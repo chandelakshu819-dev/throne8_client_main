@@ -1,4 +1,4 @@
-// app/(dashboard)/components/feed/RepostMenuDropdown.tsx
+//src/feature/components/feed/RepostMenuDropdown.tsx
 import React from 'react';
 
 const RepostMenuDropdown = ({ isDarkMode, index, post, onOpenWithPerspectiveModal, onRepostInstant }: any) => {
