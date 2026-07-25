@@ -1,6 +1,8 @@
 // src/features/profile/components/feed/PostActions.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import RepostMenuDropdown from './RepostMenuDropdown';
+import ReactionPicker, { REACTION_CONFIG } from './ReactionPicker';
+import { ReactionType } from '@/types/profile.types';
 
 interface PostActionsProps {
   post: any;
@@ -14,19 +16,37 @@ interface PostActionsProps {
   toggleComments: any;
   onOpenWithPerspectiveModal?: any;
   handleRepostInstant?: any;
+  // ✅ ADDED
+  postReactions?: Record<string, { counts: any; userReaction: ReactionType | null }>;
+  onReact?: (postId: string, type: ReactionType) => void;
 }
 
-const PostActions = ({ post, index, isDarkMode, likedPosts, handleLike, openRepostIndex, toggleRepostMenu, handleRepost, toggleComments, onOpenWithPerspectiveModal, handleRepostInstant }: PostActionsProps) => {
+const PostActions = ({
+  post, index, isDarkMode, likedPosts, handleLike, openRepostIndex, toggleRepostMenu,
+  handleRepost, toggleComments, onOpenWithPerspectiveModal, handleRepostInstant,
+  postReactions, onReact,
+}: PostActionsProps) => {
   const postKey = post.entryId || post.postId;
-  const isLiked = (typeof likedPosts?.[postKey] === 'object' ? likedPosts[postKey]?.isLiked : likedPosts?.[postKey]) ?? post.isLikedByCurrentUser ?? false;
+
+  // ✅ ADDED: reaction state lookup (falls back to old isLiked-based state
+  // if reaction data hasn't loaded for this post yet)
+  const reactionState = postReactions?.[postKey];
+  const legacyIsLiked = (typeof likedPosts?.[postKey] === 'object' ? likedPosts[postKey]?.isLiked : likedPosts?.[postKey]) ?? post.isLikedByCurrentUser ?? false;
+  const userReaction: ReactionType | null = reactionState?.userReaction ?? (legacyIsLiked ? 'like' : null);
+
+  const reactionCounts = reactionState?.counts;
+  const totalReactionCount = reactionCounts
+    ? Object.values(reactionCounts).reduce((sum: number, v: any) => sum + (v || 0), 0)
+    : (post.likesCount || post.likes || 0);
+
+  const activeConfig = REACTION_CONFIG.find(r => r.type === userReaction);
+
+  const [showPicker, setShowPicker] = useState(false);
+  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [hasReposted, setHasReposted] = useState(false);
   const [isReposting, setIsReposting] = useState(false);
   const [shareCount, setShareCount] = useState(post.shares || 0);
-
-  const likeCount = (post.likesCount || post.likes || 0)
-    + (isLiked && !post.isLikedByCurrentUser ? 1 : 0)
-    + (!isLiked && post.isLikedByCurrentUser ? -1 : 0);
 
   const handleShare = async () => {
     try {
@@ -40,17 +60,57 @@ const PostActions = ({ post, index, isDarkMode, likedPosts, handleLike, openRepo
     }
   };
 
+  // ✅ ADDED: quick click = toggle 'like' (or remove current reaction).
+  // Hover reveals the full picker for other reaction types.
+  const handleQuickClick = () => {
+    if (onReact) {
+      onReact(postKey, 'like');
+    } else {
+      handleLike?.(postKey);
+    }
+  };
+
+  const handleMouseEnter = () => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    hoverTimeout.current = setTimeout(() => setShowPicker(true), 350);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    hoverTimeout.current = setTimeout(() => setShowPicker(false), 200);
+  };
+
+  const handlePick = (type: ReactionType) => {
+    setShowPicker(false);
+    onReact?.(postKey, type);
+  };
+
   return (
     <div className="flex items-center justify-between pt-4 border-t border-opacity-20 border-[#4a3728]">
       <div className="flex items-center space-x-6">
 
-        <button
-          className={`flex items-center space-x-2 ${isLiked ? 'text-red-500' : 'text-[#4a3728]'}`}
-          onClick={() => handleLike?.(postKey)}
+        {/* ✅ Reaction button + hover picker */}
+        <div
+          className="relative"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
-          <i className={`ri-heart-${isLiked ? 'fill' : 'line'} text-xl`}></i>
-          <span className="font-semibold">{likeCount}</span>
-        </button>
+          {showPicker && (
+            <ReactionPicker onSelect={handlePick} isDarkMode={isDarkMode} />
+          )}
+          <button
+            className={`flex items-center space-x-2 transition-colors ${
+              userReaction ? '' : 'text-[#4a3728]'
+            }`}
+            style={userReaction ? { color: activeConfig?.color } : undefined}
+            onClick={handleQuickClick}
+          >
+            <span className="text-xl leading-none">
+              {activeConfig ? activeConfig.emoji : '👍'}
+            </span>
+            <span className="font-semibold">{totalReactionCount}</span>
+          </button>
+        </div>
 
         <button
           className="flex items-center text-[#4a3728] space-x-2"

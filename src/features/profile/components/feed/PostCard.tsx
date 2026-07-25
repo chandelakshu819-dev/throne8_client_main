@@ -58,6 +58,8 @@ const PostCard = ({
           toggleComments={toggleComments}
           onOpenWithPerspectiveModal={onOpenWithPerspectiveModal}
           handleRepostInstant={handleRepostInstant}
+          postReactions={postReactions}
+          onReact={onReact}
         />
 
         {openCommentsIndex === postKey && (

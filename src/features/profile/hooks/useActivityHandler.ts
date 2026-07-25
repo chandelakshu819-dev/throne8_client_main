@@ -5,12 +5,23 @@ import AuthService from '@/lib/api/auth.service';
 import { useComments } from './useComments';
 import { Post, PostLikeState } from '../types';
 import ProfileService from '@/lib/api/profile.service';
+import { ReactionCounts, ReactionType } from '@/types/profile.types';
 
 interface UseActivityHandlersProps {
     posts: Post[];
     onPostCreated?: () => void;
     profileImage: string;
 }
+
+// ✅ ADDED: per-post reaction state shape
+interface PostReactionState {
+    counts: ReactionCounts;
+    userReaction: ReactionType | null;
+}
+
+const EMPTY_REACTION_COUNTS: ReactionCounts = {
+    like: 0, celebrate: 0, support: 0, love: 0, insightful: 0, funny: 0,
+};
 
 export const useActivityHandlers = ({
     posts,
@@ -25,6 +36,8 @@ export const useActivityHandlers = ({
     const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
     const [archivingPostId, setArchivingPostId] = useState<string | null>(null);
     const [postLikes, setPostLikes] = useState<PostLikeState>({});
+    // ✅ ADDED: multi-reaction state, keyed by postId (same key as postLikes)
+    const [postReactions, setPostReactions] = useState<Record<string, PostReactionState>>({});
     const [openCommentsIndex, setOpenCommentsIndex] = useState<number | null>(null);
 
     // ── Comment UI state ───────────────────────────────────────────
@@ -55,14 +68,21 @@ export const useActivityHandlers = ({
     // ── Sync postLikes from posts prop ────────────────────────────
     useEffect(() => {
         const likesMap: PostLikeState = {};
+        const reactionsMap: Record<string, PostReactionState> = {};
         posts.forEach(post => {
             const key = post.entryId || post.postId;
             likesMap[key] = {
                 count: post.likes || 0,
                 isLiked: post.isLiked || false,
             };
+            // ✅ ADDED: seed reaction state from post prop
+            reactionsMap[key] = {
+                counts: (post as any).reactionCounts || EMPTY_REACTION_COUNTS,
+                userReaction: (post as any).userReaction ?? (post.isLiked ? 'like' : null),
+            };
         });
         setPostLikes(likesMap);
+        setPostReactions(reactionsMap);
     }, [posts]);
 
     // ── Post Handlers ─────────────────────────────────────────────
@@ -138,6 +158,62 @@ export const useActivityHandlers = ({
             setPostLikes(prev => ({ ...prev, [postId]: currentLike }));
             if (!error.message.includes('already liked') && !error.message.includes('not liked')) {
                 alert(error.message || 'Failed to update like');
+            }
+        }
+    };
+
+    // ✅ ADDED: multi-reaction handler (like/celebrate/support/love/insightful/funny)
+    // Click same reaction again → removes it. Click a different reaction →
+    // switches to it. Keeps postLikes in sync too (backend does the same
+    // sync for 'like' type on its side).
+    const handleReaction = async (postId: string, type: ReactionType) => {
+        const current = postReactions[postId] || { counts: EMPTY_REACTION_COUNTS, userReaction: null };
+        const isRemoving = current.userReaction === type;
+
+        // Build optimistic new counts
+        const newCounts: ReactionCounts = { ...current.counts };
+        if (current.userReaction) {
+            newCounts[current.userReaction] = Math.max(0, (newCounts[current.userReaction] || 0) - 1);
+        }
+        if (!isRemoving) {
+            newCounts[type] = (newCounts[type] || 0) + 1;
+        }
+        const newUserReaction: ReactionType | null = isRemoving ? null : type;
+
+        // Optimistic update — reactions
+        setPostReactions(prev => ({
+            ...prev,
+            [postId]: { counts: newCounts, userReaction: newUserReaction },
+        }));
+
+        // Optimistic update — keep old postLikes in sync for 'like' type
+        // (so any legacy UI reading postLikes still behaves correctly)
+        const wasLikeType = current.userReaction === 'like';
+        const isLikeTypeNow = newUserReaction === 'like';
+        if (wasLikeType !== isLikeTypeNow) {
+            setPostLikes(prev => {
+                const currentLike = prev[postId] || { count: 0, isLiked: false };
+                return {
+                    ...prev,
+                    [postId]: {
+                        isLiked: isLikeTypeNow,
+                        count: isLikeTypeNow ? currentLike.count + 1 : Math.max(0, currentLike.count - 1),
+                    },
+                };
+            });
+        }
+
+        try {
+            if (isRemoving) {
+                await ProfileService.removeReaction(postId);
+            } else {
+                await ProfileService.reactToPost(postId, type);
+            }
+        } catch (error: any) {
+            // Revert on failure
+            setPostReactions(prev => ({ ...prev, [postId]: current }));
+            if (!error.message?.includes('already reacted')) {
+                alert(error.message || 'Failed to update reaction');
             }
         }
     };
@@ -231,6 +307,9 @@ export const useActivityHandlers = ({
         deletingPostId,
         archivingPostId,
         postLikes,
+        // ✅ ADDED
+        postReactions,
+        handleReaction,
         openCommentsIndex,
 
         // Comment state
@@ -241,8 +320,6 @@ export const useActivityHandlers = ({
         replyingTo, setReplyingTo,
         replyingToCommentId, setReplyingToCommentId,
         replyText, setReplyText,
-        // ✅ FIXED: setIsDeletingCommentId ab return ho raha hai
-        // (pehle sirf getter export tha, setter bhool gaya tha)
         isDeletingCommentId,
         setIsDeletingCommentId,
         showEmojiPicker, setShowEmojiPicker,

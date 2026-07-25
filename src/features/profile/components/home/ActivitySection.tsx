@@ -892,6 +892,8 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({
                                                             handleRepostInstant={handleRepostInstant}
                                                             handleRepost={handleRepostInstant}
                                                             postCommentCounts={undefined}
+                                                            postReactions={handlers.postReactions}
+                                                            onReact={handlers.handleReaction}
                                                         />
                                                     </div>
                                                 );
