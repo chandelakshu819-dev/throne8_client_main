@@ -36,13 +36,16 @@ const PostSkeleton = () => (
 );
 
 const FeedContainer = (props: any) => {
-  const { posts = [], isLoadingPosts = false, currentUserId, likedPosts, isDarkMode,
-    showRepostProgressBar,   // ← check karo ye props mein aa raha hai
-    repostProgress,          // ← aur ye bhi
-    feedReposts = [],
+  const {
+    posts = [],
+    isLoadingPosts = false,
+    currentUserId,
+    likedPosts,
+    isDarkMode,
+    showRepostProgressBar,
+    repostProgress,
     profileData,
     fullName,
-    repostingPostId,
   } = props;
 
   // Add loading state with skeleton loaders
@@ -77,35 +80,42 @@ const FeedContainer = (props: any) => {
         isDarkMode={isDarkMode}
       />
       <div className="space-y-8">
-
-        {feedReposts.map((repostItem: any) => (
-          <FeedRepostCard
-            key={repostItem.repostId}
-            repostItem={repostItem}
-            isDarkMode={isDarkMode}
-            profileImage={profileData?.profileImage || props.profileImage}
-            fullName={fullName}
-            currentUserId={currentUserId}
-          />
-        ))}
-
-        {posts.map((post: any, index: number) => (
-          <PostCard
-            likedPosts={likedPosts}
-            currentUserId={currentUserId}
-            key={post.entryId || post.postId || index}
-            post={post}
-            profileImage={props.profileImage}
-            index={index}
-            onOpenWithPerspectiveModal={props.onOpenWithPerspectiveModal}
-            handleRepostInstant={props.handleRepostInstant}
-            {...props}
-          />
-        ))}
+        {/* ✅ FIX: feedReposts wala hardcoded block hataya —
+            ab reposts backend se hi `posts` array ke andar
+            feedItemType: 'repost' tag ke saath aate hain,
+            already feedScore se sorted. Isliye ek hi loop
+            mein dono types render karte hain, taaki order
+            sahi rahe aur duplicate na ho. */}
+        {posts.map((post: any, index: number) =>
+          post.feedItemType === 'repost' ? (
+            <FeedRepostCard
+              key={post.repostId}
+              repostItem={post}
+              isDarkMode={isDarkMode}
+              profileImage={profileData?.profileImage || props.profileImage}
+              fullName={fullName}
+              currentUserId={currentUserId}
+              likedPosts={likedPosts}
+              handleLike={props.handleLike}
+              toggleComments={props.toggleComments}
+            />
+          ) : (
+            <PostCard
+              likedPosts={likedPosts}
+              currentUserId={currentUserId}
+              key={post.entryId || post.postId || index}
+              post={post}
+              profileImage={props.profileImage}
+              index={index}
+              onOpenWithPerspectiveModal={props.onOpenWithPerspectiveModal}
+              handleRepostInstant={props.handleRepostInstant}
+              {...props}
+            />
+          )
+        )}
       </div>
     </main>
   );
 };
 
 export default FeedContainer;
-

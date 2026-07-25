@@ -1,5 +1,7 @@
+// src/features/dashboard/components/feed/FeedRepostCard.tsx
 'use client';
 import React from 'react';
+import PostActions from './PostActions';
 
 interface FeedRepostCardProps {
     repostItem: any;
@@ -7,6 +9,9 @@ interface FeedRepostCardProps {
     profileImage: string;
     fullName: string;
     currentUserId?: string;
+    likedPosts?: any;
+    handleLike?: (postKey: string) => void;
+    toggleComments?: (postKey: string) => void;
 }
 
 const FeedRepostCard = ({
@@ -15,6 +20,9 @@ const FeedRepostCard = ({
     profileImage,
     fullName,
     currentUserId,
+    likedPosts,
+    handleLike,
+    toggleComments,
 }: FeedRepostCardProps) => {
     const originalPost = repostItem.originalPost;
     if (!originalPost) return null;
@@ -27,6 +35,19 @@ const FeedRepostCard = ({
         const hrs = Math.floor(mins / 60);
         if (hrs < 24) return `${hrs}h ago`;
         return `${Math.floor(hrs / 24)}d ago`;
+    };
+
+    // ✅ FIX: PostActions expects a "post"-shaped object.
+    // Like/comment/share original post ke entryId ke against
+    // lagne chahiye, repostId ke against nahi — isliye
+    // originalPost ko synthetic post object bana ke pass
+    // kar rahe hain.
+    const syntheticPost = {
+        entryId: originalPost.entryId,
+        likesCount: originalPost.likesCount || 0,
+        commentsCount: originalPost.commentsCount || 0,
+        isLikedByCurrentUser: originalPost.isLikedByCurrentUser || false,
+        shares: originalPost.shares || 0,
     };
 
     return (
@@ -78,7 +99,7 @@ const FeedRepostCard = ({
                         className={`text-sm italic mb-4 pl-3 border-l-2 border-[#6b5643]/40 ${isDarkMode ? 'text-slate-300' : 'text-[#4a3728]/80'
                             }`}
                     >
-                        "{repostItem.thoughtText}"
+                        &ldquo;{repostItem.thoughtText}&rdquo;
                     </p>
                 )}
 
@@ -150,25 +171,22 @@ const FeedRepostCard = ({
                         />
                     )}
 
-                    {/* Original Post Stats */}
-                    <div
-                        className={`flex items-center gap-5 mt-4 pt-3 border-t ${isDarkMode ? 'border-slate-600/50' : 'border-[#4a3728]/10'
-                            }`}
-                    >
-                        <span
-                            className={`flex items-center gap-1.5 text-sm ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/50'
-                                }`}
-                        >
-                            <i className="ri-heart-line" />
-                            {originalPost.likesCount || 0}
-                        </span>
-                        <span
-                            className={`flex items-center gap-1.5 text-sm ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/50'
-                                }`}
-                        >
-                            <i className="ri-message-3-line" />
-                            {originalPost.commentsCount || 0}
-                        </span>
+                    {/* ✅ FIX: Static stats display ki jagah ab
+                        real PostActions component — like/comment/
+                        share sab clickable aur original post ke
+                        entryId ke against kaam karte hain. */}
+                    <div className={`mt-4 pt-3 border-t ${isDarkMode ? 'border-slate-600/50' : 'border-[#4a3728]/10'}`}>
+                        <PostActions
+                            post={syntheticPost}
+                            index={originalPost.entryId}
+                            isDarkMode={isDarkMode}
+                            likedPosts={likedPosts}
+                            handleLike={handleLike}
+                            toggleComments={toggleComments}
+                            openRepostIndex={null}
+                            toggleRepostMenu={() => {}}
+                            handleRepost={() => {}}
+                        />
                     </div>
                 </div>
             </div>

@@ -1,4 +1,4 @@
-// app/(dashboard)/components/feed/FeedContainer.tsx
+// app/feature/components/feed/FeedContainer.tsx
 import React from 'react';
 import PostCard from './PostCard';
 import RepostProgressBar from './RepostProgressBar';
