@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
+import { usePostsData } from '@/features/profile/hooks/usePostsData';
 import { usePostImpressions } from '@/hooks/analytics/usePostImpressions';
+import AnalyticsService from '@/lib/api/analytics.service';
 import { X, TrendingUp, BarChart3, Users, Eye, MousePointer, Share2 } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import {
@@ -32,6 +34,8 @@ interface PostImpressionsModalProps {
     isOpen: boolean;
     onClose: () => void;
     analytics: any;
+    userId?: string;   // ✅ naya prop
+
 }
 
 // Dummy data
@@ -51,35 +55,35 @@ const generateDummyGraphData = (days: number) => {
     return { labels, impressions, engagements };
 };
 
-const dummyPosts = [
-    {
-        id: 1,
-        title: 'Excited to share our new product launch! 🚀',
-        date: '2 days ago',
-        impressions: 1250,
-        engagements: 340,
-        clicks: 120,
-        shares: 45
-    },
-    {
-        id: 2,
-        title: 'Great insights from today\'s conference',
-        date: '5 days ago',
-        impressions: 890,
-        engagements: 210,
-        clicks: 85,
-        shares: 28
-    },
-    {
-        id: 3,
-        title: 'Team building activity highlights',
-        date: '1 week ago',
-        impressions: 650,
-        engagements: 180,
-        clicks: 60,
-        shares: 15
-    }
-];
+// const dummyPosts = [
+//     {
+//         id: 1,
+//         title: 'Excited to share our new product launch! 🚀',
+//         date: '2 days ago',
+//         impressions: 1250,
+//         engagements: 340,
+//         clicks: 120,
+//         shares: 45
+//     },
+//     {
+//         id: 2,
+//         title: 'Great insights from today\'s conference',
+//         date: '5 days ago',
+//         impressions: 890,
+//         engagements: 210,
+//         clicks: 85,
+//         shares: 28
+//     },
+//     {
+//         id: 3,
+//         title: 'Team building activity highlights',
+//         date: '1 week ago',
+//         impressions: 650,
+//         engagements: 180,
+//         clicks: 60,
+//         shares: 15
+//     }
+// ];
 
 const dummyFollowersData = {
     totalFollowers: 3282,
@@ -110,7 +114,9 @@ const dummyFollowersData = {
 const PostImpressionsModal: React.FC<PostImpressionsModalProps> = ({
     isOpen,
     onClose,
-    analytics
+    analytics,
+    userId   // ✅ naya prop
+
 }) => {
     const [activeTab, setActiveTab] = useState<'posts' | 'audience'>('posts');
     const [timeRange, setTimeRange] = useState<7 | 30 | 90>(30);
@@ -118,6 +124,87 @@ const PostImpressionsModal: React.FC<PostImpressionsModalProps> = ({
     const [showCustomInput, setShowCustomInput] = useState(false);
     const [customDays, setCustomDays] = useState('');
     const { change, isLoading: changeLoading } = usePostImpressions({ days: timeRange });
+
+    const [discoveryStats, setDiscoveryStats] = useState<any>(null);
+const [discoveryLoading, setDiscoveryLoading] = useState(false);
+
+useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchDiscoveryStats = async () => {
+        setDiscoveryLoading(true);
+        try {
+            const result = await AnalyticsService.getDiscoveryStats(timeRange);
+            setDiscoveryStats(result?.data || result);
+        } catch (error) {
+            console.error('Failed to fetch discovery stats:', error);
+        } finally {
+            setDiscoveryLoading(false);
+        }
+    };
+
+    fetchDiscoveryStats();
+}, [isOpen, timeRange]);
+
+
+const { userPosts, fetchUserPosts } = usePostsData(userId);
+const [postsWithStats, setPostsWithStats] = useState<any[]>([]);
+const [postsStatsLoading, setPostsStatsLoading] = useState(false);
+
+useEffect(() => {
+    if (!isOpen || !userId) return;
+    fetchUserPosts(userId);
+}, [isOpen, userId]);
+
+useEffect(() => {
+    if (!isOpen || userPosts.length === 0) return;
+
+    const top3 = [...userPosts]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 3);
+
+    const fetchStats = async () => {
+        setPostsStatsLoading(true);
+        try {
+            const results = await Promise.all(
+                top3.map(async (post) => {
+                    try {
+                        const res = await AnalyticsService.getPostAnalytics(post.postId, 30);
+                        const stats = res?.data || res;
+                        return {
+                            id: post.postId,
+                            title: post.title || post.text || 'Untitled post',
+                            date: post.time,
+                            impressions: stats?.totalImpressions || 0,
+                            engagements: (
+                                (stats?.engagement?.likes || 0) +
+                                (stats?.engagement?.comments || 0) +
+                                (stats?.engagement?.shares || 0) +
+                                (stats?.engagement?.saves || 0)
+                            ),
+                            shares: stats?.engagement?.shares || 0,
+                        };
+                    } catch (err) {
+                        console.error('Failed to fetch stats for post', post.postId, err);
+                        return {
+                            id: post.postId,
+                            title: post.title || post.text || 'Untitled post',
+                            date: post.time,
+                            impressions: 0,
+                            engagements: 0,
+                            shares: 0,
+                        };
+                    }
+                })
+            );
+            setPostsWithStats(results);
+        } finally {
+            setPostsStatsLoading(false);
+        }
+    };
+
+    fetchStats();
+}, [isOpen, userPosts]);
 
     if (!isOpen) return null;
 
@@ -375,60 +462,64 @@ const PostImpressionsModal: React.FC<PostImpressionsModalProps> = ({
                                         </div>
                                     </div>
                                     <div className="bg-white rounded-xl p-4 shadow border border-[#e0d8cf]">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <MousePointer className="w-5 h-5 text-green-500" />
-                                            <span className="text-sm text-[#7a5c3e]">Total Engagements</span>
-                                        </div>
-                                        <p className="text-2xl font-bold text-[#4a3728]">
-                                            {Math.floor((analytics?.postImpressions?.total || 0) * 0.3)}
-                                        </p>
-                                    </div>
-                                    <div className="bg-white rounded-xl p-4 shadow border border-[#e0d8cf]">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <Users className="w-5 h-5 text-purple-500" />
-                                            <span className="text-sm text-[#7a5c3e]">Members Reached</span>
-                                        </div>
-                                        <p className="text-2xl font-bold text-[#4a3728]">
-                                            {Math.floor((analytics?.postImpressions?.total || 0) * 0.7)}
-                                        </p>
-                                    </div>
+    <div className="flex items-center gap-3 mb-2">
+        <MousePointer className="w-5 h-5 text-green-500" />
+        <span className="text-sm text-[#7a5c3e]">Total Engagements</span>
+    </div>
+    <p className="text-2xl font-bold text-[#4a3728]">
+        {discoveryLoading ? '...' : (discoveryStats?.totalEngagements ?? 0)}
+    </p>
+</div>
+<div className="bg-white rounded-xl p-4 shadow border border-[#e0d8cf]">
+    <div className="flex items-center gap-3 mb-2">
+        <Users className="w-5 h-5 text-purple-500" />
+        <span className="text-sm text-[#7a5c3e]">Members Reached</span>
+    </div>
+    <p className="text-2xl font-bold text-[#4a3728]">
+        {discoveryLoading ? '...' : (discoveryStats?.membersReached ?? 0)}
+    </p>
+</div>
                                 </div>
                             </div>
 
                             {/* Posts List */}
+
                             <div>
-                                <h3 className="text-xl font-bold text-[#4a3728] mb-4">Recent Posts Performance</h3>
-                                <div className="space-y-4">
-                                    {dummyPosts.map((post) => (
-                                        <div key={post.id} className="bg-white rounded-xl p-5 shadow border border-[#e0d8cf] hover:shadow-lg transition-all">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <div className="flex-1">
-                                                    <p className="font-semibold text-[#4a3728] mb-1">{post.title}</p>
-                                                    <p className="text-xs text-[#7a5c3e]">{post.date}</p>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-4 gap-4">
-                                                <div className="text-center">
-                                                    <p className="text-lg font-bold text-blue-600">{post.impressions}</p>
-                                                    <p className="text-xs text-[#7a5c3e]">Impressions</p>
-                                                </div>
-                                                <div className="text-center">
-                                                    <p className="text-lg font-bold text-green-600">{post.engagements}</p>
-                                                    <p className="text-xs text-[#7a5c3e]">Engagements</p>
-                                                </div>
-                                                <div className="text-center">
-                                                    <p className="text-lg font-bold text-purple-600">{post.clicks}</p>
-                                                    <p className="text-xs text-[#7a5c3e]">Clicks</p>
-                                                </div>
-                                                <div className="text-center">
-                                                    <p className="text-lg font-bold text-orange-600">{post.shares}</p>
-                                                    <p className="text-xs text-[#7a5c3e]">Shares</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+    <h3 className="text-xl font-bold text-[#4a3728] mb-4">Recent Posts Performance</h3>
+    <div className="space-y-4">
+        {postsStatsLoading && (
+            <p className="text-sm text-[#7a5c3e]">Loading post stats...</p>
+        )}
+        {!postsStatsLoading && postsWithStats.length === 0 && (
+            <p className="text-sm text-[#7a5c3e]">No posts yet.</p>
+        )}
+        {postsWithStats.map((post) => (
+            <div key={post.id} className="bg-white rounded-xl p-5 shadow border border-[#e0d8cf] hover:shadow-lg transition-all">
+                <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                        <p className="font-semibold text-[#4a3728] mb-1">{post.title}</p>
+                        <p className="text-xs text-[#7a5c3e]">{post.date}</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center">
+                        <p className="text-lg font-bold text-blue-600">{post.impressions}</p>
+                        <p className="text-xs text-[#7a5c3e]">Impressions</p>
+                    </div>
+                    <div className="text-center">
+                        <p className="text-lg font-bold text-green-600">{post.engagements}</p>
+                        <p className="text-xs text-[#7a5c3e]">Engagements</p>
+                    </div>
+                    <div className="text-center">
+                        <p className="text-lg font-bold text-orange-600">{post.shares}</p>
+                        <p className="text-xs text-[#7a5c3e]">Shares</p>
+                    </div>
+                </div>
+            </div>
+        ))}
+    </div>
+</div>
+                           
                         </>
                     ) : (
                         <>

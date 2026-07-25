@@ -451,6 +451,72 @@ static async getSearchAppearancesChange(days: number = 30): Promise<any> {
             throw error;
         }
     }
+
+
+    /**
+     * 🎯 GET DISCOVERY STATS (Total Impressions, Engagements, Members Reached)
+     * GET /profile/analytics/discovery-stats
+     */
+    static async getDiscoveryStats(days?: number): Promise<any> {
+        try {
+            const { data } = await api.get('/profile/analytics/discovery-stats', {
+                params: days ? { days } : {}
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [ANALYTICS] Failed to fetch discovery stats:', error);
+            throw error;
+        }
+    }
+
+/**
+     * 🖱️ Get Clicks Count
+     * GET /profile/analytics/clicks/count
+     */
+static async getClicksCount(days?: number): Promise<any> {
+    try {
+        const { data } = await api.get('/profile/analytics/clicks/count', {
+            params: days ? { days } : {}
+        });
+        return data;
+    } catch (error: any) {
+        console.error('❌ [ANALYTICS] Failed to fetch clicks count:', error);
+        throw error;
+    }
+}
+
+/**
+ * 🔗 Get Shares Count
+ * GET /profile/analytics/shares/count
+ */
+static async getSharesCount(days?: number): Promise<any> {
+    try {
+        const { data } = await api.get('/profile/analytics/shares/count', {
+            params: days ? { days } : {}
+        });
+        return data;
+    } catch (error: any) {
+        console.error('❌ [ANALYTICS] Failed to fetch shares count:', error);
+        throw error;
+    }
+}
+
+/**
+ * 👥 Get Unique Visitors Count
+ * GET /profile/analytics/unique-visitors/count
+ */
+static async getUniqueVisitorsCount(days?: number): Promise<any> {
+    try {
+        const { data } = await api.get('/profile/analytics/unique-visitors/count', {
+            params: days ? { days } : {}
+        });
+        return data;
+    } catch (error: any) {
+        console.error('❌ [ANALYTICS] Failed to fetch unique visitors count:', error);
+        throw error;
+    }
+}
+
 }
 
 export default AnalyticsService;

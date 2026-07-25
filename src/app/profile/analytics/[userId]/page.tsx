@@ -17,7 +17,7 @@ import { useHeadlineData } from '@/features/profile/hooks/useHeadlineData';
 import { transformToProfileData } from '@/shared/utils/profileTransformers';
 import SearchAppearancesModal from '../../../../features/profile/components/analytics/SearchAppearancesModal';
 import ProfileViewsModal from '../../../../features/profile/components/analytics/ProfileViewsModal';
-
+import AudienceInsights from '../../../../features/profile/components/analytics/AudienceInsights';
 export default function AnalyticsDetailsPage() {
     const params = useParams();
     const router = useRouter();
@@ -33,6 +33,15 @@ export default function AnalyticsDetailsPage() {
     const [showPostModal, setShowPostModal] = useState(false);
     const [showProfileViewsModal, setShowProfileViewsModal] = useState(false);
     const [showSearchModal, setShowSearchModal] = useState(false);
+
+    const [engagementData, setEngagementData] = useState<{
+        clicks: number;
+        shares: number;
+        uniqueVisitors: number;
+    }>({ clicks: 0, shares: 0, uniqueVisitors: 0 });
+
+
+    const [demographics, setDemographics] = useState<any>(null);
 
     const {
         userProfileData,
@@ -68,11 +77,35 @@ export default function AnalyticsDetailsPage() {
             setIsLoading(true);
             const response = await AnalyticsService.getAllAnalytics(timeRange);
             setAnalytics(response.data);
+            // ✅ Fetch real engagement breakdown
+            const [clicksRes, sharesRes, visitorsRes,demographicsRes] = await Promise.all([
+                AnalyticsService.getClicksCount(timeRange),
+                AnalyticsService.getSharesCount(timeRange),
+                AnalyticsService.getUniqueVisitorsCount(timeRange),
+                AnalyticsService.getViewerDemographics(timeRange),
+
+            ]);
+
+            setEngagementData({
+                clicks: clicksRes?.data?.total || 0,
+                shares: sharesRes?.data?.total || 0,
+                uniqueVisitors: visitorsRes?.data?.total || 0,
+            });
+            setDemographics(demographicsRes?.data || null);
+            console.log('🔍 Demographics data:', demographicsRes?.data);
+
         } catch (error) {
             console.error('Failed to load analytics:', error);
         } finally {
             setIsLoading(false);
         }
+    };
+
+    // ✅ Real progress bar width — relative to max (90-day) value
+    const getInsightWidth = (value: number, max: number): string => {
+        if (!max || max === 0) return '0%';
+        const pct = Math.min((value / max) * 100, 100);
+        return `${pct}%`;
     };
 
     if (isLoading) {
@@ -132,6 +165,8 @@ export default function AnalyticsDetailsPage() {
             </div>
         );
     }
+
+
 
     return (
         <>
@@ -264,8 +299,8 @@ export default function AnalyticsDetailsPage() {
                                         <MousePointer className="w-5 h-5 text-[#7a5c3e]" />
                                         <span className="text-[#4a3728]">Clicks</span>
                                     </div>
-                                    <span className="font-semibold text-[#4a3728]">
-                                        {Math.floor(Math.random() * 500)}
+                                        <span className="font-semibold text-[#4a3728]">
+                                        {engagementData.clicks}
                                     </span>
                                 </div>
                                 <div className="flex items-center justify-between">
@@ -274,20 +309,25 @@ export default function AnalyticsDetailsPage() {
                                         <span className="text-[#4a3728]">Shares</span>
                                     </div>
                                     <span className="font-semibold text-[#4a3728]">
-                                        {Math.floor(Math.random() * 200)}
+                                        {engagementData.shares}
                                     </span>
+                                    
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <Users className="w-5 h-5 text-[#7a5c3e]" />
                                         <span className="text-[#4a3728]">Unique Visitors</span>
                                     </div>
+
                                     <span className="font-semibold text-[#4a3728]">
-                                        {Math.floor(Math.random() * 300)}
+                                        {engagementData.uniqueVisitors}
                                     </span>
                                 </div>
                             </div>
                         </div>
+
+
+                        
 
                         {/* Time-based Insights */}
                         <div className="bg-white rounded-2xl p-6 shadow-lg border border-[#e0d8cf]">
@@ -301,7 +341,8 @@ export default function AnalyticsDetailsPage() {
                                         </span>
                                     </div>
                                     <div className="w-full h-2 bg-[#e0d8cf] rounded-full overflow-hidden">
-                                        <div className="h-full bg-blue-500 rounded-full" style={{ width: '45%' }}></div>
+                                    <div className="h-full bg-blue-500 rounded-full" style={{ width: getInsightWidth(analytics?.profileViews?.last7Days || 0, analytics?.profileViews?.last90Days || 0) }}></div>
+
                                     </div>
                                 </div>
                                 <div>
@@ -312,7 +353,8 @@ export default function AnalyticsDetailsPage() {
                                         </span>
                                     </div>
                                     <div className="w-full h-2 bg-[#e0d8cf] rounded-full overflow-hidden">
-                                        <div className="h-full bg-green-500 rounded-full" style={{ width: '75%' }}></div>
+                                    <div className="h-full bg-green-500 rounded-full" style={{ width: getInsightWidth(analytics?.profileViews?.last30Days || 0, analytics?.profileViews?.last90Days || 0) }}></div>
+
                                     </div>
                                 </div>
                                 <div>
@@ -323,11 +365,14 @@ export default function AnalyticsDetailsPage() {
                                         </span>
                                     </div>
                                     <div className="w-full h-2 bg-[#e0d8cf] rounded-full overflow-hidden">
-                                        <div className="h-full bg-purple-500 rounded-full" style={{ width: '100%' }}></div>
+                                    <div className="h-full bg-purple-500 rounded-full" style={{ width: getInsightWidth(analytics?.profileViews?.last90Days || 0, analytics?.profileViews?.last90Days || 0) }}></div>
                                     </div>
                                 </div>
+                               
                             </div>
                         </div>
+                         {/* ⬇️ NAYI LINE YAHAN ADD KARNI HAI */}
+                         <AudienceInsights demographics={demographics} />
                     </div>
                 </div>
             </div>
@@ -337,6 +382,8 @@ export default function AnalyticsDetailsPage() {
                 isOpen={showPostModal}
                 onClose={() => setShowPostModal(false)}
                 analytics={analytics}
+                userId={userId}
+
             />
 
             {/* Profile Views Modal */}
