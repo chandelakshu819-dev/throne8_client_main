@@ -16,7 +16,6 @@ interface PostActionsProps {
   toggleComments: any;
   onOpenWithPerspectiveModal?: any;
   handleRepostInstant?: any;
-  // ✅ ADDED
   postReactions?: Record<string, { counts: any; userReaction: ReactionType | null }>;
   onReact?: (postId: string, type: ReactionType) => void;
 }
@@ -28,8 +27,6 @@ const PostActions = ({
 }: PostActionsProps) => {
   const postKey = post.entryId || post.postId;
 
-  // ✅ ADDED: reaction state lookup (falls back to old isLiked-based state
-  // if reaction data hasn't loaded for this post yet)
   const reactionState = postReactions?.[postKey];
   const legacyIsLiked = (typeof likedPosts?.[postKey] === 'object' ? likedPosts[postKey]?.isLiked : likedPosts?.[postKey]) ?? post.isLikedByCurrentUser ?? false;
   const userReaction: ReactionType | null = reactionState?.userReaction ?? (legacyIsLiked ? 'like' : null);
@@ -60,8 +57,6 @@ const PostActions = ({
     }
   };
 
-  // ✅ ADDED: quick click = toggle 'like' (or remove current reaction).
-  // Hover reveals the full picker for other reaction types.
   const handleQuickClick = () => {
     if (onReact) {
       onReact(postKey, 'like');
@@ -86,10 +81,10 @@ const PostActions = ({
   };
 
   return (
-    <div className="flex items-center justify-between pt-4 border-t border-opacity-20 border-[#4a3728]">
-      <div className="flex items-center space-x-6">
+    <div className={`flex items-center justify-between pt-4 mt-1 border-t ${isDarkMode ? 'border-slate-700' : 'border-[#e0d8cf]'}`}>
+      <div className="flex items-center gap-2">
 
-        {/* ✅ Reaction button + hover picker */}
+        {/* ✅ Reaction pill — matches Comment/Share pill styling */}
         <div
           className="relative"
           onMouseEnter={handleMouseEnter}
@@ -99,33 +94,45 @@ const PostActions = ({
             <ReactionPicker onSelect={handlePick} isDarkMode={isDarkMode} />
           )}
           <button
-            className={`flex items-center space-x-2 transition-colors ${
-              userReaction ? '' : 'text-[#4a3728]'
-            }`}
-            style={userReaction ? { color: activeConfig?.color } : undefined}
             onClick={handleQuickClick}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 ${
+              userReaction
+                ? 'bg-opacity-10'
+                : isDarkMode
+                  ? 'text-slate-300 hover:bg-slate-700'
+                  : 'text-[#4a3728] hover:bg-[#e0d8cf]/60'
+            }`}
+            style={
+              userReaction
+                ? { color: activeConfig?.color, backgroundColor: `${activeConfig?.color}1A` }
+                : undefined
+            }
           >
-            <span className="text-xl leading-none">
+            <span className="text-lg leading-none">
               {activeConfig ? activeConfig.emoji : '👍'}
             </span>
-            <span className="font-semibold">{totalReactionCount}</span>
+            <span>{totalReactionCount > 0 ? totalReactionCount : 'Like'}</span>
           </button>
         </div>
 
         <button
-          className="flex items-center text-[#4a3728] space-x-2"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 ${
+            isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-[#4a3728] hover:bg-[#e0d8cf]/60'
+          }`}
           onClick={() => toggleComments(postKey)}
         >
-          <i className="ri-message-3-line text-xl"></i>
-          <span className="font-semibold">{post.commentsCount || post.comments || 0}</span>
+          <i className="ri-message-3-line text-lg"></i>
+          <span>{post.commentsCount || post.comments || 0}</span>
         </button>
 
         <button
-          className="flex items-center text-[#4a3728] space-x-2"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 ${
+            isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-[#4a3728] hover:bg-[#e0d8cf]/60'
+          }`}
           onClick={handleShare}
         >
-          <i className="ri-share-forward-line text-xl"></i>
-          <span className="font-semibold">{shareCount}</span>
+          <i className="ri-share-forward-line text-lg"></i>
+          <span>{shareCount}</span>
         </button>
       </div>
 
@@ -133,9 +140,9 @@ const PostActions = ({
         <button
           onClick={() => toggleRepostMenu(index)}
           disabled={isReposting}
-          className={`p-2 rounded-xl transition-all duration-300 ${hasReposted
+          className={`p-2 rounded-full transition-all duration-200 ${hasReposted
               ? 'text-green-600'
-              : isDarkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-[#e0d8cf]/50 text-[#4a3728]'
+              : isDarkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-[#e0d8cf]/60 text-[#4a3728]'
             }`}
         >
           <i className={`ri-repeat-${hasReposted ? 'fill' : 'line'} text-xl`}></i>
