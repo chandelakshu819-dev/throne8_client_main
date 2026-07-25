@@ -125,6 +125,43 @@ const PostImpressionsModal: React.FC<PostImpressionsModalProps> = ({
     const [customDays, setCustomDays] = useState('');
     const { change, isLoading: changeLoading } = usePostImpressions({ days: timeRange });
 
+
+    const [timelineData, setTimelineData] = useState<{ labels: string[]; impressions: number[]; engagements: number[] }>({
+        labels: [],
+        impressions: [],
+        engagements: []
+    });
+    const [timelineLoading, setTimelineLoading] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const fetchTimeline = async () => {
+            setTimelineLoading(true);
+            try {
+                const res = await AnalyticsService.getPostImpressionsTimeline(timeRange);
+                const raw = res?.data || res;
+                console.log('📊 Timeline API response:', raw);
+
+                // Adjust these field names once we confirm actual API shape
+                const points = raw?.timeline || [];
+                setTimelineData({
+                    labels: points.map((p: any) =>
+                        new Date(p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    ),
+                    impressions: points.map((p: any) => p.impressions || 0),
+                    engagements: points.map((p: any) => p.uniqueViewers || 0),
+                });
+            } catch (error) {
+                console.error('Failed to fetch timeline:', error);
+            } finally {
+                setTimelineLoading(false);
+            }
+        };
+
+        fetchTimeline();
+    }, [isOpen, timeRange]);
+
     const [discoveryStats, setDiscoveryStats] = useState<any>(null);
 const [discoveryLoading, setDiscoveryLoading] = useState(false);
 
@@ -208,7 +245,8 @@ useEffect(() => {
 
     if (!isOpen) return null;
 
-    const graphData = generateDummyGraphData(timeRange);
+    // const graphData = generateDummyGraphData(timeRange);
+    const graphData = timelineData;
 
     const chartData = {
         labels: graphData.labels,

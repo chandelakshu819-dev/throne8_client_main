@@ -281,6 +281,8 @@ useEffect(() => {
                     <PremiumFeatures />
 
                     {/* Activity Section */}
+                    <div id="activity-section">
+
                     <ActivitySection
                         isOwnProfile={isOwnProfile}
                         posts={userPosts}
@@ -296,6 +298,7 @@ useEffect(() => {
                         onCreateRepost={createRepost}
                         onDeleteRepost={removeRepost}
                     />
+                    </div>
 
                     {/* Skills Section */}
                     <SkillsSection isOwnProfile={isOwnProfile} />

@@ -121,14 +121,25 @@ const ProfileCard: React.FC<ProfileCardProps> = ({currentUserId, isDarkMode }) =
         {/* Stats Grid */}
         <div className="mt-6 grid grid-cols-2 gap-4 mb-6">
           {[
-            { label: 'Connections', value: totalConnections, color: 'from-[#6b5643] to-[#8b7355]' },
-            { label: 'Posts', value: userPosts.length, color: 'from-[#8b7355] to-[#9d8466]' },
-            // { label: 'Profile Views', value: '2056', color: 'from-[#4a3728] to-[#6b5643]' },
-            // { label: 'Post Impressions', value: '855', color: 'from-[#6b5643] to-[#4a3728]' },
+            {
+              label: 'Connections',
+              value: totalConnections,
+              color: 'from-[#6b5643] to-[#8b7355]',
+              onClick: () => router.push(`/profile/network/${currentUserId}`),
+            },
+            {
+              label: 'Posts',
+              value: userPosts.length,
+              color: 'from-[#8b7355] to-[#9d8466]',
+              // onClick: () => router.push(`/profile/${currentUserId}?section=activity`),
+              onClick: () => router.push('/profile#activity-section', { scroll: false }),
+            },
           ].map((stat, idx) => (
-            <div
+            <button
               key={idx}
-              className={`p-4 rounded-2xl backdrop-blur-sm border transition-all duration-300 hover:scale-105 ${isDarkMode ? 'bg-slate-700/30 border-slate-600/30' : 'bg-[#e0d8cf]/50 border-[#4a3728]/20'}`}
+              type="button"
+              onClick={stat.onClick}
+              className={`p-4 rounded-2xl backdrop-blur-sm border transition-all duration-300 hover:scale-105 text-center cursor-pointer ${isDarkMode ? 'bg-slate-700/30 border-slate-600/30' : 'bg-[#e0d8cf]/50 border-[#4a3728]/20'}`}
             >
               <p className={`text-2xl font-black bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
                 {stat.value}
@@ -136,12 +147,15 @@ const ProfileCard: React.FC<ProfileCardProps> = ({currentUserId, isDarkMode }) =
               <p className={`text-xs font-semibold ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/70'} uppercase tracking-wider`}>
                 {stat.label}
               </p>
-            </div>
+            </button>
           ))}
         </div>
+        
 
         <StatsCards
           isDarkMode={isDarkMode}
+          currentUserId={currentUserId}
+
         />
 
         <button
