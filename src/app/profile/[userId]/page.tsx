@@ -9,7 +9,6 @@ import React, { useEffect, useState, useMemo } from 'react';
 import ProfileNavbar from '../../../features/profile/components/home/ProfileNavbar';
 import ProfileBanner from '../../../features/profile/components/home/ProfileBanner';
 import ProfileHeader from '../../../features/profile/components/home/ProfileHeader';
-import ProfessionalJourney from '../../../features/profile/components/home/ProfessionalJourney';
 import AboutSection from '../../../features/profile/components/home/AboutSection';
 import EducationSection from '../../../features/profile/components/home/EducationSection';
 import ExperienceSection from '../../../features/profile/components/home/ExperienceSection';
@@ -27,6 +26,8 @@ import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData'
 import AnalyticsService from '@/lib/api/analytics.service';
 import ConnectionService from '@/lib/api/connection.service';
 import FollowService from '@/lib/api/follow.service';
+import AuthService from '@/lib/api/auth.service';
+import ProfileService from '@/lib/api/profile.service';
 
 export default function SearchUserProfilePage() {
     const params = useParams();
@@ -64,10 +65,8 @@ export default function SearchUserProfilePage() {
     );
 
     const {
-        followingList,
-        followersList,
         totalConnections,
-        isLoadingConnections,
+        followersList,
         fetchConnectionsData,
     } = useConnectionsData();
 
@@ -75,6 +74,37 @@ export default function SearchUserProfilePage() {
     const [isConnected, setIsConnected] = useState(false);
     const [connectionPending, setConnectionPending] = useState(false);
     const [isFollowActionLoading, setIsFollowActionLoading] = useState(false);
+
+    // ✅ FIX: navbar ko hamesha LOGGED-IN user ka naam/photo dikhana hai,
+    // jis profile ko view kar rahe hain uska nahi. useAuth() ka `user`
+    // sirf { userId, email, role } jaisa halka object deta hai, isliye
+    // naam/photo alag se fetch karke yahan store karte hain.
+    const [currentUserName, setCurrentUserName] = useState('');
+    const [currentUserImage, setCurrentUserImage] = useState('');
+
+    useEffect(() => {
+        if (!user?.userId) return;
+        const fetchCurrentUser = async () => {
+            try {
+                const response = await AuthService.getUserProfileById(user.userId);
+                const data = response?.data;
+                if (data) {
+                    setCurrentUserName(
+                        `${data.firstName || ''} ${data.lastName || ''}`.trim() || user.email || ''
+                    );
+                    if (data.profilePhotoId) {
+                        const photoRes = await ProfileService.getProfilePhotoById(data.profilePhotoId);
+                        setCurrentUserImage(photoRes?.data?.photo?.cloudinarySecureUrl || '');
+                    }
+                } else {
+                    setCurrentUserName(user.email || '');
+                }
+            } catch (error) {
+                setCurrentUserName(user.email || '');
+            }
+        };
+        fetchCurrentUser();
+    }, [user?.userId, user?.email]);
 
     useEffect(() => {
         if (userId) {
@@ -102,7 +132,7 @@ export default function SearchUserProfilePage() {
                 const res = await ConnectionService.getUserConnections(user.userId);
                 const connections = res?.data?.data || res?.data || [];
                 const connected = connections.some(
-                    (c: any) =>
+                    (c: { fromUserId?: string; toUserId?: string; status?: string }) =>
                         (c.fromUserId === userId || c.toUserId === userId) &&
                         c.status === 'active'
                 );
@@ -121,7 +151,7 @@ export default function SearchUserProfilePage() {
                 const res = await ConnectionService.getOutgoingRequests(user.userId);
                 const outgoingRequests = res?.data?.data || res?.data || [];
                 const isPending = outgoingRequests.some(
-                    (r: any) => r.toUserId === userId
+                    (r: { toUserId?: string }) => r.toUserId === userId
                 );
                 setConnectionPending(isPending);
             } catch {
@@ -140,7 +170,7 @@ export default function SearchUserProfilePage() {
                 const res = await ConnectionService.getIncomingRequests(user.userId);
                 const incomingRequests = res?.data?.data || res?.data || [];
                 const matchedRequest = incomingRequests.find(
-                    (r: any) => r.fromUserId === userId
+                    (r: { fromUserId?: string }) => r.fromUserId === userId
                 );
                 setIncomingRequestId(matchedRequest?.requestId || null);
             } catch {
@@ -215,7 +245,7 @@ export default function SearchUserProfilePage() {
         fetchAboutData,
     } = useAboutData(aboutId);
 
-    const { headlineData, isLoadingHeadline, fetchHeadlineData } = useHeadlineData(headlineId);
+    const { headlineData, fetchHeadlineData } = useHeadlineData(headlineId);
 
     const profileData = transformToProfileData(userProfileData, profileImageUrl, headlineData);
 
@@ -233,10 +263,10 @@ export default function SearchUserProfilePage() {
         if (user?.userId && userId && user.userId !== userId) {
             AnalyticsService.recordProfileView(userId, {
                 viewerId: user.userId,
-                viewerName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+                viewerName: currentUserName || user.email,
             });
         }
-    }, [user, userId]);
+    }, [user, userId, currentUserName]);
 
     useEffect(() => {
         if (aboutId) {
@@ -297,9 +327,11 @@ export default function SearchUserProfilePage() {
 
     return (
         <div className="min-h-screen bg-[#f6ede8] py-12 px-4 font-sans overflow-x-hidden">
+            {/* ✅ FIX: navbar ab hamesha LOGGED-IN user ka naam/photo dikhata hai,
+                chahe kisi bhi profile ([userId]) ko view kar rahe ho */}
             <ProfileNavbar
-                profileImage={profileData.profileImage}
-                userName={profileData.userName}
+                profileImage={currentUserImage}
+                userName={currentUserName}
                 currentUserId={user?.userId}
             />
 
@@ -313,12 +345,13 @@ export default function SearchUserProfilePage() {
                         isOwnProfile={isOwnProfile}
                     />
 
+                    {/* ✅ FIX: pronouns prop hataya — ProfileHeader ab yeh prop
+                        accept hi nahi karta (backend me field exist nahi karti) */}
                     <ProfileHeader
                         isOwnProfile={isOwnProfile}
                         currentUserId={userId}
                         profileImage={profileImageUrl}
-                        name={profileData.name} 
-                        pronouns={profileData.pronouns}
+                        name={profileData.name}
                         headline={headlineData?.title || profileData.headline}
                         headlineId={headlineId}
                         onHeadlineCreated={() => { }}
@@ -340,6 +373,9 @@ export default function SearchUserProfilePage() {
                         onFollow={handleFollow}
                         onConnect={handleConnect}
                         onMessage={handleMessage}
+                        incomingRequestId={incomingRequestId}
+                        onAcceptRequest={handleAcceptRequest}
+                        onDeclineRequest={handleDeclineRequest}
                     />
                     <div id="about">
                         <AboutSection
@@ -370,28 +406,26 @@ export default function SearchUserProfilePage() {
                     />
 
                     <div id="activity">
-                       <ActivitySection
-                           posts={userPosts as any}
-                           onPostCreated={() => { }}
-                           isLoading={isLoadingPosts}
-                           profileImage={profileImageUrl}
-                           fullName={fullName}
-                           headline={profileData.headline}
-                           followers={followersList.length}
-
-                           userId={userId}
-
-                           currentUserId={user?.userId}
-                           isOwnProfile={isOwnProfile}
-                       />
-                   </div>
+                        <ActivitySection
+                            posts={userPosts as any}
+                            onPostCreated={() => { }}
+                            isLoading={isLoadingPosts}
+                            profileImage={profileImageUrl}
+                            fullName={fullName}
+                            headline={profileData.headline}
+                            followers={followersList.length}
+                            userId={userId}
+                            currentUserId={user?.userId}
+                            isOwnProfile={isOwnProfile}
+                        />
+                    </div>
 
                     <SkillsSection userId={userId} isOwnProfile={isOwnProfile} />
                     <InterestsSection />
                 </div>
 
                 <div className="w-full md:w-80 md:min-w-[20rem]">
-                  <PeopleYouMayKnow userId={user?.userId} />
+                    <PeopleYouMayKnow userId={user?.userId} />
                 </div>
             </div>
         </div>

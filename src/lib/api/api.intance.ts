@@ -1,7 +1,18 @@
 // src/lib/api/api.instance.ts
 import config from "@/config/env.config";
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
 import TokenStorage from "@/lib/store/token.storage";
+
+// ✅ FIX (v2): Previous approach captured `axios.defaults.adapter` and called
+// it directly as a function. In current axios versions this is NOT a plain
+// function — it's an array (['xhr','http','fetch']) resolved internally via
+// adapters.getAdapter(). Calling it directly threw:
+//   "TypeError: defaultAdapter is not a function"
+// ...which broke EVERY request including login.
+//
+// New approach: dedupe at the `api.get` method level instead of the adapter
+// level. Same effect (identical in-flight GET requests share one promise),
+// but doesn't touch axios internals at all — so it's safe across versions.
 
 const api: AxiosInstance = axios.create({
     baseURL: config.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL,
@@ -12,6 +23,42 @@ const api: AxiosInstance = axios.create({
     },
     withCredentials: true,
 });
+
+// ==================== GET REQUEST DEDUPLICATION ====================
+// Same problem as before: multiple hooks (useConnectionsData, useAboutData,
+// useEducation, etc.) firing identical GET requests when several components
+// mount together (profile page, dashboard). We dedupe by wrapping `api.get`
+// so identical concurrent calls (same url + params) share one network
+// request/promise instead of firing duplicates.
+//
+// Only GET is wrapped — mutations (POST/PUT/PATCH/DELETE) always fire fresh.
+
+const pendingGetRequests = new Map<string, Promise<any>>();
+
+function buildRequestKey(url: string, requestConfig?: AxiosRequestConfig): string {
+    const paramsKey = requestConfig?.params
+        ? JSON.stringify(requestConfig.params)
+        : '';
+    return `GET:${url}:${paramsKey}`;
+}
+
+const originalGet = api.get.bind(api);
+
+api.get = ((url: string, requestConfig?: AxiosRequestConfig) => {
+    const key = buildRequestKey(url, requestConfig);
+
+    const existing = pendingGetRequests.get(key);
+    if (existing) {
+        return existing;
+    }
+
+    const requestPromise = originalGet(url, requestConfig).finally(() => {
+        pendingGetRequests.delete(key);
+    });
+
+    pendingGetRequests.set(key, requestPromise);
+    return requestPromise;
+}) as typeof api.get;
 
 // ==================== REQUEST INTERCEPTOR ====================
 api.interceptors.request.use(

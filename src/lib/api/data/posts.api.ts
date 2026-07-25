@@ -1,4 +1,4 @@
-// src/profile/api/posts.api.ts
+// src/lib/api/data/posts.api.ts
 import AuthService from '@/lib/api/auth.service';
 import { TransformedPost } from '@/types/profile.types';
 import { calculateTimeAgo } from '@/shared/utils/time.util';
@@ -7,7 +7,17 @@ import ProfileService from '../profile.service';
 // Shared transformer — keeps the exact same shape both flows had before
 const transformPosts = (rawPosts: any[]): TransformedPost[] => {
     return rawPosts.map((post: any) => ({
-        postId: post.postId,
+        // ✅ FIX: backend response me id field ka naam route ke hisaab se
+        // alag ho sakta hai (apne posts wale route vs dusre user ke posts
+        // wale /posts/user/:userId route). Pehle sirf `post.postId` set
+        // hota tha — agar us route pe backend `entryId` ya `_id` bhej raha
+        // ho to postId hamesha undefined ban jaata, aur SAARE posts ka key
+        // (jo poore app me `post.entryId || post.postId` se nikala jaata
+        // hai) collide ho jaata — isi wajah se kisi ek post pe like ya
+        // 3-dot menu click karne se saare posts affect ho rahe the
+        // (dusre user ki profile dekhte waqt).
+        postId: post.postId || post._id || post.entryId,
+        entryId: post.entryId || post.postId || post._id,
         title: post.title,
         text: post.content,
         // FIX: post.images can be UNDEFINED (not just empty array) when a post
@@ -50,6 +60,12 @@ export const postsApi = {
         const response = userId
             ? await ProfileService.getAllUserPostsByUserId(userId, false)
             : await ProfileService.getAllUserPosts(false);
+
+        // 🔍 TEMP DEBUG — ek baar console me check kar lo ki raw backend
+        // object me id field ka naam kya hai, phir isse hata dena.
+        if (response.data.posts?.[0]) {
+            console.log('🔍 RAW POST SAMPLE (remove this log after checking):', response.data.posts[0]);
+        }
 
         return transformPosts(response.data.posts);
     }
