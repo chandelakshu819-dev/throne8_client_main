@@ -1,13 +1,16 @@
 ﻿// app/(dashboard)/components/sidebar/StatsCards.tsx
 'use client';
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import AnalyticsService from '@/lib/api/analytics.service';
 
 interface StatsCardsProps {
   isDarkMode: boolean;
+  currentUserId: string;
 }
 
-const StatsCards: React.FC<StatsCardsProps> = ({ isDarkMode }) => {
+const StatsCards: React.FC<StatsCardsProps> = ({ isDarkMode, currentUserId }) => {
+  const router = useRouter();
   const [profileViews, setProfileViews] = useState<number>(0);
   const [viewsChangePercent, setViewsChangePercent] = useState<number>(0);
   const [postImpressions, setPostImpressions] = useState<number>(0);
@@ -46,9 +49,21 @@ const StatsCards: React.FC<StatsCardsProps> = ({ isDarkMode }) => {
     return `${num}`;
   };
 
+  const handleProfileViewsClick = () => {
+    router.push(`/profile/analytics/${currentUserId}?tab=views`);
+  };
+
+  const handleImpressionsClick = () => {
+    router.push(`/profile/analytics/${currentUserId}?tab=impressions`);
+  };
+
   return (
     <div className={`grid grid-cols-2 gap-3 mb-4 ${isDarkMode ? 'bg-slate-700/30' : 'bg-white/40'} p-4 rounded-2xl`}>
-      <div className={`flex flex-col items-center justify-center gap-1 p-3 rounded-xl ${isDarkMode ? 'bg-slate-600/30' : 'bg-[#e0d8cf]/50'}`}>
+      <button
+        type="button"
+        onClick={handleProfileViewsClick}
+        className={`flex flex-col items-center justify-center gap-1 p-3 rounded-xl transition-all duration-300 hover:scale-105 cursor-pointer ${isDarkMode ? 'bg-slate-600/30' : 'bg-[#e0d8cf]/50'}`}
+      >
         <div className={`p-2 rounded-xl ${isDarkMode ? 'bg-slate-600/50' : 'bg-[#e0d8cf]/80'}`}>
           <i className="ri-eye-line text-lg text-[#6b5643]"></i>
         </div>
@@ -65,8 +80,12 @@ const StatsCards: React.FC<StatsCardsProps> = ({ isDarkMode }) => {
             </span>
           )}
         </div>
-      </div>
-      <div className={`flex flex-col items-center justify-center gap-1 p-3 rounded-xl ${isDarkMode ? 'bg-slate-600/30' : 'bg-[#e0d8cf]/50'}`}>
+      </button>
+      <button
+        type="button"
+        onClick={handleImpressionsClick}
+        className={`flex flex-col items-center justify-center gap-1 p-3 rounded-xl transition-all duration-300 hover:scale-105 cursor-pointer ${isDarkMode ? 'bg-slate-600/30' : 'bg-[#e0d8cf]/50'}`}
+      >
         <div className={`p-2 rounded-xl ${isDarkMode ? 'bg-slate-600/50' : 'bg-[#e0d8cf]/80'}`}>
           <i className="ri-line-chart-line text-lg text-[#6b5643]"></i>
         </div>
@@ -78,7 +97,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ isDarkMode }) => {
             {isLoading ? '...' : formatCount(postImpressions)}
           </p>
         </div>
-      </div>
+      </button>
     </div>
   );
 };
