@@ -86,14 +86,18 @@ export const useActivityHandlers = ({
     }, [posts]);
 
     // ── Post Handlers ─────────────────────────────────────────────
-    const handleUpdatePost = async (postId: string, newTitle: string) => {
-        try {
-            await ProfileService.updatePost(postId, { title: newTitle });
-            onPostCreated?.();
-        } catch (error: any) {
-            alert(error.message || 'Failed to update post');
-        }
-    };
+    const handleUpdatePost = async (postId: string, newContent: string) => {
+    try {
+        // ✅ FIX: pehle { title: newTitle } bhej rahe the, lekin card pe
+        // hamesha post.content render hota hai (PostContent.tsx confirm
+        // karta hai) — isliye title update kabhi screen pe nahi dikhta tha.
+        // Ab correct field "content" update ho raha hai.
+        await ProfileService.updatePost(postId, { content: newContent });
+        onPostCreated?.();
+    } catch (error: any) {
+        alert(error.message || 'Failed to update post');
+    }
+};
 
     const handleDeletePost = async (postId: string) => {
         if (!confirm('Are you sure you want to delete this post?')) return;

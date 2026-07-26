@@ -595,22 +595,23 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({
 
             // ✅ NEW: 'edit' action — PostMenuDropdown ke "Edit post" button se aata hai.
             // UpdatePostModal ko open karta hai (jo already component ke end mein render hota hai)
-            case 'edit': {
-                const idx = posts.findIndex(p => (p.entryId || p.postId) === postId);
-                if (idx === -1) break;
-                handlers.setUpdatePostId(idx);
-                handlers.setUpdatePostTitle(post.title || post.content || '');
-                handlers.setShowUpdateModal(true);
-                break;
-            }
-
-            case 'save':
-                await handlers.handleSavePost(postId, post.isSaved || false);
-                break;
-            case 'delete':
-                await handlers.handleDeletePost(postId);
-                break;
-            case 'archive':
+           case 'edit': {
+          const idx = posts.findIndex(p => (p.entryId || p.postId) === postId);
+          if (idx === -1) break;
+          handlers.setUpdatePostId(idx);
+          // ✅ FIX: content field priority pe — yahi actually card pe dikhta hai
+          handlers.setUpdatePostTitle(post.content || post.title || '');
+          handlers.setShowUpdateModal(true);
+          break;
+        }  
+      
+                  case 'save':
+                      await handlers.handleSavePost(postId, post.isSaved || false);
+                      break;
+                  case 'delete':
+                      await handlers.handleDeletePost(postId);
+                      break;
+                  case 'archive':
                 await handlers.handleArchivePost(postId);
                 break;
             case 'copy':

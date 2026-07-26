@@ -1,8 +1,8 @@
+// src/hooks/analytics/usePostImpressions.ts
+
 import { useState, useEffect, useCallback } from 'react';
 import AnalyticsService from '@/lib/api/analytics.service';
 import { PostImpression } from '@/types/analytics.types';
-import { useSocket } from '@/core/realtime/useSocket';
-
 
 interface UsePostImpressionsOptions {
     days?: number;
@@ -12,8 +12,6 @@ interface UsePostImpressionsOptions {
 
 export const usePostImpressions = (options: UsePostImpressionsOptions = {}) => {
     const { days = 30, postId, autoLoad = true } = options;
-    const { socket } = useSocket();   // 👈 NEW
-
 
     const [impressions, setImpressions] = useState<PostImpression[]>([]);
     const [timeline, setTimeline] = useState<any>(null);
@@ -42,7 +40,6 @@ export const usePostImpressions = (options: UsePostImpressionsOptions = {}) => {
                 const statsResponse = await AnalyticsService.getPostImpressionStats(postId);
                 setStats(statsResponse.data);
             }
-
         } catch (err: any) {
             console.error('❌ [usePostImpressions] Failed:', err);
             setError(err.message || 'Failed to load impressions');
@@ -73,23 +70,11 @@ export const usePostImpressions = (options: UsePostImpressionsOptions = {}) => {
         }
     }, [autoLoad, fetchImpressions]);
 
-    // 👇 NEW — real-time listener
-
-    useEffect(() => {
-        if (!socket) return;
-
-        const handlePostImpression = () => {
-            fetchImpressions();
-        };
-
-        socket.on('analytics:post-impression', handlePostImpression);
-
-        return () => {
-            socket.off('analytics:post-impression', handlePostImpression);
-        };
-    }, [socket, fetchImpressions]);
-
-
+    // ℹ️ NOTE: socket-triggered auto-refetch ('analytics:post-impression')
+    // was intentionally removed here. If you want real-time updates back,
+    // debounce the handler (e.g. 5-10s) before calling fetchImpressions(),
+    // otherwise frequent broadcast events will re-trigger 3 parallel API
+    // calls each time and can retrigger rate-limit issues.
 
     return {
         impressions,
