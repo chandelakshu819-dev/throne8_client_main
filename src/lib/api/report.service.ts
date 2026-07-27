@@ -3,24 +3,19 @@ import api from "./api.intance";
 
 class ReportService {
     /**
-     * ⚠️ BACKEND NOTE: /api/v1/reports route abhi thronet-server mein nahi hai.
-     * Isko banane ke liye Profile module mein ek naya:
-     *   - Report.model.ts   (postId, reporterId, reason, status, createdAt)
-     *   - report.controller.ts (POST /reports)
-     *   - report.routes.ts
-     * add karna hoga. Filhaal ye function call fail hoga (404) —
-     * frontend usko gracefully handle karta hai (soft-fail).
+     * Backend Report route thronet-server mein Profile module ke andar
+     * mount hai. Profile router khud "/api/v1/profile" prefix ke andar
+     * mount hota hai, isliye fallback "/profile/reports" hai.
      */
     static async reportPost(postId: string, reason: string) {
         try {
-            const { data } = await api.post(
-                `${config?.NEXT_PUBLIC_REPORTS_ENDPOINT || process.env.NEXT_PUBLIC_REPORTS_ENDPOINT || '/reports'}`,
-                { postId, reason }
-            );
+            const endpoint = config.NEXT_PUBLIC_REPORTS_ENDPOINT || '/profile/reports';
+            const { data } = await api.post(endpoint, { postId, reason });
             return data;
-        } catch (error: any) {
-            console.error('[REPORT_POST] Failed:', error);
-            throw new Error(error.response?.data?.message || 'Failed to submit report');
+        } catch (error: unknown) {
+            const err = error as { response?: { data?: { message?: string } }; message?: string };
+            console.error('[REPORT_POST] Failed:', err);
+            throw new Error(err.response?.data?.message || err.message || 'Failed to submit report');
         }
     }
 }

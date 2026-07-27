@@ -75,9 +75,11 @@ const _config = {
     // ============================================================
     // 4. ACTIVITY / POSTS ENDPOINTS
     // ============================================================
+    
     NEXT_PUBLIC_ACTIVITY_ENDPOINT: optionalEnv('NEXT_PUBLIC_ACTIVITY_ENDPOINT'),
     NEXT_PUBLIC_FEED_ENDPOINT: optionalEnv('NEXT_PUBLIC_FEED_ENDPOINT'),
     NEXT_PUBLIC_COMMENTS_ENDPOINT: optionalEnv('NEXT_PUBLIC_COMMENTS_ENDPOINT'),
+    NEXT_PUBLIC_REPORTS_ENDPOINT: optionalEnv('NEXT_PUBLIC_REPORTS_ENDPOINT'),
 
     // ============================================================
     // 5. MENTORSHIP ENDPOINTS
