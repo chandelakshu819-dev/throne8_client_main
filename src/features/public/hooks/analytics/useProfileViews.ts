@@ -62,6 +62,7 @@ export const useProfileViews = (options: UseProfileViewsOptions = {}) => {
             viewerId?: string;
             viewerName?: string;
             viewerHeadline?: string;
+            viewerPhotoUrl?: string;
         }
     ) => {
         try {
@@ -71,7 +72,6 @@ export const useProfileViews = (options: UseProfileViewsOptions = {}) => {
             console.error('❌ [useProfileViews] Track failed:', error);
         }
     }, []);
-
     useEffect(() => {
         if (autoLoad) {
             fetchViews();

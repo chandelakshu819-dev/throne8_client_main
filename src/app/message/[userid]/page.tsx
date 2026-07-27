@@ -2,6 +2,7 @@
 'use client';
 import AuthService from "@/lib/api/auth.service";
 import React, { useMemo, useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useMessaging } from "../../../features/messages/hooks/useMessaging";
 import MessagingAPI from "@/lib/api/messaging.service";
 import ConnectionService from "@/lib/api/connection.service";
@@ -134,6 +135,12 @@ export default function MessagingPage() {
 
   const currentUserId = currentUser?.userId || '';
 
+  // ✅ FIX: agar URL mein ?chatWith=<userId> aaya hai (jaise Profile Views
+  // modal se "Message" click karne par), toh us user ke saath conversation
+  // automatically start/open karo
+  const searchParams = useSearchParams();
+  const chatWithUserId = searchParams.get('chatWith');
+
   // ── useMessaging hook — saara real-time logic yahan ─────────────────────
   const {
     conversations,
@@ -265,7 +272,7 @@ export default function MessagingPage() {
     }
   };
 
-  // ── Start a new direct conversation ─────────────────────────────────────
+  /// ── Start a new direct conversation ─────────────────────────────────────
   const startDirectConversation = async (targetUserId: string) => {
     try {
       const conv = await MessagingAPI.getOrCreateDirectConversation(targetUserId);
@@ -275,6 +282,14 @@ export default function MessagingPage() {
       console.error('Failed to start conversation:', e);
     }
   };
+
+  // ✅ FIX: jab currentUserId load ho jaye aur URL mein chatWith param ho,
+  // us user ke saath conversation auto-start kar do
+  useEffect(() => {
+    if (chatWithUserId && currentUserId && chatWithUserId !== currentUserId) {
+      startDirectConversation(chatWithUserId);
+    }
+  }, [chatWithUserId, currentUserId]);
 
   // ── Handle send ──────────────────────────────────────────────────────────
   const handleSend = async () => {

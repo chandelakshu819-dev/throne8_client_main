@@ -270,6 +270,12 @@ export default function SearchUserProfilePage() {
         // nahi ho jaata (isCurrentUserLoaded === true), tab tak view record
         // nahi karni — warna viewerPhotoUrl khali chali jaati hai (race condition)
         if (user?.userId && userId && user.userId !== userId && isCurrentUserLoaded) {
+            console.log('🔍 [DEBUG] Recording profile view with:', {
+                viewerId: user.userId,
+                viewerName: currentUserName || user.email,
+                viewerPhotoUrl: currentUserImage,
+                isCurrentUserLoaded,
+            });
             AnalyticsService.recordProfileView(userId, {
                 viewerId: user.userId,
                 viewerName: currentUserName || user.email,
