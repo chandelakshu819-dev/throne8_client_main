@@ -22,13 +22,6 @@ const transformPosts = (rawPosts: any[]): TransformedPost[] => {
         entryId: post.entryId || post.postId || post._id,
         title: post.title,
         text: post.content,
-        // FIX: post.images can be UNDEFINED (not just empty array) when a post
-        // only has videos/documents (e.g. "Motivation video" post). Doing
-        // post.images[0] on undefined throws and silently kills the whole
-        // .map(), which made fetchUserPosts fail and show "No posts yet"
-        // even though the backend returned valid posts. Using optional
-        // chaining on the array itself (post.images?.[0]) fixes this, and
-        // we fall back to the first video's thumbnail-worthy url if needed.
         image: post.images?.[0]?.cloudinarySecureUrl
             || post.videos?.[0]?.cloudinarySecureUrl
             || '',
@@ -37,8 +30,6 @@ const transformPosts = (rawPosts: any[]): TransformedPost[] => {
         comments: post.commentsCount || 0,
         reposts: 0,
         time: calculateTimeAgo(post.createdAt),
-        // FIX: default to [] instead of leaving undefined, so any component
-        // doing images.length / images.map() downstream doesn't also crash.
         images: post.images || [],
         videos: post.videos || [],
         documents: post.documents || [],
@@ -46,6 +37,14 @@ const transformPosts = (rawPosts: any[]): TransformedPost[] => {
         isPinned: post.isPinned || false,
         isSaved: post.isSaved || false,
         isArchived: post.isArchived || false,
+        // ✅ ADDED: reaction fields — backend sends reactionCounts always
+        // (default 0s), and we derive "which reaction did I give" from the
+        // reactions array since isLikedByCurrentUser only tracks the old
+        // simple-like boolean.
+        reactionCounts: post.reactionCounts || {
+            like: 0, celebrate: 0, support: 0, love: 0, insightful: 0, funny: 0,
+        },
+        userReaction: post.userReaction ?? null,
     }));
 };
 
@@ -62,12 +61,6 @@ export const postsApi = {
         const response = userId
             ? await ProfileService.getAllUserPostsByUserId(userId, false)
             : await ProfileService.getAllUserPosts(false);
-
-        // 🔍 TEMP DEBUG — ek baar console me check kar lo ki raw backend
-        // object me id field ka naam kya hai, phir isse hata dena.
-        if (response.data.posts?.[0]) {
-            console.log('🔍 RAW POST SAMPLE (remove this log after checking):', response.data.posts[0]);
-        }
 
         return transformPosts(response.data.posts);
     }

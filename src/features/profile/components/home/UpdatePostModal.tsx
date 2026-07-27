@@ -1,7 +1,5 @@
 'use client';
 
-import AuthService from '@/lib/api/auth.service';
-import ProfileService from '@/lib/api/profile.service';
 import React, { useState, useRef, useEffect } from 'react';
 
 interface UpdatePostModalProps {
@@ -9,7 +7,7 @@ interface UpdatePostModalProps {
     isOpen: boolean;
     onClose: () => void;
     currentTitle: string;
-    onUpdate: (postId: string, newTitle: string) => void;
+    onUpdate: (postId: string, newTitle: string) => Promise<void>;
 }
 
 export default function UpdatePostModal({
@@ -38,7 +36,6 @@ export default function UpdatePostModal({
 
         if (isOpen) {
             document.addEventListener('mousedown', handleClickOutside);
-            // Focus input when modal opens
             setTimeout(() => inputRef.current?.focus(), 100);
             return () => document.removeEventListener('mousedown', handleClickOutside);
         }
@@ -52,13 +49,15 @@ export default function UpdatePostModal({
 
         setIsSubmitting(true);
         try {
-            // ✅ Call API
-            await ProfileService.updatePost(postId, { title: title.trim() });
-
-            onUpdate(postId, title);  // ✅ Pass postId
+            // ✅ FIX: pehle yahan ProfileService.updatePost() DIRECTLY call ho raha
+            // tha, aur uske baad onUpdate(postId, title) bhi call hota tha — jo
+            // parent (ActivitySection → useActivityHandler.ts) ke andar
+            // FIR SE ProfileService.updatePost() call karta tha. Matlab API
+            // 2 baar hit ho rahi thi (race condition + wasted network call).
+            // Ab sirf ek hi source of truth hai: onUpdate prop, jo already
+            // API call + refetch (onPostCreated -> loadPosts) dono handle karta hai.
+            await onUpdate(postId, title.trim());
             onClose();
-
-            // console.log('✅ Post updated successfully');
         } catch (error: any) {
             console.error('❌ Update failed:', error);
             alert(error.message || 'Failed to update post');
@@ -83,20 +82,20 @@ export default function UpdatePostModal({
             >
                 {/* Header */}
                 <div className="bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] px-6 py-4">
-                    <h2 className="text-xl font-bold text-[#f6ede8]">Update Post Title</h2>
+                    <h2 className="text-xl font-bold text-[#f6ede8]">Update Post</h2>
                 </div>
 
                 {/* Body */}
                 <div className="p-6">
                     <label className="block text-sm font-semibold text-[#4a3728] mb-3">
-                        Post Title
+                        Post Content
                     </label>
                     <textarea
                         ref={inputRef}
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Enter your post title here..."
+                        placeholder="Enter your post content here..."
                         className="w-full px-4 py-3 border border-[#e0d8cf]/50 rounded-xl text-[#4a3728] placeholder-[#4a3728]/40 focus:outline-none focus:ring-2 focus:ring-[#4a3728]/30 focus:border-transparent resize-none transition-all duration-200"
                         rows={4}
                     />

@@ -31,7 +31,6 @@ export interface UserProfileData {
 }
 
 export interface ProfileData {
-    // ✅ FIX: stray index signature hataya — yehi TS error ka root cause tha
     bannerImage: string;
     profileImage: string;
     pronouns: string;
@@ -52,8 +51,23 @@ export interface ProfileData {
     location: string;
 }
 
+// ✅ ADDED: reaction type + counts shape, shared across post/reaction UI
+export type ReactionType = 'like' | 'celebrate' | 'support' | 'love' | 'insightful' | 'funny';
+
+export interface ReactionCounts {
+    like: number;
+    celebrate: number;
+    support: number;
+    love: number;
+    insightful: number;
+    funny: number;
+}
+
 export interface TransformedPost {
     postId: string;
+    // ✅ ADDED: entryId — same value as postId, kept explicit since the rest
+    // of the app reads `post.entryId || post.postId` as the canonical key
+    entryId: string;
     title: string;
     text: string;
     image: string;
@@ -69,6 +83,9 @@ export interface TransformedPost {
     isPinned: boolean;
     isSaved: boolean;
     isArchived: boolean;
+    // ✅ ADDED: multi-reaction system fields
+    reactionCounts?: ReactionCounts;
+    userReaction?: ReactionType | null;
 }
 
 export interface AboutData {

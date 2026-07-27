@@ -1450,6 +1450,67 @@ static async getAllExperiencesByUserId(userId: string): Promise<any> {
     }
 
     /**
+     * ✅ REACT TO POST (like/celebrate/support/love/insightful/funny)
+     */
+    static async reactToPost(postId: string, type: string): Promise<any> {
+        try {
+            console.log('👍 [REACT_POST] Reacting to post:', postId, { type });
+
+            const { data } = await api.post(
+                `${config?.NEXT_PUBLIC_ACTIVITY_ENDPOINT || process.env.NEXT_PUBLIC_ACTIVITY_ENDPOINT}/posts/${postId}/react`,
+                { type }
+            );
+
+            console.log('✅ [REACT_POST] Reaction added successfully');
+            return data;
+
+        } catch (error: any) {
+            console.error('❌ [REACT_POST] Failed:', error);
+            throw new Error(error.response?.data?.message || 'Failed to react to post');
+        }
+    }
+
+    /**
+     * ✅ REMOVE REACTION FROM POST
+     */
+    static async removeReaction(postId: string): Promise<any> {
+        try {
+            console.log('👍 [REMOVE_REACTION] Removing reaction:', postId);
+
+            const { data } = await api.delete(
+                `${config?.NEXT_PUBLIC_ACTIVITY_ENDPOINT || process.env.NEXT_PUBLIC_ACTIVITY_ENDPOINT}/posts/${postId}/react`
+            );
+
+            console.log('✅ [REMOVE_REACTION] Reaction removed successfully');
+            return data;
+
+        } catch (error: any) {
+            console.error('❌ [REMOVE_REACTION] Failed:', error);
+            throw new Error(error.response?.data?.message || 'Failed to remove reaction');
+        }
+    }
+
+    /**
+     * ✅ GET USER REACTIONS (posts a specific user has reacted to — Reactions tab)
+     */
+    static async getUserReactions(userId: string): Promise<any> {
+        try {
+            console.log('👍 [GET_USER_REACTIONS] Fetching reactions for user:', userId);
+
+            const { data } = await api.get(
+                `${config?.NEXT_PUBLIC_ACTIVITY_ENDPOINT || process.env.NEXT_PUBLIC_ACTIVITY_ENDPOINT}/reactions/user/${userId}`
+            );
+
+            console.log('✅ [GET_USER_REACTIONS] Reactions fetched:', data.data?.total);
+            return data;
+
+        } catch (error: any) {
+            console.error('❌ [GET_USER_REACTIONS] Failed:', error);
+            throw new Error(error.response?.data?.message || 'Failed to fetch reactions');
+        }
+    }
+
+    /**
  * 💡 CREATE SKILL
  */
     static async createSkill(skillData: {
