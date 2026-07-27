@@ -1,10 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState ,useEffect} from 'react';
 import { X, Eye, TrendingUp, Calendar, Clock, User } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
-import { dummyViewers } from '../../types';
+import AnalyticsService from '@/lib/api/analytics.service';
 
+interface ProfileViewer {
+    viewerId: string | null;
+    viewerName: string;
+    viewerHeadline: string | null;
+    viewerPhotoUrl: string | null;
+    viewedAt: string;
+    isAnonymous: boolean;
+}
 
 interface ProfileViewsModalProps {
     isOpen: boolean;
@@ -12,19 +20,19 @@ interface ProfileViewsModalProps {
     analytics: any;
 }
 
-const generateViewsGraphData = (days: number) => {
-    const labels = [];
-    const views = [];
+// const generateViewsGraphData = (days: number) => {
+//     const labels = [];
+//     const views = [];
 
-    for (let i = days - 1; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-        views.push(Math.floor(Math.random() * 50) + 10);
-    }
+//     for (let i = days - 1; i >= 0; i--) {
+//         const date = new Date();
+//         date.setDate(date.getDate() - i);
+//         labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+//         views.push(Math.floor(Math.random() * 50) + 10);
+//     }
 
-    return { labels, views };
-};
+//     return { labels, views };
+// };
 
 const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
     isOpen,
@@ -35,9 +43,43 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
     const [showCustomInput, setShowCustomInput] = useState(false);
     const [customDays, setCustomDays] = useState('');
 
-    if (!isOpen) return null;
+    const [viewers, setViewers] = useState<ProfileViewer[]>([]);
+    const [isLoadingViewers, setIsLoadingViewers] = useState(false);
+    const [graphData, setGraphData] = useState<{ labels: string[]; views: number[] }>({ labels: [], views: [] });
 
-    const graphData = generateViewsGraphData(timeRange);
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const loadData = async () => {
+            setIsLoadingViewers(true);
+            try {
+                const [detailRes, trendRes] = await Promise.all([
+                    AnalyticsService.getProfileViewsDetail(true, 1, 20),
+                    AnalyticsService.getProfileViewsTrend(timeRange, 'day')
+                ]);
+
+                setViewers(detailRes?.data?.views || []);
+
+                const trend = trendRes?.data?.trend || [];
+                setGraphData({
+                    labels: trend.map((t: any) =>
+                        new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    ),
+                    views: trend.map((t: any) => t.views)
+                });
+            } catch (error) {
+                console.error('Failed to load profile views data:', error);
+                setViewers([]);
+                setGraphData({ labels: [], views: [] });
+            } finally {
+                setIsLoadingViewers(false);
+            }
+        };
+
+        loadData();
+    }, [isOpen, timeRange]);
+
+    if (!isOpen) return null;
 
     const chartData = {
         labels: graphData.labels,
@@ -124,7 +166,6 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6">
-                    {/* Graph Controls */}
                     {/* Graph Controls */}
                     <div className="mb-6 flex justify-between items-center">
                         <h3 className="text-lg font-bold text-[#4a3728]">Views Over Time</h3>
@@ -228,38 +269,51 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
                             Who Viewed Your Profile
                         </h3>
                         <div className="space-y-3">
-                            {dummyViewers.map((viewer) => (
-                                <div
-                                    key={viewer.id}
-                                    className="bg-white rounded-xl p-4 shadow border border-[#e0d8cf] hover:shadow-lg transition-all"
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <img
-                                            src={viewer.avatar}
-                                            alt={viewer.name}
-                                            className="w-14 h-14 rounded-xl object-cover border-2 border-blue-500"
-                                        />
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <h4 className="font-bold text-[#4a3728]">{viewer.name}</h4>
-                                                {viewer.viewCount > 1 && (
-                                                    <span className="bg-blue-100 text-blue-600 text-xs font-semibold px-2 py-1 rounded-full">
-                                                        {viewer.viewCount}x views
+                            {isLoadingViewers ? (
+                                <p className="text-sm text-[#7a5c3e] text-center py-8">Loading viewers...</p>
+                            ) : viewers.length === 0 ? (
+                                <p className="text-sm text-[#7a5c3e] text-center py-8">No profile views yet</p>
+                            ) : (
+                                viewers.map((viewer, index) => (
+                                    <div
+                                        key={viewer.viewerId || index}
+                                        className="bg-white rounded-xl p-4 shadow border border-[#e0d8cf] hover:shadow-lg transition-all"
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            {viewer.viewerPhotoUrl ? (
+                                                <img
+                                                    src={viewer.viewerPhotoUrl}
+                                                    alt={viewer.viewerName}
+                                                    className="w-14 h-14 rounded-xl object-cover border-2 border-blue-500"
+                                                />
+                                            ) : (
+                                                <div className="w-14 h-14 rounded-xl border-2 border-blue-500 bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                                    <span className="text-blue-600 font-bold text-lg">
+                                                        {viewer.viewerName?.charAt(0)?.toUpperCase() || '?'}
                                                     </span>
+                                                </div>
+                                            )}
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <h4 className="font-bold text-[#4a3728]">{viewer.viewerName}</h4>
+                                                </div>
+                                                {viewer.viewerHeadline && (
+                                                    <p className="text-sm text-[#7a5c3e] mb-2">{viewer.viewerHeadline}</p>
                                                 )}
+                                                <div className="flex items-center gap-2 text-xs text-[#7a5c3e]">
+                                                    <Clock className="w-3 h-3" />
+                                                    <span>{new Date(viewer.viewedAt).toLocaleString()}</span>
+                                                </div>
                                             </div>
-                                            <p className="text-sm text-[#7a5c3e] mb-2">{viewer.headline}</p>
-                                            <div className="flex items-center gap-2 text-xs text-[#7a5c3e]">
-                                                <Clock className="w-3 h-3" />
-                                                <span>{viewer.viewedAt}</span>
-                                            </div>
+                                            {!viewer.isAnonymous && viewer.viewerId && (
+                                                <button className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all text-sm font-semibold">
+                                                    Connect
+                                                </button>
+                                            )}
                                         </div>
-                                        <button className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all text-sm font-semibold">
-                                            Connect
-                                        </button>
                                     </div>
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>

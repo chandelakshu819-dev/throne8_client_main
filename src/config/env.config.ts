@@ -336,6 +336,8 @@ const _config = {
     NEXT_PUBLIC_LINKEDIN_CLIENT_ID: optionalEnv('NEXT_PUBLIC_LINKEDIN_CLIENT_ID'),
 
 
+    
+
 } as const;
 
 const config = Object.freeze(_config);

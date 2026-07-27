@@ -81,6 +81,10 @@ export default function SearchUserProfilePage() {
     // naam/photo alag se fetch karke yahan store karte hain.
     const [currentUserName, setCurrentUserName] = useState('');
     const [currentUserImage, setCurrentUserImage] = useState('');
+    // ✅ FIX: ye flag batata hai ki current user ka naam/photo fetch
+    // poora ho chuka hai ya nahi. Isse pehle profile-view record
+    // nahi hogi, taaki viewerPhotoUrl kabhi khali na jaye (race condition fix)
+    const [isCurrentUserLoaded, setIsCurrentUserLoaded] = useState(false);
 
     useEffect(() => {
         if (!user?.userId) return;
@@ -101,6 +105,8 @@ export default function SearchUserProfilePage() {
                 }
             } catch (error) {
                 setCurrentUserName(user.email || '');
+            } finally {
+                setIsCurrentUserLoaded(true);
             }
         };
         fetchCurrentUser();
@@ -260,13 +266,18 @@ export default function SearchUserProfilePage() {
     }, [userId, fetchUserProfileById]);
 
     useEffect(() => {
-        if (user?.userId && userId && user.userId !== userId) {
+        // ✅ FIX: jab tak currentUserImage/currentUserName ka fetch poora
+        // nahi ho jaata (isCurrentUserLoaded === true), tab tak view record
+        // nahi karni — warna viewerPhotoUrl khali chali jaati hai (race condition)
+        if (user?.userId && userId && user.userId !== userId && isCurrentUserLoaded) {
             AnalyticsService.recordProfileView(userId, {
                 viewerId: user.userId,
                 viewerName: currentUserName || user.email,
+                viewerHeadline: undefined,
+                viewerPhotoUrl: currentUserImage || undefined,
             });
         }
-    }, [user, userId, currentUserName]);
+    }, [user, userId, currentUserName, currentUserImage, isCurrentUserLoaded]);
 
     useEffect(() => {
         if (aboutId) {

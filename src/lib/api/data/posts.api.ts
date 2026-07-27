@@ -16,7 +16,9 @@ const transformPosts = (rawPosts: any[]): TransformedPost[] => {
         // hai) collide ho jaata — isi wajah se kisi ek post pe like ya
         // 3-dot menu click karne se saare posts affect ho rahe the
         // (dusre user ki profile dekhte waqt).
-        postId: post.postId || post._id || post.entryId,
+        postId: post.entryId || post.postId || post._id,   // ✅ entryId sabse pehle
+
+        // postId: post.postId || post._id || post.entryId,
         entryId: post.entryId || post.postId || post._id,
         title: post.title,
         text: post.content,

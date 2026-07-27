@@ -134,6 +134,23 @@ class AnalyticsService {
         }
     }
 
+
+     /**
+     * 📈 Get Profile Views Trend (graph data — day/week/month wise breakdown)
+     * GET /profile/analytics/profile-views/trend
+     */
+     static async getProfileViewsTrend(days: number = 30, groupBy: 'day' | 'week' | 'month' = 'day'): Promise<any> {
+        try {
+            const { data } = await api.get('/profile/analytics/profile-views/trend', {
+                params: { days, groupBy }
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [ANALYTICS] Failed to fetch profile views trend:', error);
+            throw error;
+        }
+    }
+
     /**
  * 📈 Get Profile Views % Change
  * GET /profile/analytics/profile-views/change
@@ -279,23 +296,38 @@ static async getSearchAppearancesChange(days: number = 30): Promise<any> {
     }
 
     /**
+     */
+   /**
      * 9️⃣ Get All Analytics Summary
      * GET /profile/analytics/all
+     * @param dateRange - days ka range (default 30)
+     * @param useCache - abhi backend cache support nahi karta, isliye ye param
+     *                    sirf frontend compatibility ke liye rakha hai (ignore hota hai)
      */
-    static async getAllAnalytics(dateRange: number = 30): Promise<any> {
-        try {
-            // console.log('📊 [ANALYTICS] Fetching all analytics summary...');
-            const { data } = await api.get('/profile/analytics/all', {
-                params: { dateRange }
-            });
-            // console.log('✅ [ANALYTICS] All analytics fetched:', data);
-            return data;
-        } catch (error: any) {
-            console.error('❌ [ANALYTICS] Failed to fetch all analytics:', error);
-            throw error;
-        }
+   static async getAllAnalytics(dateRange: number = 30, useCache: boolean = true): Promise<any> {
+    try {
+        // console.log('📊 [ANALYTICS] Fetching all analytics summary...');
+        const { data } = await api.get('/profile/analytics/all', {
+            params: { dateRange }
+        });
+        // console.log('✅ [ANALYTICS] All analytics fetched:', data);
+        return data;
+    } catch (error: any) {
+        console.error('❌ [ANALYTICS] Failed to fetch all analytics:', error);
+        throw error;
     }
+}
 
+/**
+ * 🧹 Clear Analytics Cache
+ * Backend abhi caching support nahi karta, isliye ye ek no-op method hai —
+ * sirf isliye add kiya taaki useAnalytics.ts hook crash na kare jab
+ * clearCache() call ho. Future mein agar backend caching add ho,
+ * yahan real cache-clear logic daal sakte hain.
+ */
+static clearAnalyticsCache(): void {
+    // console.log('🧹 [ANALYTICS] Cache clear requested (no-op, backend has no cache yet)');
+}
     /**
      * 🔟 Get Who Viewed Profile (Same as #3)
      * GET /profile/analytics/who-viewed
@@ -451,7 +483,21 @@ static async getSearchAppearancesChange(days: number = 30): Promise<any> {
             throw error;
         }
     }
-
+/**
+ * 📊 GET POST ANALYTICS (full breakdown: impressions, engagement, daily timeline)
+ * GET /profile/analytics/post/:postId
+ */
+static async getPostAnalytics(postId: string, days: number = 30) {
+    try {
+        const { data } = await api.get(`/profile/analytics/post/${postId}`, {
+            params: { days }
+        });
+        return data;
+    } catch (error: any) {
+        console.error('❌ Get post analytics failed:', error);
+        throw error;
+    }
+}
 
     /**
      * 🎯 GET DISCOVERY STATS (Total Impressions, Engagements, Members Reached)
