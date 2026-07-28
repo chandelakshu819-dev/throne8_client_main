@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState ,useEffect} from 'react';
+import { useRouter } from 'next/navigation';
 import { X, Eye, TrendingUp, Calendar, Clock, User } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import AnalyticsService from '@/lib/api/analytics.service';
+import ConnectionService from '@/lib/api/connection.service';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
 interface ProfileViewer {
     viewerId: string | null;
@@ -39,6 +42,9 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
     onClose,
     analytics
 }) => {
+    const router = useRouter();
+    const { user } = useAuth();
+
     const [timeRange, setTimeRange] = useState<7 | 30 | 90>(30);
     const [showCustomInput, setShowCustomInput] = useState(false);
     const [customDays, setCustomDays] = useState('');
@@ -47,15 +53,26 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
     const [isLoadingViewers, setIsLoadingViewers] = useState(false);
     const [graphData, setGraphData] = useState<{ labels: string[]; views: number[] }>({ labels: [], views: [] });
 
+    // ✅ FIX: connected users ki ek Set banate hain (fast lookup ke liye),
+    // taaki har viewer ke liye check kar saken ki hum unse pehle se connected hain ya nahi
+    const [connectedUserIds, setConnectedUserIds] = useState<Set<string>>(new Set());
+
+    // ✅ FIX: jinhe request bhej di hai (is session mein), unko track karne ke liye —
+    // taaki button turant "Pending" dikha de bina refresh kiye
+    const [pendingRequestIds, setPendingRequestIds] = useState<Set<string>>(new Set());
+    // ✅ FIX: kis viewer ke Connect button pe abhi request bhej rahe hain (loading state)
+    const [connectingId, setConnectingId] = useState<string | null>(null);
+
     useEffect(() => {
         if (!isOpen) return;
 
         const loadData = async () => {
             setIsLoadingViewers(true);
             try {
-                const [detailRes, trendRes] = await Promise.all([
+                const [detailRes, trendRes, connectionsRes] = await Promise.all([
                     AnalyticsService.getProfileViewsDetail(true, 1, 20),
-                    AnalyticsService.getProfileViewsTrend(timeRange, 'day')
+                    AnalyticsService.getProfileViewsTrend(timeRange, 'day'),
+                    user?.userId ? ConnectionService.getUserConnections(user.userId) : Promise.resolve(null)
                 ]);
 
                 setViewers(detailRes?.data?.views || []);
@@ -67,6 +84,20 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
                     ),
                     views: trend.map((t: any) => t.views)
                 });
+
+                // ✅ FIX: connections list se ek Set banao — jisme doosre wale user ki id ho
+                // (fromUserId/toUserId mein se jo current user nahi hai wo), sirf 'active' status wale
+                if (connectionsRes && user?.userId) {
+                    const connections = connectionsRes?.data?.data || connectionsRes?.data || [];
+                    const ids = new Set<string>(
+                        connections
+                            .filter((c: any) => c.status === 'active')
+                            .map((c: any) =>
+                                c.fromUserId === user.userId ? c.toUserId : c.fromUserId
+                            )
+                    );
+                    setConnectedUserIds(ids);
+                }
             } catch (error) {
                 console.error('Failed to load profile views data:', error);
                 setViewers([]);
@@ -77,9 +108,26 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
         };
 
         loadData();
-    }, [isOpen, timeRange]);
-
+    }, [isOpen, timeRange, user?.userId]);
     if (!isOpen) return null;
+
+    // ✅ FIX: Connect button click hone par connection request bhejta hai
+    const handleConnect = async (targetUserId: string) => {
+        if (connectingId) return; // ek time pe ek hi request
+        try {
+            setConnectingId(targetUserId);
+            await ConnectionService.sendConnectionRequest({ toUserId: targetUserId });
+            setPendingRequestIds((prev) => new Set(prev).add(targetUserId));
+        } catch (error: any) {
+            alert(
+                error.message?.includes('already exists')
+                    ? 'Connection request already sent'
+                    : (error.message || 'Failed to send connection request')
+            );
+        } finally {
+            setConnectingId(null);
+        }
+    };
 
     const chartData = {
         labels: graphData.labels,
@@ -306,9 +354,29 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
                                                 </div>
                                             </div>
                                             {!viewer.isAnonymous && viewer.viewerId && (
-                                                <button className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all text-sm font-semibold">
-                                                    Connect
-                                                </button>
+                                                connectedUserIds.has(viewer.viewerId) ? (
+                                                    <button
+                                                        onClick={() => router.push(`/message/${user?.userId}?chatWith=${viewer.viewerId}`)}
+                                                        className="px-4 py-2 bg-[#4a3728] text-white rounded-lg hover:bg-[#3a2b1f] transition-all text-sm font-semibold"
+                                                    >
+                                                        Message
+                                                    </button>
+                                                ) : pendingRequestIds.has(viewer.viewerId) ? (
+                                                    <button
+                                                        disabled
+                                                        className="px-4 py-2 bg-[#e0d8cf] text-[#7a5c3e] rounded-lg text-sm font-semibold cursor-not-allowed"
+                                                    >
+                                                        Pending
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleConnect(viewer.viewerId as string)}
+                                                        disabled={connectingId === viewer.viewerId}
+                                                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    >
+                                                        {connectingId === viewer.viewerId ? 'Sending...' : 'Connect'}
+                                                    </button>
+                                                )
                                             )}
                                         </div>
                                     </div>
