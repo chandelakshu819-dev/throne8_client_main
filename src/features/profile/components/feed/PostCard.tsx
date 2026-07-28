@@ -5,6 +5,7 @@ import PostHeader from './PostHeader';
 import PostContent from './PostContent';
 import PostActions from './PostActions';
 import CommentsSection from './CommentsSection';
+import PostDetailModal from './PostDetailModal';
 import { usePostImpressionTracking } from '@/features/public/hooks/analytics/usePostImpressionTracking';
 import { ReactionType } from '@/types/profile.types';
 
@@ -21,6 +22,9 @@ const PostCard = ({
 }) => {
   const { trackPostImpression } = usePostImpressionTracking();
   const postKey = post.entryId || post.postId;
+
+  // LinkedIn-style expanded post modal
+  const [isDetailOpen, setIsDetailOpen] = React.useState(false);
 
   return (
     <div
@@ -50,7 +54,10 @@ const PostCard = ({
             headline={headline}
           />
 
-          <PostContent post={post} isDarkMode={isDarkMode} />
+          {/* Click on post body opens the LinkedIn-style expanded modal */}
+          <div onClick={() => setIsDetailOpen(true)} className="cursor-pointer">
+            <PostContent post={post} isDarkMode={isDarkMode} />
+          </div>
         </div>
 
         <PostActions
@@ -67,6 +74,7 @@ const PostCard = ({
           handleRepostInstant={handleRepostInstant}
           postReactions={postReactions}
           onReact={onReact}
+          currentUserId={currentUserId}
         />
 
         {openCommentsIndex === postKey && (
@@ -95,6 +103,51 @@ const PostCard = ({
             profileImage={profileImage} setReplyingTo={undefined} />
         )}
       </div>
+
+      {isDetailOpen && (
+        <PostDetailModal
+          post={post}
+          index={index}
+          isDarkMode={isDarkMode}
+          onClose={() => setIsDetailOpen(false)}
+          currentUserId={currentUserId}
+          isOwnProfile={isOwnProfile}
+          fullName={fullName}
+          headline={headline}
+          profileImage={profileImage}
+          openMenuIndex={openMenuIndex}
+          togglePostMenu={togglePostMenu}
+          handlePostAction={handlePostAction}
+          likedPosts={likedPosts}
+          handleLike={handleLike}
+          openRepostIndex={openRepostIndex}
+          toggleRepostMenu={toggleRepostMenu}
+          handleRepost={handleRepost}
+          onOpenWithPerspectiveModal={onOpenWithPerspectiveModal}
+          handleRepostInstant={handleRepostInstant}
+          postReactions={postReactions}
+          onReact={onReact}
+          commentText={commentText}
+          setCommentText={setCommentText}
+          replyingTo={replyingTo}
+          openCommentMenuIndex={openCommentMenuIndex}
+          editingCommentId={editingCommentId}
+          editCommentText={editCommentText}
+          setEditCommentText={setEditCommentText}
+          showEmojiPicker={showEmojiPicker}
+          setShowEmojiPicker={setShowEmojiPicker}
+          handleReply={handleReply}
+          handleCommentReaction={handleCommentReaction}
+          toggleCommentMenu={toggleCommentMenu}
+          handleCommentAction={handleCommentAction}
+          handleEditSubmit={handleEditSubmit}
+          handleEmojiClick={handleEmojiClick}
+          handleCommentSubmit={handleCommentSubmit}
+          emojiList={emojiList}
+          postComments={postComments}
+          postCommentCounts={postCommentCounts}
+        />
+      )}
     </div>
   );
 };

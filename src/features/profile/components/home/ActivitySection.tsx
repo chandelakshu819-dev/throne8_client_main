@@ -6,6 +6,10 @@ import ShowAllActivityModal from './ShowAllActivityModal';
 import CreatePostModal from './CreatePostModal';
 import UpdatePostModal from './UpdatePostModal';
 import PostCard from '../feed/PostCard';
+// ✅ ADDED: these two are what actually make like/comment "real" (clickable,
+// stateful) instead of static counts — same components PostCard already uses.
+import PostActions from '../feed/PostActions';
+import CommentsSection from '../feed/CommentsSection';
 import RepostWithPerspectiveModal from '../../../dashboard/components/feed/RepostWithPerspectiveModal';
 import ReportPostModal from './ReportPostModal';
 import { useActivityHandlers } from '../../hooks/useActivityHandler';
@@ -95,6 +99,9 @@ const DocumentCard = ({ post, doc }: { post: any; doc: any }) => {
 };
 
 // ─── Repost Card ──────────────────────────────────────────────────────────────
+// ✅ CHANGED: this component now accepts the same "engagement" props as
+// PostCard/PostActions/CommentsSection so like + comment behave exactly like
+// on a normal post — no more static counts.
 const RepostCard = ({
     repost,
     onDeleteRepost,
@@ -102,6 +109,34 @@ const RepostCard = ({
     fullName,
     currentUserId,
     isOwnProfile = true,
+    // ✅ ADDED — reactions
+    postReactions,
+    onReact,
+    likedPosts,
+    handleLike,
+    // ✅ ADDED — comments
+    toggleComments,
+    openCommentsIndex,
+    postComments,
+    commentText,
+    setCommentText,
+    replyingTo,
+    setReplyingTo,
+    openCommentMenuIndex,
+    editingCommentId,
+    editCommentText,
+    setEditCommentText,
+    showEmojiPicker,
+    setShowEmojiPicker,
+    handleReply,
+    handleCommentReaction,
+    toggleCommentMenu,
+    handleCommentAction,
+    handleEditSubmit,
+    handleEmojiClick,
+    handleCommentSubmit,
+    emojiList,
+    postCommentCounts,
 }: {
     repost: any;
     onDeleteRepost?: (repostId: string) => Promise<any>;
@@ -109,6 +144,32 @@ const RepostCard = ({
     fullName?: string;
     currentUserId?: string;
     isOwnProfile?: boolean;
+    postReactions?: any;
+    onReact?: (postId: string, type: any) => void;
+    likedPosts?: any;
+    handleLike?: any;
+    toggleComments?: any;
+    openCommentsIndex?: any;
+    postComments?: any;
+    commentText?: any;
+    setCommentText?: any;
+    replyingTo?: any;
+    setReplyingTo?: any;
+    openCommentMenuIndex?: any;
+    editingCommentId?: any;
+    editCommentText?: any;
+    setEditCommentText?: any;
+    showEmojiPicker?: any;
+    setShowEmojiPicker?: any;
+    handleReply?: any;
+    handleCommentReaction?: any;
+    toggleCommentMenu?: any;
+    handleCommentAction?: any;
+    handleEditSubmit?: any;
+    handleEmojiClick?: any;
+    handleCommentSubmit?: any;
+    emojiList?: any;
+    postCommentCounts?: any;
 }) => {
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -116,6 +177,9 @@ const RepostCard = ({
     const [originalAuthorAvatar, setOriginalAuthorAvatar] = useState<string>('');
 
     const originalPost = repost.originalPost;
+    // ✅ Like/comment/reactions always target the ORIGINAL post's id —
+    // that's the post that actually owns the engagement data.
+    const postKey = originalPost?.entryId;
 
     useEffect(() => {
         if (!originalPost?.userId) return;
@@ -159,6 +223,15 @@ const RepostCard = ({
             setIsDeleting(false);
             setOpenMenuId(null);
         }
+    };
+
+    // PostActions expects a "post"-shaped object.
+    const syntheticPost = {
+        entryId: postKey,
+        likesCount: originalPost.likesCount || 0,
+        commentsCount: postCommentCounts?.[postKey] ?? originalPost.commentsCount ?? 0,
+        isLikedByCurrentUser: originalPost.isLikedByCurrentUser || false,
+        shares: originalPost.shares || 0,
     };
 
     return (
@@ -277,20 +350,55 @@ const RepostCard = ({
                     />
                 )}
 
-                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-[#e0d8cf]/30">
-                    <span className="text-xs text-[#4a3728]/50 flex items-center gap-1">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                        </svg>
-                        {originalPost.likesCount || 0}
-                    </span>
-                    <span className="text-xs text-[#4a3728]/50 flex items-center gap-1">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
-                        {originalPost.commentsCount || 0}
-                    </span>
+                {/* ✅ REPLACED: static <span> like/comment counts →
+                    real clickable PostActions (reactions + comment toggle + share) */}
+                <div className="mt-3 pt-3 border-t border-[#e0d8cf]/30">
+                    <PostActions
+                        post={syntheticPost}
+                        index={postKey}
+                        isDarkMode={false}
+                        likedPosts={likedPosts}
+                        handleLike={handleLike}
+                        toggleComments={toggleComments}
+                        openRepostIndex={null}
+                        toggleRepostMenu={() => {}}
+                        handleRepost={() => {}}
+                        postReactions={postReactions}
+                        onReact={onReact}
+                    />
                 </div>
+
+                {/* ✅ ADDED: comments now actually expand under the reposted
+                    original post, same as a normal post card. */}
+                {openCommentsIndex === postKey && (
+                    <div className="mt-2">
+                        <CommentsSection
+                            isDarkMode={false}
+                            commentText={commentText}
+                            setCommentText={setCommentText}
+                            replyingTo={replyingTo}
+                            setReplyingTo={setReplyingTo}
+                            openCommentMenuIndex={openCommentMenuIndex}
+                            editingCommentId={editingCommentId}
+                            editCommentText={editCommentText}
+                            setEditCommentText={setEditCommentText}
+                            showEmojiPicker={showEmojiPicker}
+                            setShowEmojiPicker={setShowEmojiPicker}
+                            commentCount={postCommentCounts?.[postKey] ?? originalPost.commentsCount ?? 0}
+                            handleReply={handleReply}
+                            handleCommentReaction={handleCommentReaction}
+                            toggleCommentMenu={toggleCommentMenu}
+                            handleCommentAction={handleCommentAction}
+                            handleEditSubmit={handleEditSubmit}
+                            handleEmojiClick={handleEmojiClick}
+                            postId={postKey}
+                            comments={postComments?.[postKey] || []}
+                            handleCommentSubmit={() => handleCommentSubmit?.(postKey)}
+                            emojiList={emojiList}
+                            profileImage={profileImage}
+                        />
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -387,6 +495,11 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({
     const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
     const [reportingPostId, setReportingPostId] = useState<string | null>(null);
     const [reportSubmitting, setReportSubmitting] = useState(false);
+
+    // ✅ ADDED: reposted original posts open their comments here — keyed by
+    // the ORIGINAL post's entryId (not by index, since a reposted post may
+    // not exist in the local `posts` array at all).
+    const [openRepostCommentsKey, setOpenRepostCommentsKey] = useState<string | null>(null);
 
     useEffect(() => {
         setVisibleCommentsCount(3);
@@ -793,6 +906,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({
                                         >
                                             {combinedItems.map((item, idx) => {
                                                 if (item.type === 'repost') {
+                                                    const originalKey = item.data.originalPost?.entryId;
                                                     return (
                                                         <div
                                                             key={`repost-${item.data.repostId}`}
@@ -805,6 +919,35 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({
                                                                 fullName={fullName}
                                                                 currentUserId={currentUserId}
                                                                 isOwnProfile={isOwnProfile}
+                                                                // ✅ ADDED — reactions (same source PostCard uses)
+                                                                postReactions={handlers.postReactions}
+                                                                onReact={handlers.handleReaction}
+                                                                likedPosts={handlers.postLikes}
+                                                                handleLike={handlers.handleLikeToggle}
+                                                                // ✅ ADDED — comments
+                                                                openCommentsIndex={openRepostCommentsKey}
+                                                                toggleComments={(pid: string) =>
+                                                                    setOpenRepostCommentsKey(prev => (prev === pid ? null : pid))
+                                                                }
+                                                                postComments={handlers.commentsByPost}
+                                                                commentText={handlers.commentText}
+                                                                setCommentText={handlers.setCommentText}
+                                                                replyingTo={handlers.replyingTo}
+                                                                setReplyingTo={handlers.setReplyingTo}
+                                                                openCommentMenuIndex={handlers.openCommentMenuIndex}
+                                                                editingCommentId={handlers.editingCommentId}
+                                                                editCommentText={handlers.editCommentText}
+                                                                setEditCommentText={handlers.setEditCommentText}
+                                                                showEmojiPicker={handlers.showEmojiPicker}
+                                                                setShowEmojiPicker={handlers.setShowEmojiPicker}
+                                                                handleReply={handlers.setReplyingToCommentId}
+                                                                handleCommentReaction={handlers.likeCommentToggle}
+                                                                toggleCommentMenu={handlers.toggleCommentMenu}
+                                                                handleCommentAction={handlers.handleCommentAction}
+                                                                handleEditSubmit={handlers.handleEditSubmit}
+                                                                handleEmojiClick={handlers.handleEmojiClick}
+                                                                handleCommentSubmit={handlers.handleCommentSubmit}
+                                                                postCommentCounts={undefined}
                                                             />
                                                         </div>
                                                     );

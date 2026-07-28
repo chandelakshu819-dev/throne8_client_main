@@ -2,6 +2,7 @@
 import React, { useState, useRef } from 'react';
 import RepostMenuDropdown from './RepostMenuDropdown';
 import ReactionPicker, { REACTION_CONFIG } from './ReactionPicker';
+import SendPostModal from './SendPostModal';
 import { ReactionType } from '@/types/profile.types';
 
 interface PostActionsProps {
@@ -18,12 +19,13 @@ interface PostActionsProps {
   handleRepostInstant?: any;
   postReactions?: Record<string, { counts: any; userReaction: ReactionType | null }>;
   onReact?: (postId: string, type: ReactionType) => void;
+  currentUserId?: string; // ✅ NEW: needed to fetch connections for the Send modal
 }
 
 const PostActions = ({
   post, index, isDarkMode, likedPosts, handleLike, openRepostIndex, toggleRepostMenu,
   handleRepost, toggleComments, onOpenWithPerspectiveModal, handleRepostInstant,
-  postReactions, onReact,
+  postReactions, onReact, currentUserId,
 }: PostActionsProps) => {
   const postKey = post.entryId || post.postId;
 
@@ -36,6 +38,8 @@ const PostActions = ({
     ? Object.values(reactionCounts).reduce((sum: number, v: any) => sum + (v || 0), 0)
     : (post.likesCount || post.likes || 0);
 
+  const commentCount = post.commentsCount || post.comments || 0;
+
   const activeConfig = REACTION_CONFIG.find(r => r.type === userReaction);
 
   const [showPicker, setShowPicker] = useState(false);
@@ -43,19 +47,9 @@ const PostActions = ({
 
   const [hasReposted, setHasReposted] = useState(false);
   const [isReposting, setIsReposting] = useState(false);
-  const [shareCount, setShareCount] = useState(post.shares || 0);
 
-  const handleShare = async () => {
-    try {
-      const postUrl = `${window.location.origin}/post/${postKey}`;
-      await navigator.clipboard.writeText(postUrl);
-      setShareCount((prev: number) => prev + 1);
-      alert('Post link copied! Share it anywhere.');
-    } catch (err) {
-      console.error('Failed to share post:', err);
-      alert('Failed to copy link');
-    }
-  };
+  // ✅ NEW: Send modal state (replaces plain clipboard-copy behaviour)
+  const [showSendModal, setShowSendModal] = useState(false);
 
   const handleQuickClick = () => {
     if (onReact) {
@@ -80,11 +74,41 @@ const PostActions = ({
     onReact?.(postKey, type);
   };
 
-  return (
-    <div className={`flex items-center justify-between pt-4 mt-1 border-t ${isDarkMode ? 'border-slate-700' : 'border-[#e0d8cf]'}`}>
-      <div className="flex items-center gap-2">
+  const mutedText = isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60';
+  const hoverBg = isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-[#e0d8cf]/60';
+  const iconText = isDarkMode ? 'text-slate-300' : 'text-[#4a3728]';
 
-        {/* ✅ Reaction pill — matches Comment/Share pill styling */}
+  return (
+    <div className="pt-3 mt-1">
+      {/* ── Row 1: summary counts (reaction icon + total, comment count) ── */}
+      {(totalReactionCount > 0 || commentCount > 0) && (
+        <div className={`flex items-center justify-between px-1 pb-2 text-sm ${mutedText}`}>
+          <div className="flex items-center gap-1.5">
+            {totalReactionCount > 0 && (
+              <>
+                <span className="text-base leading-none">{activeConfig ? activeConfig.emoji : '👍'}</span>
+                <span>{totalReactionCount}</span>
+              </>
+            )}
+          </div>
+          {commentCount > 0 && (
+            <button
+              onClick={() => toggleComments(postKey)}
+              className="hover:underline"
+            >
+              {commentCount} comment{commentCount !== 1 ? 's' : ''}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Divider ── */}
+      <div className={`border-t ${isDarkMode ? 'border-slate-700' : 'border-[#e0d8cf]'}`} />
+
+      {/* ── Row 2: Like / Comment / Repost / Send — evenly spaced ── */}
+      <div className="grid grid-cols-4 gap-1 pt-1">
+
+        {/* Like */}
         <div
           className="relative"
           onMouseEnter={handleMouseEnter}
@@ -95,71 +119,74 @@ const PostActions = ({
           )}
           <button
             onClick={handleQuickClick}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 ${
-              userReaction
-                ? 'bg-opacity-10'
-                : isDarkMode
-                  ? 'text-slate-300 hover:bg-slate-700'
-                  : 'text-[#4a3728] hover:bg-[#e0d8cf]/60'
+            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+              userReaction ? '' : `${iconText} ${hoverBg}`
             }`}
-            style={
-              userReaction
-                ? { color: activeConfig?.color, backgroundColor: `${activeConfig?.color}1A` }
-                : undefined
-            }
+            style={userReaction ? { color: activeConfig?.color } : undefined}
           >
             <span className="text-lg leading-none">
               {activeConfig ? activeConfig.emoji : '👍'}
             </span>
-            <span>{totalReactionCount > 0 ? totalReactionCount : 'Like'}</span>
+            <span>{activeConfig?.label || 'Like'}</span>
           </button>
         </div>
 
+        {/* Comment */}
         <button
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 ${
-            isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-[#4a3728] hover:bg-[#e0d8cf]/60'
-          }`}
           onClick={() => toggleComments(postKey)}
+          className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${iconText} ${hoverBg}`}
         >
           <i className="ri-message-3-line text-lg"></i>
-          <span>{post.commentsCount || post.comments || 0}</span>
+          <span>Comment</span>
         </button>
 
-        <button
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 ${
-            isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-[#4a3728] hover:bg-[#e0d8cf]/60'
-          }`}
-          onClick={handleShare}
-        >
-          <i className="ri-share-forward-line text-lg"></i>
-          <span>{shareCount}</span>
-        </button>
-      </div>
-
-      <div className="relative repost-menu">
-        <button
-          onClick={() => toggleRepostMenu(index)}
-          disabled={isReposting}
-          className={`p-2 rounded-full transition-all duration-200 ${hasReposted
-              ? 'text-green-600'
-              : isDarkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-[#e0d8cf]/60 text-[#4a3728]'
+        {/* Repost */}
+        <div className="relative repost-menu">
+          <button
+            onClick={() => toggleRepostMenu(index)}
+            disabled={isReposting}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+              hasReposted ? 'text-green-600' : `${iconText} ${hoverBg}`
             }`}
+          >
+            <i className={`ri-repeat-${hasReposted ? 'fill' : 'line'} text-lg`}></i>
+            <span>Repost</span>
+          </button>
+          {openRepostIndex === index && (
+            <RepostMenuDropdown
+              isDarkMode={isDarkMode}
+              index={index}
+              post={post}
+              onOpenWithPerspectiveModal={onOpenWithPerspectiveModal}
+              onRepostInstant={(idx: any) => {
+                handleRepostInstant(idx);
+                toggleRepostMenu(idx);
+              }}
+            />
+          )}
+        </div>
+
+        {/* Send — ab modal open karta hai (LinkedIn-style) instead of silent clipboard copy */}
+        <button
+          onClick={() => setShowSendModal(true)}
+          className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${iconText} ${hoverBg}`}
         >
-          <i className={`ri-repeat-${hasReposted ? 'fill' : 'line'} text-xl`}></i>
+          <i className="ri-send-plane-line text-lg"></i>
+          <span>Send</span>
         </button>
-        {openRepostIndex === index && (
-          <RepostMenuDropdown
-            isDarkMode={isDarkMode}
-            index={index}
-            post={post}
-            onOpenWithPerspectiveModal={onOpenWithPerspectiveModal}
-            onRepostInstant={(idx: any) => {
-              handleRepostInstant(idx);
-              toggleRepostMenu(idx);
-            }}
-          />
-        )}
       </div>
+
+      {/* ✅ NEW: Send Post Modal */}
+      {showSendModal && currentUserId && (
+        <SendPostModal
+          isOpen={showSendModal}
+          onClose={() => setShowSendModal(false)}
+          currentUserId={currentUserId}
+          postId={postKey}
+          postOwnerName={post.firstName || post.fullName || 'this'}
+          isDarkMode={isDarkMode}
+        />
+      )}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 // src/features/dashboard/components/feed/PostActions.tsx
 import React, { useState } from 'react';
 import RepostMenuDropdown from './RepostMenuDropdown';
+import SendPostModal from './SendPostModal';
 
 interface PostActionsProps {
   post: any;
@@ -14,9 +15,10 @@ interface PostActionsProps {
   toggleComments: any;
   onOpenWithPerspectiveModal?: any;
   handleRepostInstant?: any;
+  currentUserId?: string; // ✅ NEW: needed to fetch connections for the Send modal
 }
 
-const PostActions = ({ post, index, isDarkMode, likedPosts, handleLike, openRepostIndex, toggleRepostMenu, handleRepost, toggleComments, onOpenWithPerspectiveModal, handleRepostInstant }: PostActionsProps) => {
+const PostActions = ({ post, index, isDarkMode, likedPosts, handleLike, openRepostIndex, toggleRepostMenu, handleRepost, toggleComments, onOpenWithPerspectiveModal, handleRepostInstant, currentUserId }: PostActionsProps) => {
   const postKey = post.entryId || post.postId;
   const isLiked = likedPosts[postKey] ?? post.isLikedByCurrentUser ?? false;
 
@@ -24,21 +26,12 @@ const PostActions = ({ post, index, isDarkMode, likedPosts, handleLike, openRepo
   const [isReposting, setIsReposting] = useState(false);
   const [shareCount, setShareCount] = useState(post.shares || 0);
 
+  // ✅ NEW: Send modal state (replaces plain clipboard-copy behaviour)
+  const [showSendModal, setShowSendModal] = useState(false);
+
   const likeCount = (post.likesCount || post.likes || 0)
     + (isLiked && !post.isLikedByCurrentUser ? 1 : 0)
     + (!isLiked && post.isLikedByCurrentUser ? -1 : 0);
-
-  const handleShare = async () => {
-    try {
-      const postUrl = `${window.location.origin}/post/${postKey}`;
-      await navigator.clipboard.writeText(postUrl);
-      setShareCount((prev: number) => prev + 1);
-      alert('Post link copied! Share it anywhere.');
-    } catch (err) {
-      console.error('Failed to share post:', err);
-      alert('Failed to copy link');
-    }
-  };
 
   // ✅ LinkedIn-style action button: icon in a soft circle + label + count
   const ActionButton = ({
@@ -145,9 +138,26 @@ const PostActions = ({ post, index, isDarkMode, likedPosts, handleLike, openRepo
             )}
           </div>
 
-          <ActionButton icon="ri-send-plane-line" label="Send" onClick={handleShare} />
+          {/* Send — ab modal open karta hai (LinkedIn-style) instead of silent clipboard copy */}
+          <ActionButton
+            icon="ri-send-plane-line"
+            label="Send"
+            onClick={() => setShowSendModal(true)}
+          />
         </div>
       </div>
+
+      {/* ✅ NEW: Send Post Modal */}
+      {showSendModal && currentUserId && (
+        <SendPostModal
+          isOpen={showSendModal}
+          onClose={() => setShowSendModal(false)}
+          currentUserId={currentUserId}
+          postId={postKey}
+          postOwnerName={post.firstName || post.fullName || 'this'}
+          isDarkMode={isDarkMode}
+        />
+      )}
     </div>
   );
 };

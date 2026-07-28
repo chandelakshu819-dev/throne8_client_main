@@ -1,6 +1,4 @@
-
 // src/features/dashboard/hooks/useAllUsersPosts.ts
-// — DONO FILES MEIN YEHI CONTENT PASTE KARO
 
 import { useState, useCallback } from 'react';
 import { transformApiPostToFeedPost } from '@/shared/utils/postTransformers';
@@ -18,7 +16,19 @@ export const useAllUsersPosts = () => {
             const response = await ProfileService.getAllPostsForHomeFeed(false);
             const posts = response.data.posts;
 
-            const uniqueUserIds = [...new Set(posts.map((post: any) => String(post.userId)))] as string[];
+            // ✅ FIX: reposts ke case mein post.userId = repostedBy hota hai,
+            // original author (originalPost.userId) iss list mein missing
+            // rehta tha — isliye reposted card pe original author ka
+            // naam/avatar kabhi resolve nahi hota tha.
+            const uniqueUserIds = [
+                ...new Set(
+                    posts.flatMap((post: any) =>
+                        post.feedItemType === 'repost'
+                            ? [String(post.userId), String(post.originalPost?.userId)]
+                            : [String(post.userId)]
+                    ).filter(Boolean)
+                ),
+            ] as string[];
 
             let usersData: Record<string, any> = {};
             if (uniqueUserIds.length > 0) {
@@ -71,6 +81,50 @@ export const useAllUsersPosts = () => {
             }
 
             const transformedPosts = posts.map((post: any) => {
+                // ✅ FIX: repost items ko alag handle karo — pehle yeh seedha
+                // transformApiPostToFeedPost() ko chala jaata tha jo
+                // feedItemType, originalPost, repostId sab drop kar deta tha.
+                // Isse FeedContainer.tsx ka `post.feedItemType === 'repost'`
+                // check kabhi true nahi hota tha aur FeedRepostCard render
+                // hi nahi hota tha.
+                if (post.feedItemType === 'repost') {
+                    const reposterData = usersData[post.userId];               // jisne repost kiya
+                    const originalUserData = usersData[post.originalPost?.userId]; // original post ka author
+
+                    if (!reposterData || !originalUserData) {
+                        console.warn(`⚠️ No user data for repost ${post.repostId}`);
+                        return null;
+                    }
+
+                    const originalProfileImageUrl = originalUserData.profilePhotoId
+                        ? profilePhotosMap[originalUserData.profilePhotoId] || null
+                        : null;
+
+                    return {
+                        feedItemType: 'repost',
+                        repostId: post.repostId,
+                        repostType: post.repostType,
+                        thoughtText: post.thoughtText,
+                        createdAt: post.createdAt,
+                        repostedBy: post.repostedBy,
+                        originalPost: {
+                            entryId: post.originalPost.entryId,
+                            title: post.originalPost.title,
+                            content: post.originalPost.content,
+                            images: post.originalPost.images || [],
+                            videos: post.originalPost.videos || [],
+                            documents: post.originalPost.documents || [],
+                            likesCount: post.originalPost.likesCount || 0,
+                            commentsCount: post.originalPost.commentsCount || 0,
+                            isLikedByCurrentUser: post.originalPost.isLikedByCurrentUser || false,
+                            createdAt: post.originalPost.createdAt,
+                            userAvatar: originalProfileImageUrl,
+                            userName: `${originalUserData.firstName} ${originalUserData.lastName}`.trim(),
+                            fullName: `${originalUserData.firstName} ${originalUserData.lastName}`.trim(),
+                        },
+                    };
+                }
+
                 const userData = usersData[post.userId];
                 if (!userData) {
                     console.warn(`⚠️ No user data for post ${post.postId}`);

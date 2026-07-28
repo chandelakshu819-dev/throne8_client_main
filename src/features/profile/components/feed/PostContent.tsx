@@ -1,4 +1,4 @@
-// app/(dashboard)/components/feed/PostContent.tsx
+// app/(profile)/components/feed/PostContent.tsx
 import React, { useState } from 'react';
 
 const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) => {
