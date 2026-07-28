@@ -218,10 +218,10 @@ export default function AnalyticsDetailsPage() {
                         {/* Post Impressions Card */}
                         <div className="bg-white rounded-2xl p-6 shadow-lg border border-[#e0d8cf]">
                             <div className="flex items-center justify-between mb-4">
-                                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                                    <BarChart3 className="w-6 h-6 text-green-600" />
-                                </div>
-                                <TrendingUp className="w-5 h-5 text-green-500" />
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#E8DACB' }}>
+    <BarChart3 className="w-6 h-6" style={{ color: '#8B5A2B' }} />
+</div>
+                                <TrendingUp className="w-5 h-5" style={{ color: '#8B5A2B' }} />
                             </div>
                             <h3 className="text-3xl font-bold text-[#4a3728] mb-1">
                                 {analytics?.postImpressions?.total || 0}
@@ -242,10 +242,10 @@ export default function AnalyticsDetailsPage() {
                         {/* Profile Views Card */}
                         <div className="bg-white rounded-2xl p-6 shadow-lg border border-[#e0d8cf]">
                             <div className="flex items-center justify-between mb-4">
-                                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                                    <Eye className="w-6 h-6 text-blue-600" />
-                                </div>
-                                <TrendingUp className="w-5 h-5 text-green-500" />
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#E3D2BE' }}>
+    <Eye className="w-6 h-6" style={{ color: '#A66B3D' }} />
+</div>
+                                <TrendingUp className="w-5 h-5" style={{ color: '#8B5A2B' }} />
                             </div>
                             <h3 className="text-3xl font-bold text-[#4a3728] mb-1">
                                 {analytics?.profileViews?.total || 0}
@@ -266,10 +266,10 @@ export default function AnalyticsDetailsPage() {
                         {/* Search Appearances Card */}
                         <div className="bg-white rounded-2xl p-6 shadow-lg border border-[#e0d8cf]">
                             <div className="flex items-center justify-between mb-4">
-                                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                                    <Search className="w-6 h-6 text-purple-600" />
-                                </div>
-                                <TrendingUp className="w-5 h-5 text-green-500" />
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#D9C3A9' }}>
+    <Search className="w-6 h-6" style={{ color: '#6F4520' }} />
+</div>
+                                <TrendingUp className="w-5 h-5" style={{ color: '#8B5A2B' }}/>
                             </div>
                             <h3 className="text-3xl font-bold text-[#4a3728] mb-1">
                                 {analytics?.searchAppearances?.total || 0}
@@ -341,7 +341,7 @@ export default function AnalyticsDetailsPage() {
                                         </span>
                                     </div>
                                     <div className="w-full h-2 bg-[#e0d8cf] rounded-full overflow-hidden">
-                                    <div className="h-full bg-blue-500 rounded-full" style={{ width: getInsightWidth(analytics?.profileViews?.last7Days || 0, analytics?.profileViews?.last90Days || 0) }}></div>
+                                    <div className="h-full rounded-full" style={{ width: getInsightWidth(analytics?.profileViews?.last7Days || 0, analytics?.profileViews?.last90Days || 0) ,backgroundColor: '#D8B8A0'}}></div>
 
                                     </div>
                                 </div>
@@ -353,7 +353,7 @@ export default function AnalyticsDetailsPage() {
                                         </span>
                                     </div>
                                     <div className="w-full h-2 bg-[#e0d8cf] rounded-full overflow-hidden">
-                                    <div className="h-full bg-green-500 rounded-full" style={{ width: getInsightWidth(analytics?.profileViews?.last30Days || 0, analytics?.profileViews?.last90Days || 0) }}></div>
+                                    <div className="h-full rounded-full" style={{ width: getInsightWidth(analytics?.profileViews?.last30Days || 0, analytics?.profileViews?.last90Days || 0) ,backgroundColor: '#C08552'}}></div>
 
                                     </div>
                                 </div>
@@ -365,7 +365,7 @@ export default function AnalyticsDetailsPage() {
                                         </span>
                                     </div>
                                     <div className="w-full h-2 bg-[#e0d8cf] rounded-full overflow-hidden">
-                                    <div className="h-full bg-purple-500 rounded-full" style={{ width: getInsightWidth(analytics?.profileViews?.last90Days || 0, analytics?.profileViews?.last90Days || 0) }}></div>
+                                    <div className="h-full rounded-full" style={{ width: getInsightWidth(analytics?.profileViews?.last90Days || 0, analytics?.profileViews?.last90Days || 0),backgroundColor: '#8B5A2B'}}></div>
                                     </div>
                                 </div>
                                

@@ -11,86 +11,44 @@ interface SearchAppearancesModalProps {
     analytics: any;
 }
 
-// Dummy search data
-const dummySearchData = [
-    {
-        id: 1,
-        searchTerm: 'Product Manager',
-        count: 45,
-        date: '2024-01-20',
-        time: '10:30 AM',
-        highlighted: true
-    },
-    {
-        id: 2,
-        searchTerm: 'Tech Lead India',
-        count: 32,
-        date: '2024-01-19',
-        time: '2:45 PM',
-        highlighted: false
-    },
-    {
-        id: 3,
-        searchTerm: 'Software Engineer',
-        count: 28,
-        date: '2024-01-18',
-        time: '11:15 AM',
-        highlighted: true
-    },
-    {
-        id: 4,
-        searchTerm: 'Startup Founder',
-        count: 22,
-        date: '2024-01-17',
-        time: '4:20 PM',
-        highlighted: false
-    },
-    {
-        id: 5,
-        searchTerm: 'Full Stack Developer',
-        count: 19,
-        date: '2024-01-16',
-        time: '9:00 AM',
-        highlighted: true
-    },
-    {
-        id: 6,
-        searchTerm: 'UI/UX Designer',
-        count: 15,
-        date: '2024-01-15',
-        time: '3:30 PM',
-        highlighted: false
-    },
-    {
-        id: 7,
-        searchTerm: 'Business Analyst',
-        count: 12,
-        date: '2024-01-14',
-        time: '1:45 PM',
-        highlighted: false
-    },
-    {
-        id: 8,
-        searchTerm: 'Data Scientist',
-        count: 10,
-        date: '2024-01-13',
-        time: '5:00 PM',
-        highlighted: true
-    }
-];
 
-const generateSearchGraphData = (days: number) => {
-    const labels = [];
-    const searches = [];
+
+// const generateSearchGraphData = (days: number) => {
+//     const labels = [];
+//     const searches = [];
+
+//     for (let i = days - 1; i >= 0; i--) {
+//         const date = new Date();
+//         date.setDate(date.getDate() - i);
+//         labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+//         searches.push(Math.floor(Math.random() * 30) + 5);
+//     }
+
+//     return { labels, searches };
+// };
+
+// Real appearedAt timestamps ko day-wise group karke graph data banata hai
+const buildRealGraphData = (rawAppearances: any[], days: number) => {
+    const labels: string[] = [];
+    const countsByDate: Record<string, number> = {};
 
     for (let i = days - 1; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
+        const key = date.toISOString().split('T')[0];
+        countsByDate[key] = 0;
         labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-        searches.push(Math.floor(Math.random() * 30) + 5);
     }
 
-    return { labels, searches };
+    rawAppearances.forEach((item) => {
+        if (!item?.appearedAt) return;
+        const key = new Date(item.appearedAt).toISOString().split('T')[0];
+        if (key in countsByDate) {
+            countsByDate[key]++;
+        }
+    });
+
+    return { labels, searches: Object.values(countsByDate) };
 };
 
 const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
@@ -104,6 +62,7 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
     const [customDays, setCustomDays] = useState('');
 
     const [searchHistory, setSearchHistory] = useState<any[]>([]);
+    const [rawAppearances, setRawAppearances] = useState<any[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [change, setChange] = useState<any>(null);   // 👈 NEW
 
@@ -125,6 +84,10 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
             ]);
 
 
+            setRawAppearances(response.data.appearances || []);   // 👈 NAYA — raw data save
+
+
+
             // Group by search query and count
             const grouped = response.data.appearances.reduce((acc: any, item: any) => {
                 const query = item.searchQuery;
@@ -133,11 +96,14 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
                         searchTerm: query,
                         count: 0,
                         dates: [],
-                        highlighted: item.wasClicked // Use actual click data
+                        highlighted: false// Use actual click data
                     };
                 }
                 acc[query].count++;
                 acc[query].dates.push(item.appearedAt);
+                if (item.wasClicked) {
+                    acc[query].highlighted = true;   // 👈 kisi bhi appearance me click hua toh true
+                }
                 return acc;
             }, {});
 
@@ -152,12 +118,25 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
         }
     };
 
+    // ✅ Background scroll lock
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+        }
+
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [isOpen]);
+
+
     if (!isOpen) return null;
 
-    const graphData = generateSearchGraphData(timeRange);
+    const graphData = buildRealGraphData(rawAppearances, timeRange);
+
     const filteredSearches = filterType === 'all'
-        ? dummySearchData
-        : dummySearchData.filter(s => s.highlighted);
+    ? searchHistory
+    : searchHistory.filter((s: any) => s.highlighted);
 
     const chartData = {
         labels: graphData.labels,
@@ -165,13 +144,13 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
             {
                 label: 'Search Appearances',
                 data: graphData.searches,
-                borderColor: '#8b5cf6',
-                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
                 fill: true,
                 tension: 0.4,
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                pointBackgroundColor: '#8b5cf6',
+                pointBackgroundColor: '#3b82f6',
                 pointBorderColor: '#fff',
                 pointBorderWidth: 2
             }
@@ -224,7 +203,7 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-[#f6ede8] rounded-3xl shadow-2xl border border-[#e0d8cf] max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 flex items-center justify-between">
+                <div className="bg-gradient-to-r from-[#7a5c3e] to-[#5f4630] p-6 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <Search className="w-8 h-8 text-white" />
                         <div>
@@ -256,7 +235,7 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
                                         setShowCustomInput(false);
                                     }}
                                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === days && !showCustomInput
-                                        ? 'bg-purple-500 text-white'
+                                        ? 'bg-[#7a5c3e] text-white'
                                         : 'bg-[#e0d8cf] text-[#7a5c3e] hover:bg-[#d4c4b5]'
                                         }`}
                                 >
@@ -268,7 +247,7 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
                             <button
                                 onClick={() => setShowCustomInput(!showCustomInput)}
                                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${showCustomInput
-                                    ? 'bg-purple-500 text-white'
+                                    ? 'bg-[#7a5c3e] text-white'
                                     : 'bg-[#e0d8cf] text-[#7a5c3e] hover:bg-[#d4c4b5]'
                                     }`}
                             >
@@ -285,7 +264,7 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
                                         value={customDays}
                                         onChange={(e) => setCustomDays(e.target.value)}
                                         placeholder="Days"
-                                        className="w-20 px-3 py-2 rounded-lg border border-[#e0d8cf] text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 text-[#4a3728]"
+                                        className="w-20 px-3 py-2 rounded-lg border border-[#e0d8cf] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#4a3728]"
                                     />
                                     <button
                                         onClick={() => {
@@ -294,7 +273,7 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
                                                 setTimeRange(days as any);
                                             }
                                         }}
-                                        className="px-3 py-2 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600 transition-all"
+                                        className="px-3 py-2 bg-[#7a5c3e] text-white rounded-lg text-sm font-medium hover:bg-[#6b4e34] transition-all"
                                     >
                                         Apply
                                     </button>
@@ -314,7 +293,7 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div className="bg-white rounded-xl p-4 shadow border border-[#e0d8cf]">
                             <div className="flex items-center gap-2 mb-2">
-                                <Calendar className="w-5 h-5 text-purple-500" />
+                                <Calendar className="w-5 h-5 text-blue-500" />
                                 <span className="text-sm text-[#7a5c3e]">Last 7 Days</span>
                             </div>
                             <p className="text-2xl font-bold text-[#4a3728]">
@@ -323,7 +302,7 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
                         </div>
                         <div className="bg-white rounded-xl p-4 shadow border border-[#e0d8cf]">
                             <div className="flex items-center gap-2 mb-2">
-                                <Calendar className="w-5 h-5 text-purple-500" />
+                                <Calendar className="w-5 h-5 text-blue-500" />
                                 <span className="text-sm text-[#7a5c3e]">Last 30 Days</span>
                             </div>
                             <div className="flex items-center gap-2">
@@ -346,11 +325,11 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
                         </div>
                         <div className="bg-white rounded-xl p-4 shadow border border-[#e0d8cf]">
                             <div className="flex items-center gap-2 mb-2">
-                                <Hash className="w-5 h-5 text-purple-500" />
+                                <Hash className="w-5 h-5 text-blue-500" />
                                 <span className="text-sm text-[#7a5c3e]">Highlighted</span>
                             </div>
                             <p className="text-2xl font-bold text-[#4a3728]">
-                                {dummySearchData.filter(s => s.highlighted).length}
+                                 {searchHistory.filter((s: any) => s.highlighted).length}
                             </p>
                         </div>
                     </div>
@@ -360,7 +339,7 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
                         <button
                             onClick={() => setFilterType('all')}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterType === 'all'
-                                ? 'bg-purple-500 text-white'
+                                ? 'bg-[#7a5c3e] text-white'
                                 : 'bg-[#e0d8cf] text-[#7a5c3e] hover:bg-[#d4c4b5]'
                                 }`}
                         >
@@ -369,7 +348,7 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
                         <button
                             onClick={() => setFilterType('highlighted')}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterType === 'highlighted'
-                                ? 'bg-purple-500 text-white'
+                                ? 'bg-blue-500 text-white'
                                 : 'bg-[#e0d8cf] text-[#7a5c3e] hover:bg-[#d4c4b5]'
                                 }`}
                         >
@@ -382,42 +361,55 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
                         <h3 className="text-xl font-bold text-[#4a3728] mb-4">
                             Search Terms
                         </h3>
+
+
+                        
                         <div className="space-y-3">
-                            {filteredSearches.map((search) => (
-                                <div
-                                    key={search.id}
-                                    className="bg-white rounded-xl p-4 shadow border border-[#e0d8cf] hover:shadow-lg transition-all"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-4 flex-1">
-                                            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                                                <Search className="w-6 h-6 text-purple-600" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <h4 className="font-bold text-[#4a3728]">{search.searchTerm}</h4>
-                                                    {search.highlighted && (
-                                                        <span className="bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-1 rounded-full">
-                                                            ⭐ Highlighted
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-4 text-sm text-[#7a5c3e]">
-                                                    <span className="flex items-center gap-1">
-                                                        <Calendar className="w-4 h-4" />
-                                                        {search.date}
-                                                    </span>
-                                                    <span>{search.time}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-2xl font-bold text-purple-600">{search.count}</p>
-                                            <p className="text-xs text-[#7a5c3e]">appearances</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+
+                        {filteredSearches.map((search: any, index: number) => {
+    // Sabse latest appearance ka date/time nikaalo (dates array me se pehla, kyunki backend already descending sort karta hai)
+    const latestDate = search.dates && search.dates.length > 0
+        ? new Date(search.dates[0])
+        : null;
+
+    return (
+        <div
+            key={search.searchTerm + index}
+            className="bg-white rounded-xl p-4 shadow border border-[#e0d8cf] hover:shadow-lg transition-all"
+        >
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4 flex-1">
+                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                        <Search className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-bold text-[#4a3728]">{search.searchTerm}</h4>
+                            {search.highlighted && (
+                                <span className="bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-1 rounded-full">
+                                    ⭐ Highlighted
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-[#7a5c3e]">
+                            <span className="flex items-center gap-1">
+                                <Calendar className="w-4 h-4" />
+                                {latestDate ? latestDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'}
+                            </span>
+                            <span>
+                                {latestDate ? latestDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <p className="text-2xl font-bold text-blue-600">{search.count}</p>
+                    <p className="text-xs text-[#7a5c3e]">appearances</p>
+                </div>
+            </div>
+        </div>
+    );
+})}
                         </div>
                     </div>
                 </div>

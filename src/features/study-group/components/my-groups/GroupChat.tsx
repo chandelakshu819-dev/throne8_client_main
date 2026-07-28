@@ -131,7 +131,7 @@ const GroupChat = ({ groupId, groupDetails }: { groupId: string; groupDetails?: 
   // Tab state
   const [activeTab, setActiveTab] = useState<string>("chat");
   const dispatch = useAppDispatch();
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupChat.tsx
+// src/features/studyGroup/components/GroupChat.tsx
   const messages = useAppSelector( selectMessagesByGroup( groupId));
   const messagesLoading = useAppSelector(() => selectMessagesLoading);
   const sendLoading = useAppSelector(() => selectSendLoading);
@@ -139,7 +139,6 @@ const GroupChat = ({ groupId, groupDetails }: { groupId: string; groupDetails?: 
   const replyingToFromStore = useAppSelector(selectReplyingToMessage);
   const pinnedMessages = useAppSelector( selectPinnedMessages(groupId));
   const typingUsers = useAppSelector(selectTypingUserNames(groupId));
-========
   const messages = useAppSelector((state: any) => selectMessagesByGroup(groupId)(state.chat ?? {}));
   const messagesLoading = useAppSelector((state: any) => selectMessagesLoading(state.chat ?? {}));
   const sendLoading = useAppSelector((state: any) => selectSendLoading(state.chat ?? {}));
@@ -147,7 +146,7 @@ const GroupChat = ({ groupId, groupDetails }: { groupId: string; groupDetails?: 
   const replyingToFromStore = useAppSelector((state: any) => selectReplyingToMessage(state.chat ?? {}));
   const pinnedMessages = useAppSelector((state: any) => selectPinnedMessages(groupId)(state.chat ?? {}));
   const typingUsers = useAppSelector((state: any) => selectTypingUserNames(groupId)(state.chat ?? {}));
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/GroupChat.tsx
+// src/features/study-group/components/my-groups/GroupChat.tsx
 
   const { emitTyping, emitStopTyping } = useChatSocket(groupId);
 
@@ -163,21 +162,18 @@ const GroupChat = ({ groupId, groupDetails }: { groupId: string; groupDetails?: 
   const [showAttachmentMenu, setShowAttachmentMenu] = useState<boolean>(false);
 
   // File states
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupChat.tsx
   const groupFiles = useAppSelector( selectFilesByGroup(groupId));
   const pinnedGroupFiles = useAppSelector(selectPinnedFilesByGroup(groupId));
   const filesLoading = useAppSelector( selectFilesLoading);
   const fileUploadLoading = useAppSelector(selectFileUploadLoading);
   const fileDeleteLoading = useAppSelector(() => selectFileDeleteLoading);
   const filePinLoading = useAppSelector(() => selectFilePinLoading);
-========
   const groupFiles = useAppSelector( (state: any) => selectFilesByGroup(groupId)(state.chat ?? {}) );
   const pinnedGroupFiles = useAppSelector((state: any) => selectPinnedFilesByGroup(groupId)(state.chat ?? {}));
   const filesLoading = useAppSelector((state: any) => selectFilesLoading(state.chat ?? {}));
   const fileUploadLoading = useAppSelector((state: any) => selectFileUploadLoading(state.chat ?? {}));
   const fileDeleteLoading = useAppSelector((state: any) => selectFileDeleteLoading(state.chat ?? {}));
   const filePinLoading = useAppSelector((state: any) => selectFilePinLoading(state.chat ?? {}));
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/GroupChat.tsx
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [fileSearchQuery, setFileSearchQuery] = useState<string>("");
@@ -185,21 +181,18 @@ const GroupChat = ({ groupId, groupDetails }: { groupId: string; groupDetails?: 
   const [copySuccess, setCopySuccess] = useState(false);
 
   // Doubt states
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupChat.tsx
   const doubts = useAppSelector( selectDoubtsByGroup(groupId));
   const [doubtFiles, setDoubtFiles] = useState<File[]>([]);
   const doubtsLoading = useAppSelector(() => selectDoubtsLoading);
   const doubtPostLoading = useAppSelector(() => selectDoubtPostLoading);
   const answerPostLoading = useAppSelector(() => selectAnswerPostLoading);
   const [doubtInput, setDoubtInput] = useState<{ title: string; description: string; category: string; tags: string[]; isUrgent: boolean; difficulty: string }>({ title: "", description: "", category: "Mathematics", tags: [], isUrgent: false, difficulty: "Medium" });
-========
   const doubts = useAppSelector((state: any) => selectDoubtsByGroup(groupId)(state.chat ?? {}));
   const [doubtFiles, setDoubtFiles] = useState<File[]>([]);
   const doubtsLoading = useAppSelector((state: any) => selectDoubtsLoading(state.chat ?? {})  );
   const doubtPostLoading = useAppSelector((state: any) => selectDoubtPostLoading(state.chat ?? {}));
   const answerPostLoading = useAppSelector((state: any) => selectAnswerPostLoading(state.chat ?? {}));
   const [doubtInput, setDoubtInput] = useState({ title: "", description: "", category: "Mathematics", tags: [], isUrgent: false, difficulty: "Medium" });
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/GroupChat.tsx
   const [selectedDoubt, setSelectedDoubt] = useState<any | null>(null);
   // Redux se live doubt data lo — selectedDoubt ID se match karke
   const liveSelectedDoubt = selectedDoubt
@@ -207,12 +200,9 @@ const GroupChat = ({ groupId, groupDetails }: { groupId: string; groupDetails?: 
     : null;
   const [selectedDoubtAnswers, setSelectedDoubtAnswers] = useState<any[]>([]);
   // Live answers from Redux — auto-update hote hain
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupChat.tsx
   const liveAnswers = useAppSelector( selectDoubtAnswers(selectedDoubt?.doubtId ?? '')
-========
   const liveAnswers = useAppSelector( (state: any) =>
     selectDoubtAnswers(selectedDoubt?.doubtId ?? '')
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/GroupChat.tsx
   );
   const [answerInput, setAnswerInput] = useState<string>("");
   const [doubtSearchQuery, setDoubtSearchQuery] = useState<string>("");
