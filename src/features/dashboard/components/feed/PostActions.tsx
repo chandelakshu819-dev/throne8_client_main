@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import RepostMenuDropdown from './RepostMenuDropdown';
 import SendPostModal from './SendPostModal';
+import ReactionsModal from '@/features/profile/components/feed/ReactionsModal'; // ✅ NEW
 
 interface PostActionsProps {
   post: any;
@@ -15,7 +16,7 @@ interface PostActionsProps {
   toggleComments: any;
   onOpenWithPerspectiveModal?: any;
   handleRepostInstant?: any;
-  currentUserId?: string; // ✅ NEW: needed to fetch connections for the Send modal
+  currentUserId?: string;
 }
 
 const PostActions = ({ post, index, isDarkMode, likedPosts, handleLike, openRepostIndex, toggleRepostMenu, handleRepost, toggleComments, onOpenWithPerspectiveModal, handleRepostInstant, currentUserId }: PostActionsProps) => {
@@ -26,30 +27,18 @@ const PostActions = ({ post, index, isDarkMode, likedPosts, handleLike, openRepo
   const [isReposting, setIsReposting] = useState(false);
   const [shareCount, setShareCount] = useState(post.shares || 0);
 
-  // ✅ NEW: Send modal state (replaces plain clipboard-copy behaviour)
   const [showSendModal, setShowSendModal] = useState(false);
+  // ✅ NEW: Reactions modal state
+  const [showReactionsModal, setShowReactionsModal] = useState(false);
 
   const likeCount = (post.likesCount || post.likes || 0)
     + (isLiked && !post.isLikedByCurrentUser ? 1 : 0)
     + (!isLiked && post.isLikedByCurrentUser ? -1 : 0);
 
-  // ✅ LinkedIn-style action button: icon in a soft circle + label + count
   const ActionButton = ({
-    icon,
-    activeIcon,
-    active,
-    label,
-    count,
-    onClick,
-    activeColorClass,
+    icon, activeIcon, active, label, count, onClick, activeColorClass,
   }: {
-    icon: string;
-    activeIcon?: string;
-    active?: boolean;
-    label: string;
-    count?: number;
-    onClick: () => void;
-    activeColorClass?: string;
+    icon: string; activeIcon?: string; active?: boolean; label: string; count?: number; onClick: () => void; activeColorClass?: string;
   }) => (
     <button
       onClick={onClick}
@@ -67,7 +56,6 @@ const PostActions = ({ post, index, isDarkMode, likedPosts, handleLike, openRepo
 
   return (
     <div className="pt-2">
-      {/* ✅ Reaction counts strip (LinkedIn jaise "8  💬2  🔁3  ➤") */}
       <div
         className={`flex items-center justify-between pb-2 mb-1 text-xs ${
           isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/50'
@@ -75,10 +63,14 @@ const PostActions = ({ post, index, isDarkMode, likedPosts, handleLike, openRepo
       >
         <div className="flex items-center gap-1">
           {likeCount > 0 && (
-            <span className="flex items-center gap-1">
+            // ✅ FIX: ab clickable button hai, Reactions modal kholta hai
+            <button
+              onClick={() => setShowReactionsModal(true)}
+              className="flex items-center gap-1 hover:underline"
+            >
               <i className="ri-thumb-up-fill text-[#0a66c2] text-sm"></i>
               {likeCount}
-            </span>
+            </button>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -138,7 +130,6 @@ const PostActions = ({ post, index, isDarkMode, likedPosts, handleLike, openRepo
             )}
           </div>
 
-          {/* Send — ab modal open karta hai (LinkedIn-style) instead of silent clipboard copy */}
           <ActionButton
             icon="ri-send-plane-line"
             label="Send"
@@ -147,7 +138,6 @@ const PostActions = ({ post, index, isDarkMode, likedPosts, handleLike, openRepo
         </div>
       </div>
 
-      {/* ✅ NEW: Send Post Modal */}
       {showSendModal && currentUserId && (
         <SendPostModal
           isOpen={showSendModal}
@@ -158,6 +148,14 @@ const PostActions = ({ post, index, isDarkMode, likedPosts, handleLike, openRepo
           isDarkMode={isDarkMode}
         />
       )}
+
+      {/* ✅ NEW: Reactions Modal */}
+      <ReactionsModal
+        postId={postKey}
+        isOpen={showReactionsModal}
+        onClose={() => setShowReactionsModal(false)}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 };

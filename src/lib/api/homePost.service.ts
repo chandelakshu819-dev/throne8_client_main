@@ -60,6 +60,22 @@ class HomePostService {
             throw new Error('Failed to fetch feed.');
         }
     }
+
+    /**
+     * ✅ NEW: GET /api/v1/activity/posts/:postId/reactors
+     * Post ke saare reactions/likes ki list (Reactions modal ke liye)
+     */
+    static async getPostReactors(postId: string): Promise<any> {
+        try {
+            const { data } = await api.get(`/activity/posts/${postId}/reactors`);
+            return data;
+        } catch (error: any) {
+            if (error?.response?.data?.message) {
+                throw new Error(error.response.data.message);
+            }
+            throw new Error('Failed to fetch post reactors.');
+        }
+    }
 }
 
 export default HomePostService;

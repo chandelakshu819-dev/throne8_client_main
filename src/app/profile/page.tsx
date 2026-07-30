@@ -33,6 +33,8 @@ import { useProfile } from '@/features/profile/hooks/useProfile';
 import { useAboutData } from '@/features/profile/hooks/useAboutData';
 import { useHeadlineData } from '@/features/profile/hooks/useHeadlineData';
 import { useSkillsData } from '@/features/profile/hooks/useSkillsData';
+// ✅ NEW — connections ka single source of truth is page ke liye
+import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData';
 
 
 export default function ProfilePage() {
@@ -101,6 +103,11 @@ export default function ProfilePage() {
     const { educationList, loadEducation } = useEducation();
     const { skillsList, fetchSkillsData } = useSkillsData(user?.userId, true);
 
+    // ✅ NEW: connections count — ProfileHeader jaisa hi hook, 30s cache +
+    // in-flight dedupe ki wajah se extra network request NAHI lagegi
+    // (ProfileHeader apna alag instance call karta hai, dono same cache hit karenge)
+    const { totalConnections, fetchConnectionsData } = useConnectionsData();
+
     // ✅ Fetch data on mount
     useEffect(() => {
         if (user) {
@@ -109,6 +116,7 @@ export default function ProfilePage() {
             loadEducation();
             loadMyReposts();
             fetchSkillsData();
+            fetchConnectionsData(user.userId); // ✅ NEW
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
@@ -126,25 +134,25 @@ export default function ProfilePage() {
 
     const { socket } = useSocket();
 
-useEffect(() => {
-    if (!socket) return;
+    useEffect(() => {
+        if (!socket) return;
 
-    const handleFollowReceived = () => {
-        setFollowersCount(prev => prev + 1);
-    };
+        const handleFollowReceived = () => {
+            setFollowersCount(prev => prev + 1);
+        };
 
-    const handleFollowRemoved = () => {
-        setFollowersCount(prev => Math.max(0, prev - 1));
-    };
+        const handleFollowRemoved = () => {
+            setFollowersCount(prev => Math.max(0, prev - 1));
+        };
 
-    socket.on(SOCKET_EVENTS.FOLLOW_RECEIVED, handleFollowReceived);
-    socket.on(SOCKET_EVENTS.FOLLOW_REMOVED, handleFollowRemoved);
+        socket.on(SOCKET_EVENTS.FOLLOW_RECEIVED, handleFollowReceived);
+        socket.on(SOCKET_EVENTS.FOLLOW_REMOVED, handleFollowRemoved);
 
-    return () => {
-        socket.off(SOCKET_EVENTS.FOLLOW_RECEIVED, handleFollowReceived);
-        socket.off(SOCKET_EVENTS.FOLLOW_REMOVED, handleFollowRemoved);
-    };
-}, [socket]);
+        return () => {
+            socket.off(SOCKET_EVENTS.FOLLOW_RECEIVED, handleFollowReceived);
+            socket.off(SOCKET_EVENTS.FOLLOW_REMOVED, handleFollowRemoved);
+        };
+    }, [socket]);
 
 
 
@@ -199,7 +207,7 @@ useEffect(() => {
                     profileImage={profileImageUrl}
                     userName={profileData.userName}
                     currentUserId={user?.userId}
-                    companyId={profileData?.companyId}
+                    companyId={profileData?.company}
                 />
 
                 {/* Main Content (Left) */}
@@ -221,7 +229,7 @@ useEffect(() => {
                         currentUserId={user?.userId}
                         profileImage={profileImageUrl}
                         name={profileData.name}
-                        pronouns={profileData.pronouns}
+                        // pronouns={profileData.pronouns}
                         headline={headlineData?.title || profileData.headline}
                         headlineId={headlineId}
                         onHeadlineCreated={fetchHeadlineData}
@@ -318,7 +326,10 @@ useEffect(() => {
                         educationList={educationList}
                         experienceList={experienceList}
                         skillsCount={skillsList.length}
-                        connectionsCount={profileData.connections}
+                        connectionsCount={totalConnections}
+                        //{/* ✅ FIX: profileData.connections (jo transformer mein hamesha '' hardcoded hai)
+                            // ki jagah ab totalConnections use ho raha hai — same real
+                            // source jo ProfileHeader ke "8 connections" mein dikhta hai *///
                         postsCount={userPosts?.length || 0}
                     />
                     {/* People You May Know */}

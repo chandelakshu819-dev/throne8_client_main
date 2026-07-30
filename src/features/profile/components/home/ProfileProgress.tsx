@@ -1,6 +1,14 @@
-// src/profile/components/ProfileProgress.tsx
+// src/features/profile/components/home/ProfileProgress.tsx
 'use client';
 import React from 'react';
+import {
+    calculateProfileCompletion,
+    getMissingSkillsCount,
+    calculateNetworkGrowth,
+    getRemainingConnections,
+    calculateContentEngagement,
+    getRemainingPosts,
+} from '@/shared/utils/profileCompletion';
 
 interface ProfileProgressProps {
     profileImageUrl?: string | null;
@@ -25,20 +33,18 @@ const ProfileProgress: React.FC<ProfileProgressProps> = ({
     connectionsCount = 0,
     postsCount = 0,
 }) => {
-    // ===== Profile Completion (7 checkpoints) =====
-    const checks = [
-        !!profileImageUrl,
-        !!bannerUrl,
-        !!headline,
-        !!about,
-        educationList.length > 0,
-        experienceList.length > 0,
-        skillsCount >= 3,
-    ];
-    const completedCount = checks.filter(Boolean).length;
-    const profileCompletion = Math.round((completedCount / checks.length) * 100);
+    // ===== Profile Completion (7 checkpoints) — ✅ shared utility se =====
+    const profileCompletion = calculateProfileCompletion({
+        profileImageUrl,
+        bannerUrl,
+        headline,
+        about,
+        educationList,
+        experienceList,
+        skillsCount,
+    });
 
-    const missingSkills = Math.max(0, 3 - skillsCount);
+    const missingSkills = getMissingSkillsCount(skillsCount);
     const completionDescription =
         profileCompletion === 100
             ? 'Your profile is fully complete!'
@@ -46,20 +52,18 @@ const ProfileProgress: React.FC<ProfileProgressProps> = ({
                 ? `Add ${missingSkills} more skill${missingSkills > 1 ? 's' : ''} to reach 100%`
                 : 'Complete remaining sections to reach 100%';
 
-    // ===== Network Growth (target: 50 connections) =====
+    // ===== Network Growth (target: 50 connections) — ✅ shared utility se =====
     const connectionsNum = typeof connectionsCount === 'string' ? parseInt(connectionsCount) || 0 : connectionsCount;
-    const NETWORK_TARGET = 50;
-    const networkGrowth = Math.min(100, Math.round((connectionsNum / NETWORK_TARGET) * 100));
-    const remainingConnections = Math.max(0, NETWORK_TARGET - connectionsNum);
+    const networkGrowth = calculateNetworkGrowth(connectionsNum);
+    const remainingConnections = getRemainingConnections(connectionsNum);
     const networkDescription =
         networkGrowth >= 100
             ? 'Great network size!'
             : `Connect with ${remainingConnections} more professionals`;
 
-    // ===== Content Engagement (target: 10 posts) =====
-    const POSTS_TARGET = 10;
-    const contentEngagement = Math.min(100, Math.round((postsCount / POSTS_TARGET) * 100));
-    const remainingPosts = Math.max(0, POSTS_TARGET - postsCount);
+    // ===== Content Engagement (target: 10 posts) — ✅ shared utility se =====
+    const contentEngagement = calculateContentEngagement(postsCount);
+    const remainingPosts = getRemainingPosts(postsCount);
     const engagementDescription =
         contentEngagement >= 100
             ? 'You are actively sharing content!'

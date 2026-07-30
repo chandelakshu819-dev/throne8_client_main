@@ -17,6 +17,10 @@ export interface UserProfileData {
     aboutId?: string;
     experienceIds?: string[];
     educationIds?: string[];
+    
+}
+export interface ProfileData {
+    companyId?: string; 
 }
 
 export interface ProfileState {
