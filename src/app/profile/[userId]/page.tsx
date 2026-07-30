@@ -81,6 +81,9 @@ export default function SearchUserProfilePage() {
     // naam/photo alag se fetch karke yahan store karte hain.
     const [currentUserName, setCurrentUserName] = useState('');
     const [currentUserImage, setCurrentUserImage] = useState('');
+    // ✅ FIX: current user ki headline bhi store karte hain, taaki jab
+    // ye kisi aur ka profile view kare, uski headline bhi record ho sake
+    const [currentUserHeadline, setCurrentUserHeadline] = useState('');
     // ✅ FIX: ye flag batata hai ki current user ka naam/photo fetch
     // poora ho chuka hai ya nahi. Isse pehle profile-view record
     // nahi hogi, taaki viewerPhotoUrl kabhi khali na jaye (race condition fix)
@@ -100,6 +103,15 @@ export default function SearchUserProfilePage() {
                         const photoRes = await ProfileService.getProfilePhotoById(data.profilePhotoId);
                         setCurrentUserImage(photoRes?.data?.photo?.cloudinarySecureUrl || '');
                     }
+                    // ✅ FIX: current user ki headline fetch karo (agar headlineId hai)
+                    if (data.headlineId) {
+                        try {
+                            const headlineRes = await ProfileService.getHeadlineById(data.headlineId);
+                            setCurrentUserHeadline(headlineRes?.data?.title || '');
+                        } catch {
+                            setCurrentUserHeadline('');
+                        }
+                    }
                 } else {
                     setCurrentUserName(user.email || '');
                 }
@@ -112,6 +124,7 @@ export default function SearchUserProfilePage() {
         fetchCurrentUser();
     }, [user?.userId, user?.email]);
 
+    
     useEffect(() => {
         if (userId) {
             fetchConnectionsData(userId);

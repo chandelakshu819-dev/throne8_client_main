@@ -63,6 +63,11 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
     // ✅ FIX: kis viewer ke Connect button pe abhi request bhej rahe hain (loading state)
     const [connectingId, setConnectingId] = useState<string | null>(null);
 
+
+
+
+
+
     useEffect(() => {
         if (!isOpen) return;
 
@@ -109,6 +114,18 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
 
         loadData();
     }, [isOpen, timeRange, user?.userId]);
+
+     // ✅ Scroll lock effect — YAHA ADD KARO
+     useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+        }
+
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
     // ✅ FIX: Connect button click hone par connection request bhejta hai
@@ -194,7 +211,7 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-[#f6ede8] rounded-3xl shadow-2xl border border-[#e0d8cf] max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 flex items-center justify-between">
+                <div className="bg-gradient-to-r from-[#7a5c3e] to-[#5f4630] p-6 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <Eye className="w-8 h-8 text-white" />
                         <div>
@@ -226,7 +243,7 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
                                         setShowCustomInput(false);
                                     }}
                                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === days && !showCustomInput
-                                            ? 'bg-blue-500 text-white'
+                                            ? 'bg-[#7a5c3e] text-white'
                                             : 'bg-[#e0d8cf] text-[#7a5c3e] hover:bg-[#d4c4b5]'
                                         }`}
                                 >
@@ -238,7 +255,7 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
                             <button
                                 onClick={() => setShowCustomInput(!showCustomInput)}
                                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${showCustomInput
-                                        ? 'bg-blue-500 text-white'
+                                        ? 'bg-[#7a5c3e] text-white'
                                         : 'bg-[#e0d8cf] text-[#7a5c3e] hover:bg-[#d4c4b5]'
                                     }`}
                             >
@@ -255,7 +272,7 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
                                         value={customDays}
                                         onChange={(e) => setCustomDays(e.target.value)}
                                         placeholder="Days"
-                                        className="w-20 px-3 py-2 rounded-lg border border-[#e0d8cf] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-[#4a3728]"
+                                        className="w-20 px-3 py-2 rounded-lg border border-[#e0d8cf] text-sm focus:outline-none focus:ring-2 focus:ring-[#7a5c3e] text-[#4a3728]"
                                     />
                                     <button
                                         onClick={() => {
@@ -264,7 +281,7 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
                                                 setTimeRange(days as any);
                                             }
                                         }}
-                                        className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-all"
+                                        className="px-3 py-2 bg-[#7a5c3e] text-white rounded-lg text-sm font-medium hover:bg-[#6b4e34] transition-all"
                                     >
                                         Apply
                                     </button>
@@ -332,11 +349,11 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
                                                 <img
                                                     src={viewer.viewerPhotoUrl}
                                                     alt={viewer.viewerName}
-                                                    className="w-14 h-14 rounded-xl object-cover border-2 border-blue-500"
+                                                    className="w-14 h-14 rounded-xl object-cover border-2 border-[#c4a789]"
                                                 />
                                             ) : (
-                                                <div className="w-14 h-14 rounded-xl border-2 border-blue-500 bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                                    <span className="text-blue-600 font-bold text-lg">
+                                                <div className="w-14 h-14 rounded-xl border-2 border-[#c4a789] bg-[#f0e6d8] flex items-center justify-center flex-shrink-0">
+                                                    <span className="text-[#7a5c3e] font-bold text-lg">
                                                         {viewer.viewerName?.charAt(0)?.toUpperCase() || '?'}
                                                     </span>
                                                 </div>

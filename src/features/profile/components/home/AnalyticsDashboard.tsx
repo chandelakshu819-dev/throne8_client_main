@@ -1,3 +1,5 @@
+
+
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -114,10 +116,10 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ userId }) => {
                     onClick={() => router.push(`/profile/analytics/${currentUser?.userId}`)}
                     className="group bg-[#e0d8cf] rounded-xl p-4 shadow-md border border-[#c9bfb4] hover:shadow-[0_0_16px_#c9bfb4] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer">
                     <div className="flex justify-between items-start mb-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300">
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300" style={{ background: 'linear-gradient(to bottom right, #C08552, #A66B3D)' }}>
                             <Eye className="w-5 h-5 text-white" />
                         </div>
-                        <p className={`text-xs font-semibold ${changes.profileViews >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        <p className="text-xs font-semibold" style={{ color: changes.profileViews >= 0 ? '#5B8C5A' : '#B85C5C' }}>
                             {formatChange(changes.profileViews)}
                         </p>
                     </div>
@@ -140,8 +142,8 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ userId }) => {
                     <div className="mt-1.5">
                         <div className="w-full h-1.5 bg-[#d1c5b9] rounded-full overflow-hidden">
                             <div
-                                className="h-1.5 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-700"
-                                style={{ width: `${getProgressWidth(analytics.profileViews.last7Days, analytics.profileViews.total)}%` }}
+                                className="h-1.5 rounded-full transition-all duration-700"
+                                style={{ width: `${getProgressWidth(analytics.profileViews.last7Days, analytics.profileViews.total)}%`, background: 'linear-gradient(to right, #C08552, #A66B3D)' }}
                             ></div>
                         </div>
                     </div>
@@ -163,10 +165,10 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ userId }) => {
                     onClick={() => router.push(`/profile/analytics/${currentUser?.userId}`)}
                     className="group bg-[#e0d8cf] rounded-xl p-4 shadow-md border border-[#c9bfb4] hover:shadow-[0_0_16px_#c9bfb4] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer">
                     <div className="flex justify-between items-start mb-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300">
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300" style={{ background: 'linear-gradient(to bottom right, #C08552, #A66B3D)' }}>
                             <TrendingUp className="w-5 h-5 text-white" />
                         </div>
-                        <p className={`text-xs font-semibold ${changes.postImpressions >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        <p className="text-xs font-semibold" style={{ color: changes.postImpressions >= 0 ? '#5B8C5A' : '#B85C5C' }}>
                             {formatChange(changes.postImpressions)}
                         </p>
                     </div>
@@ -189,8 +191,8 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ userId }) => {
                     <div className="mt-1.5">
                         <div className="w-full h-1.5 bg-[#d1c5b9] rounded-full overflow-hidden">
                             <div
-                                className="h-1.5 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full transition-all duration-700"
-                                style={{ width: `${getProgressWidth(analytics.postImpressions.last7Days, analytics.postImpressions.total)}%` }}
+                                className="h-1.5 rounded-full transition-all duration-700"
+                                style={{ width: `${getProgressWidth(analytics.postImpressions.last7Days, analytics.postImpressions.total)}%`, background: 'linear-gradient(to right, #C08552, #A66B3D)' }}
                             ></div>
                         </div>
                     </div>
@@ -212,10 +214,10 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ userId }) => {
                     onClick={() => router.push(`/profile/analytics/${currentUser?.userId}`)}
                     className="group bg-[#e0d8cf] rounded-xl p-4 shadow-md border border-[#c9bfb4] hover:shadow-[0_0_16px_#c9bfb4] hover:-translate-y-0.5 transition-all duration-300 cursor-pointer">
                     <div className="flex justify-between items-start mb-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300">
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300" style={{ background: 'linear-gradient(to bottom right, #C08552, #A66B3D)' }}>
                             <Users className="w-5 h-5 text-white" />
                         </div>
-                        <p className={`text-xs font-semibold ${changes.searchAppearances >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        <p className="text-xs font-semibold" style={{ color: changes.searchAppearances >= 0 ? '#5B8C5A' : '#B85C5C' }}>
                             {formatChange(changes.searchAppearances)}
                         </p>
                     </div>
@@ -238,8 +240,8 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ userId }) => {
                     <div className="mt-1.5">
                         <div className="w-full h-1.5 bg-[#d1c5b9] rounded-full overflow-hidden">
                             <div
-                                className="h-1.5 bg-gradient-to-r from-green-500 to-green-600 rounded-full transition-all duration-700"
-                                style={{ width: `${getProgressWidth(analytics.searchAppearances.last7Days, analytics.searchAppearances.total)}%` }}
+                                className="h-1.5 rounded-full transition-all duration-700"
+                                style={{ width: `${getProgressWidth(analytics.searchAppearances.last7Days, analytics.searchAppearances.total)}%`, background: 'linear-gradient(to right, #C08552, #A66B3D)' }}
                             ></div>
                         </div>
                     </div>

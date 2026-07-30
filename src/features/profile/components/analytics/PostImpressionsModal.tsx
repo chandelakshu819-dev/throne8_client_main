@@ -125,6 +125,18 @@ const PostImpressionsModal: React.FC<PostImpressionsModalProps> = ({
     const [customDays, setCustomDays] = useState('');
     const { change, isLoading: changeLoading } = usePostImpressions({ days: timeRange });
 
+    
+     // ✅ NEW: Background scroll lock jab modal open ho
+    useEffect(() => {
+        if (isOpen) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [isOpen]);
+
 
     const [timelineData, setTimelineData] = useState<{ labels: string[]; impressions: number[]; engagements: number[] }>({
         labels: [],
