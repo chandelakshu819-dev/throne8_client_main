@@ -187,6 +187,21 @@ class ConnectionService {
             throw new Error(error.response?.data?.message || 'Failed to delete connection');
         }
     }
+
+    /**
+     * 🎉 GET CATCH UP FEED (job changes, work anniversaries, birthdays)
+     * NOTE: adjust the path below (`/connections/catchup`) if your backend
+     * mounts the catchup router under a different prefix.
+     */
+    static async getCatchUpFeed(userId: string) {
+        try {
+            const { data } = await api.get(`/connections/catchup/${userId}`);
+            return data;
+        } catch (error: any) {
+            console.error('❌ [GET_CATCHUP] Failed:', error);
+            throw new Error(error.response?.data?.message || 'Failed to fetch catch up feed');
+        }
+    }
 }
 
 export default ConnectionService;

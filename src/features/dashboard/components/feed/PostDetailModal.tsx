@@ -1,5 +1,6 @@
 // features/dashboard/components/feed/PostDetailModal.tsx
 import React from 'react';
+import { createPortal } from 'react-dom';
 import PostHeader from './PostHeader';
 import PostContent from './PostContent';
 import PostActions from './PostActions';
@@ -99,7 +100,12 @@ const PostDetailModal = ({
     };
   }, []);
 
-  return (
+  // Next.js SSR-safe mount check — document.body only exists client-side
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
+  const modalContent = (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4"
       onClick={onClose}
@@ -192,6 +198,8 @@ const PostDetailModal = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default PostDetailModal;

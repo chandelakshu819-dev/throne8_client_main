@@ -7,10 +7,17 @@ import { PersonCardLoader } from './PersonCardLoader';
 interface SuggestionsSectionProps {
     title?: string;
     people: Person[];
-    connectedUsers: Set<string>; // ✅ Changed from Set<number> to Set<string>
-    onConnect: (userId: string) => void; // ✅ Changed from number to string
+    connectedUsers: Set<string>;
+    onConnect: (userId: string) => void;
     isLoading?: boolean;
 }
+
+// Har "Show more" click pe itne naye cards add honge
+const PAGE_SIZE = 4;
+
+// Naya batch dikhne se pehle itni der ka chhota loading feel diya jaata hai
+// (data toh already fetched hai, ye sirf smooth "loading" jaisa UX dene ke liye hai)
+const LOAD_MORE_DELAY_MS = 400;
 
 export const SuggestionsSection: React.FC<SuggestionsSectionProps> = ({
     title = "People You May Know",
@@ -19,9 +26,11 @@ export const SuggestionsSection: React.FC<SuggestionsSectionProps> = ({
     onConnect,
     isLoading = false
 }) => {
-    const [showAll, setShowAll] = useState(false);
+    // ✅ Ab "showAll" boolean ki jagah ek counter — batch-wise reveal ke liye
+    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-    // ✅ Loading state
+    // ✅ Loading state (initial fetch)
     if (isLoading) {
         return (
             <div
@@ -55,8 +64,25 @@ export const SuggestionsSection: React.FC<SuggestionsSectionProps> = ({
         );
     }
 
-    // ✅ Show first 4 or all based on state
-    const displayedPeople = showAll ? people : people.slice(0, 4);
+    const displayedPeople = people.slice(0, visibleCount);
+    const hasMore = visibleCount < people.length;
+    const isFullyExpanded = !hasMore && people.length > PAGE_SIZE;
+
+    const handleShowMore = () => {
+        if (isLoadingMore) return; // double-click guard
+        setIsLoadingMore(true);
+        // Chhota sa delay — LinkedIn jaisa "loading next batch" feel dene ke liye
+        setTimeout(() => {
+            setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, people.length));
+            setIsLoadingMore(false);
+        }, LOAD_MORE_DELAY_MS);
+    };
+
+    const handleShowLess = () => {
+        setVisibleCount(PAGE_SIZE);
+        // Section ke top pe smoothly scroll kar do taaki user disoriented na ho
+        // (optional — agar chahiye toh ref lagakar scrollIntoView kar sakte hain)
+    };
 
     return (
         <div
@@ -66,8 +92,6 @@ export const SuggestionsSection: React.FC<SuggestionsSectionProps> = ({
             <SectionHeader
                 icon={<i className="ri-hand-coin-fill"></i>}
                 title={title}
-                // actionLabel={people.length > 4 ? (showAll ? "Show Less" : "See all →") : undefined}
-                // onActionClick={people.length > 4 ? () => setShowAll(!showAll) : undefined}
             />
 
             <PeopleGrid
@@ -76,16 +100,29 @@ export const SuggestionsSection: React.FC<SuggestionsSectionProps> = ({
                 onConnect={onConnect}
             />
 
-            {/* ✅ Show More/Less Button - Only when people > 4 */}
-            {people.length > 4 && ( // ✅ FIXED: 4 se jyada pe button show hoga
-                <div className="absolute mt-10 top-0 right-10 text-center">
+            {/* ✅ Naya batch load hote waqt niche skeleton cards dikhte hain */}
+            {isLoadingMore && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
+                    {[...Array(Math.min(PAGE_SIZE, people.length - visibleCount))].map((_, index) => (
+                        <PersonCardLoader key={`loading-more-${index}`} />
+                    ))}
+                </div>
+            )}
+
+            {/* ✅ Show more / Show less button */}
+            {(hasMore || isFullyExpanded) && (
+                <div className="flex justify-center mt-8">
                     <button
-                        onClick={() => setShowAll(!showAll)}
-                        className="ml-auto text-sm font-bold px-4 py-2 rounded-xl transition"
+                        onClick={isFullyExpanded ? handleShowLess : handleShowMore}
+                        disabled={isLoadingMore}
+                        className="text-sm font-bold px-6 py-2.5 rounded-xl transition-all duration-300 shadow-lg hover:scale-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                         style={{ backgroundColor: '#f6ede8', color: '#4a3728' }}
-                        // className="px-6 py-3 bg-[#4a3728] text-[#f6ede8] rounded-xl font-semibold hover:bg-[#3a2718] transition-all duration-300 shadow-lg"
                     >
-                        {showAll ? "Hide ▲" : `Show more →`}
+                        {isLoadingMore
+                            ? 'Loading...'
+                            : isFullyExpanded
+                                ? 'Show less ▲'
+                                : `Show more →`}
                     </button>
                 </div>
             )}

@@ -13,11 +13,14 @@ import { SuggestionsForCompaniesSection } from '@/features/networks/components/s
 import { PremiumSpotlight } from '@/features/networks/components/premium/PremiumSpotlight';
 import { ProfileViewerCard } from '@/features/networks/components/profile/ProfileViewerCard';
 import { ProfileCompletionCard } from '@/features/networks/components/profile/ProfileCompletionCard';
+import { CatchUpSection } from '@/features/networks/components/catchup/CatchUpSection';
+import { AddBirthdayPrompt } from '@/features/networks/components/catchup/AddBirthdayPrompt';
 
 // Hooks
 import { useNetworkConnections } from '@/features/networks/hooks/useNetworkConnections';
 import { useNetworkUsers } from '@/features/networks/hooks/useNetworkUsers';
 import { useConnectionRequests } from '@/features/networks/hooks/useConnectionRequests';
+import { useCatchUp } from '@/features/networks/hooks/useCatchUp';
 
 // Types
 import { TabType } from '@/features/networks/types';
@@ -71,6 +74,8 @@ export default function NetworkPage() {
     const { headlineData } = useHeadlineData(headlineId);
     const { networkUsers, isLoadingUsers, fetchNetworkUsers } = useNetworkUsers();
 
+    // ✅ Catch Up feed — job changes, work anniversaries, birthdays
+    const { items: catchUpItems, isLoading: isLoadingCatchUp, fetchCatchUp } = useCatchUp();
 
     useEffect(() => {
         if (user) {
@@ -83,6 +88,13 @@ export default function NetworkPage() {
             }
         }
     }, [user, fetchUserProfile, fetchNetworkUsers]);
+
+    // ✅ Fetch Catch Up feed only when that tab becomes active (avoid unnecessary calls)
+    useEffect(() => {
+        if (user && activeTab === 'catchup') {
+            fetchCatchUp(user.userId);
+        }
+    }, [user, activeTab, fetchCatchUp]);
 
     console.log("All network users => ", networkUsers)
 
@@ -100,6 +112,12 @@ export default function NetworkPage() {
         profileImageUrl,
         headlineData
     );
+
+    // ✅ Does the logged-in user already have a dateOfBirth set?
+    // NOTE: agar `userProfileData` mein dateOfBirth field abhi return nahi ho raha,
+    // toh useProfileData/fetchUserProfile ke response mein ye field bhi include karo
+    // (backend User model mein already add ho chuka hai).
+    const hasDateOfBirth = !!(userProfileData as any)?.dateOfBirth;
 
     return (
         <>
@@ -136,7 +154,7 @@ export default function NetworkPage() {
                         <div className="max-w-4xl mx-auto p-6 space-y-8">
                             <NetworkTab activeTab={activeTab} setActiveTab={setActiveTab} />
 
-                            {/* Connection Requests */}
+                            {/* Connection Requests — dono tabs mein relevant hai, isliye upar hi rehne diya */}
                             <ConnectionRequestsList
                                 requests={requests}
                                 sentRequests={sentRequests}
@@ -154,38 +172,44 @@ export default function NetworkPage() {
                             <ProfileViewerCard />
                         </div>
 
-                        {/* People You May Know - Section 1 */}
-                        <SuggestionsSection
-                            people={networkUsers}
-                            connectedUsers={connectedUsers}
-                            onConnect={handleConnect}
-                            isLoading={isLoadingUsers}
-                        />
+                        {/* ✅ GROW TAB CONTENT */}
+                        {activeTab === 'grow' && (
+                            <>
+                                {/* People You May Know - Section 1 */}
+                                <SuggestionsSection
+                                    people={networkUsers}
+                                    connectedUsers={connectedUsers}
+                                    onConnect={handleConnect}
+                                    isLoading={isLoadingUsers}
+                                />
 
-                        {/* Suggestions for Companies */}
-                        <SuggestionsForCompaniesSection
-                            companies={realCompanies}            
-                            followingCompanies={followingCompanies}
-                            onFollow={handleFollowCompany}
-                            isLoading={isLoadingCompanies}        
-                        />
+                                {/* Suggestions for Companies */}
+                                <SuggestionsForCompaniesSection
+                                    companies={realCompanies}
+                                    followingCompanies={followingCompanies}
+                                    onFollow={handleFollowCompany}
+                                    isLoading={isLoadingCompanies}
+                                />
 
-                        {/* Premium Spotlight - Section 1 */}
-                        <PremiumSpotlight profiles={premiumProfiles} />
+                                {/* Premium Spotlight - Section 1 */}
+                                <PremiumSpotlight profiles={premiumProfiles} />
 
-                        {/* Suggestions For You */}
-                        {/* <SuggestionsSection
-                            title="Suggestions For You"
-                            people={suggestionForYou}
-                            connectedUsers={connectedUsers}
-                            onConnect={handleConnect}
-                        /> */}
+                                {/* Profile Completion Card */}
+                                <ProfileCompletionCard completionPercentage={12} />
+                            </>
+                        )}
 
-                        {/* Premium Spotlight - Section 2 */}
-                        {/* <PremiumSpotlight profiles={premiumProfiles} /> */}
+                        {/* ✅ CATCH UP TAB CONTENT */}
+                        {activeTab === 'catchup' && (
+                            <>
+                                <AddBirthdayPrompt
+                                    hasDateOfBirth={hasDateOfBirth}
+                                    onSaved={() => user && fetchCatchUp(user.userId)}
+                                />
 
-                        {/* Profile Completion Card */}
-                        <ProfileCompletionCard completionPercentage={12} />
+                                <CatchUpSection items={catchUpItems} isLoading={isLoadingCatchUp} />
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
