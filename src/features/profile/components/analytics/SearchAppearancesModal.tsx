@@ -11,22 +11,6 @@ interface SearchAppearancesModalProps {
     analytics: any;
 }
 
-
-
-// const generateSearchGraphData = (days: number) => {
-//     const labels = [];
-//     const searches = [];
-
-//     for (let i = days - 1; i >= 0; i--) {
-//         const date = new Date();
-//         date.setDate(date.getDate() - i);
-//         labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-//         searches.push(Math.floor(Math.random() * 30) + 5);
-//     }
-
-//     return { labels, searches };
-// };
-
 // Real appearedAt timestamps ko day-wise group karke graph data banata hai
 const buildRealGraphData = (rawAppearances: any[], days: number) => {
     const labels: string[] = [];
@@ -64,7 +48,7 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
     const [searchHistory, setSearchHistory] = useState<any[]>([]);
     const [rawAppearances, setRawAppearances] = useState<any[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-    const [change, setChange] = useState<any>(null);   // 👈 NEW
+    const [change, setChange] = useState<any>(null);
 
 
     useEffect(() => {
@@ -77,39 +61,42 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
         try {
             setIsLoadingHistory(true);
 
-            // const response = await AnalyticsService.getSearchAppearancesDetail(1, 50);
             const [response, changeResponse] = await Promise.all([
                 AnalyticsService.getSearchAppearancesDetail(1, 50),
-                AnalyticsService.getSearchAppearancesChange(timeRange)   // 👈 NEW
+                AnalyticsService.getSearchAppearancesChange(timeRange)
             ]);
 
+            setRawAppearances(response.data.appearances || []);
 
-            setRawAppearances(response.data.appearances || []);   // 👈 NAYA — raw data save
-
-
-
-            // Group by search query and count
+            // ✅ FIX: searchQuery ki jagah searcherId se group karo,
+            // taaki "kisne search kiya" dikhe, na ki "kya search kiya"
             const grouped = response.data.appearances.reduce((acc: any, item: any) => {
-                const query = item.searchQuery;
-                if (!acc[query]) {
-                    acc[query] = {
-                        searchTerm: query,
+                const key = item.searcherId || `anon-${item.searchQuery}`;
+                if (!acc[key]) {
+                    acc[key] = {
+                        searcherId: item.searcherId,
+                        searcherName: item.searcherName || 'LinkedIn Member',
+                        searcherPhotoUrl: item.searcherPhotoUrl || null,
+                        queries: [],
                         count: 0,
                         dates: [],
-                        highlighted: false// Use actual click data
+                        highlighted: false
                     };
                 }
-                acc[query].count++;
-                acc[query].dates.push(item.appearedAt);
+                acc[key].count++;
+                acc[key].dates.push(item.appearedAt);
+                if (!acc[key].queries.includes(item.searchQuery)) {
+                    acc[key].queries.push(item.searchQuery);
+                }
                 if (item.wasClicked) {
-                    acc[query].highlighted = true;   // 👈 kisi bhi appearance me click hua toh true
+                    acc[key].highlighted = true;
                 }
                 return acc;
             }, {});
 
             const searchData = Object.values(grouped).sort((a: any, b: any) => b.count - a.count);
             setSearchHistory(searchData);
-            setChange(changeResponse.data);   // 👈 NEW
+            setChange(changeResponse.data);
 
         } catch (error) {
             console.error('Failed to load search history:', error);
@@ -359,11 +346,9 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
                     {/* Search History */}
                     <div>
                         <h3 className="text-xl font-bold text-[#4a3728] mb-4">
-                            Search Terms
+                            Who Searched You
                         </h3>
 
-
-                        
                         <div className="space-y-3">
 
                         {filteredSearches.map((search: any, index: number) => {
@@ -374,23 +359,34 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
 
     return (
         <div
-            key={search.searchTerm + index}
+            key={(search.searcherId || search.searcherName) + index}
             className="bg-white rounded-xl p-4 shadow border border-[#e0d8cf] hover:shadow-lg transition-all"
         >
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4 flex-1">
-                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                        <Search className="w-6 h-6 text-blue-600" />
+                    <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-blue-100 flex items-center justify-center">
+                        {search.searcherPhotoUrl ? (
+                            <img
+                                src={search.searcherPhotoUrl}
+                                alt={search.searcherName}
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <Search className="w-6 h-6 text-blue-600" />
+                        )}
                     </div>
                     <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-bold text-[#4a3728]">{search.searchTerm}</h4>
+                            <h4 className="font-bold text-[#4a3728]">{search.searcherName}</h4>
                             {search.highlighted && (
                                 <span className="bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-1 rounded-full">
                                     ⭐ Highlighted
                                 </span>
                             )}
                         </div>
+                        {/* <p className="text-xs text-[#7a5c3e] mb-1 truncate">
+                            searched: "{search.queries.join('", "')}"
+                        </p> */}
                         <div className="flex items-center gap-4 text-sm text-[#7a5c3e]">
                             <span className="flex items-center gap-1">
                                 <Calendar className="w-4 h-4" />

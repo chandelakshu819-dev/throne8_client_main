@@ -28,6 +28,9 @@ interface EnrichedUser extends UserSearchResult {
     profileImageUrl?: string;
 }
 
+const SESSION_IDLE_MS = 1500;   // typing rukne ke kitni der baad "final" maana jaaye
+const MIN_QUERY_LENGTH = 3;     // "h", "n" jaise 1-2 letter wale track nahi honge
+
 interface CompanySearchResult {
     companyId: string;
     companyName: string;
@@ -56,12 +59,20 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
     const searchRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     const trackedCompanyIdsRef = useRef<Set<string>>(new Set());
+    const trackedQueryKeysRef = useRef<Set<string>>(new Set()); // 🔧 FIX #2: naya ref add kiya
+    const latestStateRef = useRef<{
+        query: string;
+        users: EnrichedUser[];
+        companies: CompanySearchResult[];
+    }>({ query: '', users: [], companies: [] });
+    const sessionIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-   
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
                 setShowResults(false);
+                finalizeSearchSession();
             }
         };
 
@@ -69,24 +80,34 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-   
+
     useEffect(() => {
         fetchAllUsers();
         fetchAllCompanies();
     }, []);
 
-   
+    useEffect(() => {
+        return () => {
+            finalizeSearchSession();
+            if (sessionIdleTimerRef.current) {
+                clearTimeout(sessionIdleTimerRef.current);
+            }
+        };
+    }, []);
+
+
     useEffect(() => {
         if (!searchQuery.trim()) {
             setFilteredUsers([]);
             setFilteredCompanies([]);
             setShowResults(false);
             trackedCompanyIdsRef.current.clear();
+            resetSearchSession();
             return;
         }
 
         const timeoutId = setTimeout(() => {
-           
+
             const filtered = allUsers.filter(user => {
                 const query = searchQuery.toLowerCase();
                 return (
@@ -111,58 +132,47 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
             setFilteredCompanies(filteredComps);
             setShowResults(true);
 
-           
-            if (filtered.length > 0) {
-                trackSearchAppearances(filtered, searchQuery);
-            }
+            latestStateRef.current = {
+                query: searchQuery.toLowerCase().trim(),
+                users: filtered,
+                companies: filteredComps,
+            };
 
-           
-           
-           
-            if (filteredComps.length > 0) {
-                filteredComps.forEach((company) => {
-                   
-                    if (!trackedCompanyIdsRef.current.has(company.companyId)) {
-                        trackedCompanyIdsRef.current.add(company.companyId);
-
-                        CompanyService.trackCompanyEvent({
-                            companyId: company.companyId,
-                            eventType: 'search_appearance',
-                            searchQuery: searchQuery.toLowerCase().trim(),
-                        }).catch(() => { });
-                    }
-                });
+            if (sessionIdleTimerRef.current) {
+                clearTimeout(sessionIdleTimerRef.current);
             }
+            sessionIdleTimerRef.current = setTimeout(() => {
+                finalizeSearchSession();
+            }, SESSION_IDLE_MS);
+
+            // 🔧 FIX #1: Dono purane duplicate/buggy company-tracking blocks yahan se
+            // HATA diye gaye hain. Ab company tracking SIRF finalizeSearchSession() ke
+            // andar hoti hai — idle timer / click-outside / user-click pe, har keystroke pe nahi.
+
         }, 500);
 
         return () => clearTimeout(timeoutId);
     }, [searchQuery, allUsers, allCompanies]);
 
-   
+
     const fetchAllUsers = async () => {
         try {
             setIsLoading(true);
-           
 
             const response = await AuthService.getAllUsers({
                 limit: 100,
             });
 
-           
             const users = response.data.users.filter(
                 (user: UserSearchResult) => user.userId !== currentUserId
             );
 
             console.log('✅ [SEARCH] Loaded users:', users);
 
-           
             const profilePhotoIds = users
                 .map((user: UserSearchResult) => user.profilePhotoId)
                 .filter(Boolean);
 
-           
-
-           
             let profilePhotosMap: Record<string, string> = {};
             if (profilePhotoIds.length > 0) {
                 try {
@@ -171,13 +181,12 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                         acc[photo.photoId] = photo.cloudinarySecureUrl;
                         return acc;
                     }, {});
-                   
+
                 } catch (error) {
                     console.warn('⚠️ Failed to fetch profile photos:', error);
                 }
             }
 
-           
             const enrichedUsers: EnrichedUser[] = users.map((user: any) => ({
                 ...user,
                 profileImageUrl: user.profilePhotoId
@@ -186,7 +195,6 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
             }));
 
             setAllUsers(enrichedUsers);
-           
 
         } catch (error: any) {
             console.error('❌ [SEARCH] Failed to fetch users:', error);
@@ -205,19 +213,55 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
         }
     };
 
-    const trackSearchAppearances = async (users: UserSearchResult[], query: string) => {
-        const trackingKey = `${query}-${users.map(u => u.userId).join(',')}`;
 
-       
-        if (trackedCompanyIdsRef.current.has(trackingKey)) { 
+    const finalizeSearchSession = () => {
+        const { query, users, companies } = latestStateRef.current;
+
+        if (!query || query.length < MIN_QUERY_LENGTH) return;
+
+        if (users.length > 0) {
+            trackSearchAppearances(users, query);
+        }
+
+        if (companies.length > 0) {
+            companies.forEach((company) => {
+                const companyTrackKey = `company:${query}:${company.companyId}`;
+                if (!trackedCompanyIdsRef.current.has(companyTrackKey)) {
+                    trackedCompanyIdsRef.current.add(companyTrackKey);
+
+                    CompanyService.trackCompanyEvent({
+                        companyId: company.companyId,
+                        eventType: 'search_appearance',
+                        searchQuery: query,
+                    }).catch(() => { });
+                }
+            });
+        }
+
+        if (sessionIdleTimerRef.current) {
+            clearTimeout(sessionIdleTimerRef.current);
+            sessionIdleTimerRef.current = null;
+        }
+    };
+
+    const resetSearchSession = () => {
+        if (sessionIdleTimerRef.current) {
+            clearTimeout(sessionIdleTimerRef.current);
+            sessionIdleTimerRef.current = null;
+        }
+        latestStateRef.current = { query: '', users: [], companies: [] };
+    };
+
+    const trackSearchAppearances = async (users: UserSearchResult[], query: string) => {
+        const trackingKey = `search:${query}`;
+
+        // 🔧 FIX #2: trackedCompanyIdsRef ki jagah ab trackedQueryKeysRef use ho raha hai
+        if (trackedQueryKeysRef.current.has(trackingKey)) {
             return;
         }
 
-        trackedCompanyIdsRef.current.add(trackingKey);
+        trackedQueryKeysRef.current.add(trackingKey);
 
-       
-
-       
         users.forEach((user, index) => {
             AnalyticsService.recordSearchAppearance(
                 user.userId,
@@ -230,11 +274,10 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
         });
     };
 
-   
-    const handleUserClick = async (userId: string, fullName: string, position: number) => {
-       
 
-       
+    const handleUserClick = async (userId: string, fullName: string, position: number) => {
+        finalizeSearchSession();
+
         try {
             await AnalyticsService.recordSearchAppearance(
                 userId,
@@ -242,22 +285,27 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                 true,
                 position
             );
-           
+
         } catch (error) {
             console.warn('⚠️ [TRACKING] Failed to track click:', error);
         }
 
-       
         setShowResults(false);
         setSearchQuery('');
         trackedCompanyIdsRef.current.clear();
+        resetSearchSession();
+
         router.push(`/profile/${userId}`);
     };
 
-   
+
     const handleCompanyClick = async (companyId: string) => {
+        finalizeSearchSession();
+
         setShowResults(false);
         setSearchQuery('');
+        resetSearchSession();
+
         router.push(`/user-company/${companyId}`);
     };
 
@@ -291,10 +339,6 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                                 onClick={() => handleUserClick(user.userId, user.fullName, index + 1)}
                                 className="w-full flex items-center gap-3 px-3 py-3 hover:bg-[#e0d8cf] rounded-lg transition-colors duration-200 text-left"
                             >
-                                {/* <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#7a5c3e] to-[#4a3728] flex items-center justify-center text-white font-bold text-sm">
-                                    {user.firstName?.charAt(0).toUpperCase()}
-                                    {user.lastName?.charAt(0).toUpperCase()}
-                                </div> */}
                                 <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#e0d8cf] flex-shrink-0">
                                     <img
                                         src={user.profileImageUrl || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s'}
