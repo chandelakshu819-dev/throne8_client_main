@@ -115,7 +115,7 @@ export default function Home() {
 
     useEffect(() => {
         if (user) {
-            loadProfile();   // ← Redux action
+            loadProfile();  
             loadPosts();
             fetchUserProfile();
         }
@@ -183,7 +183,13 @@ export default function Home() {
     ];
 
 
-    // ✅ FIX — entryId bhi handle karo
+   
+   // ✅ FIX: ab reactions[] system use karta hai (/react POST aur /react DELETE)
+    // instead of purane /like, /unlike (jo sirf likedBy[] update karta tha aur
+    // reactions[] ko kabhi touch nahi karta tha — isi wajah se feed pe like count
+    // dikhta tha lekin Reactions modal hamesha "No reactions yet" dikhata tha).
+    // Ab profile activity aur feed dono same /react endpoint use karte hain,
+    // isliye Reactions modal dono jagah consistent data dikhayega.
     const handleLike = async (postId: string) => {
         const isCurrentlyLiked = likedPosts[postId] ??
             allPosts.find(p => (p.entryId || p.postId) === postId)?.isLikedByCurrentUser ?? false;
@@ -192,16 +198,15 @@ export default function Home() {
 
         try {
             if (isCurrentlyLiked) {
-                await ProfileService.unlikePost(postId);
+                await ProfileService.removeReaction(postId);
             } else {
-                await ProfileService.likePost(postId);
+                await ProfileService.reactToPost(postId, 'like');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Like/Unlike failed:', error);
             setLikedPosts(prev => ({ ...prev, [postId]: isCurrentlyLiked }));
         }
     };
-
     const toggleSidebar = () => {
         setIsSidebarOpen(!isSidebarOpen);
     };
@@ -1594,6 +1599,3 @@ export default function Home() {
         </div >
     );
 }
-
-
-

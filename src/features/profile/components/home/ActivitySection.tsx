@@ -1,4 +1,3 @@
-// src/features/profile/components/home/ActivitySection.tsx
 'use client';
 import React, { useEffect, useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -6,8 +5,6 @@ import ShowAllActivityModal from './ShowAllActivityModal';
 import CreatePostModal from './CreatePostModal';
 import UpdatePostModal from './UpdatePostModal';
 import PostCard from '../feed/PostCard';
-// ✅ ADDED: these two are what actually make like/comment "real" (clickable,
-// stateful) instead of static counts — same components PostCard already uses.
 import PostActions from '../feed/PostActions';
 import CommentsSection from '../feed/CommentsSection';
 import RepostWithPerspectiveModal from '../../../dashboard/components/feed/RepostWithPerspectiveModal';
@@ -21,100 +18,82 @@ import AuthService from '@/lib/api/auth.service';
 import FollowService from '@/lib/api/follow.service';
 import ReportService from '@/lib/api/report.service';
 
-// ─── Empty State ──────────────────────────────────────────────────────────────
-const EmptyState = ({ label }: { label: string }) => (
+const EmptyState = ({ label }: { label: string }) => {
+  return (
     <div className="text-center py-14">
-        <div className="w-16 h-16 bg-[#4a3728]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-[#4a3728]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
-                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-            </svg>
-        </div>
-        <p className="text-[#4a3728]/50 font-medium">{label}</p>
+      <div className="w-16 h-16 bg-[#4a3728]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <svg className="w-8 h-8 text-[#4a3728]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+        </svg>
+      </div>
+      <p className="text-[#4a3728]/50 font-medium">{label}</p>
     </div>
-);
-
-// ─── Document Card (with eye/preview — same as modal) ────────────────────────
-const DocumentCard = ({ post, doc }: { post: any; doc: any }) => {
-    const [showPreview, setShowPreview] = useState(false);
-    const previewUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(doc.cloudinarySecureUrl)}&embedded=true`;
-    const fileSizeKB = doc.fileSize ? (doc.fileSize / 1024).toFixed(0) : '—';
-
-    return (
-        <div className="group bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/40 to-[#f6ede8]/30 backdrop-blur-sm rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-500 border border-[#e0d8cf]/40 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#4a3728]/5 to-transparent rounded-full blur-xl group-hover:scale-150 transition-transform duration-700" />
-            <div className="flex items-start gap-5 relative z-10">
-                <div className="flex-shrink-0 w-14 h-14 bg-gradient-to-br from-[#4a3728] to-[#7a5c3e] rounded-xl flex items-center justify-center shadow-lg">
-                    <svg className="w-7 h-7 text-[#f6ede8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-[#4a3728] truncate">{doc.originalName}</h4>
-                    <p className="text-sm text-[#4a3728]/60 mt-0.5">
-                        {post.title} · {fileSizeKB} KB · {doc.format?.toUpperCase() || 'DOC'}
-                    </p>
-                    <div className="flex gap-3 mt-3 flex-wrap">
-                        <button
-                            onClick={() => setShowPreview(v => !v)}
-                            className="px-4 py-2 bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] text-[#f6ede8] rounded-xl text-sm font-semibold hover:opacity-90 transition-all duration-200 flex items-center gap-2"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            {showPreview ? 'Hide PDF' : 'View PDF'}
-                        </button>
-                        <a
-                            href={doc.cloudinarySecureUrl}
-                            download={doc.originalName}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-4 py-2 border-2 border-[#4a3728]/30 text-[#4a3728] rounded-xl text-sm font-semibold hover:border-[#4a3728]/60 hover:bg-[#4a3728]/5 transition-all duration-200 flex items-center gap-2"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            Download
-                        </a>
-                    </div>
-                </div>
-            </div>
-            {showPreview && (
-                <div className="mt-5 rounded-xl overflow-hidden border-2 border-[#e0d8cf] relative z-10">
-                    <div className="bg-[#4a3728]/5 px-4 py-2 flex items-center gap-2 border-b border-[#e0d8cf]">
-                        <div className="w-2 h-2 rounded-full bg-[#4a3728]/40" />
-                        <span className="text-xs font-semibold text-[#4a3728]/60 truncate">{doc.originalName}</span>
-                    </div>
-                    <iframe
-                        src={previewUrl}
-                        className="w-full h-[520px] bg-white"
-                        title={doc.originalName}
-                    />
-                </div>
-            )}
-        </div>
-    );
+  );
 };
 
-// ─── Repost Card ──────────────────────────────────────────────────────────────
-// ✅ CHANGED: this component now accepts the same "engagement" props as
-// PostCard/PostActions/CommentsSection so like + comment behave exactly like
-// on a normal post — no more static counts.
-const RepostCard = ({
+const DocumentCard = ({ post, doc }: { post: any; doc: any }) => {
+  const [showPreview, setShowPreview] = useState(false);
+  const previewUrl = 'https://docs.google.com/viewer?url=' + encodeURIComponent(doc.cloudinarySecureUrl) + '&embedded=true';
+  const fileSizeKB = doc.fileSize ? (doc.fileSize / 1024).toFixed(0) : '-';
+
+  const togglePreview = () => {
+    setShowPreview(!showPreview);
+  };
+
+  return (
+    <div className="group bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/40 to-[#f6ede8]/30 backdrop-blur-sm rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-500 border border-[#e0d8cf]/40 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#4a3728]/5 to-transparent rounded-full blur-xl group-hover:scale-150 transition-transform duration-700" />
+      <div className="flex items-start gap-5 relative z-10">
+        <div className="flex-shrink-0 w-14 h-14 bg-gradient-to-br from-[#4a3728] to-[#7a5c3e] rounded-xl flex items-center justify-center shadow-lg">
+          <svg className="w-7 h-7 text-[#f6ede8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <h4 className="font-bold text-[#4a3728] truncate">{doc.originalName}</h4>
+          <p className="text-sm text-[#4a3728]/60 mt-0.5">
+            {post.title} - {fileSizeKB} KB - {doc.format ? doc.format.toUpperCase() : 'DOC'}
+          </p>
+          <div className="flex gap-3 mt-3 flex-wrap">
+            <button onClick={togglePreview} className="px-4 py-2 bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] text-[#f6ede8] rounded-xl text-sm font-semibold hover:opacity-90 transition-all duration-200 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span>{showPreview ? 'Hide PDF' : 'View PDF'}</span>
+            </button>
+            <a href={doc.cloudinarySecureUrl} download={doc.originalName} target="_blank" rel="noopener noreferrer" className="px-4 py-2 border-2 border-[#4a3728]/30 text-[#4a3728] rounded-xl text-sm font-semibold hover:border-[#4a3728]/60 hover:bg-[#4a3728]/5 transition-all duration-200 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span>Download</span>
+            </a>
+          </div>
+        </div>
+      </div>
+      {showPreview ? (
+        <div className="mt-5 rounded-xl overflow-hidden border-2 border-[#e0d8cf] relative z-10">
+          <div className="bg-[#4a3728]/5 px-4 py-2 flex items-center gap-2 border-b border-[#e0d8cf]">
+            <div className="w-2 h-2 rounded-full bg-[#4a3728]/40" />
+            <span className="text-xs font-semibold text-[#4a3728]/60 truncate">{doc.originalName}</span>
+          </div>
+          <iframe src={previewUrl} className="w-full h-[520px] bg-white" title={doc.originalName} />
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+const RepostCard = (props: any) => {
+  const {
     repost,
     onDeleteRepost,
     profileImage,
     fullName,
     currentUserId,
-    isOwnProfile = true,
-    // ✅ ADDED — reactions
-    postReactions,
-    onReact,
+    isOwnProfile,
     likedPosts,
     handleLike,
-    // ✅ ADDED — comments
     toggleComments,
     openCommentsIndex,
     postComments,
@@ -137,332 +116,246 @@ const RepostCard = ({
     handleCommentSubmit,
     emojiList,
     postCommentCounts,
-}: {
-    repost: any;
-    onDeleteRepost?: (repostId: string) => Promise<any>;
-    profileImage?: string;
-    fullName?: string;
-    currentUserId?: string;
-    isOwnProfile?: boolean;
-    postReactions?: any;
-    onReact?: (postId: string, type: any) => void;
-    likedPosts?: any;
-    handleLike?: any;
-    toggleComments?: any;
-    openCommentsIndex?: any;
-    postComments?: any;
-    commentText?: any;
-    setCommentText?: any;
-    replyingTo?: any;
-    setReplyingTo?: any;
-    openCommentMenuIndex?: any;
-    editingCommentId?: any;
-    editCommentText?: any;
-    setEditCommentText?: any;
-    showEmojiPicker?: any;
-    setShowEmojiPicker?: any;
-    handleReply?: any;
-    handleCommentReaction?: any;
-    toggleCommentMenu?: any;
-    handleCommentAction?: any;
-    handleEditSubmit?: any;
-    handleEmojiClick?: any;
-    handleCommentSubmit?: any;
-    emojiList?: any;
-    postCommentCounts?: any;
-}) => {
-    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [originalAuthorName, setOriginalAuthorName] = useState<string>('');
-    const [originalAuthorAvatar, setOriginalAuthorAvatar] = useState<string>('');
+  } = props;
 
-    const originalPost = repost.originalPost;
-    // ✅ Like/comment/reactions always target the ORIGINAL post's id —
-    // that's the post that actually owns the engagement data.
-    const postKey = originalPost?.entryId;
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [originalAuthorName, setOriginalAuthorName] = useState('');
+  const [originalAuthorAvatar, setOriginalAuthorAvatar] = useState('');
 
-    useEffect(() => {
-        if (!originalPost?.userId) return;
+  const originalPost = repost.originalPost;
+  const postKey = originalPost ? originalPost.entryId : undefined;
 
-        // If it is the current user themselves:
-        if (originalPost.userId === currentUserId) {
-            setOriginalAuthorName(fullName || 'You');
-            setOriginalAuthorAvatar(profileImage || '');
-            return;
+  useEffect(() => {
+    if (!originalPost || !originalPost.userId) return;
+
+    if (originalPost.userId === currentUserId) {
+      setOriginalAuthorName(fullName || 'You');
+      setOriginalAuthorAvatar(profileImage || '');
+      return;
+    }
+
+    const fetchAuthor = async () => {
+      try {
+        const response = await AuthService.getUserProfileById(originalPost.userId);
+        const user = response ? response.data : null;
+        if (user) {
+          setOriginalAuthorName((user.firstName + ' ' + (user.lastName || '')).trim());
+          if (user.profilePhotoId) {
+            const photoRes = await ProfileService.getProfilePhotoById(user.profilePhotoId);
+            setOriginalAuthorAvatar(photoRes && photoRes.data && photoRes.data.photo ? photoRes.data.photo.cloudinarySecureUrl : '');
+          }
         }
-
-        // Otherwise fetch:
-        const fetchAuthor = async () => {
-            try {
-                const response = await AuthService.getUserProfileById(originalPost.userId);
-                const user = response?.data;
-                if (user) {
-                    setOriginalAuthorName(`${user.firstName} ${user.lastName || ''}`.trim());
-                    if (user.profilePhotoId) {
-                        const photoRes = await ProfileService.getProfilePhotoById(user.profilePhotoId);
-                        setOriginalAuthorAvatar(photoRes?.data?.photo?.cloudinarySecureUrl || '');
-                    }
-                }
-            } catch (err) {
-                setOriginalAuthorName('Unknown User');
-            }
-        };
-        fetchAuthor();
-    }, [originalPost?.userId, currentUserId, fullName, profileImage]);
-
-    if (!originalPost) return null;
-
-    const handleDeleteRepost = async () => {
-        if (!confirm('Remove this repost?')) return;
-        try {
-            setIsDeleting(true);
-            await onDeleteRepost?.(repost.repostId);
-        } catch (err) {
-            alert('Failed to remove repost');
-        } finally {
-            setIsDeleting(false);
-            setOpenMenuId(null);
-        }
+      } catch (err) {
+        setOriginalAuthorName('Unknown User');
+      }
     };
+    fetchAuthor();
+  }, [originalPost, currentUserId, fullName, profileImage]);
 
-    // PostActions expects a "post"-shaped object.
-    const syntheticPost = {
-        entryId: postKey,
-        likesCount: originalPost.likesCount || 0,
-        commentsCount: postCommentCounts?.[postKey] ?? originalPost.commentsCount ?? 0,
-        isLikedByCurrentUser: originalPost.isLikedByCurrentUser || false,
-        shares: originalPost.shares || 0,
-    };
+  if (!originalPost) return null;
 
-    return (
-        <div className="p-6 rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1 bg-[#f6ede8]/95 border-[#4a3728]/20 relative overflow-hidden h-full flex flex-col">
-            {/* Repost Header */}
-            <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#e0d8cf]/50">
-                <div className="flex items-center gap-3 flex-1">
-                    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#4a3728]/20 flex-shrink-0 flex items-center justify-center bg-[#4a3728]/20">
-                        {profileImage ? (
-                            <img
-                                src={profileImage}
-                                alt="You"
-                                className="w-full h-full object-cover"
-                            />
-                        ) : (
-                            <svg className="w-5 h-5 text-[#4a3728]/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                        )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                            <p className="font-bold text-[#4a3728] text-sm truncate">You</p>
-                            <span className="text-xs text-[#4a3728]/50 flex-shrink-0">reposted</span>
-                        </div>
-                        <p className="text-xs text-[#4a3728]/50 mt-0.5">
-                            {repost.repostType === 'quote' ? 'Quote Repost' : 'Repost'} ·{' '}
-                            {new Date(repost.createdAt).toLocaleDateString('en-US', {
-                                month: 'short', day: 'numeric'
-                            })}
-                        </p>
-                    </div>
-                </div>
+  const handleDeleteRepost = async () => {
+    if (!confirm('Remove this repost?')) return;
+    try {
+      setIsDeleting(true);
+      if (onDeleteRepost) await onDeleteRepost(repost.repostId);
+    } catch (err) {
+      alert('Failed to remove repost');
+    } finally {
+      setIsDeleting(false);
+      setOpenMenuId(null);
+    }
+  };
 
-                {/* 3-dot menu — owner only (delete/remove repost is a mutation) */}
-                {isOwnProfile && (
-                    <div className="relative flex-shrink-0">
-                        <button
-                            onClick={() => setOpenMenuId(openMenuId ? null : 'menu')}
-                            className="p-2 hover:bg-[#4a3728]/10 rounded-full transition-all duration-200"
-                        >
-                            <svg className="w-5 h-5 text-[#4a3728]/60" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 8a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 8a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
-                            </svg>
-                        </button>
-                        {openMenuId === 'menu' && (
-                            <div className="absolute right-0 top-8 bg-white rounded-xl shadow-2xl border border-[#e0d8cf] z-50 min-w-[180px]">
-                                <button
-                                    onClick={handleDeleteRepost}
-                                    disabled={isDeleting}
-                                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 flex items-center gap-2"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                    {isDeleting ? 'Removing...' : 'Remove Repost'}
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
+  const syntheticPost = {
+    entryId: postKey,
+    likesCount: originalPost.likesCount || 0,
+    commentsCount: postCommentCounts && postCommentCounts[postKey] !== undefined ? postCommentCounts[postKey] : (originalPost.commentsCount || 0),
+    isLikedByCurrentUser: originalPost.isLikedByCurrentUser || false,
+    shares: originalPost.shares || 0,
+  };
 
-            {/* Quote thought (if quote repost) */}
-            {repost.repostType === 'quote' && repost.thoughtText && (
-                <p className="text-sm text-[#4a3728]/80 italic mb-4 px-2 border-l-2 border-[#4a3728]/30">
-                    &ldquo;{repost.thoughtText}&rdquo;
-                </p>
+  return (
+    <div className="p-6 rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1 bg-[#f6ede8]/95 border-[#4a3728]/20 relative overflow-hidden h-full flex flex-col">
+      <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#e0d8cf]/50">
+        <div className="flex items-center gap-3 flex-1">
+          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#4a3728]/20 flex-shrink-0 flex items-center justify-center bg-[#4a3728]/20">
+            {profileImage ? (
+              <img src={profileImage} alt="You" className="w-full h-full object-cover" />
+            ) : (
+              <svg className="w-5 h-5 text-[#4a3728]/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
             )}
-
-            {/* Original Post Content */}
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-[#e0d8cf]/30">
-                <div className="flex items-start gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center border-2 border-[#4a3728]/10 bg-[#4a3728]/10">
-                        {originalAuthorAvatar || originalPost.userAvatar ? (
-                            <img
-                                src={originalAuthorAvatar || originalPost.userAvatar}
-                                alt="Author"
-                                className="w-full h-full object-cover"
-                            />
-                        ) : (
-                            <svg className="w-5 h-5 text-[#4a3728]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                        )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="font-bold text-[#4a3728] text-sm">
-                            {originalAuthorName || originalPost.userName || originalPost.fullName || 'Unknown User'}
-                        </p>
-                        <p className="text-xs text-[#4a3728]/50">
-                            {new Date(originalPost.createdAt).toLocaleDateString('en-US', {
-                                month: 'short', day: 'numeric'
-                            })}
-                        </p>
-                    </div>
-                </div>
-
-                <h3 className="text-base font-bold text-[#4a3728] mb-2">{originalPost.title}</h3>
-
-                {originalPost.content && (
-                    <p className="text-sm text-[#4a3728]/70 leading-relaxed mb-3 line-clamp-3">
-                        {originalPost.content}
-                    </p>
-                )}
-
-                {/* Images if any */}
-                {originalPost.images?.length > 0 && (
-                    <img
-                        src={originalPost.images[0].cloudinarySecureUrl}
-                        alt={originalPost.title}
-                        className="w-full h-40 object-cover rounded-lg mt-2"
-                        onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                    />
-                )}
-
-                {/* ✅ REPLACED: static <span> like/comment counts →
-                    real clickable PostActions (reactions + comment toggle + share) */}
-                <div className="mt-3 pt-3 border-t border-[#e0d8cf]/30">
-                    <PostActions
-                        post={syntheticPost}
-                        index={postKey}
-                        isDarkMode={false}
-                        likedPosts={likedPosts}
-                        handleLike={handleLike}
-                        toggleComments={toggleComments}
-                        openRepostIndex={null}
-                        toggleRepostMenu={() => {}}
-                        handleRepost={() => {}}
-                        postReactions={postReactions}
-                        onReact={onReact}
-                    />
-                </div>
-
-                {/* ✅ ADDED: comments now actually expand under the reposted
-                    original post, same as a normal post card. */}
-                {openCommentsIndex === postKey && (
-                    <div className="mt-2">
-                        <CommentsSection
-                            isDarkMode={false}
-                            commentText={commentText}
-                            setCommentText={setCommentText}
-                            replyingTo={replyingTo}
-                            setReplyingTo={setReplyingTo}
-                            openCommentMenuIndex={openCommentMenuIndex}
-                            editingCommentId={editingCommentId}
-                            editCommentText={editCommentText}
-                            setEditCommentText={setEditCommentText}
-                            showEmojiPicker={showEmojiPicker}
-                            setShowEmojiPicker={setShowEmojiPicker}
-                            commentCount={postCommentCounts?.[postKey] ?? originalPost.commentsCount ?? 0}
-                            handleReply={handleReply}
-                            handleCommentReaction={handleCommentReaction}
-                            toggleCommentMenu={toggleCommentMenu}
-                            handleCommentAction={handleCommentAction}
-                            handleEditSubmit={handleEditSubmit}
-                            handleEmojiClick={handleEmojiClick}
-                            postId={postKey}
-                            comments={postComments?.[postKey] || []}
-                            handleCommentSubmit={() => handleCommentSubmit?.(postKey)}
-                            emojiList={emojiList}
-                            profileImage={profileImage}
-                        />
-                    </div>
-                )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-[#4a3728] text-sm truncate">You</p>
+              <span className="text-xs text-[#4a3728]/50 flex-shrink-0">reposted</span>
             </div>
+            <p className="text-xs text-[#4a3728]/50 mt-0.5">
+              {repost.repostType === 'quote' ? 'Quote Repost' : 'Repost'} - {new Date(repost.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </p>
+          </div>
         </div>
-    );
-};
 
-// ─── Video Card (same as modal) ───────────────────────────────────────────────
-const VideoCard = ({ post, video }: { post: any; video: any }) => {
-    const fileSizeMB = video.fileSize ? (video.fileSize / (1024 * 1024)).toFixed(1) : '—';
-    const duration = video.duration
-        ? `${Math.floor(video.duration / 60)}:${String(Math.floor(video.duration % 60)).padStart(2, '0')}`
-        : '';
+        {isOwnProfile ? (
+          <div className="relative flex-shrink-0">
+            <button onClick={() => setOpenMenuId(openMenuId ? null : 'menu')} className="p-2 hover:bg-[#4a3728]/10 rounded-full transition-all duration-200">
+              <svg className="w-5 h-5 text-[#4a3728]/60" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 8a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 8a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
+              </svg>
+            </button>
+            {openMenuId === 'menu' ? (
+              <div className="absolute right-0 top-8 bg-white rounded-xl shadow-2xl border border-[#e0d8cf] z-50 min-w-[180px]">
+                <button onClick={handleDeleteRepost} disabled={isDeleting} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  {isDeleting ? 'Removing...' : 'Remove Repost'}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
-    return (
-        <div className="group bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/40 to-[#f6ede8]/30 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 border border-[#e0d8cf]/40 relative">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#4a3728]/5 to-transparent rounded-full blur-xl group-hover:scale-150 transition-transform duration-700 z-[1]" />
-            <div className="relative">
-                <video
-                    controls
-                    className="w-full h-64 object-cover bg-black"
-                    src={video.cloudinarySecureUrl}
-                    preload="metadata"
-                />
-                {duration && (
-                    <div className="absolute bottom-3 right-3 bg-black/70 text-white px-3 py-1 rounded-lg text-sm font-semibold z-[2]">
-                        {duration}
-                    </div>
-                )}
-            </div>
-            <div className="p-5 relative z-[1]">
-                <h4 className="text-base font-bold text-[#4a3728] mb-1">{post.title}</h4>
-                <div className="flex items-center gap-3 text-[#4a3728]/60 text-sm">
-                    <span className="bg-[#4a3728]/10 px-2 py-0.5 rounded-lg font-semibold uppercase text-xs">{video.format || 'MP4'}</span>
-                    <span>{fileSizeMB} MB</span>
-                    <span className="truncate">{video.originalName}</span>
-                </div>
-            </div>
+      {repost.repostType === 'quote' && repost.thoughtText ? (
+        <p className="text-sm text-[#4a3728]/80 italic mb-4 px-2 border-l-2 border-[#4a3728]/30">{repost.thoughtText}</p>
+      ) : null}
+
+      <div className="bg-white rounded-xl p-4 shadow-sm border border-[#e0d8cf]/30">
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center border-2 border-[#4a3728]/10 bg-[#4a3728]/10">
+            {originalAuthorAvatar || originalPost.userAvatar ? (
+              <img src={originalAuthorAvatar || originalPost.userAvatar} alt="Author" className="w-full h-full object-cover" />
+            ) : (
+              <svg className="w-5 h-5 text-[#4a3728]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-[#4a3728] text-sm">{originalAuthorName || originalPost.userName || originalPost.fullName || 'Unknown User'}</p>
+            <p className="text-xs text-[#4a3728]/50">{new Date(originalPost.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+          </div>
         </div>
-    );
-};
 
-// ─── Image Card (same as modal) ───────────────────────────────────────────────
-const ImageCard = ({ post, img }: { post: any; img: any }) => (
-    <div className="group bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/40 to-[#f6ede8]/30 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-500 border border-[#e0d8cf]/40">
-        <div className="relative overflow-hidden h-56">
-            <img
-                src={img.cloudinarySecureUrl}
-                alt={post.title}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&h=500&fit=crop'; }}
+        <h3 className="text-base font-bold text-[#4a3728] mb-2">{originalPost.title}</h3>
+
+        {originalPost.content ? (
+          <p className="text-sm text-[#4a3728]/70 leading-relaxed mb-3 line-clamp-3">{originalPost.content}</p>
+        ) : null}
+
+        {originalPost.images && originalPost.images.length > 0 ? (
+          <img
+            src={originalPost.images[0].cloudinarySecureUrl}
+            alt={originalPost.title}
+            className="w-full h-40 object-cover rounded-lg mt-2"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        ) : null}
+
+        <div className="mt-3 pt-3 border-t border-[#e0d8cf]/30">
+          <PostActions
+            post={syntheticPost}
+            index={postKey}
+            isDarkMode={false}
+            likedPosts={likedPosts}
+            handleLike={handleLike}
+            toggleComments={toggleComments}
+            openRepostIndex={null}
+            toggleRepostMenu={() => {}}
+            handleRepost={() => {}}
+            currentUserId={currentUserId}
+          />
+        </div>
+
+        {openCommentsIndex === postKey ? (
+          <div className="mt-2">
+            <CommentsSection
+              isDarkMode={false}
+              commentText={commentText}
+              setCommentText={setCommentText}
+              replyingTo={replyingTo}
+              setReplyingTo={setReplyingTo}
+              openCommentMenuIndex={openCommentMenuIndex}
+              editingCommentId={editingCommentId}
+              editCommentText={editCommentText}
+              setEditCommentText={setEditCommentText}
+              showEmojiPicker={showEmojiPicker}
+              setShowEmojiPicker={setShowEmojiPicker}
+              commentCount={postCommentCounts && postCommentCounts[postKey] !== undefined ? postCommentCounts[postKey] : (originalPost.commentsCount || 0)}
+              handleReply={handleReply}
+              handleCommentReaction={handleCommentReaction}
+              toggleCommentMenu={toggleCommentMenu}
+              handleCommentAction={handleCommentAction}
+              handleEditSubmit={handleEditSubmit}
+              handleEmojiClick={handleEmojiClick}
+              postId={postKey}
+              comments={postComments && postComments[postKey] ? postComments[postKey] : []}
+              handleCommentSubmit={() => { if (handleCommentSubmit) handleCommentSubmit(postKey); }}
+              emojiList={emojiList}
+              profileImage={profileImage}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-        </div>
-        <div className="p-4">
-            <p className="text-[#4a3728] font-semibold text-sm truncate">{post.title}</p>
-            <div className="flex items-center justify-between mt-1">
-                <span className="text-xs text-[#4a3728]/50 uppercase">{img.format}</span>
-                <span className="text-xs text-[#4a3728]/50">{img.width}×{img.height}</span>
-            </div>
-        </div>
+          </div>
+        ) : null}
+      </div>
     </div>
-);
+  );
+};
 
-// ─── Main ActivitySection ─────────────────────────────────────────────────────
-const ActivitySection: React.FC<ActivitySectionProps> = ({
+const VideoCard = ({ post, video }: { post: any; video: any }) => {
+  const fileSizeMB = video.fileSize ? (video.fileSize / (1024 * 1024)).toFixed(1) : '-';
+  const duration = video.duration ? Math.floor(video.duration / 60) + ':' + String(Math.floor(video.duration % 60)).padStart(2, '0') : '';
+
+  return (
+    <div className="group bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/40 to-[#f6ede8]/30 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 border border-[#e0d8cf]/40 relative">
+      <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#4a3728]/5 to-transparent rounded-full blur-xl group-hover:scale-150 transition-transform duration-700 z-[1]" />
+      <div className="relative">
+        <video controls className="w-full h-64 object-cover bg-black" src={video.cloudinarySecureUrl} preload="metadata" />
+        {duration ? (
+          <div className="absolute bottom-3 right-3 bg-black/70 text-white px-3 py-1 rounded-lg text-sm font-semibold z-[2]">{duration}</div>
+        ) : null}
+      </div>
+      <div className="p-5 relative z-[1]">
+        <h4 className="text-base font-bold text-[#4a3728] mb-1">{post.title}</h4>
+        <div className="flex items-center gap-3 text-[#4a3728]/60 text-sm">
+          <span className="bg-[#4a3728]/10 px-2 py-0.5 rounded-lg font-semibold uppercase text-xs">{video.format || 'MP4'}</span>
+          <span>{fileSizeMB} MB</span>
+          <span className="truncate">{video.originalName}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ImageCard = ({ post, img }: { post: any; img: any }) => {
+  return (
+    <div className="group bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/40 to-[#f6ede8]/30 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-500 border border-[#e0d8cf]/40">
+      <div className="relative overflow-hidden h-56">
+        <img
+          src={img.cloudinarySecureUrl}
+          alt={post.title}
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&h=500&fit=crop'; }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      </div>
+      <div className="p-4">
+        <p className="text-[#4a3728] font-semibold text-sm truncate">{post.title}</p>
+        <div className="flex items-center justify-between mt-1">
+          <span className="text-xs text-[#4a3728]/50 uppercase">{img.format}</span>
+          <span className="text-xs text-[#4a3728]/50">{img.width}x{img.height}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
+  const {
     posts,
     onPostCreated,
     isLoading = false,
@@ -473,901 +366,850 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({
     currentUserId,
     userReposts = [],
     userId,
-    isLoadingReposts = false,
     onCreateRepost,
     onDeleteRepost,
     isOwnProfile = true,
-}) => {
-    const [activeTab, setActiveTab] = useState('Posts');
-    const [showAllModal, setShowAllModal] = useState(false);
-    const [showCreatePostModal, setShowCreatePostModal] = useState(false);
-    const [openRepostIndex, setOpenRepostIndex] = useState<number | null>(null);
-    const [isRepostWithPerspectiveOpen, setIsRepostWithPerspectiveOpen] = useState(false);
-    const [selectedRepostPost, setSelectedRepostPost] = useState<any>(null);
-    const [userComments, setUserComments] = useState<any[]>([]);
-    const [isLoadingUserComments, setIsLoadingUserComments] = useState(false);
-    const [selectedAnalyticsPost, setSelectedAnalyticsPost] = useState<any | null>(null);
-    const [visibleCommentsCount, setVisibleCommentsCount] = useState(3);
-    const [visibleImagesCount, setVisibleImagesCount] = useState(3);
+  } = props as any;
 
-    // ✅ NEW: viewer-action state — not-interested/unfollow ke baad post hide karne
-    // ke liye, aur report modal open/submit track karne ke liye
-    const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
-    const [reportingPostId, setReportingPostId] = useState<string | null>(null);
-    const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState('Posts');
+  const [showAllModal, setShowAllModal] = useState(false);
+  const [showCreatePostModal, setShowCreatePostModal] = useState(false);
+  const [openRepostIndex, setOpenRepostIndex] = useState<number | null>(null);
+  const [isRepostWithPerspectiveOpen, setIsRepostWithPerspectiveOpen] = useState(false);
+  const [selectedRepostPost, setSelectedRepostPost] = useState<any>(null);
+  const [userComments, setUserComments] = useState<any[]>([]);
+  const [isLoadingUserComments, setIsLoadingUserComments] = useState(false);
+  const [selectedAnalyticsPost, setSelectedAnalyticsPost] = useState<any>(null);
+  const [visibleCommentsCount, setVisibleCommentsCount] = useState(3);
+  const [visibleImagesCount, setVisibleImagesCount] = useState(3);
+  const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
+  const [reportingPostId, setReportingPostId] = useState<string | null>(null);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [undoToast, setUndoToast] = useState<any>(null);
+  const [openRepostCommentsKey, setOpenRepostCommentsKey] = useState<string | null>(null);
 
-    // ✅ ADDED: reposted original posts open their comments here — keyed by
-    // the ORIGINAL post's entryId (not by index, since a reposted post may
-    // not exist in the local `posts` array at all).
-    const [openRepostCommentsKey, setOpenRepostCommentsKey] = useState<string | null>(null);
+  useEffect(() => {
+    setVisibleCommentsCount(3);
+    setVisibleImagesCount(3);
+  }, [activeTab]);
 
-    useEffect(() => {
-        setVisibleCommentsCount(3);
-        setVisibleImagesCount(3);
-    }, [activeTab]);
-
- useEffect(() => {
+  useEffect(() => {
     if (activeTab !== 'Comments') return;
-
     const targetUserId = isOwnProfile ? currentUserId : userId;
     if (!targetUserId) return;
 
     const fetchComments = async () => {
-        try {
-            setIsLoadingUserComments(true);
-            // ✅ FIX: apni profile pe apne comments, doosre ki profile pe
-            // us user ke comments — pehle ye hamesha "meri" comments
-            // fetch karta tha chahe kisi ki bhi profile ho
-            const response = isOwnProfile
-                ? await ProfileService.getMyComments()
-                : await ProfileService.getCommentsByUserId(targetUserId);
-            setUserComments(response.data?.comments || response.data || []);
-        } catch (error) {
-            console.error('Failed to load comments:', error);
-            setUserComments([]);
-        } finally {
-            setIsLoadingUserComments(false);
-        }
+      try {
+        setIsLoadingUserComments(true);
+        const response = isOwnProfile ? await ProfileService.getMyComments() : await ProfileService.getCommentsByUserId(targetUserId);
+        setUserComments(response.data && response.data.comments ? response.data.comments : (response.data || []));
+      } catch (error) {
+        setUserComments([]);
+      } finally {
+        setIsLoadingUserComments(false);
+      }
     };
     fetchComments();
-}, [activeTab, currentUserId, userId, isOwnProfile]);
+  }, [activeTab, currentUserId, userId, isOwnProfile]);
 
-    const formatRelativeTime = (dateStr: string) => {
-        if (!dateStr) return 'Recently';
-        const diffMs = Date.now() - new Date(dateStr).getTime();
-        const mins = Math.floor(diffMs / 60000);
-        const hours = Math.floor(mins / 60);
-        const days = Math.floor(hours / 24);
-        if (mins < 1) return 'Just now';
-        if (mins < 60) return `${mins}m ago`;
-        if (hours < 24) return `${hours}h ago`;
-        return `${days}d ago`;
-    };
+  const formatRelativeTime = (dateStr: string) => {
+    if (!dateStr) return 'Recently';
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    const hours = Math.floor(mins / 60);
+    const days = Math.floor(hours / 24);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return mins + 'm ago';
+    if (hours < 24) return hours + 'h ago';
+    return days + 'd ago';
+  };
 
-    const handlers = useActivityHandlers({ posts, onPostCreated, profileImage });
+  const handlers = useActivityHandlers({ posts, onPostCreated, profileImage });
 
-    const repostedEntryIds = new Set(
-        userReposts
-            .map((r: any) => r.originalPost?.entryId)
-            .filter(Boolean)
-    );
+  const repostedEntryIds = new Set(userReposts.map((r: any) => r.originalPost ? r.originalPost.entryId : null).filter(Boolean));
 
-    // ✅ CHANGED: ab hiddenPostIds (not-interested / unfollow se hide hui posts)
-    // ko bhi filter karta hai, taaki wo feed se turant gayab ho jayein
-    const filteredPosts = posts.filter(
-        (p: any) =>
-            !repostedEntryIds.has(p.entryId || p.postId) &&
-            !hiddenPostIds.has(p.entryId || p.postId)
-    );
-    const hasMorePosts = (filteredPosts.length + userReposts.length) > 2;
+  const filteredPosts = posts.filter((p: any) => {
+    const key = p.entryId || p.postId;
+    return !repostedEntryIds.has(key) && !hiddenPostIds.has(key);
+  });
+  const hasMorePosts = (filteredPosts.length + userReposts.length) > 2;
 
-    const combinedItems = [
-        ...userReposts.map((repost: any) => ({ type: 'repost', data: repost })),
-        ...filteredPosts.map((post: any) => ({ type: 'post', data: post })),
-    ];
+  const combinedItems = [
+    ...userReposts.map((repost: any) => ({ type: 'repost', data: repost })),
+    ...filteredPosts.map((post: any) => ({ type: 'post', data: post })),
+  ];
 
-    const scrollRef = useRef<HTMLDivElement>(null);
-    const [showLeftArrow, setShowLeftArrow] = useState(false);
-    const [showRightArrow, setShowRightArrow] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showLeftArrow, setShowLeftArrow] = useState(false);
+  const [showRightArrow, setShowRightArrow] = useState(false);
 
-    const handleScroll = () => {
-        if (scrollRef.current) {
-            const { scrollLeft, clientWidth, scrollWidth } = scrollRef.current;
-            setShowLeftArrow(scrollLeft > 10);
-            setShowRightArrow(scrollLeft + clientWidth < scrollWidth - 10);
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      const scrollLeft = scrollRef.current.scrollLeft;
+      const clientWidth = scrollRef.current.clientWidth;
+      const scrollWidth = scrollRef.current.scrollWidth;
+      setShowLeftArrow(scrollLeft > 10);
+      setShowRightArrow(scrollLeft + clientWidth < scrollWidth - 10);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => { handleScroll(); }, 200);
+    return () => clearTimeout(timer);
+  }, [combinedItems.length]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (handlers.openMenuId !== null) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.post-menu-container') && !target.closest('.post-menu-trigger')) {
+          handlers.setOpenMenuId(null);
         }
+      }
     };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [handlers.openMenuId, handlers.setOpenMenuId]);
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            handleScroll();
-        }, 200);
-        return () => clearTimeout(timer);
-    }, [combinedItems.length]);
+  const scrollLeftFn = () => {
+    if (scrollRef.current) {
+      const clientWidth = scrollRef.current.clientWidth;
+      scrollRef.current.scrollBy({ left: -clientWidth / 2, behavior: 'smooth' });
+    }
+  };
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (handlers.openMenuId !== null) {
-                const target = event.target as HTMLElement;
-                if (!target.closest('.post-menu-container') && !target.closest('.post-menu-trigger')) {
-                    handlers.setOpenMenuId(null);
-                }
-            }
-        };
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
-    }, [handlers.openMenuId, handlers.setOpenMenuId]);
+  const scrollRightFn = () => {
+    if (scrollRef.current) {
+      const clientWidth = scrollRef.current.clientWidth;
+      scrollRef.current.scrollBy({ left: clientWidth / 2, behavior: 'smooth' });
+    }
+  };
 
-    const scrollLeft = () => {
-        if (scrollRef.current) {
-            const { clientWidth } = scrollRef.current;
-            scrollRef.current.scrollBy({ left: -clientWidth / 2, behavior: 'smooth' });
-        }
-    };
+  const { fetchConnectionsData } = useConnectionsData();
 
-    const scrollRight = () => {
-        if (scrollRef.current) {
-            const { clientWidth } = scrollRef.current;
-            scrollRef.current.scrollBy({ left: clientWidth / 2, behavior: 'smooth' });
-        }
-    };
+  useEffect(() => {
+    if (currentUserId) fetchConnectionsData(currentUserId);
+  }, [currentUserId]);
 
-    const {
-        followersList,
-        isLoadingConnections,
-        fetchConnectionsData,
-    } = useConnectionsData();
+  const ShowAllButton = ({ label }: { label: string }) => (
+    <button onClick={() => setShowAllModal(true)} className="w-full group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border-2 border-dashed border-[#4a3728]/30 hover:border-[#4a3728]/50 rounded-2xl p-6 transition-all duration-300 flex items-center justify-center gap-3 relative z-30">
+      <span className="text-[#4a3728] font-bold text-lg">{label}</span>
+      <svg className="w-5 h-5 text-[#4a3728] group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+      </svg>
+    </button>
+  );
 
-    useEffect(() => {
-        if (currentUserId) fetchConnectionsData(currentUserId);
-    }, [currentUserId]);
+  const allVideos: { post: any; video: any }[] = posts.flatMap((p: any) => (p.videos || []).map((v: any) => ({ post: p, video: v })));
+  const allImages: { post: any; img: any }[] = posts.flatMap((p: any) => (p.images || []).map((img: any) => ({ post: p, img })));
+  const allDocuments: { post: any; doc: any }[] = posts.flatMap((p: any) => (p.documents || []).map((doc: any) => ({ post: p, doc })));
 
-    // ── Show All button ───────────────────────────────────────────
-    const ShowAllButton = ({ label }: { label: string }) => (
-        <button
-            onClick={() => setShowAllModal(true)}
-            className="w-full group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border-2 border-dashed border-[#4a3728]/30 hover:border-[#4a3728]/50 rounded-2xl p-6 transition-all duration-300 flex items-center justify-center gap-3 relative z-30"
-        >
-            <span className="text-[#4a3728] font-bold text-lg">{label}</span>
-            <svg className="w-5 h-5 text-[#4a3728] group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-            </svg>
-        </button>
-    );
+  const handleRepostInstant = async (idx: number) => {
+    const post = posts[idx];
+    if (!post) return;
+    const postId = post.entryId || post.postId;
+    try {
+      if (onCreateRepost) await onCreateRepost(postId, 'repost');
+      alert('Post reposted successfully!');
+      if (onPostCreated) onPostCreated();
+    } catch (error: any) {
+      if (error.message && error.message.includes('already reposted')) {
+        alert('You have already reposted this post');
+      } else {
+        alert(error.message || 'Repost failed');
+      }
+    } finally {
+      setOpenRepostIndex(null);
+    }
+  };
 
-    // ── Derived media lists (same logic as modal) ─────────────────
-    const allVideos: { post: any; video: any }[] = posts.flatMap((p: any) =>
-        (p.videos || []).map((v: any) => ({ post: p, video: v }))
-    );
-    const allImages: { post: any; img: any }[] = posts.flatMap((p: any) =>
-        (p.images || []).map((img: any) => ({ post: p, img }))
-    );
-    const allDocuments: { post: any; doc: any }[] = posts.flatMap((p: any) =>
-        (p.documents || []).map((doc: any) => ({ post: p, doc }))
-    );
+  const openRepostWithPerspectiveModal = (post: any, idx: number) => {
+    setSelectedRepostPost(post);
+    setIsRepostWithPerspectiveOpen(true);
+    setOpenRepostIndex(null);
+  };
 
-    const handleRepostInstant = async (idx: number) => {
-        const post = posts[idx];
-        if (!post) return;
-        const postId = post.entryId || post.postId;
-        try {
-            await onCreateRepost?.(postId, 'repost');
-            alert('Post reposted successfully!');
-            onPostCreated?.();
-        } catch (error: any) {
-            if (error.message?.includes('already reposted')) {
-                alert('You have already reposted this post');
-            } else {
-                alert(error.message || 'Repost failed');
-            }
-        } finally {
-            setOpenRepostIndex(null);
-        }
-    };
+  const handleConfirmRepost = async (thoughts: string) => {
+    if (!selectedRepostPost) return;
+    const postId = selectedRepostPost.entryId || selectedRepostPost.postId;
+    try {
+      if (onCreateRepost) await onCreateRepost(postId, 'quote', thoughts);
+      alert('Quote reposted successfully!');
+      if (onPostCreated) onPostCreated();
+    } catch (error: any) {
+      alert(error.message || 'Repost failed');
+    } finally {
+      setIsRepostWithPerspectiveOpen(false);
+      setSelectedRepostPost(null);
+    }
+  };
 
-    const openRepostWithPerspectiveModal = (post: any, idx: number) => {
-        setSelectedRepostPost(post);
-        setIsRepostWithPerspectiveOpen(true);
-        setOpenRepostIndex(null);
-    };
+  const handleUndoAction = async () => {
+    if (!undoToast) return;
+    const postId = undoToast.postId;
+    const action = undoToast.action;
+    const targetUserId = undoToast.targetUserId;
 
-    const handleConfirmRepost = async (thoughts: string) => {
-        if (!selectedRepostPost) return;
-        const postId = selectedRepostPost.entryId || selectedRepostPost.postId;
-        try {
-            await onCreateRepost?.(postId, 'quote', thoughts);
-            alert('Quote reposted successfully!');
-            onPostCreated?.();
-        } catch (error: any) {
-            alert(error.message || 'Repost failed');
-        } finally {
-            setIsRepostWithPerspectiveOpen(false);
-            setSelectedRepostPost(null);
-        }
-    };
+    setHiddenPostIds((prev) => {
+      const next = new Set(prev);
+      next.delete(postId);
+      return next;
+    });
 
-    // ✅ handlePostAction — ab not-interested / unfollow / report teeno
-    // real handlers ke saath wired hain (pehle sirf alert() the)
-    const handlePostAction = async (action: string, postId: string) => {
-        // viewer (non-owner) ko bhi ye "safe" actions allowed hain — ye kisi
-        // post ko edit/delete nahi karte, sirf apne khud ke view-preferences
-        // ya moderation-report update karte hain.
-        const viewerAllowedActions = ['copy', 'embed', 'analytics', 'save', 'not-interested', 'unfollow', 'report'];
+    if (action === 'unfollow' && targetUserId) {
+      try {
+        await FollowService.followUser(targetUserId);
+      } catch (err: any) {
+        alert(err.message || 'Failed to re-follow');
+      }
+    }
 
-        if (!isOwnProfile && !viewerAllowedActions.includes(action)) {
-            return;
-        }
+    setUndoToast(null);
+  };
 
-        const post = posts.find(p => (p.entryId || p.postId) === postId);
-        if (!post) return;
+  const handlePostAction = async (action: string, postId: string) => {
+    const viewerAllowedActions = ['copy', 'embed', 'analytics', 'save', 'not-interested', 'unfollow', 'report'];
 
-        switch (action) {
-            case 'pin':
-                await handlers.handlePinPost(postId, post.isPinned || false);
-                break;
+    if (!isOwnProfile && viewerAllowedActions.indexOf(action) === -1) {
+      return;
+    }
 
-            // ✅ NEW: 'edit' action — PostMenuDropdown ke "Edit post" button se aata hai.
-            // UpdatePostModal ko open karta hai (jo already component ke end mein render hota hai)
-           case 'edit': {
-          const idx = posts.findIndex(p => (p.entryId || p.postId) === postId);
-          if (idx === -1) break;
-          handlers.setUpdatePostId(idx);
-          // ✅ FIX: content field priority pe — yahi actually card pe dikhta hai
-          handlers.setUpdatePostTitle(post.content || post.title || '');
-          handlers.setShowUpdateModal(true);
-          break;
-        }  
-      
-                  case 'save':
-                      await handlers.handleSavePost(postId, post.isSaved || false);
-                      break;
-                  case 'delete':
-                      await handlers.handleDeletePost(postId);
-                      break;
-                  case 'archive':
-                await handlers.handleArchivePost(postId);
-                break;
-            case 'copy':
-                try {
-                    const postUrl = `${window.location.origin}/post/${postId}`;
-                    await navigator.clipboard.writeText(postUrl);
-                    alert('Post link copied to clipboard!');
-                } catch (err) {
-                    console.error('Failed to copy text: ', err);
-                }
-                break;
-            case 'embed':
-                try {
-                    const embedCode = `<iframe src="${window.location.origin}/post/${postId}/embed" width="504" height="600" frameborder="0" style="border: 1px solid #e0d8cf; border-radius: 8px;"></iframe>`;
-                    await navigator.clipboard.writeText(embedCode);
-                    alert('Embed iframe code copied to clipboard!');
-                } catch (err) {
-                    console.error('Failed to copy embed code: ', err);
-                }
-                break;
-            case 'analytics':
-                setSelectedAnalyticsPost(post);
-                break;
-            case 'hide':
-                await handlers.handleArchivePost(postId);
-                break;
+    const post = posts.find((p: any) => (p.entryId || p.postId) === postId);
+    if (!post) return;
 
-            // ✅ REAL: client-side hide. Backend route (POST /feed/not-interested)
-            // abhi thronet-server mein nahi hai, isliye preference session ke
-            // baad persist nahi hoga — TODO(backend) jab route ban jaye to yahan
-            // API call add karna.
-            case 'not-interested': {
-                setHiddenPostIds(prev => new Set(prev).add(postId));
-                alert("Got it — you won't see this post again.");
-                break;
-            }
+    if (action === 'pin') {
+      await handlers.handlePinPost(postId, post.isPinned || false);
+      return;
+    }
 
-            // ✅ REAL: FollowService.unfollowUser() se actual backend call
-            case 'unfollow': {
-                const targetUserId = (post as any).userId || (post as any).userid || (post as any).authorId;
-                if (!targetUserId) {
-                    alert('Unable to identify this user.');
-                    break;
-                }
-                const targetName = (post as any).userName || (post as any).fullName || 'this user';
-                if (!confirm(`Unfollow ${targetName}? You'll stop seeing their posts.`)) break;
+    if (action === 'edit') {
+      const idx = posts.findIndex((p: any) => (p.entryId || p.postId) === postId);
+      if (idx === -1) return;
+      handlers.setUpdatePostId(idx);
+      handlers.setUpdatePostTitle(post.content || post.title || '');
+      handlers.setShowUpdateModal(true);
+      return;
+    }
 
-                try {
-                    await FollowService.unfollowUser(targetUserId);
-                    setHiddenPostIds(prev => new Set(prev).add(postId));
-                    alert(`Unfollowed ${targetName}.`);
-                } catch (err: any) {
-                    alert(err.message || 'Failed to unfollow');
-                }
-                break;
-            }
+    if (action === 'save') {
+      await handlers.handleSavePost(postId, post.isSaved || false);
+      return;
+    }
 
-            // ✅ REAL: opens ReportPostModal → user reason select karta hai →
-            // ReportService.reportPost() call hota hai (backend route abhi
-            // missing hai, isliye soft-fail handle hai modal ke submit mein)
-            case 'report': {
-                setReportingPostId(postId);
-                break;
-            }
+    if (action === 'delete') {
+      await handlers.handleDeletePost(postId);
+      return;
+    }
 
-            default:
-                break;
-        }
-    };
+    if (action === 'archive' || action === 'hide') {
+      await handlers.handleArchivePost(postId);
+      return;
+    }
 
-    return (
-        <>
-            <div id="activity-section" className="bg-gradient-to-br from-[#f6ede8]/90 via-[#f6ede8]/80 to-[#e0d8cf]/70 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-[#e0d8cf]/60 mb-8 relative overflow-hidden">
-                {/* Background blobs */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#e0d8cf]/20 to-transparent rounded-full blur-3xl" />
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-[#4a3728]/10 to-transparent rounded-full blur-2xl" />
+    if (action === 'copy') {
+      try {
+        const postUrl = window.location.origin + '/post/' + postId;
+        await navigator.clipboard.writeText(postUrl);
+        alert('Post link copied to clipboard!');
+      } catch (err) {
+        console.error('Failed to copy text: ', err);
+      }
+      return;
+    }
 
-                {/* ── Section Header ── */}
-                <div className="flex justify-between items-center mb-6 relative z-10">
-                    <div className="flex items-center gap-3">
-                        <div className="w-2 h-8 bg-gradient-to-b from-[#4a3728] to-[#7a5c3e] rounded-full" />
-                        <h3 className="text-2xl font-bold text-[#4a3728] tracking-tight">Activity</h3>
-                    </div>
-                    <div className="flex items-center gap-2 bg-[#4a3728]/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                        <div className="w-2 h-2 bg-[#4a3728] rounded-full animate-pulse" />
-                        <p className="text-sm font-semibold text-[#4a3728]">
-                            {followers} followers
-                        </p>
-                    </div>
-                </div>
+    if (action === 'embed') {
+      try {
+        const embedCode = '<iframe src="' + window.location.origin + '/post/' + postId + '/embed" width="504" height="600" frameborder="0" style="border: 1px solid #e0d8cf; border-radius: 8px;"></iframe>';
+        await navigator.clipboard.writeText(embedCode);
+        alert('Embed iframe code copied to clipboard!');
+      } catch (err) {
+        console.error('Failed to copy embed code: ', err);
+      }
+      return;
+    }
 
-                {/* ── Tabs + Create Button ── */}
-                <div className="flex justify-between items-center mb-8 relative z-10">
-                    <div className="bg-[#e0d8cf]/50 backdrop-blur-sm rounded-2xl p-1">
-                        <div className="flex">
-                            {ACTIVITY_TABS.map((item) => (
-                                <button
-                                    key={item}
-                                    onClick={() => setActiveTab(item)}
-                                    className={`px-6 py-3 text-sm font-semibold rounded-xl transition-all duration-300 relative ${activeTab === item
-                                        ? 'text-[#f6ede8] bg-[#4a3728] shadow-lg transform scale-105'
-                                        : 'text-[#4a3728]/70 hover:text-[#4a3728] hover:bg-[#e0d8cf]/30'
-                                        }`}
-                                >
-                                    {item}
-                                    {activeTab === item && (
-                                        <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-[#4a3728] rounded-full" />
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+    if (action === 'analytics') {
+      setSelectedAnalyticsPost(post);
+      return;
+    }
 
-                    {/* 🔒 Owner-only: Create a post button */}
-                    {isOwnProfile && (
-                        <button
-                            onClick={() => setShowCreatePostModal(true)}
-                            className="group px-6 py-3 bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] text-[#f6ede8] rounded-2xl text-sm font-semibold transition-all duration-300 flex items-center gap-3 relative overflow-hidden"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-r from-[#7a5c3e] to-[#4a3728] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                            <svg className="w-5 h-5 relative z-10 group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                            <span className="relative z-10">Create a post</span>
-                        </button>
-                    )}
-                </div>
+    if (action === 'not-interested') {
+      setHiddenPostIds((prev) => {
+        const next = new Set(prev);
+        next.add(postId);
+        return next;
+      });
+      setUndoToast({
+        postId: postId,
+        message: "You won't see this post again.",
+        action: 'not-interested',
+      });
+      setTimeout(() => {
+        setUndoToast((prev: any) => (prev && prev.postId === postId ? null : prev));
+      }, 6000);
+      return;
+    }
 
-                {/* ── Tab Content ── */}
-                <div className="space-y-6 relative z-10">
+    if (action === 'unfollow') {
+      const targetUserId = post.userId || post.userid || post.authorId;
+      if (!targetUserId) {
+        alert('Unable to identify this user.');
+        return;
+      }
+      const targetName = post.userName || post.fullName || 'this user';
+      if (!confirm('Unfollow ' + targetName + '? You will stop seeing their posts.')) return;
 
-                    {/* ── POSTS ── */}
-                    {activeTab === 'Posts' && (
-                        <>
-                            {isLoading ? (
-                                <div className="flex justify-center items-center py-12">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4a3728]" />
-                                </div>
-                            ) : combinedItems.length === 0 ? (
-                                <EmptyState label={isOwnProfile ? "No posts yet. Create your first post!" : "No posts yet."} />
-                            ) : (
-                                <>
-                                    <div className="relative w-full min-w-0 group/slider">
-                                        <style dangerouslySetInnerHTML={{ __html: `
-                                            .no-scrollbar::-webkit-scrollbar {
-                                                display: none !important;
-                                            }
-                                        ` }} />
+      try {
+        await FollowService.unfollowUser(targetUserId);
+        setHiddenPostIds((prev) => {
+          const next = new Set(prev);
+          next.add(postId);
+          return next;
+        });
+        setUndoToast({
+          postId: postId,
+          message: 'Unfollowed ' + targetName + '.',
+          action: 'unfollow',
+          targetUserId: targetUserId,
+        });
+        setTimeout(() => {
+          setUndoToast((prev: any) => (prev && prev.postId === postId ? null : prev));
+        }, 6000);
+      } catch (err: any) {
+        alert(err.message || 'Failed to unfollow');
+      }
+      return;
+    }
 
-                                        {/* Left Arrow Button */}
-                                        {showLeftArrow && (
-                                            <button
-                                                onClick={scrollLeft}
-                                                className="absolute left-[-16px] top-1/2 -translate-y-1/2 z-20 bg-white hover:bg-neutral-100 text-[#4a3728] w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-[#e0d8cf] transition-all duration-200"
-                                            >
-                                                <ChevronLeft className="w-6 h-6" />
-                                            </button>
-                                        )}
+    if (action === 'report') {
+      setReportingPostId(postId);
+      return;
+    }
+  };
 
-                                        {/* Right Arrow Button */}
-                                        {showRightArrow && (
-                                            <button
-                                                onClick={scrollRight}
-                                                className="absolute right-[-16px] top-1/2 -translate-y-1/2 z-20 bg-white hover:bg-neutral-100 text-[#4a3728] w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-[#e0d8cf] transition-all duration-200"
-                                            >
-                                                <ChevronRight className="w-6 h-6" />
-                                            </button>
-                                        )}
+  return (
+    <>
+      <div id="activity-section" className="bg-gradient-to-br from-[#f6ede8]/90 via-[#f6ede8]/80 to-[#e0d8cf]/70 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-[#e0d8cf]/60 mb-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#e0d8cf]/20 to-transparent rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-[#4a3728]/10 to-transparent rounded-full blur-2xl" />
 
-                                        {/* Scrollable Row */}
-                                        <div
-                                            ref={scrollRef}
-                                            onScroll={handleScroll}
-                                            className="flex flex-row overflow-x-auto gap-4 scroll-smooth pb-28 px-1 no-scrollbar -mb-28"
-                                            style={{
-                                                scrollbarWidth: 'none',
-                                                msOverflowStyle: 'none',
-                                            }}
-                                        >
-                                            {combinedItems.map((item, idx) => {
-                                                if (item.type === 'repost') {
-                                                    const originalKey = item.data.originalPost?.entryId;
-                                                    return (
-                                                        <div
-                                                            key={`repost-${item.data.repostId}`}
-                                                            className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col self-start"
-                                                        >
-                                                            <RepostCard
-                                                                repost={item.data}
-                                                                onDeleteRepost={onDeleteRepost}
-                                                                profileImage={profileImage}
-                                                                fullName={fullName}
-                                                                currentUserId={currentUserId}
-                                                                isOwnProfile={isOwnProfile}
-                                                                // ✅ ADDED — reactions (same source PostCard uses)
-                                                                postReactions={handlers.postReactions}
-                                                                onReact={handlers.handleReaction}
-                                                                likedPosts={handlers.postLikes}
-                                                                handleLike={handlers.handleLikeToggle}
-                                                                // ✅ ADDED — comments
-                                                                openCommentsIndex={openRepostCommentsKey}
-                                                                toggleComments={(pid: string) =>
-                                                                    setOpenRepostCommentsKey(prev => (prev === pid ? null : pid))
-                                                                }
-                                                                postComments={handlers.commentsByPost}
-                                                                commentText={handlers.commentText}
-                                                                setCommentText={handlers.setCommentText}
-                                                                replyingTo={handlers.replyingTo}
-                                                                setReplyingTo={handlers.setReplyingTo}
-                                                                openCommentMenuIndex={handlers.openCommentMenuIndex}
-                                                                editingCommentId={handlers.editingCommentId}
-                                                                editCommentText={handlers.editCommentText}
-                                                                setEditCommentText={handlers.setEditCommentText}
-                                                                showEmojiPicker={handlers.showEmojiPicker}
-                                                                setShowEmojiPicker={handlers.setShowEmojiPicker}
-                                                                handleReply={handlers.setReplyingToCommentId}
-                                                                handleCommentReaction={handlers.likeCommentToggle}
-                                                                toggleCommentMenu={handlers.toggleCommentMenu}
-                                                                handleCommentAction={handlers.handleCommentAction}
-                                                                handleEditSubmit={handlers.handleEditSubmit}
-                                                                handleEmojiClick={handlers.handleEmojiClick}
-                                                                handleCommentSubmit={handlers.handleCommentSubmit}
-                                                                postCommentCounts={undefined}
-                                                            />
-                                                        </div>
-                                                    );
-                                                }
+        <div className="flex justify-between items-center mb-6 relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-8 bg-gradient-to-b from-[#4a3728] to-[#7a5c3e] rounded-full" />
+            <h3 className="text-2xl font-bold text-[#4a3728] tracking-tight">Activity</h3>
+          </div>
+          <div className="flex items-center gap-2 bg-[#4a3728]/10 px-4 py-2 rounded-full backdrop-blur-sm">
+            <div className="w-2 h-2 bg-[#4a3728] rounded-full animate-pulse" />
+            <p className="text-sm font-semibold text-[#4a3728]">{followers} followers</p>
+          </div>
+        </div>
 
-                                                const post = item.data;
-                                                const postKey = post.entryId || post.postId;
-                                                const originalIndex = posts.findIndex(p => (p.entryId || p.postId) === postKey);
-                                                const idxToUse = originalIndex !== -1 ? originalIndex : idx;
+        <div className="flex justify-between items-center mb-8 relative z-10">
+          <div className="bg-[#e0d8cf]/50 backdrop-blur-sm rounded-2xl p-1">
+            <div className="flex">
+              {ACTIVITY_TABS.map((item: string) => (
+                <button
+                  key={item}
+                  onClick={() => setActiveTab(item)}
+                  className={'px-6 py-3 text-sm font-semibold rounded-xl transition-all duration-300 relative ' + (activeTab === item ? 'text-[#f6ede8] bg-[#4a3728] shadow-lg transform scale-105' : 'text-[#4a3728]/70 hover:text-[#4a3728] hover:bg-[#e0d8cf]/30')}
+                >
+                  {item}
+                  {activeTab === item ? (
+                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-[#4a3728] rounded-full" />
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </div>
 
-                                                return (
-                                                    <div
-                                                        key={`post-${postKey}`}
-                                                        className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col"
-                                                    >
-                                                        <PostCard
-                                                            post={post}
-                                                            index={idxToUse}
-                                                            isOwnProfile={isOwnProfile}
-                                                            profileImage={profileImage}
-                                                            fullName={fullName}
-                                                            headline={headline}
-                                                            postLikes={handlers.postLikes}
-                                                            openMenuId={handlers.openMenuId}
-                                                            setOpenMenuId={handlers.setOpenMenuId}
-                                                            onLikeToggle={handlers.handleLikeToggle}
-                                                            onPinPost={isOwnProfile ? handlers.handlePinPost : undefined}
-                                                            onSavePost={handlers.handleSavePost}
-                                                            onDeletePost={isOwnProfile ? handlers.handleDeletePost : undefined}
-                                                            onArchivePost={isOwnProfile ? handlers.handleArchivePost : undefined}
-                                                            onOpenUpdateModal={isOwnProfile ? (i: any, title: any) => {
-                                                                handlers.setUpdatePostId(i);
-                                                                handlers.setUpdatePostTitle(title);
-                                                                handlers.setShowUpdateModal(true);
-                                                            } : undefined}
-                                                            openCommentsIndex={handlers.openCommentsIndex === idxToUse ? postKey : null}
-                                                            onToggleComments={handlers.toggleCommentsPanel}
-                                                            commentsByPost={handlers.commentsByPost}
-                                                            isLoadingComments={handlers.isLoadingComments}
-                                                            isSubmittingComment={handlers.isSubmittingComment}
-                                                            commentLikes={handlers.commentLikes}
-                                                            formatCommentTime={handlers.formatCommentTime}
-                                                            openCommentMenuIndex={handlers.openCommentMenuIndex}
-                                                            toggleCommentMenu={handlers.toggleCommentMenu}
-                                                            handleCommentAction={handlers.handleCommentAction}
-                                                            editingCommentId={handlers.editingCommentId}
-                                                            editCommentText={handlers.editCommentText}
-                                                            setEditCommentText={handlers.setEditCommentText}
-                                                            handleEditSubmit={handlers.handleEditSubmit}
-                                                            isDeletingCommentId={handlers.isDeletingCommentId}
-                                                            replyingToCommentId={handlers.replyingToCommentId}
-                                                            setReplyingToCommentId={handlers.setReplyingToCommentId}
-                                                            replyText={handlers.replyText}
-                                                            setReplyText={handlers.setReplyText}
-                                                            handleReplySubmit={handlers.handleReplySubmit}
-                                                            likeCommentToggle={handlers.likeCommentToggle}
-                                                            commentText={handlers.commentText}
-                                                            setCommentText={handlers.setCommentText}
-                                                            handleCommentSubmit={handlers.handleCommentSubmit}
-                                                            replyingTo={handlers.replyingTo}
-                                                            setReplyingTo={handlers.setReplyingTo}
-                                                            showEmojiPicker={handlers.showEmojiPicker}
-                                                            setShowEmojiPicker={handlers.setShowEmojiPicker}
-                                                            handleEmojiClick={handlers.handleEmojiClick}
-                                                            setIsDeletingCommentId={handlers.setIsDeletingCommentId}
-                                                            currentUserId={currentUserId || ''}
-                                                            isDarkMode={undefined}
-                                                            likedPosts={handlers.postLikes}
-                                                            handleLike={handlers.handleLikeToggle}
-                                                            openMenuIndex={handlers.openMenuId}
-                                                            openRepostIndex={openRepostIndex}
-                                                            handlePostAction={handlePostAction}
-                                                            toggleComments={(pid: string) => {
-                                                                const pIdx = posts.findIndex(p => (p.entryId || p.postId) === pid);
-                                                                if (pIdx !== -1) {
-                                                                    handlers.toggleCommentsPanel(pIdx, pid);
-                                                                }
-                                                            }}
-                                                            handleReply={handlers.setReplyingToCommentId}
-                                                            handleCommentReaction={handlers.likeCommentToggle}
-                                                            postComments={handlers.commentsByPost}
-                                                            emojiList={undefined}
-                                                            togglePostMenu={(key: string) => handlers.setOpenMenuId(handlers.openMenuId === key ? null : key)}
-                                                            toggleRepostMenu={(i: number) => setOpenRepostIndex(openRepostIndex === i ? null : i)}
-                                                            onOpenWithPerspectiveModal={openRepostWithPerspectiveModal}
-                                                            handleRepostInstant={handleRepostInstant}
-                                                            handleRepost={handleRepostInstant}
-                                                            postCommentCounts={undefined}
-                                                            postReactions={handlers.postReactions}
-                                                            onReact={handlers.handleReaction}
-                                                        />
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                    {hasMorePosts && (
-                                        <div className="relative z-30 mt-6 w-full">
-                                            <ShowAllButton label={`Show All Posts (${filteredPosts.length + userReposts.length})`} />
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                        </>
-                    )}
+          {isOwnProfile ? (
+            <button onClick={() => setShowCreatePostModal(true)} className="group px-6 py-3 bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] text-[#f6ede8] rounded-2xl text-sm font-semibold transition-all duration-300 flex items-center gap-3 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-[#7a5c3e] to-[#4a3728] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <svg className="w-5 h-5 relative z-10 group-hover:rotate-12 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              <span className="relative z-10">Create a post</span>
+            </button>
+          ) : null}
+        </div>
 
-                    {activeTab === 'Comments' && (() => {
+        <div className="space-y-6 relative z-10">
+          {activeTab === 'Posts' ? (
+            isLoading ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4a3728]" />
+              </div>
+            ) : combinedItems.length === 0 ? (
+              <EmptyState label={isOwnProfile ? 'No posts yet. Create your first post!' : 'No posts yet.'} />
+            ) : (
+              <>
+                <div className="relative w-full min-w-0 group/slider">
+                  <style dangerouslySetInnerHTML={{ __html: '.no-scrollbar::-webkit-scrollbar { display: none !important; }' }} />
+
+                  {showLeftArrow ? (
+                    <button onClick={scrollLeftFn} className="absolute left-[-16px] top-1/2 -translate-y-1/2 z-20 bg-white hover:bg-neutral-100 text-[#4a3728] w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-[#e0d8cf] transition-all duration-200">
+                      <ChevronLeft className="w-6 h-6" />
+                    </button>
+                  ) : null}
+
+                  {showRightArrow ? (
+                    <button onClick={scrollRightFn} className="absolute right-[-16px] top-1/2 -translate-y-1/2 z-20 bg-white hover:bg-neutral-100 text-[#4a3728] w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-[#e0d8cf] transition-all duration-200">
+                      <ChevronRight className="w-6 h-6" />
+                    </button>
+                  ) : null}
+
+                  <div
+                    ref={scrollRef}
+                    onScroll={handleScroll}
+                    className="flex flex-row overflow-x-auto gap-4 scroll-smooth pb-28 px-1 no-scrollbar -mb-28"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  >
+                    {combinedItems.map((item, idx) => {
+                      if (item.type === 'repost') {
                         return (
-                            <div className="space-y-6">
-                                {isLoadingUserComments ? (
-                                    <div className="flex justify-center items-center py-12">
-                                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4a3728]" />
-                                    </div>
-                                ) : userComments.length === 0 ? (
-                                    <EmptyState label="Comments you've made will appear here." />
-                                ) : (
-                                    <div className="space-y-4">
-                                        {userComments.slice(0, visibleCommentsCount).map((comment: any, commentIdx: number) => (
-                                            <div
-                                                key={comment.commentId || commentIdx}
-                                                className="bg-white hover:bg-neutral-50/50 transition-colors p-6 rounded-2xl border border-[#e0d8cf]/40 shadow-sm flex flex-col gap-3"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <img
-                                                        src={profileImage || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s'}
-                                                        alt={fullName}
-                                                        className="w-10 h-10 rounded-xl object-cover border border-[#4a3728]/20"
-                                                    />
-                                                    <div>
-                                                        <h4 className="font-bold text-[#4a3728]">{fullName}</h4>
-                                                        <p className="text-xs text-[#4a3728]/60">
-                                                            {formatRelativeTime(comment.createdAt)}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-sm font-medium text-[#4a3728] pl-1">
-                                                    {comment.content}
-                                                </div>
-                                                <div className="flex items-center gap-4 text-xs text-[#4a3728]/50 pl-1 mt-1 border-t border-[#4a3728]/10 pt-2">
-                                                    <span className="flex items-center gap-1">
-                                                        <i className="ri-heart-line text-sm"></i>
-                                                        {comment.likesCount || 0} likes
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-
-                                        {userComments.length > visibleCommentsCount && (
-                                            <button
-                                                onClick={() => setVisibleCommentsCount(prev => prev + 3)}
-                                                className="w-full mt-6 group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border-2 border-dashed border-[#4a3728]/30 hover:border-[#4a3728]/50 rounded-2xl p-4 transition-all duration-300 flex items-center justify-center gap-2 relative z-30 text-[#4a3728] font-bold text-sm"
-                                            >
-                                                <span>Show More</span>
-                                                <svg className="w-4 h-4 text-[#4a3728] group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                                </svg>
-                                            </button>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+                          <div key={'repost-' + item.data.repostId} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col self-start">
+                            <RepostCard
+                              repost={item.data}
+                              onDeleteRepost={onDeleteRepost}
+                              profileImage={profileImage}
+                              fullName={fullName}
+                              currentUserId={currentUserId}
+                              isOwnProfile={isOwnProfile}
+                              likedPosts={handlers.postLikes}
+                              handleLike={handlers.handleLikeToggle}
+                              openCommentsIndex={openRepostCommentsKey}
+                              toggleComments={(pid: string) => setOpenRepostCommentsKey((prev) => (prev === pid ? null : pid))}
+                              postComments={handlers.commentsByPost}
+                              commentText={handlers.commentText}
+                              setCommentText={handlers.setCommentText}
+                              replyingTo={handlers.replyingTo}
+                              setReplyingTo={handlers.setReplyingTo}
+                              openCommentMenuIndex={handlers.openCommentMenuIndex}
+                              editingCommentId={handlers.editingCommentId}
+                              editCommentText={handlers.editCommentText}
+                              setEditCommentText={handlers.setEditCommentText}
+                              showEmojiPicker={handlers.showEmojiPicker}
+                              setShowEmojiPicker={handlers.setShowEmojiPicker}
+                              handleReply={handlers.setReplyingToCommentId}
+                              handleCommentReaction={handlers.likeCommentToggle}
+                              toggleCommentMenu={handlers.toggleCommentMenu}
+                              handleCommentAction={handlers.handleCommentAction}
+                              handleEditSubmit={handlers.handleEditSubmit}
+                              handleEmojiClick={handlers.handleEmojiClick}
+                              handleCommentSubmit={handlers.handleCommentSubmit}
+                              postCommentCounts={undefined}
+                            />
+                          </div>
                         );
-                    })()}
+                      }
 
-                    {/* ── VIDEOS ── */}
-                    {activeTab === 'Videos' && (
-                        <div className="space-y-6">
-                            {allVideos.length === 0 ? (
-                                <EmptyState label="No videos uploaded yet." />
-                            ) : (
-                                <>
-                                    {allVideos.slice(0, 2).map(({ post, video }, idx) => (
-                                        <VideoCard key={`${post.entryId || post.postId}-${idx}`} post={post} video={video} />
-                                    ))}
-                                    {allVideos.length > 2 && (
-                                        <ShowAllButton label={`Show All Videos (${allVideos.length})`} />
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    )}
+                      const post = item.data;
+                      const postKey = post.entryId || post.postId;
+                      const originalIndex = posts.findIndex((p: any) => (p.entryId || p.postId) === postKey);
+                      const idxToUse = originalIndex !== -1 ? originalIndex : idx;
 
-                    {/* ── IMAGES ── */}
-                    {activeTab === 'Images' && (
-                        <div className="space-y-5">
-                            {allImages.length === 0 ? (
-                                <EmptyState label="No images uploaded yet." />
-                            ) : (
-                                <>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                                        {allImages.slice(0, visibleImagesCount).map(({ post, img }, idx) => (
-                                            <ImageCard key={`${post.entryId || post.postId}-${idx}`} post={post} img={img} />
-                                        ))}
-                                    </div>
-                                    {allImages.length > visibleImagesCount && (
-                                        <button
-                                            onClick={() => setVisibleImagesCount(prev => prev + 3)}
-                                            className="w-full mt-6 group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border-2 border-dashed border-[#4a3728]/30 hover:border-[#4a3728]/50 rounded-2xl p-4 transition-all duration-300 flex items-center justify-center gap-2 relative z-30 text-[#4a3728] font-bold text-sm"
-                                        >
-                                            <span>Show all images</span>
-                                            <svg className="w-4 h-4 text-[#4a3728] group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                            </svg>
-                                        </button>
-                                    )}
-                                </>
-                            )}
+                      return (
+                        <div key={'post-' + postKey} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col">
+                          <PostCard
+                            post={post}
+                            index={idxToUse}
+                            isOwnProfile={isOwnProfile}
+                            profileImage={profileImage}
+                            fullName={fullName}
+                            headline={headline}
+                            postLikes={handlers.postLikes}
+                            openMenuId={handlers.openMenuId}
+                            setOpenMenuId={handlers.setOpenMenuId}
+                            onLikeToggle={handlers.handleLikeToggle}
+                            onPinPost={isOwnProfile ? handlers.handlePinPost : undefined}
+                            onSavePost={handlers.handleSavePost}
+                            onDeletePost={isOwnProfile ? handlers.handleDeletePost : undefined}
+                            onArchivePost={isOwnProfile ? handlers.handleArchivePost : undefined}
+                            onOpenUpdateModal={
+                              isOwnProfile
+                                ? (i: any, title: any) => {
+                                    handlers.setUpdatePostId(i);
+                                    handlers.setUpdatePostTitle(title);
+                                    handlers.setShowUpdateModal(true);
+                                  }
+                                : undefined
+                            }
+                            openCommentsIndex={handlers.openCommentsIndex === idxToUse ? postKey : null}
+                            onToggleComments={handlers.toggleCommentsPanel}
+                            commentsByPost={handlers.commentsByPost}
+                            isLoadingComments={handlers.isLoadingComments}
+                            isSubmittingComment={handlers.isSubmittingComment}
+                            commentLikes={handlers.commentLikes}
+                            formatCommentTime={handlers.formatCommentTime}
+                            openCommentMenuIndex={handlers.openCommentMenuIndex}
+                            toggleCommentMenu={handlers.toggleCommentMenu}
+                            handleCommentAction={handlers.handleCommentAction}
+                            editingCommentId={handlers.editingCommentId}
+                            editCommentText={handlers.editCommentText}
+                            setEditCommentText={handlers.setEditCommentText}
+                            handleEditSubmit={handlers.handleEditSubmit}
+                            isDeletingCommentId={handlers.isDeletingCommentId}
+                            replyingToCommentId={handlers.replyingToCommentId}
+                            setReplyingToCommentId={handlers.setReplyingToCommentId}
+                            replyText={handlers.replyText}
+                            setReplyText={handlers.setReplyText}
+                            handleReplySubmit={handlers.handleReplySubmit}
+                            likeCommentToggle={handlers.likeCommentToggle}
+                            commentText={handlers.commentText}
+                            setCommentText={handlers.setCommentText}
+                            handleCommentSubmit={handlers.handleCommentSubmit}
+                            replyingTo={handlers.replyingTo}
+                            setReplyingTo={handlers.setReplyingTo}
+                            showEmojiPicker={handlers.showEmojiPicker}
+                            setShowEmojiPicker={handlers.setShowEmojiPicker}
+                            handleEmojiClick={handlers.handleEmojiClick}
+                            setIsDeletingCommentId={handlers.setIsDeletingCommentId}
+                            currentUserId={currentUserId || ''}
+                            isDarkMode={undefined}
+                            likedPosts={handlers.postLikes}
+                            handleLike={handlers.handleLikeToggle}
+                            openMenuIndex={handlers.openMenuId}
+                            openRepostIndex={openRepostIndex}
+                            handlePostAction={handlePostAction}
+                            toggleComments={(pid: string) => {
+                              const pIdx = posts.findIndex((p: any) => (p.entryId || p.postId) === pid);
+                              if (pIdx !== -1) {
+                                handlers.toggleCommentsPanel(pIdx, pid);
+                              }
+                            }}
+                            handleReply={handlers.setReplyingToCommentId}
+                            handleCommentReaction={handlers.likeCommentToggle}
+                            postComments={handlers.commentsByPost}
+                            emojiList={undefined}
+                            togglePostMenu={(key: string) => handlers.setOpenMenuId(handlers.openMenuId === key ? null : key)}
+                            toggleRepostMenu={(i: number) => setOpenRepostIndex(openRepostIndex === i ? null : i)}
+                            onOpenWithPerspectiveModal={openRepostWithPerspectiveModal}
+                            handleRepostInstant={handleRepostInstant}
+                            handleRepost={handleRepostInstant}
+                            postCommentCounts={undefined}
+                          />
                         </div>
-                    )}
-
-                    {/* ── DOCUMENTS ── */}
-                    {activeTab === 'Documents' && (
-                        <div className="space-y-5">
-                            {allDocuments.length === 0 ? (
-                                <EmptyState label="No documents uploaded yet." />
-                            ) : (
-                                <>
-                                    {allDocuments.slice(0, 3).map(({ post, doc }, idx) => (
-                                        <DocumentCard key={`${post.entryId || post.postId}-${idx}`} post={post} doc={doc} />
-                                    ))}
-                                    {allDocuments.length > 3 && (
-                                        <ShowAllButton label={`Show All Documents (${allDocuments.length})`} />
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    )}
+                      );
+                    })}
+                  </div>
                 </div>
+                {hasMorePosts ? (
+                  <div className="relative z-30 mt-6 w-full">
+                    <ShowAllButton label={'Show All Posts (' + (filteredPosts.length + userReposts.length) + ')'} />
+                  </div>
+                ) : null}
+              </>
+            )
+          ) : null}
+
+          {activeTab === 'Comments' ? (
+            <div className="space-y-6">
+              {isLoadingUserComments ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4a3728]" />
+                </div>
+              ) : userComments.length === 0 ? (
+                <EmptyState label="Comments you've made will appear here." />
+              ) : (
+                <div className="space-y-4">
+                  {userComments.slice(0, visibleCommentsCount).map((comment: any, commentIdx: number) => (
+                    <div key={comment.commentId || commentIdx} className="bg-white hover:bg-neutral-50/50 transition-colors p-6 rounded-2xl border border-[#e0d8cf]/40 shadow-sm flex flex-col gap-3">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={profileImage || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s'}
+                          alt={fullName}
+                          className="w-10 h-10 rounded-xl object-cover border border-[#4a3728]/20"
+                        />
+                        <div>
+                          <h4 className="font-bold text-[#4a3728]">{fullName}</h4>
+                          <p className="text-xs text-[#4a3728]/60">{formatRelativeTime(comment.createdAt)}</p>
+                        </div>
+                      </div>
+                      <div className="text-sm font-medium text-[#4a3728] pl-1">{comment.content}</div>
+                      <div className="flex items-center gap-4 text-xs text-[#4a3728]/50 pl-1 mt-1 border-t border-[#4a3728]/10 pt-2">
+                        <span className="flex items-center gap-1">
+                          <i className="ri-heart-line text-sm"></i>
+                          {comment.likesCount || 0} likes
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {userComments.length > visibleCommentsCount ? (
+                    <button
+                      onClick={() => setVisibleCommentsCount((prev) => prev + 3)}
+                      className="w-full mt-6 group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border-2 border-dashed border-[#4a3728]/30 hover:border-[#4a3728]/50 rounded-2xl p-4 transition-all duration-300 flex items-center justify-center gap-2 relative z-30 text-[#4a3728] font-bold text-sm"
+                    >
+                      <span>Show More</span>
+                      <svg className="w-4 h-4 text-[#4a3728] group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {activeTab === 'Videos' ? (
+            <div className="space-y-6">
+              {allVideos.length === 0 ? (
+                <EmptyState label="No videos uploaded yet." />
+              ) : (
+                <>
+                  {allVideos.slice(0, 2).map(({ post, video }, idx) => (
+                    <VideoCard key={(post.entryId || post.postId) + '-' + idx} post={post} video={video} />
+                  ))}
+                  {allVideos.length > 2 ? <ShowAllButton label={'Show All Videos (' + allVideos.length + ')'} /> : null}
+                </>
+              )}
+            </div>
+          ) : null}
+
+          {activeTab === 'Images' ? (
+            <div className="space-y-5">
+              {allImages.length === 0 ? (
+                <EmptyState label="No images uploaded yet." />
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {allImages.slice(0, visibleImagesCount).map(({ post, img }, idx) => (
+                      <ImageCard key={(post.entryId || post.postId) + '-' + idx} post={post} img={img} />
+                    ))}
+                  </div>
+                  {allImages.length > visibleImagesCount ? (
+                    <button
+                      onClick={() => setVisibleImagesCount((prev) => prev + 3)}
+                      className="w-full mt-6 group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border-2 border-dashed border-[#4a3728]/30 hover:border-[#4a3728]/50 rounded-2xl p-4 transition-all duration-300 flex items-center justify-center gap-2 relative z-30 text-[#4a3728] font-bold text-sm"
+                    >
+                      <span>Show all images</span>
+                      <svg className="w-4 h-4 text-[#4a3728] group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ) : null}
+
+          {activeTab === 'Documents' ? (
+            <div className="space-y-5">
+              {allDocuments.length === 0 ? (
+                <EmptyState label="No documents uploaded yet." />
+              ) : (
+                <>
+                  {allDocuments.slice(0, 3).map(({ post, doc }, idx) => (
+                    <DocumentCard key={(post.entryId || post.postId) + '-' + idx} post={post} doc={doc} />
+                  ))}
+                  {allDocuments.length > 3 ? <ShowAllButton label={'Show All Documents (' + allDocuments.length + ')'} /> : null}
+                </>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <ShowAllActivityModal
+        isOpen={showAllModal}
+        onClose={() => setShowAllModal(false)}
+        activeSection={activeTab}
+        posts={posts}
+        userReposts={userReposts}
+        profileImage={profileImage}
+        fullName={fullName}
+        currentUserId={currentUserId}
+        postLikes={handlers.postLikes}
+        onLikeToggle={handlers.handleLikeToggle}
+      />
+
+      {isOwnProfile ? (
+        <UpdatePostModal
+          postId={(posts[handlers.updatePostId || 0] && (posts[handlers.updatePostId || 0].entryId || posts[handlers.updatePostId || 0].postId)) || ''}
+          isOpen={handlers.showUpdateModal}
+          onClose={() => {
+            handlers.setShowUpdateModal(false);
+            handlers.setUpdatePostId(null);
+          }}
+          currentTitle={handlers.updatePostTitle}
+          onUpdate={handlers.handleUpdatePost}
+        />
+      ) : null}
+
+      {isOwnProfile ? (
+        <CreatePostModal
+          isOpen={showCreatePostModal}
+          onClose={() => setShowCreatePostModal(false)}
+          onSubmit={async () => {
+            setShowCreatePostModal(false);
+            if (onPostCreated) onPostCreated();
+          }}
+        />
+      ) : null}
+
+      <RepostWithPerspectiveModal
+        isOpen={isRepostWithPerspectiveOpen}
+        onClose={() => {
+          setIsRepostWithPerspectiveOpen(false);
+          setSelectedRepostPost(null);
+        }}
+        post={selectedRepostPost}
+        onRepost={handleConfirmRepost}
+        isDarkMode={false}
+      />
+
+      {reportingPostId ? (
+        <ReportPostModal
+          postId={reportingPostId}
+          onClose={() => setReportingPostId(null)}
+          onSubmit={async (reason: string) => {
+            setReportSubmitting(true);
+            try {
+              await ReportService.reportPost(reportingPostId, reason);
+              alert('Post reported. Thank you for helping keep our community safe.');
+            } catch (err: any) {
+              alert('Report received. Our team will review it shortly.');
+            } finally {
+              setReportSubmitting(false);
+              setReportingPostId(null);
+            }
+          }}
+          isSubmitting={reportSubmitting}
+        />
+      ) : null}
+
+      {selectedAnalyticsPost ? (
+        <div onClick={() => setSelectedAnalyticsPost(null)} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-slate-800 w-full max-w-md rounded-3xl p-8 shadow-2xl border border-[#e0d8cf]/50 dark:border-slate-700/50 relative text-[#4a3728] dark:text-slate-100">
+            <button onClick={() => setSelectedAnalyticsPost(null)} className="absolute top-4 right-4 p-2.5 rounded-full hover:bg-[#e0d8cf]/40 dark:hover:bg-slate-700/50 transition-colors text-[#4a3728]/70 dark:text-slate-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="flex items-center gap-2 mb-6">
+              <div className="p-2 bg-[#4a3728] text-white rounded-xl">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-black text-[#4a3728] dark:text-white">Post Analytics</h2>
             </div>
 
-            {/* ── Modals ── */}
-            <ShowAllActivityModal
-                isOpen={showAllModal}
-                onClose={() => setShowAllModal(false)}
-                activeSection={activeTab}
-                posts={posts}
-                userReposts={userReposts}
-                profileImage={profileImage}
-                fullName={fullName}
-                currentUserId={currentUserId}
-                postLikes={handlers.postLikes}
-                onLikeToggle={handlers.handleLikeToggle}
-            />
+            <div className="mb-6 bg-[#e0d8cf]/10 dark:bg-slate-700/30 border border-[#e0d8cf]/30 dark:border-slate-700/50 rounded-2xl p-4">
+              <p className="text-xs font-bold text-[#4a3728]/50 dark:text-slate-400/60 uppercase tracking-wider mb-1">Post Caption</p>
+              <p className="text-sm font-semibold text-[#4a3728] dark:text-slate-200 line-clamp-2 italic">
+                {selectedAnalyticsPost.content || selectedAnalyticsPost.text || 'No text content'}
+              </p>
+            </div>
 
-            {/* 🔒 Owner-only: editing another user's post is never valid */}
-            {isOwnProfile && (
-                <UpdatePostModal
-                    postId={posts[handlers.updatePostId || 0]?.entryId || posts[handlers.updatePostId || 0]?.postId || ''}
-                    isOpen={handlers.showUpdateModal}
-                    onClose={() => {
-                        handlers.setShowUpdateModal(false);
-                        handlers.setUpdatePostId(null);
-                    }}
-                    currentTitle={handlers.updatePostTitle}
-                    onUpdate={handlers.handleUpdatePost}
-                />
-            )}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/40 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
+                <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  Impressions
+                </span>
+                <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
+                  {selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 0}
+                </span>
+              </div>
 
-            {/* 🔒 Owner-only: creating a post "as" another user's profile is never valid */}
-            {isOwnProfile && (
-                <CreatePostModal
-                    isOpen={showCreatePostModal}
-                    onClose={() => setShowCreatePostModal(false)}
-                    onSubmit={async () => {
-                        setShowCreatePostModal(false);
-                        onPostCreated?.();
-                    }}
-                />
-            )}
+              <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/40 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
+                <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  Likes
+                </span>
+                <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
+                  {selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0}
+                </span>
+              </div>
 
-            <RepostWithPerspectiveModal
-                isOpen={isRepostWithPerspectiveOpen}
-                onClose={() => {
-                    setIsRepostWithPerspectiveOpen(false);
-                    setSelectedRepostPost(null);
-                }}
-                post={selectedRepostPost}
-                onRepost={handleConfirmRepost}
-                isDarkMode={false}
-            />
+              <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/40 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
+                <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  Comments
+                </span>
+                <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
+                  {selectedAnalyticsPost.commentsCount || 0}
+                </span>
+              </div>
 
-            {/* ✅ NEW: Report modal — postId set hote hi khulta hai */}
-            {reportingPostId && (
-                <ReportPostModal
-                    postId={reportingPostId}
-                    onClose={() => setReportingPostId(null)}
-                    onSubmit={async (reason: string) => {
-                        setReportSubmitting(true);
-                        try {
-                            // TODO(backend): /api/v1/reports route abhi thronet-server
-                            // mein nahi hai. Jab tak backend route nahi banta, catch
-                            // block gracefully fail karega (soft-fail UX).
-                            await ReportService.reportPost(reportingPostId, reason);
-                            alert('Post reported. Thank you for helping keep our community safe.');
-                        } catch (err: any) {
-                            console.error('Report failed (backend endpoint likely missing):', err);
-                            alert('Report received. Our team will review it shortly.');
-                        } finally {
-                            setReportSubmitting(false);
-                            setReportingPostId(null);
-                        }
-                    }}
-                    isSubmitting={reportSubmitting}
-                />
-            )}
+              <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/40 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
+                <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Engagement
+                </span>
+                <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
+                  {(
+                    ((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) +
+                      (selectedAnalyticsPost.commentsCount || 0) +
+                      (selectedAnalyticsPost.sharesCount || selectedAnalyticsPost.shares || 0)) /
+                    (selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 1) *
+                    100
+                  ).toFixed(1)}%
+                </span>
+              </div>
+            </div>
 
-            {selectedAnalyticsPost && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-bold text-[#4a3728]/60 dark:text-slate-400">
+                <span>Engagement Level</span>
+                <span className="text-[#4a3728] dark:text-white">
+                  {Math.min(
+                    100,
+                    Math.round(
+                      ((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) +
+                        (selectedAnalyticsPost.commentsCount || 0) +
+                        (selectedAnalyticsPost.sharesCount || selectedAnalyticsPost.shares || 0)) /
+                        (selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 1) *
+                        100 *
+                        2
+                    )
+                  )}%
+                </span>
+              </div>
+              <div className="w-full h-3 bg-[#e0d8cf]/30 dark:bg-slate-700 rounded-full overflow-hidden">
                 <div
-                    onClick={() => setSelectedAnalyticsPost(null)}
-                    className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
-                >
-                    <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="bg-white dark:bg-slate-800 w-full max-w-md rounded-3xl p-8 shadow-2xl border border-[#e0d8cf]/50 dark:border-slate-700/50 relative text-[#4a3728] dark:text-slate-100"
-                    >
-                        <button
-                            onClick={() => setSelectedAnalyticsPost(null)}
-                            className="absolute top-4 right-4 p-2.5 rounded-full hover:bg-[#e0d8cf]/40 dark:hover:bg-slate-700/50 transition-colors text-[#4a3728]/70 dark:text-slate-400"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+                  className="h-full bg-gradient-to-r from-[#8b7355] to-[#4a3728] dark:from-[#9d8466] dark:to-white rounded-full transition-all duration-1000"
+                  style={{
+                    width:
+                      Math.min(
+                        100,
+                        Math.round(
+                          ((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) +
+                            (selectedAnalyticsPost.commentsCount || 0) +
+                            (selectedAnalyticsPost.sharesCount || selectedAnalyticsPost.shares || 0)) /
+                            (selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 1) *
+                            100 *
+                            2
+                        )
+                      ) + '%',
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
-                        {/* Title */}
-                        <div className="flex items-center gap-2 mb-6">
-                            <div className="p-2 bg-[#4a3728] text-white rounded-xl">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                </svg>
-                            </div>
-                            <h2 className="text-xl font-black text-[#4a3728] dark:text-white">Post Analytics</h2>
-                        </div>
-
-                        {/* Content Preview */}
-                        <div className="mb-6 bg-[#e0d8cf]/10 dark:bg-slate-700/30 border border-[#e0d8cf]/30 dark:border-slate-700/50 rounded-2xl p-4">
-                            <p className="text-xs font-bold text-[#4a3728]/50 dark:text-slate-400/60 uppercase tracking-wider mb-1">Post Caption</p>
-                            <p className="text-sm font-semibold text-[#4a3728] dark:text-slate-200 line-clamp-2 italic">
-                                {selectedAnalyticsPost.content || selectedAnalyticsPost.text || 'No text content'}
-                            </p>
-                        </div>
-
-                        {/* Metrics Grid */}
-                        <div className="grid grid-cols-2 gap-4 mb-6">
-                            {/* Views */}
-                            <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/40 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
-                                <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                    Impressions
-                                </span>
-                                <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                                    {selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 0}
-                                </span>
-                            </div>
-
-                            {/* Likes */}
-                            <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/40 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
-                                <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                                    </svg>
-                                    Likes
-                                </span>
-                                <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                                    {selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0}
-                                </span>
-                            </div>
-
-                            {/* Comments */}
-                            <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/40 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
-                                <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                    </svg>
-                                    Comments
-                                </span>
-                                <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                                    {selectedAnalyticsPost.commentsCount || 0}
-                                </span>
-                            </div>
-
-                            {/* Engagement Rate */}
-                            <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/40 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
-                                <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    </svg>
-                                    Engagement
-                                </span>
-                                <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                                    {(((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) + (selectedAnalyticsPost.commentsCount || 0) + (selectedAnalyticsPost.sharesCount || selectedAnalyticsPost.shares || 0)) / (selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 1) * 100).toFixed(1)}%
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Progress Bar visual indicator */}
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-xs font-bold text-[#4a3728]/60 dark:text-slate-400">
-                                <span>Engagement Level</span>
-                                <span className="text-[#4a3728] dark:text-white">
-                                    {Math.min(100, Math.round((((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) + (selectedAnalyticsPost.commentsCount || 0) + (selectedAnalyticsPost.sharesCount || selectedAnalyticsPost.shares || 0)) / (selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 1) * 100) * 2))}%
-                                </span>
-                            </div>
-                            <div className="w-full h-3 bg-[#e0d8cf]/30 dark:bg-slate-700 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-gradient-to-r from-[#8b7355] to-[#4a3728] dark:from-[#9d8466] dark:to-white rounded-full transition-all duration-1000"
-                                    style={{
-                                        width: `${Math.min(100, Math.round((((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) + (selectedAnalyticsPost.commentsCount || 0) + (selectedAnalyticsPost.sharesCount || selectedAnalyticsPost.shares || 0)) / (selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 1) * 100) * 2))}%`
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
+      {undoToast ? (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[2000] bg-[#4a3728] text-[#f6ede8] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 animate-fade-in">
+          <span className="text-sm font-medium">{undoToast.message}</span>
+          <button onClick={handleUndoAction} className="text-sm font-bold underline hover:text-white transition-colors">Undo</button>
+          <button onClick={() => setUndoToast(null)} className="text-[#f6ede8]/60 hover:text-[#f6ede8] ml-1">x</button>
+        </div>
+      ) : null}
+    </>
+  );
 };
 
 export default ActivitySection;
