@@ -104,14 +104,19 @@ export default function SearchUserProfilePage() {
                         setCurrentUserImage(photoRes?.data?.photo?.cloudinarySecureUrl || '');
                     }
                     // ✅ FIX: current user ki headline fetch karo (agar headlineId hai)
-                    if (data.headlineId) {
-                        try {
-                            const headlineRes = await ProfileService.getHeadlineById(data.headlineId);
-                            setCurrentUserHeadline(headlineRes?.data?.title || '');
-                        } catch {
-                            setCurrentUserHeadline('');
-                        }
-                    }
+                   console.log('🔍 [DEBUG] data.headlineId:', data.headlineId);
+                   if (data.headlineId) {
+                       try {
+                           const headlineRes = await ProfileService.getHeadlineById(data.headlineId);
+                           console.log('🔍 [DEBUG] headlineRes:', headlineRes);
+                           setCurrentUserHeadline(headlineRes?.data?.title || '');
+                       } catch (err) {
+                           console.log('🔍 [DEBUG] headline fetch error:', err);
+                           setCurrentUserHeadline('');
+                       }
+                   } else {
+                       console.log('🔍 [DEBUG] No headlineId found on user data');
+                   }
                 } else {
                     setCurrentUserName(user.email || '');
                 }
@@ -292,11 +297,11 @@ export default function SearchUserProfilePage() {
             AnalyticsService.recordProfileView(userId, {
                 viewerId: user.userId,
                 viewerName: currentUserName || user.email,
-                viewerHeadline: undefined,
+                viewerHeadline: currentUserHeadline || undefined,
                 viewerPhotoUrl: currentUserImage || undefined,
             });
         }
-    }, [user, userId, currentUserName, currentUserImage, isCurrentUserLoaded]);
+    }, [user, userId, currentUserName, currentUserImage, currentUserHeadline, isCurrentUserLoaded]);
 
     useEffect(() => {
         if (aboutId) {

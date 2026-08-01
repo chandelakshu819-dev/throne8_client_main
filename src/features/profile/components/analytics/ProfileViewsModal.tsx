@@ -2,7 +2,7 @@
 
 import React, { useState ,useEffect} from 'react';
 import { useRouter } from 'next/navigation';
-import { X, Eye, TrendingUp, Calendar, Clock, User } from 'lucide-react';
+import { X, Eye, TrendingUp, Calendar, User } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import AnalyticsService from '@/lib/api/analytics.service';
 import ConnectionService from '@/lib/api/connection.service';
@@ -22,6 +22,31 @@ interface ProfileViewsModalProps {
     onClose: () => void;
     analytics: any;
 }
+
+
+// ✅ FIX: "2h ago" jaisa relative time dikhane ke liye helper.
+// Agar 7 din se zyada purana view hai, to readable date dikha do
+// (warna "45d ago" jaisa ajeeb lagega).
+const formatRelativeTime = (dateString: string): string => {
+    const viewedDate = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - viewedDate.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+
+    if (diffSec < 60) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHour < 24) return `${diffHour}h ago`;
+    if (diffDay < 7) return `${diffDay}d ago`;
+
+    return viewedDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: viewedDate.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+    });
+};
 
 // const generateViewsGraphData = (days: number) => {
 //     const labels = [];
@@ -365,9 +390,10 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
                                                 {viewer.viewerHeadline && (
                                                     <p className="text-sm text-[#7a5c3e] mb-2">{viewer.viewerHeadline}</p>
                                                 )}
-                                                <div className="flex items-center gap-2 text-xs text-[#7a5c3e]">
-                                                    <Clock className="w-3 h-3" />
-                                                    <span>{new Date(viewer.viewedAt).toLocaleString()}</span>
+                                                <div className="text-xs text-[#7a5c3e]">
+                                                    <span title={new Date(viewer.viewedAt).toLocaleString()}>
+                                                        Viewed {formatRelativeTime(viewer.viewedAt)}
+                                                    </span>
                                                 </div>
                                             </div>
                                             {!viewer.isAnonymous && viewer.viewerId && (

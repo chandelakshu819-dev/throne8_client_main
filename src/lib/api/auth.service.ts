@@ -515,6 +515,10 @@ static async getUsersBulk(userIds: string[]): Promise<any> {
         firstName?: string;
         lastName?: string;
         location?: string;
+        currentPosition?: string;
+        company?: string;
+        education?: string;
+        pronouns?: string;
         onboarding?: any;
         preferences?: any;
     }): Promise<any> {
