@@ -1,9 +1,9 @@
 /**
  * messaging.api.ts
- * 
+ *
  * Messaging ke liye dedicated API service.
  * Aapke existing `api` axios instance ko use karta hai (auth interceptor included).
- * 
+ *
  * Usage:
  *   import MessagingAPI from '@/lib/api/messaging.api';
  */
@@ -31,6 +31,23 @@ export interface ConversationResponse {
     createdAt: string;
 }
 
+// Snapshot of the message being replied to — stored on the reply message itself
+export interface ReplySnapshot {
+    messageId: string;
+    text?: string;
+    senderId: string;
+    type: string;
+}
+
+// Rich preview data for a shared post (attached to metadata.postPreview)
+export interface PostPreview {
+    postId: string;
+    title?: string;
+    image?: string;
+    authorName?: string;
+    authorAvatar?: string;
+}
+
 export interface MessageResponse {
     messageId: string;
     conversationId: string;
@@ -42,7 +59,10 @@ export interface MessageResponse {
     status: 'sending' | 'sent' | 'delivered' | 'seen' | 'failed';
     reactions: { emoji: string; count: number; reactedByMe: boolean }[];
     isPinned: boolean;
-    metadata?: Record<string, unknown>;
+    isEdited?: boolean;
+    editedAt?: string;
+    replyTo?: ReplySnapshot | null;
+    metadata?: Record<string, unknown> & { postPreview?: PostPreview };
     createdAt: string;
     deliveredAt?: string;
     seenAt?: string;
@@ -88,7 +108,8 @@ class MessagingAPIService {
     // ── MESSAGES ──────────────────────────────────────────────────────────────
 
     /**
-     * Message bhejo.
+     * Message bhejo. `replyToMessageId` de kar reply banao, `metadata` mein
+     * postPreview jaisa rich data bhej sakte ho (e.g. jab post share ho raha ho).
      */
     async sendMessage(payload: {
         conversationId: string;
@@ -96,8 +117,21 @@ class MessagingAPIService {
         type?: 'text' | 'voice' | 'image';
         mediaUrl?: string;
         mediaDuration?: number;
+        replyToMessageId?: string;
+        metadata?: Record<string, unknown>;
     }): Promise<MessageResponse> {
         const { data } = await api.post(`${config.NEXT_PUBLIC_MESSAGES_MESSAGES_ENDPOINT || process.env.NEXT_PUBLIC_MESSAGES_MESSAGES_ENDPOINT}`, payload);
+        return data.data;
+    }
+
+    /**
+     * Apna hi message edit karo (text-only). Backend isEdited/editedAt set karega.
+     */
+    async editMessage(messageId: string, text: string): Promise<MessageResponse> {
+        const { data } = await api.patch(
+            `${config.NEXT_PUBLIC_MESSAGES_MESSAGES_ENDPOINT || process.env.NEXT_PUBLIC_MESSAGES_MESSAGES_ENDPOINT}/${messageId}`,
+            { text }
+        );
         return data.data;
     }
 

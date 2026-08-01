@@ -10,6 +10,11 @@ import { initializeSocket } from '@/core/realtime/socket.client'; // aapka exist
 
 // ==================== TYPES ====================
 
+interface SendMessageOptions {
+    replyToMessageId?: string;
+    metadata?: Record<string, unknown>;
+}
+
 interface UseMessagingReturn {
     // State
     conversations: ConversationResponse[];
@@ -23,7 +28,8 @@ interface UseMessagingReturn {
 
     // Actions
     setActiveConversation: (conversationId: string) => void;
-    sendMessage: (text: string, type?: 'text' | 'voice' | 'image') => Promise<void>;
+    sendMessage: (text: string, type?: 'text' | 'voice' | 'image', options?: SendMessageOptions) => Promise<void>;
+    editMessage: (messageId: string, newText: string) => Promise<void>;
     loadMoreMessages: () => Promise<void>;
     toggleReaction: (messageId: string, emoji: string) => Promise<void>;
     togglePin: (messageId: string) => Promise<void>;
@@ -47,11 +53,16 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
     const cursorRef = useRef<string | null>(null);      // cursor for pagination
     const socketRef = useRef<Socket | null>(null);
     const activeConvRef = useRef<string | null>(null);  // ref for socket callbacks
+    const messagesRef = useRef<MessageResponse[]>([]);  // always-fresh snapshot for reply lookups
 
-    // keep ref in sync
+    // keep refs in sync
     useEffect(() => {
         activeConvRef.current = activeConversationId;
     }, [activeConversationId]);
+
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
 
     // ── 1. CONVERSATIONS FETCH ───────────────────────────────────────────────
 
@@ -136,13 +147,19 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
         }
     }, [activeConversationId, hasMoreMessages]);
 
-    // ── 4. SEND MESSAGE ──────────────────────────────────────────────────────
+    // ── 4. SEND MESSAGE (supports reply + rich metadata) ─────────────────────
 
     const sendMessage = useCallback(async (
         text: string,
-        type: 'text' | 'voice' | 'image' = 'text'
+        type: 'text' | 'voice' | 'image' = 'text',
+        options?: SendMessageOptions
     ) => {
         if (!activeConversationId || !text.trim()) return;
+
+        // Build a lightweight snapshot of the message being replied to (if any)
+        const replyToMsg = options?.replyToMessageId
+            ? messagesRef.current.find(m => m.messageId === options.replyToMessageId)
+            : undefined;
 
         // Optimistic message (shows immediately)
         const tempId = `temp_${Date.now()}`;
@@ -155,6 +172,16 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
             status: 'sending',
             reactions: [],
             isPinned: false,
+            isEdited: false,
+            metadata: options?.metadata,
+            replyTo: replyToMsg
+                ? {
+                    messageId: replyToMsg.messageId,
+                    text: replyToMsg.text,
+                    senderId: replyToMsg.senderId,
+                    type: replyToMsg.type,
+                }
+                : null,
             createdAt: new Date().toISOString(),
         };
 
@@ -166,6 +193,8 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
                 conversationId: activeConversationId,
                 text,
                 type,
+                replyToMessageId: options?.replyToMessageId,
+                metadata: options?.metadata,
             });
 
             // Replace optimistic message with real one from backend
@@ -201,7 +230,38 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
         }
     }, [activeConversationId, currentUserId]);
 
-    // ── 5. REACTIONS ─────────────────────────────────────────────────────────
+    // ── 5. EDIT MESSAGE ───────────────────────────────────────────────────────
+
+    const editMessage = useCallback(async (messageId: string, newText: string) => {
+        if (!newText.trim()) return;
+
+        const snapshot = messagesRef.current;
+
+        // Optimistic update
+        setMessages(prev =>
+            prev.map(m => m.messageId === messageId ? { ...m, text: newText, isEdited: true } : m)
+        );
+
+        try {
+            const updated = await MessagingAPI.editMessage(messageId, newText);
+            setMessages(prev => prev.map(m => m.messageId === messageId ? updated : m));
+
+            // Keep sidebar preview in sync if this was the last message
+            setConversations(prev =>
+                prev.map(c =>
+                    c.lastMessage?.messageId === messageId
+                        ? { ...c, lastMessage: { ...c.lastMessage!, text: updated.text || '' } }
+                        : c
+                )
+            );
+        } catch (err) {
+            console.error('[useMessaging] editMessage failed:', err);
+            // Revert on failure
+            setMessages(snapshot);
+        }
+    }, []);
+
+    // ── 6. REACTIONS ─────────────────────────────────────────────────────────
 
     const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
         try {
@@ -212,7 +272,7 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
         }
     }, []);
 
-    // ── 6. PIN ───────────────────────────────────────────────────────────────
+    // ── 7. PIN ───────────────────────────────────────────────────────────────
 
     const togglePin = useCallback(async (messageId: string) => {
         try {
@@ -223,18 +283,22 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
         }
     }, []);
 
-    // ── 7. DELETE ────────────────────────────────────────────────────────────
+    // ── 8. DELETE ────────────────────────────────────────────────────────────
 
     const deleteMessage = useCallback(async (messageId: string) => {
+        const snapshot = messagesRef.current;
+        // Optimistic removal
+        setMessages(prev => prev.filter(m => m.messageId !== messageId));
         try {
             await MessagingAPI.deleteMessage(messageId);
-            setMessages(prev => prev.filter(m => m.messageId !== messageId));
         } catch (err) {
             console.error('[useMessaging] deleteMessage failed:', err);
+            // Revert on failure
+            setMessages(snapshot);
         }
     }, []);
 
-    // ── 8. MARK SEEN ─────────────────────────────────────────────────────────
+    // ── 9. MARK SEEN ─────────────────────────────────────────────────────────
 
     const markSeen = useCallback(async (conversationId: string) => {
         try {
@@ -244,7 +308,7 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
         }
     }, []);
 
-    // ── 9. SOCKET.IO REAL-TIME EVENTS ────────────────────────────────────────
+    // ── 10. SOCKET.IO REAL-TIME EVENTS ───────────────────────────────────────
 
     useEffect(() => {
         if (!currentUserId) return;
@@ -259,7 +323,7 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
         }
 
         // ── EVENT: New message received ──────────────────────────────────────
-        // Server emits: { messageId, conversationId, senderId, type, text, mediaUrl, status, createdAt }
+        // Server emits: { messageId, conversationId, senderId, type, text, mediaUrl, status, createdAt, replyTo?, metadata? }
         const onNewMessage = (payload: any) => {
             const { conversationId } = payload;
 
@@ -267,8 +331,9 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
             if (conversationId === activeConvRef.current) {
                 const newMsg: MessageResponse = {
                     ...payload,
-                    reactions: [],
-                    isPinned: false,
+                    reactions: payload.reactions || [],
+                    isPinned: payload.isPinned || false,
+                    isEdited: payload.isEdited || false,
                 };
                 setMessages(prev => {
                     // Duplicate check
@@ -352,6 +417,18 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
             setMessages(prev => prev.filter(m => m.messageId !== payload.messageId));
         };
 
+        // ── EVENT: Message edited ────────────────────────────────────────────
+        // Server emits: { messageId, conversationId, text, editedAt }
+        const onMessageEdited = (payload: any) => {
+            setMessages(prev =>
+                prev.map(m =>
+                    m.messageId === payload.messageId
+                        ? { ...m, text: payload.text, isEdited: true, editedAt: payload.editedAt }
+                        : m
+                )
+            );
+        };
+
         // ── EVENT: Typing indicator ──────────────────────────────────────────
         // Server emits: { conversationId, userId, isTyping }
         const onTyping = (payload: any) => {
@@ -368,6 +445,7 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
         socket.on('conversation:seen', onConversationSeen);
         socket.on('message:reaction', onMessageReaction);
         socket.on('message:deleted', onMessageDeleted);
+        socket.on('message:edited', onMessageEdited);
         socket.on('user:typing', onTyping);
 
         return () => {
@@ -376,6 +454,7 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
             socket.off('conversation:seen', onConversationSeen);
             socket.off('message:reaction', onMessageReaction);
             socket.off('message:deleted', onMessageDeleted);
+            socket.off('message:edited', onMessageEdited);
             socket.off('user:typing', onTyping);
         };
     }, [currentUserId]); // Only currentUserId dependency - socket listeners are stable
@@ -393,6 +472,7 @@ export function useMessaging(currentUserId: string): UseMessagingReturn {
         typingUsers,
         setActiveConversation,
         sendMessage,
+        editMessage,
         loadMoreMessages,
         toggleReaction,
         togglePin,

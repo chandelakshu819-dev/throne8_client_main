@@ -4,13 +4,13 @@ import AuthService from "@/lib/api/auth.service";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMessaging } from "../../../features/messages/hooks/useMessaging";
-import MessagingAPI from "@/lib/api/messaging.service";
+import MessagingAPI, { MessageResponse } from "@/lib/api/messaging.service";
 import ConnectionService from "@/lib/api/connection.service";
 import ProfileService from "@/lib/api/profile.service";
 import { COLORS, emojis, quotes } from "@/features/messages/constants";
 
 // ============================================================
-// COLORS & ICONS — Unchanged from your original
+// COLORS & ICONS
 // ============================================================
 export const Icon = {
   Search: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"w-5 h-5 " + (p.className || "")}><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" /></svg>,
@@ -28,7 +28,73 @@ export const Icon = {
   Users: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"w-5 h-5 " + (p.className || "")}><path strokeWidth="2" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" strokeWidth="2" /><path strokeWidth="2" d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
   X: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"w-5 h-5 " + (p.className || "")}><line x1="18" y1="6" x2="6" y2="18" strokeWidth="2" /><line x1="6" y1="6" x2="18" y2="18" strokeWidth="2" /></svg>,
   ArrowUp: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"w-4 h-4 " + (p.className || "")}><path strokeWidth="2" strokeLinecap="round" d="M12 19V5m-7 7l7-7 7 7" /></svg>,
+  Reply: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"w-4 h-4 " + (p.className || "")}><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v.5" /></svg>,
+  Edit: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"w-4 h-4 " + (p.className || "")}><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" /></svg>,
+  Trash: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"w-4 h-4 " + (p.className || "")}><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16z" /></svg>,
+  Link: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"w-5 h-5 " + (p.className || "")}><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>,
 };
+
+// ============================================================
+// POST SHARE DETECTION
+// ============================================================
+const POST_URL_REGEX = /(https?:\/\/[^\s]+\/post\/([a-zA-Z0-9-]+))/i;
+
+function formatPreviewText(text?: string) {
+  if (!text) return 'Start conversation...';
+  if (POST_URL_REGEX.test(text)) return '📎 Shared a post';
+  return text;
+}
+
+// Rich card — used when the message carries metadata.postPreview
+// (attach this metadata when the "Send" action on a post creates the message)
+function PostPreviewCardRich({ preview, url, colors }: { preview: any; url: string; colors: any }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block rounded-xl overflow-hidden border hover:shadow-md transition-all bg-white/40"
+      style={{ borderColor: colors.bgSoft }}
+    >
+      {preview.image && (
+        <div className="w-full h-36 overflow-hidden">
+          <img src={preview.image} alt="" className="w-full h-full object-cover" />
+        </div>
+      )}
+      <div className="p-3">
+        <div className="flex items-center gap-2 mb-1.5">
+          {preview.authorAvatar
+            ? <img src={preview.authorAvatar} className="w-6 h-6 rounded-full object-cover" alt="" />
+            : <AvatarCircle name={preview.authorName || 'U'} size={6} />}
+          <span className="text-xs font-medium opacity-70 truncate">{preview.authorName || 'Someone'}</span>
+        </div>
+        <p className="text-sm font-semibold leading-snug line-clamp-2">{preview.title || 'Shared a post'}</p>
+        <p className="text-[11px] mt-1.5 font-medium text-blue-500">View post →</p>
+      </div>
+    </a>
+  );
+}
+
+// Fallback card — used when we only have the raw URL (no rich metadata yet)
+function PostPreviewCardBasic({ url, colors }: { url: string; colors: any }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 rounded-xl overflow-hidden border p-3 hover:shadow-md transition-all bg-white/40"
+      style={{ borderColor: colors.bgSoft }}
+    >
+      <div className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: colors.bgSoft }}>
+        <Icon.Link className="w-5 h-5 opacity-60" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">Shared post</p>
+        <p className="text-[11px] font-medium text-blue-500 mt-0.5">View post →</p>
+      </div>
+    </a>
+  );
+}
 
 // ============================================================
 // HELPER: User avatar placeholder (jab real avatar na ho)
@@ -42,8 +108,8 @@ export function AvatarCircle({ name, size = 12 }: { name: string; size?: number 
   const color = colors[name?.charCodeAt(0) % colors.length] || '#888';
   return (
     <div
-      className={`w-${size} h-${size} rounded-full flex items-center justify-center text-white font-semibold text-sm`}
-      style={{ background: color, minWidth: `${size * 4}px`, minHeight: `${size * 4}px` }}
+      className="rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
+      style={{ background: color, width: `${size * 4}px`, height: `${size * 4}px`, fontSize: size <= 6 ? '10px' : '14px' }}
     >
       {getInitials(name)}
     </div>
@@ -58,7 +124,7 @@ export function MessageStatus({ status }: { status: string }) {
   if (status === 'sent') return <span className="text-[10px] opacity-50">✓</span>;
   if (status === 'delivered') return <span className="text-[10px] opacity-60">✓✓</span>;
   if (status === 'seen') return <span className="text-[10px] text-blue-500">✓✓</span>;
-  if (status === 'failed') return <span className="text-[10px] text-red-500">✗</span>;
+  if (status === 'failed') return <span className="text-[10px] text-red-500">✗ failed</span>;
   return null;
 }
 
@@ -74,13 +140,13 @@ function ConversationItem({
   colors,
   userCache,
 }: any) {
-  // conv.members mein dono users hain, dusra user find karo
   const otherMemberId = conv.members?.find((m: string) => m !== currentUserId);
   const displayName = conv.type === 'group'
     ? (conv.groupName || 'Group Chat')
     : (userCache?.[otherMemberId]?.name || otherMemberId || 'User');
+  const avatarUrl = conv.type === 'group' ? conv.groupAvatar : userCache?.[otherMemberId]?.avatar;
 
-  const lastMsgText = conv.lastMessage?.text || 'Start conversation...';
+  const lastMsgText = formatPreviewText(conv.lastMessage?.text);
   const timeStr = conv.lastMessage
     ? new Date(conv.lastMessage.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
@@ -88,30 +154,29 @@ function ConversationItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left rounded-2xl px-3 py-3 transition-all duration-200 shadow-sm border transform hover:scale-[1.02] ${isActive ? 'border-blue-200 shadow-md' : 'hover:shadow-md'}`}
+      className={`w-full text-left rounded-2xl px-3 py-3 transition-all duration-200 border ${isActive ? 'shadow-md' : 'border-transparent hover:shadow-sm'}`}
       style={{
-        background: isActive ? 'linear-gradient(to right, #fff, #f9f9f9)' : undefined,
-        borderColor: colors.bgSoft,
+        background: isActive ? colors.bgSoft : 'transparent',
+        borderColor: isActive ? colors.bgSoft : 'transparent',
       }}
     >
       <div className="flex items-center gap-3">
         <div className="relative flex-shrink-0">
-          {/* Avatar — real photo nahi hai toh initials */}
-          <div className="w-12 h-12 rounded-full overflow-hidden">
-            <AvatarCircle name={displayName} size={12} />
-          </div>
+          {avatarUrl
+            ? <img src={avatarUrl} alt={displayName} className="w-12 h-12 rounded-full object-cover" />
+            : <AvatarCircle name={displayName} size={12} />}
           {conv.unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full h-5 w-5 flex items-center justify-center font-bold ring-2" style={{ ringColor: colors.card } as any}>
               {conv.unreadCount > 9 ? '9+' : conv.unreadCount}
             </span>
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex justify-between items-center">
-            <p className="font-medium truncate text-sm">{displayName}</p>
-            <span className="text-[11px] opacity-50 flex-shrink-0 ml-1">{timeStr}</span>
+          <div className="flex justify-between items-center gap-2">
+            <p className={`truncate text-sm ${conv.unreadCount > 0 ? 'font-semibold' : 'font-medium'}`}>{displayName}</p>
+            <span className="text-[11px] opacity-50 flex-shrink-0">{timeStr}</span>
           </div>
-          <p className={`text-xs opacity-60 truncate mt-0.5 ${isTyping ? 'text-green-600 font-medium animate-pulse' : ''}`}>
+          <p className={`text-xs truncate mt-0.5 ${isTyping ? 'text-green-600 font-medium animate-pulse' : conv.unreadCount > 0 ? 'opacity-90 font-medium' : 'opacity-55'}`}>
             {isTyping ? 'typing...' : lastMsgText}
           </p>
         </div>
@@ -128,16 +193,12 @@ export default function MessagingPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    // Aapke existing AuthService se current user lo
     const user = AuthService.getCurrentUser();
     setCurrentUser(user);
   }, []);
 
   const currentUserId = currentUser?.userId || '';
 
-  // ✅ FIX: agar URL mein ?chatWith=<userId> aaya hai (jaise Profile Views
-  // modal se "Message" click karne par), toh us user ke saath conversation
-  // automatically start/open karo
   const searchParams = useSearchParams();
   const chatWithUserId = searchParams.get('chatWith');
 
@@ -153,6 +214,7 @@ export default function MessagingPage() {
     typingUsers,
     setActiveConversation,
     sendMessage,
+    editMessage,
     loadMoreMessages,
     toggleReaction,
     togglePin,
@@ -166,6 +228,11 @@ export default function MessagingPage() {
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
 
+  // Reply / edit state
+  const [replyingTo, setReplyingTo] = useState<MessageResponse | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+
   // New conversation modal
   const [showNewConvModal, setShowNewConvModal] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -173,6 +240,7 @@ export default function MessagingPage() {
   const [connectionUsers, setConnectionUsers] = useState<any[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const colors = isDark ? COLORS.dark : COLORS.light;
 
   // ── Auto scroll to bottom on new messages ───────────────────────────────
@@ -180,7 +248,6 @@ export default function MessagingPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Existing useEffect ke baad ye add karo:
   useEffect(() => {
     if (currentUserId) loadAllUsers();
   }, [currentUserId]);
@@ -191,6 +258,9 @@ export default function MessagingPage() {
   const activeConvName = activeConversation?.type === 'group'
     ? (activeConversation.groupName || 'Group Chat')
     : (userCache[otherMemberId || '']?.name || otherMemberId || 'Loading...');
+  const activeConvAvatar = activeConversation?.type === 'group'
+    ? activeConversation.groupAvatar
+    : userCache[otherMemberId || '']?.avatar;
 
   // ── Filter conversations by search ──────────────────────────────────────
   const filteredConversations = useMemo(() => {
@@ -209,21 +279,7 @@ export default function MessagingPage() {
 
   const todayQuote = useMemo(() => quotes[new Date().getDate() % quotes.length], []);
 
-  // ── Load all users for "New Conversation" modal ──────────────────────────
-  // const loadAllUsers = async () => {
-  //   try {
-  //     const res = await AuthService.getAllUsers({ limit: 50 });
-  //     const users = res?.data?.users || [];
-  //     setAllUsers(users.filter((u: any) => u.userId !== currentUserId));
-  //     // Cache by userId
-  //     const cache: Record<string, any> = {};
-  //     users.forEach((u: any) => { cache[u.userId] = u; });
-  //     setUserCache(prev => ({ ...prev, ...cache }));
-  //   } catch (e) {
-  //     console.error('Failed to load users:', e);
-  //   }
-  // };
-
+  // ── Load all users (connections) for "New Conversation" + sidebar list ──
   const loadAllUsers = async () => {
     try {
       const connectionsResponse = await ConnectionService.getUserConnections(currentUserId);
@@ -238,7 +294,6 @@ export default function MessagingPage() {
       );
       const profileResponses = await Promise.all(profilePromises);
 
-      // Profile photos fetch
       const profiles = profileResponses.filter(r => r !== null).map(r => r!.data);
       const photoIds = profiles.map(u => u.profilePhotoId).filter(Boolean);
       let photosMap: Record<string, string> = {};
@@ -259,14 +314,11 @@ export default function MessagingPage() {
       }));
 
       setAllUsers(users);
-
       setConnectionUsers(users);
 
-      // Cache update
       const cache: Record<string, any> = {};
       users.forEach(u => { cache[u.userId] = { name: u.username, avatar: u.avatar }; });
       setUserCache(prev => ({ ...prev, ...cache }));
-
     } catch (e) {
       console.error('Failed to load connections:', e);
     }
@@ -283,20 +335,20 @@ export default function MessagingPage() {
     }
   };
 
-  // ✅ FIX: jab currentUserId load ho jaye aur URL mein chatWith param ho,
-  // us user ke saath conversation auto-start kar do
   useEffect(() => {
     if (chatWithUserId && currentUserId && chatWithUserId !== currentUserId) {
       startDirectConversation(chatWithUserId);
     }
   }, [chatWithUserId, currentUserId]);
 
-  // ── Handle send ──────────────────────────────────────────────────────────
+  // ── Handle send (also carries reply info) ────────────────────────────────
   const handleSend = async () => {
     if (!messageInput.trim() || !activeConversationId) return;
     const text = messageInput.trim();
+    const replyToMessageId = replyingTo?.messageId;
     setMessageInput('');
-    await sendMessage(text);
+    setReplyingTo(null);
+    await sendMessage(text, 'text', replyToMessageId ? { replyToMessageId } : undefined);
   };
 
   // ── Handle voice record (simulated) ─────────────────────────────────────
@@ -310,12 +362,35 @@ export default function MessagingPage() {
     }
   };
 
-  // ── TYPING INDICATOR emit ────────────────────────────────────────────────
-  // Optional: socket se typing event bhejo
-  // const handleTyping = (e) => {
-  //   setMessageInput(e.target.value);
-  //   socket?.emit('user:typing', { conversationId: activeConversationId, isTyping: true });
-  // };
+  // ── Reply / edit helpers ──────────────────────────────────────────────────
+  const startReply = (msg: MessageResponse) => {
+    setEditingMessageId(null);
+    setReplyingTo(msg);
+    inputRef.current?.focus();
+  };
+
+  const startEdit = (msg: MessageResponse) => {
+    setReplyingTo(null);
+    setEditingMessageId(msg.messageId);
+    setEditText(msg.text || '');
+  };
+
+  const saveEdit = async (msg: MessageResponse) => {
+    const trimmed = editText.trim();
+    if (trimmed && trimmed !== msg.text) {
+      await editMessage(msg.messageId, trimmed);
+    }
+    setEditingMessageId(null);
+  };
+
+  const confirmDelete = (messageId: string) => {
+    if (window.confirm('Delete this message? This cannot be undone.')) {
+      deleteMessage(messageId);
+    }
+  };
+
+  const replySenderLabel = (senderId: string) =>
+    senderId === currentUserId ? 'You' : (userCache[senderId]?.name || 'User');
 
   const isActiveTyping = activeConversationId ? typingUsers[activeConversationId] : false;
 
@@ -326,7 +401,7 @@ export default function MessagingPage() {
     <div className="min-h-screen transition-colors duration-300" style={{ background: colors.bg, color: colors.text }}>
 
       {/* ── HEADER ── */}
-      <header className="sticky top-0 z-30 w-full backdrop-blur-md" style={{ background: colors.text + "ee" }}>
+      <header className="sticky top-0 z-30 w-full backdrop-blur-md" style={{ background: colors.dark + "ee" }}>
         <div className="mx-auto max-w-[1400px] px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 text-white">
             <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
@@ -353,8 +428,7 @@ export default function MessagingPage() {
         <div className="grid gap-6 md:grid-cols-[300px_1fr_300px] grid-cols-1">
 
           {/* ── SIDEBAR: Conversations ── */}
-          <aside className="rounded-3xl p-4 shadow-xl backdrop-blur-sm" style={{ background: colors.card }}>
-            {/* Search */}
+          <aside className="rounded-3xl p-4 shadow-xl" style={{ background: colors.card }}>
             <div className="flex items-center gap-2 rounded-2xl px-3 py-2 mb-3 border" style={{ background: colors.bg, borderColor: colors.bgSoft }}>
               <Icon.Search />
               <input
@@ -365,7 +439,6 @@ export default function MessagingPage() {
               />
             </div>
 
-            {/* Loading state */}
             {isLoadingConversations && (
               <div className="space-y-2">
                 {[1, 2, 3].map(i => (
@@ -374,38 +447,20 @@ export default function MessagingPage() {
               </div>
             )}
 
-            {/* Conversation list */}
-            {/* {!isLoadingConversations && (
-              <div className="space-y-2 max-h-[72vh] overflow-y-auto pr-1">
-                {filteredConversations.length === 0 && (
+            {!isLoadingConversations && (
+              <div className="space-y-1 max-h-[72vh] overflow-y-auto pr-1">
+                {filteredConversations.length === 0 && connectionUsers.length === 0 && (
                   <div className="text-center py-8 opacity-50 text-sm">
-                    <p>Koi conversation nahi mili.</p>
+                    <p>No conversations yet.</p>
                     <button
                       onClick={() => { setShowNewConvModal(true); loadAllUsers(); }}
                       className="mt-2 text-blue-500 hover:underline"
                     >
-                      Nayi conversation shuru karo
+                      Start a new conversation
                     </button>
                   </div>
                 )}
-                {filteredConversations.map(conv => (
-                  <ConversationItem
-                    key={conv.conversationId}
-                    conv={conv}
-                    isActive={activeConversationId === conv.conversationId}
-                    currentUserId={currentUserId}
-                    onClick={() => setActiveConversation(conv.conversationId)}
-                    isTyping={typingUsers[conv.conversationId] || false}
-                    colors={colors}
-                    userCache={userCache}
-                  />
-                ))}
-              </div>
-            )} */}
 
-            {!isLoadingConversations && (
-              <div className="space-y-2 max-h-[72vh] overflow-y-auto pr-1">
-                {/* Existing conversations pehle */}
                 {filteredConversations.map(conv => (
                   <ConversationItem
                     key={conv.conversationId}
@@ -419,28 +474,21 @@ export default function MessagingPage() {
                   />
                 ))}
 
-                {/* Divider — connections jo abhi conversation mein nahi hain */}
                 {connectionUsers.length > 0 && (
                   <>
-                    <p className="text-xs opacity-40 px-2 pt-3 pb-1 font-medium">CONNECTIONS</p>
+                    <p className="text-xs opacity-40 px-2 pt-3 pb-1 font-semibold tracking-wide">CONNECTIONS</p>
                     {connectionUsers
-                      .filter(u => !conversations.some(c =>
-                        c.members?.includes(u.userId)
-                      ))
+                      .filter(u => !conversations.some(c => c.members?.includes(u.userId)))
                       .map(user => (
                         <button
                           key={user.userId}
                           onClick={() => startDirectConversation(user.userId)}
-                          className="w-full text-left rounded-2xl px-3 py-3 transition-all duration-200 shadow-sm border transform hover:scale-[1.02] hover:shadow-md"
-                          style={{ borderColor: colors.bgSoft }}
+                          className="w-full text-left rounded-2xl px-3 py-3 transition-all duration-200 hover:shadow-sm"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="relative flex-shrink-0">
-                              {user.avatar
-                                ? <img src={user.avatar} alt={user.username} className="w-12 h-12 rounded-full object-cover" />
-                                : <AvatarCircle name={user.username || 'User'} size={12} />
-                              }
-                            </div>
+                            {user.avatar
+                              ? <img src={user.avatar} alt={user.username} className="w-12 h-12 rounded-full object-cover" />
+                              : <AvatarCircle name={user.username || 'User'} size={12} />}
                             <div className="flex-1 min-w-0">
                               <p className="font-medium truncate text-sm">{user.username}</p>
                               <p className="text-xs opacity-50 truncate">Click to start chat</p>
@@ -458,12 +506,11 @@ export default function MessagingPage() {
           {/* ── MAIN: Chat Area ── */}
           <section className="rounded-3xl p-4 shadow-xl min-h-[78vh] flex flex-col" style={{ background: colors.card }}>
 
-            {/* No conversation selected */}
             {!activeConversationId && (
               <div className="flex-1 flex flex-col items-center justify-center opacity-40">
                 <span className="text-6xl mb-4">💬</span>
-                <p className="text-lg font-medium">Koi conversation select karo</p>
-                <p className="text-sm mt-1">Ya nayi conversation shuru karo</p>
+                <p className="text-lg font-medium">Select a conversation</p>
+                <p className="text-sm mt-1">Or start a new one from the connections list</p>
               </div>
             )}
 
@@ -472,7 +519,9 @@ export default function MessagingPage() {
                 {/* Chat Header */}
                 <div className="flex items-center justify-between pb-3 mb-3 border-b" style={{ borderColor: colors.bgSoft }}>
                   <div className="flex items-center gap-3">
-                    <AvatarCircle name={activeConvName} size={12} />
+                    {activeConvAvatar
+                      ? <img src={activeConvAvatar} alt={activeConvName} className="w-12 h-12 rounded-full object-cover" />
+                      : <AvatarCircle name={activeConvName} size={12} />}
                     <div>
                       <p className="font-semibold">
                         {activeConvName}
@@ -483,7 +532,9 @@ export default function MessagingPage() {
                       <p className="text-xs opacity-50">
                         {isActiveTyping
                           ? <span className="text-green-600 animate-pulse">typing...</span>
-                          : `${activeConversation?.members?.length || 0} members`
+                          : activeConversation?.type === 'group'
+                            ? `${activeConversation?.members?.length || 0} members`
+                            : 'Active'
                         }
                       </p>
                     </div>
@@ -500,7 +551,7 @@ export default function MessagingPage() {
                     <p className="text-xs font-semibold opacity-60 mb-2">📌 Pinned Messages</p>
                     {pinnedMessages.map(m => (
                       <div key={m.messageId} className="flex justify-between items-center text-sm py-1">
-                        <span className="truncate">{m.text}</span>
+                        <span className="truncate">{formatPreviewText(m.text)}</span>
                         <button onClick={() => togglePin(m.messageId)} className="text-xs text-blue-500 ml-2 flex-shrink-0">Unpin</button>
                       </div>
                     ))}
@@ -533,6 +584,10 @@ export default function MessagingPage() {
                   {!isLoadingMessages && messages.map(msg => {
                     const isMe = msg.senderId === currentUserId;
                     const isSystem = msg.type === 'system' || msg.type === 'system_reminder';
+                    const isEditing = editingMessageId === msg.messageId;
+
+                    const postMatch = msg.text?.match(POST_URL_REGEX);
+                    const postPreview = (msg.metadata as any)?.postPreview;
 
                     return (
                       <div
@@ -545,7 +600,7 @@ export default function MessagingPage() {
                             background: isSystem
                               ? '#6b7280'
                               : isMe
-                                ? colors.bg
+                                ? colors.bgSoft
                                 : '#efe3da',
                             color: isSystem ? '#fff' : colors.text,
                           }}
@@ -557,51 +612,115 @@ export default function MessagingPage() {
                             </p>
                           )}
 
-                          {/* Message text */}
-                          <p className="text-[15px] leading-snug">{msg.text}</p>
+                          {/* Reply quote */}
+                          {msg.replyTo && !isEditing && (
+                            <div
+                              className="mb-2 pl-2 py-1 border-l-2 text-xs opacity-70 truncate rounded-r"
+                              style={{ borderColor: colors.text, background: 'rgba(0,0,0,0.04)' }}
+                            >
+                              <span className="font-semibold">{replySenderLabel(msg.replyTo.senderId)}</span>
+                              <span className="ml-1">{formatPreviewText(msg.replyTo.text)}</span>
+                            </div>
+                          )}
 
-                          {/* Footer: time + status + reactions */}
-                          <div className="flex items-center justify-between mt-2 gap-2">
-                            <div className="flex items-center gap-1 flex-wrap">
-                              {msg.reactions.map(r => (
+                          {/* EDIT MODE */}
+                          {isEditing ? (
+                            <div className="flex flex-col gap-2 min-w-[180px]">
+                              <textarea
+                                value={editText}
+                                onChange={e => setEditText(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(msg); }
+                                  if (e.key === 'Escape') setEditingMessageId(null);
+                                }}
+                                className="w-full bg-white/60 border rounded-lg p-2 text-[15px] outline-none resize-none"
+                                style={{ borderColor: colors.bgSoft, color: colors.text }}
+                                rows={2}
+                                autoFocus
+                              />
+                              <div className="flex gap-2 justify-end text-xs">
+                                <button onClick={() => setEditingMessageId(null)} className="px-3 py-1 rounded-full opacity-60 hover:opacity-100">Cancel</button>
                                 <button
-                                  key={r.emoji}
-                                  onClick={() => toggleReaction(msg.messageId, r.emoji)}
-                                  className={`text-xs rounded-full px-2 py-0.5 border transition-all ${r.reactedByMe ? 'bg-blue-100 border-blue-300' : 'bg-white/20 border-transparent'}`}
+                                  onClick={() => saveEdit(msg)}
+                                  className="px-3 py-1 rounded-full text-white"
+                                  style={{ background: colors.dark }}
                                 >
-                                  {r.emoji} {r.count}
+                                  Save
                                 </button>
-                              ))}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              <span className="text-[11px] opacity-50">
-                                {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                              {isMe && <MessageStatus status={msg.status} />}
-                            </div>
-                          </div>
+                          ) : postPreview ? (
+                            <PostPreviewCardRich preview={postPreview} url={postMatch?.[1] || (msg.text || '#')} colors={colors} />
+                          ) : postMatch ? (
+                            <PostPreviewCardBasic url={postMatch[1]} colors={colors} />
+                          ) : (
+                            <p className="text-[15px] leading-snug whitespace-pre-wrap break-words">{msg.text}</p>
+                          )}
 
-                          {/* Hover actions: emoji + pin */}
-                          {!isSystem && (
+                          {/* Footer: time + status + edited + reactions */}
+                          {!isEditing && (
+                            <div className="flex items-center justify-between mt-2 gap-2">
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {msg.reactions.map(r => (
+                                  <button
+                                    key={r.emoji}
+                                    onClick={() => toggleReaction(msg.messageId, r.emoji)}
+                                    className={`text-xs rounded-full px-2 py-0.5 border transition-all ${r.reactedByMe ? 'bg-blue-100 border-blue-300' : 'bg-white/20 border-transparent'}`}
+                                  >
+                                    {r.emoji} {r.count}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                {msg.isEdited && <span className="text-[10px] opacity-40 italic">edited</span>}
+                                <span className="text-[11px] opacity-50">
+                                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                {isMe && <MessageStatus status={msg.status} />}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Hover actions: reply + emoji + pin + edit + delete */}
+                          {!isSystem && !isEditing && (
                             <div className={`absolute -top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 ${showEmojiPicker === msg.messageId ? 'opacity-100' : ''}`}>
+                              <button
+                                onClick={() => startReply(msg)}
+                                className="bg-white shadow rounded-full p-1 text-gray-600 hover:bg-gray-100"
+                                title="Reply"
+                              >
+                                <Icon.Reply />
+                              </button>
                               <button
                                 onClick={() => setShowEmojiPicker(showEmojiPicker === msg.messageId ? null : msg.messageId)}
                                 className="bg-white shadow rounded-full p-1 text-gray-600 hover:bg-gray-100"
+                                title="React"
                               >
                                 <Icon.Smile className="w-3 h-3" />
                               </button>
                               <button
                                 onClick={() => togglePin(msg.messageId)}
                                 className="bg-white shadow rounded-full p-1 text-gray-600 hover:bg-gray-100"
+                                title={msg.isPinned ? 'Unpin' : 'Pin'}
                               >
                                 <Icon.Pin className="w-3 h-3" />
                               </button>
+                              {isMe && msg.type === 'text' && (
+                                <button
+                                  onClick={() => startEdit(msg)}
+                                  className="bg-white shadow rounded-full p-1 text-gray-600 hover:bg-gray-100"
+                                  title="Edit"
+                                >
+                                  <Icon.Edit className="w-3 h-3" />
+                                </button>
+                              )}
                               {isMe && (
                                 <button
-                                  onClick={() => deleteMessage(msg.messageId)}
+                                  onClick={() => confirmDelete(msg.messageId)}
                                   className="bg-white shadow rounded-full p-1 text-red-400 hover:bg-red-50"
+                                  title="Delete"
                                 >
-                                  <Icon.X className="w-3 h-3" />
+                                  <Icon.Trash className="w-3 h-3" />
                                 </button>
                               )}
                             </div>
@@ -640,13 +759,32 @@ export default function MessagingPage() {
                   </div>
                 )}
 
+                {/* Reply preview bar */}
+                {replyingTo && (
+                  <div
+                    className="mt-3 flex items-center justify-between rounded-xl px-3 py-2 border-l-4"
+                    style={{ background: colors.bg, borderColor: colors.dark }}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold opacity-60">
+                        Replying to {replyingTo.senderId === currentUserId ? 'yourself' : replySenderLabel(replyingTo.senderId)}
+                      </p>
+                      <p className="text-sm truncate opacity-80">{formatPreviewText(replyingTo.text)}</p>
+                    </div>
+                    <button onClick={() => setReplyingTo(null)} className="p-1 opacity-50 hover:opacity-100 flex-shrink-0">
+                      <Icon.X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
                 {/* Input area */}
-                <div className="mt-4 flex items-center gap-2">
+                <div className="mt-3 flex items-center gap-2">
                   <div
                     className="flex-1 rounded-2xl border px-3 py-2 flex items-center gap-2 focus-within:border-blue-300 focus-within:shadow-md transition-all"
                     style={{ background: colors.bg, borderColor: colors.bgSoft }}
                   >
                     <input
+                      ref={inputRef}
                       value={messageInput}
                       onChange={e => setMessageInput(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
@@ -664,7 +802,7 @@ export default function MessagingPage() {
                     onClick={handleSend}
                     disabled={!messageInput.trim() || isSending}
                     className="rounded-2xl px-4 py-2.5 shadow text-white transition-all hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:scale-100 flex items-center gap-2"
-                    style={{ background: colors.text }}
+                    style={{ background: colors.dark }}
                   >
                     <Icon.Send />
                     <span>{isSending ? 'Sending...' : 'Send'}</span>
@@ -676,7 +814,6 @@ export default function MessagingPage() {
 
           {/* ── RIGHT SIDEBAR ── */}
           <aside className="space-y-4">
-            {/* Today's Quote */}
             <div className="rounded-3xl p-4 shadow-xl" style={{ background: colors.card }}>
               <p className="text-sm opacity-60 mb-2">Today's Thought</p>
               <div className="rounded-2xl p-4 border" style={{ background: colors.bg, borderColor: colors.bgSoft }}>
@@ -685,7 +822,6 @@ export default function MessagingPage() {
               </div>
             </div>
 
-            {/* Stats */}
             <div className="rounded-3xl p-4 shadow-xl" style={{ background: colors.card }}>
               <p className="font-semibold mb-3">Activity Stats</p>
               <div className="grid grid-cols-2 gap-3">
