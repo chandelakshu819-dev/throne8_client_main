@@ -73,6 +73,15 @@ const EditIntroModal: React.FC<EditIntroModalProps> = ({
 
     const { updateProfile, createUserHeadline, loadProfile } = useProfile();
 
+    // ✅ FIX: modal khula ho tab background page scroll na ho
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [isOpen]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
@@ -90,27 +99,27 @@ const EditIntroModal: React.FC<EditIntroModalProps> = ({
             }));
         }
     };
-
     const validateForm = () => {
         try {
-            // ✅ Zod validation - same as server
             updateProfileSchema.parse(formData);
+            const newErrors: Record<string, string> = {};
             if (formData.headline) {
                 if (formData.headline.length < HEADLINE_VALIDATION.minLength) {
-                    errors.headline = `Headline must be at least ${HEADLINE_VALIDATION.minLength} characters`;
+                    newErrors.headline = `Headline must be at least ${HEADLINE_VALIDATION.minLength} characters`;
+                } else if (formData.headline.length > HEADLINE_VALIDATION.maxLength) {
+                    newErrors.headline = `Headline cannot exceed ${HEADLINE_VALIDATION.maxLength} characters`;
                 }
-                if (formData.headline.length > HEADLINE_VALIDATION.maxLength) {
-                    errors.headline = `Headline cannot exceed ${HEADLINE_VALIDATION.maxLength} characters`;
-                }
+            }
+            if (Object.keys(newErrors).length > 0) {
+                setErrors(newErrors);
+                return false;
             }
             return true;
         } catch (error) {
             if (error instanceof z.ZodError) {
                 const newErrors: Record<string, string> = {};
                 error.errors.forEach((err) => {
-                    if (err.path[0]) {
-                        newErrors[err.path[0] as string] = err.message;
-                    }
+                    if (err.path[0]) newErrors[err.path[0] as string] = err.message;
                 });
                 setErrors(newErrors);
             }
@@ -131,12 +140,17 @@ const EditIntroModal: React.FC<EditIntroModalProps> = ({
         try {
         
 
-            // ✅ Build updates object
+            // ✅ FIX: pehle sirf firstName/lastName/location track ho rahe the —
+            // currentPosition, company, education, pronouns change karne par
+            // wo silently drop ho jaate the aur backend ko kabhi bhejte hi nahi the
             const updates: any = {};
             if (formData.firstName !== initialData.firstName) updates.firstName = formData.firstName;
             if (formData.lastName !== initialData.lastName) updates.lastName = formData.lastName;
             if (formData.location !== initialData.location) updates.location = formData.location;
-
+            if (formData.currentPosition !== initialData.currentPosition) updates.currentPosition = formData.currentPosition;
+            if (formData.company !== initialData.company) updates.company = formData.company;
+            if (formData.education !== initialData.education) updates.education = formData.education;
+            if (formData.pronouns !== initialData.pronouns) updates.pronouns = formData.pronouns;
             // ✅ Redux: Update profile
             if (Object.keys(updates).length > 0) {
                 await updateProfile(updates).unwrap();
@@ -268,7 +282,7 @@ const EditIntroModal: React.FC<EditIntroModalProps> = ({
                                         <option value="He/Him">He/Him</option>
                                         <option value="She/Her">She/Her</option>
                                         <option value="They/Them">They/Them</option>
-                                        <option value="Prefer not to say">Prefer not to say</option>
+                                        <option value="Other">Prefer not to say</option>
                                     </select>
                                 </div>
                             </div>

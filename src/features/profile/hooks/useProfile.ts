@@ -48,6 +48,10 @@ export const useProfile = () => {
         firstName?: string;
         lastName?: string;
         location?: string;
+        currentPosition?: string;
+        company?: string;
+        education?: string;
+        pronouns?: string;
     }) => dispatch(updateUserProfile(updates));
 
     const createUserHeadline = (title: string) => dispatch(createHeadline(title));
