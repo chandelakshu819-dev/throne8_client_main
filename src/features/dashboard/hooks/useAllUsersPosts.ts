@@ -16,7 +16,7 @@ export const useAllUsersPosts = () => {
             const response = await ProfileService.getAllPostsForHomeFeed(false);
             const posts = response.data.posts;
 
-            // ✅ FIX: reposts ke case mein post.userId = repostedBy hota hai,
+            // ✅ reposts ke case mein post.userId = repostedBy hota hai,
             // original author (originalPost.userId) iss list mein missing
             // rehta tha — isliye reposted card pe original author ka
             // naam/avatar kabhi resolve nahi hota tha.
@@ -81,20 +81,36 @@ export const useAllUsersPosts = () => {
             }
 
             const transformedPosts = posts.map((post: any) => {
-                // ✅ FIX: repost items ko alag handle karo — pehle yeh seedha
+                // ✅ repost items ko alag handle karo — pehle yeh seedha
                 // transformApiPostToFeedPost() ko chala jaata tha jo
                 // feedItemType, originalPost, repostId sab drop kar deta tha.
-                // Isse FeedContainer.tsx ka `post.feedItemType === 'repost'`
-                // check kabhi true nahi hota tha aur FeedRepostCard render
-                // hi nahi hota tha.
                 if (post.feedItemType === 'repost') {
                     const reposterData = usersData[post.userId];               // jisne repost kiya
                     const originalUserData = usersData[post.originalPost?.userId]; // original post ka author
 
+                    // ✅ BUG 3 DEBUG: agar yeh warning console mein dikhe with
+                    // reposterId ya originalAuthorId "undefined" — toh backend
+                    // response mein woh field hi missing/galat naam se aa raha hai.
+                    // Isse hume exact root cause pata chal jayega.
                     if (!reposterData || !originalUserData) {
-                        console.warn(`⚠️ No user data for repost ${post.repostId}`);
+                        console.warn(`⚠️ Dropping repost ${post.repostId} — missing user data`, {
+                            reposterId: post.userId,
+                            originalAuthorId: post.originalPost?.userId,
+                            hasReposterData: !!reposterData,
+                            hasOriginalUserData: !!originalUserData,
+                            rawOriginalPost: post.originalPost,
+                        });
                         return null;
                     }
+
+                    // ✅ FIX (Bug 1): reposter ka naam/avatar ab actually
+                    // resolve karke return object mein bheja ja raha hai —
+                    // pehle reposterData fetch hoti thi lekin kabhi use hi
+                    // nahi hoti thi, isliye FeedRepostCard ko current viewer
+                    // ka naam fallback ke roop mein milta tha.
+                    const reposterProfileImageUrl = reposterData.profilePhotoId
+                        ? profilePhotosMap[reposterData.profilePhotoId] || null
+                        : null;
 
                     const originalProfileImageUrl = originalUserData.profilePhotoId
                         ? profilePhotosMap[originalUserData.profilePhotoId] || null
@@ -106,9 +122,12 @@ export const useAllUsersPosts = () => {
                         repostType: post.repostType,
                         thoughtText: post.thoughtText,
                         createdAt: post.createdAt,
-                        repostedBy: post.repostedBy,
+                        userId: post.userId, // reposter's id
+                        reposterName: `${reposterData.firstName || ''} ${reposterData.lastName || ''}`.trim() || 'Unknown User',
+                        reposterAvatar: reposterProfileImageUrl,
                         originalPost: {
                             entryId: post.originalPost.entryId,
+                            userId: post.originalPost.userId,
                             title: post.originalPost.title,
                             content: post.originalPost.content,
                             images: post.originalPost.images || [],
@@ -119,8 +138,8 @@ export const useAllUsersPosts = () => {
                             isLikedByCurrentUser: post.originalPost.isLikedByCurrentUser || false,
                             createdAt: post.originalPost.createdAt,
                             userAvatar: originalProfileImageUrl,
-                            userName: `${originalUserData.firstName} ${originalUserData.lastName}`.trim(),
-                            fullName: `${originalUserData.firstName} ${originalUserData.lastName}`.trim(),
+                            userName: `${originalUserData.firstName || ''} ${originalUserData.lastName || ''}`.trim() || 'Unknown User',
+                            fullName: `${originalUserData.firstName || ''} ${originalUserData.lastName || ''}`.trim() || 'Unknown User',
                         },
                     };
                 }

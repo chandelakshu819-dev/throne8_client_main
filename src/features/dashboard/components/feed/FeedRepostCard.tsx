@@ -11,13 +11,17 @@ interface FeedRepostCardProps {
     profileImage: string;
     fullName: string;
     currentUserId?: string;
+
+    // ✅ FIX (Bug 1): actual reposter ka naam/avatar — repostItem se aata hai,
+    // current viewer ke fullName/profileImage se kabhi confuse nahi hona chahiye.
+    reposterName?: string;
+    reposterAvatar?: string | null;
+
     likedPosts?: any;
     handleLike?: (postKey: string) => void;
     toggleComments?: (postKey: string) => void;
 
-    // ✅ ADDED: comment wiring — same prop shapes PostCard already
-    // receives from its parent. Without these, the Comment button
-    // on a reposted card had nothing to open.
+    // comment wiring — same prop shapes PostCard already receives
     openCommentsIndex?: any;
     postComments?: any;
     commentText?: any;
@@ -40,7 +44,7 @@ interface FeedRepostCardProps {
     emojiList?: any;
     postCommentCounts?: any;
 
-    // ✅ ADDED: reaction system wiring (emoji likes), same as PostCard
+    // reaction system wiring (emoji likes), same as PostCard
     postReactions?: Record<string, { counts: any; userReaction: ReactionType | null }>;
     onReact?: (postId: string, type: ReactionType) => void;
 }
@@ -51,6 +55,8 @@ const FeedRepostCard = ({
     profileImage,
     fullName,
     currentUserId,
+    reposterName,
+    reposterAvatar,
     likedPosts,
     handleLike,
     toggleComments,
@@ -85,6 +91,15 @@ const FeedRepostCard = ({
     // belong to the original post, not to the repost wrapper.
     const postKey = originalPost.entryId;
 
+    // ✅ FIX (Bug 1): reposter ka display name ab repostItem se resolve
+    // hota hai. currentUserId se match kare toh "You reposted" dikhao,
+    // warna reposter ka actual naam. Sirf tab fullName/profileImage pe
+    // fallback karo jab repostItem mein reposter data hi na aaya ho
+    // (defensive — normally yeh case nahi aana chahiye).
+    const isOwnRepost = repostItem.userId && currentUserId && repostItem.userId === currentUserId;
+    const displayName = isOwnRepost ? 'You' : (reposterName || repostItem.reposterName || fullName || 'Someone');
+    const displayAvatar = isOwnRepost ? profileImage : (reposterAvatar ?? repostItem.reposterAvatar ?? profileImage);
+
     const timeAgo = (dateStr: string) => {
         const diff = Date.now() - new Date(dateStr).getTime();
         const mins = Math.floor(diff / 60000);
@@ -115,20 +130,20 @@ const FeedRepostCard = ({
             <div className="absolute inset-0 bg-gradient-to-br from-[#6b5643]/3 via-[#8b7355]/3 to-[#4a3728]/3" />
 
             <div className="relative z-10">
-                {/* ── Repost Header (tumne repost kiya) ── */}
+                {/* ── Repost Header (actual reposter, not current viewer) ── */}
                 <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[#4a3728]/10">
                     <i className="ri-repeat-line text-lg text-[#6b5643]" />
                     <div className="w-6 h-6 rounded-full overflow-hidden border border-[#4a3728]/20 flex-shrink-0">
-                        {profileImage ? (
+                        {displayAvatar ? (
                             <img
-                                src={profileImage}
-                                alt={fullName}
+                                src={displayAvatar}
+                                alt={displayName}
                                 className="w-full h-full object-cover"
                             />
                         ) : (
                             <div className="w-full h-full bg-[#4a3728]/20 flex items-center justify-center">
                                 <span className="text-xs text-[#4a3728] font-bold">
-                                    {fullName?.charAt(0)}
+                                    {displayName?.charAt(0)}
                                 </span>
                             </div>
                         )}
@@ -137,7 +152,7 @@ const FeedRepostCard = ({
                         className={`text-sm font-semibold ${isDarkMode ? 'text-slate-300' : 'text-[#4a3728]/70'
                             }`}
                     >
-                        {fullName} reposted
+                        {displayName} reposted
                         {repostItem.repostType === 'quote' && ' with thoughts'}
                     </span>
                     <span
@@ -226,7 +241,7 @@ const FeedRepostCard = ({
                         />
                     )}
 
-                    {/* ✅ Real, clickable actions — reactions + comments +
+                    {/* Real, clickable actions — reactions + comments +
                         share, wired against the original post's id. */}
                     <div className={`mt-4 pt-3 border-t ${isDarkMode ? 'border-slate-600/50' : 'border-[#4a3728]/10'}`}>
                         <PostActions
@@ -244,9 +259,9 @@ const FeedRepostCard = ({
                         />
                     </div>
 
-                    {/* ✅ ADDED: this was completely missing before —
-                        without it, clicking "Comment" toggled state
-                        in the parent but nothing ever rendered here. */}
+                    {/* ✅ FIX (Bug 2): ab FeedContainer se comment props
+                        properly aate hain, isliye yeh block render hoga
+                        jab user "Comment" pe click karega. */}
                     {openCommentsIndex === postKey && (
                         <div className="mt-2">
                             <CommentsSection
@@ -270,7 +285,7 @@ const FeedRepostCard = ({
                                 handleEmojiClick={handleEmojiClick}
                                 postId={postKey}
                                 comments={postComments?.[postKey] || []}
-                                handleCommentSubmit={() => handleCommentSubmit(postKey)}
+                                handleCommentSubmit={() => handleCommentSubmit?.(postKey)}
                                 emojiList={emojiList}
                                 profileImage={profileImage}
                             />

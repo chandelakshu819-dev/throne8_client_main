@@ -1,5 +1,6 @@
 // app/(dashboard)/components/feed/PostContent.tsx
 import React, { useState } from 'react';
+import { renderFormattedContent, renderFormattedLine } from '@/shared/utils/postContentFormat';
 
 const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) => {
   const [expanded, setExpanded] = useState(false);
@@ -13,10 +14,19 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
   const isTooLong = content.length > 40;
   const isLong = isMultiline || isTooLong;
 
+  // ✅ NEW: content ab **bold**/_italic_/"- bullet" ko formatted React
+  // elements ke saath render karta hai — dangerouslySetInnerHTML kahin
+  // use nahi hota, isliye XSS-safe hai. Collapsed state mein sirf pehli
+  // line ka inline formatting dikhata hai (bullets sirf expanded mein
+  // list ban ke dikhte hain, kyunki bullet ek multi-line concept hai).
+  const displayNode = expanded
+    ? renderFormattedContent(content)
+    : (isMultiline ? renderFormattedLine(firstLine) : renderFormattedContent(content));
+
   return (
     <>
       <p className={`text-base font-medium leading-relaxed mb-2 whitespace-pre-wrap ${!expanded && isLong ? 'line-clamp-1' : ''} ${isDarkMode ? 'text-slate-200' : 'text-[#4a3728]'}`}>
-        {expanded ? content : (isMultiline ? firstLine : content)}
+        {displayNode}
       </p>
       {isLong && (
         <button

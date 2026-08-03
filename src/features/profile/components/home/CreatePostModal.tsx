@@ -1,7 +1,7 @@
 'use client';
 import AuthService from '@/lib/api/auth.service';
 import ProfileService from '@/lib/api/profile.service';
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
 interface CreatePostModalProps {
     isOpen: boolean;
@@ -38,6 +38,11 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
     });
     const [isSaving, setIsSaving] = useState(false);
 
+    // ✅ NEW: ref to the content textarea, needed so the formatting
+    // toolbar can read cursor position / selection and insert markdown
+    // syntax at the right spot.
+    const contentRef = useRef<HTMLTextAreaElement>(null);
+
     const validateForm = () => {
         const newErrors = { title: '', content: '' };
         let isValid = true;
@@ -64,6 +69,56 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
     const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setFormData({ ...formData, content: e.target.value });
         if (errors.content) setErrors({ ...errors, content: '' });
+    };
+
+    // ✅ NEW: Bold / Italic / Bullet toolbar handler. Reads the current
+    // textarea selection, wraps or prefixes it with markdown-lite syntax
+    // (**bold**, _italic_, "- " bullet), and restores cursor/selection
+    // afterward so typing feels natural (like a real editor toolbar).
+    const applyFormat = (type: 'bold' | 'italic' | 'bullet') => {
+        const textarea = contentRef.current;
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const value = formData.content;
+        const selected = value.slice(start, end);
+
+        let newValue = value;
+        let newCursorStart = start;
+        let newCursorEnd = end;
+
+        if (type === 'bold') {
+            const placeholder = selected || 'bold text';
+            const insert = `**${placeholder}**`;
+            newValue = value.slice(0, start) + insert + value.slice(end);
+            newCursorStart = start + 2;
+            newCursorEnd = start + 2 + placeholder.length;
+        } else if (type === 'italic') {
+            const placeholder = selected || 'italic text';
+            const insert = `_${placeholder}_`;
+            newValue = value.slice(0, start) + insert + value.slice(end);
+            newCursorStart = start + 1;
+            newCursorEnd = start + 1 + placeholder.length;
+        } else if (type === 'bullet') {
+            // Insert "- " at the start of the current line, not at the
+            // cursor position — bullets only make sense at line-start.
+            const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+            newValue = value.slice(0, lineStart) + '- ' + value.slice(lineStart);
+            newCursorStart = start + 2;
+            newCursorEnd = end + 2;
+        }
+
+        setFormData((prev) => ({ ...prev, content: newValue }));
+        if (errors.content) setErrors((prev) => ({ ...prev, content: '' }));
+
+        // Restore focus + selection after React re-renders the textarea
+        // with the new value (setSelectionRange needs the new value to
+        // already be in the DOM, hence the rAF).
+        requestAnimationFrame(() => {
+            textarea.focus();
+            textarea.setSelectionRange(newCursorStart, newCursorEnd);
+        });
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'images' | 'videos' | 'documents') => {
@@ -195,10 +250,40 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
 
                         {/* Content Field */}
                         <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-[#4a3728]">
-                                Content <span className="text-red-500">*</span>
-                            </label>
+                            <div className="flex items-center justify-between">
+                                <label className="block text-sm font-semibold text-[#4a3728]">
+                                    Content <span className="text-red-500">*</span>
+                                </label>
+                                {/* ✅ NEW: formatting toolbar — Bold / Italic / Bullet */}
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => applyFormat('bold')}
+                                        title="Bold"
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold text-[#4a3728] bg-[#e0d8cf]/40 hover:bg-[#e0d8cf]/70 transition-colors"
+                                    >
+                                        B
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => applyFormat('italic')}
+                                        title="Italic"
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-sm italic text-[#4a3728] bg-[#e0d8cf]/40 hover:bg-[#e0d8cf]/70 transition-colors"
+                                    >
+                                        i
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => applyFormat('bullet')}
+                                        title="Bullet point"
+                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-sm text-[#4a3728] bg-[#e0d8cf]/40 hover:bg-[#e0d8cf]/70 transition-colors"
+                                    >
+                                        •
+                                    </button>
+                                </div>
+                            </div>
                             <textarea
+                                ref={contentRef}
                                 placeholder="Write your post content here..."
                                 value={formData.content}
                                 onChange={handleContentChange}

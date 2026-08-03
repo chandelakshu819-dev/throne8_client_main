@@ -80,20 +80,31 @@ const FeedContainer = (props: any) => {
         isDarkMode={isDarkMode}
       />
       <div className="space-y-8">
-        {/* ✅ FIX: feedReposts wala hardcoded block hataya —
-            ab reposts backend se hi `posts` array ke andar
+        {/* reposts backend se `posts` array ke andar
             feedItemType: 'repost' tag ke saath aate hain,
-            already feedScore se sorted. Isliye ek hi loop
-            mein dono types render karte hain, taaki order
-            sahi rahe aur duplicate na ho. */}
+            already feedScore se sorted. Ek hi loop mein
+            dono types render karte hain, taaki order sahi
+            rahe aur duplicate na ho. */}
         {posts.map((post: any, index: number) =>
           post.feedItemType === 'repost' ? (
             <FeedRepostCard
               key={post.repostId}
+              // ✅ FIX (Bug 2): poore comment/reaction wiring props
+              // spread kiye — pehle sirf 3 props (likedPosts,
+              // handleLike, toggleComments) explicit pass ho rahe the,
+              // baaki (openCommentsIndex, postComments, commentText,
+              // wagera) FeedRepostCard tak pahunchte hi nahi the isliye
+              // "Comment" button pe kuch render nahi hota tha.
+              {...props}
               repostItem={post}
               isDarkMode={isDarkMode}
               profileImage={profileData?.profileImage || props.profileImage}
               fullName={fullName}
+              // ✅ FIX (Bug 1): actual reposter ka naam/avatar — ab
+              // useAllUsersPosts.ts se transform hoke post object ke
+              // andar hi aata hai, current viewer ke fullName ki jagah.
+              reposterName={post.reposterName}
+              reposterAvatar={post.reposterAvatar}
               currentUserId={currentUserId}
               likedPosts={likedPosts}
               handleLike={props.handleLike}
