@@ -58,8 +58,7 @@ export default function Home() {
     const [repostProgress, setRepostProgress] = useState(0);
     const [showRepostProgressBar, setShowRepostProgressBar] = useState(false);
 
-    const { allPosts, isLoadingAllPosts, fetchAllUsersPosts } = useAllUsersPosts();
-
+const { allPosts, isLoadingAllPosts, isLoadingMore, hasMore, fetchAllUsersPosts, loadMorePosts } = useAllUsersPosts();
     // Media & Schedule states
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
     const [selectedVideos, setSelectedVideos] = useState<File[]>([]);
@@ -834,7 +833,7 @@ export default function Home() {
                         profileImage={profileData.profileImage}
                         handleLike={handleLike}
                         postComments={postComments}
-                        postCommentCounts={postCommentCounts}  // add karo
+                        postCommentCounts={postCommentCounts}
                         openMenuIndex={openMenuIndex}
                         openRepostIndex={openRepostIndex}
                         openCommentsIndex={openCommentsIndex}
@@ -868,7 +867,9 @@ export default function Home() {
                         repostProgress={repostProgress}
                         posts={allPosts}
                         isLoadingPosts={isLoadingAllPosts}
-
+                        isLoadingMore={isLoadingMore}          
+                        hasMore={hasMore}                     
+                        loadMorePosts={loadMorePosts}          
                         feedReposts={feedReposts}           // ← ADD
                         profileData={profileData}           // ← ADD
                         fullName={fullName}                 // ← ADD

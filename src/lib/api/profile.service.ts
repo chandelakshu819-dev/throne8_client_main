@@ -1297,22 +1297,24 @@ static async getAllExperiencesByUserId(userId: string): Promise<any> {
 
     // ✅ ADD THIS METHOD after getAllUserPosts method:
 
-    /**
-     * 🌐 GET ALL POSTS FOR HOME FEED
-     * Gets all posts from database (from all users)
+   /**
+     * 🌐 GET ALL POSTS FOR HOME FEED (paginated)
      */
-    static async getAllPostsForHomeFeed(includeArchived: boolean = false): Promise<any> {
+    static async getAllPostsForHomeFeed(
+        page: number = 1,
+        limit: number = 20,
+        includeArchived: boolean = false
+    ): Promise<any> {
         try {
-            console.log('🌐 [GET_ALL_POSTS_HOME] Fetching all posts for home feed...');
+            console.log('🌐 [GET_ALL_POSTS_HOME] Fetching home feed...', { page, limit });
 
             const baseEndpoint = config?.NEXT_PUBLIC_FEED_ENDPOINT || process.env.NEXT_PUBLIC_FEED_ENDPOINT || '/profile/home-post';
             const endpoint = baseEndpoint.endsWith('/feed') ? baseEndpoint : `${baseEndpoint}/feed`;
 
             const { data } = await api.get(endpoint, {
-                params: { includeArchived }
+                params: { page, limit, includeArchived }
             });
 
-            // console.log('✅ [GET_ALL_POSTS_HOME] Posts fetched:', data.data?.total || data.data?.posts?.length);
             return data;
 
         } catch (error: any) {

@@ -1,5 +1,5 @@
 // app/(dashboard)/components/feed/FeedContainer.tsx
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import PostCard from './PostCard';
 import RepostProgressBar from './RepostProgressBar';
 import FeedRepostCard from './FeedRepostCard';
@@ -7,7 +7,6 @@ import FeedRepostCard from './FeedRepostCard';
 // Skeleton Loader Component for Post
 const PostSkeleton = () => (
   <div className="bg-white rounded-lg shadow-md p-4 space-y-4">
-    {/* Header with profile image and name */}
     <div className="flex items-center space-x-4">
       <div className="w-12 h-12 rounded-full bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer"></div>
       <div className="flex-1 space-y-2">
@@ -15,18 +14,12 @@ const PostSkeleton = () => (
         <div className="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer rounded w-24"></div>
       </div>
     </div>
-
-    {/* Content skeleton */}
     <div className="space-y-3">
       <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer rounded"></div>
       <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer rounded w-5/6"></div>
       <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer rounded w-4/6"></div>
     </div>
-
-    {/* Image skeleton */}
     <div className="h-64 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer rounded"></div>
-
-    {/* Actions skeleton */}
     <div className="flex justify-between pt-4 border-t">
       <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer rounded w-16"></div>
       <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer rounded w-16"></div>
@@ -39,6 +32,9 @@ const FeedContainer = (props: any) => {
   const {
     posts = [],
     isLoadingPosts = false,
+    isLoadingMore = false,
+    hasMore = false,
+    loadMorePosts,
     currentUserId,
     likedPosts,
     isDarkMode,
@@ -48,7 +44,30 @@ const FeedContainer = (props: any) => {
     fullName,
   } = props;
 
-  // Add loading state with skeleton loaders
+  // ✅ Infinite scroll trigger — jab yeh sentinel div viewport mein aata hai,
+  // aur hasMore true hai aur pehle se loadMore chal nahi raha, agla page fetch karo
+  const observerTarget = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!loadMorePosts) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore && !isLoadingPosts) {
+          loadMorePosts();
+        }
+      },
+      { threshold: 0.1, rootMargin: '200px' } // 200px pehle hi trigger karo, taaki user ko wait na karna pade
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) observer.observe(currentTarget);
+
+    return () => {
+      if (currentTarget) observer.unobserve(currentTarget);
+    };
+  }, [hasMore, isLoadingMore, isLoadingPosts, loadMorePosts]);
+
   if (isLoadingPosts) {
     return (
       <main className="postLoader flex-1 space-y-8">
@@ -61,7 +80,6 @@ const FeedContainer = (props: any) => {
     );
   }
 
-  // Add empty state
   if (posts.length === 0) {
     return (
       <main className="flex-1 text-center py-20">
@@ -73,36 +91,21 @@ const FeedContainer = (props: any) => {
 
   return (
     <main className="flex-1 space-y-8">
-      {/* Repost Progress Bar at top of feed */}
       <RepostProgressBar
         isVisible={showRepostProgressBar}
         progress={repostProgress}
         isDarkMode={isDarkMode}
       />
       <div className="space-y-8">
-        {/* reposts backend se `posts` array ke andar
-            feedItemType: 'repost' tag ke saath aate hain,
-            already feedScore se sorted. Ek hi loop mein
-            dono types render karte hain, taaki order sahi
-            rahe aur duplicate na ho. */}
         {posts.map((post: any, index: number) =>
           post.feedItemType === 'repost' ? (
             <FeedRepostCard
               key={post.repostId}
-              // ✅ FIX (Bug 2): poore comment/reaction wiring props
-              // spread kiye — pehle sirf 3 props (likedPosts,
-              // handleLike, toggleComments) explicit pass ho rahe the,
-              // baaki (openCommentsIndex, postComments, commentText,
-              // wagera) FeedRepostCard tak pahunchte hi nahi the isliye
-              // "Comment" button pe kuch render nahi hota tha.
               {...props}
               repostItem={post}
               isDarkMode={isDarkMode}
               profileImage={profileData?.profileImage || props.profileImage}
               fullName={fullName}
-              // ✅ FIX (Bug 1): actual reposter ka naam/avatar — ab
-              // useAllUsersPosts.ts se transform hoke post object ke
-              // andar hi aata hai, current viewer ke fullName ki jagah.
               reposterName={post.reposterName}
               reposterAvatar={post.reposterAvatar}
               currentUserId={currentUserId}
@@ -125,6 +128,21 @@ const FeedContainer = (props: any) => {
           )
         )}
       </div>
+
+      {/* ✅ Sentinel element — jab yeh screen pe aata hai, next page load hota hai */}
+      {hasMore && (
+        <div ref={observerTarget} className="py-4">
+          {isLoadingMore && (
+            <div className="space-y-8">
+              <PostSkeleton />
+            </div>
+          )}
+        </div>
+      )}
+
+      {!hasMore && posts.length > 0 && (
+        <p className="text-center text-gray-400 text-sm py-8">You're all caught up 🎉</p>
+      )}
     </main>
   );
 };

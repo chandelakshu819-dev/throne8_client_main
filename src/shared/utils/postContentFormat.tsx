@@ -1,7 +1,7 @@
 // src/shared/utils/postContentFormat.tsx
 //
-// ✅ Lightweight markdown-lite formatter for post content.
-// Supports: **bold**, _italic_, "- " bullet lines.
+// ✅ Lightweight markdown-lite formatter for post/comment content.
+// Supports: **bold**, _italic_, "- " bullet lines, @[Name](userId) mentions.
 //
 // Deliberately does NOT use dangerouslySetInnerHTML — everything is
 // parsed straight into React elements, so it's XSS-safe by construction.
@@ -9,17 +9,38 @@
 // into a post, it renders as plain literal text, never as real HTML.
 
 import React from 'react';
+import Link from 'next/link';
+
+const MENTION_PATTERN = /@\[([^\]]+)\]\(([^)]+)\)/;
 
 /**
- * Parses **bold** and _italic_ markers inside a single line of text.
+ * Parses **bold**, _italic_, and @[Name](userId) mention markers inside
+ * a single line of text.
  */
 function parseInline(text: string, keyPrefix: string): React.ReactNode[] {
     if (!text) return [];
 
-    const tokens = text.split(/(\*\*[^*\n]+\*\*|_[^_\n]+_)/g).filter((t) => t.length > 0);
+    const tokens = text
+        .split(/(\*\*[^*\n]+\*\*|_[^_\n]+_|@\[[^\]]+\]\([^)]+\))/g)
+        .filter((t) => t.length > 0);
 
     return tokens.map((token, i) => {
         const key = `${keyPrefix}-${i}`;
+
+        const mentionMatch = token.match(MENTION_PATTERN);
+        if (mentionMatch) {
+            const [, name, userId] = mentionMatch;
+            return (
+                <Link
+                    key={key}
+                    href={`/profile/${userId}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="font-semibold text-[#4a3728] hover:underline"
+                >
+                    @{name}
+                </Link>
+            );
+        }
 
         if (token.startsWith('**') && token.endsWith('**') && token.length > 4) {
             return <strong key={key}>{token.slice(2, -2)}</strong>;

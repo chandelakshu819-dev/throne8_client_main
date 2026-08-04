@@ -1,6 +1,12 @@
-// app/(dashboard)/components/feed/CommentInput.tsx
-import React from 'react';
+// This same file replaces BOTH:
+//   app/(dashboard)/components/feed/CommentInput.tsx
+//   app/features/profile/components/feed/CommentInput.tsx
+// (the two copies were identical before this change)
+
+import React, { useRef } from 'react';
 import EmojiPicker from './EmojiPicker';
+import { useMentionAutocomplete, MentionUser } from '@/shared/hooks/useMentionAutocomplete';
+import MentionAutocomplete from '@/shared/uiComponents/MentionAutocomplete';
 
 interface CommentInputProps {
   isDarkMode: any;
@@ -27,6 +33,57 @@ const CommentInput = ({
   emojiList,
   profileImage,
 }: CommentInputProps) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // ✅ NEW: @mention autocomplete wiring — same hook used in CreatePostModal
+  const mention = useMentionAutocomplete({
+    value: commentText,
+    onChange: setCommentText,
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cursorPos = e.target.selectionStart || 0;
+    mention.handleTextChange(e.target.value, cursorPos);
+  };
+
+  const handleSelectMention = (user: MentionUser) => {
+    const input = inputRef.current;
+    if (!input) return;
+    const cursorPos = input.selectionStart || 0;
+    const newCursorPos = mention.selectMention(user, cursorPos);
+    requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(newCursorPos, newCursorPos);
+    });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (mention.isOpen && mention.results.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        mention.setActiveIndex((i) => (i + 1) % mention.results.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        mention.setActiveIndex((i) => (i - 1 + mention.results.length) % mention.results.length);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSelectMention(mention.results[mention.activeIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        mention.closeMention();
+        return;
+      }
+    }
+    // ✅ Original behaviour: Enter submits the comment when the mention
+    // dropdown isn't open.
+    if (e.key === 'Enter') handleCommentSubmit();
+  };
+
   return (
     <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-slate-700/30' : 'bg-[#e0d8cf]/30'}`}>
       <div className="flex gap-3">
@@ -45,17 +102,17 @@ const CommentInput = ({
             </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 relative">
             <input
+              ref={inputRef}
               type="text"
               value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder={replyingTo ? 'Write a reply...' : 'Write a comment...'}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onBlur={() => setTimeout(() => mention.closeMention(), 150)}
+              placeholder={replyingTo ? 'Write a reply... (type @ to mention someone)' : 'Write a comment... (type @ to mention someone)'}
               className={`flex-1 px-4 py-2 rounded-xl border focus:outline-none focus:ring-2 focus:ring-[#6b5643] ${isDarkMode ? 'bg-slate-600 border-slate-500 text-white placeholder-slate-400' : 'bg-white border-[#4a3728]/30 text-[#4a3728] placeholder-[#4a3728]/60'
                 }`}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') handleCommentSubmit();
-              }}
             />
             <button
               onClick={handleCommentSubmit}
@@ -63,6 +120,16 @@ const CommentInput = ({
             >
               Post
             </button>
+            {mention.isOpen && (
+              <MentionAutocomplete
+                results={mention.results}
+                isSearching={mention.isSearching}
+                activeIndex={mention.activeIndex}
+                onSelect={handleSelectMention}
+                onHover={mention.setActiveIndex}
+                isDarkMode={isDarkMode}
+              />
+            )}
           </div>
 
           <div className="flex items-center gap-3 mt-3 relative">

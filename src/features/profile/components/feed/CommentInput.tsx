@@ -1,4 +1,4 @@
-// app/(dashboard)/components/feed/CommentInput.tsx
+// app/features/profile/components/feed/CommentInput.tsx
 import React from 'react';
 import EmojiPicker from './EmojiPicker';
 
