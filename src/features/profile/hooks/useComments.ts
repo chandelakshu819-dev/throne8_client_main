@@ -1,7 +1,7 @@
 // src/hooks/data/useComments.ts
 // ✅ COMPLETE HOOK - Replace previous version
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import AuthService from '@/lib/api/auth.service';
 import { z } from 'zod';
 import ProfileService from '@/lib/api/profile.service';
@@ -40,6 +40,7 @@ export interface CommentData {
     threadDepth?: number;
     replyCount?: number;
     user?: CommentUser;
+    isAuthor?: boolean; // ✅ NEW: true when this comment's author === the post owner
 }
 
 // ==================== HOOK ====================
@@ -50,13 +51,22 @@ export const useComments = () => {
     const [isSubmittingComment, setIsSubmittingComment] = useState(false);
     const [commentLikes, setCommentLikes] = useState<{ [commentId: string]: { count: number; isLiked: boolean } }>({});
 
+    // ✅ NEW: remembers each post's owner userId so re-fetches (after create/edit/delete)
+    // don't need the caller to keep re-passing it every single time.
+    const postOwnerIdsRef = useRef<{ [postId: string]: string }>({});
+
     // ==================== FETCH COMMENTS ====================
-    const fetchCommentsByPost = useCallback(async (postId: string) => {
+    const fetchCommentsByPost = useCallback(async (postId: string, postOwnerId?: string) => {
+        if (postOwnerId) {
+            postOwnerIdsRef.current[postId] = postOwnerId;
+        }
+        const effectiveOwnerId = postOwnerIdsRef.current[postId];
+
         try {
             setIsLoadingComments(prev => ({ ...prev, [postId]: true }));
             const response = await ProfileService.getCommentsByPostId(postId);
             const rawComments: CommentData[] = response.data?.comments || [];
-            const enriched = await enrichCommentsWithUsers(rawComments);
+            const enriched = await enrichCommentsWithUsers(rawComments, effectiveOwnerId);
 
             const likesMap: { [key: string]: { count: number; isLiked: boolean } } = {};
             enriched.forEach(c => {
@@ -160,7 +170,11 @@ export const useComments = () => {
 
     // ==================== USER ENRICHMENT ====================
     // ✅ Ab bulk calls use hote hain — individual getUserProfileById/getHeadlineById loops hata diye
-    const enrichCommentsWithUsers = async (comments: CommentData[]): Promise<CommentData[]> => {
+    // ✅ NEW: ownerId param se har comment pe isAuthor flag set hota hai
+    const enrichCommentsWithUsers = async (
+        comments: CommentData[],
+        postOwnerId?: string
+    ): Promise<CommentData[]> => {
         if (comments.length === 0) return [];
         try {
             const uniqueUserIds = [...new Set(comments.map(c => c.userId))];
@@ -210,6 +224,7 @@ export const useComments = () => {
                 const u = usersMap[comment.userId];
                 return {
                     ...comment,
+                    isAuthor: !!postOwnerId && comment.userId === postOwnerId,
                     user: {
                         userId: comment.userId,
                         name: u ? `${u.firstName} ${u.lastName}`.trim() : 'Unknown User',

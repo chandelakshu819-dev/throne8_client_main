@@ -1,4 +1,5 @@
 // features/dashboard/components/feed/PostCard.tsx
+
 import React from 'react';
 import PostHeader from './PostHeader';
 import PostContent from './PostContent';
@@ -312,7 +313,10 @@ const PostCard = ({
             comments={postComments?.[postKey] || []}
             handleCommentSubmit={() => handleCommentSubmit(postKey)}
             emojiList={emojiList}
-            profileImage={profileImage} setReplyingTo={undefined}          />
+            profileImage={profileImage}
+            setReplyingTo={undefined}
+            currentUserId={currentUserId}
+          />
         )}
       </div>
 
