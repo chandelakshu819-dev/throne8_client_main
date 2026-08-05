@@ -729,7 +729,6 @@ const post = allPosts.find(p => (p.entryId || p.postId) === postId);
 if (post?.userId && post.userId !== user?.userId) {
     AnalyticsService.recordEngagement(postId, post.userId, 'comment');
 }
-                const newComment = res.data.comment;
                 const newComment = {
                     ...res.data.comment,
                     user: selfUser,
