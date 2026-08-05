@@ -456,6 +456,44 @@ static clearAnalyticsCache(): void {
         }
     }
 
+
+
+
+    /**
+ * 👍 RECORD ENGAGEMENT (like/comment/share/save)
+ */
+static async recordEngagement(postId: string, postOwnerId: string, engagementType: 'like' | 'comment' | 'share' | 'save') {
+    try {
+        const { data } = await api.post('/profile/analytics/record-engagement', {
+            postId,
+            postOwnerId,
+            engagementType
+        });
+        return data;
+    } catch (error: any) {
+        console.error('❌ Record engagement failed:', error);
+        return null; // non-critical, chup-chaap fail hone do
+    }
+}
+
+/**
+ * 🔗 RECORD SHARE (repost)
+ */
+static async recordShare(postOwnerId: string, postId: string, shareType: string = 'linkedin') {
+    try {
+        const { data } = await api.post('/profile/analytics/record-share', {
+            postOwnerId,
+            postId,
+            shareType
+        });
+        return data;
+    } catch (error: any) {
+        console.error('❌ Record share failed:', error);
+        return null;
+    }
+}
+
+
     /**
      * 📊 GET POST IMPRESSIONS TIMELINE (for graphs)
      */

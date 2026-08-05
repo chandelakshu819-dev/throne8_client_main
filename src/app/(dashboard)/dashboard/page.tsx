@@ -12,6 +12,7 @@ import { useProfile } from '@/store/hooks';
 import RepostWithPerspectiveModal from '@/features/dashboard/components/feed/RepostWithPerspectiveModal';
 import ConfirmRepostModal from '@/features/dashboard/components/feed/ConfirmRepostModal';
 import ProfileService from '@/lib/api/profile.service';
+import AnalyticsService from '@/lib/api/analytics.service';
 import HomePostService from '@/lib/api/homePost.service';
 import RepostService from '@/lib/api/repost.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -191,22 +192,31 @@ export default function Home() {
     // Ab profile activity aur feed dono same /react endpoint use karte hain,
     // isliye Reactions modal dono jagah consistent data dikhayega.
     const handleLike = async (postId: string) => {
-        const isCurrentlyLiked = likedPosts[postId] ??
-            allPosts.find(p => (p.entryId || p.postId) === postId)?.isLikedByCurrentUser ?? false;
-
+        const post = allPosts.find(p => (p.entryId || p.postId) === postId);
+        const isCurrentlyLiked = likedPosts[postId] ?? post?.isLikedByCurrentUser ?? false;
+    
         setLikedPosts(prev => ({ ...prev, [postId]: !isCurrentlyLiked }));
-
+    
         try {
             if (isCurrentlyLiked) {
                 await ProfileService.removeReaction(postId);
             } else {
                 await ProfileService.reactToPost(postId, 'like');
+    
+                // 🔧 NEW: Analytics mein bhi engagement record karo
+                // (postTransformers.ts confirm karta hai post.userId hi owner hai)
+                if (post?.userId && post.userId !== user?.userId) {
+                    AnalyticsService.recordEngagement(postId, post.userId, 'like');
+                }
             }
         } catch (error: any) {
             console.error('Like/Unlike failed:', error);
             setLikedPosts(prev => ({ ...prev, [postId]: isCurrentlyLiked }));
         }
     };
+
+
+
     const toggleSidebar = () => {
         setIsSidebarOpen(!isSidebarOpen);
     };
@@ -471,6 +481,10 @@ export default function Home() {
 
         try {
             const result = await RepostService.createRepost(postId, 'quote', thoughts);
+            // 🔧 NEW: Analytics mein share record karo
+            if (post?.userId && post.userId !== user?.userId) {
+               AnalyticsService.recordShare(post.userId, postId, 'linkedin');
+         }
 
             setRepostProgress(60);
             await new Promise(resolve => setTimeout(resolve, 300));
@@ -526,6 +540,11 @@ export default function Home() {
 
         try {
             const result = await RepostService.createRepost(postId, 'repost');
+
+            // ✅ NEW: Analytics mein share record karo
+if (post?.userId && post.userId !== user?.userId) {
+    AnalyticsService.recordShare(post.userId, postId, 'linkedin');
+}
 
             // Progress animate karo
             setRepostProgress(60);
@@ -621,6 +640,13 @@ export default function Home() {
             } else {
                 // console.log(`Commenting on post ${postId}: ${commentText}`);
                 const res = await ProfileService.createComment(postId, commentText);
+
+
+                // ✅ NEW: Analytics mein comment engagement record karo
+const post = allPosts.find(p => (p.entryId || p.postId) === postId);
+if (post?.userId && post.userId !== user?.userId) {
+    AnalyticsService.recordEngagement(postId, post.userId, 'comment');
+}
                 const newComment = res.data.comment;
                 // new comment top mein ya bottom mein add karo
                 setPostComments(prev => ({
