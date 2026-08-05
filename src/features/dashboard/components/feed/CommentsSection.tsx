@@ -27,6 +27,7 @@ interface CommentsSectionProps {
   comments: any;
   postId: any;
   emojiList: any;
+  currentUserId?: string;
 }
 
 const CommentsSection = ({
@@ -53,6 +54,7 @@ const CommentsSection = ({
   comments = [],
   postId,
   emojiList,
+  currentUserId,
 }: CommentsSectionProps) => {
   const [visibleCommentsCount, setVisibleCommentsCount] = useState(3);
   const [sortMode, setSortMode] = useState<'relevant' | 'recent'>('relevant');
@@ -159,6 +161,7 @@ const CommentsSection = ({
             handleCommentAction={handleCommentAction}
             handleEditSubmit={handleEditSubmit}
             handleReply={handleReply}
+            currentUserId={currentUserId}
           />
         ))}
       </div>

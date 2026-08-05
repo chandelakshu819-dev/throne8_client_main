@@ -2,6 +2,8 @@
 import AuthService from '@/lib/api/auth.service';
 import ProfileService from '@/lib/api/profile.service';
 import React, { useState, useRef } from 'react';
+import { useMentionAutocomplete, MentionUser } from '@/shared/hooks/useMentionAutocomplete';
+import MentionAutocomplete from '@/shared/uiComponents/MentionAutocomplete';
 
 interface CreatePostModalProps {
     isOpen: boolean;
@@ -38,10 +40,15 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
     });
     const [isSaving, setIsSaving] = useState(false);
 
-    // ✅ NEW: ref to the content textarea, needed so the formatting
-    // toolbar can read cursor position / selection and insert markdown
-    // syntax at the right spot.
+    // ref to the content textarea, needed so the formatting toolbar and
+    // the mention autocomplete can read cursor position / selection.
     const contentRef = useRef<HTMLTextAreaElement>(null);
+
+    // ✅ NEW: @mention autocomplete wiring
+    const mention = useMentionAutocomplete({
+        value: formData.content,
+        onChange: (newContent) => setFormData((prev) => ({ ...prev, content: newContent })),
+    });
 
     const validateForm = () => {
         const newErrors = { title: '', content: '' };
@@ -66,13 +73,48 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
         if (errors.title) setErrors({ ...errors, title: '' });
     };
 
+    // ✅ CHANGED: content changes now go through the mention hook, which
+    // detects "@" typing and drives the autocomplete dropdown, then
+    // forwards the new value into formData.content itself.
     const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setFormData({ ...formData, content: e.target.value });
-        if (errors.content) setErrors({ ...errors, content: '' });
+        const cursorPos = e.target.selectionStart;
+        mention.handleTextChange(e.target.value, cursorPos);
+        if (errors.content) setErrors((prev) => ({ ...prev, content: '' }));
     };
 
-    // ✅ NEW: Bold / Italic / Bullet toolbar handler. Reads the current
-    // textarea selection, wraps or prefixes it with markdown-lite syntax
+    // ✅ NEW: keyboard navigation for the mention dropdown (Up/Down/Enter/Esc)
+    const handleContentKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (!mention.isOpen || mention.results.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            mention.setActiveIndex((i) => (i + 1) % mention.results.length);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            mention.setActiveIndex((i) => (i - 1 + mention.results.length) % mention.results.length);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSelectMention(mention.results[mention.activeIndex]);
+        } else if (e.key === 'Escape') {
+            mention.closeMention();
+        }
+    };
+
+    // ✅ NEW: when a user is picked from the dropdown, insert the mention
+    // and restore focus + cursor position right after it.
+    const handleSelectMention = (user: MentionUser) => {
+        const textarea = contentRef.current;
+        if (!textarea) return;
+        const cursorPos = textarea.selectionStart;
+        const newCursorPos = mention.selectMention(user, cursorPos);
+        requestAnimationFrame(() => {
+            textarea.focus();
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+        });
+    };
+
+    // Bold / Italic / Bullet toolbar handler. Reads the current textarea
+    // selection, wraps or prefixes it with markdown-lite syntax
     // (**bold**, _italic_, "- " bullet), and restores cursor/selection
     // afterward so typing feels natural (like a real editor toolbar).
     const applyFormat = (type: 'bold' | 'italic' | 'bullet') => {
@@ -112,9 +154,6 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
         setFormData((prev) => ({ ...prev, content: newValue }));
         if (errors.content) setErrors((prev) => ({ ...prev, content: '' }));
 
-        // Restore focus + selection after React re-renders the textarea
-        // with the new value (setSelectionRange needs the new value to
-        // already be in the DOM, hence the rAF).
         requestAnimationFrame(() => {
             textarea.focus();
             textarea.setSelectionRange(newCursorStart, newCursorEnd);
@@ -249,12 +288,12 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
                         </div>
 
                         {/* Content Field */}
-                        <div className="space-y-2">
+                        <div className="space-y-2 relative">
                             <div className="flex items-center justify-between">
                                 <label className="block text-sm font-semibold text-[#4a3728]">
                                     Content <span className="text-red-500">*</span>
                                 </label>
-                                {/* ✅ NEW: formatting toolbar — Bold / Italic / Bullet */}
+                                {/* formatting toolbar — Bold / Italic / Bullet */}
                                 <div className="flex items-center gap-1">
                                     <button
                                         type="button"
@@ -284,12 +323,23 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
                             </div>
                             <textarea
                                 ref={contentRef}
-                                placeholder="Write your post content here..."
+                                placeholder="Write your post content here... (type @ to mention someone)"
                                 value={formData.content}
                                 onChange={handleContentChange}
+                                onKeyDown={handleContentKeyDown}
+                                onBlur={() => setTimeout(() => mention.closeMention(), 150)}
                                 rows={6}
                                 className="w-full px-4 py-3 bg-[#e0d8cf]/30 border border-[#e0d8cf]/50 rounded-xl text-[#4a3728] placeholder-[#4a3728]/40 focus:outline-none focus:ring-2 focus:ring-[#4a3728] focus:bg-[#f6ede8] transition-all duration-300 resize-none"
                             />
+                            {mention.isOpen && (
+                                <MentionAutocomplete
+                                    results={mention.results}
+                                    isSearching={mention.isSearching}
+                                    activeIndex={mention.activeIndex}
+                                    onSelect={handleSelectMention}
+                                    onHover={mention.setActiveIndex}
+                                />
+                            )}
                             {errors.content && <p className="text-red-500 text-sm font-medium">{errors.content}</p>}
                         </div>
 

@@ -221,18 +221,20 @@ export const useActivityHandlers = ({
             }
         }
     };
-
-    // ── Comment Handlers ──────────────────────────────────────────
+// ── Comment Handlers ──────────────────────────────────────────
     const toggleCommentsPanel = async (idx: number, postId: string) => {
         if (openCommentsIndex === idx) {
             setOpenCommentsIndex(null);
         } else {
             setOpenCommentsIndex(idx);
             if (postId && !commentsByPost[postId]) {
-                await fetchCommentsByPost(postId);
+                // ✅ post-owner ka userId nikalo taaki useComments ko pata ho
+                // konsa comment "Author" badge ke laayak hai
+                const ownerPost = posts.find(p => (p.entryId || p.postId) === postId);
+                await fetchCommentsByPost(postId, ownerPost?.userId);
             }
         }
-    };
+    };;
 
     const toggleCommentMenu = (commentId: string) => {
         setOpenCommentMenuIndex(prev => (prev === commentId ? null : commentId));

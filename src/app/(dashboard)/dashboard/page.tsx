@@ -15,6 +15,7 @@ import ProfileService from '@/lib/api/profile.service';
 import AnalyticsService from '@/lib/api/analytics.service';
 import HomePostService from '@/lib/api/homePost.service';
 import RepostService from '@/lib/api/repost.service';
+import AuthService from '@/lib/api/auth.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useProfileData } from '@/features/profile/hooks/useProfileData';
 import { useHeadlineData } from '@/features/profile/hooks/useHeadlineData';
@@ -59,8 +60,7 @@ export default function Home() {
     const [repostProgress, setRepostProgress] = useState(0);
     const [showRepostProgressBar, setShowRepostProgressBar] = useState(false);
 
-    const { allPosts, isLoadingAllPosts, fetchAllUsersPosts } = useAllUsersPosts();
-
+const { allPosts, isLoadingAllPosts, isLoadingMore, hasMore, fetchAllUsersPosts, loadMorePosts } = useAllUsersPosts();
     // Media & Schedule states
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
     const [selectedVideos, setSelectedVideos] = useState<File[]>([]);
@@ -589,9 +589,78 @@ if (post?.userId && post.userId !== user?.userId) {
         }
     };
 
-    // const toggleComments = (index: any) => {
-    //     setOpenCommentsIndex(openCommentsIndex === index ? null : index);
-    // };
+    // ✅ NEW: comment ke raw userId list se real name/avatar/headline nikalta hai,
+    // aur postOwnerId se compare karke "isAuthor" flag bhi laga deta hai (jisse
+    // CommentItem "Author" badge dikha sake) — bulk API calls use hoti hain
+    // taaki N comments ke liye N calls na jayein.
+    const enrichCommentsWithUserData = async (rawComments: any[], postOwnerId?: string) => {
+        if (!rawComments || rawComments.length === 0) return [];
+
+        try {
+            const uniqueUserIds = [...new Set(rawComments.map((c: any) => c.userId))] as string[];
+
+            let usersData: any[] = [];
+            if (uniqueUserIds.length > 0) {
+                try {
+                    const bulkResponse = await AuthService.getUsersBulk(uniqueUserIds);
+                    usersData = bulkResponse.data?.users || [];
+                } catch (err) {
+                    console.warn('⚠️ Failed to fetch comment users in bulk:', err);
+                }
+            }
+
+            const photoIds = usersData.map((u: any) => u.profilePhotoId).filter(Boolean);
+            let photosMap: Record<string, string> = {};
+            if (photoIds.length > 0) {
+                const res = await ProfileService.getMultipleProfilePhotosByIds(photoIds).catch(() => null);
+                if (res) {
+                    photosMap = res.data.photos.reduce((acc: Record<string, string>, p: any) => {
+                        acc[p.photoId] = p.cloudinarySecureUrl;
+                        return acc;
+                    }, {});
+                }
+            }
+
+            const headlineIds = usersData.map((u: any) => u.headlineId).filter(Boolean);
+            let headlinesMap: Record<string, string> = {};
+            if (headlineIds.length > 0) {
+                try {
+                    const headlinesResponse = await ProfileService.getMultipleHeadlinesByIds(headlineIds);
+                    const headlines = headlinesResponse.data?.headlines || [];
+                    headlinesMap = headlines.reduce((acc: Record<string, string>, h: any) => {
+                        acc[h.headlineId] = h.title;
+                        return acc;
+                    }, {});
+                } catch {
+                    // headlines optional, ignore failure
+                }
+            }
+
+            const usersMap = usersData.reduce((acc: Record<string, any>, u: any) => {
+                acc[u.userId] = u;
+                return acc;
+            }, {});
+
+            const FALLBACK_AVATAR =
+                'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s';
+
+            return rawComments.map((comment: any) => {
+                const u = usersMap[comment.userId];
+                return {
+                    ...comment,
+                    isAuthor: !!postOwnerId && comment.userId === postOwnerId,
+                    user: {
+                        userId: comment.userId,
+                        name: u ? `${u.firstName} ${u.lastName}`.trim() : 'Unknown User',
+                        avatar: u?.profilePhotoId ? photosMap[u.profilePhotoId] || FALLBACK_AVATAR : FALLBACK_AVATAR,
+                        headline: u?.headlineId ? headlinesMap[u.headlineId] || '' : '',
+                    },
+                };
+            });
+        } catch {
+            return rawComments;
+        }
+    };
 
     // toggleComments replace karo:
     const toggleComments = async (postId: string) => {
@@ -600,45 +669,58 @@ if (post?.userId && post.userId !== user?.userId) {
 
         if (!isOpen) {  // har baar open hone pe fetch karo
             try {
-                // console.log(`Fetching comments for post ${postId}...`);
                 const res = await ProfileService.getCommentsByPostId(postId);
-                const comments = res.data.comments || [];
-                setPostComments(prev => ({ ...prev, [postId]: comments }));
-                setPostCommentCounts(prev => ({ ...prev, [postId]: comments.length }));
+                const rawComments = res.data.comments || [];
+
+                // ✅ post-owner ka userId nikalo taaki isAuthor badge sahi lage
+                const postOwnerId = allPosts.find(
+                    (p) => (p.entryId || p.postId) === postId
+                )?.userId;
+
+                const enrichedComments = await enrichCommentsWithUserData(rawComments, postOwnerId);
+
+                setPostComments(prev => ({ ...prev, [postId]: enrichedComments }));
+                setPostCommentCounts(prev => ({ ...prev, [postId]: enrichedComments.length }));
             } catch (error) {
                 console.error('Failed to fetch comments:', error);
             }
         }
     };
 
-    // const handleCommentSubmit = (postIndex: any) => {
-    //     if (commentText.trim()) {
-    //         // // console.log(`Comment on post ${postIndex}: ${commentText}`);
-    //         setCommentText('');
-    //         setReplyingTo(null);
-    //     }
-    // };
-
     // handleCommentSubmit replace karo:
     const handleCommentSubmit = async (postId: string) => {
         if (!commentText.trim()) return;
 
+        // ✅ Apna khud ka user object turant available hai (login ke user se) —
+        // isse naya comment/reply bina extra API call ke turant sahi
+        // avatar/name ke saath dikh jaata hai, "Unknown User" nahi dikhta.
+        const FALLBACK_AVATAR =
+            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s';
+        const postOwnerId = allPosts.find(
+            (p) => (p.entryId || p.postId) === postId
+        )?.userId;
+        const selfUser = {
+            userId: user?.userId,
+            name: fullName,
+            avatar: profileData.profileImage || FALLBACK_AVATAR,
+            headline: headlineData?.title || '',
+        };
+
         try {
             if (replyingTo) {
-                // console.log(`Replying to comment ${replyingTo} on post ${postId}: ${commentText}`);
                 const res = await ProfileService.createReply(replyingTo, commentText);
+                const newReply = { ...res.data.reply, user: selfUser };
                 // reply ko us comment ke niche add karo
                 setPostComments(prev => {
                     const updated = (prev[postId] || []).map(c => {
                         if (c.commentId === replyingTo) {
-                            return { ...c, replies: [...(c.replies || []), res.data.reply] };
+                            return { ...c, replies: [...(c.replies || []), newReply] };
                         }
                         return c;
                     });
                     return { ...prev, [postId]: updated };
                 });
             } else {
-                // console.log(`Commenting on post ${postId}: ${commentText}`);
                 const res = await ProfileService.createComment(postId, commentText);
 
 
@@ -648,6 +730,11 @@ if (post?.userId && post.userId !== user?.userId) {
     AnalyticsService.recordEngagement(postId, post.userId, 'comment');
 }
                 const newComment = res.data.comment;
+                const newComment = {
+                    ...res.data.comment,
+                    user: selfUser,
+                    isAuthor: !!postOwnerId && user?.userId === postOwnerId,
+                };
                 // new comment top mein ya bottom mein add karo
                 setPostComments(prev => ({
                     ...prev,
@@ -689,6 +776,8 @@ if (post?.userId && post.userId !== user?.userId) {
             // // console.log('Copying comment link...');
         } else if (action === 'follow' || action === 'unfollow') {
             // // console.log(`${action} user`);
+        } else if (action === 'report') {
+            // // console.log('Reporting comment');
         } else if (action === 'hide') {
             // // console.log('Hiding this comment');
         }
@@ -860,7 +949,7 @@ if (post?.userId && post.userId !== user?.userId) {
                         profileImage={profileData.profileImage}
                         handleLike={handleLike}
                         postComments={postComments}
-                        postCommentCounts={postCommentCounts}  // add karo
+                        postCommentCounts={postCommentCounts}
                         openMenuIndex={openMenuIndex}
                         openRepostIndex={openRepostIndex}
                         openCommentsIndex={openCommentsIndex}
@@ -894,7 +983,9 @@ if (post?.userId && post.userId !== user?.userId) {
                         repostProgress={repostProgress}
                         posts={allPosts}
                         isLoadingPosts={isLoadingAllPosts}
-
+                        isLoadingMore={isLoadingMore}          
+                        hasMore={hasMore}                     
+                        loadMorePosts={loadMorePosts}          
                         feedReposts={feedReposts}           // ← ADD
                         profileData={profileData}           // ← ADD
                         fullName={fullName}                 // ← ADD
