@@ -50,8 +50,11 @@ const StatsCards: React.FC<StatsCardsProps> = ({ isDarkMode }) => {
     <div className={`grid grid-cols-2 gap-3 mb-4 ${isDarkMode ? 'bg-slate-700/30' : 'bg-white/40'} p-4 rounded-2xl`}>
       {/* Profile Views */}
       <div className={`flex flex-col items-center justify-center gap-1 p-3 rounded-xl ${isDarkMode ? 'bg-slate-600/30' : 'bg-[#e0d8cf]/50'}`}>
-        <div className={`p-2 rounded-xl ${isDarkMode ? 'bg-slate-600/50' : 'bg-[#e0d8cf]/80'}`}>
-          <i className="ri-eye-line text-lg text-[#6b5643]"></i>
+        <div
+          className="p-2 rounded-xl shadow-md"
+          style={{ background: 'linear-gradient(to bottom right, #C08552, #A66B3D)' }}
+        >
+          <i className="ri-eye-line text-lg text-white"></i>
         </div>
         <p className={`text-xs font-medium text-center ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/70'}`}>
           Profile Views
@@ -69,8 +72,11 @@ const StatsCards: React.FC<StatsCardsProps> = ({ isDarkMode }) => {
       </div>
       {/* Post Impressions */}
       <div className={`flex flex-col items-center justify-center gap-1 p-3 rounded-xl ${isDarkMode ? 'bg-slate-600/30' : 'bg-[#e0d8cf]/50'}`}>
-        <div className={`p-2 rounded-xl ${isDarkMode ? 'bg-slate-600/50' : 'bg-[#e0d8cf]/80'}`}>
-          <i className="ri-line-chart-line text-lg text-[#6b5643]"></i>
+        <div
+          className="p-2 rounded-xl shadow-md"
+          style={{ background: 'linear-gradient(to bottom right, #C08552, #A66B3D)' }}
+        >
+          <i className="ri-line-chart-line text-lg text-white"></i>
         </div>
         <p className={`text-xs font-medium text-center ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/70'}`}>
           Impressions
