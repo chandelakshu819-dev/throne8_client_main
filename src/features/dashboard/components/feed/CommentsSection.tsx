@@ -28,6 +28,8 @@ interface CommentsSectionProps {
   postId: any;
   emojiList: any;
   currentUserId?: string;
+  postOwnerId?: string;
+  commentsLoading?: boolean;
 }
 
 const CommentsSection = ({
@@ -55,6 +57,8 @@ const CommentsSection = ({
   postId,
   emojiList,
   currentUserId,
+  postOwnerId,
+  commentsLoading,
 }: CommentsSectionProps) => {
   const [visibleCommentsCount, setVisibleCommentsCount] = useState(3);
   const [sortMode, setSortMode] = useState<'relevant' | 'recent'>('relevant');
@@ -145,7 +149,14 @@ const CommentsSection = ({
 
       {/* ── Comments list ── */}
       <div className="space-y-1">
-        {visibleComments.map((comment: any) => (
+        {/* ✅ Loading state — jab tak backend se comments fetch ho rahe hain, yeh dikhega instead of khaali panel */}
+        {commentsLoading && (
+          <div className={`text-sm px-2 py-3 ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
+            Loading comments...
+          </div>
+        )}
+
+        {!commentsLoading && visibleComments.map((comment: any) => (
           <CommentItem
             key={comment.commentId || comment._id}
             comment={comment}
@@ -162,11 +173,12 @@ const CommentsSection = ({
             handleEditSubmit={handleEditSubmit}
             handleReply={handleReply}
             currentUserId={currentUserId}
+            postOwnerId={postOwnerId}
           />
         ))}
       </div>
 
-      {sortedComments.length > visibleCommentsCount && (
+      {!commentsLoading && sortedComments.length > visibleCommentsCount && (
         <button
           onClick={() => setVisibleCommentsCount((prev) => prev + 3)}
           className={`text-sm font-semibold mt-2 mb-1 px-2 hover:underline ${

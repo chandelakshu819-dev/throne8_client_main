@@ -17,6 +17,7 @@ const CommentItem = ({
   handleReply,
   setReplyingTo,
   profileImage,
+  currentUserId,
 }: {
   comment: any;
   isDarkMode: any;
@@ -31,12 +32,19 @@ const CommentItem = ({
   handleReply: any;
   setReplyingTo: any;
   profileImage: any;
+  currentUserId?: string;
 }) => {
   const likeCount = Object.values(comment.reactions || {}).reduce(
     (sum: number, v: any) => sum + (v || 0),
     0
   );
   const isLikedByMe = !!comment.likedByCurrentUser;
+
+  // ✅ FIX: comment.commentId hi asli id hai (backend se aata hai). Pehle
+  // dropdown open/close check `comment.id` se ho raha tha jabki toggle
+  // `comment.commentId` bhejta tha — match kabhi hota nahi tha, isliye
+  // "⋯" menu kabhi khulta hi nahi tha.
+  const commentId = comment.commentId || comment.id;
 
   const authorName = comment.user?.name || comment.user || 'User';
   const authorAvatar =
@@ -89,13 +97,13 @@ const CommentItem = ({
                 </span>
               )}
             </div>
-            {comment.headline && (
+            {(comment.user?.headline || comment.headline) && (
               <p className={`text-xs mt-0.5 line-clamp-1 ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
-                {comment.headline}
+                {comment.user?.headline || comment.headline}
               </p>
             )}
 
-            {editingCommentId === comment.id ? (
+            {editingCommentId === commentId ? (
               <div className="mt-2">
                 <input
                   type="text"
@@ -105,12 +113,12 @@ const CommentItem = ({
                     isDarkMode ? 'bg-slate-600 border-slate-500 text-white' : 'bg-white border-[#4a3728]/30 text-[#4a3728]'
                   }`}
                   onKeyPress={(e) => {
-                    if (e.key === 'Enter') handleEditSubmit(comment.id);
+                    if (e.key === 'Enter') handleEditSubmit(commentId);
                   }}
                 />
                 <div className="flex gap-2 mt-2">
                   <button
-                    onClick={() => handleEditSubmit(comment.id)}
+                    onClick={() => handleEditSubmit(commentId)}
                     className="px-3 py-1 bg-[#6b5643] text-white rounded-lg text-xs font-semibold"
                   >
                     Save
@@ -148,7 +156,7 @@ const CommentItem = ({
             )}
 
             <button
-              onClick={() => handleCommentReaction(comment.id, '❤️')}
+              onClick={() => handleCommentReaction(commentId, '❤️')}
               className={`text-xs font-bold ${
                 isLikedByMe
                   ? 'text-[#0a66c2]'
@@ -161,7 +169,7 @@ const CommentItem = ({
             </button>
 
             <button
-              onClick={() => handleReply(comment.id)}
+              onClick={() => handleReply(commentId)}
               className={`text-xs font-bold ${
                 isDarkMode ? 'text-slate-400 hover:text-white' : 'text-[#4a3728]/60 hover:text-[#4a3728]'
               }`}
@@ -171,16 +179,19 @@ const CommentItem = ({
 
             <div className="relative comment-menu ml-auto">
               <button
-                onClick={() => toggleCommentMenu(comment.commentId || comment.id)}
-                className={`p-1 rounded-lg transition-all ${isDarkMode ? 'hover:bg-slate-600' : 'hover:bg-[#e0d8cf]'}`}
+                onClick={() => toggleCommentMenu(commentId)}
+                className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${
+                  isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-600' : 'text-[#4a3728]/60 hover:text-[#4a3728] hover:bg-[#e0d8cf]'
+                }`}
               >
-                <span className="text-base">⋯</span>
+                <span className="text-lg leading-none font-bold">⋯</span>
               </button>
 
-              {openCommentMenuIndex === comment.id && (
+              {openCommentMenuIndex === commentId && (
                 <CommentMenuDropdown
                   isDarkMode={isDarkMode}
                   comment={comment}
+                  currentUserId={currentUserId}
                   handleCommentAction={handleCommentAction}
                 />
               )}
@@ -194,10 +205,10 @@ const CommentItem = ({
               style={{ borderColor: isDarkMode ? '#334155' : '#4a372820' }}
             >
               {comment.replies.map((reply: any) => (
-                <div key={reply.id} className="flex items-start gap-2">
+                <div key={reply.id || reply.commentId} className="flex items-start gap-2">
                   <img
-                    src={reply.avatar}
-                    alt={reply.user}
+                    src={reply.user?.avatar || reply.avatar}
+                    alt={reply.user?.name || reply.user}
                     className="w-7 h-7 rounded-full object-cover flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
@@ -207,14 +218,14 @@ const CommentItem = ({
                       }`}
                     >
                       <p className={`font-bold text-xs ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
-                        {reply.user}
+                        {reply.user?.name || reply.user}
                       </p>
                       <p
                         className={`text-xs mt-0.5 whitespace-pre-wrap ${
                           isDarkMode ? 'text-slate-300' : 'text-[#4a3728]/80'
                         }`}
                       >
-                        {renderFormattedContent(reply.text || '')}
+                        {renderFormattedContent(reply.content || reply.text || '')}
                       </p>
                     </div>
                     <div className="flex items-center gap-3 mt-1 pl-3">
@@ -222,7 +233,7 @@ const CommentItem = ({
                         {reply.time}
                       </span>
                       <button
-                        onClick={() => handleCommentReaction(reply.id, '❤️')}
+                        onClick={() => handleCommentReaction(reply.id || reply.commentId, '❤️')}
                         className={`text-xs font-bold ${
                           isDarkMode ? 'text-slate-400 hover:text-white' : 'text-[#4a3728]/60 hover:text-[#4a3728]'
                         }`}

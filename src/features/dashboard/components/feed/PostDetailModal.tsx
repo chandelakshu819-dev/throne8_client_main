@@ -192,6 +192,8 @@ const PostDetailModal = ({
               emojiList={emojiList}
               profileImage={profileImage}
               setReplyingTo={undefined}
+              currentUserId={currentUserId}
+              postOwnerId={post.userId}
             />
           </div>
         </div>
