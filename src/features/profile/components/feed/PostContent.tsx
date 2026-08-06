@@ -1,5 +1,7 @@
 // app/(profile)/components/feed/PostContent.tsx
 import React, { useState } from 'react';
+import AnalyticsService from '@/lib/api/analytics.service';
+
 
 const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) => {
   const [expanded, setExpanded] = useState(false);
@@ -63,13 +65,21 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
             </div>
           </div>
           <a
-            href={post.documents[0].cloudinarySecureUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-4 py-2 bg-[#4a3728] text-[#f6ede8] text-xs font-bold rounded-xl hover:opacity-90 transition-opacity flex-shrink-0"
-          >
-            Download
-          </a>
+           href={post.documents[0].cloudinarySecureUrl}
+           target="_blank"
+           rel="noopener noreferrer"
+           onClick={() => {
+             AnalyticsService.recordClick(
+               post.userId,
+               'document_download',
+               post.documents[0].cloudinarySecureUrl,
+               post.entryId || post.postId
+             );
+           }}
+           className="px-4 py-2 bg-[#4a3728] text-[#f6ede8] text-xs font-bold rounded-xl hover:opacity-90 transition-opacity flex-shrink-0"
+         >
+           Download
+         </a>
         </div>
       )}
     </>

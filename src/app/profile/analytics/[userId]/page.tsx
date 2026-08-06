@@ -82,7 +82,7 @@ export default function AnalyticsDetailsPage() {
                 AnalyticsService.getClicksCount(timeRange),
                 AnalyticsService.getSharesCount(timeRange),
                 AnalyticsService.getUniqueVisitorsCount(timeRange),
-                AnalyticsService.getViewerDemographics(timeRange),
+                AnalyticsService.getViewerDemographics(),
 
             ]);
 

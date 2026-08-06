@@ -300,6 +300,12 @@ export default function SearchUserProfilePage() {
                 viewerHeadline: currentUserHeadline || undefined,
                 viewerPhotoUrl: currentUserImage || undefined,
             });
+
+        // ✅ NEW: Unique visitor bhi record karo (profile visit event)
+        AnalyticsService.recordUniqueVisitor(
+            userId,
+            typeof window !== 'undefined' ? window.location.href : undefined
+        );
         }
     }, [user, userId, currentUserName, currentUserImage, currentUserHeadline, isCurrentUserLoaded]);
 
