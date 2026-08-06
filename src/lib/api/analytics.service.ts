@@ -494,6 +494,50 @@ static async recordShare(postOwnerId: string, postId: string, shareType: string 
 }
 
 
+/**
+ * 🖱️ RECORD CLICK (link/document/button click)
+ */
+static async recordClick(
+    targetUserId: string,
+    clickType: string,
+    targetUrl?: string,
+    postId?: string
+) {
+    try {
+        const { data } = await api.post('/profile/analytics/record-click', {
+            targetUserId,
+            clickType,
+            targetUrl,
+            postId
+        });
+        return data;
+    } catch (error: any) {
+        console.error('❌ Record click failed:', error);
+        return null; // non-critical, chup-chaap fail hone do
+    }
+}
+
+/**
+ * 👥 RECORD UNIQUE VISITOR (profile visit)
+ */
+static async recordUniqueVisitor(
+    profileOwnerId: string,
+    pageUrl?: string,
+    duration?: number
+) {
+    try {
+        const { data } = await api.post('/profile/analytics/record-unique-visitor', {
+            profileOwnerId,
+            pageUrl,
+            duration
+        });
+        return data;
+    } catch (error: any) {
+        console.error('❌ Record unique visitor failed:', error);
+        return null;
+    }
+}
+
     /**
      * 📊 GET POST IMPRESSIONS TIMELINE (for graphs)
      */
