@@ -162,7 +162,7 @@ const PostImpressionsModal: React.FC<PostImpressionsModalProps> = ({
                         new Date(p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                     ),
                     impressions: points.map((p: any) => p.impressions || 0),
-                    engagements: points.map((p: any) => p.uniqueViewers || 0),
+                    engagements: points.map((p: any) => p.engagements || 0),
                 });
             } catch (error) {
                 console.error('Failed to fetch timeline:', error);
@@ -218,7 +218,8 @@ useEffect(() => {
             const results = await Promise.all(
                 top3.map(async (post) => {
                     try {
-                        const res = await AnalyticsService.getPostAnalytics(post.postId, 30);
+                        // const res = await AnalyticsService.getPostAnalytics(post.postId, 30);
+                        const res = await AnalyticsService.getPostAnalytics(post.postId, timeRange);
                         const stats = res?.data || res;
                         return {
                             id: post.postId,
@@ -253,7 +254,7 @@ useEffect(() => {
     };
 
     fetchStats();
-}, [isOpen, userPosts]);
+}, [isOpen, userPosts, timeRange]);
 
     if (!isOpen) return null;
 
@@ -495,7 +496,7 @@ useEffect(() => {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <p className="text-2xl font-bold text-[#4a3728]">
-                                                {analytics?.postImpressions?.total || 0}
+                                            {discoveryLoading ? '...' : (discoveryStats?.totalImpressions ?? 0)}
                                             </p>
                                             {!changeLoading && change?.change && (
                                                 <span
