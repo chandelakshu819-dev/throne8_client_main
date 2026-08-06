@@ -5,8 +5,7 @@ import { Briefcase, Users, Clock, Star, Plus, Video, MessageSquare, Package, Fil
 import ServiceModal from './ServiceModal';
 import EditSessionModal from '@/features/study-group/modals/EditSessionModal';
 import SessionService, { CreateSessionInput } from "@/lib/api/session.service";
-import { validateSessionForm } from '@/features/profile/schemas/session.schema';
-
+import { validateSessionForm } from '@/features/profile/validators/session.schema';
 interface ServicesPageProps {
   mentorData?: any;
   showServiceForm: boolean;

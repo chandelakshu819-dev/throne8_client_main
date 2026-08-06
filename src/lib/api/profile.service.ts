@@ -1963,6 +1963,31 @@ static async getCommentsByUserId(userId: string): Promise<any> {
             throw new Error(error.response?.data?.message || 'Failed to unlike comment');
         }
     }
+    // ✅ 10. REPORT COMMENT
+    static async reportComment(commentId: string, reason?: string): Promise<any> {
+        try {
+            const { data } = await api.post(
+                `${config?.NEXT_PUBLIC_ACTIVITY_ENDPOINT || process.env.NEXT_PUBLIC_ACTIVITY_ENDPOINT}/comments/${commentId}/report`,
+                { reason }
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to report comment');
+        }
+    }
+
+    // ✅ 11. MUTE THREAD (post-level notifications off, derived from a commentId)
+    static async muteThread(commentId: string): Promise<any> {
+        try {
+            const { data } = await api.post(
+                `${config?.NEXT_PUBLIC_ACTIVITY_ENDPOINT || process.env.NEXT_PUBLIC_ACTIVITY_ENDPOINT}/comments/${commentId}/mute-thread`
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to mute thread');
+        }
+    }
 }
+
 
 export default ProfileService;

@@ -21,6 +21,7 @@ import { useProfileData } from '@/features/profile/hooks/useProfileData';
 import { useHeadlineData } from '@/features/profile/hooks/useHeadlineData';
 import { transformToProfileData } from '@/shared/utils/profileTransformers';
 import ProfileNavbar from '@/features/profile/components/home/ProfileNavbar';
+import ConnectionService from '@/lib/api/connection.service';
 
 export default function Home() {
     const { user, isLoading } = useAuth();
@@ -33,6 +34,7 @@ export default function Home() {
     const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
     const [postComments, setPostComments] = useState<Record<string, any[]>>({});
     const [postCommentCounts, setPostCommentCounts] = useState<Record<string, number>>({});
+    const [commentsLoading, setCommentsLoading] = useState<Record<string, boolean>>({});
     const [notifications] = useState(3);
     const [searchQuery, setSearchQuery] = useState('');
     const [postContent, setPostContent] = useState('');
@@ -662,12 +664,14 @@ if (post?.userId && post.userId !== user?.userId) {
         }
     };
 
-    // toggleComments replace karo:
+    // toggleComments — ab instant open hota hai, aur sirf pehli baar fetch karta hai (cache hit pe re-fetch nahi)
     const toggleComments = async (postId: string) => {
         const isOpen = openCommentsIndex === postId;
-        setOpenCommentsIndex(isOpen ? null : postId);
+        setOpenCommentsIndex(isOpen ? null : postId); // ✅ turant toggle, koi wait nahi
 
-        if (!isOpen) {  // har baar open hone pe fetch karo
+        // ✅ Agar already fetch ho chuke hain to dobara API call mat karo — instant show
+        if (!isOpen && !postComments[postId]) {
+            setCommentsLoading(prev => ({ ...prev, [postId]: true }));
             try {
                 const res = await ProfileService.getCommentsByPostId(postId);
                 const rawComments = res.data.comments || [];
@@ -683,6 +687,8 @@ if (post?.userId && post.userId !== user?.userId) {
                 setPostCommentCounts(prev => ({ ...prev, [postId]: enrichedComments.length }));
             } catch (error) {
                 console.error('Failed to fetch comments:', error);
+            } finally {
+                setCommentsLoading(prev => ({ ...prev, [postId]: false }));
             }
         }
     };
@@ -723,13 +729,12 @@ if (post?.userId && post.userId !== user?.userId) {
             } else {
                 const res = await ProfileService.createComment(postId, commentText);
 
-
                 // ✅ NEW: Analytics mein comment engagement record karo
-const post = allPosts.find(p => (p.entryId || p.postId) === postId);
-if (post?.userId && post.userId !== user?.userId) {
-    AnalyticsService.recordEngagement(postId, post.userId, 'comment');
-}
-                const newComment = res.data.comment;
+                const post = allPosts.find(p => (p.entryId || p.postId) === postId);
+                if (post?.userId && post.userId !== user?.userId) {
+                    AnalyticsService.recordEngagement(postId, post.userId, 'comment');
+                }
+
                 const newComment = {
                     ...res.data.comment,
                     user: selfUser,
@@ -765,21 +770,78 @@ if (post?.userId && post.userId !== user?.userId) {
         setOpenCommentMenuIndex(openCommentMenuIndex === commentId ? null : commentId);
     };
 
-    const handleCommentAction = (action: any, commentId: any, commentText: any) => {
-        // // console.log(`Comment action: ${action} on comment ${commentId}`);
+  // ✅ Comment "⋯" menu actions — extra param ka meaning action ke hisaab se badalta hai:
+    //   - edit → current comment text
+    //   - block → target user's userId
+    //   - baaki actions ke liye ignore ho jaata hai
+    const handleCommentAction = async (action: any, commentId: any, extra: any) => {
         if (action === 'edit') {
             setEditingCommentId(commentId);
-            setEditCommentText(commentText);
+            setEditCommentText(extra);
         } else if (action === 'delete') {
-            // // console.log('Deleting comment...');
+            if (!confirm('Delete this comment? This cannot be undone.')) return;
+            try {
+                await ProfileService.deleteComment(commentId);
+
+                // ✅ UI se turant hatao — top-level comments se, aur agar
+                // kisi comment ka reply hai to uski replies[] se bhi
+                setPostComments(prev => {
+                    const updated: Record<string, any[]> = {};
+                    for (const postId in prev) {
+                        const comments = prev[postId] || [];
+                        const wasTopLevel = comments.some((c: any) => c.commentId === commentId);
+
+                        if (wasTopLevel) {
+                            updated[postId] = comments.filter((c: any) => c.commentId !== commentId);
+                            setPostCommentCounts(counts => ({
+                                ...counts,
+                                [postId]: Math.max(0, (counts[postId] || 1) - 1),
+                            }));
+                        } else {
+                            updated[postId] = comments.map((c: any) => ({
+                                ...c,
+                                replies: (c.replies || []).filter((r: any) => (r.commentId || r.id) !== commentId),
+                            }));
+                        }
+                    }
+                    return updated;
+                });
+            } catch (error: any) {
+                alert(error.message || 'Failed to delete comment');
+            }
         } else if (action === 'copy') {
-            // // console.log('Copying comment link...');
+            const url = `${window.location.origin}/post#comment-${commentId}`;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('Link copied to clipboard');
+            }).catch(() => {
+                alert('Could not copy link');
+            });
+        } else if (action === 'block') {
+            const targetUserId = extra;
+            if (!targetUserId) return;
+            if (!confirm('Block this user? They will no longer be able to interact with you.')) return;
+            try {
+                await ConnectionService.blockUser(targetUserId);
+                alert('User blocked successfully');
+            } catch (error: any) {
+                alert(error.message || 'Failed to block user');
+            }
+       } else if (action === 'report') {
+            try {
+                await ProfileService.reportComment(commentId);
+                alert('Comment reported. Our team will review it.');
+            } catch (error: any) {
+                alert(error.message || 'Failed to report comment');
+            }
+        } else if (action === 'mute-notifications' || action === 'mute-thread') {
+            try {
+                await ProfileService.muteThread(commentId);
+                alert('Notifications muted for this conversation.');
+            } catch (error: any) {
+                alert(error.message || 'Failed to mute notifications');
+            }
         } else if (action === 'follow' || action === 'unfollow') {
-            // // console.log(`${action} user`);
-        } else if (action === 'report') {
-            // // console.log('Reporting comment');
-        } else if (action === 'hide') {
-            // // console.log('Hiding this comment');
+            console.log(`${action} user`);
         }
         setOpenCommentMenuIndex(null);
     };
@@ -835,25 +897,6 @@ if (post?.userId && post.userId !== user?.userId) {
             reactions: { '🔥': 8, '👏': 4 }
         }
     ];
-
-    // const userPost = [
-    //     {
-    //         id: 1,
-    //         author: "Sujal Sharma",
-    //         image: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=400",
-    //         likes: 120,
-    //         comments: 18,
-    //         shares: 6,
-    //     },
-    //     {
-    //         id: 2,
-    //         author: "Sujal Sharma",
-    //         image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400",
-    //         likes: 86,
-    //         comments: 11,
-    //         shares: 3,
-    //     },
-    // ];
 
     useEffect(() => {
         const handleClickOutside = (event: any) => {
@@ -920,7 +963,7 @@ if (post?.userId && post.userId !== user?.userId) {
                 {/* Left Sidebar - Hidden on mobile, shown on desktop */}
                 <div className="hidden lg:block sticky-sidebar">
                     <Left
-                        currentUserId={user?.userId!}
+                        currentUserId={user?.userId ?? ''}
                         isSidebarOpen={isSidebarOpen}
                         isDarkMode={isDarkMode}
                     />
@@ -950,6 +993,7 @@ if (post?.userId && post.userId !== user?.userId) {
                         handleLike={handleLike}
                         postComments={postComments}
                         postCommentCounts={postCommentCounts}
+                        commentsLoading={commentsLoading}
                         openMenuIndex={openMenuIndex}
                         openRepostIndex={openRepostIndex}
                         openCommentsIndex={openCommentsIndex}
@@ -1039,7 +1083,7 @@ if (post?.userId && post.userId !== user?.userId) {
                             )}
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h1 className={`text-base sm:text-lg font-bold truncate ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>What's inspiring you today?</h1>
+                            <h1 className={`text-base sm:text-lg font-bold truncate ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>What&apos;s inspiring you today?</h1>
                             <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/70'}`}>Share your thoughts ✨</p>
                         </div>
                     </div>
