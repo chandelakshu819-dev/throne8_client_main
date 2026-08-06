@@ -202,6 +202,60 @@ class ConnectionService {
             throw new Error(error.response?.data?.message || 'Failed to fetch catch up feed');
         }
     }
+
+    /**
+     * 🚫 BLOCK USER
+     * Blocks another user so they can no longer interact with the current user
+     * (e.g. from a comment's "⋯" menu).
+     */
+    static async blockUser(blockedId: string, reason: string = 'other') {
+        try {
+            const { data } = await api.post('/connections/block', { blockedId, reason });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [BLOCK_USER] Failed:', error);
+            throw new Error(error.response?.data?.message || 'Failed to block user');
+        }
+    }
+
+    /**
+     * ✅ UNBLOCK USER
+     */
+    static async unblockUser(blockedId: string) {
+        try {
+            const { data } = await api.delete(`/connections/block/${blockedId}`);
+            return data;
+        } catch (error: any) {
+            console.error('❌ [UNBLOCK_USER] Failed:', error);
+            throw new Error(error.response?.data?.message || 'Failed to unblock user');
+        }
+    }
+
+    /**
+     * 🔍 CHECK IF A USER IS BLOCKED (bidirectional)
+     */
+    static async isUserBlocked(userId: string) {
+        try {
+            const { data } = await api.get(`/connections/block/status/${userId}`);
+            return data;
+        } catch (error: any) {
+            console.error('❌ [IS_USER_BLOCKED] Failed:', error);
+            throw new Error(error.response?.data?.message || 'Failed to check block status');
+        }
+    }
+
+    /**
+     * 📋 GET BLOCKED USERS LIST
+     */
+    static async getBlockedUsers() {
+        try {
+            const { data } = await api.get('/connections/block');
+            return data;
+        } catch (error: any) {
+            console.error('❌ [GET_BLOCKED_USERS] Failed:', error);
+            throw new Error(error.response?.data?.message || 'Failed to fetch blocked users');
+        }
+    }
 }
 
 export default ConnectionService;
