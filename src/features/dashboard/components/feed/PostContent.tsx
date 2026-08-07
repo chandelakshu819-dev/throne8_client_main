@@ -1,6 +1,7 @@
 // app/(dashboard)/components/feed/PostContent.tsx
 import React, { useState } from 'react';
 import { renderFormattedContent, renderFormattedLine } from '@/shared/utils/postContentFormat';
+import AnalyticsService from '@/lib/api/analytics.service';
 
 const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) => {
   const [expanded, setExpanded] = useState(false);
@@ -36,8 +37,11 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
           {expanded ? 'Show less' : 'Read more'}
         </button>
       )}
-      {post.image && (
-        <div className="mb-6 rounded-2xl overflow-hidden bg-transparent w-full h-[300px] flex justify-center">
+     {post.image && (
+        <div
+          onClick={() => AnalyticsService.recordClick(post.userId, 'image', post.image, post.postId)}
+          className="mb-6 rounded-2xl overflow-hidden bg-transparent w-full h-[300px] flex justify-center cursor-pointer"
+        >
           <img
             src={post.image}
             alt="Post content"
@@ -45,8 +49,11 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
           />
         </div>
       )}
-      {post.videos && post.videos.length > 0 && (
-        <div className="mb-6 rounded-2xl overflow-hidden bg-black w-full h-80 flex justify-center">
+     {post.videos && post.videos.length > 0 && (
+        <div
+          onClick={() => AnalyticsService.recordClick(post.userId, 'video', post.videos[0].cloudinarySecureUrl, post.postId)}
+          className="mb-6 rounded-2xl overflow-hidden bg-black w-full h-80 flex justify-center"
+        >
           <video
             src={post.videos[0].cloudinarySecureUrl}
             controls
@@ -76,6 +83,7 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
             href={post.documents[0].cloudinarySecureUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => AnalyticsService.recordClick(post.userId, 'document_download', post.documents[0].cloudinarySecureUrl, post.postId)}
             className="px-4 py-2 bg-[#4a3728] text-[#f6ede8] text-xs font-bold rounded-xl hover:opacity-90 transition-opacity flex-shrink-0"
           >
             Download
