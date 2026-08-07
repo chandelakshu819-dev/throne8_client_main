@@ -1,10 +1,60 @@
 // app/(dashboard)/components/feed/RepostMenuDropdown.tsx
-import React from 'react';
+'use client';
 
-const RepostMenuDropdown = ({ isDarkMode, index, post, onOpenWithPerspectiveModal, onRepostInstant }: any) => {
-  return (
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+
+const RepostMenuDropdown = ({
+  isDarkMode,
+  index,
+  post,
+  onOpenWithPerspectiveModal,
+  onRepostInstant,
+  anchorRef, // optional: pass the trigger button's ref for perfect positioning
+}: any) => {
+  const [mounted, setMounted] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number; openUp: boolean } | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const computePosition = () => {
+      const anchorEl =
+        anchorRef?.current ||
+        document.querySelector(`[data-repost-trigger="${index}"]`);
+      if (!anchorEl) return;
+
+      const rect = (anchorEl as HTMLElement).getBoundingClientRect();
+      const dropdownHeight = 180; // approx height of the menu
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUp = spaceBelow < dropdownHeight;
+
+      setCoords({
+        top: openUp ? rect.top - dropdownHeight - 8 : rect.bottom + 8,
+        left: Math.max(8, rect.right - 288), // 288 = w-72
+        openUp,
+      });
+    };
+
+    computePosition();
+    window.addEventListener('resize', computePosition);
+    window.addEventListener('scroll', computePosition, true);
+    return () => {
+      window.removeEventListener('resize', computePosition);
+      window.removeEventListener('scroll', computePosition, true);
+    };
+  }, [anchorRef, index]);
+
+  if (!mounted || !coords) return null;
+
+  const menu = (
     <div
-      className={`absolute right-0 bottom-full mb-2 w-72 rounded-2xl shadow-2xl border z-50 overflow-hidden ${
+      ref={dropdownRef}
+      style={{ position: 'fixed', top: coords.top, left: coords.left }}
+      className={`w-72 rounded-2xl shadow-2xl border z-[9999] overflow-hidden ${
         isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-[#4a3728]/20'
       }`}
     >
@@ -35,6 +85,8 @@ const RepostMenuDropdown = ({ isDarkMode, index, post, onOpenWithPerspectiveModa
       </button>
     </div>
   );
+
+  return createPortal(menu, document.body);
 };
 
 export default RepostMenuDropdown;

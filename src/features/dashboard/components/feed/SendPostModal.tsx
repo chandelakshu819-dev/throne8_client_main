@@ -160,8 +160,8 @@ const SendPostModal: React.FC<SendPostModalProps> = ({
   const borderColor = isDarkMode ? 'border-slate-700' : 'border-[#e0d8cf]';
   const hoverRow = isDarkMode ? 'hover:bg-slate-700/60' : 'hover:bg-[#f6ede8]';
 
-  return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+ return createPortal(
+    <div className="fixed inset-0 z-[110] flex items-center justify-center px-4">
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"

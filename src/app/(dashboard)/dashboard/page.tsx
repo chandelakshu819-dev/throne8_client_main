@@ -664,35 +664,40 @@ if (post?.userId && post.userId !== user?.userId) {
         }
     };
 
-    // toggleComments — ab instant open hota hai, aur sirf pehli baar fetch karta hai (cache hit pe re-fetch nahi)
-    const toggleComments = async (postId: string) => {
-        const isOpen = openCommentsIndex === postId;
-        setOpenCommentsIndex(isOpen ? null : postId); // ✅ turant toggle, koi wait nahi
+ // ✅ NEW: sirf fetch karta hai (open/close nahi) — modal aur inline section
+    // dono isko reuse kar sakte hain bina ek dusre ki UI state chhede
+    const fetchCommentsForPost = async (postId: string) => {
+        // Already fetched (ya fetch ho rahe) hain to dobara call mat karo
+        if (postComments[postId] || commentsLoading[postId]) return;
 
-        // ✅ Agar already fetch ho chuke hain to dobara API call mat karo — instant show
-        if (!isOpen && !postComments[postId]) {
-            setCommentsLoading(prev => ({ ...prev, [postId]: true }));
-            try {
-                const res = await ProfileService.getCommentsByPostId(postId);
-                const rawComments = res.data.comments || [];
+        setCommentsLoading(prev => ({ ...prev, [postId]: true }));
+        try {
+            const res = await ProfileService.getCommentsByPostId(postId);
+            const rawComments = res.data.comments || [];
 
-                // ✅ post-owner ka userId nikalo taaki isAuthor badge sahi lage
-                const postOwnerId = allPosts.find(
-                    (p) => (p.entryId || p.postId) === postId
-                )?.userId;
+            const postOwnerId = allPosts.find(
+                (p) => (p.entryId || p.postId) === postId
+            )?.userId;
 
-                const enrichedComments = await enrichCommentsWithUserData(rawComments, postOwnerId);
+            const enrichedComments = await enrichCommentsWithUserData(rawComments, postOwnerId);
 
-                setPostComments(prev => ({ ...prev, [postId]: enrichedComments }));
-                setPostCommentCounts(prev => ({ ...prev, [postId]: enrichedComments.length }));
-            } catch (error) {
-                console.error('Failed to fetch comments:', error);
-            } finally {
-                setCommentsLoading(prev => ({ ...prev, [postId]: false }));
-            }
+            setPostComments(prev => ({ ...prev, [postId]: enrichedComments }));
+            setPostCommentCounts(prev => ({ ...prev, [postId]: enrichedComments.length }));
+        } catch (error) {
+            console.error('Failed to fetch comments:', error);
+        } finally {
+            setCommentsLoading(prev => ({ ...prev, [postId]: false }));
         }
     };
 
+    // toggleComments — ab instant open hota hai; fetching fetchCommentsForPost ko delegate karta hai
+    const toggleComments = (postId: string) => {
+        const isOpen = openCommentsIndex === postId;
+        setOpenCommentsIndex(isOpen ? null : postId); // ✅ turant toggle, koi wait nahi
+        if (!isOpen) {
+            fetchCommentsForPost(postId);
+        }
+    };
     // handleCommentSubmit replace karo:
     const handleCommentSubmit = async (postId: string) => {
         if (!commentText.trim()) return;

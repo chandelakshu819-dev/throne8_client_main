@@ -1,4 +1,4 @@
-// src/profile/components/PostCard.tsx
+// src/features/profile/components/PostCard.tsx
 'use client';
 import React from 'react';
 import { Post, PostLikeState } from '../../types';

@@ -42,6 +42,7 @@ const PostDetailModal = ({
   profileImage,
   postComments,
   postCommentCounts,
+  fetchCommentsForPost,
 }: {
   post: any;
   index: any;
@@ -78,10 +79,19 @@ const PostDetailModal = ({
   profileImage: any;
   postComments: any;
   postCommentCounts: any;
+  fetchCommentsForPost?: (postId: string) => void;
 }) => {
   const postKey = post.entryId || post.postId;
   const mediaUrl = post.image || post.mediaUrl || post.postImage || null;
   const hasMedia = !!mediaUrl;
+
+  // Modal khulte hi comments fetch karo agar already load nahi hue
+  React.useEffect(() => {
+    if (fetchCommentsForPost && !postComments?.[postKey]) {
+      fetchCommentsForPost(postKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postKey]);
 
   // Close on ESC key
   React.useEffect(() => {
@@ -119,7 +129,7 @@ const PostDetailModal = ({
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-20 w-9 h-9 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+          className="absolute top-3 right-3 z-30 w-9 h-9 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
           aria-label="Close"
         >
           ✕
@@ -136,38 +146,46 @@ const PostDetailModal = ({
           </div>
         )}
 
-        {/* Right: header + content + actions + comments */}
+        {/* Right: single continuous scroll pane — header, content, actions, comments sab ek saath scroll hote hain (LinkedIn style) */}
         <div
-          className={`flex flex-col ${hasMedia ? 'w-full md:w-[420px]' : 'w-full'} h-full overflow-y-auto p-4`}
+          className={`flex flex-col ${hasMedia ? 'w-full md:w-[420px]' : 'w-full'} h-full min-h-0`}
         >
-          <PostHeader
-            currentUserId={currentUserId}
-            post={post}
-            index={index}
-            isDarkMode={isDarkMode}
-            openMenuIndex={openMenuIndex}
-            togglePostMenu={togglePostMenu}
-            handlePostAction={handlePostAction}
-          />
+          {/* ✅ Sticky author header — LinkedIn jaisa, scroll karte waqt bhi upar dikhta rehta hai */}
+          <div
+            className={`sticky top-0 z-20 px-4 pt-4 pb-2 ${
+              isDarkMode ? 'bg-slate-800' : 'bg-[#f6ede8]'
+            }`}
+          >
+            <PostHeader
+              currentUserId={currentUserId}
+              post={post}
+              index={index}
+              isDarkMode={isDarkMode}
+              openMenuIndex={openMenuIndex}
+              togglePostMenu={togglePostMenu}
+              handlePostAction={handlePostAction}
+            />
+          </div>
 
-          <PostContent post={post} isDarkMode={isDarkMode} />
+          {/* ✅ Everything below scrolls together in ONE pane — no nested scroll containers */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4">
+            <PostContent post={post} isDarkMode={isDarkMode} />
 
-          <PostActions
-            post={post}
-            index={index}
-            isDarkMode={isDarkMode}
-            likedPosts={likedPosts}
-            handleLike={handleLike}
-            openRepostIndex={openRepostIndex}
-            toggleRepostMenu={toggleRepostMenu}
-            handleRepost={handleRepost}
-            toggleComments={() => {}}
-            onOpenWithPerspectiveModal={onOpenWithPerspectiveModal}
-            handleRepostInstant={handleRepostInstant}
-            currentUserId={currentUserId}
-          />
+            <PostActions
+              post={post}
+              index={index}
+              isDarkMode={isDarkMode}
+              likedPosts={likedPosts}
+              handleLike={handleLike}
+              openRepostIndex={openRepostIndex}
+              toggleRepostMenu={toggleRepostMenu}
+              handleRepost={handleRepost}
+              toggleComments={() => {}}
+              onOpenWithPerspectiveModal={onOpenWithPerspectiveModal}
+              handleRepostInstant={handleRepostInstant}
+              currentUserId={currentUserId}
+            />
 
-          <div className="flex-1 overflow-y-auto mt-2">
             <CommentsSection
               isDarkMode={isDarkMode}
               commentText={commentText}

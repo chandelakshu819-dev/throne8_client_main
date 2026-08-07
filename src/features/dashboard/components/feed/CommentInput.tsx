@@ -1,7 +1,4 @@
-// This same file replaces BOTH:
-//   app/(dashboard)/components/feed/CommentInput.tsx
-//   app/features/profile/components/feed/CommentInput.tsx
-// (the two copies were identical before this change)
+//   src/features/dashboard/components/feed/CommentInput.tsx
 
 import React, { useRef } from 'react';
 import EmojiPicker from './EmojiPicker';
