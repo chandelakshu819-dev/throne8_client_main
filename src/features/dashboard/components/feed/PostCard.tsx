@@ -7,6 +7,7 @@ import PostActions from './PostActions';
 import CommentsSection from './CommentsSection';
 import PostDetailModal from './PostDetailModal';
 import { usePostImpressionTracking } from '@/features/public/hooks/analytics/usePostImpressionTracking';
+import AnalyticsService from '@/lib/api/analytics.service';
 
 const PostCard = ({
   fullName, headline,postLikes,openMenuId, setOpenMenuId, onLikeToggle, onPinPost,onSavePost, onDeletePost, onArchivePost, onOpenUpdateModal, onToggleComments, commentsByPost, isLoadingComments, isSubmittingComment, commentLikes, formatCommentTime, isDeletingCommentId, setIsDeletingCommentId, replyingToCommentId, setReplyingToCommentId, currentUserId, post, index, isDarkMode, likedPosts, handleLike, openMenuIndex, openRepostIndex, openCommentsIndex, commentText, setCommentText, replyingTo, openCommentMenuIndex, editingCommentId, editCommentText, setEditCommentText, showEmojiPicker, setShowEmojiPicker, handlePostAction, handleRepost, toggleComments, handleCommentSubmit, handleReply, handleCommentReaction, toggleCommentMenu, handleCommentAction, handleEditSubmit, handleEmojiClick, postComments, emojiList, togglePostMenu, toggleRepostMenu, postCommentCounts, profileImage, onOpenWithPerspectiveModal, handleRepostInstant, replyText, setReplyText, handleReplySubmit, likeCommentToggle, commentLikeStatus, setReplyingTo, commentsLoading,
@@ -271,7 +272,13 @@ const PostCard = ({
         />
 
         {/* Click on post body opens the LinkedIn-style expanded modal */}
-        <div onClick={() => setIsDetailOpen(true)} className="cursor-pointer">
+        <div
+          onClick={() => {
+            setIsDetailOpen(true);
+            AnalyticsService.recordClick(post.userId, 'post_link', undefined, post.postId);
+          }}
+          className="cursor-pointer"
+        >
           <PostContent post={post} isDarkMode={isDarkMode} />
         </div>
 
