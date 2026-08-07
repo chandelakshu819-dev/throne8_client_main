@@ -295,6 +295,24 @@ static async getSearchAppearancesChange(days: number = 30): Promise<any> {
         }
     }
 
+
+
+    /**
+ * 🔦 Get Search Appearances with Highlighted Terms (live searcher name lookup)
+ * GET /profile/analytics/search-appearances/highlighted
+ */
+static async getSearchAppearancesWithHighlights(page: number = 1, limit: number = 50): Promise<any> {
+    try {
+        const { data } = await api.get('/profile/analytics/search-appearances/highlighted', {
+            params: { page, limit }
+        });
+        return data;
+    } catch (error: any) {
+        console.error('❌ [ANALYTICS] Failed to fetch search appearances with highlights:', error);
+        throw error;
+    }
+}
+
     /**
      */
    /**
