@@ -1,4 +1,4 @@
-// src/lib/socket/socket.client.ts
+// src/core/realtime/socket.client.ts
 import { io, Socket } from 'socket.io-client';
 import TokenStorage from '@/lib/store/token.storage';
 

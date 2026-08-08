@@ -25,20 +25,20 @@ class RepostService {
             return data;
         } catch (error: any) {
             console.error('❌ Repost creation failed:', error);
-            // Axios error ka actual message yahan hota hai:
             const message = error?.response?.data?.message || error?.message || 'Failed to create repost';
             throw new Error(message);
         }
     }
 
     /**
-     * DELETE /posts/reposts/:repostId
+     * DELETE /reposts/:repostId
      * Repost delete karo
+     * ✅ FIX: extra "posts/" segment hataya — backend route sirf /reposts/:repostId hai
      */
     static async deleteRepost(repostId: string) {
         try {
             const { data } = await api.delete(
-                `/profile/activity/posts/reposts/${repostId}`
+                `/profile/activity/reposts/${repostId}`
             );
             console.log('✅ Repost deleted successfully:', data);
             return data;
@@ -49,13 +49,14 @@ class RepostService {
     }
 
     /**
-     * GET /posts/reposts/my-reposts
+     * GET /reposts/my-reposts
      * Apne saare reposts laao
+     * ✅ FIX: extra "posts/" segment hataya — backend route sirf /reposts/my-reposts hai
      */
     static async getMyReposts() {
         try {
             const { data } = await api.get(
-                `/profile/activity/posts/reposts/my-reposts`
+                `/profile/activity/reposts/my-reposts`
             );
             console.log('✅ My reposts fetched successfully:', data);
             return data;
