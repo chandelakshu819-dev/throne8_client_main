@@ -256,6 +256,23 @@ class ConnectionService {
             throw new Error(error.response?.data?.message || 'Failed to fetch blocked users');
         }
     }
+
+
+    /**
+     * 🤝 GET MUTUAL CONNECTIONS BETWEEN TWO USERS
+     */
+    static async getMutualConnections(userId1: string, userId2: string, limit: number = 3) {
+        try {
+            const { data } = await api.get(`/connections/mutual/${userId1}/${userId2}`, {
+                params: { limit }
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [GET_MUTUAL_CONNECTIONS] Failed:', error);
+            // safe fallback — kabhi bhi UI ko block nahi karna
+            return { data: { mutuals: [], count: 0 } };
+        }
+    }
 }
 
 export default ConnectionService;

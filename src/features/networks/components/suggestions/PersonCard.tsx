@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Person } from '@/features/networks/types';
 
 interface PersonCardProps {
-    person: Person;
+    person: Person; 
     isConnected: boolean;
     onConnect: (userId: string) => void;
     isLoading?: boolean;
@@ -70,16 +70,18 @@ export const PersonCard: React.FC<PersonCardProps> = ({
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-1 mb-4">
-                        <div className="flex -space-x-1">
-                            <div className="w-4 h-4 bg-[#f6ede8] rounded-full border border-white"></div>
-                            <div className="w-4 h-4 bg-[#e0d8cf] rounded-full border border-white"></div>
-                            <div className="w-4 h-4 bg-[#f6ede8] rounded-full border border-white"></div>
+                    {person.mutuals && (
+                        <div className="flex items-center gap-1 mb-4">
+                            <div className="flex -space-x-1">
+                                <div className="w-4 h-4 bg-[#f6ede8] rounded-full border border-white"></div>
+                                <div className="w-4 h-4 bg-[#e0d8cf] rounded-full border border-white"></div>
+                                <div className="w-4 h-4 bg-[#f6ede8] rounded-full border border-white"></div>
+                            </div>
+                            <span className="text-xs opacity-50 font-medium ml-1 line-clamp-1" style={{ color: '#4a3728' }}>
+                                {person.mutuals}
+                            </span>
                         </div>
-                        <span className="text-xs opacity-50 font-medium ml-1" style={{ color: '#4a3728' }}>
-                            {person.mutuals}
-                        </span>
-                    </div>
+                    )}
 
                     <button
                         onClick={() => onConnect(person.id)}

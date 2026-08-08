@@ -13,7 +13,6 @@ export const useNetworkUsers = () => {
             setIsLoadingUsers(true);
             setCurrentUserId(userId);
 
-            // ✅ STEP 1: Fetch user's connections in parallel with users
             const [usersResponse, connectionsResponse] = await Promise.all([
                 AuthService.getAllUsers({ limit: 100 }),
                 ConnectionService.getUserConnections(userId).catch(() => ({ data: { data: [] } }))
@@ -22,21 +21,16 @@ export const useNetworkUsers = () => {
             const users = usersResponse.data.users;
             const connections = connectionsResponse.data.data || [];
 
-            // ✅ STEP 2: Create Set of connected user IDs for fast lookup
             const connectedUserIds = new Set<string>();
             connections.forEach((conn: any) => {
                 if (conn.fromUserId !== userId) connectedUserIds.add(conn.fromUserId);
                 if (conn.toUserId !== userId) connectedUserIds.add(conn.toUserId);
             });
 
-            // ✅ STEP 3: Filter out current user and connected users
             const userIds = users
                 .map((user: any) => user.userId)
                 .filter((id: string) => id !== userId && !connectedUserIds.has(id));
 
-            // ✅ STEP 4: Fetch detailed profile data — SINGLE BULK CALL
-            // (pehle yahan har user ke liye alag getUserProfileById call hota tha,
-            // jisse 429 aata tha. Ab ek hi request mein sab fetch hote hain.)
             let usersData: any[] = [];
             if (userIds.length > 0) {
                 try {
@@ -48,12 +42,10 @@ export const useNetworkUsers = () => {
                 }
             }
 
-            // ✅ STEP 5: Extract profile photo IDs
             const profilePhotoIds = usersData
                 .map((user: any) => user.profilePhotoId)
                 .filter(Boolean);
 
-            // ✅ STEP 6: Fetch all profile photos (already bulk — no change)
             let profilePhotosMap: Record<string, string> = {};
             if (profilePhotoIds.length > 0) {
                 try {
@@ -67,13 +59,10 @@ export const useNetworkUsers = () => {
                 }
             }
 
-            // ✅ STEP 7: Extract headline IDs
             const headlineIds = usersData
                 .map((user: any) => user.headlineId)
                 .filter(Boolean);
 
-            // ✅ STEP 8: Fetch all headlines — SINGLE BULK CALL
-            // (pehle yahan har headline ke liye alag getHeadlineById call hota tha)
             let headlinesMap: Record<string, string> = {};
             if (headlineIds.length > 0) {
                 try {
@@ -88,8 +77,45 @@ export const useNetworkUsers = () => {
                 }
             }
 
-            // ✅ STEP 9: Transform data for UI
-            const transformedUsers = usersData.map((user: any) => {
+            // ✅ NEW STEP: Fetch mutual connections for each suggested user in parallel
+            const mutualsResults = await Promise.all(
+                usersData.map((user: any) =>
+                    ConnectionService.getMutualConnections(userId, user.userId, 3)
+                        .then((res: any) => res?.data || { mutuals: [], count: 0 })
+                        .catch(() => ({ mutuals: [], count: 0 }))
+                )
+            );
+
+            // ✅ Collect the actual "mutual person" IDs (not connection record IDs)
+            // Har mutual record me fromUserId/toUserId hai — jo current suggested user nahi hai wahi mutual person hai
+            const mutualPersonIdsSet = new Set<string>();
+            usersData.forEach((suggestedUser: any, index: number) => {
+                const rawMutuals = mutualsResults[index]?.mutuals || [];
+                rawMutuals.forEach((m: any) => {
+                    const mutualPersonId = m.fromUserId === userId ? m.toUserId : m.fromUserId;
+                    if (mutualPersonId && mutualPersonId !== userId && mutualPersonId !== suggestedUser.userId) {
+                        mutualPersonIdsSet.add(mutualPersonId);
+                    }
+                });
+            });
+
+            // ✅ Bulk fetch mutual persons' basic info (name) for display
+            let mutualPersonsMap: Record<string, { name: string }> = {};
+            const mutualPersonIds = Array.from(mutualPersonIdsSet);
+            if (mutualPersonIds.length > 0) {
+                try {
+                    const mutualUsersResponse = await AuthService.getUsersBulk(mutualPersonIds);
+                    const mutualUsersData = mutualUsersResponse.data?.users || [];
+                    mutualPersonsMap = mutualUsersData.reduce((acc: Record<string, { name: string }>, u: any) => {
+                        acc[u.userId] = { name: `${u.firstName} ${u.lastName}`.trim() };
+                        return acc;
+                    }, {});
+                } catch (error) {
+                    console.warn('⚠️ Failed to fetch mutual persons info:', error);
+                }
+            }
+
+            const transformedUsers = usersData.map((user: any, index: number) => {
                 const profileImageUrl = user.profilePhotoId
                     ? profilePhotosMap[user.profilePhotoId] || null
                     : null;
@@ -98,11 +124,29 @@ export const useNetworkUsers = () => {
                     ? headlinesMap[user.headlineId] || null
                     : null;
 
+                // ✅ Build LinkedIn-style mutual connections text
+                const rawMutuals = mutualsResults[index]?.mutuals || [];
+                const mutualCount = mutualsResults[index]?.count || rawMutuals.length || 0;
+
+                let mutualsText = '';
+                if (mutualCount > 0) {
+                    const firstMutualId = rawMutuals[0]
+                        ? (rawMutuals[0].fromUserId === userId ? rawMutuals[0].toUserId : rawMutuals[0].fromUserId)
+                        : null;
+                    const firstMutualName = firstMutualId && mutualPersonsMap[firstMutualId]
+                        ? mutualPersonsMap[firstMutualId].name
+                        : 'Someone';
+
+                    mutualsText = mutualCount === 1
+                        ? `${firstMutualName} is a mutual connection`
+                        : `${firstMutualName} and ${mutualCount - 1} other mutual connection${mutualCount - 1 > 1 ? 's' : ''}`;
+                }
+
                 return {
                     id: user.userId,
                     name: `${user.firstName} ${user.lastName}`.trim(),
                     title: headlineText || '',
-                    mutuals: 'Connect to see mutual connections',
+                    mutuals: mutualsText,
                     image: profileImageUrl || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s',
                     location: user.location || '',
                 };
