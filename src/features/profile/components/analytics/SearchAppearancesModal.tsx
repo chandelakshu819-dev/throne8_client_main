@@ -62,8 +62,7 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
             setIsLoadingHistory(true);
 
             const [response, changeResponse] = await Promise.all([
-                AnalyticsService.getSearchAppearancesWithHighlights(1, 50),   // ✅ ye method call karo
-
+                AnalyticsService.getSearchAppearancesWithHighlights(1, 50),   // ← ye line change
                 AnalyticsService.getSearchAppearancesChange(timeRange)
             ]);
 
