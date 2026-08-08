@@ -1,4 +1,4 @@
-// src/lib/socket/useSocket.tsx
+// src/core/realtime/useSocket.tsx
 'use client';
 
 import { useEffect, useState } from 'react';

@@ -15,26 +15,15 @@ class AnalyticsService {
         position?: number
     ): Promise<any> {
         try {
-            // console.log('🔍 [ANALYTICS] Recording search appearance:', {
-            //     searchedUserId,
-            //     searchQuery,
-            //     wasClicked,
-            //     position
-            // });
-
-            // const { data } = await api.post('/api/v1/profile/analytics/record-search', {
-                const { data } = await api.post('/profile/analytics/record-search', {
+            const { data } = await api.post('/profile/analytics/record-search', {
                 searchedUserId,
                 searchQuery,
                 wasClicked,
                 position
             });
-
-            // console.log('✅ [ANALYTICS] Search appearance recorded');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to record search appearance:', error);
-            // Don't throw - this is non-critical tracking
             return null;
         }
     }
@@ -51,37 +40,22 @@ class AnalyticsService {
         }
     ): Promise<any> {
         try {
-            // console.log('👁️ [ANALYTICS] Recording profile view:', {
-            //     profileOwnerId,
-            //     viewerData
-            // });
-
-            // const { data } = await api.post('/api/v1/profile/analytics/record-profile-view', {
-                const { data } = await api.post('/profile/analytics/record-profile-view', {
+            const { data } = await api.post('/profile/analytics/record-profile-view', {
                 profileOwnerId,
                 ...viewerData
             });
-
-            // console.log('✅ [ANALYTICS] Profile view recorded');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to record profile view:', error);
-            // Don't throw - this is non-critical tracking
             return null;
         }
     }
 
     // ==================== EXISTING GET METHODS ====================
 
-    /**
-     * 1️⃣ Toggle Analytics Privacy
-     * PUT /profile/analytics/privacy
-     */
     static async togglePrivacy(isPrivate: boolean): Promise<any> {
         try {
-            // console.log('🔐 [ANALYTICS] Toggling privacy:', isPrivate);
             const { data } = await api.put('/profile/analytics/privacy', { isPrivate });
-            // console.log('✅ [ANALYTICS] Privacy toggled successfully');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Toggle privacy failed:', error);
@@ -89,22 +63,11 @@ class AnalyticsService {
         }
     }
 
-    /**
-     * 2️⃣ Get Profile Views Count
-     * GET /profile/analytics/profile-views/count
-     */
     static async getProfileViewsCount(dateRange: number = 90): Promise<any> {
         try {
-            // console.log('👀 [ANALYTICS] Fetching profile views count...');
-            // const { data } = await api.get('/api/v1/profile/analytics/profile-views/count', {
-            //     params: { dateRange }/
-
             const { data } = await api.get('/profile/analytics/profile-views/count', {
                 params: { dateRange }
             });
-
-
-            // console.log('✅ [ANALYTICS] Profile views fetched:', data);
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to fetch profile views:', error);
@@ -112,21 +75,15 @@ class AnalyticsService {
         }
     }
 
-    /**
-     * 3️⃣ Get Profile Views Detail (Who Viewed)
-     * GET /profile/analytics/profile-views/detail
-     */
     static async getProfileViewsDetail(
         isPremium: boolean = false,
         page: number = 1,
         limit: number = 10
     ): Promise<any> {
         try {
-            // console.log('👥 [ANALYTICS] Fetching profile views detail...');
             const { data } = await api.get('/profile/analytics/profile-views/detail', {
                 params: { isPremium, page, limit }
             });
-            // console.log('✅ [ANALYTICS] Profile views detail fetched');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to fetch profile views detail:', error);
@@ -134,12 +91,7 @@ class AnalyticsService {
         }
     }
 
-
-     /**
-     * 📈 Get Profile Views Trend (graph data — day/week/month wise breakdown)
-     * GET /profile/analytics/profile-views/trend
-     */
-     static async getProfileViewsTrend(days: number = 30, groupBy: 'day' | 'week' | 'month' = 'day'): Promise<any> {
+    static async getProfileViewsTrend(days: number = 30, groupBy: 'day' | 'week' | 'month' = 'day'): Promise<any> {
         try {
             const { data } = await api.get('/profile/analytics/profile-views/trend', {
                 params: { days, groupBy }
@@ -151,69 +103,47 @@ class AnalyticsService {
         }
     }
 
-    /**
- * 📈 Get Profile Views % Change
- * GET /profile/analytics/profile-views/change
- */
-static async getProfileViewsChange(days: number = 30): Promise<any> {
-    try {
-        const { data } = await api.get('/profile/analytics/profile-views/change', {
-            params: { days }
-        });
-        return data;
-    } catch (error: any) {
-        console.error('❌ [ANALYTICS] Failed to fetch profile views change:', error);
-        throw error;
+    static async getProfileViewsChange(days: number = 30): Promise<any> {
+        try {
+            const { data } = await api.get('/profile/analytics/profile-views/change', {
+                params: { days }
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [ANALYTICS] Failed to fetch profile views change:', error);
+            throw error;
+        }
     }
-}
 
-
-/**
-     * 📈 Get Post Impressions % Change
-     * GET /profile/analytics/post-impressions/change
-     */
-static async getPostImpressionsChange(days: number = 30): Promise<any> {
-    try {
-        const { data } = await api.get('/profile/analytics/post-impressions/change', {
-            params: { days }
-        });
-        return data;
-    } catch (error: any) {
-        console.error('❌ [ANALYTICS] Failed to fetch post impressions change:', error);
-        throw error;
+    static async getPostImpressionsChange(days: number = 30): Promise<any> {
+        try {
+            const { data } = await api.get('/profile/analytics/post-impressions/change', {
+                params: { days }
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [ANALYTICS] Failed to fetch post impressions change:', error);
+            throw error;
+        }
     }
-}
 
-/**
- * 📈 Get Search Appearances % Change
- * GET /profile/analytics/search-appearances/change
- */
-static async getSearchAppearancesChange(days: number = 30): Promise<any> {
-    try {
-        const { data } = await api.get('/profile/analytics/search-appearances/change', {
-            params: { days }
-        });
-        return data;
-    } catch (error: any) {
-        console.error('❌ [ANALYTICS] Failed to fetch search appearances change:', error);
-        throw error;
+    static async getSearchAppearancesChange(days: number = 30): Promise<any> {
+        try {
+            const { data } = await api.get('/profile/analytics/search-appearances/change', {
+                params: { days }
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [ANALYTICS] Failed to fetch search appearances change:', error);
+            throw error;
+        }
     }
-}
-    /**
-     * 4️⃣ Get Post Impressions Count
-     * GET /profile/analytics/post-impressions/count
-     */
+
     static async getPostImpressionsCount(limit: number = 20): Promise<any> {
         try {
-            // console.log('📊 [ANALYTICS] Fetching post impressions count...');
-            // const { data } = await api.get('/api/v1/profile/analytics/post-impressions/count', {
-            //     params: { limit }
-
             const { data } = await api.get('/profile/analytics/post-impressions/count', {
                 params: { limit }
-            
             });
-            // console.log('✅ [ANALYTICS] Post impressions count fetched');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to fetch post impressions:', error);
@@ -221,18 +151,11 @@ static async getSearchAppearancesChange(days: number = 30): Promise<any> {
         }
     }
 
-    /**
-     * 5️⃣ Get Post Impressions Detail
-     * GET /profile/analytics/post-impressions/detail
-     */
     static async getPostImpressionsDetail(page: number = 1, limit: number = 50): Promise<any> {
         try {
-            // console.log('📈 [ANALYTICS] Fetching post impressions detail...');
             const { data } = await api.get('/profile/analytics/post-impressions/detail', {
                 params: { page, limit }
             });
-            // console.log('✅ [ANALYTICS] Post impressions detail fetched
-            // ');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to fetch post impressions detail:', error);
@@ -240,17 +163,11 @@ static async getSearchAppearancesChange(days: number = 30): Promise<any> {
         }
     }
 
-    /**
-     * 6️⃣ Get Post Impressions by Timeframe
-     * GET /profile/analytics/post-impressions/timeframe
-     */
     static async getPostImpressionsByTimeframe(days: number = 7): Promise<any> {
         try {
-            // console.log('📅 [ANALYTICS] Fetching post impressions timeframe...');
             const { data } = await api.get('/profile/analytics/post-impressions/timeframe', {
                 params: { days }
             });
-            // console.log('✅ [ANALYTICS] Post impressions timeframe fetched');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to fetch post impressions timeframe:', error);
@@ -258,18 +175,9 @@ static async getSearchAppearancesChange(days: number = 30): Promise<any> {
         }
     }
 
-    /**
-     * 7️⃣ Get Search Appearances Count
-     * GET /profile/analytics/search-appearances/count
-     */
     static async getSearchAppearancesCount(): Promise<any> {
         try {
-            // console.log('🔍 [ANALYTICS] Fetching search appearances count...');
-            // const { data } = await api.get('/api/v1/profile/analytics/search-appearances/count');
-
             const { data } = await api.get('/profile/analytics/search-appearances/count');
-
-            // console.log('✅ [ANALYTICS] Search appearances count fetched');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to fetch search appearances:', error);
@@ -277,17 +185,11 @@ static async getSearchAppearancesChange(days: number = 30): Promise<any> {
         }
     }
 
-    /**
-     * 8️⃣ Get Search Appearances Detail
-     * GET /profile/analytics/search-appearances/detail
-     */
     static async getSearchAppearancesDetail(page: number = 1, limit: number = 50): Promise<any> {
         try {
-            // console.log('🔎 [ANALYTICS] Fetching search appearances detail...');
             const { data } = await api.get('/profile/analytics/search-appearances/detail', {
                 params: { page, limit }
             });
-            // console.log('✅ [ANALYTICS] Search appearances detail fetched');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to fetch search appearances detail:', error);
@@ -295,54 +197,31 @@ static async getSearchAppearancesChange(days: number = 30): Promise<any> {
         }
     }
 
-    /**
-     */
-   /**
-     * 9️⃣ Get All Analytics Summary
-     * GET /profile/analytics/all
-     * @param dateRange - days ka range (default 30)
-     * @param useCache - abhi backend cache support nahi karta, isliye ye param
-     *                    sirf frontend compatibility ke liye rakha hai (ignore hota hai)
-     */
-   static async getAllAnalytics(dateRange: number = 30, useCache: boolean = true): Promise<any> {
-    try {
-        // console.log('📊 [ANALYTICS] Fetching all analytics summary...');
-        const { data } = await api.get('/profile/analytics/all', {
-            params: { dateRange }
-        });
-        // console.log('✅ [ANALYTICS] All analytics fetched:', data);
-        return data;
-    } catch (error: any) {
-        console.error('❌ [ANALYTICS] Failed to fetch all analytics:', error);
-        throw error;
+    static async getAllAnalytics(dateRange: number = 30, useCache: boolean = true): Promise<any> {
+        try {
+            const { data } = await api.get('/profile/analytics/all', {
+                params: { dateRange }
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [ANALYTICS] Failed to fetch all analytics:', error);
+            throw error;
+        }
     }
-}
 
-/**
- * 🧹 Clear Analytics Cache
- * Backend abhi caching support nahi karta, isliye ye ek no-op method hai —
- * sirf isliye add kiya taaki useAnalytics.ts hook crash na kare jab
- * clearCache() call ho. Future mein agar backend caching add ho,
- * yahan real cache-clear logic daal sakte hain.
- */
-static clearAnalyticsCache(): void {
-    // console.log('🧹 [ANALYTICS] Cache clear requested (no-op, backend has no cache yet)');
-}
-    /**
-     * 🔟 Get Who Viewed Profile (Same as #3)
-     * GET /profile/analytics/who-viewed
-     */
+    static clearAnalyticsCache(): void {
+        // no-op, backend has no cache yet
+    }
+
     static async getWhoViewedProfile(
         isPremium: boolean = false,
         page: number = 1,
         limit: number = 20
     ): Promise<any> {
         try {
-            // console.log('👁️ [ANALYTICS] Fetching who viewed profile...');
             const { data } = await api.get('/profile/analytics/who-viewed', {
                 params: { isPremium, page, limit }
             });
-            // console.log('✅ [ANALYTICS] Who viewed profile fetched');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to fetch who viewed:', error);
@@ -350,15 +229,9 @@ static clearAnalyticsCache(): void {
         }
     }
 
-    /**
-     * 1️⃣1️⃣ Get Viewer Demographics
-     * GET /profile/analytics/demographics
-     */
     static async getViewerDemographics(): Promise<any> {
         try {
-            // console.log('👥 [ANALYTICS] Fetching viewer demographics...');
             const { data } = await api.get('/profile/analytics/demographics');
-            // console.log('✅ [ANALYTICS] Viewer demographics fetched');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to fetch demographics:', error);
@@ -366,17 +239,11 @@ static clearAnalyticsCache(): void {
         }
     }
 
-    /**
-     * 1️⃣2️⃣ Get Search Keywords
-     * GET /profile/analytics/search-keywords
-     */
     static async getSearchKeywords(limit: number = 10): Promise<any> {
         try {
-            // console.log('🔑 [ANALYTICS] Fetching search keywords...');
             const { data } = await api.get('/profile/analytics/search-keywords', {
                 params: { limit }
             });
-            // console.log('✅ [ANALYTICS] Search keywords fetched');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to fetch search keywords:', error);
@@ -384,17 +251,11 @@ static clearAnalyticsCache(): void {
         }
     }
 
-    /**
-     * 1️⃣3️⃣ Get Analytics by Date Range
-     * GET /profile/analytics/date-range
-     */
     static async getAnalyticsByDateRange(startDate: string, endDate: string): Promise<any> {
         try {
-            // console.log('📅 [ANALYTICS] Fetching analytics by date range...');
             const { data } = await api.get('/profile/analytics/date-range', {
                 params: { startDate, endDate }
             });
-            // console.log('✅ [ANALYTICS] Analytics by date range fetched');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to fetch analytics by date range:', error);
@@ -402,17 +263,11 @@ static clearAnalyticsCache(): void {
         }
     }
 
-    /**
-     * 1️⃣4️⃣ Export Analytics
-     * GET /profile/analytics/export
-     */
     static async exportAnalytics(format: 'csv' | 'excel' = 'csv'): Promise<any> {
         try {
-            // console.log('📥 [ANALYTICS] Exporting analytics...');
             const { data } = await api.get('/profile/analytics/export', {
                 params: { format }
             });
-            // console.log('✅ [ANALYTICS] Analytics exported');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to export analytics:', error);
@@ -420,17 +275,11 @@ static clearAnalyticsCache(): void {
         }
     }
 
-    /**
-     * 1️⃣5️⃣ Get Analytics Graphs Data
-     * GET /profile/analytics/graphs
-     */
     static async getAnalyticsGraphData(days: number = 30): Promise<any> {
         try {
-            // console.log('📊 [ANALYTICS] Fetching analytics graph data...');
             const { data } = await api.get('/profile/analytics/graphs', {
                 params: { days }
             });
-            // console.log('✅ [ANALYTICS] Analytics graph data fetched');
             return data;
         } catch (error: any) {
             console.error('❌ [ANALYTICS] Failed to fetch graph data:', error);
@@ -439,108 +288,96 @@ static clearAnalyticsCache(): void {
     }
 
     /**
- * 🔥 SMART POST IMPRESSION (Time-based, 10-min cooldown)
- */
-    static async recordPostImpressionSmart(postId: string, postOwnerId: string, source: string) {
+     * 🔥 SMART POST IMPRESSION (Time-based, 10-min cooldown)
+     * ✅ CHANGED: naya `viewDuration` param add hua (seconds mein) — actual
+     * dwell time bhejta hai jo `usePostImpressionTracking` entry/exit se nikaalta hai
+     */
+    static async recordPostImpressionSmart(
+        postId: string,
+        postOwnerId: string,
+        source: string,
+        viewDuration?: number
+    ) {
         try {
             const { data } = await api.post('/profile/analytics/record-post-impression-smart', {
                 postId,
                 postOwnerId,
-                source
+                source,
+                viewDuration
             });
             return data;
         } catch (error: any) {
             console.error('❌ Record post impression failed:', error);
-            // Don't throw - non-critical
             return null;
         }
     }
 
-
-
-
-    /**
- * 👍 RECORD ENGAGEMENT (like/comment/share/save)
- */
-static async recordEngagement(postId: string, postOwnerId: string, engagementType: 'like' | 'comment' | 'share' | 'save') {
-    try {
-        const { data } = await api.post('/profile/analytics/record-engagement', {
-            postId,
-            postOwnerId,
-            engagementType
-        });
-        return data;
-    } catch (error: any) {
-        console.error('❌ Record engagement failed:', error);
-        return null; // non-critical, chup-chaap fail hone do
+    static async recordEngagement(postId: string, postOwnerId: string, engagementType: 'like' | 'comment' | 'share' | 'save') {
+        try {
+            const { data } = await api.post('/profile/analytics/record-engagement', {
+                postId,
+                postOwnerId,
+                engagementType
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ Record engagement failed:', error);
+            return null;
+        }
     }
-}
 
-/**
- * 🔗 RECORD SHARE (repost)
- */
-static async recordShare(postOwnerId: string, postId: string, shareType: string = 'linkedin') {
-    try {
-        const { data } = await api.post('/profile/analytics/record-share', {
-            postOwnerId,
-            postId,
-            shareType
-        });
-        return data;
-    } catch (error: any) {
-        console.error('❌ Record share failed:', error);
-        return null;
+    static async recordShare(postOwnerId: string, postId: string, shareType: string = 'linkedin') {
+        try {
+            const { data } = await api.post('/profile/analytics/record-share', {
+                postOwnerId,
+                postId,
+                shareType
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ Record share failed:', error);
+            return null;
+        }
     }
-}
 
-
-/**
- * 🖱️ RECORD CLICK (link/document/button click)
- */
-static async recordClick(
-    targetUserId: string,
-    clickType: string,
-    targetUrl?: string,
-    postId?: string
-) {
-    try {
-        const { data } = await api.post('/profile/analytics/record-click', {
-            targetUserId,
-            clickType,
-            targetUrl,
-            postId
-        });
-        return data;
-    } catch (error: any) {
-        console.error('❌ Record click failed:', error);
-        return null; // non-critical, chup-chaap fail hone do
+    static async recordClick(
+        targetUserId: string,
+        clickType: string,
+        targetUrl?: string,
+        postId?: string
+    ) {
+        try {
+            const { data } = await api.post('/profile/analytics/record-click', {
+                targetUserId,
+                clickType,
+                targetUrl,
+                postId
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ Record click failed:', error);
+            return null;
+        }
     }
-}
 
-/**
- * 👥 RECORD UNIQUE VISITOR (profile visit)
- */
-static async recordUniqueVisitor(
-    profileOwnerId: string,
-    pageUrl?: string,
-    duration?: number
-) {
-    try {
-        const { data } = await api.post('/profile/analytics/record-unique-visitor', {
-            profileOwnerId,
-            pageUrl,
-            duration
-        });
-        return data;
-    } catch (error: any) {
-        console.error('❌ Record unique visitor failed:', error);
-        return null;
+    static async recordUniqueVisitor(
+        profileOwnerId: string,
+        pageUrl?: string,
+        duration?: number
+    ) {
+        try {
+            const { data } = await api.post('/profile/analytics/record-unique-visitor', {
+                profileOwnerId,
+                pageUrl,
+                duration
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ Record unique visitor failed:', error);
+            return null;
+        }
     }
-}
 
-    /**
-     * 📊 GET POST IMPRESSIONS TIMELINE (for graphs)
-     */
     static async getPostImpressionsTimeline(days: number = 30, postId?: string) {
         try {
             const { data } = await api.get('/profile/analytics/post-impressions/timeline', {
@@ -553,9 +390,6 @@ static async recordUniqueVisitor(
         }
     }
 
-    /**
-     * 📈 GET POST IMPRESSION STATS (detailed breakdown)
-     */
     static async getPostImpressionStats(postId: string) {
         try {
             const { data } = await api.get(`/profile/analytics/post/${postId}/impression-stats`);
@@ -565,26 +399,19 @@ static async recordUniqueVisitor(
             throw error;
         }
     }
-/**
- * 📊 GET POST ANALYTICS (full breakdown: impressions, engagement, daily timeline)
- * GET /profile/analytics/post/:postId
- */
-static async getPostAnalytics(postId: string, days: number = 30) {
-    try {
-        const { data } = await api.get(`/profile/analytics/post/${postId}`, {
-            params: { days }
-        });
-        return data;
-    } catch (error: any) {
-        console.error('❌ Get post analytics failed:', error);
-        throw error;
-    }
-}
 
-    /**
-     * 🎯 GET DISCOVERY STATS (Total Impressions, Engagements, Members Reached)
-     * GET /profile/analytics/discovery-stats
-     */
+    static async getPostAnalytics(postId: string, days: number = 30) {
+        try {
+            const { data } = await api.get(`/profile/analytics/post/${postId}`, {
+                params: { days }
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ Get post analytics failed:', error);
+            throw error;
+        }
+    }
+
     static async getDiscoveryStats(days?: number): Promise<any> {
         try {
             const { data } = await api.get('/profile/analytics/discovery-stats', {
@@ -597,54 +424,41 @@ static async getPostAnalytics(postId: string, days: number = 30) {
         }
     }
 
-/**
-     * 🖱️ Get Clicks Count
-     * GET /profile/analytics/clicks/count
-     */
-static async getClicksCount(days?: number): Promise<any> {
-    try {
-        const { data } = await api.get('/profile/analytics/clicks/count', {
-            params: days ? { days } : {}
-        });
-        return data;
-    } catch (error: any) {
-        console.error('❌ [ANALYTICS] Failed to fetch clicks count:', error);
-        throw error;
+    static async getClicksCount(days?: number): Promise<any> {
+        try {
+            const { data } = await api.get('/profile/analytics/clicks/count', {
+                params: days ? { days } : {}
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [ANALYTICS] Failed to fetch clicks count:', error);
+            throw error;
+        }
     }
-}
 
-/**
- * 🔗 Get Shares Count
- * GET /profile/analytics/shares/count
- */
-static async getSharesCount(days?: number): Promise<any> {
-    try {
-        const { data } = await api.get('/profile/analytics/shares/count', {
-            params: days ? { days } : {}
-        });
-        return data;
-    } catch (error: any) {
-        console.error('❌ [ANALYTICS] Failed to fetch shares count:', error);
-        throw error;
+    static async getSharesCount(days?: number): Promise<any> {
+        try {
+            const { data } = await api.get('/profile/analytics/shares/count', {
+                params: days ? { days } : {}
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [ANALYTICS] Failed to fetch shares count:', error);
+            throw error;
+        }
     }
-}
 
-/**
- * 👥 Get Unique Visitors Count
- * GET /profile/analytics/unique-visitors/count
- */
-static async getUniqueVisitorsCount(days?: number): Promise<any> {
-    try {
-        const { data } = await api.get('/profile/analytics/unique-visitors/count', {
-            params: days ? { days } : {}
-        });
-        return data;
-    } catch (error: any) {
-        console.error('❌ [ANALYTICS] Failed to fetch unique visitors count:', error);
-        throw error;
+    static async getUniqueVisitorsCount(days?: number): Promise<any> {
+        try {
+            const { data } = await api.get('/profile/analytics/unique-visitors/count', {
+                params: days ? { days } : {}
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [ANALYTICS] Failed to fetch unique visitors count:', error);
+            throw error;
+        }
     }
-}
-
 }
 
 export default AnalyticsService;
