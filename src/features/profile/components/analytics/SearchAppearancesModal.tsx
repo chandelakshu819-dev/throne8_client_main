@@ -389,7 +389,7 @@ const SearchAppearancesModal: React.FC<SearchAppearancesModalProps> = ({
                             searched: "{search.queries.join('", "')}"
                         </p> */}
                         <div className="flex items-center gap-4 text-sm text-[#7a5c3e]">
-                            <span clas  sName="flex items-center gap-1">
+                            <span className="flex items-center gap-1">
                                 <Calendar className="w-4 h-4" />
                                 {latestDate ? latestDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'}
                             </span>
