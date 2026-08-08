@@ -77,7 +77,7 @@ export const useNetworkUsers = () => {
                 }
             }
 
-            // ✅ NEW STEP: Fetch mutual connections for each suggested user in parallel
+            // ✅ Fetch mutual connections for each suggested user in parallel
             const mutualsResults = await Promise.all(
                 usersData.map((user: any) =>
                     ConnectionService.getMutualConnections(userId, user.userId, 3)
@@ -87,7 +87,6 @@ export const useNetworkUsers = () => {
             );
 
             // ✅ Collect the actual "mutual person" IDs (not connection record IDs)
-            // Har mutual record me fromUserId/toUserId hai — jo current suggested user nahi hai wahi mutual person hai
             const mutualPersonIdsSet = new Set<string>();
             usersData.forEach((suggestedUser: any, index: number) => {
                 const rawMutuals = mutualsResults[index]?.mutuals || [];
@@ -99,15 +98,37 @@ export const useNetworkUsers = () => {
                 });
             });
 
-            // ✅ Bulk fetch mutual persons' basic info (name) for display
-            let mutualPersonsMap: Record<string, { name: string }> = {};
+            // ✅ Bulk fetch mutual persons' basic info (name + profilePhotoId)
+            let mutualPersonsMap: Record<string, { name: string; image: string | null }> = {};
             const mutualPersonIds = Array.from(mutualPersonIdsSet);
             if (mutualPersonIds.length > 0) {
                 try {
                     const mutualUsersResponse = await AuthService.getUsersBulk(mutualPersonIds);
                     const mutualUsersData = mutualUsersResponse.data?.users || [];
-                    mutualPersonsMap = mutualUsersData.reduce((acc: Record<string, { name: string }>, u: any) => {
-                        acc[u.userId] = { name: `${u.firstName} ${u.lastName}`.trim() };
+
+                    // ✅ NEW: fetch their profile photos too
+                    const mutualPhotoIds = mutualUsersData
+                        .map((u: any) => u.profilePhotoId)
+                        .filter(Boolean);
+
+                    let mutualPhotosMap: Record<string, string> = {};
+                    if (mutualPhotoIds.length > 0) {
+                        try {
+                            const mutualPhotosResponse = await ProfileService.getMultipleProfilePhotosByIds(mutualPhotoIds);
+                            mutualPhotosMap = mutualPhotosResponse.data.photos.reduce((acc: Record<string, string>, photo: any) => {
+                                acc[photo.photoId] = photo.cloudinarySecureUrl;
+                                return acc;
+                            }, {});
+                        } catch (error) {
+                            console.warn('⚠️ Failed to fetch mutual persons photos:', error);
+                        }
+                    }
+
+                    mutualPersonsMap = mutualUsersData.reduce((acc: Record<string, { name: string; image: string | null }>, u: any) => {
+                        acc[u.userId] = {
+                            name: `${u.firstName} ${u.lastName}`.trim(),
+                            image: u.profilePhotoId ? (mutualPhotosMap[u.profilePhotoId] || null) : null,
+                        };
                         return acc;
                     }, {});
                 } catch (error) {
@@ -124,15 +145,19 @@ export const useNetworkUsers = () => {
                     ? headlinesMap[user.headlineId] || null
                     : null;
 
-                // ✅ Build LinkedIn-style mutual connections text
+                // ✅ Build LinkedIn-style mutual connections text + avatar stack
                 const rawMutuals = mutualsResults[index]?.mutuals || [];
                 const mutualCount = mutualsResults[index]?.count || rawMutuals.length || 0;
 
                 let mutualsText = '';
+                let mutualAvatars: string[] = [];
+
                 if (mutualCount > 0) {
-                    const firstMutualId = rawMutuals[0]
-                        ? (rawMutuals[0].fromUserId === userId ? rawMutuals[0].toUserId : rawMutuals[0].fromUserId)
-                        : null;
+                    const mutualPersonIdsForUser = rawMutuals
+                        .map((m: any) => (m.fromUserId === userId ? m.toUserId : m.fromUserId))
+                        .filter(Boolean);
+
+                    const firstMutualId = mutualPersonIdsForUser[0] || null;
                     const firstMutualName = firstMutualId && mutualPersonsMap[firstMutualId]
                         ? mutualPersonsMap[firstMutualId].name
                         : 'Someone';
@@ -140,6 +165,12 @@ export const useNetworkUsers = () => {
                     mutualsText = mutualCount === 1
                         ? `${firstMutualName} is a mutual connection`
                         : `${firstMutualName} and ${mutualCount - 1} other mutual connection${mutualCount - 1 > 1 ? 's' : ''}`;
+
+                    // ✅ Top 3 mutual persons ke real photo URLs (fallback image agar photo nahi hai)
+                    mutualAvatars = mutualPersonIdsForUser
+                        .slice(0, 3)
+                        .map((id: string) => mutualPersonsMap[id]?.image)
+                        .filter((img): img is string => !!img);
                 }
 
                 return {
@@ -147,6 +178,7 @@ export const useNetworkUsers = () => {
                     name: `${user.firstName} ${user.lastName}`.trim(),
                     title: headlineText || '',
                     mutuals: mutualsText,
+                    mutualAvatars, // ✅ NEW
                     image: profileImageUrl || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s',
                     location: user.location || '',
                 };
