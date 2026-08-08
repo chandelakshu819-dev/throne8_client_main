@@ -1,5 +1,5 @@
 'use client';
-
+// src/app/profile/page.tsx
 import { useAuth, useProtectedRoute } from '@/features/auth/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';

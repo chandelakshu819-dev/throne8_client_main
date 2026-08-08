@@ -31,6 +31,11 @@ const PostSkeleton = () => (
 const FeedContainer = (props: any) => {
   const {
     posts = [],
+    // ✅ FIX: feedReposts pehle destructure hi nahi hota tha, isliye page.tsx
+    // se pass hone ke baad bhi kabhi render hi nahi ho raha tha. Isi wajah
+    // se repost successfully backend me create ho raha tha lekin feed pe
+    // turant (bina refresh) kabhi dikhta hi nahi tha.
+    feedReposts = [],
     isLoadingPosts = false,
     isLoadingMore = false,
     hasMore = false,
@@ -80,7 +85,10 @@ const FeedContainer = (props: any) => {
     );
   }
 
-  if (posts.length === 0) {
+  // ✅ FIX: ab feedReposts ko bhi consider karo — agar sirf naye client-side
+  // reposts hain aur backend posts abhi load nahi hue, tab bhi "No posts"
+  // wala empty state galat trigger na ho
+  if (posts.length === 0 && feedReposts.length === 0) {
     return (
       <main className="flex-1 text-center py-20">
         <p className="text-gray-500 text-lg">No posts available yet</p>
@@ -97,6 +105,29 @@ const FeedContainer = (props: any) => {
         isDarkMode={isDarkMode}
       />
       <div className="space-y-8">
+        {/* ✅ FIX: client-side reposts (jo abhi-abhi create hui hain) sabse
+            top pe render karo — turant dikhengi, refresh ka wait nahi karna
+            padega. Backend refetch/refresh ke baad yeh hi reposts
+            `posts` array ke andar `feedItemType: 'repost'` ban ke aa jaayengi
+            (neeche wale block se render hongi), isliye duplicate render se
+            bachne ke liye unique `repostId` key use ki hai dono jagah. */}
+        {feedReposts.map((repostItem: any) => (
+          <FeedRepostCard
+            key={`local-${repostItem.repostId}`}
+            {...props}
+            repostItem={repostItem}
+            isDarkMode={isDarkMode}
+            profileImage={profileData?.profileImage || props.profileImage}
+            fullName={fullName}
+            reposterName={repostItem.reposterName || fullName}
+            reposterAvatar={repostItem.reposterAvatar || profileData?.profileImage}
+            currentUserId={currentUserId}
+            likedPosts={likedPosts}
+            handleLike={props.handleLike}
+            toggleComments={props.toggleComments}
+          />
+        ))}
+
         {posts.map((post: any, index: number) =>
           post.feedItemType === 'repost' ? (
             <FeedRepostCard
@@ -141,7 +172,7 @@ const FeedContainer = (props: any) => {
       )}
 
       {!hasMore && posts.length > 0 && (
-        <p className="text-center text-gray-400 text-sm py-8">You're all caught up 🎉</p>
+        <p className="text-center text-gray-400 text-sm py-8">You are all caught up 🎉</p>
       )}
     </main>
   );

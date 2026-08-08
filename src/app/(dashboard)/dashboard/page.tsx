@@ -22,6 +22,8 @@ import { useHeadlineData } from '@/features/profile/hooks/useHeadlineData';
 import { transformToProfileData } from '@/shared/utils/profileTransformers';
 import ProfileNavbar from '@/features/profile/components/home/ProfileNavbar';
 import ConnectionService from '@/lib/api/connection.service';
+import { useSocket } from '@/core/realtime/useSocket';
+import { SOCKET_EVENTS } from '@/core/realtime/socket.events';
 
 export default function Home() {
     const { user, isLoading } = useAuth();
@@ -62,7 +64,9 @@ export default function Home() {
     const [repostProgress, setRepostProgress] = useState(0);
     const [showRepostProgressBar, setShowRepostProgressBar] = useState(false);
 
-const { allPosts, isLoadingAllPosts, isLoadingMore, hasMore, fetchAllUsersPosts, loadMorePosts } = useAllUsersPosts();
+    const { allPosts, isLoadingAllPosts, isLoadingMore, hasMore, fetchAllUsersPosts, loadMorePosts, prependPost } = useAllUsersPosts();
+
+    const { socket } = useSocket();
     // Media & Schedule states
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
     const [selectedVideos, setSelectedVideos] = useState<File[]>([]);
@@ -144,6 +148,23 @@ const { allPosts, isLoadingAllPosts, isLoadingMore, hasMore, fetchAllUsersPosts,
             setLikedPosts(initialLikes);
         }
     }, [allPosts]);
+
+    // ✅ NEW: real-time socket listener — jab bhi backend 'feed:new-post' emit
+    // karta hai (repost create hone par), naya post allPosts array ke top
+    // mein turant insert ho jata hai, bina page refresh kiye.
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleNewPost = (payload: any) => {
+            prependPost(payload);
+        };
+
+        socket.on(SOCKET_EVENTS.FEED_NEW_POST, handleNewPost);
+
+        return () => {
+            socket.off(SOCKET_EVENTS.FEED_NEW_POST, handleNewPost);
+        };
+    }, [socket, prependPost]);
 
     const profileData = transformToProfileData(
         userProfileData,
@@ -530,66 +551,69 @@ const { allPosts, isLoadingAllPosts, isLoadingMore, hasMore, fetchAllUsersPosts,
         console.log('Reposted without thoughts');
     };
 
-    const handleRepostInstant = async (index: any) => {
-        const post = allPosts[index];
-        if (!post) return;
+    const handleRepostInstant = async (indexOrId: any) => {
+    // ✅ FIX: post-identity ab string postKey (entryId) hai, numeric index nahi.
+    // Purana code allPosts[index] karta tha jo string ke liye hamesha undefined
+    // deta tha — isi wajah se repost silently fail ho raha tha.
+    const post = typeof indexOrId === 'number'
+        ? allPosts[indexOrId]
+        : allPosts.find(p => (p.entryId || p.postId) === indexOrId);
 
-        const postId = post.entryId || post.postId;
-        setRepostingPostId(postId);
-        setShowRepostProgressBar(true);
-        setRepostProgress(0);
-        setIsRepostInProgress(true);
+    if (!post) return;
 
-        try {
-            const result = await RepostService.createRepost(postId, 'repost');
+    const postId = post.entryId || post.postId;
+    setRepostingPostId(postId);
+    setShowRepostProgressBar(true);
+    setRepostProgress(0);
+    setIsRepostInProgress(true);
 
-            // ✅ NEW: Analytics mein share record karo
-if (post?.userId && post.userId !== user?.userId) {
-    AnalyticsService.recordShare(post.userId, postId, 'linkedin');
-}
+    try {
+        const result = await RepostService.createRepost(postId, 'repost');
 
-            // Progress animate karo
-            setRepostProgress(60);
-            await new Promise(resolve => setTimeout(resolve, 300));
-            setRepostProgress(100);
+        if (post?.userId && post.userId !== user?.userId) {
+            AnalyticsService.recordShare(post.userId, postId, 'linkedin');
+        }
 
-            // Repost ko feed mein add karo (top par)
-            const newRepostFeedItem = {
-                feedItemType: 'repost',
-                repostId: result?.data?.repost?.repostId || result?.repost?.repostId || `temp-${Date.now()}`,
-                repostType: 'repost',
-                thoughtText: null,
-                repostedBy: user?.userId,
-                createdAt: new Date().toISOString(),
-                originalPost: {
-                    ...post,
-                    entryId: postId,
-                    userName: post.userName || post.fullName || post.userId || 'User',  // ← ADD
-                },
-            };
+        setRepostProgress(60);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        setRepostProgress(100);
 
-            setFeedReposts(prev => [newRepostFeedItem, ...prev]);
+        const newRepostFeedItem = {
+            feedItemType: 'repost',
+            repostId: result?.data?.repost?.repostId || result?.repost?.repostId || `temp-${Date.now()}`,
+            repostType: 'repost',
+            thoughtText: null,
+            repostedBy: user?.userId,
+            createdAt: new Date().toISOString(),
+            originalPost: {
+                ...post,
+                entryId: postId,
+                userName: post.userName || post.fullName || post.userId || 'User',
+            },
+        };
 
-            setTimeout(() => {
-                setShowRepostProgressBar(false);
-                setIsRepostInProgress(false);
-                setRepostProgress(0);
-                setRepostingPostId(null);
-            }, 1500);
+        setFeedReposts(prev => [newRepostFeedItem, ...prev]);
 
-        } catch (error: any) {
+        setTimeout(() => {
             setShowRepostProgressBar(false);
             setIsRepostInProgress(false);
             setRepostProgress(0);
             setRepostingPostId(null);
+        }, 1500);
 
-            if (error.message?.includes('already reposted')) {
-                alert('You have already reposted this post');
-            } else {
-                alert(error.message || 'Repost failed');
-            }
+    } catch (error: any) {
+        setShowRepostProgressBar(false);
+        setIsRepostInProgress(false);
+        setRepostProgress(0);
+        setRepostingPostId(null);
+
+        if (error.message?.includes('already reposted')) {
+            alert('You have already reposted this post');
+        } else {
+            alert(error.message || 'Repost failed');
         }
-    };
+    }
+};
 
     // ✅ NEW: comment ke raw userId list se real name/avatar/headline nikalta hai,
     // aur postOwnerId se compare karke "isAuthor" flag bhi laga deta hai (jisse

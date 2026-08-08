@@ -1,5 +1,5 @@
 ﻿'use client'
-
+// src/app/page.tsx
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useEducation } from "@/features/profile/hooks/useEducation";
 import { useProfile } from "@/features/profile/hooks/useProfile";

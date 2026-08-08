@@ -14,4 +14,7 @@ export const SOCKET_EVENTS = {
     // Follow events
     FOLLOW_RECEIVED: 'follow:received',
     FOLLOW_REMOVED: 'follow:removed',
+
+    // Feed events
+    FEED_NEW_POST: 'feed:new-post',
 } as const;

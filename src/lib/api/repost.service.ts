@@ -2,10 +2,6 @@ import api from './api.intance';
 
 class RepostService {
 
-    /**
-     * POST /posts/:entryId/repost
-     * Simple repost ya quote repost banana
-     */
     static async createRepost(
         entryId: string,
         type: 'repost' | 'quote' = 'repost',
@@ -32,13 +28,12 @@ class RepostService {
 
     /**
      * DELETE /reposts/:repostId
-     * Repost delete karo
-     * ✅ FIX: extra "posts/" segment hataya — backend route sirf /reposts/:repostId hai
+     * ✅ FIX: backend route "/posts/reposts/:repostId" hai — "posts/" wapas add kiya
      */
     static async deleteRepost(repostId: string) {
         try {
             const { data } = await api.delete(
-                `/profile/activity/reposts/${repostId}`
+                `/profile/activity/posts/reposts/${repostId}`
             );
             console.log('✅ Repost deleted successfully:', data);
             return data;
@@ -50,13 +45,14 @@ class RepostService {
 
     /**
      * GET /reposts/my-reposts
-     * Apne saare reposts laao
-     * ✅ FIX: extra "posts/" segment hataya — backend route sirf /reposts/my-reposts hai
+     * ✅ FIX: backend route "/posts/reposts/my-reposts" hai — "posts/" wapas add kiya.
+     * Yehi missing segment tha jiski wajah se "ROUTE_NOT_FOUND" 404 aa raha tha
+     * aur Activity tab pe userReposts hamesha empty rehta tha.
      */
     static async getMyReposts() {
         try {
             const { data } = await api.get(
-                `/profile/activity/reposts/my-reposts`
+                `/profile/activity/posts/reposts/my-reposts`
             );
             console.log('✅ My reposts fetched successfully:', data);
             return data;
@@ -68,7 +64,7 @@ class RepostService {
 
     /**
      * GET /posts/:entryId/reposts
-     * Ek post ke saare reposts
+     * Yeh route sahi hai — backend mein bhi "/posts/:entryId/reposts" hi hai
      */
     static async getRepostsByPost(entryId: string) {
         const { data } = await api.get(
@@ -79,7 +75,7 @@ class RepostService {
 
     /**
      * GET /posts/:entryId/repost-status
-     * Kya maine ye post repost ki hai?
+     * Yeh bhi sahi hai
      */
     static async getRepostStatus(entryId: string) {
         const { data } = await api.get(
