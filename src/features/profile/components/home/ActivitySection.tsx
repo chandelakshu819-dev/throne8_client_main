@@ -1,4 +1,5 @@
 'use client';
+// app/feature/profile/components/home/ActivitySection.tsx
 import React, { useEffect, useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ShowAllActivityModal from './ShowAllActivityModal';
@@ -123,8 +124,13 @@ const RepostCard = (props: any) => {
   const [originalAuthorName, setOriginalAuthorName] = useState('');
   const [originalAuthorAvatar, setOriginalAuthorAvatar] = useState('');
 
+  // ✅ FIX: "Read more" toggle for repost's original-post content
+  const [isContentExpanded, setIsContentExpanded] = useState(false);
+
   const originalPost = repost.originalPost;
   const postKey = originalPost ? originalPost.entryId : undefined;
+  const contentText: string = originalPost?.content || '';
+  const isLongContent = contentText.length > 150;
 
   useEffect(() => {
     if (!originalPost || !originalPost.userId) return;
@@ -168,6 +174,9 @@ const RepostCard = (props: any) => {
     }
   };
 
+  // ✅ FIX: isLikedByCurrentUser ab originalPost se aata hai (backend fix ke saath).
+  // Isse purana like state correctly carry hota hai — sirf "+1 naya like" nahi
+  // dikhega, poora sahi likesCount dikhega.
   const syntheticPost = {
     entryId: postKey,
     likesCount: originalPost.likesCount || 0,
@@ -244,8 +253,23 @@ const RepostCard = (props: any) => {
 
         <h3 className="text-base font-bold text-[#4a3728] mb-2">{originalPost.title}</h3>
 
+        {/* ✅ FIX: Read more / Show less toggle add kiya */}
         {originalPost.content ? (
-          <p className="text-sm text-[#4a3728]/70 leading-relaxed mb-3 line-clamp-3">{originalPost.content}</p>
+          <>
+            <p className={`text-sm text-[#4a3728]/70 leading-relaxed mb-1 ${!isContentExpanded ? 'line-clamp-3' : ''}`}>
+              {originalPost.content}
+            </p>
+            {isLongContent ? (
+              <button
+                onClick={() => setIsContentExpanded((prev) => !prev)}
+                className="text-xs font-bold text-[#4a3728] mb-3 hover:underline"
+              >
+                {isContentExpanded ? 'Show less' : 'Read more'}
+              </button>
+            ) : (
+              <div className="mb-3" />
+            )}
+          </>
         ) : null}
 
         {originalPost.images && originalPost.images.length > 0 ? (
@@ -434,10 +458,14 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
   });
   const hasMorePosts = (filteredPosts.length + userReposts.length) > 2;
 
+  // ✅ FIX: pehle hamesha "saari reposts, phir saare posts" order tha —
+  // koi chronological mix nahi ho raha tha. Ab createdAt ke hisaab se
+  // newest-first sort hota hai, isliye asli order (post → repost → post...)
+  // wapas dikhega.
   const combinedItems = [
-    ...userReposts.map((repost: any) => ({ type: 'repost', data: repost })),
-    ...filteredPosts.map((post: any) => ({ type: 'post', data: post })),
-  ];
+    ...userReposts.map((repost: any) => ({ type: 'repost' as const, data: repost, createdAt: repost.createdAt })),
+    ...filteredPosts.map((post: any) => ({ type: 'post' as const, data: post, createdAt: post.createdAt })),
+  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -700,6 +728,10 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
           </div>
           <div className="flex items-center gap-2 bg-[#4a3728]/10 px-4 py-2 rounded-full backdrop-blur-sm">
             <div className="w-2 h-2 bg-[#4a3728] rounded-full animate-pulse" />
+            {/* ⚠️ NOTE: `followers` yahan prop se aata hai. Agar galat/0 dikh raha hai,
+                to root cause profile/page.tsx mein hai — waha ActivitySection ko
+                `followers={profileData.followers}` (jo hardcoded/empty rehta hai)
+                ki jagah `followers={followersCount}` (real state) pass karna hoga. */}
             <p className="text-sm font-semibold text-[#4a3728]">{followers} followers</p>
           </div>
         </div>

@@ -189,6 +189,38 @@ export const useAllUsersPosts = () => {
         }
     }, [page, hasMore, isLoadingMore, isLoadingAllPosts, fetchAllUsersPosts]);
 
+    // ✅ NEW: real-time socket-pushed post/repost ko list ke top mein daalta hai.
+    // `transformPosts` hi reuse karta hai (same cache, same shape guarantee) —
+    // taaki naya item aur normal-fetch wale items exactly waisi hi shape ke ho,
+    // aur PostCard/FeedRepostCard bina extra handling ke render kar sake.
+    const prependPost = useCallback(async (rawPost: any) => {
+        if (!rawPost) return;
+
+        try {
+            const [transformed] = await transformPosts([rawPost]);
+            if (!transformed) return;
+
+            setAllPosts((prev) => {
+                // ✅ Duplicate-guard — agar ye item kisi wajah se already list mein hai
+                // (jaise optimistic-update wale purane `feedReposts` flow se), dobara na daalein
+                const key = transformed.feedItemType === 'repost'
+                    ? transformed.repostId
+                    : (transformed.entryId || transformed.postId);
+                const alreadyExists = prev.some((p: any) => {
+                    const existingKey = p.feedItemType === 'repost'
+                        ? p.repostId
+                        : (p.entryId || p.postId);
+                    return existingKey === key;
+                });
+                if (alreadyExists) return prev;
+
+                return [transformed, ...prev];
+            });
+        } catch (error) {
+            console.warn('⚠️ Failed to prepend real-time post:', error);
+        }
+    }, [transformPosts]);
+
     return {
         allPosts,
         isLoadingAllPosts,
@@ -196,5 +228,6 @@ export const useAllUsersPosts = () => {
         hasMore,
         fetchAllUsersPosts,
         loadMorePosts,
+        prependPost, // ✅ NEW
     };
 };

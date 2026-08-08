@@ -1,4 +1,4 @@
-// src/store/hooks/useProfile.ts
+// src/features/profile/hooks/useProfile.ts
 
 import { useAppDispatch, useAppSelector } from "@/core/store/store.hooks";
 import RepostService from '@/lib/api/repost.service';

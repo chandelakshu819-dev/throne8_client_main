@@ -1,5 +1,5 @@
 'use client';
-
+// src/app/profile/[userId]/page.tsx
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
