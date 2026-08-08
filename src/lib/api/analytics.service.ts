@@ -459,6 +459,20 @@ class AnalyticsService {
             throw error;
         }
     }
+
+
+
+    static async getSearchAppearancesWithHighlights(page: number = 1, limit: number = 50): Promise<any> {
+        try {
+            const { data } = await api.get('/profile/analytics/search-appearances/highlighted', {  // ✅ "highlighted" — route ke saath match
+                params: { page, limit }
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [ANALYTICS] Failed to fetch search appearances with highlights:', error);
+            throw error;
+        }
+    }
 }
 
 export default AnalyticsService;
