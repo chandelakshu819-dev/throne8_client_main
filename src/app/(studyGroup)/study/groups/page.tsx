@@ -1,5 +1,6 @@
 "use client";
 
+import TopRankedGroups from '@/features/studyGroup/components/TopRankedGroups';
 import React, { useEffect } from 'react';
 import GroupHeader from '@/features/studyGroup/components/GroupHeader';
 import CTA from '@/features/studyGroup/components/CTA';

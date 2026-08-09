@@ -2,29 +2,20 @@
 
 import React, { useState } from 'react';
 import { Users, Clock, Eye, EyeOff, Camera, CameraOff, TrendingUp, Award } from 'lucide-react';
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupCard.tsx
-import type { Group} from '../interface'
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-========
 import type { Group } from '../types';
 import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/groups/GroupCard.tsx
 
 import { selectJoiningGroupId, selectJoinLoading, selectSendRequestLoading } from '@/hooks/studyGroup/features/groups/groupsSlice';
 import { joinGroupThunk, sendJoinRequestThunk } from '@/hooks/studyGroup/features/groups/group.thunks';
-import JoinGroupModal from '@/components/modals/studyGroup/study/joinGroupModal';
+import JoinGroupModal from '@/features/study-group/modals/joinGroupModal';
 import { useGroupData } from '@/features/study-group/hooks/useGroupData';
 import { useRouter } from 'next/navigation';
 import {generateMemberAvatars} from '../helper';
-
-
-// ─── Component ────────────────────────────────────────────────────────────────
-
+// ─── Component ───────────────────────────────
 interface GroupCardProps {
   // group: Group;
   group: any;
 }
-
 const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
   const dispatch = useAppDispatch();
   const router = useRouter();

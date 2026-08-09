@@ -1,22 +1,12 @@
 // src/app/studyGroup/study/my-groups/components/GroupStatsBar.tsx
 'use client';
 
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupStatsBar.tsx
-import { STAT_CARDS } from '../data';
-import { GroupStats} from '../types';
-
-
-========
 import { Users, Crown, UserPlus, Clock, Award } from 'lucide-react';
 import type { GroupStats } from '../../types/types';
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/GroupStatsBar.tsx
 interface GroupStatsBarProps {
   stats: GroupStats;
 }
 
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupStatsBar.tsx
-
-========
 const STAT_CARDS = [
   { key: 'totalGroups',     label: 'Total Groups',  Icon: Users , suffix: '' },
   { key: 'createdGroups',   label: 'Created',       Icon: Crown,  suffix: '' },
@@ -24,7 +14,6 @@ const STAT_CARDS = [
   { key: 'totalStudyHours', label: 'Study Hours',   Icon: Clock,  suffix: 'h' },
   { key: 'avgAttendance',   label: 'Avg Attendance', Icon: Award,  suffix: '%' },
 ] as const;
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/GroupStatsBar.tsx
 
 export const GroupStatsBar: React.FC<GroupStatsBarProps> = ({ stats }) => (
   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8">

@@ -18,8 +18,7 @@ import {
 } from '@/hooks/studyGroup/features/groups/groupsSlice';
 import { GroupCategory, GroupVisibility } from '@/lib/api/studyGroup.service';
 import { useRouter } from 'next/navigation';
-import JoinGroupModal from '@/components/modals/studyGroup/study/joinGroupModal';
-
+import JoinGroupModal from '@/features/study-group/modals/joinGroupModal';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FilterState {

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
 import { setBrowseSearchQuery as setSearchQuery, selectBrowseSearchQuery as selectSearchQuery } from '@/hooks/studyGroup/features/groups/groupsSlice';
 import SearchDropdown from '@/features/study-group/components/study/dropdown';
-import FilterModal from '@/components/modals/studyGroup/study/sidebar/FilterModal';
+import FilterModal from '@/features/study-group/modals/FilterModal';
 
 const GroupHeader = () => {
   const dispatch = useAppDispatch();

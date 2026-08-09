@@ -1,8 +1,7 @@
 "use client";
 
 import { UserPlus, ArrowRight, CheckCircle } from "lucide-react";
-import CreateGroupModal from "@/components/modals/studyGroup/study/CreateGroupModal";
-// import { useAppDispatch, useAppSelector } from "../../../../lib/redux/hooks";
+import CreateGroupModal from "@/features/study-group/modals/CreateGroupModal";// import { useAppDispatch, useAppSelector } from "../../../../lib/redux/hooks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { openCreateModal, closeCreateModal, selectIsCreateModalOpen } from "@/hooks/studyGroup/features/groups/groupsSlice";
 
@@ -97,7 +96,6 @@ export default function CTA() {
           </div>
         </div>
       </div>
-
       <CreateGroupModal
         isOpen={isModalOpen}
         onClose={() => dispatch(closeCreateModal())}

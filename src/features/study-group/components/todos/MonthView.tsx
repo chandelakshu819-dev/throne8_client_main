@@ -26,11 +26,6 @@ export default function MonthView({ currentDate, onDateClick, selectedDate }: Mo
   }, []);
 
   const today = formatDate(new Date());
-<<<<<<<< HEAD:src/features/studyGroup/components/MonthView.tsx
-
-
-========
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/todos/MonthView.tsx
   const getApiTasksForDate = useCallback((dateStr: string) => {
     const tasksForDate = apiTasks.filter(task => {
       // deadline se match karo pehle
@@ -47,10 +42,6 @@ export default function MonthView({ currentDate, onDateClick, selectedDate }: Mo
     return tasksForDate;
   }, [apiTasks, completionFilter]);
 
-<<<<<<<< HEAD:src/features/studyGroup/components/MonthView.tsx
-
-========
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/todos/MonthView.tsx
   const getStats = useCallback((dateStr: string) => {
     const apiForDate = getApiTasksForDate(dateStr);
     return {
@@ -204,7 +195,3 @@ export default function MonthView({ currentDate, onDateClick, selectedDate }: Mo
     </div>
   );
 }
-<<<<<<<< HEAD:src/features/studyGroup/components/MonthView.tsx
-
-========
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/todos/MonthView.tsx

@@ -1,5 +1,5 @@
 'use client';
-// app/feature/profile/components/home/ActivitySection.tsx
+// src/features/profile/components/home/ActivitySection.tsx
 import React, { useEffect, useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ShowAllActivityModal from './ShowAllActivityModal';
@@ -18,6 +18,7 @@ import ProfileService from '@/lib/api/profile.service';
 import AuthService from '@/lib/api/auth.service';
 import FollowService from '@/lib/api/follow.service';
 import ReportService from '@/lib/api/report.service';
+import RepostService from '@/lib/api/repost.service'; // ✅ NEW
 
 const EmptyState = ({ label }: { label: string }) => {
   return (
@@ -123,14 +124,19 @@ const RepostCard = (props: any) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [originalAuthorName, setOriginalAuthorName] = useState('');
   const [originalAuthorAvatar, setOriginalAuthorAvatar] = useState('');
-
-  // ✅ FIX: "Read more" toggle for repost's original-post content
   const [isContentExpanded, setIsContentExpanded] = useState(false);
 
   const originalPost = repost.originalPost;
   const postKey = originalPost ? originalPost.entryId : undefined;
   const contentText: string = originalPost?.content || '';
   const isLongContent = contentText.length > 150;
+
+  // ✅ repost type — quote vs simple repost
+  const isQuote = repost.repostType === 'quote';
+
+  // ✅ Quote-repost ka apna independent like state (server value se init)
+  const [quoteLiked, setQuoteLiked] = useState(!!repost.isLikedByCurrentUser);
+  const [quoteLikesCount, setQuoteLikesCount] = useState(repost.likesCount || 0);
 
   useEffect(() => {
     if (!originalPost || !originalPost.userId) return;
@@ -174,15 +180,44 @@ const RepostCard = (props: any) => {
     }
   };
 
-  // ✅ FIX: isLikedByCurrentUser ab originalPost se aata hai (backend fix ke saath).
-  // Isse purana like state correctly carry hota hai — sirf "+1 naya like" nahi
-  // dikhega, poora sahi likesCount dikhega.
+  // ✅ Quote-repost ka apna like/unlike handler — independent API call
+  const handleQuoteLike = async () => {
+    const wasLiked = quoteLiked;
+    setQuoteLiked(!wasLiked);
+    setQuoteLikesCount((prev: number) => (wasLiked ? Math.max(0, prev - 1) : prev + 1));
+
+    try {
+      if (wasLiked) {
+        await RepostService.removeReactionFromRepost(repost.repostId);
+      } else {
+        await RepostService.reactToRepost(repost.repostId);
+      }
+    } catch (err) {
+      // revert on failure
+      setQuoteLiked(wasLiked);
+      setQuoteLikesCount((prev: number) => (wasLiked ? prev + 1 : Math.max(0, prev - 1)));
+    }
+  };
+
+  // ✅ repost type ke hisaab se alag alag like-source:
+  // - 'repost' (simple): original post ka hi likesCount/status
+  // - 'quote': repost ka apna independent likesCount/status
+  const postKeyForActions = isQuote ? `repost:${repost.repostId}` : postKey;
+
   const syntheticPost = {
-    entryId: postKey,
-    likesCount: originalPost.likesCount || 0,
+    entryId: postKeyForActions,
+    likesCount: isQuote ? quoteLikesCount : (originalPost.likesCount || 0),
     commentsCount: postCommentCounts && postCommentCounts[postKey] !== undefined ? postCommentCounts[postKey] : (originalPost.commentsCount || 0),
-    isLikedByCurrentUser: originalPost.isLikedByCurrentUser || false,
+    isLikedByCurrentUser: isQuote ? quoteLiked : (originalPost.isLikedByCurrentUser || false),
     shares: originalPost.shares || 0,
+  };
+
+  const effectiveHandleLike = () => {
+    if (isQuote) {
+      handleQuoteLike();
+    } else {
+      handleLike(postKey);
+    }
   };
 
   return (
@@ -253,7 +288,6 @@ const RepostCard = (props: any) => {
 
         <h3 className="text-base font-bold text-[#4a3728] mb-2">{originalPost.title}</h3>
 
-        {/* ✅ FIX: Read more / Show less toggle add kiya */}
         {originalPost.content ? (
           <>
             <p className={`text-sm text-[#4a3728]/70 leading-relaxed mb-1 ${!isContentExpanded ? 'line-clamp-3' : ''}`}>
@@ -284,10 +318,13 @@ const RepostCard = (props: any) => {
         <div className="mt-3 pt-3 border-t border-[#e0d8cf]/30">
           <PostActions
             post={syntheticPost}
-            index={postKey}
+            index={postKeyForActions}
             isDarkMode={false}
-            likedPosts={likedPosts}
-            handleLike={handleLike}
+            // ✅ quote ke liye isolated empty likedPosts pass karo — taaki
+            // syntheticPost.isLikedByCurrentUser (quoteLiked) use ho, original
+            // post ke likedPosts map se collide na ho
+            likedPosts={isQuote ? {} : likedPosts}
+            handleLike={effectiveHandleLike}
             toggleComments={toggleComments}
             openRepostIndex={null}
             toggleRepostMenu={() => {}}
@@ -450,6 +487,9 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
 
   const handlers = useActivityHandlers({ posts, onPostCreated, profileImage });
 
+  // ✅ NOTE: yeh sirf "Posts" tab se original post ko hide karta hai (jaisa
+  // LinkedIn karta hai) — repost card khud hamesha alag, naya card ke roop
+  // mein render hota hai. Yeh already sahi behavior hai.
   const repostedEntryIds = new Set(userReposts.map((r: any) => r.originalPost ? r.originalPost.entryId : null).filter(Boolean));
 
   const filteredPosts = posts.filter((p: any) => {
@@ -458,10 +498,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
   });
   const hasMorePosts = (filteredPosts.length + userReposts.length) > 2;
 
-  // ✅ FIX: pehle hamesha "saari reposts, phir saare posts" order tha —
-  // koi chronological mix nahi ho raha tha. Ab createdAt ke hisaab se
-  // newest-first sort hota hai, isliye asli order (post → repost → post...)
-  // wapas dikhega.
+  // ✅ FIX: createdAt ke hisaab se real chronological order
   const combinedItems = [
     ...userReposts.map((repost: any) => ({ type: 'repost' as const, data: repost, createdAt: repost.createdAt })),
     ...filteredPosts.map((post: any) => ({ type: 'post' as const, data: post, createdAt: post.createdAt })),
@@ -728,10 +765,6 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
           </div>
           <div className="flex items-center gap-2 bg-[#4a3728]/10 px-4 py-2 rounded-full backdrop-blur-sm">
             <div className="w-2 h-2 bg-[#4a3728] rounded-full animate-pulse" />
-            {/* ⚠️ NOTE: `followers` yahan prop se aata hai. Agar galat/0 dikh raha hai,
-                to root cause profile/page.tsx mein hai — waha ActivitySection ko
-                `followers={profileData.followers}` (jo hardcoded/empty rehta hai)
-                ki jagah `followers={followersCount}` (real state) pass karna hoga. */}
             <p className="text-sm font-semibold text-[#4a3728]">{followers} followers</p>
           </div>
         </div>

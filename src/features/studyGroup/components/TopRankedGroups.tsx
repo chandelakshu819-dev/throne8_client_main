@@ -9,13 +9,7 @@ import { selectJoinLoading, selectTopRankedGroups, selectTopRankedGroupsLoading 
 import { useGroupData } from "@/features/study-group/hooks/useGroupData";
 import SkeletonLoader from "@/app/loading";
 import { joinGroupThunk, sendJoinRequestThunk } from "@/hooks/studyGroup/features/groups/group.thunks";
-<<<<<<<< HEAD:src/features/studyGroup/components/TopRankedGroups.tsx
-import JoinGroupModal from "@/components/modals/studyGroup/study/joinGroupModal";
-import { Group } from "../types";
-
-========
-import JoinGroupModal from "../../modals/joinGroupModal";
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/groups/TopRankedGroups.tsx
+import JoinGroupModal from "@/features/study-group/modals/joinGroupModal";
 
 
 /* ===================== CARD ===================== */

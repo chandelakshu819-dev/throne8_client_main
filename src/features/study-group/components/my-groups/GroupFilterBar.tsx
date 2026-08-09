@@ -2,14 +2,8 @@
 'use client';
 
 import { Search, Crown, UserPlus } from 'lucide-react';
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupFilterBar.tsx
-import type { GroupStats } from '@/lib/types';
-import { GROUP_TABs } from '@/lib/constants';
-import { GroupTabType} from '@/features/studyGroup/types';
-========
 import type { GroupStats } from '../../types/types';
 import { GroupTabType } from '../../types/types';
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/GroupFilterBar.tsx
 
 interface GroupFilterBarProps {
   activeTab:      GroupTabType;

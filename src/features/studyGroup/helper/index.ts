@@ -1,7 +1,7 @@
 import { GoalWithUI } from "@/hooks/studyGroup/features/goals/goalsSlice";
 import { DateType } from "../types";
 import { Tab } from "../interface";
-import { DAYS } from "@/app/mentorship/mentor-card/[mentorname]/[mentorid]/components/types/data";
+import { DAYS } from "../data";
 import { DayName } from "../data";
 
 export function getStatus(goal: GoalWithUI) {

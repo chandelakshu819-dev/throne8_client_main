@@ -10,11 +10,7 @@ export default function OverdueTab() {
 
   if (isLoading) {
     return <SkeletonLoader  />;
-<<<<<<<< HEAD:src/features/studyGroup/components/OverViewtab.tsx
-    }
-========
  }
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/todos/OverViewtab.tsx
 
   if (overdueTasks.length === 0) {
     return (

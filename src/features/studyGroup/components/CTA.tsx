@@ -1,7 +1,8 @@
 "use client";
 
+import CreateGroupModal from "@/features/study-group/modals/CreateGroupModal";
 import { UserPlus, ArrowRight, CheckCircle } from "lucide-react";
-import CreateGroupModal from "@/components/modals/studyGroup/study/CreateGroupModal";
+
 // import { useAppDispatch, useAppSelector } from "../../../../lib/redux/hooks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { openCreateModal, closeCreateModal, selectIsCreateModalOpen } from "@/hooks/studyGroup/features/groups/groupsSlice";
@@ -12,7 +13,7 @@ export default function CTA() {
 
   return (
     <>
-    
+
       <div className="w-full mt-8 bg-white border-2 border-[#e0d8cf] rounded-2xl shadow-lg overflow-hidden">
         <div
           className="rounded-2xl shadow-xl overflow-hidden relative"

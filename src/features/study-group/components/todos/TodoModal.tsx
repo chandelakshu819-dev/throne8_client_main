@@ -8,11 +8,6 @@ import { useState, useEffect } from 'react';
 import { Calendar, Award, X, Plus, Check, Trash2 } from 'lucide-react';
 import { createTaskThunk } from '@/hooks/studyGroup/features/todo/todo.thunks';
 
-<<<<<<<< HEAD:src/features/studyGroup/components/TodoModal.tsx
-
-// TodoModalProps mein ye add karo
-========
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/todos/TodoModal.tsx
 interface TodoModalProps {
   selectedDate: Date | null;
   showTodoModal: boolean;

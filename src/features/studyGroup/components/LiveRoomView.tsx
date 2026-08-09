@@ -1,7 +1,3 @@
-<<<<<<<< HEAD:src/features/studyGroup/components/LiveRoomView.tsx
-
-========
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/LiveRoomView.tsx
 'use client';
 
 import React, {
@@ -24,12 +20,7 @@ import {
   Monitor,
   Users,
 } from 'lucide-react';
-<<<<<<<< HEAD:src/features/studyGroup/components/LiveRoomView.tsx
-import { RemotePeer, ConnectionQuality, RoomMode, useLiveRoom } from '@/lib/webRTC/useLiveRoom';
-import { LiveRoomViewProps, LocalTileProps, PeerTileProps, VideoTileProps } from '../interface';
-========
 import { RemotePeer, ConnectionQuality, RoomMode, useLiveRoom } from '@/core/webrtc/useLiveRoom';
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/LiveRoomView.tsx
 
 
 // ─── Quality badge ─────────────────────────────────────────────

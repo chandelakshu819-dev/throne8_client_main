@@ -10,11 +10,7 @@ import { fetchGroupByIdThunk, fetchGroupMembersThunk, createLiveRoomThunk, fetch
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearSelectedGroup, selectGroupMembers, selectGroupMembersLoading, selectSelectedGroup, selectSelectedGroupLoading, selectActiveLiveRoom, selectActiveLiveRoomLoading, selectLiveRoomActionLoading, selectLocalCameraOn, selectLocalMicOn, selectLocalScreenShareOn, setLocalCamera, setLocalMic, setLocalScreenShare, clearActiveLiveRoom, selectAttendanceStatus, selectAttendanceCheckInLoading } from "@/hooks/studyGroup/features/groups/groupsSlice";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupRoom.tsx
-import { useGroupData } from "@/hooks/studyGroup/useGroupData";
-========
 import { useGroupData } from "@/features/study-group/hooks/useGroupData";
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/GroupRoom.tsx
 import StudyGroupService from "@/lib/api/studyGroup.service";
 import { useChatSocket } from "@/core/realtime/useChatSocket";
 import { startTimerThunk, pauseTimerThunk, resumeTimerThunk, stopTimerThunk } from "@/hooks/studyGroup/features/timer/timer.thunks";
@@ -537,11 +533,7 @@ ADD this block just before your main `return (` statement:
               ✅ Attendance marked for today
             </div>
           )}
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupRoom.tsx
- 
-========
 
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/GroupRoom.tsx
           {activeLiveRoom ? (
             <div className="flex gap-2">
               <button
@@ -662,10 +654,6 @@ ADD this block just before your main `return (` statement:
               </span>
             )}
 
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupRoom.tsx
- 
-========
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/GroupRoom.tsx
             {activeLiveRoom ? (
               <div className="flex items-center gap-2">
                 <span className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-600 rounded-full text-xs font-semibold border border-red-500/20 animate-pulse">
@@ -1282,14 +1270,8 @@ ADD this block just before your main `return (` statement:
       <div className="backdrop-blur-md bg-white/40 border-t border-[#d4c4b5] shadow-lg px-3 sm:px-4 md:px-6 py-3 sm:py-4 shrink-0 safe-area-bottom">
         <div className="flex items-center justify-center gap-2 sm:gap-3 md:gap-4">
           <button
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupRoom.tsx
-        
-            onClick={async () => {
-            
-========
                    onClick={async () => {
               // WebRTC track toggle (immediate, no server round-trip)
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/GroupRoom.tsx
               toggleWebRTCMic();
              
               const socket = getSocket();
@@ -1310,12 +1292,7 @@ ADD this block just before your main `return (` statement:
           </button>
 
           <button
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupRoom.tsx
-
-              onClick={async () => {
-========
             onClick={async () => {
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/GroupRoom.tsx
               await toggleWebRTCCamera();
               const socket = getSocket();
               socket?.emit('toggle-camera', {
@@ -1616,11 +1593,8 @@ ADD this block just before your main `return (` statement:
       {showLiveRoomView && activeLiveRoom && (
         <div className="fixed inset-0 z-[100] bg-black">
          
-<<<<<<<< HEAD:src/features/studyGroup/components/GroupRoom.tsx
-========
 
           // ✅ GroupRoom.tsx mein yeh already sahi hai, bas prop names check karo:
->>>>>>>> ed5e7918466befd6e71595a48758cdf47a8b9a31:src/features/study-group/components/my-groups/GroupRoom.tsx
           <LiveRoomView
             localStream={localStream}
             currentUserId={currentUserId}
