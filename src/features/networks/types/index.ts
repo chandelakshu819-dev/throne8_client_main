@@ -3,6 +3,7 @@ export interface Person {
     name: string;
     title: string;
     mutuals: string;
+    mutualAvatars?: string[]; // top 3 mutual persons ki photo URLs
     image: string;
     location: string;
 }
