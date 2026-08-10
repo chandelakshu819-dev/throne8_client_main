@@ -209,18 +209,20 @@ const RepostCard = (props: any) => {
   // engagement numbers/state come straight from originalPost (backend
   // source of truth). For quote repost, likes come from the repost's own
   // independent state; comments/reposts still reference the original.
-  const postForCard = isQuote
+const postForCard = isQuote
     ? {
         ...originalPost,
         entryId: postKeyForActions,
         postId: postKeyForActions,
         likesCount: quoteLikesCount,
         isLikedByCurrentUser: quoteLiked,
+        image: originalPost.images?.[0]?.cloudinarySecureUrl || '',
       }
     : {
         ...originalPost,
         entryId: postKey,
         postId: postKey,
+        image: originalPost.images?.[0]?.cloudinarySecureUrl || '',
       };
 
   const effectiveHandleLike = () => {
