@@ -258,8 +258,26 @@ class ConnectionService {
     }
 
 
+
+    static async getBulkMutualConnections(userId: string, targetUserIds: string[], limit: number = 3) {
+        try {
+            const { data } = await api.post('/connections/mutual/bulk', {
+                userId,
+                targetUserIds,
+                limit,
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [GET_BULK_MUTUAL_CONNECTIONS] Failed:', error);
+            return { data: {} }; // safe fallback, UI block nahi hogi
+        }
+    }
+
     /**
      * 🤝 GET MUTUAL CONNECTIONS BETWEEN TWO USERS
+     * 
+     * 
+     * 
      */
     static async getMutualConnections(userId1: string, userId2: string, limit: number = 3) {
         try {

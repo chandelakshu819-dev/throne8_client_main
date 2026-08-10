@@ -78,13 +78,24 @@ export const useNetworkUsers = () => {
             }
 
             // ✅ NEW STEP: Fetch mutual connections for each suggested user in parallel
-            const mutualsResults = await Promise.all(
-                usersData.map((user: any) =>
-                    ConnectionService.getMutualConnections(userId, user.userId, 3)
-                        .then((res: any) => res?.data || { mutuals: [], count: 0 })
-                        .catch(() => ({ mutuals: [], count: 0 }))
-                )
-            );
+            // ✅ FIX: N parallel calls ki jagah ek hi bulk call
+const targetUserIds = usersData.map((user: any) => user.userId);
+let mutualsResults: any[] = usersData.map(() => ({ mutuals: [], count: 0 })); // default fallback
+
+if (targetUserIds.length > 0) {
+    try {
+        const bulkRes = await ConnectionService.getBulkMutualConnections(userId, targetUserIds, 3);
+        const resultsMap = bulkRes?.data?.data || {}; // { "userId-targetId": { mutuals, count } }
+
+        mutualsResults = usersData.map((user: any) => {
+            const key = `${userId}-${user.userId}`;
+            return resultsMap[key] || { mutuals: [], count: 0 };
+        });
+    } catch (err) {
+        console.warn('⚠️ Failed to fetch bulk mutual connections:', err);
+        // mutualsResults already default fallback pe hai
+    }
+}
 
             // ✅ Collect the actual "mutual person" IDs (not connection record IDs)
             // Har mutual record me fromUserId/toUserId hai — jo current suggested user nahi hai wahi mutual person hai
