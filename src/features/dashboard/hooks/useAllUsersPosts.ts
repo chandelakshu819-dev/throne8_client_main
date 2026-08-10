@@ -12,14 +12,11 @@ export const useAllUsersPosts = () => {
     const [hasMore, setHasMore] = useState(true);
     const [page, setPage] = useState(1);
 
-    // ✅ Simple in-memory cache so repeated fetches don't re-hit user/photo/headline
-    // APIs for the same userIds every time (persists across calls within this hook instance)
     const usersCacheRef = useRef<Record<string, any>>({});
     const photosCacheRef = useRef<Record<string, string>>({});
     const headlinesCacheRef = useRef<Record<string, string>>({});
 
     const transformPosts = useCallback(async (posts: any[]) => {
-        // ✅ Only fetch user data we don't already have cached
         const uniqueUserIds = [
             ...new Set(
                 posts.flatMap((post: any) =>
@@ -81,8 +78,6 @@ export const useAllUsersPosts = () => {
         const profilePhotosMap = photosCacheRef.current;
         const headlinesMap = headlinesCacheRef.current;
 
-        // ✅ Fallback user object instead of dropping the post entirely when
-        // user data is missing (network hiccup, deleted account, etc.)
         const fallbackUser = { firstName: 'Unknown', lastName: 'User', profilePhotoId: null, headlineId: null };
 
         return posts.map((post: any) => {
@@ -121,24 +116,31 @@ export const useAllUsersPosts = () => {
                     connectionStatus: post.connectionStatus,
                     connectionDegree: post.connectionDegree,
                     originalPost: {
-                       entryId: post.originalPost.entryId,
-                       userId: post.originalPost.userId,
-                       title: post.originalPost.title,
-                       content: post.originalPost.content,
-                       images: post.originalPost.images || [],
-                       videos: post.originalPost.videos || [],
-                       documents: post.originalPost.documents || [],
-                       likesCount: post.originalPost.likesCount || 0,
-                       commentsCount: post.originalPost.commentsCount || 0,
-                       isLikedByCurrentUser: post.originalPost.isLikedByCurrentUser || false,
-                       createdAt: post.originalPost.createdAt,
-                       userAvatar: originalProfileImageUrl,
-                       userName: `${originalUserData.firstName || ''} ${originalUserData.lastName || ''}`.trim() || 'Unknown User',
-                       fullName: `${originalUserData.firstName || ''} ${originalUserData.lastName || ''}`.trim() || 'Unknown User',
-                       // ✅ FIX: backend ab originalPost ke andar hi ye field bhejta hai
-                       connectionStatus: post.originalPost.connectionStatus || 'none',
-                       connectionDegree: post.originalPost.connectionDegree ?? null,
-                   },
+                        entryId: post.originalPost.entryId,
+                        userId: post.originalPost.userId,
+                        title: post.originalPost.title,
+                        content: post.originalPost.content,
+                        images: post.originalPost.images || [],
+                        videos: post.originalPost.videos || [],
+                        documents: post.originalPost.documents || [],
+                        likesCount: post.originalPost.likesCount || 0,
+                        commentsCount: post.originalPost.commentsCount || 0,
+                        isLikedByCurrentUser: post.originalPost.isLikedByCurrentUser || false,
+                        createdAt: post.originalPost.createdAt,
+                        userAvatar: originalProfileImageUrl,
+                        userName:
+                            `${originalUserData.firstName || ''} ${originalUserData.lastName || ''}`.trim() ||
+                            'Unknown User',
+                        fullName:
+                            `${originalUserData.firstName || ''} ${originalUserData.lastName || ''}`.trim() ||
+                            'Unknown User',
+                        connectionStatus: post.originalPost.connectionStatus || 'none',
+                        connectionDegree: post.originalPost.connectionDegree ?? null,
+                        // ✅ counts
+                        repostsCount: post.originalPost.repostsCount || 0,
+                        sendsCount: post.originalPost.sendsCount || 0,
+                        shares: post.originalPost.repostsCount || post.originalPost.shares || 0,
+                    },
                 };
             }
 
@@ -173,7 +175,6 @@ export const useAllUsersPosts = () => {
             setAllPosts((prev) => (append ? [...prev, ...transformedPosts] : transformedPosts));
             setHasMore(pagination?.hasNextPage ?? false);
             setPage(pageNum);
-
         } catch (error: any) {
             console.error('❌ [HOOK] Failed to fetch home feed posts:', error);
             if (!append) setAllPosts([]);
@@ -189,10 +190,6 @@ export const useAllUsersPosts = () => {
         }
     }, [page, hasMore, isLoadingMore, isLoadingAllPosts, fetchAllUsersPosts]);
 
-    // ✅ NEW: real-time socket-pushed post/repost ko list ke top mein daalta hai.
-    // `transformPosts` hi reuse karta hai (same cache, same shape guarantee) —
-    // taaki naya item aur normal-fetch wale items exactly waisi hi shape ke ho,
-    // aur PostCard/FeedRepostCard bina extra handling ke render kar sake.
     const prependPost = useCallback(async (rawPost: any) => {
         if (!rawPost) return;
 
@@ -201,17 +198,15 @@ export const useAllUsersPosts = () => {
             if (!transformed) return;
 
             setAllPosts((prev) => {
-                // ✅ Duplicate-guard — agar ye item kisi wajah se already list mein hai
-                // (jaise optimistic-update wale purane `feedReposts` flow se), dobara na daalein
-                const key = transformed.feedItemType === 'repost'
-                    ? transformed.repostId
-                    : (transformed.entryId || transformed.postId);
-                const alreadyExists = prev.some((p: any) => {
-                    const existingKey = p.feedItemType === 'repost'
-                        ? p.repostId
-                        : (p.entryId || p.postId);
-                    return existingKey === key;
-                });
+                const getKey = (item: any) => {
+                    if (item?.feedItemType === 'repost') {
+                        return item.repostId;
+                    }
+                    return item?.entryId || item?.postId;
+                };
+
+                const key = getKey(transformed);
+                const alreadyExists = prev.some((p: any) => getKey(p) === key);
                 if (alreadyExists) return prev;
 
                 return [transformed, ...prev];
@@ -228,6 +223,6 @@ export const useAllUsersPosts = () => {
         hasMore,
         fetchAllUsersPosts,
         loadMorePosts,
-        prependPost, // ✅ NEW
+        prependPost,
     };
 };

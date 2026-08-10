@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { X, Search, Link as LinkIcon, Check } from 'lucide-react';
 import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData';
 import MessagingAPI from '@/lib/api/messaging.service';
+import HomePostService from '@/lib/api/homePost.service';
 
 interface SendPostModalProps {
   isOpen: boolean;
@@ -14,6 +15,10 @@ interface SendPostModalProps {
   postId: string;
   postOwnerName?: string;
   isDarkMode?: boolean;
+  // ✅ NEW: parent (PostActions) ko batata hai ki send successful hua,
+  // kitne logo ko bheja gaya — taaki "X sends" count optimistically
+  // turant update ho jaye, poori feed refetch kiye bina.
+  onSendSuccess?: (recipientCount: number) => void;
 }
 
 interface ConnectionUser {
@@ -30,6 +35,7 @@ const SendPostModal: React.FC<SendPostModalProps> = ({
   postId,
   postOwnerName = 'this',
   isDarkMode = false,
+  onSendSuccess,
 }) => {
   const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState('');
@@ -139,6 +145,14 @@ const SendPostModal: React.FC<SendPostModalProps> = ({
           });
         })
       );
+
+      // ✅ FIX: pehle koi bhi "send" event kahin record nahi hota tha —
+      // isliye "X sends" count feed pe hamesha 0/missing rehta tha.
+      // Ab har successful send ke baad, backend counter badhta hai
+      // (targetIds.length se, i.e. jitne logo ko bheja utna hi add hota hai)
+      // aur parent (PostActions) ko turant optimistic update ke liye batao.
+      await HomePostService.recordSend(postId, targetIds.length);
+      onSendSuccess?.(targetIds.length);
 
       setSentDone(true);
       setTimeout(() => {

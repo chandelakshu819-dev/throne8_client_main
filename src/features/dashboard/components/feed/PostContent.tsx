@@ -1,11 +1,11 @@
-// app/(dashboard)/components/feed/PostContent.tsx
+// features/dashboard/components/feed/PostContent.tsx
 import React, { useState } from 'react';
 import { renderFormattedContent, renderFormattedLine } from '@/shared/utils/postContentFormat';
 import AnalyticsService from '@/lib/api/analytics.service';
 
 const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) => {
   const [expanded, setExpanded] = useState(false);
-  const content: string = post.content || '';
+  const content: string = post.content || post.text || '';
 
   // Get lines and filter out empty ones to find the first real line
   const lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
@@ -15,7 +15,7 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
   const isTooLong = content.length > 40;
   const isLong = isMultiline || isTooLong;
 
-  // ✅ NEW: content ab **bold**/_italic_/"- bullet" ko formatted React
+  // ✅ content ab **bold**/_italic_/"- bullet" ko formatted React
   // elements ke saath render karta hai — dangerouslySetInnerHTML kahin
   // use nahi hota, isliye XSS-safe hai. Collapsed state mein sirf pehli
   // line ka inline formatting dikhata hai (bullets sirf expanded mein
@@ -26,20 +26,49 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
 
   return (
     <>
-      <p className={`text-base font-medium leading-relaxed mb-2 whitespace-pre-wrap ${!expanded && isLong ? 'line-clamp-1' : ''} ${isDarkMode ? 'text-slate-200' : 'text-[#4a3728]'}`}>
+      <p
+        className={`text-base font-medium leading-relaxed mb-2 whitespace-pre-wrap ${
+          !expanded && isLong ? 'line-clamp-1' : ''
+        } ${isDarkMode ? 'text-slate-200' : 'text-[#4a3728]'}`}
+      >
         {displayNode}
       </p>
+
       {isLong && (
         <button
-          onClick={() => setExpanded(v => !v)}
-          className={`text-sm font-semibold mb-4 ${isDarkMode ? 'text-slate-300 hover:text-white' : 'text-[#6b5643] hover:text-[#4a3728]'}`}
+          onClick={(e) => {
+            // ✅ FIX: PostContent PostCard/FeedRepostCard ke andar ek
+            // onClick wrapper div ke bheetar hota hai (jo post-detail
+            // modal kholta hai). stopPropagation() ke bina yeh click
+            // bubble ho ke us parent onClick ko bhi trigger kar deta
+            // tha — isliye "Read more" click karne pe expand ke saath
+            // saath poori post bhi open ho jaati thi. Ab sirf expand/
+            // collapse hoga, modal nahi khulega.
+            e.stopPropagation();
+            setExpanded((v) => !v);
+          }}
+          className={`text-sm font-semibold mb-4 ${
+            isDarkMode
+              ? 'text-slate-300 hover:text-white'
+              : 'text-[#6b5643] hover:text-[#4a3728]'
+          }`}
         >
           {expanded ? 'Show less' : 'Read more'}
         </button>
       )}
-     {post.image && (
+
+      {post.image && (
         <div
-          onClick={() => AnalyticsService.recordClick(post.userId, 'image', post.image, post.postId)}
+          onClick={() => {
+            // Analytics record karo. stopPropagation hata diya taaki
+            // parent PostCard ka modal-open onClick bhi chale.
+            AnalyticsService.recordClick(
+              post.userId,
+              'image',
+              post.image,
+              post.postId
+            );
+          }}
           className="mb-6 rounded-2xl overflow-hidden bg-transparent w-full h-[300px] flex justify-center cursor-pointer"
         >
           <img
@@ -49,10 +78,18 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
           />
         </div>
       )}
-     {post.videos && post.videos.length > 0 && (
+
+      {post.videos && post.videos.length > 0 && (
         <div
-          onClick={() => AnalyticsService.recordClick(post.userId, 'video', post.videos[0].cloudinarySecureUrl, post.postId)}
-          className="mb-6 rounded-2xl overflow-hidden bg-black w-full h-80 flex justify-center"
+          onClick={() => {
+            AnalyticsService.recordClick(
+              post.userId,
+              'video',
+              post.videos[0].cloudinarySecureUrl,
+              post.postId
+            );
+          }}
+          className="mb-6 rounded-2xl overflow-hidden bg-black w-full h-80 flex justify-center cursor-pointer"
         >
           <video
             src={post.videos[0].cloudinarySecureUrl}
@@ -62,12 +99,26 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
           />
         </div>
       )}
+
       {post.documents && post.documents.length > 0 && (
-        <div className="mb-6 bg-gradient-to-br from-[#e0d8cf]/40 to-[#f6ede8]/30 border border-[#e0d8cf]/50 p-4 rounded-2xl flex items-center justify-between gap-4">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="mb-6 bg-gradient-to-br from-[#e0d8cf]/40 to-[#f6ede8]/30 border border-[#e0d8cf]/50 p-4 rounded-2xl flex items-center justify-between gap-4"
+        >
           <div className="flex items-center gap-3 min-w-0">
             <div className="p-2.5 bg-[#4a3728] text-[#f6ede8] rounded-xl flex-shrink-0">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
               </svg>
             </div>
             <div className="min-w-0">
@@ -75,7 +126,10 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
                 {post.documents[0].originalName || 'Document'}
               </p>
               <p className="text-xs text-[#4a3728]/60">
-                {post.documents[0].fileSize ? `${(post.documents[0].fileSize / 1024).toFixed(0)} KB` : '—'} · {post.documents[0].format?.toUpperCase() || 'PDF'}
+                {post.documents[0].fileSize
+                  ? `${(post.documents[0].fileSize / 1024).toFixed(0)} KB`
+                  : '—'}{' '}
+                · {post.documents[0].format?.toUpperCase() || 'PDF'}
               </p>
             </div>
           </div>
@@ -83,7 +137,15 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
             href={post.documents[0].cloudinarySecureUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => AnalyticsService.recordClick(post.userId, 'document_download', post.documents[0].cloudinarySecureUrl, post.postId)}
+            onClick={(e) => {
+              e.stopPropagation();
+              AnalyticsService.recordClick(
+                post.userId,
+                'document_download',
+                post.documents[0].cloudinarySecureUrl,
+                post.postId
+              );
+            }}
             className="px-4 py-2 bg-[#4a3728] text-[#f6ede8] text-xs font-bold rounded-xl hover:opacity-90 transition-opacity flex-shrink-0"
           >
             Download

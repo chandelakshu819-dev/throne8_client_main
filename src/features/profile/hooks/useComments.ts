@@ -40,7 +40,7 @@ export interface CommentData {
     threadDepth?: number;
     replyCount?: number;
     user?: CommentUser;
-    isAuthor?: boolean; // ✅ NEW: true when this comment's author === the post owner
+    isAuthor?: boolean; // true when this comment's author === the post owner
 }
 
 // ==================== HOOK ====================
@@ -51,16 +51,35 @@ export const useComments = () => {
     const [isSubmittingComment, setIsSubmittingComment] = useState(false);
     const [commentLikes, setCommentLikes] = useState<{ [commentId: string]: { count: number; isLiked: boolean } }>({});
 
-    // ✅ NEW: remembers each post's owner userId so re-fetches (after create/edit/delete)
+    // remembers each post's owner userId so re-fetches (after create/edit/delete)
     // don't need the caller to keep re-passing it every single time.
     const postOwnerIdsRef = useRef<{ [postId: string]: string }>({});
 
+    // ✅ NEW: tracks which postIds have already been fetched at least once.
+    // Isse toggle-open pe agar comments already cache mein hain, dobara
+    // poora bulk-fetch + enrichment pipeline nahi chalta — turant open
+    // hota hai. `forceRefresh` se explicitly re-fetch bhi ho sakta hai
+    // (create/edit/delete ke baad).
+    const fetchedPostIdsRef = useRef<Set<string>>(new Set());
+
     // ==================== FETCH COMMENTS ====================
-    const fetchCommentsByPost = useCallback(async (postId: string, postOwnerId?: string) => {
+    const fetchCommentsByPost = useCallback(async (
+        postId: string,
+        postOwnerId?: string,
+        forceRefresh: boolean = false
+    ) => {
         if (postOwnerId) {
             postOwnerIdsRef.current[postId] = postOwnerId;
         }
         const effectiveOwnerId = postOwnerIdsRef.current[postId];
+
+        // ✅ Already fetched once and caller isn't forcing a refresh —
+        // skip the network round-trip entirely. This is the main fix for
+        // "comment section opens slow": on repeat opens of the same post,
+        // no loading spinner, no bulk-fetch pipeline, instant open.
+        if (!forceRefresh && fetchedPostIdsRef.current.has(postId)) {
+            return;
+        }
 
         try {
             setIsLoadingComments(prev => ({ ...prev, [postId]: true }));
@@ -74,6 +93,7 @@ export const useComments = () => {
             });
             setCommentLikes(prev => ({ ...prev, ...likesMap }));
             setCommentsByPost(prev => ({ ...prev, [postId]: enriched }));
+            fetchedPostIdsRef.current.add(postId);
         } catch (error: any) {
             console.error('❌ [COMMENTS] Fetch failed:', error.message);
             setCommentsByPost(prev => ({ ...prev, [postId]: [] }));
@@ -90,7 +110,8 @@ export const useComments = () => {
         try {
             setIsSubmittingComment(true);
             await ProfileService.createComment(postId, parsed.data.content);
-            await fetchCommentsByPost(postId);
+            // ✅ force refresh — naya comment cache ko bypass karke turant dikhna chahiye
+            await fetchCommentsByPost(postId, undefined, true);
         } catch (error: any) {
             throw error;
         } finally {
@@ -106,7 +127,7 @@ export const useComments = () => {
         try {
             setIsSubmittingComment(true);
             await ProfileService.createReply(commentId, parsed.data.content);
-            await fetchCommentsByPost(postId);
+            await fetchCommentsByPost(postId, undefined, true);
         } catch (error: any) {
             throw error;
         } finally {
@@ -169,8 +190,10 @@ export const useComments = () => {
     }, [commentLikes]);
 
     // ==================== USER ENRICHMENT ====================
-    // ✅ Ab bulk calls use hote hain — individual getUserProfileById/getHeadlineById loops hata diye
-    // ✅ NEW: ownerId param se har comment pe isAuthor flag set hota hai
+    // ✅ Bulk calls use hote hain — individual getUserProfileById/getHeadlineById loops nahi hain.
+    // ✅ FIX: photos aur headlines dono sirf usersData pe depend karte hain, ek doosre
+    // pe nahi — pehle yeh sequentially (await ek ke baad ek) chal rahe the jo unnecessary
+    // latency add kar raha tha. Ab Promise.all se parallel chalte hain.
     const enrichCommentsWithUsers = async (
         comments: CommentData[],
         postOwnerId?: string
@@ -190,31 +213,32 @@ export const useComments = () => {
             }
 
             const photoIds = usersData.map((u: any) => u.profilePhotoId).filter(Boolean);
+            const headlineIds = usersData.map((u: any) => u.headlineId).filter(Boolean);
 
-            let photosMap: Record<string, string> = {};
-            if (photoIds.length > 0) {
-                const res = await ProfileService.getMultipleProfilePhotosByIds(photoIds).catch(() => null);
-                if (res) {
-                    photosMap = res.data.photos.reduce((acc: Record<string, string>, p: any) => {
+            // ✅ FIX: parallel fetch instead of sequential
+            const [photosMap, headlinesMap] = await Promise.all([
+                (async (): Promise<Record<string, string>> => {
+                    if (photoIds.length === 0) return {};
+                    const res = await ProfileService.getMultipleProfilePhotosByIds(photoIds).catch(() => null);
+                    if (!res) return {};
+                    return res.data.photos.reduce((acc: Record<string, string>, p: any) => {
                         acc[p.photoId] = p.cloudinarySecureUrl; return acc;
                     }, {});
-                }
-            }
-
-            const headlineIds = usersData.map((u: any) => u.headlineId).filter(Boolean);
-            let headlinesMap: Record<string, string> = {};
-            if (headlineIds.length > 0) {
-                try {
-                    const headlinesResponse = await ProfileService.getMultipleHeadlinesByIds(headlineIds);
-                    const headlines = headlinesResponse.data?.headlines || [];
-                    headlinesMap = headlines.reduce((acc: Record<string, string>, headline: any) => {
-                        acc[headline.headlineId] = headline.title;
-                        return acc;
-                    }, {});
-                } catch {
-                    // headlines optional
-                }
-            }
+                })(),
+                (async (): Promise<Record<string, string>> => {
+                    if (headlineIds.length === 0) return {};
+                    try {
+                        const headlinesResponse = await ProfileService.getMultipleHeadlinesByIds(headlineIds);
+                        const headlines = headlinesResponse.data?.headlines || [];
+                        return headlines.reduce((acc: Record<string, string>, headline: any) => {
+                            acc[headline.headlineId] = headline.title;
+                            return acc;
+                        }, {});
+                    } catch {
+                        return {}; // headlines optional
+                    }
+                })(),
+            ]);
 
             const usersMap = usersData.reduce((acc: Record<string, any>, u: any) => {
                 acc[u.userId] = u; return acc;

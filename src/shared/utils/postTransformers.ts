@@ -1,62 +1,67 @@
 import { calculateTimeAgo } from './time.util';
 
-
-
-// ✅ NEW: maps raw degree (1 | 2 | 3 | null) → LinkedIn-style label
+// ✅ maps raw degree (1 | 2 | 3 | null) → LinkedIn-style label
 const getDegreeLabel = (
-    connectionDegree: 1 | 2 | 3 | null | undefined,
-    connectionStatus: string
+  connectionDegree: 1 | 2 | 3 | null | undefined,
+  connectionStatus: string
 ): string | null => {
-    if (connectionStatus === 'self') return null; // never show a badge on your own posts
-    if (connectionDegree === 1) return '1st';
-    if (connectionDegree === 2) return '2nd';
-    if (connectionDegree === 3) return '3rd';
-    return '3rd+'; // null/undefined = beyond 3 hops or no path found
+  if (connectionStatus === 'self') return null;
+  if (connectionDegree === 1) return '1st';
+  if (connectionDegree === 2) return '2nd';
+  if (connectionDegree === 3) return '3rd';
+  return '3rd+';
 };
 
-
 export const transformApiPostToFeedPost = (
-    apiPost: any,
-    userData?: any,
-    profileImageUrl?: string | null,
-    headlineText?: string | null
+  apiPost: any,
+  userData?: any,
+  profileImageUrl?: string | null,
+  headlineText?: string | null
 ) => {
+  const connectionStatus = apiPost.connectionStatus || 'none';
 
-    const connectionStatus = apiPost.connectionStatus || 'none';
+  return {
+    user: userData
+      ? `${userData.firstName || ''} ${userData.lastName || ''}`.trim()
+      : 'Unknown User',
+    avatar: profileImageUrl || userData?.profilePhotoUrl || '',
+    role: headlineText || userData?.headline || '',
+    time: calculateTimeAgo(apiPost.createdAt),
+    content: apiPost.content || apiPost.text || '',
+    image: apiPost.images?.[0]?.cloudinarySecureUrl || apiPost.image || '',
 
-    return {
-        user: userData ? `${userData.firstName} ${userData.lastName}`.trim() : 'Unknown User',
-        avatar: profileImageUrl || userData?.profilePhotoUrl || '',
-        role: headlineText || userData?.headline || '',
-        time: calculateTimeAgo(apiPost.createdAt),
-        content: apiPost.content || apiPost.text || '',
-        image: apiPost.images?.[0]?.cloudinarySecureUrl || apiPost.image || '',
-        likes: apiPost.likesCount || apiPost.likes || 0,
-        likesCount: apiPost.likesCount || apiPost.likes || 0,
-        comments: apiPost.commentsCount || apiPost.comments || 0,
-        commentsCount: apiPost.commentsCount || apiPost.comments || 0,
-        shares: apiPost.sharesCount || apiPost.reposts || 0,
-        postId: apiPost.entryId || apiPost.postId,
-        entryId: apiPost.entryId,
-        userId: apiPost.userId,
-        isLiked: apiPost.isLiked || apiPost.isLikedByCurrentUser || false,
-        isLikedByCurrentUser: apiPost.isLiked || apiPost.isLikedByCurrentUser || false,
-        images: apiPost.images || [],
-        videos: apiPost.videos || [],
-        documents: apiPost.documents || [],
-        connectionStatus: apiPost.connectionStatus || 'none',
+    likes: apiPost.likesCount || apiPost.likes || 0,
+    likesCount: apiPost.likesCount || apiPost.likes || 0,
+    comments: apiPost.commentsCount || apiPost.comments || 0,
+    commentsCount: apiPost.commentsCount || apiPost.comments || 0,
 
-        connectionDegree: apiPost.connectionDegree ?? null,
-        degreeLabel: getDegreeLabel(apiPost.connectionDegree, connectionStatus),
+    // ✅ FIXED counts
+    shares: apiPost.repostsCount || apiPost.sharesCount || apiPost.shares || 0,
+    repostsCount: apiPost.repostsCount || apiPost.sharesCount || apiPost.shares || 0,
+    sendsCount: apiPost.sendsCount || 0,
 
-        
-        likedByConnections: apiPost.likedByConnections || [],                     
-        likedByConnectionsAvatars: apiPost.likedByConnectionsAvatars || [],       
-        likedByConnectionsCount: apiPost.likedByConnectionsCount || 0,            
-        likedByConnectionsFull: apiPost.likedByConnectionsFull || [],             
-        commentedByConnections: apiPost.commentedByConnections || [],             
-        commentedByConnectionsAvatars: apiPost.commentedByConnectionsAvatars || [],
-        commentedByConnectionsCount: apiPost.commentedByConnectionsCount || 0,
-        commentedByConnectionsFull: apiPost.commentedByConnectionsFull || [],
-    };
+    postId: apiPost.entryId || apiPost.postId,
+    entryId: apiPost.entryId,
+    userId: apiPost.userId,
+    isLiked: apiPost.isLiked || apiPost.isLikedByCurrentUser || false,
+    isLikedByCurrentUser: apiPost.isLiked || apiPost.isLikedByCurrentUser || false,
+
+    images: apiPost.images || [],
+    videos: apiPost.videos || [],
+    documents: apiPost.documents || [],
+
+    connectionStatus,
+    connectionDegree: apiPost.connectionDegree ?? null,
+    degreeLabel: getDegreeLabel(apiPost.connectionDegree, connectionStatus),
+
+    likedByConnections: apiPost.likedByConnections || [],
+    likedByConnectionsAvatars: apiPost.likedByConnectionsAvatars || [],
+    likedByConnectionsCount: apiPost.likedByConnectionsCount || 0,
+    likedByConnectionsFull: apiPost.likedByConnectionsFull || [],
+
+    commentedByConnections: apiPost.commentedByConnections || [],
+    commentedByConnectionsAvatars: apiPost.commentedByConnectionsAvatars || [],
+    commentedByConnectionsCount: apiPost.commentedByConnectionsCount || 0,
+    commentedByConnectionsFull: apiPost.commentedByConnectionsFull || [],
+  };
 };

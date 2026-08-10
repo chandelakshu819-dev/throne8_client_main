@@ -62,7 +62,7 @@ class HomePostService {
     }
 
     /**
-     * ✅ NEW: GET /api/v1/activity/posts/:postId/reactors
+     * GET /api/v1/activity/posts/:postId/reactors
      * Post ke saare reactions/likes ki list (Reactions modal ke liye)
      */
     static async getPostReactors(postId: string): Promise<any> {
@@ -74,6 +74,27 @@ class HomePostService {
                 throw new Error(error.response.data.message);
             }
             throw new Error('Failed to fetch post reactors.');
+        }
+    }
+
+    /**
+     * ✅ NEW: POST /api/v1/activity/posts/:postId/record-send
+     * SendPostModal se post successfully send hone ke baad call hota hai —
+     * `recipientCount` batata hai kitne logo ko ek saath bheja gaya, taaki
+     * total "sends" count usi hisaab se badhe (5 logo ko bheja = +5, sirf +1 nahi).
+     * Non-critical hai — fail ho jaaye toh bhi user ka message already
+     * bhej diya gaya hai, isliye yahan error silently swallow hota hai
+     * (UI ko block nahi karna, sirf ek counter hai).
+     */
+    static async recordSend(postId: string, recipientCount: number): Promise<any> {
+        try {
+            const { data } = await api.post(`/activity/posts/${postId}/record-send`, {
+                recipientCount,
+            });
+            return data;
+        } catch (error: any) {
+            console.warn('⚠️ Failed to record send count (non-critical):', error?.message);
+            return null;
         }
     }
 }

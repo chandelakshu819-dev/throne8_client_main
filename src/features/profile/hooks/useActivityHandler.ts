@@ -85,19 +85,33 @@ export const useActivityHandlers = ({
         setPostReactions(reactionsMap);
     }, [posts]);
 
+    // ✅ NEW: seed like-state for a post that does NOT belong to the current
+    // `posts` prop array (e.g. the ORIGINAL post shown inside a repost card
+    // on this profile — that original post might belong to a different
+    // user entirely, so it never gets synced by the effect above).
+    // Only seeds if not already present, so it never clobbers a value that
+    // came from the posts-prop sync or from a subsequent like/unlike click.
+    const seedPostLikeState = (postId: string, state: { count: number; isLiked: boolean }) => {
+        if (!postId) return;
+        setPostLikes(prev => {
+            if (prev[postId] !== undefined) return prev; // already seeded/known — don't overwrite
+            return { ...prev, [postId]: state };
+        });
+    };
+
     // ── Post Handlers ─────────────────────────────────────────────
     const handleUpdatePost = async (postId: string, newContent: string) => {
-    try {
-        // ✅ FIX: pehle { title: newTitle } bhej rahe the, lekin card pe
-        // hamesha post.content render hota hai (PostContent.tsx confirm
-        // karta hai) — isliye title update kabhi screen pe nahi dikhta tha.
-        // Ab correct field "content" update ho raha hai.
-        await ProfileService.updatePost(postId, { content: newContent });
-        onPostCreated?.();
-    } catch (error: any) {
-        alert(error.message || 'Failed to update post');
-    }
-};
+        try {
+            // ✅ FIX: pehle { title: newTitle } bhej rahe the, lekin card pe
+            // hamesha post.content render hota hai (PostContent.tsx confirm
+            // karta hai) — isliye title update kabhi screen pe nahi dikhta tha.
+            // Ab correct field "content" update ho raha hai.
+            await ProfileService.updatePost(postId, { content: newContent });
+            onPostCreated?.();
+        } catch (error: any) {
+            alert(error.message || 'Failed to update post');
+        }
+    };
 
     const handleDeletePost = async (postId: string) => {
         if (!confirm('Are you sure you want to delete this post?')) return;
@@ -221,7 +235,7 @@ export const useActivityHandlers = ({
             }
         }
     };
-// ── Comment Handlers ──────────────────────────────────────────
+    // ── Comment Handlers ──────────────────────────────────────────
     const toggleCommentsPanel = async (idx: number, postId: string) => {
         if (openCommentsIndex === idx) {
             setOpenCommentsIndex(null);
@@ -230,7 +244,7 @@ export const useActivityHandlers = ({
             if (postId && !commentsByPost[postId]) {
                 // ✅ post-owner ka userId nikalo taaki useComments ko pata ho
                 // konsa comment "Author" badge ke laayak hai
-                const ownerPost = posts.find(p => (p.entryId || p.postId) === postId);
+                const ownerPost = posts.find(p => (p.entryId || p.postId) === postId) as (Post & { userId?: string }) | undefined;
                 await fetchCommentsByPost(postId, ownerPost?.userId);
             }
         }
@@ -313,7 +327,7 @@ export const useActivityHandlers = ({
         deletingPostId,
         archivingPostId,
         postLikes,
-        // ✅ ADDED
+        seedPostLikeState, // ✅ NEW — exposed for RepostCard to seed original-post like state
         postReactions,
         handleReaction,
         openCommentsIndex,

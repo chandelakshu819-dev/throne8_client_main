@@ -93,8 +93,6 @@ const FeedRepostCard = ({
     handleCommentSubmit,
     emojiList,
     postCommentCounts,
-    postReactions,
-    onReact,
     openRepostIndex,
     toggleRepostMenu,
     handleRepost,
@@ -104,6 +102,11 @@ const FeedRepostCard = ({
     togglePostMenu,
     handlePostAction,
 }: FeedRepostCardProps) => {
+    // ✅ FIX: hook must run unconditionally, before any early return
+    // (previously declared after the `if (!originalPost) return null`
+    // below, which violates React's rules-of-hooks)
+    const [isDetailOpen, setIsDetailOpen] = React.useState(false);
+
     const originalPost = repostItem.originalPost;
     if (!originalPost) return null;
 
@@ -162,10 +165,11 @@ const FeedRepostCard = ({
         commentsCount: postCommentCounts?.[postKey] ?? originalPost.commentsCount ?? 0,
         isLikedByCurrentUser: originalPost.isLikedByCurrentUser || false,
         shares: originalPost.shares || 0,
+        // ✅ FIX: repost/send counts missing thi — isliye FeedRepostCard
+        // ke andar PostActions ko yeh data mil hi nahi raha tha
+        repostsCount: originalPost.repostsCount || 0,
+        sendsCount: originalPost.sendsCount || 0,
     };
-
-    // PostCard jaisa hi detail-modal state
-    const [isDetailOpen, setIsDetailOpen] = React.useState(false);
 
     return (
         <div
@@ -250,8 +254,6 @@ const FeedRepostCard = ({
                             onOpenWithPerspectiveModal={onOpenWithPerspectiveModal}
                             handleRepostInstant={handleRepostInstant}
                             currentUserId={currentUserId}
-                            postReactions={postReactions}
-                            onReact={onReact}
                         />
                     </div>
 
@@ -294,7 +296,7 @@ const FeedRepostCard = ({
                     index={postKey}
                     isDarkMode={isDarkMode}
                     onClose={() => setIsDetailOpen(false)}
-                    currentUserId={currentUserId}
+                    currentUserId={currentUserId || ''}
                     openMenuIndex={openMenuIndex}
                     togglePostMenu={togglePostMenu}
                     handlePostAction={handlePostAction}

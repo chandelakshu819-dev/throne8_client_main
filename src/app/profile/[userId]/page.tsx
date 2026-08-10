@@ -23,6 +23,7 @@ import { usePostsData } from '@/features/profile/hooks/usePostsData';
 import { useAboutData } from '@/features/profile/hooks/useAboutData';
 import { useHeadlineData } from '@/features/profile/hooks/useHeadlineData';
 import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData';
+import { useFollowCounts } from '@/features/profile/hooks/useFollowCounts'; // ✅ NEW
 import AnalyticsService from '@/lib/api/analytics.service';
 import ConnectionService from '@/lib/api/connection.service';
 import FollowService from '@/lib/api/follow.service';
@@ -69,6 +70,21 @@ export default function SearchUserProfilePage() {
         followersList,
         fetchConnectionsData,
     } = useConnectionsData();
+
+    // ✅ NEW — dedicated Follow-system counts. This is DIFFERENT from
+    // "connections" above (mutual/accepted network). This hook hits
+    // GET /api/v1/follow/counts/:userId which is the real one-directional
+    // follow count (LinkedIn/Twitter-style "Follow" button), and is what
+    // the "X followers" badge on ProfileHeader / ActivitySection should
+    // actually be showing. Previously both were wired to
+    // `followersList.length` (from useConnectionsData), which only
+    // reflects mutual connections — hence "0 followers" even when the
+    // user had real followers via the Follow system.
+    const {
+        followersCount,
+        fetchFollowCounts,
+        invalidateFollowCounts,
+    } = useFollowCounts();
 
     const [isFollowing, setIsFollowing] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
@@ -135,6 +151,14 @@ export default function SearchUserProfilePage() {
             fetchConnectionsData(userId);
         }
     }, [userId, fetchConnectionsData]);
+
+    // ✅ NEW — fetch real follow-system counts (followers/following) for
+    // whichever profile is being viewed.
+    useEffect(() => {
+        if (userId) {
+            fetchFollowCounts(userId);
+        }
+    }, [userId, fetchFollowCounts]);
 
     useEffect(() => {
         if (!userId || !user?.userId || userId === user.userId) return;
@@ -249,6 +273,11 @@ export default function SearchUserProfilePage() {
                 await FollowService.followUser(userId);
                 setIsFollowing(true);
             }
+            // ✅ NEW — invalidate cached follow counts and refetch immediately
+            // so the "X followers" badge updates right after follow/unfollow,
+            // instead of waiting for the next natural fetch cycle.
+            invalidateFollowCounts(userId);
+            await fetchFollowCounts(userId);
         } catch (error: any) {
             alert(error.message || 'Failed to update follow status');
         } finally {
@@ -399,7 +428,7 @@ export default function SearchUserProfilePage() {
                         company={profileData.company}
                         description={profileData.description}
                         location={profileData.location}
-                        followers={followersList.length}
+                        followers={followersCount}
                         connections={totalConnections.toString()}
                         firstName={userProfileData?.firstName || ''}
                         lastName={userProfileData?.lastName || ''}
@@ -454,7 +483,7 @@ export default function SearchUserProfilePage() {
                             profileImage={profileImageUrl}
                             fullName={fullName}
                             headline={profileData.headline}
-                            followers={followersList.length}
+                            followers={followersCount}
                             userId={userId}
                             currentUserId={user?.userId}
                             isOwnProfile={isOwnProfile}

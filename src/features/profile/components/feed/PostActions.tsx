@@ -42,6 +42,8 @@ const PostActions = ({
     ?? 0;
 
   const commentCount = post.commentsCount || post.comments || 0;
+  const shareCount = post.repostsCount || 0;
+  const sendCount = post.sendsCount || 0;
 
   const [hasReposted, setHasReposted] = useState(false);
   const [isReposting, setIsReposting] = useState(false);
@@ -54,7 +56,7 @@ const PostActions = ({
   return (
     <div className="pt-3 mt-1">
       {/* ── Row 1: summary counts ── */}
-      {(likeCount > 0 || commentCount > 0) && (
+      {(likeCount > 0 || commentCount > 0 || shareCount > 0 || sendCount > 0) && (
         <div className={`flex items-center justify-between px-1 pb-2 text-sm ${mutedText}`}>
           <div className="flex items-center gap-1.5">
             {likeCount > 0 && (
@@ -72,6 +74,10 @@ const PostActions = ({
               {commentCount} comment{commentCount !== 1 ? 's' : ''}
             </button>
           )}
+          <div className="flex items-center gap-3">
+            {shareCount > 0 && <span>{shareCount} repost{shareCount !== 1 ? 's' : ''}</span>}
+            {sendCount > 0 && <span>{sendCount} send{sendCount !== 1 ? 's' : ''}</span>}
+          </div>
         </div>
       )}
 
@@ -84,9 +90,8 @@ const PostActions = ({
         {/* Like — simple direct toggle, same as dashboard feed */}
         <button
           onClick={() => handleLike?.(postKey)}
-          className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-            isLiked ? 'text-[#0a66c2]' : `${iconText} ${hoverBg}`
-          }`}
+          className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${isLiked ? 'text-[#0a66c2]' : `${iconText} ${hoverBg}`
+            }`}
         >
           <i className={`ri-thumb-up-${isLiked ? 'fill' : 'line'} text-lg`}></i>
           <span>Like</span>
@@ -106,9 +111,8 @@ const PostActions = ({
           <button
             onClick={() => toggleRepostMenu(index)}
             disabled={isReposting}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-              hasReposted ? 'text-green-600' : `${iconText} ${hoverBg}`
-            }`}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${hasReposted ? 'text-green-600' : `${iconText} ${hoverBg}`
+              }`}
           >
             <i className={`ri-repeat-${hasReposted ? 'fill' : 'line'} text-lg`}></i>
             <span>Repost</span>

@@ -1,4 +1,5 @@
 // src/features/profile/components/PostCard.tsx
+
 'use client';
 import React from 'react';
 import { Post, PostLikeState } from '../../types';
@@ -278,24 +279,27 @@ const PostCard: React.FC<PostCardProps> = ({
                         <span className="text-sm font-semibold">{post.comments}</span>
                     </button>
 
-                    {/* Repost */}
+                  {/* Repost */}
                     <button className="group/btn flex items-center gap-2 text-[#4a3728]/70 hover:text-green-500 transition-all duration-200">
                         <div className="p-2 rounded-xl group-hover/btn:bg-green-50 transition-colors duration-200">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
                         </div>
-                        <span className="text-sm font-semibold">{post.reposts}</span>
+                        <span className="text-sm font-semibold">{post.repostsCount || 0}</span>
                     </button>
                 </div>
 
-                {/* Share */}
+                {/* Share / Send */}
                 <button className="group/btn flex items-center gap-2 text-[#4a3728]/70 hover:text-[#4a3728] transition-all duration-200">
                     <div className="p-2 rounded-xl group-hover/btn:bg-[#e0d8cf]/30 transition-colors duration-200">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
                         </svg>
                     </div>
+                    {(post.sendsCount || 0) > 0 && (
+                        <span className="text-sm font-semibold">{post.sendsCount}</span>
+                    )}
                 </button>
             </div>
 

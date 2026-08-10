@@ -1,5 +1,5 @@
-// src/profile/components/ProfileHeader.tsx
-'use client';
+// src/features/profile/components/home/ProfileHeader.tsx
+// 'use client';
 import React, { useEffect, useState } from 'react';
 import EditIntroModal from './EditIntroModal';
 import ProfileImageModal from './ProfileImageModal';

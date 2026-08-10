@@ -86,6 +86,11 @@ const DocumentCard = ({ post, doc }: { post: any; doc: any }) => {
   );
 };
 
+// ✅ REWRITTEN: RepostCard now reuses the SAME PostCard component used for
+// normal posts, instead of duplicating card markup. Only the OUTER header
+// ("You reposted") is custom — everything below it (author, content, media,
+// like/comment/repost/send bar) is the exact same PostCard used elsewhere,
+// so styling/behavior stays perfectly consistent and never drifts.
 const RepostCard = (props: any) => {
   const {
     repost,
@@ -94,50 +99,26 @@ const RepostCard = (props: any) => {
     fullName,
     currentUserId,
     isOwnProfile,
-    likedPosts,
-    handleLike,
-    toggleComments,
-    openCommentsIndex,
-    postComments,
-    commentText,
-    setCommentText,
-    replyingTo,
-    setReplyingTo,
-    openCommentMenuIndex,
-    editingCommentId,
-    editCommentText,
-    setEditCommentText,
-    showEmojiPicker,
-    setShowEmojiPicker,
-    handleReply,
-    handleCommentReaction,
-    toggleCommentMenu,
-    handleCommentAction,
-    handleEditSubmit,
-    handleEmojiClick,
-    handleCommentSubmit,
-    emojiList,
-    postCommentCounts,
+    handlers,
+    openRepostCommentsKey,
+    setOpenRepostCommentsKey,
   } = props;
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [originalAuthorName, setOriginalAuthorName] = useState('');
+  const [originalAuthorHeadline, setOriginalAuthorHeadline] = useState('');
   const [originalAuthorAvatar, setOriginalAuthorAvatar] = useState('');
-  const [isContentExpanded, setIsContentExpanded] = useState(false);
 
   const originalPost = repost.originalPost;
-  const postKey = originalPost ? originalPost.entryId : undefined;
-  const contentText: string = originalPost?.content || '';
-  const isLongContent = contentText.length > 150;
-
-  // ✅ repost type — quote vs simple repost
   const isQuote = repost.repostType === 'quote';
+  const postKey = originalPost ? (originalPost.entryId || originalPost.postId) : undefined;
 
   // ✅ Quote-repost ka apna independent like state (server value se init)
   const [quoteLiked, setQuoteLiked] = useState(!!repost.isLikedByCurrentUser);
   const [quoteLikesCount, setQuoteLikesCount] = useState(repost.likesCount || 0);
 
+  // ── Fetch original author's name/headline/avatar ──
   useEffect(() => {
     if (!originalPost || !originalPost.userId) return;
 
@@ -153,6 +134,14 @@ const RepostCard = (props: any) => {
         const user = response ? response.data : null;
         if (user) {
           setOriginalAuthorName((user.firstName + ' ' + (user.lastName || '')).trim());
+          if (user.headlineId) {
+            try {
+              const headlineRes = await ProfileService.getHeadlineById(user.headlineId);
+              setOriginalAuthorHeadline(headlineRes?.data?.title || '');
+            } catch {
+              setOriginalAuthorHeadline('');
+            }
+          }
           if (user.profilePhotoId) {
             const photoRes = await ProfileService.getProfilePhotoById(user.profilePhotoId);
             setOriginalAuthorAvatar(photoRes && photoRes.data && photoRes.data.photo ? photoRes.data.photo.cloudinarySecureUrl : '');
@@ -164,6 +153,19 @@ const RepostCard = (props: any) => {
     };
     fetchAuthor();
   }, [originalPost, currentUserId, fullName, profileImage]);
+
+  // ✅ Simple repost ke liye: original post ka like-state postLikes map mein
+  // seed karo agar wahan pehle se nahi hai (kyunki ye post `posts` prop
+  // — apne khud ke posts — ka hissa nahi hai, isliye normal sync-effect
+  // isko cover nahi karta)
+  useEffect(() => {
+    if (!isQuote && postKey && originalPost) {
+      handlers.seedPostLikeState(postKey, {
+        count: originalPost.likesCount || 0,
+        isLiked: originalPost.isLikedByCurrentUser || false,
+      });
+    }
+  }, [isQuote, postKey, originalPost]);
 
   if (!originalPost) return null;
 
@@ -193,37 +195,47 @@ const RepostCard = (props: any) => {
         await RepostService.reactToRepost(repost.repostId);
       }
     } catch (err) {
-      // revert on failure
       setQuoteLiked(wasLiked);
       setQuoteLikesCount((prev: number) => (wasLiked ? prev + 1 : Math.max(0, prev - 1)));
     }
   };
 
-  // ✅ repost type ke hisaab se alag alag like-source:
-  // - 'repost' (simple): original post ka hi likesCount/status
-  // - 'quote': repost ka apna independent likesCount/status
+  // ✅ getPostIdForInteraction() concept: normal post -> post._id,
+  // simple repost -> originalPostEntryId, quote repost -> its own repostId
+  // (independent engagement).
   const postKeyForActions = isQuote ? `repost:${repost.repostId}` : postKey;
 
-  const syntheticPost = {
-    entryId: postKeyForActions,
-    likesCount: isQuote ? quoteLikesCount : (originalPost.likesCount || 0),
-    commentsCount: postCommentCounts && postCommentCounts[postKey] !== undefined ? postCommentCounts[postKey] : (originalPost.commentsCount || 0),
-    isLikedByCurrentUser: isQuote ? quoteLiked : (originalPost.isLikedByCurrentUser || false),
-    shares: originalPost.shares || 0,
-  };
+  // ✅ Synthetic post object handed to PostCard. For simple repost, all
+  // engagement numbers/state come straight from originalPost (backend
+  // source of truth). For quote repost, likes come from the repost's own
+  // independent state; comments/reposts still reference the original.
+  const postForCard = isQuote
+    ? {
+        ...originalPost,
+        entryId: postKeyForActions,
+        postId: postKeyForActions,
+        likesCount: quoteLikesCount,
+        isLikedByCurrentUser: quoteLiked,
+      }
+    : {
+        ...originalPost,
+        entryId: postKey,
+        postId: postKey,
+      };
 
   const effectiveHandleLike = () => {
     if (isQuote) {
       handleQuoteLike();
     } else {
-      handleLike(postKey);
+      handlers.handleLikeToggle(postKey);
     }
   };
 
   return (
     <div className="p-6 rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1 bg-[#f6ede8]/95 border-[#4a3728]/20 relative overflow-hidden h-full flex flex-col">
+      {/* ── Outer header: represents the REPOSTER ("You reposted"), never the original author ── */}
       <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#e0d8cf]/50">
-        <div className="flex items-center gap-3 flex-1">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#4a3728]/20 flex-shrink-0 flex items-center justify-center bg-[#4a3728]/20">
             {profileImage ? (
               <img src={profileImage} alt="You" className="w-full h-full object-cover" />
@@ -239,11 +251,13 @@ const RepostCard = (props: any) => {
               <span className="text-xs text-[#4a3728]/50 flex-shrink-0">reposted</span>
             </div>
             <p className="text-xs text-[#4a3728]/50 mt-0.5">
-              {repost.repostType === 'quote' ? 'Quote Repost' : 'Repost'} - {new Date(repost.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {isQuote ? 'Quote Repost' : 'Repost'} · {new Date(repost.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </p>
           </div>
         </div>
 
+        {/* ✅ Only the "remove my repost" action — no edit/delete/pin/archive
+            menu for the ORIGINAL post shows up here */}
         {isOwnProfile ? (
           <div className="relative flex-shrink-0">
             <button onClick={() => setOpenMenuId(openMenuId ? null : 'menu')} className="p-2 hover:bg-[#4a3728]/10 rounded-full transition-all duration-200">
@@ -265,103 +279,74 @@ const RepostCard = (props: any) => {
         ) : null}
       </div>
 
-      {repost.repostType === 'quote' && repost.thoughtText ? (
+      {isQuote && repost.thoughtText ? (
         <p className="text-sm text-[#4a3728]/80 italic mb-4 px-2 border-l-2 border-[#4a3728]/30">{repost.thoughtText}</p>
       ) : null}
 
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-[#e0d8cf]/30">
-        <div className="flex items-start gap-3 mb-3">
-          <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center border-2 border-[#4a3728]/10 bg-[#4a3728]/10">
-            {originalAuthorAvatar || originalPost.userAvatar ? (
-              <img src={originalAuthorAvatar || originalPost.userAvatar} alt="Author" className="w-full h-full object-cover" />
-            ) : (
-              <svg className="w-5 h-5 text-[#4a3728]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-[#4a3728] text-sm">{originalAuthorName || originalPost.userName || originalPost.fullName || 'Unknown User'}</p>
-            <p className="text-xs text-[#4a3728]/50">{new Date(originalPost.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
-          </div>
-        </div>
-
-        <h3 className="text-base font-bold text-[#4a3728] mb-2">{originalPost.title}</h3>
-
-        {originalPost.content ? (
-          <>
-            <p className={`text-sm text-[#4a3728]/70 leading-relaxed mb-1 ${!isContentExpanded ? 'line-clamp-3' : ''}`}>
-              {originalPost.content}
-            </p>
-            {isLongContent ? (
-              <button
-                onClick={() => setIsContentExpanded((prev) => !prev)}
-                className="text-xs font-bold text-[#4a3728] mb-3 hover:underline"
-              >
-                {isContentExpanded ? 'Show less' : 'Read more'}
-              </button>
-            ) : (
-              <div className="mb-3" />
-            )}
-          </>
-        ) : null}
-
-        {originalPost.images && originalPost.images.length > 0 ? (
-          <img
-            src={originalPost.images[0].cloudinarySecureUrl}
-            alt={originalPost.title}
-            className="w-full h-40 object-cover rounded-lg mt-2"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-          />
-        ) : null}
-
-        <div className="mt-3 pt-3 border-t border-[#e0d8cf]/30">
-          <PostActions
-            post={syntheticPost}
-            index={postKeyForActions}
-            isDarkMode={false}
-            // ✅ quote ke liye isolated empty likedPosts pass karo — taaki
-            // syntheticPost.isLikedByCurrentUser (quoteLiked) use ho, original
-            // post ke likedPosts map se collide na ho
-            likedPosts={isQuote ? {} : likedPosts}
-            handleLike={effectiveHandleLike}
-            toggleComments={toggleComments}
-            openRepostIndex={null}
-            toggleRepostMenu={() => {}}
-            handleRepost={() => {}}
-            currentUserId={currentUserId}
-          />
-        </div>
-
-        {openCommentsIndex === postKey ? (
-          <div className="mt-2">
-            <CommentsSection
-              isDarkMode={false}
-              commentText={commentText}
-              setCommentText={setCommentText}
-              replyingTo={replyingTo}
-              setReplyingTo={setReplyingTo}
-              openCommentMenuIndex={openCommentMenuIndex}
-              editingCommentId={editingCommentId}
-              editCommentText={editCommentText}
-              setEditCommentText={setEditCommentText}
-              showEmojiPicker={showEmojiPicker}
-              setShowEmojiPicker={setShowEmojiPicker}
-              commentCount={postCommentCounts && postCommentCounts[postKey] !== undefined ? postCommentCounts[postKey] : (originalPost.commentsCount || 0)}
-              handleReply={handleReply}
-              handleCommentReaction={handleCommentReaction}
-              toggleCommentMenu={toggleCommentMenu}
-              handleCommentAction={handleCommentAction}
-              handleEditSubmit={handleEditSubmit}
-              handleEmojiClick={handleEmojiClick}
-              postId={postKey}
-              comments={postComments && postComments[postKey] ? postComments[postKey] : []}
-              handleCommentSubmit={() => { if (handleCommentSubmit) handleCommentSubmit(postKey); }}
-              emojiList={emojiList}
-              profileImage={profileImage}
-            />
-          </div>
-        ) : null}
+      {/* ── Inner content: SAME PostCard component used for normal posts ── */}
+      <div className="border border-[#e0d8cf]/40 rounded-2xl overflow-hidden">
+        <PostCard
+          post={postForCard}
+          index={postKeyForActions}
+          isOwnProfile={false}
+          profileImage={originalAuthorAvatar || originalPost.userAvatar}
+          fullName={originalAuthorName || originalPost.userName || originalPost.fullName || 'Unknown User'}
+          headline={originalAuthorHeadline}
+          postLikes={handlers.postLikes}
+          openMenuId={null}
+          setOpenMenuId={() => {}}
+          onLikeToggle={effectiveHandleLike}
+          onPinPost={undefined}
+          onSavePost={handlers.handleSavePost}
+          onDeletePost={undefined}
+          onArchivePost={undefined}
+          onOpenUpdateModal={undefined}
+          openCommentsIndex={openRepostCommentsKey === postKeyForActions ? postKeyForActions : null}
+          onToggleComments={() => setOpenRepostCommentsKey((prev: string | null) => (prev === postKeyForActions ? null : postKeyForActions))}
+          commentsByPost={handlers.commentsByPost}
+          isLoadingComments={handlers.isLoadingComments}
+          isSubmittingComment={handlers.isSubmittingComment}
+          commentLikes={handlers.commentLikes}
+          formatCommentTime={handlers.formatCommentTime}
+          openCommentMenuIndex={handlers.openCommentMenuIndex}
+          toggleCommentMenu={handlers.toggleCommentMenu}
+          handleCommentAction={handlers.handleCommentAction}
+          editingCommentId={handlers.editingCommentId}
+          editCommentText={handlers.editCommentText}
+          setEditCommentText={handlers.setEditCommentText}
+          handleEditSubmit={handlers.handleEditSubmit}
+          isDeletingCommentId={handlers.isDeletingCommentId}
+          replyingToCommentId={handlers.replyingToCommentId}
+          setReplyingToCommentId={handlers.setReplyingToCommentId}
+          replyText={handlers.replyText}
+          setReplyText={handlers.setReplyText}
+          handleReplySubmit={handlers.handleReplySubmit}
+          likeCommentToggle={handlers.likeCommentToggle}
+          commentText={handlers.commentText}
+          setCommentText={handlers.setCommentText}
+          handleCommentSubmit={handlers.handleCommentSubmit}
+          replyingTo={handlers.replyingTo}
+          setReplyingTo={handlers.setReplyingTo}
+          showEmojiPicker={handlers.showEmojiPicker}
+          setShowEmojiPicker={handlers.setShowEmojiPicker}
+          handleEmojiClick={handlers.handleEmojiClick}
+          setIsDeletingCommentId={handlers.setIsDeletingCommentId}
+          currentUserId={currentUserId || ''}
+          isDarkMode={undefined}
+          likedPosts={handlers.postLikes}
+          handleLike={effectiveHandleLike}
+          openMenuIndex={null}
+          openRepostIndex={null}
+          handlePostAction={() => {}}
+          toggleComments={() => setOpenRepostCommentsKey((prev: string | null) => (prev === postKeyForActions ? null : postKeyForActions))}
+          handleReply={handlers.setReplyingToCommentId}
+          handleCommentReaction={handlers.likeCommentToggle}
+          postComments={handlers.commentsByPost}
+          emojiList={undefined}
+          togglePostMenu={() => {}}
+          toggleRepostMenu={() => {}}
+          postCommentCounts={undefined}
+        />
       </div>
     </div>
   );
@@ -840,29 +825,9 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
                               fullName={fullName}
                               currentUserId={currentUserId}
                               isOwnProfile={isOwnProfile}
-                              likedPosts={handlers.postLikes}
-                              handleLike={handlers.handleLikeToggle}
-                              openCommentsIndex={openRepostCommentsKey}
-                              toggleComments={(pid: string) => setOpenRepostCommentsKey((prev) => (prev === pid ? null : pid))}
-                              postComments={handlers.commentsByPost}
-                              commentText={handlers.commentText}
-                              setCommentText={handlers.setCommentText}
-                              replyingTo={handlers.replyingTo}
-                              setReplyingTo={handlers.setReplyingTo}
-                              openCommentMenuIndex={handlers.openCommentMenuIndex}
-                              editingCommentId={handlers.editingCommentId}
-                              editCommentText={handlers.editCommentText}
-                              setEditCommentText={handlers.setEditCommentText}
-                              showEmojiPicker={handlers.showEmojiPicker}
-                              setShowEmojiPicker={handlers.setShowEmojiPicker}
-                              handleReply={handlers.setReplyingToCommentId}
-                              handleCommentReaction={handlers.likeCommentToggle}
-                              toggleCommentMenu={handlers.toggleCommentMenu}
-                              handleCommentAction={handlers.handleCommentAction}
-                              handleEditSubmit={handlers.handleEditSubmit}
-                              handleEmojiClick={handlers.handleEmojiClick}
-                              handleCommentSubmit={handlers.handleCommentSubmit}
-                              postCommentCounts={undefined}
+                              handlers={handlers}
+                              openRepostCommentsKey={openRepostCommentsKey}
+                              setOpenRepostCommentsKey={setOpenRepostCommentsKey}
                             />
                           </div>
                         );
