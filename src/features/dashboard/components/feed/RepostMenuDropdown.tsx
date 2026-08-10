@@ -54,9 +54,9 @@ const RepostMenuDropdown = ({
     <div
       ref={dropdownRef}
       style={{ position: 'fixed', top: coords.top, left: coords.left }}
-      className={`w-72 rounded-2xl shadow-2xl border z-[9999] overflow-hidden ${
-        isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-[#4a3728]/20'
-      }`}
+      className={`repost-menu w-72 rounded-2xl shadow-2xl border z-[9999] overflow-hidden ${
+  isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-[#4a3728]/20'
+}`}
     >
       <button
         onClick={() => onRepostInstant(index)}
