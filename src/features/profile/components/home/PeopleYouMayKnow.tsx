@@ -145,6 +145,7 @@ const PeopleYouMayKnow: React.FC<PeopleYouMayKnowProps> = ({ userId }) => {
                                         <p className="text-sm text-[#4a3728]/70 mb-3 line-clamp-2">
                                             {person.title || 'Throne8 member'}
                                         </p>
+                                        
                                         <button
                                             onClick={(e) => handleConnect(e, person.id)}
                                             disabled={isConnecting}
