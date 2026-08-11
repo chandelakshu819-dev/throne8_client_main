@@ -3,9 +3,9 @@
 
 import React, { useEffect, useState } from "react";
 import { Clock } from "./Icons";
-// import { SERVICES, FILTERS, C, btnPrimary } from "./types/data";
+// import { SERVICES, FILTERS, C, btnPrimary } from "../types/data";
 import { btnPrimary, C } from "../types/data";
-// import type { Service } from "./types/types";
+// import type { Service } from "../types/types";
 import SessionService from "@/lib/api/session.service";
 import { Service } from "../types/types";
 

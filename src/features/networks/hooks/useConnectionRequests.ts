@@ -133,9 +133,12 @@ export const useConnectionRequests = () => {
     };
 
     const fetchOutgoingRequests = async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s max
         try {
             setIsLoadingSent(true);
             const response = await ConnectionService.getOutgoingRequests(user!.userId);
+            clearTimeout(timeoutId);
 
             const requestsArray = response.data.data;
 
@@ -222,7 +225,12 @@ export const useConnectionRequests = () => {
 
             setSentRequests(transformedSentRequests);
         } catch (error: any) {
-            console.error('❌ Failed to fetch outgoing requests:', error.message);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+                console.warn('⚠️ getOutgoingRequests timed out — showing empty sent list');
+            } else {
+                console.error('❌ Failed to fetch outgoing requests:', error.message);
+            }
             setSentRequests([]);
         } finally {
             setIsLoadingSent(false);

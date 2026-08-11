@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import { Camera, Star, Briefcase } from "./Icons";
-import { MENTOR, C } from "./types/data";
+import { MENTOR, C } from "../../types/data";
 
 interface MentorSidebarProps {
     mentorData: any;

@@ -2,8 +2,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { PAY_METHODS, C, btnPrimary } from "./types/data";
-import type { CalendarData, Service, FormData as BookingFormData } from "./types/types";
+import { PAY_METHODS, C, btnPrimary } from "../../types/data";
+import type { CalendarData, Service, FormData as BookingFormData } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
 
 interface PaymentStepProps {

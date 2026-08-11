@@ -5,7 +5,8 @@ import TokenStorage from "@/store/token.storage";
 import config from "@/config/env.config";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-    Bell, MessageCircle, Users, Edit3, CheckCircle, X, Heart, MessageSquare, Share2, Bookmark, Search, Filter, Settings, Moon, Sun, Volume2, VolumeX, Zap, TrendingUp, Award, Calendar, MapPin, Eye, EyeOff, Loader2, Wifi, WifiOff, RefreshCw, Trash2 } from "lucide-react";
+    Bell, MessageCircle, Users, Edit3, CheckCircle, X, Heart, MessageSquare, Share2, Bookmark, Search, Filter, Settings, Moon, Sun, Volume2, VolumeX, Zap, TrendingUp, Award, Calendar, MapPin, Eye, EyeOff, Loader2, Wifi, WifiOff, RefreshCw, Trash2
+} from "lucide-react";
 
 import NotificationService from "@/lib/api/notification.service";
 import { Stats, Notification } from "@/features/notification/interface";
@@ -16,6 +17,8 @@ import ProfileService from "@/lib/api/profile.service";
 ////////////////////////////////////// changed modified
 import ConnectionService from "@/lib/api/connection.service";
 import FollowService from "@/lib/api/follow.service";
+import { useSocket } from "@/core/realtime/useSocket";
+import { useRouter } from "next/navigation";
 
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -43,6 +46,7 @@ export function isTodayDate(dateStr: string): boolean {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 const NotificationsPage = () => {
+    const router = useRouter();
     const [selectedTab, setSelectedTab] = useState("all");
     const [darkMode, setDarkMode] = useState(false);
     const [soundEnabled, setSoundEnabled] = useState(true);
@@ -63,19 +67,22 @@ const NotificationsPage = () => {
         engagementRate: 85,
     });
     const [animateCards, setAnimateCards] = useState(false);
+    // Tracks requestIds that have been acted on, so Accept/Ignore hides them immediately
+    const [actedRequests, setActedRequests] = useState<Set<string>>(new Set());
 
 
     ////////////////////////////////////Changed Modified
-    
+
 
 
     ////////////////////////////////////changed modified
- const dispatch = useAppDispatch();
+    const dispatch = useAppDispatch();
     const profile = useAppSelector((state) => state.login.profile);
     const authUser = useAppSelector((state) => state.login.user);
+    const { socket, isConnected: socketConnected } = useSocket();
     const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
-const [connectionStats, setConnectionStats] = useState<{ connections: number } | null>(null);
-const [followStats, setFollowStats] = useState<{ followers: number; following: number } | null>(null);
+    const [connectionStats, setConnectionStats] = useState<{ connections: number } | null>(null);
+    const [followStats, setFollowStats] = useState<{ followers: number; following: number } | null>(null);
 
     useEffect(() => {
         dispatch(fetchCurrentUser());
@@ -95,46 +102,46 @@ const [followStats, setFollowStats] = useState<{ followers: number; following: n
 
 
     /////////////////////////////// changed modified 
-  useEffect(() => {
-    const userId = profile?.userId || (profile as any)?.id || (profile as any)?._id || authUser?.userId || (authUser as any)?.id;
-    if (userId) {
-        ConnectionService.getConnectionStats(userId)
-            .then((res) => {
-                const stats = res?.data;
-                setConnectionStats({
-                    connections: stats?.accepted?.total ?? 0,
+    useEffect(() => {
+        const userId = profile?.userId || (profile as any)?.id || (profile as any)?._id || authUser?.userId || (authUser as any)?.id;
+        if (userId) {
+            ConnectionService.getConnectionStats(userId)
+                .then((res) => {
+                    const stats = res?.data;
+                    setConnectionStats({
+                        connections: stats?.accepted?.total ?? 0,
+                    });
+                })
+                .catch((err) => {
+                    console.error('Failed to fetch connection stats:', err);
+                    setConnectionStats({ connections: 0 });
                 });
-            })
-            .catch((err) => {
-                console.error('Failed to fetch connection stats:', err);
-                setConnectionStats({ connections: 0 });
-            });
-    }
-}, [profile?.userId, (profile as any)?.id, (profile as any)?._id, authUser?.userId, (authUser as any)?.id]);
+        }
+    }, [profile?.userId, (profile as any)?.id, (profile as any)?._id, authUser?.userId, (authUser as any)?.id]);
 
 
 
-useEffect(() => {
-    const userId = profile?.userId || (profile as any)?.id || (profile as any)?._id || authUser?.userId || (authUser as any)?.id;
-    if (userId) {
-        FollowService.getFollowCounts(userId)
-            .then((res) => {
-                const data = res?.data;
-                setFollowStats({
-                    followers: data?.followersCount ?? 0,
-                    following: data?.followingCount ?? 0,
+    useEffect(() => {
+        const userId = profile?.userId || (profile as any)?.id || (profile as any)?._id || authUser?.userId || (authUser as any)?.id;
+        if (userId) {
+            FollowService.getFollowCounts(userId)
+                .then((res) => {
+                    const data = res?.data;
+                    setFollowStats({
+                        followers: data?.followersCount ?? 0,
+                        following: data?.followingCount ?? 0,
+                    });
+                })
+                .catch((err) => {
+                    console.error('Failed to fetch follow counts:', err);
+                    setFollowStats({ followers: 0, following: 0 });
                 });
-            })
-            .catch((err) => {
-                console.error('Failed to fetch follow counts:', err);
-                setFollowStats({ followers: 0, following: 0 });
-            });
-    }
-}, [profile?.userId, (profile as any)?.id, (profile as any)?._id, authUser?.userId, (authUser as any)?.id]);
+        }
+    }, [profile?.userId, (profile as any)?.id, (profile as any)?._id, authUser?.userId, (authUser as any)?.id]);
 
 
 
-    
+
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const WS_URL = config?.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_WS_URL;
     // const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
@@ -147,7 +154,7 @@ useEffect(() => {
             if (append) setLoadingMore(true);
             else setIsLoading(true);
 
-             try {
+            try {
                 const json = await NotificationService.getNotifications({ page: pageNum, limit: 20 });
 
                 //////////////////////////////Changed Modified
@@ -167,7 +174,7 @@ useEffect(() => {
                     });
                 }
             } catch (err) {
-                  console.error("Failed to fetch notifications:", err);
+                console.error("Failed to fetch notifications:", err);
                 // socket se live aate rahenge
             } finally {
                 setIsLoading(false);
@@ -183,12 +190,12 @@ useEffect(() => {
     }, [fetchNotifications]);
 
 
-    
-  
 
 
-//////////////////////////////////changed Modified 
-// ── Poll for new notifications every 15 seconds (frontend-only) ──
+
+
+    //////////////////////////////////changed Modified 
+    // ── Poll for new notifications every 15 seconds (frontend-only) ──
     useEffect(() => {
         if (!realTimeEnabled) return;
 
@@ -227,6 +234,46 @@ useEffect(() => {
 
         return () => clearInterval(interval);
     }, [realTimeEnabled, soundEnabled]);
+
+    // ── Socket: subscribe to notification:new and notification:unread:count ──
+    useEffect(() => {
+        if (!socket || !socketConnected) return;
+
+        const handleNew = (payload: Notification) => {
+            if (!payload?.notificationId) return;
+            setNotifications((prev) => {
+                // Deduplicate — if the polling already stored this ID, skip
+                if (prev.some((n) => n.notificationId === payload.notificationId)) return prev;
+                setNewAlert(true);
+                setTimeout(() => setNewAlert(false), 3500);
+                if (soundEnabled) playNotifSound();
+                return [payload, ...prev];
+            });
+            // Unread count: only increment if the payload is unread
+            if (!payload.isRead) {
+                setStats((prev) => ({
+                    ...prev,
+                    unreadCount: prev.unreadCount + 1,
+                    todayCount: isTodayDate(payload.createdAt) ? prev.todayCount + 1 : prev.todayCount,
+                }));
+            }
+        };
+
+        const handleUnreadCount = (data: { count: number }) => {
+            setStats((prev) => ({ ...prev, unreadCount: data.count }));
+        };
+
+        socket.on('notification:new', handleNew);
+        socket.on('notification:unread:count', handleUnreadCount);
+
+        // Update isConnected to reflect real socket status
+        setIsConnected(socketConnected);
+
+        return () => {
+            socket.off('notification:new', handleNew);
+            socket.off('notification:unread:count', handleUnreadCount);
+        };
+    }, [socket, socketConnected, soundEnabled]);
 
 
 
@@ -273,7 +320,7 @@ useEffect(() => {
             unreadCount: Math.max(0, prev.unreadCount - 1),
         }));
 
-       try {
+        try {
             await NotificationService.markNotificationRead(notificationId);
         } catch (_) { }
     };
@@ -307,17 +354,48 @@ useEffect(() => {
         await fetchNotifications(nextPage, true);
     };
 
+    // ── Accept / Ignore connection request from Notifications panel ──
+    const handleAcceptFromNotification = async (notificationId: string, requestId: string) => {
+        try {
+            await ConnectionService.acceptConnectionRequest(requestId);
+            setActedRequests((prev) => new Set(prev).add(requestId));
+            // Mark the notification as read and remove it from the unread count
+            markAsRead(notificationId);
+        } catch (error: any) {
+            console.error('❌ Failed to accept connection request from notification:', error.message);
+            alert(error.message || 'Failed to accept connection request');
+        }
+    };
+
+    const handleIgnoreFromNotification = async (notificationId: string, requestId: string) => {
+        try {
+            await ConnectionService.declineConnectionRequest(requestId);
+            setActedRequests((prev) => new Set(prev).add(requestId));
+            // Dismiss the notification from the list
+            removeNotification(notificationId);
+        } catch (error: any) {
+            console.error('❌ Failed to decline connection request from notification:', error.message);
+            alert(error.message || 'Failed to decline connection request');
+        }
+    };
+
     // ── Filter / search ────────────────────────────────────────────────────────
     const filteredNotifications = notifications.filter((n) => {
+        const lowerQuery = searchQuery.toLowerCase();
         const matchesSearch =
-            n.senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            n.message.toLowerCase().includes(searchQuery.toLowerCase());
+            !searchQuery ||
+            (n.senderName ?? "").toLowerCase().includes(lowerQuery) ||
+            (n.message ?? "").toLowerCase().includes(lowerQuery);
         const matchesFilter = filterBy === "all" || n.type === filterBy;
+        const isConnectionNotif =
+            n.entityType === "connection" ||
+            n.type === "connection_request" ||
+            n.type === "connection_accepted";
         const matchesTab =
             selectedTab === "all" ||
             (selectedTab === "unread" && !n.isRead) ||
             (selectedTab === "posts" && n.entityType === "post") ||
-            (selectedTab === "connections" && n.entityType === "connection");
+            (selectedTab === "connections" && isConnectionNotif);
         return matchesSearch && matchesFilter && matchesTab;
     });
 
@@ -416,7 +494,7 @@ useEffect(() => {
                                 <div className="absolute inset-0 bg-gradient-to-br from-[#4a3728] to-[#7a5c3e] rounded-full blur-lg opacity-60 group-hover:opacity-80 transition-opacity duration-500"></div>
 
                                 {/* //////////////////Changed Modified */}
-                                 <img
+                                <img
                                     src={
                                         profilePhotoUrl ||
                                         `https://api.dicebear.com/7.x/initials/svg?seed=${profile?.firstName || 'User'}`
@@ -458,22 +536,22 @@ useEffect(() => {
                                     </div>
                                 </div>
                                 <div className="flex justify-center gap-6 pt-3">
-                                  <div className="text-center">
-    <p className={`text-lg font-bold ${textClass}`}>{connectionStats?.connections ?? '—'}</p>
-    <p
-        className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}
-    >
-        Connections
-    </p>
-</div>
-<div className="text-center">
-    <p className={`text-lg font-bold ${textClass}`}>{followStats?.followers ?? '—'}</p>
-    <p
-        className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}
-    >
-        Followers
-    </p>
-</div>
+                                    <div className="text-center">
+                                        <p className={`text-lg font-bold ${textClass}`}>{connectionStats?.connections ?? '—'}</p>
+                                        <p
+                                            className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+                                        >
+                                            Connections
+                                        </p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className={`text-lg font-bold ${textClass}`}>{followStats?.followers ?? '—'}</p>
+                                        <p
+                                            className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+                                        >
+                                            Followers
+                                        </p>
+                                    </div>
                                     <div className="text-center">
                                         <p className={`text-lg font-bold ${textClass}`}>
                                             {stats.engagementRate}%
@@ -801,6 +879,35 @@ useEffect(() => {
                                                                         </button>
                                                                     </div>
                                                                 </div>
+
+                                                                {/* Accept / Ignore for connection requests */}
+                                                                {notification.type === 'connection_request' && !actedRequests.has(notification.entityId) && (
+                                                                    <div className="flex items-center gap-2 mt-3">
+                                                                        <button
+                                                                            onClick={() => handleAcceptFromNotification(notification.notificationId, notification.entityId)}
+                                                                            className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-[#4a3728] to-[#6a5748] text-white text-xs font-semibold rounded-xl hover:opacity-90 hover:scale-105 transition-all duration-200 shadow"
+                                                                        >
+                                                                            <CheckCircle className="w-3.5 h-3.5" />
+                                                                            Accept
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleIgnoreFromNotification(notification.notificationId, notification.entityId)}
+                                                                            className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-xl border transition-all duration-200 hover:scale-105 ${darkMode
+                                                                                    ? 'border-gray-600 text-gray-300 hover:bg-gray-700'
+                                                                                    : 'border-gray-300 text-gray-600 hover:bg-gray-100'
+                                                                                }`}
+                                                                        >
+                                                                            <X className="w-3.5 h-3.5" />
+                                                                            Ignore
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                                {/* Acted state — show confirmation inline */}
+                                                                {notification.type === 'connection_request' && actedRequests.has(notification.entityId) && (
+                                                                    <p className="mt-2 text-xs text-green-600 font-medium flex items-center gap-1">
+                                                                        <CheckCircle className="w-3.5 h-3.5" /> Request handled
+                                                                    </p>
+                                                                )}
                                                             </div>
 
                                                             {/* Action buttons */}
@@ -859,7 +966,10 @@ useEffect(() => {
                                                         ))}
                                                     </div>
                                                     {notification.entityType === "post" && (
-                                                        <button className="text-xs text-[#4a3728] hover:underline transition-colors">
+                                                        <button 
+                                                            onClick={() => router.push(`/post/${notification.entityId}`)}
+                                                            className="text-xs text-[#4a3728] hover:underline transition-colors"
+                                                        >
                                                             View Post →
                                                         </button>
                                                     )}
