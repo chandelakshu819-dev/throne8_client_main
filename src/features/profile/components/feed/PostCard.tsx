@@ -30,20 +30,20 @@ const PostCard = ({
 
 
 
-  const contentWrapperRef = React.useRef<HTMLDivElement>(null);
-const [contentScale, setContentScale] = React.useState(1);
+//   const contentWrapperRef = React.useRef<HTMLDivElement>(null);
+// const [contentScale, setContentScale] = React.useState(1);
 
-React.useLayoutEffect(() => {
-  const el = contentWrapperRef.current;
-  if (!el) return;
-  const parentHeight = el.parentElement?.clientHeight || 0;
-  const contentHeight = el.scrollHeight;
-  if (contentHeight > parentHeight && parentHeight > 0) {
-    setContentScale(parentHeight / contentHeight);
-  } else {
-    setContentScale(1);
-  }
-}, [post]);
+// React.useLayoutEffect(() => {
+//   const el = contentWrapperRef.current;
+//   if (!el) return;
+//   const parentHeight = el.parentElement?.clientHeight || 0;
+//   const contentHeight = el.scrollHeight;
+//   if (contentHeight > parentHeight && parentHeight > 0) {
+//     setContentScale(parentHeight / contentHeight);
+//   } else {
+//     setContentScale(1);
+//   }
+// }, [post]);
 
   return (
     <div
@@ -59,11 +59,7 @@ React.useLayoutEffect(() => {
       <div className="absolute inset-0 bg-gradient-to-br from-[#6b5643]/3 via-[#8b7355]/3 to-[#4a3728]/3 rounded-3xl"></div>
       <div className="relative z-10 flex flex-col justify-between h-full flex-1 min-h-0">
       <div className="overflow-hidden flex-1 min-h-0">
-  <div
-    ref={contentWrapperRef}
-    style={{ transform: `scale(${contentScale})`, transformOrigin: 'top left', width: `${100 / contentScale}%` }}
-  >
-    <PostHeader
+      <PostHeader
             currentUserId={currentUserId}
             post={post}
             index={postKey}
@@ -83,6 +79,9 @@ React.useLayoutEffect(() => {
           </div>
         </div>
 
+        <div className="flex-shrink-0">
+
+
         <PostActions
           post={post}
           index={index}
@@ -99,6 +98,7 @@ React.useLayoutEffect(() => {
           onReact={onReact}
           currentUserId={currentUserId}
         />
+        </div>
 
         {openCommentsIndex === postKey && (
           <CommentsSection
@@ -175,7 +175,7 @@ React.useLayoutEffect(() => {
         />
       )}
     </div>
-    </div>
+   
   );
 };
 
