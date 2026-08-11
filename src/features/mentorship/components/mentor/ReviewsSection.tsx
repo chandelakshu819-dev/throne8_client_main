@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Star } from "./Icons";
-import { REVIEWS, MENTOR, C } from "./types/data";
+import { REVIEWS, MENTOR, C } from "../../types/data";
 
 const ReviewsSection: React.FC = () => {
     return (

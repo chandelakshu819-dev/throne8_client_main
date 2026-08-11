@@ -2,8 +2,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { C } from "./types/data";
-import type { BookingStep, Service, CalendarData, FormData as BookingFormData } from "./types/types";
+import { C } from "../types/data";
+import type { BookingStep, Service, CalendarData, FormData as BookingFormData } from "../types/types";
 import MentorSidebar from "./MentorSidebar";
 import ServicesSection from "./ServicesSection";
 import ReviewsSection from "./ReviewsSection";

@@ -1,8 +1,8 @@
 // components/mentor-profile/booking/ConfirmationStep.tsx
 
 import React from "react";
-import { MONTHS, C, btnPrimary } from "./types/data";
-import type { Service, CalendarData, FormData } from "./types/types";
+import { MONTHS, C, btnPrimary } from "../../types/data";
+import type { Service, CalendarData, FormData } from "../../types/types";
 
 interface ConfirmationStepProps {
     selectedService: Service | null;

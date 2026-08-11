@@ -104,7 +104,9 @@ const RepostCard = (props: any) => {
     setOpenRepostCommentsKey,
   } = props;
 
+
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [isThoughtExpanded, setIsThoughtExpanded] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [originalAuthorName, setOriginalAuthorName] = useState('');
   const [originalAuthorHeadline, setOriginalAuthorHeadline] = useState('');
@@ -234,9 +236,12 @@ const postForCard = isQuote
   };
 
   return (
-    <div className="p-6 rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1 bg-[#f6ede8]/95 border-[#4a3728]/20 relative overflow-hidden h-full flex flex-col">
+    <div className="p-3 rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1 bg-[#f6ede8]/95 border-[#4a3728]/20 relative overflow-hidden h-full flex flex-col">
       {/* ── Outer header: represents the REPOSTER ("You reposted"), never the original author ── */}
-      <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#e0d8cf]/50">
+
+
+      {/* <div className="flex items-center justify-between mb-4 pb-4 border-b border-[#e0d8cf]/50"> */}
+      <div className="flex items-center justify-between mb-2 pb-2 border-b border-[#e0d8cf]/50">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#4a3728]/20 flex-shrink-0 flex items-center justify-center bg-[#4a3728]/20">
             {profileImage ? (
@@ -282,12 +287,25 @@ const postForCard = isQuote
       </div>
 
       {isQuote && repost.thoughtText ? (
-        <p className="text-sm text-[#4a3728]/80 italic mb-4 px-2 border-l-2 border-[#4a3728]/30">{repost.thoughtText}</p>
-      ) : null}
+  <div className="mb-2 px-2 border-l-2 border-[#4a3728]/30">
+    <p className={`text-sm text-[#4a3728]/80 italic whitespace-pre-wrap ${!isThoughtExpanded ? 'line-clamp-1' : ''}`}>
+      {repost.thoughtText}
+    </p>
+    {repost.thoughtText.length > 40 || repost.thoughtText.includes('\n') ? (
+      <button
+        onClick={() => setIsThoughtExpanded((v) => !v)}
+        className="text-xs font-semibold text-[#6b5643] hover:text-[#4a3728] mt-0.5"
+      >
+        {isThoughtExpanded ? 'Show less' : 'Read more'}
+      </button>
+    ) : null}
+  </div>
+) : null}
+
 
       {/* ── Inner content: SAME PostCard component used for normal posts ── */}
-      <div className="border border-[#e0d8cf]/40 rounded-2xl overflow-hidden">
-        <PostCard
+  <div className="flex-1 min-h-0 overflow-hidden">
+  <PostCard
           post={postForCard}
           index={postKeyForActions}
           isOwnProfile={false}
@@ -350,7 +368,7 @@ const postForCard = isQuote
           postCommentCounts={undefined}
         />
       </div>
-    </div>
+   </div>
   );
 };
 
@@ -819,8 +837,8 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
                     {combinedItems.map((item, idx) => {
                       if (item.type === 'repost') {
                         return (
-                          <div key={'repost-' + item.data.repostId} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col self-start">
-                            <RepostCard
+                          // <div key={'repost-' + item.data.repostId} className="w-[calc(100%-16px)] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-11px)] flex-shrink-0 flex flex-col h-[560px]">
+<div key={'repost-' + item.data.repostId} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col h-[500px]">                            <RepostCard
                               repost={item.data}
                               onDeleteRepost={onDeleteRepost}
                               profileImage={profileImage}
@@ -841,7 +859,8 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
                       const idxToUse = originalIndex !== -1 ? originalIndex : idx;
 
                       return (
-                        <div key={'post-' + postKey} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col">
+                        // <div key={'post-' + postKey} className="w-[calc(100%-16px)] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-11px)] flex-shrink-0 flex flex-col h-[560px]">
+                        <div key={'post-' + postKey} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col h-[500px]">
                           <PostCard
                             post={post}
                             index={idxToUse}
