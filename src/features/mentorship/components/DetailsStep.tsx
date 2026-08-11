@@ -2,8 +2,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { MONTHS, C, btnPrimary } from "./types/data";
-import type { Service, CalendarData, FormData } from "./types/types";
+import { MONTHS, C, btnPrimary } from "../types/data";
+import type { Service, CalendarData, FormData } from "../types/types";
 import { useProfileData } from "@/features/profile/hooks/useProfileData";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 

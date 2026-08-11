@@ -1,8 +1,8 @@
 'use client';
 
 import { memo, useEffect, useRef } from 'react';
-import type { ChatMessage, Contact } from '../page';
-import { AVATAR_COLORS } from '../page';
+import type { ChatMessage, Contact } from '../../interface';
+import { AVATAR_COLORS } from '../../constants/data';
 
 interface Props {
   thread: ChatMessage[];

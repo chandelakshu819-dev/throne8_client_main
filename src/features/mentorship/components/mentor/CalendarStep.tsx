@@ -3,8 +3,8 @@
 
 import React, { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "./Icons";
-import { TIME_SLOTS, MONTHS, DAYS, C, btnPrimary } from "./types/data";
-import type { Service, CalendarData } from "./types/types";
+import { TIME_SLOTS, MONTHS, DAYS, C, btnPrimary } from "../../types/data";
+import type { Service, CalendarData } from "../../types/types";
 import AvailabilityService from "@/lib/api/availability.service";
 
 interface CalendarStepProps {
