@@ -29,7 +29,7 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
         </button>
       )}
       {post.image && (
-        <div className="mb-6 rounded-2xl overflow-hidden bg-transparent w-full h-[300px] flex justify-center">
+        <div className="mb-6 rounded-2xl overflow-hidden bg-transparent w-full h-[180px] flex justify-center">
           <img
             src={post.image}
             alt="Post content"
@@ -38,7 +38,7 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
         </div>
       )}
       {post.videos && post.videos.length > 0 && (
-        <div className="mb-6 rounded-2xl overflow-hidden bg-black w-full h-80 flex justify-center">
+        <div className="mb-6 rounded-2xl overflow-hidden bg-black w-full h-64 flex justify-center">
           <video
             src={post.videos[0].cloudinarySecureUrl}
             controls
