@@ -48,6 +48,7 @@ const PostDetailModal = ({
   emojiList,
   postComments,
   postCommentCounts,
+  isLoadingComments,
 }: {
   post: any;
   index: any;
@@ -89,6 +90,7 @@ const PostDetailModal = ({
   emojiList: any;
   postComments: any;
   postCommentCounts: any;
+  isLoadingComments?: { [postId: string]: boolean };
 }) => {
   const postKey = post.entryId || post.postId;
   const mediaUrl = post.image || post.mediaUrl || post.postImage || null;
@@ -147,7 +149,7 @@ const PostDetailModal = ({
           </div>
         )}
 
-        {/* Right: header + content + actions + comments */}
+        {/* Right: header + content + actions + comments — sab ek saath scroll */}
         <div
           className={`flex flex-col ${hasMedia ? 'w-full md:w-[420px]' : 'w-full'} h-full overflow-y-auto p-4`}
         >
@@ -165,7 +167,7 @@ const PostDetailModal = ({
             headline={headline}
           />
 
-          <PostContent post={post} isDarkMode={isDarkMode} />
+          <PostContent post={post} isDarkMode={isDarkMode} forceExpanded hideMedia />
 
           <PostActions
             post={post}
@@ -184,7 +186,7 @@ const PostDetailModal = ({
             currentUserId={currentUserId}
           />
 
-          <div className="flex-1 overflow-y-auto mt-2">
+          <div className="mt-2">
             <CommentsSection
               isDarkMode={isDarkMode}
               commentText={commentText}
@@ -209,6 +211,7 @@ const PostDetailModal = ({
               emojiList={emojiList}
               profileImage={profileImage}
               setReplyingTo={undefined}
+              isLoading={!!isLoadingComments?.[postKey]}
             />
           </div>
         </div>

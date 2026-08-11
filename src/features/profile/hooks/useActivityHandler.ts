@@ -344,12 +344,13 @@ export const useActivityHandlers = ({
         setIsDeletingCommentId,
         showEmojiPicker, setShowEmojiPicker,
 
-        // Comments hook data
-        commentsByPost,
-        isLoadingComments,
-        isSubmittingComment,
-        commentLikes,
-        formatCommentTime,
+       // Comments hook data
+       commentsByPost,
+       isLoadingComments,
+       isSubmittingComment,
+       commentLikes,
+       formatCommentTime,
+       fetchCommentsByPost,
 
         // Post handlers
         handleUpdatePost,

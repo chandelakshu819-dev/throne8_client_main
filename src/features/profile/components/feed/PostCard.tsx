@@ -15,12 +15,13 @@ const PostCard = ({
   fullName, headline, postLikes, openMenuId, setOpenMenuId, onLikeToggle, onPinPost, onSavePost, onDeletePost, onArchivePost, onOpenUpdateModal, onToggleComments, commentsByPost, isLoadingComments, isSubmittingComment, commentLikes, formatCommentTime, isDeletingCommentId, setIsDeletingCommentId, replyingToCommentId, setReplyingToCommentId, currentUserId, post, index, isOwnProfile = true, isDarkMode, likedPosts, handleLike, openMenuIndex, openRepostIndex, openCommentsIndex, commentText, setCommentText, replyingTo, openCommentMenuIndex, editingCommentId, editCommentText, setEditCommentText, showEmojiPicker, setShowEmojiPicker, handlePostAction, handleRepost, toggleComments, handleCommentSubmit, handleReply, handleCommentReaction, toggleCommentMenu, handleCommentAction, handleEditSubmit, handleEmojiClick, postComments, emojiList, togglePostMenu, toggleRepostMenu, postCommentCounts, profileImage, onOpenWithPerspectiveModal, handleRepostInstant, replyText, setReplyText, handleReplySubmit, likeCommentToggle, commentLikeStatus, setReplyingTo,
   // ✅ ADDED: reaction system props — must be accepted here or JSX below throws
   // "postReactions is not defined" since it's used in the PostActions call.
-  postReactions, onReact,
+  postReactions, onReact, fetchCommentsByPost,
 }: {
   fullName: string; headline: string; postLikes: any; openMenuId: any; setOpenMenuId: any; onLikeToggle: any; onPinPost: any; onSavePost: any; onDeletePost: any; onArchivePost: any; onOpenUpdateModal: any; onToggleComments: any; commentsByPost: any; isLoadingComments: any; isSubmittingComment: any; commentLikes: any; formatCommentTime: any; isDeletingCommentId: any; setIsDeletingCommentId: any; replyingToCommentId: any; setReplyingToCommentId: any; currentUserId: string; post: any; index: any; isOwnProfile?: boolean; isDarkMode: any; likedPosts: any; handleLike: any; openMenuIndex: any; openRepostIndex: any; openCommentsIndex: any; commentText: any; setCommentText: any; replyingTo: any; openCommentMenuIndex: any; editingCommentId: any; editCommentText: any; setEditCommentText: any; showEmojiPicker: any; setShowEmojiPicker: any; handlePostAction: any; handleRepost: any; toggleComments: any; handleCommentSubmit: any; handleReply: any; handleCommentReaction: any; toggleCommentMenu: any; handleCommentAction: any; handleEditSubmit: any; handleEmojiClick: any; postComments: any; emojiList: any; togglePostMenu: any; toggleRepostMenu: any; postCommentCounts: any; profileImage: any; onOpenWithPerspectiveModal?: any; handleRepostInstant?: any; replyText?: any; setReplyText?: any; handleReplySubmit?: any; likeCommentToggle?: any; commentLikeStatus?: any; setReplyingTo?: any;
   // ✅ ADDED
   postReactions?: Record<string, { counts: any; userReaction: ReactionType | null }>;
   onReact?: (postId: string, type: ReactionType) => void;
+  fetchCommentsByPost?: (postId: string, ownerId?: string) => Promise<void>;
 }) => {
   const { trackPostImpression } = usePostImpressionTracking();
   const postKey = post.entryId || post.postId;
@@ -28,6 +29,16 @@ const PostCard = ({
   // LinkedIn-style expanded post modal
   const [isDetailOpen, setIsDetailOpen] = React.useState(false);
 
+  // ✅ NEW: modal kholte waqt, agar comments pehle se fetch nahi hui hain
+  // to onToggleComments (= handlers.toggleCommentsPanel) call karo taaki
+  // comments load ho jayein — modal me purane comments dikhne lagenge
+  
+  const handleOpenDetailModal = () => {
+    setIsDetailOpen(true);
+    if (postKey && (!commentsByPost || !commentsByPost[postKey]) && fetchCommentsByPost) {
+      fetchCommentsByPost(postKey, post.userId);
+    }
+  };
 
 
 //   const contentWrapperRef = React.useRef<HTMLDivElement>(null);
@@ -74,8 +85,8 @@ const PostCard = ({
           />
 
           {/* Click on post body opens the LinkedIn-style expanded modal */}
-          <div onClick={() => setIsDetailOpen(true)} className="cursor-pointer">
-            <PostContent post={post} isDarkMode={isDarkMode} />
+          <div onClick={handleOpenDetailModal} className="cursor-pointer">
+            <PostContent post={post} isDarkMode={isDarkMode} disableToggle />
           </div>
         </div>
 
@@ -91,7 +102,7 @@ const PostCard = ({
           openRepostIndex={openRepostIndex}
           toggleRepostMenu={toggleRepostMenu}
           handleRepost={handleRepost}
-          toggleComments={toggleComments}
+          toggleComments={handleOpenDetailModal}
           onOpenWithPerspectiveModal={onOpenWithPerspectiveModal}
           handleRepostInstant={handleRepostInstant}
           postReactions={postReactions}
@@ -100,7 +111,7 @@ const PostCard = ({
         />
         </div>
 
-        {openCommentsIndex === postKey && (
+        {/* {openCommentsIndex === postKey && (
           <CommentsSection
             isDarkMode={isDarkMode}
             commentText={commentText}
@@ -127,7 +138,7 @@ const PostCard = ({
             setReplyingTo={undefined}
             currentUserId={currentUserId}
           />
-        )}
+        )} */}
       </div>
 
       {isDetailOpen && (
@@ -172,6 +183,7 @@ const PostCard = ({
           emojiList={emojiList}
           postComments={postComments}
           postCommentCounts={postCommentCounts}
+          isLoadingComments={isLoadingComments}
         />
       )}
     </div>

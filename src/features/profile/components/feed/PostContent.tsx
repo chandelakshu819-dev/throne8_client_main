@@ -3,8 +3,7 @@ import React, { useState } from 'react';
 import AnalyticsService from '@/lib/api/analytics.service';
 
 
-const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) => {
-  const [expanded, setExpanded] = useState(false);
+const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = false, disableToggle = false }: { post: any; isDarkMode: boolean; forceExpanded?: boolean; hideMedia?: boolean; disableToggle?: boolean }) => {  const [expanded, setExpanded] = useState(!!forceExpanded);
   const content: string = post.content || '';
 
   // Get lines and filter out empty ones to find the first real line
@@ -22,13 +21,16 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
       </p>
       {isLong && (
         <button
-          onClick={() => setExpanded(v => !v)}
+          onClick={() => {
+            if (disableToggle) return; // card ke andar: sirf bubble ho ke modal khole, khud expand na ho
+            setExpanded(v => !v);
+          }}
           className={`text-sm font-semibold mb-4 ${isDarkMode ? 'text-slate-300 hover:text-white' : 'text-[#6b5643] hover:text-[#4a3728]'}`}
         >
           {expanded ? 'Show less' : 'Read more'}
         </button>
       )}
-      {post.image && (
+      {!hideMedia && post.image && (
         <div className="mb-6 rounded-2xl overflow-hidden bg-transparent w-full h-[180px] flex justify-center">
           <img
             src={post.image}

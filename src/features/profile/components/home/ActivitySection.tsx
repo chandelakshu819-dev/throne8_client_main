@@ -366,6 +366,7 @@ const postForCard = isQuote
           togglePostMenu={() => {}}
           toggleRepostMenu={() => {}}
           postCommentCounts={undefined}
+          fetchCommentsByPost={handlers.fetchCommentsByPost}
         />
       </div>
    </div>
@@ -938,6 +939,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
                             handleRepostInstant={handleRepostInstant}
                             handleRepost={handleRepostInstant}
                             postCommentCounts={undefined}
+                            fetchCommentsByPost={handlers.fetchCommentsByPost}
                           />
                         </div>
                       );

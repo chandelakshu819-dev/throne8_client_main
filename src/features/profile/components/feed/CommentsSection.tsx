@@ -28,8 +28,8 @@ interface CommentsSectionProps {
   postId: any;
   emojiList: any;
   currentUserId?: string;
+  isLoading?: boolean;
 }
-
 const CommentsSection = ({
   isDarkMode,
   commentCount,
@@ -55,6 +55,7 @@ const CommentsSection = ({
   postId,
   emojiList,
   currentUserId,
+  isLoading = false,
 }: CommentsSectionProps) => {
   const [visibleCommentsCount, setVisibleCommentsCount] = useState(3);
   const [sortMode, setSortMode] = useState<'relevant' | 'recent'>('relevant');
@@ -143,9 +144,16 @@ const CommentsSection = ({
         </div>
       )}
 
+     {/* ── Loading state ── */}
+     {isLoading && (
+        <div className={`text-sm font-medium py-4 text-center ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
+          Loading comments...
+        </div>
+      )}
+
       {/* ── Comments list ── */}
       <div className="space-y-1">
-        {visibleComments.map((comment: any) => (
+        {!isLoading && visibleComments.map((comment: any) => (
           <CommentItem
             key={comment.commentId || comment._id}
             comment={comment}
