@@ -3,8 +3,18 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PostMenuDropdown from './PostMenuDropdown';
 import ConnectionService from '@/lib/api/connection.service';
+import DefaultAvatar from '@/shared/uiComponents/DefaultAvatar';
 
 type ConnectionStatus = 'self' | 'connected' | 'pending_sent' | 'pending_received' | 'none';
+
+// ✅ NEW: mood → emoji map, LinkedIn/Facebook style "is feeling 😊 happy"
+const MOOD_EMOJI_MAP: Record<string, string> = {
+  happy: '😊',
+  thoughtful: '🤔',
+  excited: '🤩',
+  reflective: '💭',
+  grateful: '🙏',
+};
 
 const PostHeader = ({
   post, index, isDarkMode, openMenuIndex, togglePostMenu, handlePostAction, currentUserId
@@ -18,6 +28,7 @@ const PostHeader = ({
     post.connectionStatus || 'none'
   );
   const [isSending, setIsSending] = useState(false);
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
 
   const handleProfileClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -78,30 +89,46 @@ const PostHeader = ({
     );
   };
 
+  const showDefaultAvatar = !post.avatar || avatarLoadError;
+
+  // ✅ NEW: build the "is feeling 😊 happy" fragment if mood exists
+  const moodEmoji = post.mood ? MOOD_EMOJI_MAP[post.mood] : null;
+  const moodLabel = post.mood
+    ? post.mood.charAt(0).toUpperCase() + post.mood.slice(1)
+    : null;
+
   return (
     <div className="flex items-center justify-between mb-6">
       <div className="flex items-center space-x-4">
-        <img
-          src={post.avatar}
-          alt={post.user}
-          onClick={handleProfileClick}
-          className="w-14 h-14 rounded-2xl object-cover border-2 border-[#6b5643] cursor-pointer"
-        />
+        {showDefaultAvatar ? (
+          <div
+            onClick={handleProfileClick}
+            className="w-14 h-14 border-2 border-[#6b5643] cursor-pointer"
+          >
+            <DefaultAvatar className="w-full h-full" rounded="2xl" />
+          </div>
+        ) : (
+          <img
+            src={post.avatar}
+            alt={post.user}
+            onClick={handleProfileClick}
+            onError={() => setAvatarLoadError(true)}
+            className="w-14 h-14 rounded-2xl object-cover border-2 border-[#6b5643] cursor-pointer"
+          />
+        )}
         <div>
-          <div className="flex items-center gap-3">
-            {/* <h4
+          <div className="flex items-center gap-3 flex-wrap">
+            <h4
               onClick={handleProfileClick}
               className={`text-lg font-bold cursor-pointer hover:underline ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}
             >
               {post.user}
-            </h4>
-            {renderConnectButton()} */}
-
-<h4
-              onClick={handleProfileClick}
-              className={`text-lg font-bold cursor-pointer hover:underline ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}
-            >
-              {post.user}
+              {/* ✅ NEW: mood shown right after name, LinkedIn/Facebook style */}
+              {moodEmoji && (
+                <span className={`text-sm font-normal ml-1 ${isDarkMode ? 'text-slate-300' : 'text-[#4a3728]/70'}`}>
+                  is feeling {moodEmoji} {moodLabel}
+                </span>
+              )}
             </h4>
             {post.degreeLabel && !isOwnPost && (
               <span className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/50'}`}>
@@ -109,7 +136,6 @@ const PostHeader = ({
               </span>
             )}
             {renderConnectButton()}
-            
           </div>
           <p className="text-sm font-semibold bg-gradient-to-r from-[#6b5643] to-[#8b7355] bg-clip-text text-transparent">
             {post.role}

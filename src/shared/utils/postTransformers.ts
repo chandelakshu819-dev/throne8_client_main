@@ -28,6 +28,11 @@ export const transformApiPostToFeedPost = (
     role: headlineText || userData?.headline || '',
     time: calculateTimeAgo(apiPost.createdAt),
     content: apiPost.content || apiPost.text || '',
+
+    // ✅ ADDED: mood tha model/backend mein save, lekin yahan return object
+    // mein include hi nahi tha — isliye feed pe kabhi pahuchta hi nahi tha.
+    mood: apiPost.mood || null,
+
     image: apiPost.images?.[0]?.cloudinarySecureUrl || apiPost.image || '',
 
     likes: apiPost.likesCount || apiPost.likes || 0,

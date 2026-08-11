@@ -5,6 +5,7 @@ import PostActions from './PostActions';
 import CommentsSection from './CommentsSection';
 import PostContent from './PostContent';
 import PostDetailModal from './PostDetailModal';
+import PostMenuDropdown from './PostMenuDropdown';
 import { ReactionType } from '@/types/profile.types';
 
 interface FeedRepostCardProps {
@@ -53,9 +54,9 @@ interface FeedRepostCardProps {
     onOpenWithPerspectiveModal?: any;
     handleRepostInstant?: any;
 
-    // ✅ FIX: post menu (⋯) wiring — PostDetailModal ke andar
-    // Edit/Delete/Report kaam karne ke liye zaroori hai, pehle
-    // hardcoded null/no-op tha isliye menu kabhi khulta hi nahi tha.
+    // ✅ post menu (⋯) wiring — FeedRepostCard ke inner header aur
+    // PostDetailModal dono ke andar Edit/Delete/Report kaam karne ke
+    // liye zaroori hai.
     openMenuIndex?: any;
     togglePostMenu?: any;
     handlePostAction?: any;
@@ -106,6 +107,10 @@ const FeedRepostCard = ({
     // (previously declared after the `if (!originalPost) return null`
     // below, which violates React's rules-of-hooks)
     const [isDetailOpen, setIsDetailOpen] = React.useState(false);
+
+    // ✅ NEW: repost ke saath likhe gaye "thoughtText" (italic quote) ke
+    // liye read more/less state — pehle yeh hamesha poora dikh jaata tha.
+    const [isThoughtExpanded, setIsThoughtExpanded] = React.useState(false);
 
     const originalPost = repostItem.originalPost;
     if (!originalPost) return null;
@@ -171,6 +176,11 @@ const FeedRepostCard = ({
         sendsCount: originalPost.sendsCount || 0,
     };
 
+    // ✅ NEW: original post ke 3-dot (⋯) menu ka open/close state — parent
+    // se aa raha `openMenuIndex` string/number id hai, postKey se match
+    // karke decide karte hain ki yeh menu khula hai ya nahi.
+    const isMenuOpen = openMenuIndex === postKey;
+
     return (
         <div
             className={`p-8 rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-500 hover:scale-[1.01] hover:-translate-y-0.5 ${isDarkMode
@@ -202,15 +212,45 @@ const FeedRepostCard = ({
                     </span>
                 </div>
 
-                {repostItem.repostType === 'quote' && repostItem.thoughtText && (
-                    <p className={`text-sm italic mb-4 pl-3 border-l-2 border-[#6b5643]/40 ${isDarkMode ? 'text-slate-300' : 'text-[#4a3728]/80'}`}>
-                        &ldquo;{repostItem.thoughtText}&rdquo;
-                    </p>
-                )}
+                {repostItem.repostType === 'quote' && repostItem.thoughtText && (() => {
+                    const thought: string = repostItem.thoughtText;
+                    // ✅ FIX: pehle character-count (150 chars) pe slice hota tha,
+                    // lekin agar thought mein line-breaks (\n) hain toh
+                    // whitespace-pre-wrap unhe respect karta hai aur collapsed
+                    // state mein bhi 2-3 lines dikh jaati thi. Ab hamesha poora
+                    // text dete hain aur "line-clamp-1" CSS se collapsed state
+                    // mein strictly sirf 1 line dikhti hai (line-break ho ya na ho).
+                    const hasMultipleLines = thought.split('\n').filter((l) => l.trim().length > 0).length > 1;
+                    const shouldTruncateThought = hasMultipleLines || thought.length > 80;
+
+                    return (
+                        <div className="mb-4 pl-3 border-l-2 border-[#6b5643]/40">
+                            <p
+                                className={`text-sm italic whitespace-pre-wrap break-words ${!isThoughtExpanded && shouldTruncateThought ? 'line-clamp-1' : ''
+                                    } ${isDarkMode ? 'text-slate-300' : 'text-[#4a3728]/80'}`}
+                            >
+                                &ldquo;{thought}&rdquo;
+                            </p>
+
+                            {shouldTruncateThought && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsThoughtExpanded((v) => !v)}
+                                    className={`mt-1 text-sm font-semibold not-italic ${isDarkMode
+                                        ? 'text-slate-300 hover:text-white'
+                                        : 'text-[#6b5643] hover:text-[#4a3728]'
+                                        }`}
+                                >
+                                    {isThoughtExpanded ? 'Show less' : 'Read more'}
+                                </button>
+                            )}
+                        </div>
+                    );
+                })()}
 
                 {/* ── Original Post Content ── */}
                 <div
-                    className={`rounded-2xl border p-5 ${isDarkMode ? 'bg-slate-700/40 border-slate-600/50' : 'bg-white/60 border-[#4a3728]/15'}`}
+                    className={`relative rounded-2xl border p-5 ${isDarkMode ? 'bg-slate-700/40 border-slate-600/50' : 'bg-white/60 border-[#4a3728]/15'}`}
                 >
                     <div className="flex items-center gap-3 mb-3">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${isDarkMode ? 'bg-slate-600 border-slate-500' : 'bg-[#e0d8cf] border-[#4a3728]/10'}`}>
@@ -220,7 +260,7 @@ const FeedRepostCard = ({
                                 <i className="ri-user-line text-[#4a3728]/50 text-lg" />
                             )}
                         </div>
-                        <div>
+                        <div className="flex-1 min-w-0">
                             <p className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
                                 {originalPost.userName || originalPost.fullName || 'Unknown User'}
                             </p>
@@ -228,7 +268,36 @@ const FeedRepostCard = ({
                                 {timeAgo(originalPost.createdAt)}
                             </p>
                         </div>
+
+                        {/* ✅ NEW: 3-dot (⋯) menu button — original post ke liye.
+                            Pehle yahan koi button hi nahi tha isliye Edit/Delete/
+                            Report/Save wagera options kabhi khulte hi nahi the. */}
+                        {togglePostMenu && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    togglePostMenu(postKey);
+                                }}
+                                className={`flex-shrink-0 p-2 rounded-full transition-colors ${isDarkMode ? 'hover:bg-slate-600 text-slate-300' : 'hover:bg-[#e0d8cf]/60 text-[#4a3728]/70'
+                                    }`}
+                                aria-label="Post options"
+                            >
+                                <i className="ri-more-fill text-lg" />
+                            </button>
+                        )}
                     </div>
+
+                    {/* ✅ NEW: dropdown, postKey se match hone par hi render hota hai */}
+                    {isMenuOpen && handlePostAction && (
+                        <PostMenuDropdown
+                            isDarkMode={isDarkMode}
+                            index={postKey}
+                            handlePostAction={handlePostAction}
+                            post={syntheticPost}
+                            currentUserId={currentUserId || ''}
+                        />
+                    )}
 
                     <h3 className={`text-base font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
                         {originalPost.title}

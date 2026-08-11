@@ -36,11 +36,12 @@ const CommentItem = ({
   currentUserId?: string;
   postOwnerId?: string;
 }) => {
-  const likeCount = Object.values(comment.reactions || {}).reduce(
-    (sum: number, v: any) => sum + (v || 0),
-    0
-  );
-  const isLikedByMe = !!comment.likedByCurrentUser;
+  // ✅ FIX: pehle `comment.reactions` (userId arrays) ko number samajh ke
+  // reduce kiya jaa raha tha — jo hamesha galat/garbage value deta tha.
+  // Backend actually `likesCount` (number) aur `likedBy` (userId[]) deta
+  // hai — yehi sahi source hai.
+  const likeCount = comment.likesCount || 0;
+  const isLikedByMe = !!currentUserId && (comment.likedBy || []).includes(currentUserId);
   const commentId = comment.commentId || comment.id;
 
   return (
@@ -139,12 +140,12 @@ const CommentItem = ({
             )}
 
             <button
-              onClick={() => handleCommentReaction(commentId, '❤️')}
+              onClick={() => handleCommentReaction(commentId)}
               className={`text-xs font-bold ${
                 isLikedByMe ? 'text-[#0a66c2]' : isDarkMode ? 'text-slate-400 hover:text-white' : 'text-[#4a3728]/60 hover:text-[#4a3728]'
               }`}
             >
-              Like{likeCount > 0 ? ` · ${likeCount}` : ''}
+              {isLikedByMe ? 'Liked' : 'Like'}{likeCount > 0 ? ` · ${likeCount}` : ''}
             </button>
 
             <button
@@ -182,46 +183,70 @@ const CommentItem = ({
 
           {comment.replies && comment.replies.length > 0 && (
             <div className="mt-3 ml-3 space-y-3 border-l-2 pl-4" style={{ borderColor: isDarkMode ? '#334155' : '#4a372820' }}>
-              {comment.replies.map((reply: any) => (
-                <div key={reply.id || reply.commentId} className="flex items-start gap-2">
-                  <img
-                    src={reply.user?.avatar || reply.avatar}
-                    alt={reply.user?.name || reply.user}
-                    className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div
-                      className={`inline-block rounded-2xl px-3 py-2 ${
-                        isDarkMode ? 'bg-slate-700/50' : 'bg-[#e0d8cf]/50'
-                      }`}
-                    >
-                      <p className={`font-bold text-xs ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
-                        {reply.user?.name || reply.user}
-                      </p>
-                      <p
-                        className={`text-xs mt-0.5 whitespace-pre-wrap ${
-                          isDarkMode ? 'text-slate-300' : 'text-[#4a3728]/80'
+              {comment.replies.map((reply: any) => {
+                const replyId = reply.commentId || reply.id;
+                // ✅ FIX: same fix as parent comment — real likesCount/likedBy
+                const replyLikeCount = reply.likesCount || 0;
+                const replyIsLikedByMe =
+                  !!currentUserId && (reply.likedBy || []).includes(currentUserId);
+
+                return (
+                  <div key={replyId} className="flex items-start gap-2">
+                    <img
+                      src={reply.user?.avatar || reply.avatar}
+                      alt={reply.user?.name || reply.user}
+                      className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className={`inline-block rounded-2xl px-3 py-2 ${
+                          isDarkMode ? 'bg-slate-700/50' : 'bg-[#e0d8cf]/50'
                         }`}
                       >
-                        {renderFormattedContent(reply.content || reply.text || '')}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 mt-1 pl-3">
-                      <span className={`text-xs ${isDarkMode ? 'text-slate-500' : 'text-[#4a3728]/45'}`}>
-                        {reply.time}
-                      </span>
-                      <button
-                        onClick={() => handleCommentReaction(reply.id || reply.commentId, '❤️')}
-                        className={`text-xs font-bold ${
-                          isDarkMode ? 'text-slate-400 hover:text-white' : 'text-[#4a3728]/60 hover:text-[#4a3728]'
-                        }`}
-                      >
-                        Like
-                      </button>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className={`font-bold text-xs ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
+                            {reply.user?.name || reply.user}
+                          </p>
+                          {reply.isAuthor && (
+                            <span
+                              className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+                                isDarkMode ? 'bg-slate-600 text-slate-200' : 'bg-[#4a3728]/10 text-[#4a3728]'
+                              }`}
+                            >
+                              Author
+                            </span>
+                          )}
+                        </div>
+                        <p
+                          className={`text-xs mt-0.5 whitespace-pre-wrap ${
+                            isDarkMode ? 'text-slate-300' : 'text-[#4a3728]/80'
+                          }`}
+                        >
+                          {renderFormattedContent(reply.content || reply.text || '')}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 pl-3">
+                        <span className={`text-xs ${isDarkMode ? 'text-slate-500' : 'text-[#4a3728]/45'}`}>
+                          {reply.time}
+                        </span>
+                        <button
+                          onClick={() => handleCommentReaction(replyId)}
+                          className={`text-xs font-bold ${
+                            replyIsLikedByMe
+                              ? 'text-[#0a66c2]'
+                              : isDarkMode
+                              ? 'text-slate-400 hover:text-white'
+                              : 'text-[#4a3728]/60 hover:text-[#4a3728]'
+                          }`}
+                        >
+                          {replyIsLikedByMe ? 'Liked' : 'Like'}
+                          {replyLikeCount > 0 ? ` · ${replyLikeCount}` : ''}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

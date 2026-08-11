@@ -688,6 +688,31 @@ export default function Home() {
         }
     };
 
+    // ✅ NEW: backend `getCommentsByPostId` ek FLAT list deta hai — top-level
+    // comments aur unke replies (jinka parentCommentId set hai) sab ek hi
+    // array mein. Yeh function usko parentCommentId ke basis pe ek-level-deep
+    // tree mein convert karta hai (replies apne parent comment ke "replies"
+    // array ke andar aa jaate hain), taaki purane replies bhi page reload ke
+    // baad properly nested dikhein — sirf isi session ke naye replies nahi.
+    const buildCommentTree = (flatComments: any[]) => {
+        const map: Record<string, any> = {};
+        const roots: any[] = [];
+
+        flatComments.forEach((c: any) => {
+            map[c.commentId] = { ...c, replies: [] };
+        });
+
+        flatComments.forEach((c: any) => {
+            if (c.parentCommentId && map[c.parentCommentId]) {
+                map[c.parentCommentId].replies.push(map[c.commentId]);
+            } else {
+                roots.push(map[c.commentId]);
+            }
+        });
+
+        return roots;
+    };
+
  // ✅ NEW: sirf fetch karta hai (open/close nahi) — modal aur inline section
     // dono isko reuse kar sakte hain bina ek dusre ki UI state chhede
     const fetchCommentsForPost = async (postId: string) => {
@@ -704,9 +729,10 @@ export default function Home() {
             )?.userId;
 
             const enrichedComments = await enrichCommentsWithUserData(rawComments, postOwnerId);
+            const nestedComments = buildCommentTree(enrichedComments); // ✅ tree banao — replies parent ke andar nest ho jayenge
 
-            setPostComments(prev => ({ ...prev, [postId]: enrichedComments }));
-            setPostCommentCounts(prev => ({ ...prev, [postId]: enrichedComments.length }));
+            setPostComments(prev => ({ ...prev, [postId]: nestedComments })); // ✅ nested tree store karo
+            setPostCommentCounts(prev => ({ ...prev, [postId]: enrichedComments.length })); // total count same rahega (replies included)
         } catch (error) {
             console.error('Failed to fetch comments:', error);
         } finally {
@@ -744,7 +770,12 @@ export default function Home() {
         try {
             if (replyingTo) {
                 const res = await ProfileService.createReply(replyingTo, commentText);
-                const newReply = { ...res.data.reply, user: selfUser };
+                const newReply = {
+                    ...res.data.reply,
+                    user: selfUser,
+                    likesCount: res.data.reply?.likesCount || 0,
+                    likedBy: res.data.reply?.likedBy || [],
+                };
                 // reply ko us comment ke niche add karo
                 setPostComments(prev => {
                     const updated = (prev[postId] || []).map(c => {
@@ -767,6 +798,9 @@ if (post?.userId && post.userId !== user?.userId) {
                     ...res.data.comment,
                     user: selfUser,
                     isAuthor: !!postOwnerId && user?.userId === postOwnerId,
+                    replies: [],
+                    likesCount: res.data.comment?.likesCount || 0,
+                    likedBy: res.data.comment?.likedBy || [],
                 };
                 // new comment top mein ya bottom mein add karo
                 setPostComments(prev => ({
@@ -790,8 +824,79 @@ if (post?.userId && post.userId !== user?.userId) {
         setReplyingTo(commentId);
     }
 
-    const handleCommentReaction = (commentId: any, emoji: any) => {
-        // // console.log(`Reaction ${emoji} on comment ${commentId}`);
+    // ✅ FIX: pehle yeh khaali stub tha (sirf commented-out console.log) —
+    // like button click hone pe kuch hota hi nahi tha. Ab actual like/unlike
+    // API call karta hai + optimistic UI update, aur nested replies ke andar
+    // bhi comment dhoondh ke update kar sakta hai (kyunki comments ab tree
+    // structure mein hain — buildCommentTree ke baad).
+    const handleCommentReaction = async (commentId: string) => {
+        const findComment = (comments: any[]): any => {
+            for (const c of comments) {
+                if (c.commentId === commentId) return c;
+                if (c.replies?.length) {
+                    const found = findComment(c.replies);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+
+        const updateCommentInTree = (comments: any[], updater: (c: any) => any): any[] =>
+            comments.map((c: any) => {
+                if (c.commentId === commentId) return updater(c);
+                if (c.replies?.length) {
+                    return { ...c, replies: updateCommentInTree(c.replies, updater) };
+                }
+                return c;
+            });
+
+        // yeh comment kis postId ke andar hai, woh dhoondo
+        let targetPostId: string | null = null;
+        let targetComment: any = null;
+        for (const pid in postComments) {
+            const found = findComment(postComments[pid] || []);
+            if (found) {
+                targetPostId = pid;
+                targetComment = found;
+                break;
+            }
+        }
+        if (!targetPostId || !targetComment) return;
+
+        const isCurrentlyLiked = (targetComment.likedBy || []).includes(user?.userId);
+        const prevLikedBy = targetComment.likedBy || [];
+        const prevLikesCount = targetComment.likesCount || 0;
+
+        // optimistic update
+        setPostComments(prev => ({
+            ...prev,
+            [targetPostId as string]: updateCommentInTree(prev[targetPostId as string] || [], (c) => ({
+                ...c,
+                likedBy: isCurrentlyLiked
+                    ? prevLikedBy.filter((id: string) => id !== user?.userId)
+                    : [...prevLikedBy, user?.userId],
+                likesCount: isCurrentlyLiked ? Math.max(0, prevLikesCount - 1) : prevLikesCount + 1,
+            })),
+        }));
+
+        try {
+            if (isCurrentlyLiked) {
+                await ProfileService.unlikeComment(commentId);
+            } else {
+                await ProfileService.likeComment(commentId);
+            }
+        } catch (error: any) {
+            console.error('Comment like/unlike failed:', error);
+            // revert on failure
+            setPostComments(prev => ({
+                ...prev,
+                [targetPostId as string]: updateCommentInTree(prev[targetPostId as string] || [], (c) => ({
+                    ...c,
+                    likedBy: prevLikedBy,
+                    likesCount: prevLikesCount,
+                })),
+            }));
+        }
     };
 
     const toggleCommentMenu = (commentId: any) => {
@@ -1062,6 +1167,7 @@ if (post?.userId && post.userId !== user?.userId) {
                         profileData={profileData}           // ← ADD
                         fullName={fullName}                 // ← ADD
                         repostingPostId={repostingPostId}
+                        fetchCommentsForPost={fetchCommentsForPost}
                     />
 
                     {/* Desktop Right Sidebar */}
@@ -1400,7 +1506,7 @@ if (post?.userId && post.userId !== user?.userId) {
                         {/* Video */}
                         <button
                             onClick={() => handleMediaOptionClick('video')}
-                            className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm border transition-all flex-shrink-0 ${selectedVideos.length > 0
+                            className={`flex items-center gap-1 px-2 sm:py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm border transition-all flex-shrink-0 ${selectedVideos.length > 0
                                 ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
                                 : isDarkMode
                                     ? 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-700'

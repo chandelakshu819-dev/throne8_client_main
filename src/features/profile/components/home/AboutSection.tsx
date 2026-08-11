@@ -15,6 +15,8 @@ interface AboutSectionProps {
     isOwnProfile?: boolean; // ✅ NAYA PROP
 }
 
+const ABOUT_TRUNCATE_LENGTH = 220;
+
 const AboutSection: React.FC<AboutSectionProps> = ({
     aboutData,
     isLoading = false,
@@ -30,12 +32,18 @@ const AboutSection: React.FC<AboutSectionProps> = ({
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isAboutExpanded, setIsAboutExpanded] = useState(false); // ✅ NAYA STATE for read more/less
 
     useEffect(() => {
         if (aboutData?.aboutText) {
             setAboutText(aboutData.aboutText);
         }
     }, [aboutData]);
+
+    // ✅ Agar aboutData badal jaaye (jaise dusri profile khol li), toh expand state reset ho
+    useEffect(() => {
+        setIsAboutExpanded(false);
+    }, [aboutData?.aboutText]);
 
     useEffect(() => {
         if (isModalOpen) {
@@ -139,6 +147,14 @@ const AboutSection: React.FC<AboutSectionProps> = ({
         return null;
     }
 
+    // ✅ Read more/less logic
+    const fullAboutText: string = aboutData?.aboutText || '';
+    const shouldTruncate = fullAboutText.length > ABOUT_TRUNCATE_LENGTH;
+    const displayedAboutText =
+        shouldTruncate && !isAboutExpanded
+            ? fullAboutText.slice(0, ABOUT_TRUNCATE_LENGTH).trimEnd()
+            : fullAboutText;
+
     return (
         <>
             {/* ✅ FIX: min-w-0 so this whole card can never force the page
@@ -200,15 +216,41 @@ const AboutSection: React.FC<AboutSectionProps> = ({
                                                 preserves line breaks but does NOT wrap a single long
                                                 unbroken word/URL; break-words does. */}
                                             <p className="text-[#4a3728]/90 leading-relaxed font-medium tracking-wide text-sm whitespace-pre-wrap break-words">
-                                                {aboutData.aboutText}
+                                                {displayedAboutText}
+                                                {shouldTruncate && !isAboutExpanded ? '...' : ''}
                                             </p>
+
+                                            {/* ✅ Read more / Show less toggle */}
+                                            {shouldTruncate && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsAboutExpanded((prev) => !prev)}
+                                                    className="mt-2 text-[#4a3728] font-semibold text-sm hover:underline focus:outline-none"
+                                                >
+                                                    {isAboutExpanded ? 'Show less' : 'Read more'}
+                                                </button>
+                                            )}
+
                                             {/* ✅ Edit button sirf apni profile pe */}
                                             {isOwnProfile && (
                                                 <button
                                                     onClick={() => handleOpenModal(true)}
-                                                    className="absolute top-4 right-4 bg-[#4a3728]/20 text-[#4a3728] px-2 py-1 text-xs rounded-md hover:bg-[#4a3728]/30 transition"
+                                                    className="absolute top-4 right-4 flex items-center gap-1.5 bg-[#4a3728]/10 text-[#4a3728] px-3 py-1.5 text-xs font-semibold rounded-full hover:bg-[#4a3728]/20 transition"
                                                 >
-                                                    ✏ Edit
+                                                    <svg
+                                                        className="w-3.5 h-3.5"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        viewBox="0 0 24 24"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth="2"
+                                                            d="M11 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                                        />
+                                                    </svg>
+                                                    Edit
                                                 </button>
                                             )}
                                         </>

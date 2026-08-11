@@ -8,87 +8,138 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
   const content: string = post.content || post.text || '';
 
   // Get lines and filter out empty ones to find the first real line
-  const lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+  const lines = content.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
   const firstLine = lines[0] || '';
 
   const isMultiline = lines.length > 1;
   const isTooLong = content.length > 40;
   const isLong = isMultiline || isTooLong;
 
-  // ✅ content ab **bold**/_italic_/"- bullet" ko formatted React
-  // elements ke saath render karta hai — dangerouslySetInnerHTML kahin
-  // use nahi hota, isliye XSS-safe hai. Collapsed state mein sirf pehli
-  // line ka inline formatting dikhata hai (bullets sirf expanded mein
-  // list ban ke dikhte hain, kyunki bullet ek multi-line concept hai).
   const displayNode = expanded
     ? renderFormattedContent(content)
-    : (isMultiline ? renderFormattedLine(firstLine) : renderFormattedContent(content));
+    : isMultiline
+    ? renderFormattedLine(firstLine)
+    : renderFormattedContent(content);
+
+  // ✅ Multi-image support (LinkedIn-style grid)
+  const images: any[] = post.images || [];
+  const imageCount = images.length;
+
+  const getGridColsClass = (): string => {
+    if (imageCount <= 1) return 'grid-cols-1';
+    return 'grid-cols-2';
+  };
+
+  const getTileClass = (index: number): string => {
+    const classes = ['relative', 'overflow-hidden', 'bg-black/5'];
+
+    const isFirstOfThree = imageCount === 3 && index === 0;
+    if (isFirstOfThree) {
+      classes.push('row-span-2');
+    }
+
+    if (imageCount === 1) {
+      classes.push('h-[300px]');
+    } else {
+      classes.push('h-[150px]');
+      classes.push('sm:h-[200px]');
+    }
+
+    return classes.join(' ');
+  };
+
+  const handleReadMoreClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    setExpanded((v) => !v);
+  };
+
+  const handleImageContainerClick = () => {
+    AnalyticsService.recordClick(
+      post.userId,
+      'image',
+      images[0]?.cloudinarySecureUrl,
+      post.postId
+    );
+  };
+
+  const handleVideoContainerClick = () => {
+    AnalyticsService.recordClick(
+      post.userId,
+      'video',
+      post.videos[0].cloudinarySecureUrl,
+      post.postId
+    );
+  };
+
+  const handleDocumentContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+  };
+
+  const handleDocumentDownloadClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.stopPropagation();
+    AnalyticsService.recordClick(
+      post.userId,
+      'document_download',
+      post.documents[0].cloudinarySecureUrl,
+      post.postId
+    );
+  };
+
+  const contentTextClass = [
+    'text-base',
+    'font-medium',
+    'leading-relaxed',
+    'mb-2',
+    'whitespace-pre-wrap',
+    !expanded && isLong ? 'line-clamp-1' : '',
+    isDarkMode ? 'text-slate-200' : 'text-[#4a3728]',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const readMoreClass = isDarkMode
+    ? 'text-sm font-semibold mb-4 text-slate-300 hover:text-white'
+    : 'text-sm font-semibold mb-4 text-[#6b5643] hover:text-[#4a3728]';
+
+  const imageGridClass = 'mb-6 rounded-2xl overflow-hidden grid gap-1 cursor-pointer ' + getGridColsClass();
 
   return (
     <>
-      <p
-        className={`text-base font-medium leading-relaxed mb-2 whitespace-pre-wrap ${
-          !expanded && isLong ? 'line-clamp-1' : ''
-        } ${isDarkMode ? 'text-slate-200' : 'text-[#4a3728]'}`}
-      >
-        {displayNode}
-      </p>
+      <p className={contentTextClass}>{displayNode}</p>
 
       {isLong && (
-        <button
-          onClick={(e) => {
-            // ✅ FIX: PostContent PostCard/FeedRepostCard ke andar ek
-            // onClick wrapper div ke bheetar hota hai (jo post-detail
-            // modal kholta hai). stopPropagation() ke bina yeh click
-            // bubble ho ke us parent onClick ko bhi trigger kar deta
-            // tha — isliye "Read more" click karne pe expand ke saath
-            // saath poori post bhi open ho jaati thi. Ab sirf expand/
-            // collapse hoga, modal nahi khulega.
-            e.stopPropagation();
-            setExpanded((v) => !v);
-          }}
-          className={`text-sm font-semibold mb-4 ${
-            isDarkMode
-              ? 'text-slate-300 hover:text-white'
-              : 'text-[#6b5643] hover:text-[#4a3728]'
-          }`}
-        >
+        <button onClick={handleReadMoreClick} className={readMoreClass}>
           {expanded ? 'Show less' : 'Read more'}
         </button>
       )}
 
-      {post.image && (
-        <div
-          onClick={() => {
-            // Analytics record karo. stopPropagation hata diya taaki
-            // parent PostCard ka modal-open onClick bhi chale.
-            AnalyticsService.recordClick(
-              post.userId,
-              'image',
-              post.image,
-              post.postId
+      {imageCount > 0 && (
+        <div onClick={handleImageContainerClick} className={imageGridClass}>
+          {images.slice(0, 5).map((img: any, i: number) => {
+            const isOverlayTile = imageCount > 4 && i === 3;
+            const extraCount = imageCount - 4;
+
+            return (
+              <div key={img.mediaId || i} className={getTileClass(i)}>
+                <img
+                  src={img.cloudinarySecureUrl}
+                  alt={'Post image ' + (i + 1)}
+                  className="w-full h-full object-cover hover:scale-[1.02] transition-transform duration-500"
+                />
+                {isOverlayTile && extraCount > 0 && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <span className="text-white text-2xl font-bold">+{extraCount}</span>
+                  </div>
+                )}
+              </div>
             );
-          }}
-          className="mb-6 rounded-2xl overflow-hidden bg-transparent w-full h-[300px] flex justify-center cursor-pointer"
-        >
-          <img
-            src={post.image}
-            alt="Post content"
-            className="w-full h-full object-contain hover:scale-[1.01] transition-transform duration-500"
-          />
+          })}
         </div>
       )}
 
       {post.videos && post.videos.length > 0 && (
         <div
-          onClick={() => {
-            AnalyticsService.recordClick(
-              post.userId,
-              'video',
-              post.videos[0].cloudinarySecureUrl,
-              post.postId
-            );
-          }}
+          onClick={handleVideoContainerClick}
           className="mb-6 rounded-2xl overflow-hidden bg-black w-full h-80 flex justify-center cursor-pointer"
         >
           <video
@@ -102,17 +153,12 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
 
       {post.documents && post.documents.length > 0 && (
         <div
-          onClick={(e) => e.stopPropagation()}
+          onClick={handleDocumentContainerClick}
           className="mb-6 bg-gradient-to-br from-[#e0d8cf]/40 to-[#f6ede8]/30 border border-[#e0d8cf]/50 p-4 rounded-2xl flex items-center justify-between gap-4"
         >
           <div className="flex items-center gap-3 min-w-0">
             <div className="p-2.5 bg-[#4a3728] text-[#f6ede8] rounded-xl flex-shrink-0">
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -127,7 +173,7 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
               </p>
               <p className="text-xs text-[#4a3728]/60">
                 {post.documents[0].fileSize
-                  ? `${(post.documents[0].fileSize / 1024).toFixed(0)} KB`
+                  ? (post.documents[0].fileSize / 1024).toFixed(0) + ' KB'
                   : '—'}{' '}
                 · {post.documents[0].format?.toUpperCase() || 'PDF'}
               </p>
@@ -137,15 +183,7 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
             href={post.documents[0].cloudinarySecureUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(e) => {
-              e.stopPropagation();
-              AnalyticsService.recordClick(
-                post.userId,
-                'document_download',
-                post.documents[0].cloudinarySecureUrl,
-                post.postId
-              );
-            }}
+            onClick={handleDocumentDownloadClick}
             className="px-4 py-2 bg-[#4a3728] text-[#f6ede8] text-xs font-bold rounded-xl hover:opacity-90 transition-opacity flex-shrink-0"
           >
             Download
