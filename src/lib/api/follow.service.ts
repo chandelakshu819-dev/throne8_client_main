@@ -83,6 +83,47 @@ class FollowService {
             return null;
         }
     }
+
+    /**
+     * ✅ NEW — GET user's FOLLOWERS LIST (real one-directional follow system,
+     * not "connections"). Backend: GET /api/v1/follow/followers/:userId
+     * Response body: { success, data: { data: FollowDoc[], pagination }, message }
+     * Each FollowDoc only has { followerId, createdAt, ... } — no profile
+     * info — caller is expected to bulk-fetch user profiles separately
+     * (see useFollowListsData hook).
+     */
+    static async getFollowers(userId: string, params?: { page?: number; limit?: number }) {
+        try {
+            const { data } = await api.get(
+                `${config?.NEXT_PUBLIC_FOLLOW_ENDPOINT || process.env.NEXT_PUBLIC_FOLLOW_ENDPOINT}/followers/${userId}`,
+                { params }
+            );
+            return data;
+        } catch (error: any) {
+            console.error('[GET_FOLLOWERS] Failed:', error);
+            return null;
+        }
+    }
+
+    /**
+     * ✅ NEW — GET user's FOLLOWING LIST (real one-directional follow system).
+     * Backend: GET /api/v1/follow/following/:userId
+     * Response body: { success, data: { data: FollowDoc[], pagination }, message }
+     * Each FollowDoc only has { followingId, createdAt, ... }.
+     */
+    static async getFollowing(userId: string, params?: { page?: number; limit?: number }) {
+        try {
+            const { data } = await api.get(
+                `${config?.NEXT_PUBLIC_FOLLOW_ENDPOINT || process.env.NEXT_PUBLIC_FOLLOW_ENDPOINT}/following/${userId}`,
+                { params }
+            );
+            return data;
+        } catch (error: any) {
+            console.error('[GET_FOLLOWING] Failed:', error);
+            return null;
+        }
+    }
+
     static async getUserFollowingCompanies(userId: string) {
         try {
             const { data } = await api.get(

@@ -1,4 +1,4 @@
-// src/hooks/data/useConnectionsData.ts
+// src/features/profile/hooks/useConnectionsData.ts
 import { useState, useCallback, useRef } from 'react';
 import ConnectionService from '@/lib/api/connection.service';
 import AuthService from '@/lib/api/auth.service';
@@ -116,6 +116,7 @@ export const useConnectionsData = () => {
         const followerUserIds: string[] = [];
         const connectionIdMap: Record<string, string> = {};
 
+        let unmatchedCount = 0;
         connections.forEach((conn: any) => {
             const targetId = conn.fromUserId === currentUserId ? conn.toUserId : conn.fromUserId;
             connectionIdMap[targetId] = conn.connectionId;
@@ -124,8 +125,26 @@ export const useConnectionsData = () => {
                 followingUserIds.push(conn.toUserId);
             } else if (conn.toUserId === currentUserId) {
                 followerUserIds.push(conn.fromUserId);
+            } else {
+                // ✅ This connection doc doesn't reference currentUserId on
+                // either side — this is exactly why raw connections.length
+                // used to be higher than followingList.length +
+                // followersList.length (e.g. 10 vs 9). Instead of silently
+                // dropping it, flag it loudly so the underlying backend
+                // data issue is visible in dev tools.
+                unmatchedCount += 1;
+                console.warn(
+                    '⚠️ [CONNECTIONS] Orphaned/mismatched connection doc — neither fromUserId nor toUserId matches currentUserId:',
+                    { currentUserId, connectionId: conn.connectionId, fromUserId: conn.fromUserId, toUserId: conn.toUserId }
+                );
             }
         });
+
+        if (unmatchedCount > 0) {
+            console.warn(
+                `⚠️ [CONNECTIONS] ${unmatchedCount} of ${connections.length} connection doc(s) for user ${currentUserId} did not match either direction. Check the backend Connection collection for stale/duplicate/bad-userId docs.`
+            );
+        }
 
         // ✅ STEP 3: Fetch user profiles for both lists
         const [followingProfiles, followerProfiles] = await Promise.all([
@@ -136,7 +155,12 @@ export const useConnectionsData = () => {
         return {
             followingList: followingProfiles,
             followersList: followerProfiles,
-            totalConnections: connections.length,
+            // ✅ FIX: derive totalConnections from the docs we actually matched
+            // and turned into following/followers, instead of the raw API
+            // array length. This guarantees the number shown in the UI
+            // ("X connections") always agrees with Following + Followers
+            // shown right next to it — no more "10 total" vs "9 in the list".
+            totalConnections: followingUserIds.length + followerUserIds.length,
         };
     };
 
