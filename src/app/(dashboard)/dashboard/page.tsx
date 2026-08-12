@@ -55,6 +55,13 @@ export default function Home() {
     const [editCommentText, setEditCommentText] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
+    // ✅ NEW: real "Weekly Performance" data (replaces hardcoded +24% / +18%)
+    const [weeklyPerformance, setWeeklyPerformance] = useState<{
+        profileViewsChange: number;
+        postReachChange: number;
+    } | null>(null);
+    const [isLoadingWeeklyPerformance, setIsLoadingWeeklyPerformance] = useState(false);
+
     // Repost states
     const [isRepostWithPerspectiveOpen, setIsRepostWithPerspectiveOpen] = useState(false);
     const [isConfirmRepostOpen, setIsConfirmRepostOpen] = useState(false);
@@ -117,6 +124,11 @@ export default function Home() {
         loadProfile,
         loadPosts,
     } = useProfile();
+    useEffect(() => {
+    if (userPosts?.length > 0) {
+        console.log('SAMPLE POST OBJECT:', JSON.stringify(userPosts[0], null, 2));
+    }
+}, [userPosts]);
 
     const { headlineData, isLoadingHeadline, fetchHeadlineData } = useHeadlineData(headlineId);
 
@@ -166,6 +178,35 @@ export default function Home() {
         };
     }, [socket, prependPost]);
 
+    // ✅ NEW: Analytics modal khulte hi real weekly performance data fetch karo
+    // (pehle "+24%" aur "+18%" hardcoded the — ab real backend se aata hai)
+    useEffect(() => {
+        if (!isAnalyticsOpen) return;
+        let cancelled = false;
+        setIsLoadingWeeklyPerformance(true);
+
+       Promise.all([
+            AnalyticsService.getProfileViewsChange(7),
+            AnalyticsService.getPostImpressionsChange(7),
+        ])
+            .then(([profileViewsRes, postReachRes]) => {
+                if (cancelled) return;
+                setWeeklyPerformance({
+                    profileViewsChange: profileViewsRes?.data?.change?.percentage ?? 0,
+                    postReachChange: postReachRes?.data?.change?.percentage ?? 0,
+                });
+            })
+            .catch((err) => {
+                console.error('Failed to fetch weekly performance:', err);
+                if (!cancelled) setWeeklyPerformance({ profileViewsChange: 0, postReachChange: 0 });
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoadingWeeklyPerformance(false);
+            });
+
+        return () => { cancelled = true; };
+    }, [isAnalyticsOpen]);
+
     const profileData = transformToProfileData(
         userProfileData,
         profileImageUrl,
@@ -182,6 +223,14 @@ export default function Home() {
     // console.log('👤 Profile User Image:', profileData);
 
     // console.log("all posts here ->>>", userPosts, allPosts)
+
+    // ✅ NEW: real total engagement across all of the user's own posts
+    // (replaces hardcoded "12.8K")
+    const totalEngagement = userPosts.reduce(
+        (sum: number, p: any) => sum + (p.likesCount || 0) + (p.commentsCount || 0) + (p.shares ?? p.sharesCount ?? 0),
+        0
+    );
+    const formatEngagement = (num: number) => (num >= 1000 ? (num / 1000).toFixed(1) + 'K' : String(num));
 
     const moods = [
         { id: 'happy', label: 'Happy', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
@@ -1616,7 +1665,8 @@ if (post?.userId && post.userId !== user?.userId) {
                         </div>
                         <div className={`p-3 sm:p-4 rounded-2xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-white/60'}`}>
                             <p className={`text-xs sm:text-sm ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/70'} mb-1`}>Engagement</p>
-                            <p className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-[#8b7355] to-[#6b5643] bg-clip-text text-transparent">12.8K</p>
+                            {/* ✅ FIX: real total engagement (likes+comments+shares across userPosts) — was hardcoded "12.8K" */}
+                            <p className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-[#8b7355] to-[#6b5643] bg-clip-text text-transparent">{formatEngagement(totalEngagement)}</p>
                         </div>
                     </div>
                     {/* Top Performing Posts */}
@@ -1641,7 +1691,12 @@ if (post?.userId && post.userId !== user?.userId) {
                                         <p className={`text-xs sm:text-sm font-bold mb-2 truncate ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
                                             {post.title}
                                         </p>
-                                        <div className="grid grid-cols-3 gap-1 sm:gap-2 text-xs">
+                                        {/* ✅ FIX: 3-col → 4-col grid, added Impressions (was missing) */}
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 text-xs">
+                                            <div className={`p-2 rounded ${isDarkMode ? 'bg-slate-800/50' : 'bg-[#e0d8cf]/50'}`}>
+                                                <p className={isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}>Impressions</p>
+                                                <p className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>{post.viewsCount ?? post.impressions ?? 0}</p>
+                                            </div>
                                             <div className={`p-2 rounded ${isDarkMode ? 'bg-slate-800/50' : 'bg-[#e0d8cf]/50'}`}>
                                                 <p className={isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}>Likes</p>
                                                 <p className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>{post.likesCount}</p>
@@ -1681,11 +1736,21 @@ if (post?.userId && post.userId !== user?.userId) {
                     <div className="grid grid-cols-2 gap-2 sm:gap-4">
                         <div className={`p-3 sm:p-4 rounded-xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-white/60'}`}>
                             <p className={`text-xs sm:text-sm ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/70'} mb-1`}>Profile Views</p>
-                            <p className="text-xl sm:text-2xl font-black bg-gradient-to-r from-[#6b5643] to-[#8b7355] bg-clip-text text-transparent">+24%</p>
+                            {/* ✅ FIX: real % change from backend — was hardcoded "+24%" */}
+                            <p className="text-xl sm:text-2xl font-black bg-gradient-to-r from-[#6b5643] to-[#8b7355] bg-clip-text text-transparent">
+                                {isLoadingWeeklyPerformance
+                                    ? '...'
+                                    : `${weeklyPerformance && weeklyPerformance.profileViewsChange >= 0 ? '+' : ''}${weeklyPerformance?.profileViewsChange ?? 0}%`}
+                            </p>
                         </div>
                         <div className={`p-3 sm:p-4 rounded-xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-white/60'}`}>
                             <p className={`text-xs sm:text-sm ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/70'} mb-1`}>Post Reach</p>
-                            <p className="text-xl sm:text-2xl font-black bg-gradient-to-r from-[#8b7355] to-[#6b5643] bg-clip-text text-transparent">+18%</p>
+                            {/* ✅ FIX: real % change from backend — was hardcoded "+18%" */}
+                            <p className="text-xl sm:text-2xl font-black bg-gradient-to-r from-[#8b7355] to-[#6b5643] bg-clip-text text-transparent">
+                                {isLoadingWeeklyPerformance
+                                    ? '...'
+                                    : `${weeklyPerformance && weeklyPerformance.postReachChange >= 0 ? '+' : ''}${weeklyPerformance?.postReachChange ?? 0}%`}
+                            </p>
                         </div>
                     </div>
                 </div>

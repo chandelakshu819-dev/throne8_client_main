@@ -1,0 +1,114 @@
+<svg width="1400" height="900" viewBox="0 0 1400 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
+      gradientTransform="translate(640 420) rotate(90) scale(430 560)">
+      <stop stop-color="#D8B38A" stop-opacity=".34"/>
+      <stop offset=".5" stop-color="#A9825E" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#6B4A35" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="line" x1="180" y1="180" x2="1080" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E7C79F" stop-opacity=".08"/>
+      <stop offset=".5" stop-color="#D9B98D" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#F3DEC0" stop-opacity=".08"/>
+    </linearGradient>
+
+    <linearGradient id="person" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F1D7B3"/>
+      <stop offset="1" stop-color="#A77C57"/>
+    </linearGradient>
+
+    <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+
+    <filter id="nodeGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+
+  <!-- transparent background: intended to sit over the existing brown login background -->
+
+  <!-- ambient glow -->
+  <ellipse cx="640" cy="420" rx="520" ry="390" fill="url(#glow)"/>
+
+  <!-- subtle network connections -->
+  <g stroke="url(#line)" stroke-width="2" opacity=".72">
+    <path d="M155 235 L360 330 L565 210 L790 330 L1045 205"/>
+    <path d="M225 575 L360 330 L515 555 L790 330 L930 585"/>
+    <path d="M565 210 L515 555 L735 690 L930 585 L1045 205"/>
+    <path d="M155 235 L225 575"/>
+    <path d="M1045 205 L1105 490"/>
+    <path d="M790 330 L1105 490"/>
+    <path d="M515 555 L360 720"/>
+    <path d="M735 690 L930 585"/>
+  </g>
+
+  <!-- glowing center -->
+  <circle cx="640" cy="420" r="92" fill="#D8B38A" opacity=".10" filter="url(#softGlow)"/>
+  <circle cx="640" cy="420" r="48" fill="#E6C69E" opacity=".12"/>
+  <circle cx="640" cy="420" r="7" fill="#F5DEC0" filter="url(#nodeGlow)"/>
+  <circle cx="640" cy="420" r="4" fill="#FFF1DC"/>
+
+  <!-- network nodes -->
+  <g fill="#DDBD94">
+    <circle cx="155" cy="235" r="5"/>
+    <circle cx="360" cy="330" r="7"/>
+    <circle cx="565" cy="210" r="5"/>
+    <circle cx="790" cy="330" r="7"/>
+    <circle cx="1045" cy="205" r="5"/>
+    <circle cx="225" cy="575" r="5"/>
+    <circle cx="515" cy="555" r="7"/>
+    <circle cx="735" cy="690" r="5"/>
+    <circle cx="930" cy="585" r="7"/>
+    <circle cx="1105" cy="490" r="5"/>
+    <circle cx="360" cy="720" r="4"/>
+  </g>
+
+  <!-- person 1 -->
+  <g transform="translate(305 270)">
+    <circle cx="55" cy="28" r="28" fill="url(#person)" opacity=".96"/>
+    <path d="M4 112C7 72 25 55 55 55C85 55 103 72 106 112C106 123 98 130 87 130H23C12 130 4 123 4 112Z" fill="url(#person)" opacity=".9"/>
+    <circle cx="55" cy="28" r="39" stroke="#E6C69E" stroke-opacity=".16" stroke-width="2"/>
+  </g>
+
+  <!-- person 2 -->
+  <g transform="translate(745 270)">
+    <circle cx="55" cy="28" r="28" fill="url(#person)" opacity=".96"/>
+    <path d="M4 112C7 72 25 55 55 55C85 55 103 72 106 112C106 123 98 130 87 130H23C12 130 4 123 4 112Z" fill="url(#person)" opacity=".9"/>
+    <circle cx="55" cy="28" r="39" stroke="#E6C69E" stroke-opacity=".16" stroke-width="2"/>
+  </g>
+
+  <!-- person 3 -->
+  <g transform="translate(470 510)">
+    <circle cx="55" cy="28" r="28" fill="url(#person)" opacity=".96"/>
+    <path d="M4 112C7 72 25 55 55 55C85 55 103 72 106 112C106 123 98 130 87 130H23C12 130 4 123 4 112Z" fill="url(#person)" opacity=".9"/>
+    <circle cx="55" cy="28" r="39" stroke="#E6C69E" stroke-opacity=".16" stroke-width="2"/>
+  </g>
+
+  <!-- person 4 -->
+  <g transform="translate(885 535)">
+    <circle cx="55" cy="28" r="28" fill="url(#person)" opacity=".96"/>
+    <path d="M4 112C7 72 25 55 55 55C85 55 103 72 106 112C106 123 98 130 87 130H23C12 130 4 123 4 112Z" fill="url(#person)" opacity=".9"/>
+    <circle cx="55" cy="28" r="39" stroke="#E6C69E" stroke-opacity=".16" stroke-width="2"/>
+  </g>
+
+  <!-- AI/core icon -->
+  <g transform="translate(588 368)">
+    <rect x="22" y="22" width="60" height="60" rx="18" stroke="#F1D7B3" stroke-opacity=".65" stroke-width="2"/>
+    <path d="M52 10V22M52 82V94M10 52H22M82 52H94" stroke="#F1D7B3" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="42" cy="48" r="4" fill="#F8E5CB"/>
+    <circle cx="62" cy="48" r="4" fill="#F8E5CB"/>
+    <path d="M39 63C46 69 58 69 65 63" stroke="#F8E5CB" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- tiny floating connection points -->
+  <g fill="#F0D5AF" opacity=".7">
+    <circle cx="275" cy="155" r="2"/>
+    <circle cx="475" cy="125" r="2"/>
+    <circle cx="895" cy="150" r="2"/>
+    <circle cx="1170" cy="300" r="2"/>
+    <circle cx="1125" cy="690" r="2"/>
+    <circle cx="280" cy="700" r="2"/>
+  </g>
+</svg>

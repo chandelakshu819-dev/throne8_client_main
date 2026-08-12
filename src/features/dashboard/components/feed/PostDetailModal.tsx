@@ -82,8 +82,31 @@ const PostDetailModal = ({
   fetchCommentsForPost?: (postId: string) => void;
 }) => {
   const postKey = post.entryId || post.postId;
-  const mediaUrl = post.image || post.mediaUrl || post.postImage || null;
-  const hasMedia = !!mediaUrl;
+
+  // ✅ Multi-image support — post.images is the real array (same field PostContent.tsx uses)
+  const images: any[] = post.images || [];
+  const hasMedia = images.length > 0;
+
+  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
+
+  // Agar images array badal jaye (naya post) to index reset kardo
+  React.useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [postKey]);
+
+  const safeIndex = Math.min(currentImageIndex, Math.max(images.length - 1, 0));
+  const currentImage = images[safeIndex];
+  const mediaUrl = currentImage?.cloudinarySecureUrl || currentImage?.url || null;
+
+  const goToPrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+  };
+
+  const goToNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+  };
 
   // Modal khulte hi comments fetch karo agar already load nahi hue
   React.useEffect(() => {
@@ -93,14 +116,23 @@ const PostDetailModal = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postKey]);
 
-  // Close on ESC key
+  // Close on ESC key, arrow keys for image nav
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
+      if (images.length > 1) {
+        if (e.key === 'ArrowLeft') {
+          setCurrentImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+        }
+        if (e.key === 'ArrowRight') {
+          setCurrentImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+        }
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onClose, images.length]);
 
   // Prevent background scroll while modal is open
   React.useEffect(() => {
@@ -135,14 +167,43 @@ const PostDetailModal = ({
           ✕
         </button>
 
-        {/* Left: media panel — only rendered if the post actually has an image/video */}
+        {/* Left: media panel — only rendered if the post actually has images */}
         {hasMedia && (
-          <div className="flex-1 bg-black flex items-center justify-center min-h-[240px] md:min-h-0">
+          <div className="relative flex-1 bg-black flex items-center justify-center min-h-[240px] md:min-h-0">
             <img
               src={mediaUrl}
-              alt="post media"
+              alt={`post media ${safeIndex + 1}`}
               className="max-h-full max-w-full object-contain"
             />
+
+            {/* ‹ Prev arrow — only when 2+ images */}
+            {images.length > 1 && (
+              <button
+                onClick={goToPrevImage}
+                aria-label="Previous image"
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors text-2xl"
+              >
+                ‹
+              </button>
+            )}
+
+            {/* › Next arrow — only when 2+ images */}
+            {images.length > 1 && (
+              <button
+                onClick={goToNextImage}
+                aria-label="Next image"
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors text-2xl"
+              >
+                ›
+              </button>
+            )}
+
+            {/* Image counter dots / count badge */}
+            {images.length > 1 && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 px-3 py-1 rounded-full bg-black/50 text-white text-xs font-semibold">
+                {safeIndex + 1} / {images.length}
+              </div>
+            )}
           </div>
         )}
 
