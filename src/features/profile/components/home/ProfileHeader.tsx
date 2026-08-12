@@ -1,9 +1,9 @@
 // src/features/profile/components/home/ProfileHeader.tsx
 // 'use client';
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import EditIntroModal from './EditIntroModal';
 import ProfileImageModal from './ProfileImageModal';
-import ConnectionsModal from './ConnectionsModal';
 import Contactact from './Contactact';
 import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData';
 
@@ -80,9 +80,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     onAcceptRequest,
     onDeclineRequest,
 }) => {
+    const router = useRouter();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isProfileImageModalOpen, setIsProfileImageModalOpen] = useState(false);
-    const [isConnectionsModalOpen, setIsConnectionsModalOpen] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string>('');
     const [isUpdating, setIsUpdating] = useState(false);
@@ -110,7 +110,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         if (currentUserId) {
             fetchConnectionsData(currentUserId);
         }
-    }, [currentUserId, isConnectionsModalOpen, fetchConnectionsData]);
+    }, [currentUserId, fetchConnectionsData]);
 
     const handleProfileUpdate = async () => {
         if (onDataRefresh) {
@@ -239,7 +239,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
                                 <div className="flex gap-3 justify-center md:justify-start flex-wrap">
                                     <button
-                                        onClick={() => setIsConnectionsModalOpen(true)}
+                                        onClick={() => router.push(`/network/connections?userId=${currentUserId}&tab=followers`)}
                                         className="connectionsShowButton group px-4 py-2 bg-white text-[#4a3728] rounded-full text-sm shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white">
                                         <svg className="w-5 h-5 text-[#4a3728] group-hover:animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -262,7 +262,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
                                     <button
                                         className="connectionsShowButton group px-4 py-2 bg-white text-[#4a3728] rounded-full text-sm shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white"
-                                        onClick={() => setIsConnectionsModalOpen(true)}>
+                                        onClick={() => router.push(`/network/connections?userId=${currentUserId}&tab=connections`)}>
                                         <svg className="w-5 h-5 text-[#4a3728] group-hover:animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                                         </svg>
@@ -424,15 +424,6 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                     />
                 </>
             )}
-
-            <ConnectionsModal
-                isOpen={isConnectionsModalOpen}
-                onClose={() => setIsConnectionsModalOpen(false)}
-                following={followingList}
-                followers={followersList}
-                username={name}
-                currentUserId={currentUserId}
-            />
         </>
     );
 };
