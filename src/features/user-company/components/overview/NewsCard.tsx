@@ -1,7 +1,7 @@
 'use client';
 import Image from 'next/image';
 import { Clock } from 'lucide-react';
-import { formatDate } from '../../../../shared/utils/company';
+import { formatDate } from '../../../../shared/utils/format';
 import type { NewsPost } from '@/features/company/type/company.types';
 
 export function NewsCard({ post }: { post: NewsPost }) {

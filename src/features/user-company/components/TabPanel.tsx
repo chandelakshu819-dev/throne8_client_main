@@ -9,12 +9,12 @@ const Spinner = () => (
 )
 
 const OverviewTab = dynamic(() => import('@/features/user-company/components/overview/OverviewTab').then(m => ({ default: m.OverviewTab })), { loading: () => <Spinner />, ssr: false })
-const AboutTab = dynamic(() => import('@/app/user-company/about/_components/AboutTab').then(m => ({ default: m.AboutTab })), { loading: () => <Spinner />, ssr: false })
-const PostsTab = dynamic(() => import('@/app/user-company/posts/_components/PostsTab').then(m => ({ default: m.PostsTab })), { loading: () => <Spinner />, ssr: false })
+const AboutTab = dynamic(() => import('@/features/user-company/components/about/AboutTab').then(m => ({ default: m.AboutTab })), { loading: () => <Spinner />, ssr: false })
+const PostsTab = dynamic(() => import('@/features/user-company/components/posts/PostsTab').then(m => ({ default: m.PostsTab })), { loading: () => <Spinner />, ssr: false })
 const EventsTab = dynamic(() => import('@/features/user-company/components/events/EventsTab').then(m => ({ default: m.EventsTab })), { loading: () => <Spinner />, ssr: false })
 const LifeTab = dynamic(() => import('@/features/user-company/components/life/LifeTab').then(m => ({ default: m.LifeTab })), { loading: () => <Spinner />, ssr: false })
-const JobsTab = dynamic(() => import('@/app/user-company/jobs/_components/JobsTab').then(m => ({ default: m.JobsTab })), { loading: () => <Spinner />, ssr: false })
-const ProductsTab = dynamic(() => import('@/app/user-company/products/_components/ProductsTab').then(m => ({ default: m.ProductsTab })), { loading: () => <Spinner />, ssr: false })
+const JobsTab = dynamic(() => import('@/features/user-company/components/jobs/JobsTab').then(m => ({ default: m.JobsTab })), { loading: () => <Spinner />, ssr: false })
+const ProductsTab = dynamic(() => import('@/features/user-company/components/products/ProductsTab').then(m => ({ default: m.ProductsTab })), { loading: () => <Spinner />, ssr: false })
 
 export function TabPanel() {
   const activeTab = useAppSelector((s) => s.ui.activeTab)

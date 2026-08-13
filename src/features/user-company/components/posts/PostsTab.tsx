@@ -1,7 +1,7 @@
 'use client';
 import { LayoutGrid } from 'lucide-react';
 import { PostCard } from './PostCard';
-import { usePosts } from '../_hooks/usePosts';
+import { usePosts } from '../../hooks/usePosts';
 import { PostsFilterBar } from './PostsFilterBar';
 import { Card, EmptyState } from '../ui';
 

@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useProducts } from '../_hooks/useProducts';
+import { useProducts } from '../../hooks/useProducts';
 import { Card, Button } from '../ui';
 
 const CATEGORY_COLORS: Record<string, string> = {

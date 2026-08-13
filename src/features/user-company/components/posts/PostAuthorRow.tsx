@@ -1,7 +1,8 @@
 'use client';
+// src/features/user-company/components/posts/PostAuthorRow.tsx
 import { Avatar } from '../ui';
 import type { PostAuthor } from '@/features/company/type/company.types';
-import { relativeTime } from '../../../../shared/utils/company';
+import { relativeTime } from '../../../../shared/utils/format';
 
 interface Props {
   author: PostAuthor;

@@ -99,7 +99,7 @@ function PostPreviewCardBasic({ url, colors }: { url: string; colors: any }) {
 // ============================================================
 // HELPER: User avatar placeholder (jab real avatar na ho)
 // ============================================================
-export function getInitials(name: string) {
+ function getInitials(name: string) {
   return name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
 }
 

@@ -1,6 +1,6 @@
 'use client';
 import { Heart, MessageCircle, Share2 } from 'lucide-react';
-import { formatNumber } from '../../../../shared/utils/company';
+import { formatNumber } from '../../../../shared/utils/format';
 
 interface Props {
   likes: number;
