@@ -1,4 +1,5 @@
 'use client';
+// src/features/profile/components/home/CreatePostModal.tsx
 import AuthService from '@/lib/api/auth.service';
 import ProfileService from '@/lib/api/profile.service';
 import React, { useState, useRef } from 'react';

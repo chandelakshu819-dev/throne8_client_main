@@ -1,4 +1,4 @@
-// app/(dashboard)/components/sidebar/RecentPosts.tsx
+//src/features/profile/components/sidebar/Right/RecentPosts.tsx
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 

@@ -30,7 +30,7 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
     return 'grid-cols-2';
   };
 
-  const getTileClass = (index: number): string => {
+const getTileClass = (index: number): string => {
     const classes = ['relative', 'overflow-hidden', 'bg-black/5'];
 
     const isFirstOfThree = imageCount === 3 && index === 0;
@@ -39,7 +39,7 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
     }
 
     if (imageCount === 1) {
-      classes.push('h-[300px]');
+      classes.push('max-h-[600px]');
     } else {
       classes.push('h-[150px]');
       classes.push('sm:h-[200px]');
@@ -47,7 +47,6 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
 
     return classes.join(' ');
   };
-
   const handleReadMoreClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     setExpanded((v) => !v);
@@ -122,10 +121,10 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
             return (
               <div key={img.mediaId || i} className={getTileClass(i)}>
                 <img
-                  src={img.cloudinarySecureUrl}
-                  alt={'Post image ' + (i + 1)}
-                  className="w-full h-full object-cover hover:scale-[1.02] transition-transform duration-500"
-                />
+                src={img.cloudinarySecureUrl}
+                alt={'Post image ' + (i + 1)}
+                className={`w-full ${imageCount === 1 ? 'h-auto max-h-[600px] object-contain' : 'h-full object-cover'} hover:scale-[1.02] transition-transform duration-500`}
+              />
                 {isOverlayTile && extraCount > 0 && (
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                     <span className="text-white text-2xl font-bold">+{extraCount}</span>

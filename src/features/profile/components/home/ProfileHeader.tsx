@@ -143,10 +143,13 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         <>
             {/* ✅ FIX: min-w-0 added so this flex row can shrink properly instead of
                 forcing the page wider than the viewport when a child has long text. */}
-            <div className="relative z-20 px-6 pb-6 min-w-0">
-                <div className="flex flex-col lg:flex-row items-start gap-6 -mt-12 min-w-0">
+            {/* ✅ FIX (density pass): px-6 pb-6 -> px-5 pb-5, gap-6 -> gap-4,
+                -mt-12 -> -mt-10, to shrink overall header footprint */}
+            <div className="relative z-20 px-5 pb-5 min-w-0">
+                <div className="flex flex-col lg:flex-row items-start gap-5 -mt-10 min-w-0">
+                    {/* ✅ FIX (density pass v2): w-28 h-28 -> w-32 h-32 for better proportion */}
                     <div
-                        className={`profileImageClick relative w-36 h-36 group flex-shrink-0 ${isOwnProfile ? 'cursor-pointer' : ''}`}
+                        className={`profileImageClick relative w-32 h-32 group flex-shrink-0 ${isOwnProfile ? 'cursor-pointer' : ''}`}
                         onClick={() => {
                             if (isOwnProfile) setIsProfileImageModalOpen(true);
                         }}
@@ -167,81 +170,90 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                         its row instead of expanding to its content's natural width
                         (which is what was pushing the page past the viewport and
                         causing the horizontal scrollbar on profiles with long text). */}
-                    <div className="border border-[#e0d8cf] rounded-3xl p-6 shadow-xl bg-white/60 backdrop-blur-sm w-full min-w-0">
-                        <div className="flex-1 text-center md:text-left pt-2 min-w-0">
+                    {/* ✅ FIX (density pass): p-6 -> p-4, rounded-3xl -> rounded-2xl */}
+                    <div className="border border-[#e0d8cf] rounded-2xl p-5 shadow-xl bg-white/60 backdrop-blur-sm w-full min-w-0">
+                        <div className="flex-1 text-center md:text-left pt-1 min-w-0">
                             {isOwnProfile && (
                                 <button
                                     onClick={() => setIsEditModalOpen(true)}
-                                    className="bannerEdit absolute top-4 right-4 rounded-2x border-2 border-black text-white/80 text-xl font-medium bg-black px-2 py-2 rounded-full backdrop-blur-sm hover:bg-black/30 transition-all duration-300">
-                                    ✏
+                                    className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center rounded-full bg-white text-[#4a3728] border border-[#e0d8cf] shadow-md hover:bg-[#f6ede8] hover:shadow-lg hover:scale-105 transition-all duration-300"
+                                    aria-label="Edit profile intro"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
                                 </button>
                             )}
+                            {/* ✅ FIX (density pass): space-y-3 -> space-y-2 */}
                             <div className="space-y-3 min-w-0">
                                 <div className="relative min-w-0">
                                     {/* ✅ FIX: break-words so a long name/word can't force
                                         the row wider than the container */}
-                                    <h1 className="text-3xl font-bold text-[#4a3728] flex items-center gap-2 justify-center md:justify-start mt-8 hover:text-[#5a4738] transition-colors duration-300 break-words">
+                                    {/* ✅ FIX (density pass v2): text-2xl kept, mt-5 -> mt-6 for a touch more top breathing room */}
+                                    <h1 className="text-2xl font-bold text-[#4a3728] flex items-center gap-2 justify-center md:justify-start mt-6 hover:text-[#5a4738] transition-colors duration-300 break-words">
                                         {name}
                                     </h1>
                                 </div>
                                 <div className="relative min-w-0">
                                     {/* ✅ FIX: removed fixed w-[80%], added w-full + break-words */}
-                                    <h2 className="text-md w-full font-semibold text-[#4a3728] bg-gradient-to-r from-[#4a3728] to-[#6a5748] bg-clip-text text-transparent break-words">
+                                    {/* ✅ FIX (density pass): text-md -> text-sm */}
+                                    <h2 className="text-sm w-full font-semibold text-[#4a3728] bg-gradient-to-r from-[#4a3728] to-[#6a5748] bg-clip-text text-transparent break-words">
                                         {headline}
                                     </h2>
                                 </div>
-                                {/* ✅ FIX: removed fixed w-[40vw] (viewport-relative width,
-                                    ignores the actual parent container), replaced with
-                                    w-full + break-words so long college/company names wrap
-                                    instead of overflowing horizontally */}
-                                <p className="mt-2 text-sm w-full text-[#4a3728] font-bold leading-relaxed relative break-words">
-                                    {educationList && educationList.length > 0 && educationList[0]?.schoolCollegeName && (
-                                        <>
-                                            {educationList[0].schoolCollegeName}
-                                            {(experienceList.length > 0 || company) && ' • '}
-                                        </>
+                                {/* ✅ FIX: Company aur Education ab alag-alag distinct rows mein
+                                    hain, apne apne icon ke saath — pehle dono ek hi line mein
+                                    '•' se joined the jo confusing lagta tha */}
+                                <div className="flex flex-col gap-1.5 w-full">
+                                    {((experienceList && experienceList.length > 0) || company) && (
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <svg className="w-3.5 h-3.5 text-[#4a3728]/70 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m-4 6h16a1 1 0 011 1v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a1 1 0 011-1z" />
+                                            </svg>
+                                            <p className="text-xs text-[#4a3728] font-bold break-words min-w-0">
+                                                {experienceList && experienceList.length > 0
+                                                    ? (experienceList.find(exp => exp.current)?.company || experienceList[0]?.company)
+                                                    : company}
+                                            </p>
+                                        </div>
                                     )}
 
-                                    {(!educationList || educationList.length === 0) && educationData?.collegeName && (
-                                        <>
-                                            {educationData.collegeName}
-                                            {(experienceList.length > 0 || company) && ' • '}
-                                        </>
+                                    {(((educationList && educationList.length > 0) && educationList[0]?.schoolCollegeName) || educationData?.collegeName) && (
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <svg className="w-3.5 h-3.5 text-[#4a3728]/70 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422A12.083 12.083 0 0121 15.5v0M12 14v7m-9-9.5v0a12.083 12.083 0 002.84 5.922L12 21l6.16-3.578" />
+                                            </svg>
+                                            <p className="text-xs text-[#4a3728] font-bold break-words min-w-0">
+                                                {educationList && educationList.length > 0
+                                                    ? educationList[0].schoolCollegeName
+                                                    : educationData?.collegeName}
+                                            </p>
+                                        </div>
                                     )}
-
-                                    {experienceList && experienceList.length > 0 && (
-                                        <>
-                                            {experienceList.find(exp => exp.current)?.company || experienceList[0]?.company}
-                                        </>
-                                    )}
-
-                                    {(!experienceList || experienceList.length === 0) && company && (
-                                        <>
-                                            {company}
-                                        </>
-                                    )}
-
-                                    <div className="absolute -bottom-1 left-0 w-full h-0.5 bg-gradient-to-r from-[#4a3728]/20 to-transparent rounded-full"></div>
-                                </p>
-                                <div className="flex items-center gap-2 justify-center md:justify-start bg-white/50 rounded-full px-3 py-2 backdrop-blur-sm border border-[#e0d8cf]/50 min-w-0">
-                                    <svg className="w-5 h-5 text-[#4a3728] animate-pulse flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                </div>
+                                {/* ✅ FIX (density pass): px-3 py-2 -> px-2.5 py-1.5 */}
+                                <div className="flex items-center gap-2 justify-center md:justify-start bg-white/50 rounded-full px-2.5 py-1.5 backdrop-blur-sm border border-[#e0d8cf]/50 min-w-0">
+                                    <svg className="w-4 h-4 text-[#4a3728] animate-pulse flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                     </svg>
                                     {/* ✅ FIX: break-words so a long location string can't
                                         overflow the pill / push the row wider */}
-                                    <p className="text-sm text-[#4a3728] break-words min-w-0">
+                                    <p className="text-xs text-[#4a3728] break-words min-w-0">
                                         <span className="font-semibold">Location:</span> {location}
                                     </p>
                                 </div>
 
                                 {isOwnProfile && <Contactact />}
 
-                                <div className="flex gap-3 justify-center md:justify-start flex-wrap">
+                                {/* ✅ FIX (density pass): gap-3 -> gap-2 */}
+                                <div className="flex gap-2 justify-center md:justify-start flex-wrap">
+                                    {/* ✅ FIX (density pass): px-4 py-2 -> px-3 py-1.5 */}
                                     <button
                                         onClick={() => router.push(`/network/connections?userId=${currentUserId}&tab=followers`)}
-                                        className="connectionsShowButton group px-4 py-2 bg-white text-[#4a3728] rounded-full text-sm shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white">
-                                        <svg className="w-5 h-5 text-[#4a3728] group-hover:animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        className="connectionsShowButton group px-3 py-1.5 bg-white text-[#4a3728] rounded-full text-xs shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-1.5 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white">
+                                        <svg className="w-4 h-4 text-[#4a3728] group-hover:animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
 
@@ -261,9 +273,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                     
 
                                     <button
-                                        className="connectionsShowButton group px-4 py-2 bg-white text-[#4a3728] rounded-full text-sm shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white"
+                                        className="connectionsShowButton group px-3 py-1.5 bg-white text-[#4a3728] rounded-full text-xs shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-1.5 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white"
                                         onClick={() => router.push(`/network/connections?userId=${currentUserId}&tab=connections`)}>
-                                        <svg className="w-5 h-5 text-[#4a3728] group-hover:animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg className="w-4 h-4 text-[#4a3728] group-hover:animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                                         </svg>
                                         <span className="font-semibold">
@@ -273,13 +285,15 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                 </div>
 
                                 {!isOwnProfile && (
-                                    <div className="flex gap-3 justify-center md:justify-start flex-wrap mt-4">
+                                    // ✅ FIX (density pass): gap-3 mt-4 -> gap-2 mt-3
+                                    <div className="flex gap-2 justify-center md:justify-start flex-wrap mt-3">
 
 
 {isConnected ? (
+    // ✅ FIX (density pass): px-5 py-2.5 -> px-4 py-2
     <button
         onClick={onMessage}
-        className="px-5 py-2.5 bg-[#4a3728] text-white rounded-full text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+        className="px-4 py-2 bg-[#4a3728] text-white rounded-full text-xs font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
     >
         Message
     </button>
@@ -292,13 +306,13 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             await fetchConnectionsData(currentUserId);
         }
     }}
-    className="px-5 py-2.5 bg-[#4a3728] text-white rounded-full text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+    className="px-4 py-2 bg-[#4a3728] text-white rounded-full text-xs font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
 >
     Accept
 </button>
         <button
             onClick={onDeclineRequest}
-            className="px-5 py-2.5 bg-white text-[#4a3728] border border-[#e0d8cf] rounded-full text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            className="px-4 py-2 bg-white text-[#4a3728] border border-[#e0d8cf] rounded-full text-xs font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
         >
             Decline
         </button>
@@ -307,7 +321,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     <button
         onClick={onConnect}
         disabled={connectionPending}
-        className="px-5 py-2.5 bg-[#4a3728] text-white rounded-full text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-60"
+        className="px-4 py-2 bg-[#4a3728] text-white rounded-full text-xs font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-60"
     >
         {connectionPending ? 'Pending...' : 'Connect'}
     </button>
@@ -316,7 +330,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                         <div className="relative">
                                             <button
                                                 onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
-                                                className="px-5 py-2.5 bg-white text-[#4a3728] border border-[#e0d8cf] rounded-full text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                                                className="px-4 py-2 bg-white text-[#4a3728] border border-[#e0d8cf] rounded-full text-xs font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                                             >
                                                 More
                                             </button>

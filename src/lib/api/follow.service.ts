@@ -14,7 +14,7 @@ class FollowService {
             );
             return data;
         } catch (error: any) {
-            console.error("[FOLLOW_USER] Failed:", error);
+            console.error("[FOLLOW_USER] Failed:", error?.response?.data || error);
 
             if (error.response?.status === 409) {
                 throw new Error("Already following this user");
@@ -43,7 +43,7 @@ class FollowService {
             );
             return data;
         } catch (error: any) {
-            console.error("[UNFOLLOW_USER] Failed:", error);
+            console.error("[UNFOLLOW_USER] Failed:", error?.response?.data || error);
             throw new Error(
                 error.response?.data?.message || "Failed to unfollow user"
             );
@@ -61,7 +61,7 @@ class FollowService {
             );
             return data;
         } catch (error: any) {
-            console.error("[CHECK_FOLLOW_STATUS] Failed:", error);
+            console.error("[CHECK_FOLLOW_STATUS] Failed:", error?.response?.data || error);
             return null;
         }
     }
@@ -77,20 +77,24 @@ class FollowService {
             );
             return data;
         } catch (error: any) {
-            console.error('[GET_FOLLOW_COUNTS] Failed:', error);
-
-            console.error("[GET_FOLLOW_COUNTS] Failed:", error);
+            console.error('[GET_FOLLOW_COUNTS] Failed:', error?.response?.data || error);
             return null;
         }
     }
 
     /**
-     * ✅ NEW — GET user's FOLLOWERS LIST (real one-directional follow system,
+     * ✅ GET user's FOLLOWERS LIST (real one-directional follow system,
      * not "connections"). Backend: GET /api/v1/follow/followers/:userId
      * Response body: { success, data: { data: FollowDoc[], pagination }, message }
      * Each FollowDoc only has { followerId, createdAt, ... } — no profile
      * info — caller is expected to bulk-fetch user profiles separately
      * (see useFollowListsData hook).
+     *
+     * ⚠️ FIX: pehle yeh call silently `null` return karta tha kyunki backend
+     * ka `getFollowListSchema` Joi schema `.strict()` ke saath tha, jo query
+     * string params (jo hamesha string hote hain, e.g. `limit=100`) ko number
+     * mein convert hone se rok deta tha — isse Joi validation fail hokar 400
+     * error deta tha. Ab error ko throw kar rahe hain taaki silent failure na ho.
      */
     static async getFollowers(userId: string, params?: { page?: number; limit?: number }) {
         try {
@@ -100,16 +104,18 @@ class FollowService {
             );
             return data;
         } catch (error: any) {
-            console.error('[GET_FOLLOWERS] Failed:', error);
-            return null;
+            console.error('[GET_FOLLOWERS] Failed:', error?.response?.data || error);
+            throw error;
         }
     }
 
     /**
-     * ✅ NEW — GET user's FOLLOWING LIST (real one-directional follow system).
+     * ✅ GET user's FOLLOWING LIST (real one-directional follow system).
      * Backend: GET /api/v1/follow/following/:userId
      * Response body: { success, data: { data: FollowDoc[], pagination }, message }
      * Each FollowDoc only has { followingId, createdAt, ... }.
+     *
+     * ⚠️ Same fix as getFollowers — throwing instead of silently returning null.
      */
     static async getFollowing(userId: string, params?: { page?: number; limit?: number }) {
         try {
@@ -119,8 +125,8 @@ class FollowService {
             );
             return data;
         } catch (error: any) {
-            console.error('[GET_FOLLOWING] Failed:', error);
-            return null;
+            console.error('[GET_FOLLOWING] Failed:', error?.response?.data || error);
+            throw error;
         }
     }
 
@@ -131,8 +137,7 @@ class FollowService {
             );
             return data;
         } catch (error: any) {
-
-            console.error('[GET_FOLLOWING_COMPANIES] Failed:', error);
+            console.error('[GET_FOLLOWING_COMPANIES] Failed:', error?.response?.data || error);
             throw new Error(error.response?.data?.message || 'Failed to fetch followed companies');
         }
     }

@@ -4,28 +4,13 @@ import ConnectionService from '@/lib/api/connection.service';
 import AuthService from '@/lib/api/auth.service';
 import ProfileService from '@/lib/api/profile.service';
 
-// ✅ FIX: Multiple components (page.tsx, ProfileHeader, ActivitySection, etc.)
-// each call `useConnectionsData()` independently, and each one used to fire
-// its own network request for the SAME userId at the SAME time. That's one
-// of the reasons the backend was getting hammered with duplicate requests
-// and hitting 429 rate limits on a single page load.
-//
-// Fix: a tiny in-memory cache + in-flight request map, keyed by userId.
-// - If a request for a userId is already in flight, new callers just await
-//   the same promise instead of firing a new network call.
-// - If we already have a recent result for that userId, we serve it
-//   immediately instead of re-fetching.
-//
-// This is a lightweight stand-in for something like react-query. If you
-// later add react-query/SWR, this cache can be removed entirely.
-
 type ConnectionsResult = {
     followingList: any[];
     followersList: any[];
     totalConnections: number;
 };
 
-const CACHE_TTL_MS = 30 * 1000; // 30s — tune as needed
+const CACHE_TTL_MS = 30 * 1000;
 const resultCache = new Map<string, { data: ConnectionsResult; fetchedAt: number }>();
 const inFlightRequests = new Map<string, Promise<ConnectionsResult>>();
 
@@ -36,12 +21,10 @@ export const useConnectionsData = () => {
     const [totalConnections, setTotalConnections] = useState(0);
     const lastRequestedUserId = useRef<string | null>(null);
 
-    // ✅ Helper function to fetch user profiles — ab bulk mein
     const fetchUserProfiles = async (userIds: string[], connectionIdMap: Record<string, string> = {}) => {
         if (userIds.length === 0) return [];
 
         try {
-            // ✅ SINGLE BULK CALL (pehle yahan har userId ke liye alag call hota tha)
             let profiles: any[] = [];
             try {
                 const bulkResponse = await AuthService.getUsersBulk(userIds);
@@ -51,12 +34,10 @@ export const useConnectionsData = () => {
                 return [];
             }
 
-            // Extract profile photo IDs
             const profilePhotoIds = profiles
                 .map(user => user.profilePhotoId)
                 .filter(Boolean);
 
-            // Fetch profile photos
             let profilePhotosMap: Record<string, string> = {};
             if (profilePhotoIds.length > 0) {
                 const photosResponse = await ProfileService.getMultipleProfilePhotosByIds(profilePhotoIds);
@@ -66,12 +47,10 @@ export const useConnectionsData = () => {
                 }, {});
             }
 
-            // Extract headline IDs
             const headlineIds = profiles
                 .map(user => user.headlineId)
                 .filter(Boolean);
 
-            // ✅ SINGLE BULK CALL (pehle yahan har headline ke liye alag call hota tha)
             let headlinesMap: Record<string, string> = {};
             if (headlineIds.length > 0) {
                 try {
@@ -86,7 +65,6 @@ export const useConnectionsData = () => {
                 }
             }
 
-            // Transform to UI format
             return profiles.map(user => ({
                 id: user.userId,
                 connectionId: connectionIdMap[user.userId] || '',
@@ -104,19 +82,24 @@ export const useConnectionsData = () => {
         }
     };
 
-    // Actual network fetch — only ever called once per userId at a time,
-    // thanks to the inFlightRequests map below.
     const doFetch = async (currentUserId: string): Promise<ConnectionsResult> => {
-        // ✅ STEP 1: Get all connections
         const connectionsResponse = await ConnectionService.getUserConnections(currentUserId);
         const connections = connectionsResponse.data.data || [];
 
-        // ✅ STEP 2: Separate following and followers, build connectionId map
         const followingUserIds: string[] = [];
         const followerUserIds: string[] = [];
         const connectionIdMap: Record<string, string> = {};
 
+        // ✅ FIX: Set of unique connected user IDs — yeh actual "kitne alag
+        // logon se connection hai" batata hai. Agar backend mein duplicate
+        // connection docs bane hain (same pair ke liye do docs, opposite
+        // direction mein), to woh dono followingUserIds aur followerUserIds
+        // mein chala jaata tha aur totalConnections galat (double) ho jaata
+        // tha, jabki list mein dedupe hone ke baad sahi count dikhta tha.
+        const uniqueConnectedUserIds = new Set<string>();
+
         let unmatchedCount = 0;
+        let duplicatePairCount = 0;
         connections.forEach((conn: any) => {
             const targetId = conn.fromUserId === currentUserId ? conn.toUserId : conn.fromUserId;
             connectionIdMap[targetId] = conn.connectionId;
@@ -126,18 +109,22 @@ export const useConnectionsData = () => {
             } else if (conn.toUserId === currentUserId) {
                 followerUserIds.push(conn.fromUserId);
             } else {
-                // ✅ This connection doc doesn't reference currentUserId on
-                // either side — this is exactly why raw connections.length
-                // used to be higher than followingList.length +
-                // followersList.length (e.g. 10 vs 9). Instead of silently
-                // dropping it, flag it loudly so the underlying backend
-                // data issue is visible in dev tools.
                 unmatchedCount += 1;
                 console.warn(
                     '⚠️ [CONNECTIONS] Orphaned/mismatched connection doc — neither fromUserId nor toUserId matches currentUserId:',
                     { currentUserId, connectionId: conn.connectionId, fromUserId: conn.fromUserId, toUserId: conn.toUserId }
                 );
+                return;
             }
+
+            if (uniqueConnectedUserIds.has(targetId)) {
+                duplicatePairCount += 1;
+                console.warn(
+                    '⚠️ [CONNECTIONS] Duplicate connection doc for the same pair (both directions exist in DB):',
+                    { currentUserId, otherUserId: targetId, connectionId: conn.connectionId }
+                );
+            }
+            uniqueConnectedUserIds.add(targetId);
         });
 
         if (unmatchedCount > 0) {
@@ -145,8 +132,12 @@ export const useConnectionsData = () => {
                 `⚠️ [CONNECTIONS] ${unmatchedCount} of ${connections.length} connection doc(s) for user ${currentUserId} did not match either direction. Check the backend Connection collection for stale/duplicate/bad-userId docs.`
             );
         }
+        if (duplicatePairCount > 0) {
+            console.warn(
+                `⚠️ [CONNECTIONS] ${duplicatePairCount} duplicate connection doc(s) found for user ${currentUserId} — same pair has connection docs in both directions. This is a backend data integrity issue; consider adding a unique compound index on (fromUserId, toUserId) pair (unordered) in the Connection model.`
+            );
+        }
 
-        // ✅ STEP 3: Fetch user profiles for both lists
         const [followingProfiles, followerProfiles] = await Promise.all([
             fetchUserProfiles(followingUserIds, connectionIdMap),
             fetchUserProfiles(followerUserIds, connectionIdMap)
@@ -155,12 +146,8 @@ export const useConnectionsData = () => {
         return {
             followingList: followingProfiles,
             followersList: followerProfiles,
-            // ✅ FIX: derive totalConnections from the docs we actually matched
-            // and turned into following/followers, instead of the raw API
-            // array length. This guarantees the number shown in the UI
-            // ("X connections") always agrees with Following + Followers
-            // shown right next to it — no more "10 total" vs "9 in the list".
-            totalConnections: followingUserIds.length + followerUserIds.length,
+            // ✅ FIX: unique count, ab list ke saath hamesha match karega
+            totalConnections: uniqueConnectedUserIds.size,
         };
     };
 
@@ -171,7 +158,6 @@ export const useConnectionsData = () => {
         try {
             setIsLoadingConnections(true);
 
-            // ✅ Serve from cache if we fetched this userId recently
             const cached = resultCache.get(currentUserId);
             const isFresh = cached && (Date.now() - cached.fetchedAt < CACHE_TTL_MS);
             if (isFresh) {
@@ -182,14 +168,10 @@ export const useConnectionsData = () => {
                 return;
             }
 
-            // ✅ If a request for this userId is already in flight (fired by
-            // another component's instance of this hook), reuse that promise
-            // instead of firing a duplicate network call.
             let requestPromise = inFlightRequests.get(currentUserId);
             if (!requestPromise) {
                 requestPromise = doFetch(currentUserId);
                 inFlightRequests.set(currentUserId, requestPromise);
-                // Clean up the in-flight marker once it settles (success or fail)
                 requestPromise.finally(() => {
                     inFlightRequests.delete(currentUserId);
                 });
@@ -197,11 +179,8 @@ export const useConnectionsData = () => {
 
             const result = await requestPromise;
 
-            // Cache the fresh result
             resultCache.set(currentUserId, { data: result, fetchedAt: Date.now() });
 
-            // Only apply to state if this is still the userId we most recently
-            // asked for (avoids race conditions if userId changes quickly)
             if (lastRequestedUserId.current === currentUserId) {
                 setFollowingList(result.followingList);
                 setFollowersList(result.followersList);

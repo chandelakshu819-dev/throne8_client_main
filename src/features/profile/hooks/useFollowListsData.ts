@@ -24,7 +24,7 @@ type FollowListUser = {
     image: string;
 };
 
-type FollowListsResult = {
+  type FollowListsResult = {
     followersList: FollowListUser[];
     followingList: FollowListUser[];
 };

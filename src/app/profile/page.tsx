@@ -200,7 +200,16 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f6ede8] py-12 px-4 font-sans">
+        // ✅ FIX: dashboard jaisa hi 'zoom' apply kiya (0.9) taaki density match ho.
+        // Manually browser 90% zoom karne pe jo layout accha lag raha tha,
+        // wahi effect ab yahin se milega — bina user ko khud zoom karne ki zarurat ke.
+        // Note: CSS `zoom` Chromium browsers (Chrome/Edge/Brave) mein hi reliably kaam
+        // karta hai — Firefox mein support nahi hai. Dashboard bhi isi wajah se
+        // `zoom` use kar raha hai, isliye consistency ke liye yahi approach rakha.
+        <div
+            className="min-h-screen bg-[#f6ede8] py-12 px-4 font-sans"
+            style={{ zoom: 0.85 } as React.CSSProperties}
+        >
             <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-8">
                 {/* Navbar */}
                 <ProfileNavbar

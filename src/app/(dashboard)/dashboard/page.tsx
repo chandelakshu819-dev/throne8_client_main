@@ -28,8 +28,6 @@ import { SOCKET_EVENTS } from '@/core/realtime/socket.events';
 export default function Home() {
     const { user, isLoading } = useAuth();
 
-    // console.log('🏠 [Dashboard Page] Current User:', user);
-
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(false);
@@ -55,14 +53,12 @@ export default function Home() {
     const [editCommentText, setEditCommentText] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-    // ✅ NEW: real "Weekly Performance" data (replaces hardcoded +24% / +18%)
     const [weeklyPerformance, setWeeklyPerformance] = useState<{
         profileViewsChange: number;
         postReachChange: number;
     } | null>(null);
     const [isLoadingWeeklyPerformance, setIsLoadingWeeklyPerformance] = useState(false);
 
-    // Repost states
     const [isRepostWithPerspectiveOpen, setIsRepostWithPerspectiveOpen] = useState(false);
     const [isConfirmRepostOpen, setIsConfirmRepostOpen] = useState(false);
     const [selectedRepostPost, setSelectedRepostPost] = useState(null);
@@ -74,19 +70,16 @@ export default function Home() {
     const { allPosts, isLoadingAllPosts, isLoadingMore, hasMore, fetchAllUsersPosts, loadMorePosts, prependPost } = useAllUsersPosts();
 
     const { socket } = useSocket();
-    // Media & Schedule states
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
     const [selectedVideos, setSelectedVideos] = useState<File[]>([]);
     const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
     const [videoPreviewUrls, setVideoPreviewUrls] = useState<string[]>([]);
     const [activeMediaOption, setActiveMediaOption] = useState<string | null>(null);
 
-    // Schedule states
     const [isScheduleOpen, setIsScheduleOpen] = useState(false);
     const [scheduledDate, setScheduledDate] = useState('');
     const [scheduledTime, setScheduledTime] = useState('');
 
-    // Poll states
     const [isPollOpen, setIsPollOpen] = useState(false);
     const [pollQuestion, setPollQuestion] = useState('');
     const [pollOptions, setPollOptions] = useState(['', '']);
@@ -95,7 +88,6 @@ export default function Home() {
     const [feedReposts, setFeedReposts] = useState<any[]>([]);
     const [repostingPostId, setRepostingPostId] = useState<string | null>(null);
 
-    // Event states
     const [isEventOpen, setIsEventOpen] = useState(false);
     const [eventData, setEventData] = useState({
         eventName: '',
@@ -143,12 +135,9 @@ export default function Home() {
     useEffect(() => {
         if (user) {
             fetchUserProfile();
-            fetchAllUsersPosts(); // ✅ Add this line
+            fetchAllUsersPosts();
         }
     }, [user, fetchUserProfile, fetchAllUsersPosts]);
-
-
-    // console.log('🏠 [DASHBOARD PAGE] User Posts Data:', fetchUserProfile);
 
     useEffect(() => {
         if (allPosts?.length > 0) {
@@ -161,9 +150,6 @@ export default function Home() {
         }
     }, [allPosts]);
 
-    // ✅ NEW: real-time socket listener — jab bhi backend 'feed:new-post' emit
-    // karta hai (repost create hone par), naya post allPosts array ke top
-    // mein turant insert ho jata hai, bina page refresh kiye.
     useEffect(() => {
         if (!socket) return;
 
@@ -178,8 +164,6 @@ export default function Home() {
         };
     }, [socket, prependPost]);
 
-    // ✅ NEW: Analytics modal khulte hi real weekly performance data fetch karo
-    // (pehle "+24%" aur "+18%" hardcoded the — ab real backend se aata hai)
     useEffect(() => {
         if (!isAnalyticsOpen) return;
         let cancelled = false;
@@ -213,19 +197,10 @@ export default function Home() {
         headlineData
     );
 
-    console.log('👤 [DASHBOARD PAGE] Transformed Profile Data:', profileData, userProfileData,);
-
     const fullName = userProfileData
         ? `${userProfileData.firstName} ${userProfileData.lastName}`.trim()
         : 'Loading...';
 
-    // console.log('👤 Full Name:=>>>> and whole data', userProfileData);
-    // console.log('👤 Profile User Image:', profileData);
-
-    // console.log("all posts here ->>>", userPosts, allPosts)
-
-    // ✅ NEW: real total engagement across all of the user's own posts
-    // (replaces hardcoded "12.8K")
     const totalEngagement = userPosts.reduce(
         (sum: number, p: any) => sum + (p.likesCount || 0) + (p.commentsCount || 0) + (p.shares ?? p.sharesCount ?? 0),
         0
@@ -242,27 +217,15 @@ export default function Home() {
 
     const features = [
         { id: 'schedule', icon: Calendar, label: 'Schedule Post' },
-        // { id: 'location', icon: MapPin, label: 'Add Location' },
-        // { id: 'trending', icon: Hash, label: 'Trending Tags' },
-        // { id: 'collaborate', icon: Users, label: 'Collaborate' }
     ];
 
     const mediaOptions = [
         { id: 'photo', icon: LucideImage, label: 'Photo' },
         { id: 'video', icon: Video, label: 'Video' },
-        // { id: 'gif', icon: Sparkles, label: 'GIF' },
         { id: 'poll', icon: BarChart2, label: 'Poll' },
         { id: 'event', icon: Calendar, label: 'Event' }
     ];
 
-
-   
-   // ✅ FIX: ab reactions[] system use karta hai (/react POST aur /react DELETE)
-    // instead of purane /like, /unlike (jo sirf likedBy[] update karta tha aur
-    // reactions[] ko kabhi touch nahi karta tha — isi wajah se feed pe like count
-    // dikhta tha lekin Reactions modal hamesha "No reactions yet" dikhata tha).
-    // Ab profile activity aur feed dono same /react endpoint use karte hain,
-    // isliye Reactions modal dono jagah consistent data dikhayega.
     const handleLike = async (postId: string) => {
         const post = allPosts.find(p => (p.entryId || p.postId) === postId);
         const isCurrentlyLiked = likedPosts[postId] ?? post?.isLikedByCurrentUser ?? false;
@@ -275,8 +238,6 @@ export default function Home() {
             } else {
                 await ProfileService.reactToPost(postId, 'like');
     
-                // 🔧 NEW: Analytics mein bhi engagement record karo
-                // (postTransformers.ts confirm karta hai post.userId hi owner hai)
                 if (post?.userId && post.userId !== user?.userId) {
                     AnalyticsService.recordEngagement(postId, post.userId, 'like');
                 }
@@ -286,8 +247,6 @@ export default function Home() {
             setLikedPosts(prev => ({ ...prev, [postId]: isCurrentlyLiked }));
         }
     };
-
-
 
     const toggleSidebar = () => {
         setIsSidebarOpen(!isSidebarOpen);
@@ -303,7 +262,6 @@ export default function Home() {
             return;
         }
 
-        // Poll validation
         if (isPollOpen) {
             if (!pollQuestion.trim()) {
                 setPostError('Poll question is required.');
@@ -316,7 +274,6 @@ export default function Home() {
             }
         }
 
-        // Schedule validation
         if (isScheduleOpen && (!scheduledDate || !scheduledTime)) {
             setPostError('Please select both date and time for scheduling.');
             return;
@@ -329,7 +286,6 @@ export default function Home() {
             const rawTitle = postContent.trim().substring(0, 100);
             const title = rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1);
 
-            // Media hai to FormData use karo, warna JSON
             if (selectedImages.length > 0 || selectedVideos.length > 0) {
                 const formData = new FormData();
                 formData.append('title', title);
@@ -346,7 +302,6 @@ export default function Home() {
 
                 await HomePostService.createPostWithMedia(formData);
             } else {
-                // JSON request
                 const payload: any = {
                     title,
                     content: postContent.trim(),
@@ -384,7 +339,6 @@ export default function Home() {
         }
     };
 
-    // Image select handler
     const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         if (files.length + selectedImages.length > 10) {
@@ -397,7 +351,6 @@ export default function Home() {
         setActiveMediaOption(null);
     };
 
-    // Video select handler
     const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         if (files.length + selectedVideos.length > 5) {
@@ -410,19 +363,16 @@ export default function Home() {
         setActiveMediaOption(null);
     };
 
-    // Remove image
     const removeImage = (index: number) => {
         setSelectedImages(prev => prev.filter((_, i) => i !== index));
         setImagePreviewUrls(prev => prev.filter((_, i) => i !== index));
     };
 
-    // Remove video
     const removeVideo = (index: number) => {
         setSelectedVideos(prev => prev.filter((_, i) => i !== index));
         setVideoPreviewUrls(prev => prev.filter((_, i) => i !== index));
     };
 
-    // Poll option handlers
     const addPollOption = () => {
         if (pollOptions.length < 4) setPollOptions(prev => [...prev, '']);
     };
@@ -437,7 +387,6 @@ export default function Home() {
         setPollOptions(prev => prev.map((opt, i) => i === index ? value : opt));
     };
 
-    // Media option click handler
     const handleMediaOptionClick = (optionId: string) => {
         if (optionId === 'photo') {
             document.getElementById('image-upload-input')?.click();
@@ -454,14 +403,12 @@ export default function Home() {
         }
     };
 
-    // Schedule button handler
     const handleScheduleClick = () => {
         setIsScheduleOpen(!isScheduleOpen);
         setIsPollOpen(false);
         setIsEventOpen(false);
     };
 
-    // Reset all modal state
     const resetPostModal = () => {
         setPostContent('');
         setSelectedMood('');
@@ -503,11 +450,9 @@ export default function Home() {
     };
 
     const handleRepost = (type: any, postIndex: any) => {
-        // // // console.log(`Repost type: ${type} on post ${postIndex}`);
         setOpenRepostIndex(null);
     };
 
-    // Repost with perspective handlers
     const openRepostWithPerspectiveModal = (post: any, index: any) => {
         setSelectedRepostPost(post);
         setSelectedRepostIndex(index);
@@ -520,7 +465,6 @@ export default function Home() {
         setRepostProgress(0);
         setIsRepostInProgress(true);
 
-        // Simulate progress from 0 to 100%
         const interval = setInterval(() => {
             setRepostProgress(prev => {
                 const newProgress = prev + Math.random() * 30;
@@ -533,7 +477,6 @@ export default function Home() {
             });
         }, 200);
 
-        // Hide progress bar after completion
         setTimeout(() => {
             setShowRepostProgressBar(false);
             setIsRepostInProgress(false);
@@ -553,7 +496,6 @@ export default function Home() {
 
         try {
             const result = await RepostService.createRepost(postId, 'quote', thoughts);
-            // 🔧 NEW: Analytics mein share record karo
             if (post?.userId && post.userId !== user?.userId) {
                AnalyticsService.recordShare(post.userId, postId, 'linkedin');
          }
@@ -562,7 +504,6 @@ export default function Home() {
             await new Promise(resolve => setTimeout(resolve, 300));
             setRepostProgress(100);
 
-            // Quote repost feed mein add karo
             const newRepostFeedItem = {
                 feedItemType: 'repost',
                 repostId: result?.data?.repost?.repostId || result?.repost?.repostId || `temp-${Date.now()}`,
@@ -573,7 +514,7 @@ export default function Home() {
                 originalPost: {
                     ...post,
                     entryId: postId,
-                    userName: post.userName || post.fullName || post.userId || 'User',  // ← ADD
+                    userName: post.userName || post.fullName || post.userId || 'User',
                 },
             };
 
@@ -601,9 +542,6 @@ export default function Home() {
     };
 
     const handleRepostInstant = async (indexOrId: any) => {
-    // ✅ FIX: post-identity ab string postKey (entryId) hai, numeric index nahi.
-    // Purana code allPosts[index] karta tha jo string ke liye hamesha undefined
-    // deta tha — isi wajah se repost silently fail ho raha tha.
     const post = typeof indexOrId === 'number'
         ? allPosts[indexOrId]
         : allPosts.find(p => (p.entryId || p.postId) === indexOrId);
@@ -664,10 +602,6 @@ export default function Home() {
     }
 };
 
-    // ✅ NEW: comment ke raw userId list se real name/avatar/headline nikalta hai,
-    // aur postOwnerId se compare karke "isAuthor" flag bhi laga deta hai (jisse
-    // CommentItem "Author" badge dikha sake) — bulk API calls use hoti hain
-    // taaki N comments ke liye N calls na jayein.
     const enrichCommentsWithUserData = async (rawComments: any[], postOwnerId?: string) => {
         if (!rawComments || rawComments.length === 0) return [];
 
@@ -707,7 +641,6 @@ export default function Home() {
                         return acc;
                     }, {});
                 } catch {
-                    // headlines optional, ignore failure
                 }
             }
 
@@ -737,12 +670,6 @@ export default function Home() {
         }
     };
 
-    // ✅ NEW: backend `getCommentsByPostId` ek FLAT list deta hai — top-level
-    // comments aur unke replies (jinka parentCommentId set hai) sab ek hi
-    // array mein. Yeh function usko parentCommentId ke basis pe ek-level-deep
-    // tree mein convert karta hai (replies apne parent comment ke "replies"
-    // array ke andar aa jaate hain), taaki purane replies bhi page reload ke
-    // baad properly nested dikhein — sirf isi session ke naye replies nahi.
     const buildCommentTree = (flatComments: any[]) => {
         const map: Record<string, any> = {};
         const roots: any[] = [];
@@ -762,10 +689,7 @@ export default function Home() {
         return roots;
     };
 
- // ✅ NEW: sirf fetch karta hai (open/close nahi) — modal aur inline section
-    // dono isko reuse kar sakte hain bina ek dusre ki UI state chhede
     const fetchCommentsForPost = async (postId: string) => {
-        // Already fetched (ya fetch ho rahe) hain to dobara call mat karo
         if (postComments[postId] || commentsLoading[postId]) return;
 
         setCommentsLoading(prev => ({ ...prev, [postId]: true }));
@@ -778,10 +702,10 @@ export default function Home() {
             )?.userId;
 
             const enrichedComments = await enrichCommentsWithUserData(rawComments, postOwnerId);
-            const nestedComments = buildCommentTree(enrichedComments); // ✅ tree banao — replies parent ke andar nest ho jayenge
+            const nestedComments = buildCommentTree(enrichedComments);
 
-            setPostComments(prev => ({ ...prev, [postId]: nestedComments })); // ✅ nested tree store karo
-            setPostCommentCounts(prev => ({ ...prev, [postId]: enrichedComments.length })); // total count same rahega (replies included)
+            setPostComments(prev => ({ ...prev, [postId]: nestedComments }));
+            setPostCommentCounts(prev => ({ ...prev, [postId]: enrichedComments.length }));
         } catch (error) {
             console.error('Failed to fetch comments:', error);
         } finally {
@@ -789,21 +713,17 @@ export default function Home() {
         }
     };
 
-    // toggleComments — ab instant open hota hai; fetching fetchCommentsForPost ko delegate karta hai
     const toggleComments = (postId: string) => {
         const isOpen = openCommentsIndex === postId;
-        setOpenCommentsIndex(isOpen ? null : postId); // ✅ turant toggle, koi wait nahi
+        setOpenCommentsIndex(isOpen ? null : postId);
         if (!isOpen) {
             fetchCommentsForPost(postId);
         }
     };
-    // handleCommentSubmit replace karo:
+
     const handleCommentSubmit = async (postId: string) => {
         if (!commentText.trim()) return;
 
-        // ✅ Apna khud ka user object turant available hai (login ke user se) —
-        // isse naya comment/reply bina extra API call ke turant sahi
-        // avatar/name ke saath dikh jaata hai, "Unknown User" nahi dikhta.
         const FALLBACK_AVATAR =
             'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s';
         const postOwnerId = allPosts.find(
@@ -825,7 +745,6 @@ export default function Home() {
                     likesCount: res.data.reply?.likesCount || 0,
                     likedBy: res.data.reply?.likedBy || [],
                 };
-                // reply ko us comment ke niche add karo
                 setPostComments(prev => {
                     const updated = (prev[postId] || []).map(c => {
                         if (c.commentId === replyingTo) {
@@ -838,7 +757,6 @@ export default function Home() {
             } else {
                 const res = await ProfileService.createComment(postId, commentText);
 
-                // ✅ NEW: Analytics mein comment engagement record karo
 const post = allPosts.find(p => (p.entryId || p.postId) === postId);
 if (post?.userId && post.userId !== user?.userId) {
     AnalyticsService.recordEngagement(postId, post.userId, 'comment');
@@ -851,12 +769,10 @@ if (post?.userId && post.userId !== user?.userId) {
                     likesCount: res.data.comment?.likesCount || 0,
                     likedBy: res.data.comment?.likedBy || [],
                 };
-                // new comment top mein ya bottom mein add karo
                 setPostComments(prev => ({
                     ...prev,
                     [postId]: [...(prev[postId] || []), newComment]
                 }));
-                // count badhao
                 setPostCommentCounts(prev => ({
                     ...prev,
                     [postId]: (prev[postId] || 0) + 1
@@ -873,11 +789,6 @@ if (post?.userId && post.userId !== user?.userId) {
         setReplyingTo(commentId);
     }
 
-    // ✅ FIX: pehle yeh khaali stub tha (sirf commented-out console.log) —
-    // like button click hone pe kuch hota hi nahi tha. Ab actual like/unlike
-    // API call karta hai + optimistic UI update, aur nested replies ke andar
-    // bhi comment dhoondh ke update kar sakta hai (kyunki comments ab tree
-    // structure mein hain — buildCommentTree ke baad).
     const handleCommentReaction = async (commentId: string) => {
         const findComment = (comments: any[]): any => {
             for (const c of comments) {
@@ -899,7 +810,6 @@ if (post?.userId && post.userId !== user?.userId) {
                 return c;
             });
 
-        // yeh comment kis postId ke andar hai, woh dhoondo
         let targetPostId: string | null = null;
         let targetComment: any = null;
         for (const pid in postComments) {
@@ -916,7 +826,6 @@ if (post?.userId && post.userId !== user?.userId) {
         const prevLikedBy = targetComment.likedBy || [];
         const prevLikesCount = targetComment.likesCount || 0;
 
-        // optimistic update
         setPostComments(prev => ({
             ...prev,
             [targetPostId as string]: updateCommentInTree(prev[targetPostId as string] || [], (c) => ({
@@ -936,7 +845,6 @@ if (post?.userId && post.userId !== user?.userId) {
             }
         } catch (error: any) {
             console.error('Comment like/unlike failed:', error);
-            // revert on failure
             setPostComments(prev => ({
                 ...prev,
                 [targetPostId as string]: updateCommentInTree(prev[targetPostId as string] || [], (c) => ({
@@ -952,10 +860,6 @@ if (post?.userId && post.userId !== user?.userId) {
         setOpenCommentMenuIndex(openCommentMenuIndex === commentId ? null : commentId);
     };
 
-  // ✅ Comment "⋯" menu actions — extra param ka meaning action ke hisaab se badalta hai:
-    //   - edit → current comment text
-    //   - block → target user's userId
-    //   - baaki actions ke liye ignore ho jaata hai
     const handleCommentAction = async (action: any, commentId: any, extra: any) => {
         if (action === 'edit') {
             setEditingCommentId(commentId);
@@ -965,8 +869,6 @@ if (post?.userId && post.userId !== user?.userId) {
             try {
                 await ProfileService.deleteComment(commentId);
 
-                // ✅ UI se turant hatao — top-level comments se, aur agar
-                // kisi comment ka reply hai to uski replies[] se bhi
                 setPostComments(prev => {
                     const updated: Record<string, any[]> = {};
                     for (const postId in prev) {
@@ -1030,7 +932,6 @@ if (post?.userId && post.userId !== user?.userId) {
 
     const handleEditSubmit = (commentId: any) => {
         if (editCommentText.trim()) {
-            // // console.log(`Edited comment ${commentId}: ${editCommentText}`);
             setEditingCommentId(null);
             setEditCommentText('');
         }
@@ -1042,43 +943,12 @@ if (post?.userId && post.userId !== user?.userId) {
     };
 
     const handlePhotoUpload = () => {
-        // // console.log('Opening photo upload...');
     };
 
     const handleGifSelect = () => {
-        // // console.log('Opening GIF selector...');
     };
 
     const emojiList = ['😀', '😂', '🤣', '😍', '🥰', '😊', '😎', '🤔', '😢', '😭', '😡', '🤯', '🎉', '🎊', '👍', '👏', '🙌', '💪', '🔥', '✨', '❤️', '💙', '💚', '💛', '🧡', '💜', '🖤', '🤍', '💯', '✅', '❌', '⭐', '🌟', '💫', '🚀', '🎯'];
-
-    const sampleComments = [
-        {
-            id: 1,
-            user: 'Alice Johnson',
-            avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=60',
-            text: 'This is amazing! Great work on the design system 🎨',
-            time: '2h ago',
-            reactions: { '❤️': 5, '👍': 3, '🔥': 2 },
-            replies: [
-                {
-                    id: 101,
-                    user: 'Bob Smith',
-                    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=60',
-                    text: 'I agree! The attention to detail is incredible',
-                    time: '1h ago',
-                    reactions: { '👍': 2 }
-                }
-            ]
-        },
-        {
-            id: 2,
-            user: 'Carol White',
-            avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=60',
-            text: 'Would love to see a tutorial on this! 🚀',
-            time: '3h ago',
-            reactions: { '🔥': 8, '👏': 4 }
-        }
-    ];
 
     useEffect(() => {
         const handleClickOutside = (event: any) => {
@@ -1108,10 +978,8 @@ if (post?.userId && post.userId !== user?.userId) {
         };
     }, [openMenuIndex]);
 
-
-
     return (
-        <div className={`min-h-screen transition-all duration-500 ${isDarkMode ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900' : 'bg-[#e0d8cf]'} font-['Poppins'] overflow-x-clip`}>
+        <div className={`min-h-screen transition-all duration-500 ${isDarkMode ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900' : 'bg-[#d4c9bc]'} font-['Poppins'] overflow-x-clip`}>
             {/* Header */}
             <ProfileNavbar
                 profileImage={profileData.profileImage}
@@ -1140,8 +1008,11 @@ if (post?.userId && post.userId !== user?.userId) {
                 </div>
             )}
 
-            {/* Main Container */}
-            <div className="flex flex-col lg:flex-row pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 mx-auto gap-4 md:gap-6 lg:gap-8 max-w-[1200px] w-full">
+            {/* Main Container — zoom se compact, LinkedIn-jaisa; 'zoom' sticky ko nahi todta jaise transform:scale todta hai */}
+            <div
+                className="flex flex-col lg:flex-row pt-20 sm:pt-24 px-6 sm:px-10 lg:px-16 mx-auto gap-4 md:gap-6 lg:gap-8 max-w-[1400px] w-full"
+                style={{ zoom: 0.85 } as React.CSSProperties}
+            >
                 {/* Left Sidebar - Hidden on mobile, shown on desktop */}
                 <div className="hidden lg:block sticky-sidebar">
                     <Left
@@ -1169,7 +1040,6 @@ if (post?.userId && post.userId !== user?.userId) {
                     <Main
                         currentUserId={user?.userId}
                         isDarkMode={isDarkMode}
-                        // likes={likes}
                         likedPosts={likedPosts}
                         profileImage={profileData.profileImage}
                         handleLike={handleLike}
@@ -1198,7 +1068,6 @@ if (post?.userId && post.userId !== user?.userId) {
                         handleCommentAction={handleCommentAction}
                         handleEditSubmit={handleEditSubmit}
                         handleEmojiClick={handleEmojiClick}
-                        // sampleComments={sampleComments}
                         emojiList={emojiList}
                         togglePostMenu={togglePostMenu}
                         toggleRepostMenu={toggleRepostMenu}
@@ -1212,9 +1081,9 @@ if (post?.userId && post.userId !== user?.userId) {
                         isLoadingMore={isLoadingMore}          
                         hasMore={hasMore}                     
                         loadMorePosts={loadMorePosts}          
-                        feedReposts={feedReposts}           // ← ADD
-                        profileData={profileData}           // ← ADD
-                        fullName={fullName}                 // ← ADD
+                        feedReposts={feedReposts}
+                        profileData={profileData}
+                        fullName={fullName}
                         repostingPostId={repostingPostId}
                         fetchCommentsForPost={fetchCommentsForPost}
                     />
@@ -1665,7 +1534,6 @@ if (post?.userId && post.userId !== user?.userId) {
                         </div>
                         <div className={`p-3 sm:p-4 rounded-2xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-white/60'}`}>
                             <p className={`text-xs sm:text-sm ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/70'} mb-1`}>Engagement</p>
-                            {/* ✅ FIX: real total engagement (likes+comments+shares across userPosts) — was hardcoded "12.8K" */}
                             <p className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-[#8b7355] to-[#6b5643] bg-clip-text text-transparent">{formatEngagement(totalEngagement)}</p>
                         </div>
                     </div>
@@ -1691,7 +1559,6 @@ if (post?.userId && post.userId !== user?.userId) {
                                         <p className={`text-xs sm:text-sm font-bold mb-2 truncate ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
                                             {post.title}
                                         </p>
-                                        {/* ✅ FIX: 3-col → 4-col grid, added Impressions (was missing) */}
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 text-xs">
                                             <div className={`p-2 rounded ${isDarkMode ? 'bg-slate-800/50' : 'bg-[#e0d8cf]/50'}`}>
                                                 <p className={isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}>Impressions</p>
@@ -1736,7 +1603,6 @@ if (post?.userId && post.userId !== user?.userId) {
                     <div className="grid grid-cols-2 gap-2 sm:gap-4">
                         <div className={`p-3 sm:p-4 rounded-xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-white/60'}`}>
                             <p className={`text-xs sm:text-sm ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/70'} mb-1`}>Profile Views</p>
-                            {/* ✅ FIX: real % change from backend — was hardcoded "+24%" */}
                             <p className="text-xl sm:text-2xl font-black bg-gradient-to-r from-[#6b5643] to-[#8b7355] bg-clip-text text-transparent">
                                 {isLoadingWeeklyPerformance
                                     ? '...'
@@ -1745,7 +1611,6 @@ if (post?.userId && post.userId !== user?.userId) {
                         </div>
                         <div className={`p-3 sm:p-4 rounded-xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-white/60'}`}>
                             <p className={`text-xs sm:text-sm ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/70'} mb-1`}>Post Reach</p>
-                            {/* ✅ FIX: real % change from backend — was hardcoded "+18%" */}
                             <p className="text-xl sm:text-2xl font-black bg-gradient-to-r from-[#8b7355] to-[#6b5643] bg-clip-text text-transparent">
                                 {isLoadingWeeklyPerformance
                                     ? '...'
