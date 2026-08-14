@@ -26,7 +26,9 @@ function mapToEvent(backendData: any): Event {
         day: 'numeric', month: 'short', year: 'numeric',
       })
       : 'TBD',
-    location: e.location?.venue || e.location?.city || 'TBD',
+    startDate: e.startDate || '',
+    endDate: e.endDate,
+    location: e.location || {},
     capacity: e.capacity || 0,
     registered: e.registeredCount || 0,
     waitlist: 0,

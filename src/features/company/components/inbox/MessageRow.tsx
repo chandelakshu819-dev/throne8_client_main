@@ -1,3 +1,4 @@
+//src/features/company/components/inbox/MessageRow.tsx
 import { memo, useCallback } from 'react';
 import type { Contact } from '../../interface';
 

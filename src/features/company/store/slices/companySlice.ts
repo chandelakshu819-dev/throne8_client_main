@@ -6,6 +6,7 @@ import {
     MOCK_PRODUCTS, MOCK_CULTURE_VALUES, MOCK_PERKS, MOCK_NEWS,
     MOCK_TESTIMONIALS, MOCK_GALLERY, MOCK_POSTS,
 } from '@/features/company/constants/company.data';
+import type { Post } from '@/features/company/type/company.types';
 
 interface CompanyState {
     companyId: string | null;
@@ -158,6 +159,7 @@ const companySlice = createSlice({
                         country: action.payload.headquarters?.country || '',
                         full: `${action.payload.headquarters?.city}, ${action.payload.headquarters?.state}, ${action.payload.headquarters?.country}`,
                     },
+                    socialLinks: state?.meta?.socialLinks || {},
                     logoUrl: action.payload.media?.logo?.url,
                     bannerUrl: action.payload.media?.coverImage?.url || state?.meta?.bannerUrl,
                     isVerified: action.payload.account?.isVerified || false,
@@ -165,11 +167,11 @@ const companySlice = createSlice({
                     employeeCount: action.payload.stats?.employeesCount || 0,
                 };
                 // API ke real stats se MOCK_STATS ke values override karo
-                state.stats = state?.stats?.map((stat) => {
+               state.stats = state?.stats?.map((stat) => {
                     if (stat.id === 's1') return { ...stat, value: String(action.payload.stats?.totalApplications || stat.value) };
                     if (stat.id === 's2') return { ...stat, value: String(action.payload.stats?.activeJobs || stat.value) };
                     return stat;
-                });
+                }) ?? null;
                 state.lastFetched = new Date().toISOString();
             })
             .addCase(fetchCompanyById.rejected, (state, action) => {
@@ -254,7 +256,7 @@ const companySlice = createSlice({
                             articleUrl: post.articleUrl || '#',
                             category: post.category || 'General',
                         }),
-                    }));
+                   })) as Post[];
                 }
             })
             .addCase(fetchCompanyPosts.rejected, (state) => {

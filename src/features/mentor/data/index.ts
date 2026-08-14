@@ -59,16 +59,15 @@ export const MENTOR: MentorData = {
 };
 
 export const SERVICES: Service[] = [
-    { id: 1, type: "Resource", title: "Strong Action Verbs for your Resume/CV", duration: "30 min", originalPrice: 300, price: "Free" },
-    { id: 2, type: "1:1 Call", title: "LinkedIn Zero to Hero (Limited Time Offer)", duration: "15 Min", originalPrice: 800, price: 199 },
-    { id: 3, type: "1:1 Call", title: "Quick CV/Resume Review", duration: "15 Min", originalPrice: 600, price: 199 },
-    { id: 4, type: "1:1 Call", title: "Quick Call (Limited Time Offer)", duration: "15 Min", originalPrice: 600, price: 199 },
-    { id: 5, type: "1:1 Call", title: "GD/PI Prep ; Mock Interview", duration: "45 Min", originalPrice: 900, price: 599, popular: true },
-    { id: 6, type: "Query", title: "Ask a Query", duration: "3 Days", originalPrice: 20, price: "Free" },
-    { id: 7, type: "Resource", title: "ATS Friendly Resume-Template", duration: "30 min", originalPrice: null, price: "Free" },
-    { id: 8, type: "Resource", title: "J.P.Morgan Chase & Co. CV/Resume that worked", duration: "30 min", originalPrice: null, price: "Free" },
+    { id: '1', type: "Resource", title: "Strong Action Verbs for your Resume/CV", duration: "30 min", originalPrice: 300, price: "Free" },
+    { id: '2', type: "1:1 Call", title: "LinkedIn Zero to Hero (Limited Time Offer)", duration: "15 Min", originalPrice: 800, price: 199 },
+    { id: '3', type: "1:1 Call", title: "Quick CV/Resume Review", duration: "15 Min", originalPrice: 600, price: 199 },
+    { id: '4', type: "1:1 Call", title: "Quick Call (Limited Time Offer)", duration: "15 Min", originalPrice: 600, price: 199 },
+    { id: '5', type: "1:1 Call", title: "GD/PI Prep ; Mock Interview", duration: "45 Min", originalPrice: 900, price: 599, popular: true },
+    { id: '6', type: "Query", title: "Ask a Query", duration: "3 Days", originalPrice: 20, price: "Free" },
+    { id: '7', type: "Resource", title: "ATS Friendly Resume-Template", duration: "30 min", originalPrice: null, price: "Free" },
+    { id: '8', type: "Resource", title: "J.P.Morgan Chase & Co. CV/Resume that worked", duration: "30 min", originalPrice: null, price: "Free" },
 ];
-
 export const REVIEWS: Review[] = [
     { id: 1, name: "Priya Sharma", rating: 5, date: "2 days ago", comment: "Excellent guidance on CV preparation. Dhananjay helped me identify key areas for improvement and his feedback was very actionable. Highly recommend!", service: "Quick CV/Resume Review", verified: true },
     { id: 2, name: "Rahul Kumar", rating: 5, date: "5 days ago", comment: "Amazing mentor! The LinkedIn session was incredibly valuable. Got my profile optimized and started getting recruiter messages within a week.", service: "LinkedIn Zero to Hero", verified: true },

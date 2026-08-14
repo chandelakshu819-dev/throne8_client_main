@@ -2,7 +2,7 @@
 import type {
   CompanyMeta, CompanyStat, TeamMember, JobPosting, Milestone,
   Product, CultureValue, Perk, NewsPost, Testimonial, GalleryPhoto,
-  SuggestedPerson, ProfileProgressItem,
+  SuggestedPerson, ProfileProgressItem, Post,
 } from '@/features/company/type/company.types'
 
 export const MOCK_COMPANY_META: CompanyMeta = {
@@ -256,8 +256,6 @@ export const MOCK_PROFILE_PROGRESS: ProfileProgressItem[] = [
   { id: 'pp3', label: 'Content Engagement', pct: 40, hint: 'Share 3 more posts this week' },
 ];
 
-// ── Posts mock data ───────────────────────────────────────────────
-import type { Post } from '@/types';
 
 const THRONE8_AUTHOR = {
   name: 'Throne8', role: 'Official Account', initials: 'T8',

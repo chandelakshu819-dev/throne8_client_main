@@ -1,4 +1,4 @@
-// src/app/(dashboard)/dashboard/components/sidebar/Left/LeftSidebarPanel.tsx
+// src/features/dashboard/components/sidebar/Left/LeftSidebarPanel.tsx
 'use client';
 import React from 'react';
 import { X } from 'lucide-react';
@@ -51,7 +51,7 @@ const LeftSidebarPanel: React.FC<LeftSidebarPanelProps> = ({
 
         
         <div className="p-4 space-y-6">
-          <ProfileCard currentUserId={currentUserId} isDarkMode={isDarkMode} />
+          <ProfileCard currentUserId={currentUserId || ''} isDarkMode={isDarkMode} />
           {/* <CompanyCard isDarkMode={isDarkMode} />
           <MyGroups isDarkMode={isDarkMode} /> */}
         </div>

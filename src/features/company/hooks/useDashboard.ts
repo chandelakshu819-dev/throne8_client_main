@@ -15,7 +15,7 @@ export const TOP_POSTS: TopPost[] = [
 
 export function useDashboard() {
   // Pull live counts from Redux slices so the dashboard reflects real state
-  const user = useAppSelector(s => s.user);
+ const user = useAppSelector(s => s.login.user);
   const unreadMsgs = useAppSelector(s => s.inbox.unreadCount);
   const jobItems = useAppSelector(s => s.jobs.items);
   const activityItems = useAppSelector(s => s.activity.items);
@@ -51,8 +51,7 @@ export function useDashboard() {
 
   return {
     // User
-    userName: user.name,
-
+   userName: user?.email || 'User',
     // Chart
     chartData,
     activeRange,

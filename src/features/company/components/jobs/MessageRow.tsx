@@ -1,10 +1,11 @@
+//src/features/company/components/jobs/MessageRow.tsx
 import { memo, useCallback } from 'react';
-import type { Message } from '../../../../app/(company)/jobs/page';
+import type { Contact } from '../../interface';
 
 interface Props {
-  msg: Message;
+  msg: Contact;
   isSelected: boolean;
-  onSelect: (msg: Message) => void;
+  onSelect: (msg: Contact) => void;
 }
 
 // memo — clicking any message changes `selected` in parent

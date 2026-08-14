@@ -185,7 +185,7 @@ export const CULTURE_DATA: CultureData   = {
     ],
 };
 
-export const MESSAGES: Message[] = [
+export const MESSAGES: Contact[] = [
   { id: '1', from: 'Chhavi Arora',    avatar: 'CA', color: 'bg-purple-500', preview: 'Hey! Would love to connect and discuss potential collaboration opportunities...', time: '10m ago', read: false },
   { id: '2', from: 'Manan Telrandhe', avatar: 'MT', color: 'bg-blue-500',   preview: 'Great post on AI networking! Wanted to share some thoughts on this...',          time: '1h ago',  read: false },
   { id: '3', from: 'Ankit Shinde',    avatar: 'AS', color: 'bg-green-500',  preview: 'Are you open for a freelance project? We need a React developer for...',          time: '2h ago',  read: false },

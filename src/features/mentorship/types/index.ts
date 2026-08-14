@@ -2,6 +2,18 @@ import { ReactNode } from "react";
 
 export type BookingStep = null | "calendar" | "details" | "payment" | "confirmation";
 
+export interface Mentor {
+  id: string | number;
+  name: string;
+  role?: string;
+  company?: string;
+  image?: string;
+  avatarUrl?: string;
+  rating?: number;
+  expertise?: string[];
+  bio?: string;
+  [key: string]: any;
+}
 export interface SessionType {
     id: number;
     title: string;
