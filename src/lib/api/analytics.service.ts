@@ -37,6 +37,7 @@ class AnalyticsService {
             viewerId?: string;
             viewerName?: string;
             viewerHeadline?: string;
+            viewerPhotoUrl?: string;
         }
     ): Promise<any> {
         try {

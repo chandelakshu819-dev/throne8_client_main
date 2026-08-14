@@ -12,7 +12,7 @@ import { COLORS, emojis, quotes } from "@/features/messages/constants";
 // ============================================================
 // COLORS & ICONS
 // ============================================================
-export const Icon = {
+ const Icon = {
   Search: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"w-5 h-5 " + (p.className || "")}><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" /></svg>,
   Bell: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className={"w-5 h-5 " + (p.className || "")}><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2c0 .53-.21 1.04-.59 1.41L4 17h5m6 0a3 3 0 1 1-6 0" /></svg>,
   Send: (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" className={"w-5 h-5 " + (p.className || "")}><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" /></svg>,
@@ -103,7 +103,7 @@ function PostPreviewCardBasic({ url, colors }: { url: string; colors: any }) {
   return name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
 }
 
-export function AvatarCircle({ name, size = 12 }: { name: string; size?: number }) {
+function AvatarCircle({ name, size = 12 }: { name: string; size?: number }) {
   const colors = ['#e07b39', '#5b8dd9', '#50c878', '#e06b7d', '#9b59b6'];
   const color = colors[name?.charCodeAt(0) % colors.length] || '#888';
   return (
@@ -116,10 +116,7 @@ export function AvatarCircle({ name, size = 12 }: { name: string; size?: number 
   );
 }
 
-// ============================================================
-// STATUS TICK COMPONENT
-// ============================================================
-export function MessageStatus({ status }: { status: string }) {
+ function MessageStatus({ status }: { status: string }) {
   if (status === 'sending') return <span className="text-[10px] opacity-40">⏳</span>;
   if (status === 'sent') return <span className="text-[10px] opacity-50">✓</span>;
   if (status === 'delivered') return <span className="text-[10px] opacity-60">✓✓</span>;
@@ -815,7 +812,7 @@ export default function MessagingPage() {
           {/* ── RIGHT SIDEBAR ── */}
           <aside className="space-y-4">
             <div className="rounded-3xl p-4 shadow-xl" style={{ background: colors.card }}>
-              <p className="text-sm opacity-60 mb-2">Today's Thought</p>
+              <p className="text-sm opacity-60 mb-2">Todays Thought</p>
               <div className="rounded-2xl p-4 border" style={{ background: colors.bg, borderColor: colors.bgSoft }}>
                 <p className="font-semibold">{todayQuote.text}</p>
                 <p className="text-sm mt-1 opacity-60">— {todayQuote.by}</p>

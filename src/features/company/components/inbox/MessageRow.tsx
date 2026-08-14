@@ -1,12 +1,11 @@
 import { memo, useCallback } from 'react';
-import type { Message } from '../page';
+import type { Contact } from '../../interface';
 
 interface Props {
-  msg: Message;
+  msg: Contact;
   isSelected: boolean;
-  onSelect: (msg: Message) => void;
+  onSelect: (msg: Contact) => void;
 }
-
 // memo — clicking any message changes `selected` in parent
 // Without memo: ALL 7 rows re-render on every click
 // With memo: only the deselected + newly selected row re-render (isSelected changed)

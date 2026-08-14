@@ -96,6 +96,7 @@ export interface ActivitySectionProps {
     fullName?: string;
     headline?: string;
     followers: number;
+    userId?: string;
     currentUserId?: string;
     userReposts?: any[];
     isLoadingReposts?: boolean;

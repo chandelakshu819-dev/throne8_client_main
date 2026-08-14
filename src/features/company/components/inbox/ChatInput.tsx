@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, memo } from 'react';
-import type { ChatMessage } from '../page';
+import type { ChatMessage } from '../../interface';
 
 interface Props {
   onSend: (msg: Omit<ChatMessage, 'id' | 'time'>) => void;

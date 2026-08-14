@@ -33,7 +33,7 @@ function timeAgo(dateStr: string): string {
     return `${Math.floor(s / 86400)}d ago`;
 }
 
-export function isTodayDate(dateStr: string): boolean {
+ function isTodayDate(dateStr: string): boolean {
     const d = new Date(dateStr);
     const n = new Date();
     return (

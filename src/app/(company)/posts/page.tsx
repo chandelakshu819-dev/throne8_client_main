@@ -137,10 +137,10 @@ export default function PostsPage() {
     if (activeTab === 'images') return posts.filter(p => p.images?.length);
     if (activeTab === 'videos') return posts.filter(p => p.videos?.length);
     if (activeTab === 'documents') return posts.filter(p => p.documents?.length);
-    if (activeTab === 'employee-posts') return posts.filter(p => p.author?.id !== user?.id);
+    if (activeTab === 'employee-posts') return posts.filter(p => p.author?._id !== user?._id);
     if (activeTab === 'polls') return posts.filter(p => p.hasPoll);
     return posts.filter(p => p.status === activeTab);
-  }, [activeTab, posts, user?.id]);
+  }, [activeTab, posts, user?._id]);
 
   const counts = useMemo(() => ({
     published: posts.filter(p => p.status === 'published').length,
@@ -150,9 +150,9 @@ export default function PostsPage() {
     comments: 0,
     images: posts.filter(p => p.images?.length).length,
     videos: posts.filter(p => p.videos?.length).length,
-    'employee-posts': posts.filter(p => p.author?.id !== user?.id).length,
+    'employee-posts': posts.filter(p => p.author?._id !== user?._id).length,
     polls: posts.filter(p => p.hasPoll).length,
-  }), [posts, user?.id]);
+ }), [posts, user?._id]);
 
   const openModal = useCallback(() => setShowModal(true), []);
   const closeModal = useCallback(() => setShowModal(false), []);

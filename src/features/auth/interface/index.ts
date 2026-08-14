@@ -78,6 +78,7 @@ export interface LoginState {
     loading: boolean;
     error: string | null;
     user: UserData | null;
+    profile?: any;
     isAuthenticated: boolean;
     rememberMe: boolean;
 }

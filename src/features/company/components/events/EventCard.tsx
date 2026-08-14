@@ -49,7 +49,13 @@ function InfoPopup({ event, onClose }: { event: Event; onClose: () => void }) {
         : '—'
     },
     { label: 'Time of Day', value: event.startTimeOfDay || '—' },
-    { label: 'Location', value: event.location },
+    {
+      label: 'Location', value: event.location
+        ? [event.location.venue, event.location.city, event.location.state]
+            .filter(Boolean)
+            .join(', ') || '—'
+        : '—'
+    },
     { label: 'Capacity', value: event.capacity },
     { label: 'Registered', value: event.registered },
     { label: 'Description', value: event.description || '—' },
@@ -190,7 +196,7 @@ const EventCard = memo(function EventCard({ event, onDelete }: Props) {
           </div>
           <div className="flex items-center gap-2 text-xs text-[#4a3728]/70">
             <span>{MODE_ICONS[event.mode] ?? '📍'}</span>
-            <span>{event.location} · {event.mode}</span>
+            <span>{[event.location?.venue, event.location?.city, event.location?.state].filter(Boolean).join(', ') || '—'} · {event.mode}</span>
           </div>
           {event.visibility && (
             <div className="flex items-center gap-2 text-xs text-[#4a3728]/70">

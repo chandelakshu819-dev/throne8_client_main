@@ -4,13 +4,10 @@ import Sidebar from "../../features/company/components/Sidebar";
 
 export default function CompanyLayout({
     children,
-    params,
 }: {
     children: React.ReactNode;
-    params: { userId: string };
 }) {
     const [collapsed, setCollapsed] = useState(false);
-    console.log('CompanyLayout rendered with userId:', params.userId); // Debug log
 
     return (
         <div className="min-h-screen bg-white">
