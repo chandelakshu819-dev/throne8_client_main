@@ -171,8 +171,15 @@ const GroupChat = ({ groupId, groupDetails }: { groupId: string; groupDetails?: 
   const doubtsLoading = useAppSelector((state: any) => selectDoubtsLoading(state.chat ?? {})  );
   const doubtPostLoading = useAppSelector((state: any) => selectDoubtPostLoading(state.chat ?? {}));
   const answerPostLoading = useAppSelector((state: any) => selectAnswerPostLoading(state.chat ?? {}));
-  const [doubtInput, setDoubtInput] = useState({ title: "", description: "", category: "Mathematics", tags: [], isUrgent: false, difficulty: "Medium" });
-  const [selectedDoubt, setSelectedDoubt] = useState<any | null>(null);
+const [doubtInput, setDoubtInput] = useState<{
+  title: string;
+  description: string;
+  category: string;
+  tags: string[];
+  isUrgent: boolean;
+  difficulty: string;
+}>
+({ title: "", description: "", category: "Mathematics", tags: [], isUrgent: false, difficulty: "Medium" });  const [selectedDoubt, setSelectedDoubt] = useState<any | null>(null);
   // Redux se live doubt data lo — selectedDoubt ID se match karke
   const liveSelectedDoubt = selectedDoubt
     ? doubts.find((d: any) => d.doubtId === selectedDoubt.doubtId) ?? selectedDoubt
@@ -180,7 +187,7 @@ const GroupChat = ({ groupId, groupDetails }: { groupId: string; groupDetails?: 
   const [selectedDoubtAnswers, setSelectedDoubtAnswers] = useState<any[]>([]);
   // Live answers from Redux — auto-update hote hain
   const liveAnswers = useAppSelector( (state: any) =>
-    selectDoubtAnswers(selectedDoubt?.doubtId ?? '')
+    selectDoubtAnswers(selectedDoubt?.doubtId ?? '')(state.chat ?? {})
   );
   const [answerInput, setAnswerInput] = useState<string>("");
   const [doubtSearchQuery, setDoubtSearchQuery] = useState<string>("");
@@ -518,7 +525,7 @@ const GroupChat = ({ groupId, groupDetails }: { groupId: string; groupDetails?: 
   const handleEditMessage = (messageId: string): void => {
     const message = messages.find((m) => m.messageId === messageId);
     if (!message) return;
-    setEditingMessage(message);           // local — for banner display
+    setEditingMessage(message as any);         
     setMessageInput(message.content);
     setSelectedMessageMenu(null);
   };

@@ -12,7 +12,7 @@ import { clearSelectedGroup, selectGroupMembers, selectGroupMembersLoading, sele
 import { useAuth } from "@/features/auth/hooks/useAuth";
 // import { useGroupData } from "@/hooks/studyGroup/useGroupData";
 import { useGroupData } from "@/features/study-group/hooks/useGroupData";
-import {StudyGroupService} from "@/lib/api/studyGroup.service";
+import StudyGroupService from "@/lib/api/studyGroup.service";
 import { useChatSocket } from "@/core/realtime/useChatSocket";
 import { startTimerThunk, pauseTimerThunk, resumeTimerThunk, stopTimerThunk } from "@/hooks/studyGroup/features/timer/timer.thunks";
 import { selectActiveSession, selectTimerApiLoading, selectTimerStats } from "@/hooks/studyGroup/features/timer/timerSlice";
