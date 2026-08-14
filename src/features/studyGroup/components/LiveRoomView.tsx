@@ -1,3 +1,4 @@
+//src/features/studyGroup/components/LiveRoomView.tsx
 'use client';
 
 import React, {
@@ -20,9 +21,55 @@ import {
   Monitor,
   Users,
 } from 'lucide-react';
+
 import { RemotePeer, ConnectionQuality, RoomMode, useLiveRoom } from '@/core/webrtc/useLiveRoom';
 
+// ─── Prop types ─────────────────────────────────────────────────
 
+interface VideoTileProps {
+  stream?: MediaStream | null;
+  isMuted?: boolean;
+  className?: string;
+  autoPlay?: boolean;
+}
+
+interface PeerTileProps {
+  peer: RemotePeer;
+  isPinned: boolean;
+  isSpeaking: boolean;
+  onPin: (socketId: string) => void;
+}
+
+interface LocalTileProps {
+  stream?: MediaStream | null;
+  isCameraOn: boolean;
+  isMicOn: boolean;
+  isScreenSharing: boolean;
+  userName?: string | null;
+  userAvatar?: string | null;
+  isPinned: boolean;
+  onPin: () => void;
+}
+
+interface LiveRoomViewProps {
+  localStream?: MediaStream | null;
+  isCameraOn: boolean;
+  isMicOn: boolean;
+  isScreenSharing: boolean;
+  peers: RemotePeer[];
+  activeSpeakers: string[];
+  roomMode: RoomMode;
+  roomTitle?: string;
+  currentUserId?: string;
+  localUserName?: string | null;
+  localUserAvatar?: string | null;
+  onToggleCamera: () => void;
+  onToggleMic: () => void;
+  onToggleScreenShare: () => void;
+  onLeave: () => void;
+}
+
+// ─── Quality badge ─────────────────────────────────────────────
 // ─── Quality badge ─────────────────────────────────────────────
 
 const QualityBadge = memo(({ quality }: { quality: ConnectionQuality }) => {

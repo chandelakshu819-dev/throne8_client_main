@@ -1,8 +1,8 @@
-// src/app/studyGroup/study/my-groups/components/GroupStatsBar.tsx
+// src/features/studyGroup/components/my-groups/GroupStatsBar.tsx
 'use client';
 
 import { Users, Crown, UserPlus, Clock, Award } from 'lucide-react';
-import type { GroupStats } from '../../types/types';
+import type { GroupStats } from '@/features/studyGroup/types';
 interface GroupStatsBarProps {
   stats: GroupStats;
 }

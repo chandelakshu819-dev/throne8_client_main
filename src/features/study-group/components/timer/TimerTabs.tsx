@@ -3,8 +3,8 @@
 import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
 import { setActiveTab } from '@/hooks/studyGroup/features/timer/timerSlice';
 import { useState, useEffect } from 'react';
-import { tabs } from '../data';
-import { Tab as TabTimer } from '../interface';
+import { tabs } from '@/features/studyGroup/data';
+import { Tab as TabTimer } from '@/features/studyGroup/interface';
 
 
 export default function TimerTabs() {

@@ -29,6 +29,7 @@ interface TimerState {
   seconds: number;
   isActive: boolean;
   subject: string;
+  selectedGoalId: string | null;
   customMinutes: number;
   studySessions: StudySession[];
   totalStudyTime: number;
@@ -64,6 +65,7 @@ const initialState: TimerState = {
   seconds: 0,
   isActive: false,
   subject: '',
+  selectedGoalId: null,
   customMinutes: 15,
   studySessions: [],
   totalStudyTime: 0,

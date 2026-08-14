@@ -518,7 +518,7 @@ const dispatch = useAppDispatch();
   const handleEditMessage = (messageId: string): void => {
     const message = messages.find((m) => m.messageId === messageId);
     if (!message) return;
-    setEditingMessage(message);           // local — for banner display
+   setEditingMessage({ ...message, deletedBy: message.deletedBy ?? undefined } as any);           // local — for banner display
     setMessageInput(message.content);
     setSelectedMessageMenu(null);
   };

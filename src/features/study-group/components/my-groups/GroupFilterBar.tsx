@@ -1,8 +1,8 @@
-// src/app/studyGroup/study/my-groups/components/GroupFilterBar.tsx
+// src/features/study-group/components/my-groups/GroupFilterBar.tsx
 'use client';
 
 import { Search, Crown, UserPlus } from 'lucide-react';
-import type { GroupStats } from '../../types/types';
+import type { GroupStats } from '@/features/studyGroup/types';
 import { GroupTabType } from '../../types/types';
 
 interface GroupFilterBarProps {
@@ -12,6 +12,12 @@ interface GroupFilterBarProps {
   onTabChange:    (tab: GroupTabType) => void;
   onSearchChange: (query: string) => void;
 }
+
+const GROUP_TABS_: { id: GroupTabType; label: string }[] = [
+  { id: 'all' as GroupTabType,     label: 'All' },
+  { id: 'created' as GroupTabType, label: 'Created' },
+  { id: 'joined' as GroupTabType,  label: 'Joined' },
+];
 
 const TAB_ICONS: Record<string, React.ReactNode> = {
   created: <Crown  size={14} />,
@@ -39,7 +45,7 @@ export const GroupFilterBar: React.FC<GroupFilterBarProps> = ({
 
         {/* Tab Buttons */}
         <div className="flex gap-1.5 sm:gap-2 overflow-x-auto">
-          {GROUP_TABS.map(({id, label}: { id: any, label: any }) => {
+          {GROUP_TABS_.map(({id, label}) => {
             const isActive = activeTab === id;
             return (
               <button
