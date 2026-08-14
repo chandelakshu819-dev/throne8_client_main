@@ -2,24 +2,22 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { TrendingUp, Users, Award, ChevronUp, ChevronDown, Lock, Globe } from "lucide-react";
-import { TopRankedGroupResponse } from "@/lib/api/studyGroup.service";
+import { TrendingUp, Users, Award, ChevronUp, ChevronDown } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { selectJoinLoading, selectTopRankedGroups, selectTopRankedGroupsLoading } from "@/hooks/studyGroup/features/groups/groupsSlice";
 import { useGroupData } from "@/features/study-group/hooks/useGroupData";
 import SkeletonLoader from "@/app/loading";
 import { joinGroupThunk, sendJoinRequestThunk } from "@/hooks/studyGroup/features/groups/group.thunks";
-import JoinGroupModal from "../../modals/joinGroupModal";
+import JoinGroupModal from "@/features/study-group/modals/joinGroupModal";
 
 
 /* ===================== CARD ===================== */
-// const GroupCard = ({ group }: { group: Group }) => {
 const GroupCard = ({
-  group,                    
+  group,
   onJoinClick,
 }: {
-  group: Group;
-  onJoinClick: (group: Group) => void;
+  group: any;
+  onJoinClick: (group: any) => void;
 }) => {
   const spotsLeft = group.capacity - (group.currentMemberCount ?? group.members ?? 0);
   const { getJoinRequestForGroup, addJoinRequestToCache } = useGroupData();
@@ -85,24 +83,16 @@ const GroupCard = ({
           )}
         </div>
 
-        <button 
-        onClick={()=> {
-          if(group.isMember) {
-            console.log("Navigating to group room for groupId:", group.groupId || group.id);
-            window.location.href = `/study/my-groups/${group.groupId || group.id}`; // Navigate to group room if already a member
-            return;
-          }
-          onJoinClick(group)}
-        }
-        className="w-full bg-gradient-to-r from-[#8b7355] to-[#6b5847] hover:from-[#6b5847] hover:to-[#4a3728] text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20">
-          {/* {group.isMember ? (
-            'Open Group'
-          ) : group.visibility === 'private' ? (
-            <><Lock size={14} /> Join Group</>
-          ) : (
-            <><Globe size={14} /> Join Group</>
-          )} */}
-
+        <button
+          onClick={() => {
+            if (group.isMember) {
+              console.log("Navigating to group room for groupId:", group.groupId || group.id);
+              window.location.href = `/study/my-groups/${group.groupId || group.id}`;
+              return;
+            }
+            onJoinClick(group);
+          }}
+          className="w-full bg-gradient-to-r from-[#8b7355] to-[#6b5847] hover:from-[#6b5847] hover:to-[#4a3728] text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20">
           {group.isMember ? 'Open Group' : 'Join Group'}
         </button>
       </div>
@@ -115,36 +105,32 @@ export default function TopRankedGroups() {
   const apiGroups = useAppSelector(selectTopRankedGroups) ?? [];
   const isLoading = useAppSelector(selectTopRankedGroupsLoading);
   const [error, setError] = useState<string | null>(null);
-  
-    const { getJoinRequestForGroup, addJoinRequestToCache, getUserInfo } = useGroupData();
 
+  const { getJoinRequestForGroup, addJoinRequestToCache, getUserInfo } = useGroupData();
 
   // Store enriched groups in local state
-  const [topThreeGroups, setTopThreeGroups] = useState<Group[]>([]);
+  const [topThreeGroups, setTopThreeGroups] = useState<any[]>([]);
 
-  // ADD after topThreeGroups state
   const INITIAL_CARDS = 3;
   const [showAll, setShowAll] = useState(false);
   const dispatch = useAppDispatch();
   const joinLoading = useAppSelector(selectJoinLoading);
-  const [joinModalGroup, setJoinModalGroup] = useState<Group | null>(null);
+  const [joinModalGroup, setJoinModalGroup] = useState<any>(null);
   const [joinSuccess, setJoinSuccess] = useState<string | null>(null);
 
   const displayedGroups = showAll ? topThreeGroups : topThreeGroups.slice(0, INITIAL_CARDS);
   const hasMoreGroups = topThreeGroups.length > INITIAL_CARDS;
 
-  const handleJoinClick = (group: Group) => {
+  const handleJoinClick = (group: any) => {
     if (group.isMember) {
-      // TODO: navigate to group page when that route exists
       return;
     }
     if (group.visibility === 'private') {
-      setJoinModalGroup(group); // open modal for private
+      setJoinModalGroup(group);
     } else {
-      handlePublicJoin(group.groupId); // direct join for public
+      handlePublicJoin(group.groupId || '');
     }
   };
-
 
   const handlePublicJoin = async (groupId: string) => {
     const result = await dispatch(joinGroupThunk({ groupId }));
@@ -155,10 +141,9 @@ export default function TopRankedGroups() {
         prev.map(g => g.groupId === groupId ? { ...g, isMember: true } : g)
       );
     } else {
-      // show error as toast
       setJoinSuccess(null);
       const errMsg = result.payload as string;
-      setError(errMsg || 'Failed to join group');   // ← ADD error state
+      setError(errMsg || 'Failed to join group');
       setTimeout(() => setError(null), 3000);
     }
   };
@@ -166,7 +151,7 @@ export default function TopRankedGroups() {
   const handlePrivateJoin = async (joinCode: string) => {
     if (!joinModalGroup) return;
     const result = await dispatch(joinGroupThunk({
-      groupId: joinModalGroup.groupId,
+      groupId: joinModalGroup.groupId || '',
       joinCode,
     }));
     if (joinGroupThunk.fulfilled.match(result)) {
@@ -184,7 +169,7 @@ export default function TopRankedGroups() {
   const handleRequestAccess = async (message: string) => {
     if (!joinModalGroup) return;
     const result = await dispatch(
-      sendJoinRequestThunk({ groupId: joinModalGroup.groupId, message })
+      sendJoinRequestThunk({ groupId: joinModalGroup.groupId || '', message })
     );
     if (sendJoinRequestThunk.rejected.match(result)) {
       throw new Error((result.payload as string) || 'Failed to send request');
@@ -194,11 +179,10 @@ export default function TopRankedGroups() {
   useEffect(() => {
     if (apiGroups.length === 0) return;
 
-    // getUserInfo is async — resolve all leaders in parallel
     const enrichGroups = async () => {
       const enriched = await Promise.all(
-        apiGroups.slice(0, 10).map(async (g, index) => {
-          const leaderInfo = await getUserInfo(g.leaderId); // ← async, real name + photo
+        apiGroups.slice(0, 10).map(async (g: any, index: number) => {
+          const leaderInfo = await getUserInfo(g.leaderId);
 
           const leaderName = leaderInfo.name !== 'Unknown User'
             ? leaderInfo.name
@@ -223,15 +207,14 @@ export default function TopRankedGroups() {
     };
 
     enrichGroups();
-  }, [apiGroups]); // re-runs when apiGroups loads from Redux
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiGroups]);
 
   if (isLoading) {
     return <SkeletonLoader count={3} className="px-4" />
   }
 
   if (topThreeGroups.length === 0) return null;
-
-  console.log("check the group data cse", displayedGroups)
 
   return (
     <div className="py-8 sm:py-10 lg:py-12">
@@ -253,7 +236,6 @@ export default function TopRankedGroups() {
           ))}
         </div>
 
-        {/* Show More / Show Less */}
         {hasMoreGroups && (
           <div className="flex justify-center mt-8">
             <button
@@ -268,10 +250,8 @@ export default function TopRankedGroups() {
             </button>
           </div>
         )}
-
       </div>
 
-      {/* Success Toast */}
       {joinSuccess && (
         <div className="fixed bottom-6 right-6 z-50 bg-green-500 text-white px-5 py-3 rounded-xl shadow-xl text-sm font-semibold animate-pulse">
           ✓ {joinSuccess}
@@ -284,7 +264,6 @@ export default function TopRankedGroups() {
         </div>
       )}
 
-      {/* Join Modal for private groups */}
       {joinModalGroup && (
         <JoinGroupModal
           group={joinModalGroup}
@@ -292,10 +271,9 @@ export default function TopRankedGroups() {
           onJoin={handlePrivateJoin}
           onRequest={handleRequestAccess}
           isLoading={joinLoading}
-          existingRequest={joinModalGroup ? getJoinRequestForGroup(joinModalGroup.groupId) : null}
+          existingRequest={joinModalGroup ? getJoinRequestForGroup(joinModalGroup.groupId || '') : null}
         />
       )}
-
     </div>
   )
 }

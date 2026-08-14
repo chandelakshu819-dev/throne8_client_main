@@ -3,8 +3,8 @@ import React from 'react';
 
 const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUserId }: {
   isDarkMode: boolean;
-  index: number;
-  handlePostAction: (action: string, index: number) => void,
+  index: string;
+  handlePostAction: (action: string, index: string) => void,
   post: any;
   currentUserId: string;
 }) => {

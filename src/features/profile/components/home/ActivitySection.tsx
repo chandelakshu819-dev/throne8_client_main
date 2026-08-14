@@ -358,6 +358,7 @@ const postForCard = isQuote
           openMenuIndex={null}
           openRepostIndex={null}
           handlePostAction={() => {}}
+           handleRepost={() => {}}
           toggleComments={() => setOpenRepostCommentsKey((prev: string | null) => (prev === postKeyForActions ? null : postKeyForActions))}
           handleReply={handlers.setReplyingToCommentId}
           handleCommentReaction={handlers.likeCommentToggle}
@@ -367,6 +368,7 @@ const postForCard = isQuote
           toggleRepostMenu={() => {}}
           postCommentCounts={undefined}
           fetchCommentsByPost={handlers.fetchCommentsByPost}
+          
         />
       </div>
    </div>

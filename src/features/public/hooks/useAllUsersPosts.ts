@@ -13,7 +13,7 @@ export const useAllUsersPosts = () => {
         try {
             setIsLoadingAllPosts(true);
 
-            const response = await ProfileService.getAllPostsForHomeFeed(false);
+            const response = await ProfileService.getAllPostsForHomeFeed(1, 20, false);
             const posts = response.data.posts;
 
             const uniqueUserIds = [...new Set(posts.map((post: any) => String(post.userId)))] as string[];

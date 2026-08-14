@@ -77,7 +77,7 @@ const RecentPosts: React.FC<RecentPostsProps> = ({ isDarkMode, userPosts }) => {
                 ) : post.documents?.length > 0 && post.documents[0].cloudinarySecureUrl ? (
                   <RecentPostDocThumbnail
                     doc={post.documents[0]}
-                    onClick={(e) => { e.stopPropagation(); router.push(`/posts/${post.postId}`); }}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); router.push(`/posts/${post.postId}`); }}
                     isDarkMode={isDarkMode}
                   />
                 ) : (

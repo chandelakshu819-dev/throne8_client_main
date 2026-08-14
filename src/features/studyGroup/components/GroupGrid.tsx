@@ -1,5 +1,5 @@
 "use client";
-
+//src/features/studyGroup/components/GroupGrid.tsx
 import React from 'react';
 import GroupCard from './GroupCard';
 import { ChevronDown, ChevronUp } from 'lucide-react';

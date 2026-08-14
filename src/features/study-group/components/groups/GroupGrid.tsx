@@ -1,5 +1,5 @@
 "use client";
-
+//src/features/studyGroup/components/group/GroupGrid.tsx
 import React from 'react';
 import GroupCard from './GroupCard';
 import { ChevronDown, ChevronUp } from 'lucide-react';
@@ -15,10 +15,10 @@ import {
   selectUniversityGroupsLoading,
   selectPlacementGroupsLoading,
 } from '@/hooks/studyGroup/features/groups/groupsSlice';
-import type { Group } from '../interface';
+import type { Group } from '../../interface';
 import { GroupResponse } from '@/lib/api/studyGroup.service';
 import SkeletonLoader from '@/app/loading';
-import { SectionKey } from '../types';
+import { SectionKey } from '@/features/studyGroup/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

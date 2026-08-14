@@ -1,5 +1,5 @@
 'use client';
-
+// src/features/studyGroup/components/goals/GoalsHeader.tsx
 import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
 import { addGoalToDay, GoalWithUI, selectAllGoals, selectGoalStats } from '@/hooks/studyGroup/features/goals/goalsSlice';
@@ -8,9 +8,9 @@ import {
   fetchAllGoalsThunk, fetchGoalStatsThunk, markGoalCompleteThunk, markGoalIncompleteThunk, updateGoalThunk
 } from '@/hooks/studyGroup/features/goals/goals.thunks';
 import CreateGoalModal from './CreateGoalModal';
-import EditGoalModal from './EditGoalModal';
-import GoalBoard from './GoalBoard';
-import { getTodayDayName } from './WeeklyTracker';
+import EditGoalModal from '@/features/studyGroup/components/EditGoalModal';
+import GoalBoard from '@/features/studyGroup/components/GoalBoard';
+import { getTodayDayName } from '@/features/studyGroup/helper';
 
 export default function GoalsHeader() {
   const dispatch = useAppDispatch();

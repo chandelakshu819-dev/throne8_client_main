@@ -9,8 +9,8 @@ import {
 import { fetchAllGoalsThunk, markGoalCompleteThunk, markGoalIncompleteThunk, updateGoalProgressThunk, updateGoalThunk } from '@/hooks/studyGroup/features/goals/goals.thunks';
 import { Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import GoalProgressModal from './GoalProgressModal';
-import { DAY_SHORT, DayName, DAYS } from '../data';
-import { getContrastTextColor, getTodayDayName, getWeekDates, withAlpha } from '../helper';
+import { DAY_SHORT, DayName, DAYS } from '@/features/studyGroup/data';
+import { getContrastTextColor, getTodayDayName, getWeekDates, withAlpha } from '@/features/studyGroup/helper';
 
 
 

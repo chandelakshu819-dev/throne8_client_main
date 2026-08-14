@@ -5,8 +5,8 @@ import { Pencil, Trash2, GripVertical } from 'lucide-react';
 import { GoalWithUI } from '@/hooks/studyGroup/features/goals/goalsSlice';
 import { useAppSelector } from '@/core/store/store.hooks';
 import GoalProgressModal from './GoalProgressModal';
-import { statusConfig } from '../data';
-import { getStatus } from '../helper';
+import { statusConfig } from '@/features/studyGroup/data';
+import { getStatus } from '@/features/studyGroup/helper';
 
 interface GoalCardProps {
   goal: GoalWithUI;

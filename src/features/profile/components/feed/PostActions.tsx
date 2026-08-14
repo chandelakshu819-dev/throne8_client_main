@@ -16,6 +16,8 @@ interface PostActionsProps {
   onOpenWithPerspectiveModal?: any;
   handleRepostInstant?: any;
   currentUserId?: string;
+  postReactions?: any;
+  onReact?: any;
 }
 
 // ✅ SIMPLIFIED: ab yeh bilkul dashboard/feed ke PostActions jaisa hai —

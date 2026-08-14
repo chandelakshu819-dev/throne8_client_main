@@ -80,7 +80,7 @@ export default function MentorCard({ mentor }: MentorCardProps) {
 
                     {/* Expertise Tags */}
                     <div className="flex gap-2 justify-center flex-wrap mb-4">
-                        {mentor.tags.map((tag) => (
+                        {mentor.tags.map((tag: string) => (
                             <span
                                 key={tag}
                                 className="text-[9px] bg-white px-3 py-1.5 rounded-full font-black text-[#4a3728] border border-[#ece7e2] uppercase tracking-wider"

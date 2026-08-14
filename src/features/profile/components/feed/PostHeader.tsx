@@ -4,10 +4,10 @@ import { useRouter } from 'next/navigation';
 import PostMenuDropdown from './PostMenuDropdown';
 
 const PostHeader = ({
-  post, index, isDarkMode, openMenuIndex, togglePostMenu, handlePostAction, currentUserId, fullName, profileImage, headline
+  post, index, isDarkMode, openMenuIndex, togglePostMenu, handlePostAction, currentUserId, fullName, profileImage, headline, isOwnProfile
 }: {
   post: any; index: string; isDarkMode: boolean; openMenuIndex: string | null; togglePostMenu: (index: string) => void; handlePostAction: (action: string, index: string) => void; currentUserId: string;
-  fullName?: string; profileImage?: string; headline?: string;
+  fullName?: string; profileImage?: string; headline?: string; isOwnProfile?: boolean;
 }) => {
   const router = useRouter();
   const isOwnPost = post.userId && currentUserId && post.userId === currentUserId;
