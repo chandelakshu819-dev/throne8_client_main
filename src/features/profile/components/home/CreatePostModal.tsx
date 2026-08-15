@@ -41,9 +41,22 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
     });
     const [isSaving, setIsSaving] = useState(false);
 
-    // ref to the content textarea, needed so the formatting toolbar and
+   // ref to the content textarea, needed so the formatting toolbar and
     // the mention autocomplete can read cursor position / selection.
     const contentRef = useRef<HTMLTextAreaElement>(null);
+
+    // ✅ NEW: modal khulte hi background page ko scroll hone se roko
+    React.useEffect(() => {
+        if (isOpen) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [isOpen]);
+
+
 
     // ✅ NEW: @mention autocomplete wiring
     const mention = useMentionAutocomplete({
@@ -252,7 +265,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
 
             {/* Modal */}
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <div className="bg-gradient-to-br from-[#f6ede8]/95 via-[#f6ede8]/90 to-[#e0d8cf]/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-[#e0d8cf]/60 w-full h-full max-h-screen overflow-y-auto relative">
+            <div className="bg-gradient-to-br from-[#f6ede8]/95 via-[#f6ede8]/90 to-[#e0d8cf]/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-[#e0d8cf]/60 w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
                     {/* Close Button */}
                     <button
                         onClick={handleClose}
@@ -270,9 +283,8 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
                             <h2 className="text-3xl font-bold text-[#4a3728] tracking-tight">Create a Post</h2>
                         </div>
                     </div>
-
-                    {/* Form Content */}
-                    <form onSubmit={handleSubmit} className="p-8 space-y-6">
+              {/* Form Content */}
+             <form onSubmit={handleSubmit} className="p-8 pt-10 space-y-6">
                         {/* Title Field */}
                         <div className="space-y-2">
                             <label className="block text-sm font-semibold text-[#4a3728]">

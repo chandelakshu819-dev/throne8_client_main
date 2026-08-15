@@ -888,9 +888,11 @@ useEffect(() => {
 
 // ✅ NEW: engagement % real fetched data se calculate hoga
 const engagementPercent = analyticsData
-  ? Number((((analyticsData.likes + analyticsData.comments + analyticsData.shares) / Math.max(1, analyticsData.impressions)) * 100).toFixed(1))
+  ? Math.min(
+      100,
+      Number((((analyticsData.likes + analyticsData.comments + analyticsData.shares) / Math.max(1, analyticsData.impressions)) * 100).toFixed(1))
+    )
   : 0;
-
 
   useEffect(() => {
     setVisibleCommentsCount(3);
