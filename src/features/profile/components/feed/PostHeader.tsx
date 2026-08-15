@@ -26,12 +26,23 @@ const PostHeader = ({
   return (
     <div className="flex items-center justify-between mb-6">
       <div className="flex items-center space-x-4">
-        <img
-          src={post.avatar || profileImage || ''}
-          alt={post.user || fullName || ''}
-          onClick={handleProfileClick}
-          className="w-14 h-14 rounded-2xl object-cover border-2 border-[#6b5643] cursor-pointer"
-        />
+      {(post.avatar || profileImage) ? (
+  <img
+    src={post.avatar || profileImage}
+    alt={post.user || fullName || ''}
+    onClick={handleProfileClick}
+    className="w-14 h-14 rounded-2xl object-cover border-2 border-[#6b5643] cursor-pointer"
+  />
+) : (
+  <div
+    onClick={handleProfileClick}
+    className="w-14 h-14 rounded-2xl border-2 border-[#6b5643] cursor-pointer bg-[#4a3728]/20 flex items-center justify-center flex-shrink-0"
+  >
+    <svg className="w-6 h-6 text-[#4a3728]/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+  </div>
+)}
         <div>
           <div className="flex items-center gap-3">
             <h4

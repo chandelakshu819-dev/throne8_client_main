@@ -649,7 +649,7 @@ const postForCard = isQuote
     <CommentsSection
       postId={postKey}
       comments={handlers.commentsByPost[postKey] || []}
-      isLoading={handlers.isLoadingComments}
+      isLoading={!!handlers.isLoadingComments[postKey]}
       commentCount={originalPost.commentsCount || 0}
       profileImage={profileImage}
       openCommentMenuIndex={handlers.openCommentMenuIndex}
@@ -1714,12 +1714,12 @@ const engagementPercent = analyticsData
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs font-bold text-[#4a3728]/60">
                     <span>Engagement Level</span>
-                    <span className="text-[#4a3728]">{Math.min(100, Math.round(engagementPercent * 2))}%</span>
+                    <span className="text-[#4a3728]">{Math.min(100, Math.round(engagementPercent))}%</span>
                   </div>
                   <div className="w-full h-3 bg-[#e0d8cf]/50 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-[#8b7355] to-[#4a3728] rounded-full transition-all duration-1000"
-                      style={{ width: Math.min(100, Math.round(engagementPercent * 2)) + '%' }}
+                      style={{ width: Math.min(100, Math.round(engagementPercent)) + '%' }}
                     />
                   </div>
                 </div>
@@ -1836,10 +1836,10 @@ const engagementPercent = analyticsData
                 {showEmbedComments && embedPostKey ? (
                   <div className="mt-3 border-t border-[#e0d8cf] pt-3">
                     <CommentsSection
-                      postId={embedPostKey}
-                      comments={handlers.commentsByPost[embedPostKey] || []}
-                      isLoading={handlers.isLoadingComments}
-                      commentCount={embedPost.commentsCount || 0}
+                  postId={embedPostKey}
+                  comments={handlers.commentsByPost[embedPostKey] || []}
+                  isLoading={!!handlers.isLoadingComments[embedPostKey]}
+                  commentCount={embedPost.commentsCount || 0}
                       profileImage={profileImage}
                       openCommentMenuIndex={handlers.openCommentMenuIndex}
                       toggleCommentMenu={handlers.toggleCommentMenu}

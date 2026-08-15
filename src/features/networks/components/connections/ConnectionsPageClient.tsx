@@ -342,16 +342,22 @@ const ConnectionsPageClient: React.FC = () => {
                             <h3 className="text-sm font-bold text-[#4a3728]">Manage</h3>
                         </div>
                         <div className="py-2">
-                            {quickLinks.map(({ label, icon: Icon }) => (
-                                <button
-                                    key={label}
-                                    onClick={() => alert('Coming soon')}
-                                    className="w-full flex items-center gap-3 px-5 py-3 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors text-left"
-                                >
-                                    <Icon className="w-4 h-4 text-[#4a3728]/70 flex-shrink-0" />
-                                    {label}
-                                </button>
-                            ))}
+                        {quickLinks.map(({ label, icon: Icon }) => (
+    <button
+        key={label}
+        onClick={() => {
+            if (label === 'Saved posts') {
+                router.push('/profile/saved-posts');
+            } else {
+                alert('Coming soon');
+            }
+        }}
+        className="w-full flex items-center gap-3 px-5 py-3 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors text-left"
+    >
+        <Icon className="w-4 h-4 text-[#4a3728]/70 flex-shrink-0" />
+        {label}
+    </button>
+  ))}
                         </div>
                     </div>
                 </div>

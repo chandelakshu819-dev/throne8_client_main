@@ -8,6 +8,7 @@ class AnalyticsService {
      * 🔍 Record Search Appearance (When user appears in search)
      * This is called when someone searches and this user shows in results
      */
+    
     static async recordSearchAppearance(
         searchedUserId: string,
         searchQuery: string,
