@@ -4,10 +4,10 @@ import { useRouter } from 'next/navigation';
 import PostMenuDropdown from './PostMenuDropdown';
 
 const PostHeader = ({
-  post, index, isDarkMode, openMenuIndex, togglePostMenu, handlePostAction, currentUserId, fullName, profileImage, headline, isOwnProfile
+  post, index, isDarkMode, openMenuIndex, togglePostMenu, handlePostAction, currentUserId, fullName, profileImage, headline, isOwnProfile, showMenu = true,
 }: {
   post: any; index: string; isDarkMode: boolean; openMenuIndex: string | null; togglePostMenu: (index: string) => void; handlePostAction: (action: string, index: string) => void; currentUserId: string;
-  fullName?: string; profileImage?: string; headline?: string; isOwnProfile?: boolean;
+  fullName?: string; profileImage?: string; headline?: string; isOwnProfile?: boolean; showMenu?: boolean;
 }) => {
   const router = useRouter();
   const isOwnPost = post.userId && currentUserId && post.userId === currentUserId;
@@ -49,23 +49,25 @@ const PostHeader = ({
           </p>
         </div>
       </div>
-      <div className="relative post-menu">
-        <button
-          onClick={() => togglePostMenu(index)}
-          className={`p-2 rounded-xl transition-all duration-300 post-menu-trigger ${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-[#e0d8cf]/50'}`}
-        >
-          <span className="text-xl text-[#4a3728]">⋯</span>
-        </button>
-        {openMenuIndex === index && (
-          <PostMenuDropdown
-            isDarkMode={isDarkMode}
-            index={index}
-            handlePostAction={handlePostAction}
-            post={post}
-            currentUserId={currentUserId}
-          />
-        )}
-      </div>
+      {showMenu && (
+        <div className="relative post-menu">
+          <button
+            onClick={() => togglePostMenu(index)}
+            className={`p-2 rounded-xl transition-all duration-300 post-menu-trigger ${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-[#e0d8cf]/50'}`}
+          >
+            <span className="text-xl text-[#4a3728]">⋯</span>
+          </button>
+          {openMenuIndex === index && (
+            <PostMenuDropdown
+              isDarkMode={isDarkMode}
+              index={index}
+              handlePostAction={handlePostAction}
+              post={post}
+              currentUserId={currentUserId}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 };

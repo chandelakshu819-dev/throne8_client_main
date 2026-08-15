@@ -148,14 +148,29 @@ export const useActivityHandlers = ({
         }
     };
 
-    const handleSavePost = async (postId: string, currentSaveState: boolean) => {
+    // const handleSavePost = async (postId: string, currentSaveState: boolean) => {
+    //     try {
+    //         await ProfileService.savePost(postId, !currentSaveState);
+    //         onPostCreated?.();
+    //     } catch (error: any) {
+    //         alert(error.message || 'Failed to save post');
+    //     }
+    // };
+
+
+    const handleSavePost = async (postId: string, alreadySaved: boolean) => {
         try {
-            await ProfileService.savePost(postId, !currentSaveState);
-            onPostCreated?.();
-        } catch (error: any) {
-            alert(error.message || 'Failed to save post');
+          if (alreadySaved) {
+            await ProfileService.unsavePost(postId);
+          } else {
+            await ProfileService.savePost(postId);
+          }
+        
+          // ❌ remove: alert('Post entry not found')
+        } catch (err) {
+          throw err; // RepostCard already reverts optimistic state on throw
         }
-    };
+      };
 
     const handleLikeToggle = async (postId: string) => {
         const currentLike = postLikes[postId] || { count: 0, isLiked: false };

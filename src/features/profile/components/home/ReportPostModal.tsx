@@ -9,6 +9,7 @@ const REPORT_REASONS = [
     'Something else',
 ];
 
+
 const ReportPostModal = ({
     postId,
     onClose,

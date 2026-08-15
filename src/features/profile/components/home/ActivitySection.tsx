@@ -1,5 +1,7 @@
 'use client';
 // src/features/profile/components/home/ActivitySection.tsx
+// top of ActivitySection.tsx
+import { createPortal } from 'react-dom';
 import React, { useEffect, useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ShowAllActivityModal from './ShowAllActivityModal';
@@ -19,6 +21,9 @@ import AuthService from '@/lib/api/auth.service';
 import FollowService from '@/lib/api/follow.service';
 import ReportService from '@/lib/api/report.service';
 import RepostService from '@/lib/api/repost.service'; // ✅ NEW
+import PostHeader from '../feed/PostHeader'; // ✅ NEW — embed preview ke liye
+import PostContent from '../feed/PostContent'; // ✅ NEW — embed preview ke liye
+import ReactionsModal from '../feed/ReactionsModal'; // ✅ NEW — embed preview ke likes modal ke liye
 
 const EmptyState = ({ label }: { label: string }) => {
   return (
@@ -102,19 +107,76 @@ const RepostCard = (props: any) => {
     handlers,
     openRepostCommentsKey,
     setOpenRepostCommentsKey,
+    onReportPost, // ✅ NEW
   } = props;
 
-
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);   // 👈 NEW
   const [isThoughtExpanded, setIsThoughtExpanded] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [originalAuthorName, setOriginalAuthorName] = useState('');
   const [originalAuthorHeadline, setOriginalAuthorHeadline] = useState('');
   const [originalAuthorAvatar, setOriginalAuthorAvatar] = useState('');
 
+
+   // ✅ NEW: toast + save state + embed modal
+   const [toast, setToast] = useState<{ message: string; linkText?: string; onLinkClick?: () => void } | null>(null);
+   const [isSaved, setIsSaved] = useState(false); // will sync in useEffect below
+   const [isSaving, setIsSaving] = useState(false);
+   const [showEmbedModal, setShowEmbedModal] = useState(false);
+   const [embedFullText, setEmbedFullText] = useState(false); // ✅ NEW — "less text" vs "full post" toggle
+
+   const [showEmbedLikesModal, setShowEmbedLikesModal] = useState(false);
+const [showEmbedComments, setShowEmbedComments] = useState(false);
+
+
   const originalPost = repost.originalPost;
   const isQuote = repost.repostType === 'quote';
   const postKey = originalPost ? (originalPost.entryId || originalPost.postId) : undefined;
+
+
+// ✅ FIX: sirf tab re-sync karo jab repost khud badle (postKey change),
+  // parent ke har re-render par nahi — warna optimistic save turant purane
+  // stale value se overwrite ho jata hai (flicker: save → unsave → save)
+  useEffect(() => {
+    if (originalPost) setIsSaved(!!originalPost.isSaved);
+  }, [postKey]);
+
+
+
+  // ✅ NEW: menu ke bahar kahin bhi click ho toh menu band ho jaye
+useEffect(() => {
+  if (!openMenuId) return;
+  const handleClickOutside = (event: MouseEvent) => {
+    if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      setOpenMenuId(null);
+    }
+  };
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, [openMenuId]);
+
+
+
+
+  // ✅ NEW: toast auto-dismiss// ✅ NEW: jab embed modal khule tab background page ko scroll hone se roko
+useEffect(() => {
+  if (showEmbedModal) {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden'; // background static
+    return () => {
+      document.body.style.overflow = originalOverflow; // modal band hote hi wapas normal
+    };
+  }
+}, [showEmbedModal]);
+
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
 
   // ✅ Quote-repost ka apna independent like state (server value se init)
   const [quoteLiked, setQuoteLiked] = useState(!!repost.isLikedByCurrentUser);
@@ -183,6 +245,56 @@ const RepostCard = (props: any) => {
       setOpenMenuId(null);
     }
   };
+
+
+  const handleCopyLink = async () => {
+    setOpenMenuId(null);
+    try {
+      const postUrl = window.location.origin + '/post/' + postKey;
+      await navigator.clipboard.writeText(postUrl);
+      setToast({
+        message: 'Link copied to clipboard.',
+        linkText: 'View post',
+        onLinkClick: () => window.open(postUrl, '_blank'),
+      });
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
+
+  const handleEmbed = () => {
+    setOpenMenuId(null);
+    setShowEmbedModal(true); // ✅ ab silent copy nahi, modal khulega
+  };
+
+  const handleSaveRepost = async () => {
+    setOpenMenuId(null);
+    const prevSaved = isSaved;
+    setIsSaved(!prevSaved); // optimistic toggle
+    setIsSaving(true);
+    try {
+      await handlers.handleSavePost(postKey, prevSaved);
+      setToast({ message: prevSaved ? 'Post unsaved.' : 'Post saved.' });
+    } catch (err) {
+      setIsSaved(prevSaved); // revert on failure
+      setToast({ message: 'Failed to save post.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleWhoCanView = () => {
+    setOpenMenuId(null);
+    setToast({ message: 'Visible to: ' + (originalPost.visibility ? originalPost.visibility : 'Anyone (Public)') });
+  };
+
+  const handleReportRepost = () => {
+    setOpenMenuId(null);
+    if (onReportPost) onReportPost(postKey);
+  };
+
+
+
 
   // ✅ Quote-repost ka apna like/unlike handler — independent API call
   const handleQuoteLike = async () => {
@@ -266,19 +378,43 @@ const postForCard = isQuote
         {/* ✅ Only the "remove my repost" action — no edit/delete/pin/archive
             menu for the ORIGINAL post shows up here */}
         {isOwnProfile ? (
-          <div className="relative flex-shrink-0">
+          <div className="relative flex-shrink-0" ref={menuRef}>
             <button onClick={() => setOpenMenuId(openMenuId ? null : 'menu')} className="p-2 hover:bg-[#4a3728]/10 rounded-full transition-all duration-200">
               <svg className="w-5 h-5 text-[#4a3728]/60" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 8a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 8a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
               </svg>
             </button>
             {openMenuId === 'menu' ? (
-              <div className="absolute right-0 top-8 bg-white rounded-xl shadow-2xl border border-[#e0d8cf] z-50 min-w-[180px]">
-                <button onClick={handleDeleteRepost} disabled={isDeleting} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                  {isDeleting ? 'Removing...' : 'Remove Repost'}
+              <div className="absolute right-0 top-8 bg-white rounded-xl shadow-2xl border border-[#e0d8cf] z-50 min-w-[220px] overflow-hidden">
+                <button onClick={handleSaveRepost} disabled={isSaving} className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#e0d8cf]/50 transition-colors duration-200 flex items-center gap-2 disabled:opacity-50">
+                  <i className={`ri-bookmark-${isSaved ? 'fill' : 'line'} text-base`}></i>
+                  <span>{isSaved ? 'Unsave' : 'Save'}</span>
+                </button>
+                <button onClick={handleCopyLink} className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#e0d8cf]/50 transition-colors duration-200 flex items-center gap-2">
+                  <i className="ri-links-line text-base"></i>
+                  <span>Copy link to post</span>
+                </button>
+                <button onClick={handleEmbed} className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#e0d8cf]/50 transition-colors duration-200 flex items-center gap-2">
+                  <i className="ri-code-s-slash-line text-base"></i>
+                  <span>Embed this post</span>
+                </button>
+
+                <div className="h-px bg-[#e0d8cf] my-1" />
+
+                <button onClick={handleDeleteRepost} disabled={isDeleting} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 flex items-center gap-2 disabled:opacity-50">
+                  <i className="ri-delete-bin-line text-base"></i>
+                  <span>{isDeleting ? 'Removing...' : 'Delete repost'}</span>
+                </button>
+                <button onClick={handleReportRepost} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 flex items-center gap-2">
+                  <i className="ri-flag-line text-base"></i>
+                  <span>Report post</span>
+                </button>
+
+                <div className="h-px bg-[#e0d8cf] my-1" />
+
+                <button onClick={handleWhoCanView} className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#e0d8cf]/50 transition-colors duration-200 flex items-center gap-2">
+                  <i className="ri-eye-line text-base"></i>
+                  <span>Who can view my post?</span>
                 </button>
               </div>
             ) : null}
@@ -309,6 +445,8 @@ const postForCard = isQuote
           post={postForCard}
           index={postKeyForActions}
           isOwnProfile={false}
+          showMenu={false}   // ✅ NEW — image 2 wala non-functional "⋯" hatane ke liye
+
           profileImage={originalAuthorAvatar || originalPost.userAvatar}
           fullName={originalAuthorName || originalPost.userName || originalPost.fullName || 'Unknown User'}
           headline={originalAuthorHeadline}
@@ -371,9 +509,178 @@ const postForCard = isQuote
           
         />
       </div>
-   </div>
+
+      {/* ✅ NEW: toast (alert() ki jagah) */}
+      {toast && createPortal(
+        <div className="fixed bottom-6 left-6 z-[3000] bg-white rounded-xl shadow-2xl border border-[#e0d8cf] px-4 py-3 flex items-center gap-3">
+          <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="text-sm text-[#4a3728] font-medium">
+            {toast.message}{' '}
+            {toast.linkText && (
+              <button onClick={toast.onLinkClick} className="underline font-semibold">{toast.linkText}</button>
+            )}
+          </span>
+          <button onClick={() => setToast(null)} className="text-[#4a3728]/40 hover:text-[#4a3728] ml-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>,
+        document.body
+      )}
+
+  {/* ✅ NEW: Embed modal — real LinkedIn jaisa scrollable preview */}
+  {showEmbedModal && createPortal(
+        <div onClick={() => setShowEmbedModal(false)} className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl border border-[#e0d8cf] relative flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+              <h2 className="text-lg font-bold text-[#4a3728]">Embed this post</h2>
+              <button onClick={() => setShowEmbedModal(false)} className="p-1.5 rounded-full hover:bg-[#e0d8cf]/50 text-[#4a3728]/60">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <p className="text-sm text-[#4a3728]/60 mb-2 flex-shrink-0">Copy and paste embed code on your site</p>
+
+            <div className="flex items-center gap-2 mb-4 flex-shrink-0">
+              <input
+                readOnly
+                value={'<iframe src="' + window.location.origin + '/post/' + postKey + '/embed" width="504" height="600" frameborder="0"></iframe>'}
+                className="flex-1 px-3 py-2 rounded-lg border border-[#e0d8cf] text-xs text-[#4a3728]/70 bg-[#f6ede8]/50 truncate"
+              />
+              <button
+                onClick={async () => {
+                  const embedCode = '<iframe src="' + window.location.origin + '/post/' + postKey + '/embed" width="504" height="600" frameborder="0"></iframe>';
+                  await navigator.clipboard.writeText(embedCode);
+                  setShowEmbedModal(false);
+                  setToast({ message: 'Embed code copied to clipboard.' });
+                }}
+                className="px-4 py-2 bg-[#4a3728] text-white rounded-lg text-sm font-semibold hover:opacity-90 flex-shrink-0"
+              >
+                Copy code
+              </button>
+            </div>
+
+            {/* ✅ NEW: real LinkedIn jaisa "less text" / "full post" toggle */}
+            <div className="flex items-center gap-6 mb-4 flex-shrink-0">
+              <label className="flex items-center gap-2 text-sm text-[#4a3728] cursor-pointer">
+                <input type="radio" checked={!embedFullText} onChange={() => setEmbedFullText(false)} className="accent-[#4a3728]" />
+                Embed with less text
+              </label>
+              <label className="flex items-center gap-2 text-sm text-[#4a3728] cursor-pointer">
+                <input type="radio" checked={embedFullText} onChange={() => setEmbedFullText(true)} className="accent-[#4a3728]" />
+                Embed full post
+              </label>
+            </div>
+
+            {/* ✅ NEW: scrollable, real post jaisa preview — same PostHeader/PostContent reuse */}
+            <div className="rounded-xl border border-[#e0d8cf] overflow-y-auto flex-1 min-h-0 bg-white p-4">
+              <PostHeader
+                post={{
+                  avatar: originalAuthorAvatar || originalPost.userAvatar,
+                  user: originalAuthorName || originalPost.userName || originalPost.fullName || 'Unknown User',
+                  role: originalAuthorHeadline,
+                  time: new Date(originalPost.createdAt || repost.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                  userId: originalPost.userId,
+                }}
+                index={postKeyForActions}
+                isDarkMode={false}
+                openMenuIndex={null}
+                togglePostMenu={() => {}}
+                handlePostAction={() => {}}
+                currentUserId={currentUserId || ''}
+                showMenu={false}
+              />
+              <PostContent
+                post={{
+                  content: originalPost.content || originalPost.title || '',
+                  image: originalPost.images?.[0]?.cloudinarySecureUrl || '',
+                  videos: originalPost.videos,
+                  documents: originalPost.documents,
+                }}
+                isDarkMode={false}
+                forceExpanded={embedFullText}
+              />
+              {/* ✅ yahan paste karo — PostContent ke turant baad, closing </div> se pehle */}
+              <div className="flex items-center justify-between text-xs text-[#4a3728]/60 border-t border-[#e0d8cf] pt-3 mt-2">
+  <button
+    type="button"
+    onClick={() => setShowEmbedLikesModal(true)}
+    className="hover:underline hover:text-[#4a3728] font-medium"
+  >
+    {originalPost.likesCount || 0} likes
+  </button>
+  <span className="mx-1">·</span>
+  <button
+    type="button"
+    onClick={async () => {
+      const next = !showEmbedComments;
+      setShowEmbedComments(next);
+      // ✅ pehli baar khulte waqt hi comments fetch karo agar already load nahi hue
+      if (next && postKey && !handlers.commentsByPost[postKey]) {
+        await handlers.fetchCommentsByPost(postKey, originalPost.userId);
+      }
+    }}
+    className="hover:underline hover:text-[#4a3728] font-medium"
+  >
+    {originalPost.commentsCount || 0} comments
+  </button>
+</div>
+
+{/* ✅ NEW: comments inline expand — embed preview ke andar hi */}
+{showEmbedComments && postKey ? (
+  <div className="mt-3 border-t border-[#e0d8cf] pt-3">
+    <CommentsSection
+      postId={postKey}
+      comments={handlers.commentsByPost[postKey] || []}
+      isLoading={handlers.isLoadingComments}
+      commentCount={originalPost.commentsCount || 0}
+      profileImage={profileImage}
+      openCommentMenuIndex={handlers.openCommentMenuIndex}
+      toggleCommentMenu={handlers.toggleCommentMenu}
+      handleCommentAction={handlers.handleCommentAction}
+      editingCommentId={handlers.editingCommentId}
+      editCommentText={handlers.editCommentText}
+      setEditCommentText={handlers.setEditCommentText}
+      handleEditSubmit={handlers.handleEditSubmit}
+      commentText={handlers.commentText}
+      setCommentText={handlers.setCommentText}
+      handleCommentSubmit={() => handlers.handleCommentSubmit(postKey)}
+      handleReply={handlers.setReplyingToCommentId}
+      handleCommentReaction={handlers.likeCommentToggle}
+      replyingTo={handlers.replyingTo}
+      setReplyingTo={handlers.setReplyingTo}
+      showEmojiPicker={handlers.showEmojiPicker}
+      setShowEmojiPicker={handlers.setShowEmojiPicker}
+      handleEmojiClick={handlers.handleEmojiClick}
+      currentUserId={currentUserId || ''}
+      isDarkMode={false}
+    />
+  </div>
+) : null}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+
+{showEmbedLikesModal && postKey ? (
+  <ReactionsModal
+    postId={postKey}
+    isOpen={showEmbedLikesModal}
+    onClose={() => setShowEmbedLikesModal(false)}
+    isDarkMode={false}
+  />
+) : null}
+    </div>
   );
 };
+  
 
 const VideoCard = ({ post, video }: { post: any; video: any }) => {
   const fileSizeMB = video.fileSize ? (video.fileSize / (1024 * 1024)).toFixed(1) : '-';
@@ -456,6 +763,30 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [undoToast, setUndoToast] = useState<any>(null);
   const [openRepostCommentsKey, setOpenRepostCommentsKey] = useState<string | null>(null);
+  const [actionToast, setActionToast] = useState<{ message: string; linkText?: string; onLinkClick?: () => void } | null>(null); // ✅ NEW
+
+
+  // ✅ NEW: report modal khulte hi background page ko static karo
+useEffect(() => {
+  if (reportingPostId) {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }
+}, [reportingPostId]);
+
+
+
+
+
+  useEffect(() => {
+    if (!actionToast) return;
+    const t = setTimeout(() => setActionToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [actionToast]);
+
 
   useEffect(() => {
     setVisibleCommentsCount(3);
@@ -650,6 +981,29 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
     const post = posts.find((p: any) => (p.entryId || p.postId) === postId);
     if (!post) return;
 
+
+    if (action === 'copy') {
+      try {
+        const postUrl = window.location.origin + '/post/' + postId;
+        await navigator.clipboard.writeText(postUrl);
+        setActionToast({ message: 'Link copied to clipboard.', linkText: 'View post', onLinkClick: () => window.open(postUrl, '_blank') }); // ✅ replaced alert
+      } catch (err) {
+        console.error('Failed to copy text: ', err);
+      }
+      return;
+    }
+
+    if (action === 'embed') {
+      try {
+        const embedCode = '<iframe src="' + window.location.origin + '/post/' + postId + '/embed" width="504" height="600" frameborder="0" style="border: 1px solid #e0d8cf; border-radius: 8px;"></iframe>';
+        await navigator.clipboard.writeText(embedCode);
+        setActionToast({ message: 'Embed code copied to clipboard.' }); // ✅ replaced alert
+      } catch (err) {
+        console.error('Failed to copy embed code: ', err);
+      }
+      return;
+    }
+
     if (action === 'pin') {
       await handlers.handlePinPost(postId, post.isPinned || false);
       return;
@@ -841,7 +1195,8 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
                       if (item.type === 'repost') {
                         return (
                           // <div key={'repost-' + item.data.repostId} className="w-[calc(100%-16px)] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-11px)] flex-shrink-0 flex flex-col h-[560px]">
-<div key={'repost-' + item.data.repostId} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col h-[500px]">                            <RepostCard
+<div key={'repost-' + item.data.repostId} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col h-[500px]">                            
+                          <RepostCard
                               repost={item.data}
                               onDeleteRepost={onDeleteRepost}
                               profileImage={profileImage}
@@ -851,10 +1206,17 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
                               handlers={handlers}
                               openRepostCommentsKey={openRepostCommentsKey}
                               setOpenRepostCommentsKey={setOpenRepostCommentsKey}
+                              onReportPost={(pid: string) => setReportingPostId(pid)}
+
                             />
+
                           </div>
+
+                          
                         );
                       }
+
+                      
 
                       const post = item.data;
                       const postKey = post.entryId || post.postId;
@@ -944,6 +1306,9 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
                             fetchCommentsByPost={handlers.fetchCommentsByPost}
                           />
                         </div>
+
+
+
                       );
                     })}
                   </div>
@@ -1121,9 +1486,11 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
             setReportSubmitting(true);
             try {
               await ReportService.reportPost(reportingPostId, reason);
-              alert('Post reported. Thank you for helping keep our community safe.');
-            } catch (err: any) {
-              alert('Report received. Our team will review it shortly.');
+              setActionToast({ message: 'Post reported. Thank you for helping keep our community safe.' }); // ✅ replaced alert
+
+              } catch (err: any) {
+             setActionToast({ message: 'Report received. Our team will review it shortly.' }); // ✅ replaced alert
+
             } finally {
               setReportSubmitting(false);
               setReportingPostId(null);
@@ -1261,6 +1628,27 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
           <span className="text-sm font-medium">{undoToast.message}</span>
           <button onClick={handleUndoAction} className="text-sm font-bold underline hover:text-white transition-colors">Undo</button>
           <button onClick={() => setUndoToast(null)} className="text-[#f6ede8]/60 hover:text-[#f6ede8] ml-1">x</button>
+        </div>
+      ) : null}
+
+
+
+{actionToast ? (
+        <div className="fixed bottom-6 left-6 z-[3000] bg-white rounded-xl shadow-2xl border border-[#e0d8cf] px-4 py-3 flex items-center gap-3">
+          <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="text-sm text-[#4a3728] font-medium">
+            {actionToast.message}{' '}
+            {actionToast.linkText && (
+              <button onClick={actionToast.onLinkClick} className="underline font-semibold">{actionToast.linkText}</button>
+            )}
+          </span>
+          <button onClick={() => setActionToast(null)} className="text-[#4a3728]/40 hover:text-[#4a3728] ml-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       ) : null}
     </>

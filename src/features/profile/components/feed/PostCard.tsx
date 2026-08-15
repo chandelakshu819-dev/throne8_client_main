@@ -12,7 +12,7 @@ import { usePostImpressionTracking } from '@/features/public/hooks/analytics/use
 import { ReactionType } from '@/types/profile.types';
 
 const PostCard = ({
-  fullName, headline, postLikes, openMenuId, setOpenMenuId, onLikeToggle, onPinPost, onSavePost, onDeletePost, onArchivePost, onOpenUpdateModal, onToggleComments, commentsByPost, isLoadingComments, isSubmittingComment, commentLikes, formatCommentTime, isDeletingCommentId, setIsDeletingCommentId, replyingToCommentId, setReplyingToCommentId, currentUserId, post, index, isOwnProfile = true, isDarkMode, likedPosts, handleLike, openMenuIndex, openRepostIndex, openCommentsIndex, commentText, setCommentText, replyingTo, openCommentMenuIndex, editingCommentId, editCommentText, setEditCommentText, showEmojiPicker, setShowEmojiPicker, handlePostAction, handleRepost, toggleComments, handleCommentSubmit, handleReply, handleCommentReaction, toggleCommentMenu, handleCommentAction, handleEditSubmit, handleEmojiClick, postComments, emojiList, togglePostMenu, toggleRepostMenu, postCommentCounts, profileImage, onOpenWithPerspectiveModal, handleRepostInstant, replyText, setReplyText, handleReplySubmit, likeCommentToggle, commentLikeStatus, setReplyingTo,
+  fullName, headline, postLikes, openMenuId, setOpenMenuId, onLikeToggle, onPinPost, onSavePost, onDeletePost, onArchivePost, onOpenUpdateModal, onToggleComments, commentsByPost, isLoadingComments, isSubmittingComment, commentLikes, formatCommentTime, isDeletingCommentId, setIsDeletingCommentId, replyingToCommentId, setReplyingToCommentId, currentUserId, post, index, isOwnProfile = true, isDarkMode, likedPosts, handleLike, openMenuIndex, openRepostIndex, openCommentsIndex, commentText, setCommentText, replyingTo, openCommentMenuIndex, editingCommentId, editCommentText, setEditCommentText, showEmojiPicker, setShowEmojiPicker, handlePostAction, handleRepost, toggleComments, handleCommentSubmit, handleReply, handleCommentReaction, toggleCommentMenu, handleCommentAction, handleEditSubmit, handleEmojiClick, postComments, emojiList, togglePostMenu, toggleRepostMenu, postCommentCounts, profileImage, onOpenWithPerspectiveModal, handleRepostInstant, replyText, setReplyText, handleReplySubmit, likeCommentToggle, commentLikeStatus, setReplyingTo,showMenu = true, 
   // ✅ ADDED: reaction system props — must be accepted here or JSX below throws
   // "postReactions is not defined" since it's used in the PostActions call.
   postReactions, onReact, fetchCommentsByPost,
@@ -22,6 +22,8 @@ const PostCard = ({
   postReactions?: Record<string, { counts: any; userReaction: ReactionType | null }>;
   onReact?: (postId: string, type: ReactionType) => void;
   fetchCommentsByPost?: (postId: string, ownerId?: string) => Promise<void>;
+  showMenu?: boolean; // ✅ NEW
+
 }) => {
   const { trackPostImpression } = usePostImpressionTracking();
   const postKey = post.entryId || post.postId;
@@ -82,6 +84,8 @@ const PostCard = ({
             fullName={fullName}
             profileImage={profileImage}
             headline={headline}
+            showMenu={showMenu} // ✅ NEW
+
           />
 
           {/* Click on post body opens the LinkedIn-style expanded modal */}
