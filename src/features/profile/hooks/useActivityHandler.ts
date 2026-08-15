@@ -38,6 +38,13 @@ export const useActivityHandlers = ({
     const [postLikes, setPostLikes] = useState<PostLikeState>({});
     // ✅ ADDED: multi-reaction state, keyed by postId (same key as postLikes)
     const [postReactions, setPostReactions] = useState<Record<string, PostReactionState>>({});
+    // ✅ NEW: local save-state, keyed by postId — same pattern as postLikes,
+    // avoids a full posts refetch (which was resetting scroll to the top).
+    const [postSaves, setPostSaves] = useState<Record<string, boolean>>({});
+    // ✅ NEW: local pin-state, keyed by postId — same pattern, so Pin/Unpin
+    // toggles the label instantly and lets ActivitySection re-sort pinned-first
+    // without waiting for a full posts refetch.
+    const [postPins, setPostPins] = useState<Record<string, boolean>>({});
     const [openCommentsIndex, setOpenCommentsIndex] = useState<number | null>(null);
 
     // ── Comment UI state ───────────────────────────────────────────
@@ -69,6 +76,8 @@ export const useActivityHandlers = ({
     useEffect(() => {
         const likesMap: PostLikeState = {};
         const reactionsMap: Record<string, PostReactionState> = {};
+        const savesMap: Record<string, boolean> = {}; // ✅ NEW
+        const pinsMap: Record<string, boolean> = {}; // ✅ NEW
         posts.forEach(post => {
             const key = post.entryId || post.postId;
             likesMap[key] = {
@@ -80,9 +89,13 @@ export const useActivityHandlers = ({
                 counts: (post as any).reactionCounts || EMPTY_REACTION_COUNTS,
                 userReaction: (post as any).userReaction ?? (post.isLiked ? 'like' : null),
             };
+            savesMap[key] = (post as any).isSaved || false; // ✅ NEW
+            pinsMap[key] = (post as any).isPinned || false; // ✅ NEW
         });
         setPostLikes(likesMap);
         setPostReactions(reactionsMap);
+        setPostSaves(savesMap); // ✅ NEW
+        setPostPins(pinsMap); // ✅ NEW
     }, [posts]);
 
     // ✅ NEW: seed like-state for a post that does NOT belong to the current
@@ -114,7 +127,6 @@ export const useActivityHandlers = ({
     };
 
     const handleDeletePost = async (postId: string) => {
-        if (!confirm('Are you sure you want to delete this post?')) return;
         try {
             setDeletingPostId(postId);
             await ProfileService.deletePost(postId, false);
@@ -126,6 +138,7 @@ export const useActivityHandlers = ({
             setOpenMenuId(null);
         }
     };
+    
 
     const handleArchivePost = async (postId: string) => {
         try {
@@ -140,37 +153,37 @@ export const useActivityHandlers = ({
     };
 
     const handlePinPost = async (postId: string, currentPinState: boolean) => {
+        // ✅ FIX: optimistic local toggle (jaise save/unsave) — isse label
+        // turant "Pin to profile" <-> "Unpin from profile" switch hota hai
+        // aur ActivitySection turant pinned post ko sabse aage la sakta hai,
+        // bina poora posts list refetch kiye.
+        setPostPins(prev => ({ ...prev, [postId]: !currentPinState }));
         try {
             await ProfileService.pinPost(postId, !currentPinState);
-            onPostCreated?.();
         } catch (error: any) {
-            alert(error.message || 'Failed to pin post');
+            setPostPins(prev => ({ ...prev, [postId]: currentPinState })); // revert
+            throw error;
         }
     };
 
-    // const handleSavePost = async (postId: string, currentSaveState: boolean) => {
-    //     try {
-    //         await ProfileService.savePost(postId, !currentSaveState);
-    //         onPostCreated?.();
-    //     } catch (error: any) {
-    //         alert(error.message || 'Failed to save post');
-    //     }
-    // };
 
 
     const handleSavePost = async (postId: string, alreadySaved: boolean) => {
+        // ✅ FIX: ProfileService me alag "unsavePost" method exist hi nahi karta —
+        // ek hi combined "savePost(postId, isSaved)" hai jo backend ko
+        // { isSaved: true/false } bhejta hai. Pehle hum non-existent
+        // unsavePost() call kar rahe the jo turant TypeError deta tha aur
+        // silently revert ho jaata tha — isliye Unsave kabhi kaam nahi karta tha.
+        setPostSaves(prev => ({ ...prev, [postId]: !alreadySaved }));
         try {
-          if (alreadySaved) {
-            await ProfileService.unsavePost(postId);
-          } else {
-            await ProfileService.savePost(postId);
-          }
-        
-          // ❌ remove: alert('Post entry not found')
+          await ProfileService.savePost(postId, !alreadySaved);
         } catch (err) {
-          throw err; // RepostCard already reverts optimistic state on throw
+          setPostSaves(prev => ({ ...prev, [postId]: alreadySaved })); // revert
+          throw err;
         }
       };
+
+
 
     const handleLikeToggle = async (postId: string) => {
         const currentLike = postLikes[postId] || { count: 0, isLiked: false };
@@ -342,6 +355,8 @@ export const useActivityHandlers = ({
         deletingPostId,
         archivingPostId,
         postLikes,
+        postSaves, // ✅ NEW — exposed so ActivitySection/PostCard can read save state
+        postPins, // ✅ NEW — exposed so ActivitySection/PostCard can read pin state
         seedPostLikeState, // ✅ NEW — exposed for RepostCard to seed original-post like state
         postReactions,
         handleReaction,

@@ -4,10 +4,10 @@ import { useRouter } from 'next/navigation';
 import PostMenuDropdown from './PostMenuDropdown';
 
 const PostHeader = ({
-  post, index, isDarkMode, openMenuIndex, togglePostMenu, handlePostAction, currentUserId, fullName, profileImage, headline, isOwnProfile, showMenu = true,
+  post, index, isDarkMode, openMenuIndex, togglePostMenu, handlePostAction, currentUserId, fullName, profileImage, headline, isOwnProfile, showMenu = true, isSaved = false, isPinned = false,
 }: {
   post: any; index: string; isDarkMode: boolean; openMenuIndex: string | null; togglePostMenu: (index: string) => void; handlePostAction: (action: string, index: string) => void; currentUserId: string;
-  fullName?: string; profileImage?: string; headline?: string; isOwnProfile?: boolean; showMenu?: boolean;
+  fullName?: string; profileImage?: string; headline?: string; isOwnProfile?: boolean; showMenu?: boolean; isSaved?: boolean; isPinned?: boolean; // ✅ NEW
 }) => {
   const router = useRouter();
   const isOwnPost = post.userId && currentUserId && post.userId === currentUserId;
@@ -44,13 +44,19 @@ const PostHeader = ({
           <p className="text-sm font-semibold bg-gradient-to-r from-[#6b5643] to-[#8b7355] bg-clip-text text-transparent">
             {post.role || headline || ''}
           </p>
-          <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
+          <p className={`text-xs flex items-center gap-1.5 ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
             {post.time}
+            {isPinned ? (
+              <span className={`inline-flex items-center gap-1 font-semibold ${isDarkMode ? 'text-slate-300' : 'text-[#4a3728]'}`}>
+                <i className="ri-pushpin-fill text-xs"></i>
+                Pinned
+              </span>
+            ) : null}
           </p>
         </div>
       </div>
       {showMenu && (
-        <div className="relative post-menu">
+  <div className="relative post-menu post-menu-container">
           <button
             onClick={() => togglePostMenu(index)}
             className={`p-2 rounded-xl transition-all duration-300 post-menu-trigger ${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-[#e0d8cf]/50'}`}
@@ -64,8 +70,11 @@ const PostHeader = ({
               handlePostAction={handlePostAction}
               post={post}
               currentUserId={currentUserId}
+              isSaved={isSaved} // ✅ NEW
+              isPinned={isPinned} // ✅ NEW
             />
           )}
+         
         </div>
       )}
     </div>

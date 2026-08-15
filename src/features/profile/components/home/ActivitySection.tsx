@@ -20,10 +20,12 @@ import ProfileService from '@/lib/api/profile.service';
 import AuthService from '@/lib/api/auth.service';
 import FollowService from '@/lib/api/follow.service';
 import ReportService from '@/lib/api/report.service';
+import AnalyticsService from '@/lib/api/analytics.service'; // ✅ NEW — real post analytics ke liye
 import RepostService from '@/lib/api/repost.service'; // ✅ NEW
 import PostHeader from '../feed/PostHeader'; // ✅ NEW — embed preview ke liye
 import PostContent from '../feed/PostContent'; // ✅ NEW — embed preview ke liye
 import ReactionsModal from '../feed/ReactionsModal'; // ✅ NEW — embed preview ke likes modal ke liye
+import DeleteConfirmModal from './DeleteConfirmModal';
 
 const EmptyState = ({ label }: { label: string }) => {
   return (
@@ -114,6 +116,8 @@ const RepostCard = (props: any) => {
   const menuRef = useRef<HTMLDivElement>(null);   // 👈 NEW
   const [isThoughtExpanded, setIsThoughtExpanded] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);   // ✅ yaha le aao
+
   const [originalAuthorName, setOriginalAuthorName] = useState('');
   const [originalAuthorHeadline, setOriginalAuthorHeadline] = useState('');
   const [originalAuthorAvatar, setOriginalAuthorAvatar] = useState('');
@@ -128,6 +132,10 @@ const RepostCard = (props: any) => {
 
    const [showEmbedLikesModal, setShowEmbedLikesModal] = useState(false);
 const [showEmbedComments, setShowEmbedComments] = useState(false);
+
+
+const [deleteConfirmPostId, setDeleteConfirmPostId] = useState<string | null>(null);
+const [isDeletingConfirmed, setIsDeletingConfirmed] = useState(false);
 
 
   const originalPost = repost.originalPost;
@@ -233,19 +241,23 @@ useEffect(() => {
 
   if (!originalPost) return null;
 
-  const handleDeleteRepost = async () => {
-    if (!confirm('Remove this repost?')) return;
-    try {
-      setIsDeleting(true);
-      if (onDeleteRepost) await onDeleteRepost(repost.repostId);
-    } catch (err) {
-      alert('Failed to remove repost');
-    } finally {
-      setIsDeleting(false);
-      setOpenMenuId(null);
-    }
-  };
 
+const handleDeleteRepost = () => {
+  setOpenMenuId(null);
+  setShowDeleteConfirm(true);
+};
+
+const confirmDeleteRepost = async () => {
+  try {
+    setIsDeleting(true);
+    if (onDeleteRepost) await onDeleteRepost(repost.repostId);
+  } catch (err) {
+    alert('Failed to remove repost');
+  } finally {
+    setIsDeleting(false);
+    setShowDeleteConfirm(false);
+  }
+};
 
   const handleCopyLink = async () => {
     setOpenMenuId(null);
@@ -677,9 +689,20 @@ const postForCard = isQuote
     isDarkMode={false}
   />
 ) : null}
+
+<DeleteConfirmModal
+        isOpen={showDeleteConfirm}
+        onCancel={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDeleteRepost}
+        isDeleting={isDeleting}
+        message="Are you sure you want to delete this repost permanently?"
+      />
     </div>
   );
 };
+
+
+
   
 
 const VideoCard = ({ post, video }: { post: any; video: any }) => {
@@ -756,6 +779,9 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
   const [userComments, setUserComments] = useState<any[]>([]);
   const [isLoadingUserComments, setIsLoadingUserComments] = useState(false);
   const [selectedAnalyticsPost, setSelectedAnalyticsPost] = useState<any>(null);
+  // ✅ NEW: real backend analytics ke liye state (post.viewsCount jaisa stale field use nahi karenge)
+  const [analyticsData, setAnalyticsData] = useState<{ impressions: number; likes: number; comments: number; shares: number } | null>(null);
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   const [visibleCommentsCount, setVisibleCommentsCount] = useState(3);
   const [visibleImagesCount, setVisibleImagesCount] = useState(3);
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
@@ -765,27 +791,105 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
   const [openRepostCommentsKey, setOpenRepostCommentsKey] = useState<string | null>(null);
   const [actionToast, setActionToast] = useState<{ message: string; linkText?: string; onLinkClick?: () => void } | null>(null); // ✅ NEW
 
+  // ✅ NEW: normal post ke liye embed preview modal (RepostCard jaisa)
+  const [embedPostId, setEmbedPostId] = useState<string | null>(null);
+  const [showEmbedModal, setShowEmbedModal] = useState(false);
+  const [embedFullText, setEmbedFullText] = useState(false);
+  const [showEmbedLikesModal, setShowEmbedLikesModal] = useState(false);
+  const [showEmbedComments, setShowEmbedComments] = useState(false);
 
-  // ✅ NEW: report modal khulte hi background page ko static karo
+
+  const [deleteConfirmPostId, setDeleteConfirmPostId] = useState<string | null>(null);
+  const [isDeletingConfirmed, setIsDeletingConfirmed] = useState(false);
+
+ 
+  useEffect(() => {
+    if (reportingPostId) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [reportingPostId]);
+  
+  // ✅ NEW: embed modal khulte hi background page ko scroll hone se roko
+  useEffect(() => {
+    if (showEmbedModal) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [showEmbedModal]);
+
+
+
+
 useEffect(() => {
-  if (reportingPostId) {
+  if (!actionToast) return;
+  const t = setTimeout(() => setActionToast(null), 4000);
+  return () => clearTimeout(t);
+}, [actionToast]);
+
+// ✅ NEW: post analytics modal khulte hi background page ko scroll hone se roko
+useEffect(() => {
+  if (selectedAnalyticsPost) {
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = originalOverflow;
     };
   }
-}, [reportingPostId]);
+}, [selectedAnalyticsPost]);
 
+// ✅ NEW: modal khulte hi backend se REAL analytics fetch karo — post.viewsCount
+// hamesha stale/0 tha kyunki wo kabhi backend se aata hi nahi tha
+useEffect(() => {
+  if (!selectedAnalyticsPost) {
+    setAnalyticsData(null);
+    return;
+  }
+  const postId = selectedAnalyticsPost.entryId || selectedAnalyticsPost.postId;
+  if (!postId) return;
 
+  let cancelled = false;
+  setIsLoadingAnalytics(true);
+  AnalyticsService.getPostAnalytics(postId)
+    .then((res: any) => {
+      if (cancelled) return;
+      const d = res?.data || res || {};
+      setAnalyticsData({
+        impressions: d.impressions ?? d.viewsCount ?? d.totalImpressions ?? 0,
+        likes: d.likes ?? d.likesCount ?? selectedAnalyticsPost.likesCount ?? 0,
+        comments: d.comments ?? d.commentsCount ?? selectedAnalyticsPost.commentsCount ?? 0,
+        shares: d.shares ?? d.sharesCount ?? 0,
+      });
+    })
+    .catch((err) => {
+      console.error('Failed to load post analytics:', err);
+      if (!cancelled) {
+        // fallback: jo bhi post object me already hai wahi dikha do
+        setAnalyticsData({
+          impressions: 0,
+          likes: selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0,
+          comments: selectedAnalyticsPost.commentsCount || 0,
+          shares: 0,
+        });
+      }
+    })
+    .finally(() => {
+      if (!cancelled) setIsLoadingAnalytics(false);
+    });
 
+  return () => { cancelled = true; };
+}, [selectedAnalyticsPost]);
 
-
-  useEffect(() => {
-    if (!actionToast) return;
-    const t = setTimeout(() => setActionToast(null), 4000);
-    return () => clearTimeout(t);
-  }, [actionToast]);
+// ✅ NEW: engagement % real fetched data se calculate hoga
+const engagementPercent = analyticsData
+  ? Number((((analyticsData.likes + analyticsData.comments + analyticsData.shares) / Math.max(1, analyticsData.impressions)) * 100).toFixed(1))
+  : 0;
 
 
   useEffect(() => {
@@ -837,11 +941,20 @@ useEffect(() => {
   });
   const hasMorePosts = (filteredPosts.length + userReposts.length) > 2;
 
-  // ✅ FIX: createdAt ke hisaab se real chronological order
+ // ✅ FIX: pehle pinned post(s) sabse upar, uske baad baaki createdAt
+  // ke hisaab se real chronological order (jaise pehle tha)
   const combinedItems = [
     ...userReposts.map((repost: any) => ({ type: 'repost' as const, data: repost, createdAt: repost.createdAt })),
     ...filteredPosts.map((post: any) => ({ type: 'post' as const, data: post, createdAt: post.createdAt })),
-  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  ].sort((a, b) => {
+    const aKey = a.type === 'post' ? (a.data.entryId || a.data.postId) : null;
+    const bKey = b.type === 'post' ? (b.data.entryId || b.data.postId) : null;
+    const aPinned = aKey ? (handlers.postPins[aKey] ?? a.data.isPinned ?? false) : false;
+    const bPinned = bKey ? (handlers.postPins[bKey] ?? b.data.isPinned ?? false) : false;
+    if (aPinned !== bPinned) return aPinned ? -1 : 1; // pinned wala pehle
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
@@ -981,33 +1094,40 @@ useEffect(() => {
     const post = posts.find((p: any) => (p.entryId || p.postId) === postId);
     if (!post) return;
 
-
     if (action === 'copy') {
       try {
         const postUrl = window.location.origin + '/post/' + postId;
         await navigator.clipboard.writeText(postUrl);
-        setActionToast({ message: 'Link copied to clipboard.', linkText: 'View post', onLinkClick: () => window.open(postUrl, '_blank') }); // ✅ replaced alert
+        setActionToast({ message: 'Link copied to clipboard.', linkText: 'View post', onLinkClick: () => window.open(postUrl, '_blank') });
       } catch (err) {
         console.error('Failed to copy text: ', err);
+        setActionToast({ message: 'Failed to copy link.' });
       }
       return;
     }
 
     if (action === 'embed') {
+      // ✅ FIX: seedha clipboard copy nahi — RepostCard jaisa preview modal kholo
+      setEmbedPostId(postId);
+      setShowEmbedModal(true);
+      return;
+
+    }
+
+
+    if (action === 'pin') {
+      // ✅ FIX: read from local postPins state (not stale post.isPinned prop)
+      const wasPinned = handlers.postPins[postId] ?? post.isPinned ?? false;
       try {
-        const embedCode = '<iframe src="' + window.location.origin + '/post/' + postId + '/embed" width="504" height="600" frameborder="0" style="border: 1px solid #e0d8cf; border-radius: 8px;"></iframe>';
-        await navigator.clipboard.writeText(embedCode);
-        setActionToast({ message: 'Embed code copied to clipboard.' }); // ✅ replaced alert
+        await handlers.handlePinPost(postId, wasPinned);
+        setActionToast({ message: wasPinned ? 'Post unpinned.' : 'Post pinned to profile.' });
       } catch (err) {
-        console.error('Failed to copy embed code: ', err);
+        setActionToast({ message: 'Failed to pin post.' });
       }
       return;
     }
 
-    if (action === 'pin') {
-      await handlers.handlePinPost(postId, post.isPinned || false);
-      return;
-    }
+
 
     if (action === 'edit') {
       const idx = posts.findIndex((p: any) => (p.entryId || p.postId) === postId);
@@ -1019,39 +1139,32 @@ useEffect(() => {
     }
 
     if (action === 'save') {
-      await handlers.handleSavePost(postId, post.isSaved || false);
+      const wasSaved = handlers.postSaves[postId] ?? post.isSaved ?? false;
+      try {
+        await handlers.handleSavePost(postId, wasSaved);
+        setActionToast({ message: wasSaved ? 'Post unsaved.' : 'Post saved.' });
+      } catch (err: any) {
+        console.error('Save/unsave failed:', err); // debug ke liye — dekh sakte ho actual backend error kya hai
+        // ✅ FIX: pehle hardcoded "Failed to save post." tha chahe save fail ho
+        // ya unsave — ab action ke hisaab se sahi message dikhega
+        setActionToast({ message: wasSaved ? 'Failed to unsave post.' : 'Failed to save post.' });
+      }
       return;
     }
 
+
+
     if (action === 'delete') {
-      await handlers.handleDeletePost(postId);
+      // ✅ ab confirm() nahi — custom modal khulega, user confirm karega tab delete hoga
+      setDeleteConfirmPostId(postId);
       return;
     }
+
+
 
     if (action === 'archive' || action === 'hide') {
       await handlers.handleArchivePost(postId);
-      return;
-    }
-
-    if (action === 'copy') {
-      try {
-        const postUrl = window.location.origin + '/post/' + postId;
-        await navigator.clipboard.writeText(postUrl);
-        alert('Post link copied to clipboard!');
-      } catch (err) {
-        console.error('Failed to copy text: ', err);
-      }
-      return;
-    }
-
-    if (action === 'embed') {
-      try {
-        const embedCode = '<iframe src="' + window.location.origin + '/post/' + postId + '/embed" width="504" height="600" frameborder="0" style="border: 1px solid #e0d8cf; border-radius: 8px;"></iframe>';
-        await navigator.clipboard.writeText(embedCode);
-        alert('Embed iframe code copied to clipboard!');
-      } catch (err) {
-        console.error('Failed to copy embed code: ', err);
-      }
+      setActionToast({ message: 'Post archived.' });
       return;
     }
 
@@ -1111,6 +1224,20 @@ useEffect(() => {
     if (action === 'report') {
       setReportingPostId(postId);
       return;
+    }
+  };
+
+
+  const confirmDeletePost = async () => {
+    if (!deleteConfirmPostId) return;
+    try {
+      setIsDeletingConfirmed(true);
+      await handlers.handleDeletePost(deleteConfirmPostId);
+    } catch (err) {
+      setActionToast({ message: 'Failed to delete post.' });
+    } finally {
+      setIsDeletingConfirmed(false);
+      setDeleteConfirmPostId(null);
     }
   };
 
@@ -1283,6 +1410,8 @@ useEffect(() => {
                             currentUserId={currentUserId || ''}
                             isDarkMode={undefined}
                             likedPosts={handlers.postLikes}
+                            postSaves={handlers.postSaves}
+                            postPins={handlers.postPins}
                             handleLike={handlers.handleLikeToggle}
                             openMenuIndex={handlers.openMenuId}
                             openRepostIndex={openRepostIndex}
@@ -1500,127 +1629,253 @@ useEffect(() => {
         />
       ) : null}
 
-      {selectedAnalyticsPost ? (
+{selectedAnalyticsPost ? (
         <div onClick={() => setSelectedAnalyticsPost(null)} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-slate-800 w-full max-w-md rounded-3xl p-8 shadow-2xl border border-[#e0d8cf]/50 dark:border-slate-700/50 relative text-[#4a3728] dark:text-slate-100">
-            <button onClick={() => setSelectedAnalyticsPost(null)} className="absolute top-4 right-4 p-2.5 rounded-full hover:bg-[#e0d8cf]/40 dark:hover:bg-slate-700/50 transition-colors text-[#4a3728]/70 dark:text-slate-400">
+          <div onClick={(e) => e.stopPropagation()} className="bg-[#f6ede8] w-full max-w-md rounded-3xl p-8 shadow-2xl border border-[#e0d8cf] relative text-[#4a3728]">
+            <button onClick={() => setSelectedAnalyticsPost(null)} className="absolute top-4 right-4 p-2.5 rounded-full hover:bg-[#e0d8cf]/50 transition-colors text-[#4a3728]/70">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
 
             <div className="flex items-center gap-2 mb-6">
-              <div className="p-2 bg-[#4a3728] text-white rounded-xl">
+              <div className="p-2 bg-[#4a3728] text-[#f6ede8] rounded-xl">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <h2 className="text-xl font-black text-[#4a3728] dark:text-white">Post Analytics</h2>
+              <h2 className="text-xl font-black text-[#4a3728]">Post Analytics</h2>
             </div>
 
-            <div className="mb-6 bg-[#e0d8cf]/10 dark:bg-slate-700/30 border border-[#e0d8cf]/30 dark:border-slate-700/50 rounded-2xl p-4">
-              <p className="text-xs font-bold text-[#4a3728]/50 dark:text-slate-400/60 uppercase tracking-wider mb-1">Post Caption</p>
-              <p className="text-sm font-semibold text-[#4a3728] dark:text-slate-200 line-clamp-2 italic">
+            <div className="mb-6 bg-white/60 border border-[#e0d8cf]/60 rounded-2xl p-4">
+              <p className="text-xs font-bold text-[#4a3728]/50 uppercase tracking-wider mb-1">Post Caption</p>
+              <p className="text-sm font-semibold text-[#4a3728] line-clamp-2 italic">
                 {selectedAnalyticsPost.content || selectedAnalyticsPost.text || 'No text content'}
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/40 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
-                <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  Impressions
-                </span>
-                <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                  {selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 0}
-                </span>
+            {isLoadingAnalytics ? (
+              <div className="flex justify-center items-center py-10">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4a3728]" />
               </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="p-4 bg-white/60 border border-[#e0d8cf]/60 rounded-2xl flex flex-col justify-between">
+                    <span className="text-xs font-bold text-[#4a3728]/60 flex items-center gap-1.5 mb-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      Impressions
+                    </span>
+                    <span className="text-3xl font-black tracking-tight text-[#4a3728]">
+                      {analyticsData?.impressions ?? 0}
+                    </span>
+                  </div>
 
-              <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/40 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
-                <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                  Likes
-                </span>
-                <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                  {selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0}
-                </span>
-              </div>
+                  <div className="p-4 bg-white/60 border border-[#e0d8cf]/60 rounded-2xl flex flex-col justify-between">
+                    <span className="text-xs font-bold text-[#4a3728]/60 flex items-center gap-1.5 mb-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                      Likes
+                    </span>
+                    <span className="text-3xl font-black tracking-tight text-[#4a3728]">
+                      {analyticsData?.likes ?? (selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0)}
+                    </span>
+                  </div>
 
-              <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/40 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
-                <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                  Comments
-                </span>
-                <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                  {selectedAnalyticsPost.commentsCount || 0}
-                </span>
-              </div>
+                  <div className="p-4 bg-white/60 border border-[#e0d8cf]/60 rounded-2xl flex flex-col justify-between">
+                    <span className="text-xs font-bold text-[#4a3728]/60 flex items-center gap-1.5 mb-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      Comments
+                    </span>
+                    <span className="text-3xl font-black tracking-tight text-[#4a3728]">
+                      {analyticsData?.comments ?? (selectedAnalyticsPost.commentsCount || 0)}
+                    </span>
+                  </div>
 
-              <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/40 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
-                <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  Engagement
-                </span>
-                <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                  {(
-                    ((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) +
-                      (selectedAnalyticsPost.commentsCount || 0) +
-                      (selectedAnalyticsPost.sharesCount || selectedAnalyticsPost.shares || 0)) /
-                    (selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 1) *
-                    100
-                  ).toFixed(1)}%
-                </span>
-              </div>
-            </div>
+                  <div className="p-4 bg-white/60 border border-[#e0d8cf]/60 rounded-2xl flex flex-col justify-between">
+                    <span className="text-xs font-bold text-[#4a3728]/60 flex items-center gap-1.5 mb-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Engagement
+                    </span>
+                    <span className="text-3xl font-black tracking-tight text-[#4a3728]">
+                      {engagementPercent}%
+                    </span>
+                  </div>
+                </div>
 
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs font-bold text-[#4a3728]/60 dark:text-slate-400">
-                <span>Engagement Level</span>
-                <span className="text-[#4a3728] dark:text-white">
-                  {Math.min(
-                    100,
-                    Math.round(
-                      ((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) +
-                        (selectedAnalyticsPost.commentsCount || 0) +
-                        (selectedAnalyticsPost.sharesCount || selectedAnalyticsPost.shares || 0)) /
-                        (selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 1) *
-                        100 *
-                        2
-                    )
-                  )}%
-                </span>
-              </div>
-              <div className="w-full h-3 bg-[#e0d8cf]/30 dark:bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-[#8b7355] to-[#4a3728] dark:from-[#9d8466] dark:to-white rounded-full transition-all duration-1000"
-                  style={{
-                    width:
-                      Math.min(
-                        100,
-                        Math.round(
-                          ((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) +
-                            (selectedAnalyticsPost.commentsCount || 0) +
-                            (selectedAnalyticsPost.sharesCount || selectedAnalyticsPost.shares || 0)) /
-                            (selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 1) *
-                            100 *
-                            2
-                        )
-                      ) + '%',
-                  }}
-                />
-              </div>
-            </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold text-[#4a3728]/60">
+                    <span>Engagement Level</span>
+                    <span className="text-[#4a3728]">{Math.min(100, Math.round(engagementPercent * 2))}%</span>
+                  </div>
+                  <div className="w-full h-3 bg-[#e0d8cf]/50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-[#8b7355] to-[#4a3728] rounded-full transition-all duration-1000"
+                      style={{ width: Math.min(100, Math.round(engagementPercent * 2)) + '%' }}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
+      ) : null}
+
+
+
+
+
+      {/* ✅ NEW: normal post ke liye embed preview modal — RepostCard wale se hubahu */}
+      {showEmbedModal && embedPostId ? (() => {
+        const embedPost = posts.find((p: any) => (p.entryId || p.postId) === embedPostId);
+        if (!embedPost) return null;
+        const embedPostKey = embedPost.entryId || embedPost.postId;
+        return createPortal(
+          <div onClick={() => setShowEmbedModal(false)} className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div onClick={(e) => e.stopPropagation()} className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl border border-[#e0d8cf] relative flex flex-col max-h-[85vh]">
+              <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                <h2 className="text-lg font-bold text-[#4a3728]">Embed this post</h2>
+                <button onClick={() => setShowEmbedModal(false)} className="p-1.5 rounded-full hover:bg-[#e0d8cf]/50 text-[#4a3728]/60">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <p className="text-sm text-[#4a3728]/60 mb-2 flex-shrink-0">Copy and paste embed code on your site</p>
+
+              <div className="flex items-center gap-2 mb-4 flex-shrink-0">
+                <input
+                  readOnly
+                  value={'<iframe src="' + window.location.origin + '/post/' + embedPostKey + '/embed" width="504" height="600" frameborder="0"></iframe>'}
+                  className="flex-1 px-3 py-2 rounded-lg border border-[#e0d8cf] text-xs text-[#4a3728]/70 bg-[#f6ede8]/50 truncate"
+                />
+                <button
+                  onClick={async () => {
+                    const embedCode = '<iframe src="' + window.location.origin + '/post/' + embedPostKey + '/embed" width="504" height="600" frameborder="0"></iframe>';
+                    try {
+                      await navigator.clipboard.writeText(embedCode);
+                      setShowEmbedModal(false);
+                      setActionToast({ message: 'Embed code copied to clipboard.' });
+                    } catch (err) {
+                      setActionToast({ message: 'Failed to copy embed code.' });
+                    }
+                  }}
+                  className="px-4 py-2 bg-[#4a3728] text-white rounded-lg text-sm font-semibold hover:opacity-90 flex-shrink-0"
+                >
+                  Copy code
+                </button>
+              </div>
+
+              <div className="flex items-center gap-6 mb-4 flex-shrink-0">
+                <label className="flex items-center gap-2 text-sm text-[#4a3728] cursor-pointer">
+                  <input type="radio" checked={!embedFullText} onChange={() => setEmbedFullText(false)} className="accent-[#4a3728]" />
+                  Embed with less text
+                </label>
+                <label className="flex items-center gap-2 text-sm text-[#4a3728] cursor-pointer">
+                  <input type="radio" checked={embedFullText} onChange={() => setEmbedFullText(true)} className="accent-[#4a3728]" />
+                  Embed full post
+                </label>
+              </div>
+
+              <div className="rounded-xl border border-[#e0d8cf] overflow-y-auto flex-1 min-h-0 bg-white p-4">
+                <PostHeader
+                  post={{
+                    avatar: embedPost.avatar || profileImage,
+                    user: embedPost.user || fullName,
+                    role: embedPost.role || headline,
+                    time: new Date(embedPost.createdAt || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                    userId: embedPost.userId,
+                  }}
+                  index={embedPostKey}
+                  isDarkMode={false}
+                  openMenuIndex={null}
+                  togglePostMenu={() => {}}
+                  handlePostAction={() => {}}
+                  currentUserId={currentUserId || ''}
+                  showMenu={false}
+                />
+                <PostContent
+                  post={{
+                    content: embedPost.content || embedPost.title || '',
+                    image: embedPost.images?.[0]?.cloudinarySecureUrl || embedPost.image || '',
+                    videos: embedPost.videos,
+                    documents: embedPost.documents,
+                  }}
+                  isDarkMode={false}
+                  forceExpanded={embedFullText}
+                />
+                <div className="flex items-center justify-between text-xs text-[#4a3728]/60 border-t border-[#e0d8cf] pt-3 mt-2">
+                  <button type="button" onClick={() => setShowEmbedLikesModal(true)} className="hover:underline hover:text-[#4a3728] font-medium">
+                    {embedPost.likesCount || embedPost.likes || 0} likes
+                  </button>
+                  <span className="mx-1">·</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const next = !showEmbedComments;
+                      setShowEmbedComments(next);
+                      if (next && embedPostKey && !handlers.commentsByPost[embedPostKey]) {
+                        await handlers.fetchCommentsByPost(embedPostKey, embedPost.userId);
+                      }
+                    }}
+                    className="hover:underline hover:text-[#4a3728] font-medium"
+                  >
+                    {embedPost.commentsCount || 0} comments
+                  </button>
+                </div>
+
+                {showEmbedComments && embedPostKey ? (
+                  <div className="mt-3 border-t border-[#e0d8cf] pt-3">
+                    <CommentsSection
+                      postId={embedPostKey}
+                      comments={handlers.commentsByPost[embedPostKey] || []}
+                      isLoading={handlers.isLoadingComments}
+                      commentCount={embedPost.commentsCount || 0}
+                      profileImage={profileImage}
+                      openCommentMenuIndex={handlers.openCommentMenuIndex}
+                      toggleCommentMenu={handlers.toggleCommentMenu}
+                      handleCommentAction={handlers.handleCommentAction}
+                      editingCommentId={handlers.editingCommentId}
+                      editCommentText={handlers.editCommentText}
+                      setEditCommentText={handlers.setEditCommentText}
+                      commentText={handlers.commentText}
+                      setCommentText={handlers.setCommentText}
+                      handleCommentSubmit={() => handlers.handleCommentSubmit(embedPostKey)}
+                      handleReply={handlers.setReplyingToCommentId}
+                      handleCommentReaction={handlers.likeCommentToggle}
+                      replyingTo={handlers.replyingTo}
+                      setReplyingTo={handlers.setReplyingTo}
+                      showEmojiPicker={handlers.showEmojiPicker}
+                      setShowEmojiPicker={handlers.setShowEmojiPicker}
+                      handleEmojiClick={handlers.handleEmojiClick}
+                      currentUserId={currentUserId || ''}
+                      isDarkMode={false}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>,
+          document.body
+        );
+      })() : null}
+
+      {showEmbedLikesModal && embedPostId ? (
+        <ReactionsModal
+          postId={embedPostId}
+          isOpen={showEmbedLikesModal}
+          onClose={() => setShowEmbedLikesModal(false)}
+          isDarkMode={false}
+        />
       ) : null}
 
       {undoToast ? (
@@ -1631,7 +1886,13 @@ useEffect(() => {
         </div>
       ) : null}
 
-
+<DeleteConfirmModal
+        isOpen={!!deleteConfirmPostId}
+        onCancel={() => setDeleteConfirmPostId(null)}
+        onConfirm={confirmDeletePost}
+        isDeleting={isDeletingConfirmed}
+        message="Are you sure you want to delete this post permanently?"
+      />
 
 {actionToast ? (
         <div className="fixed bottom-6 left-6 z-[3000] bg-white rounded-xl shadow-2xl border border-[#e0d8cf] px-4 py-3 flex items-center gap-3">
