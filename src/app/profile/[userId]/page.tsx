@@ -394,9 +394,11 @@ export default function SearchUserProfilePage() {
             </div>
         );
     }
-
-    return (
-        <div className="min-h-screen bg-[#f6ede8] py-12 px-4 font-sans overflow-x-hidden">
+return (
+        <div
+            className="min-h-screen bg-[#f6ede8] py-12 px-4 font-sans overflow-x-hidden"
+            style={{ zoom: 0.85 } as React.CSSProperties}
+        >
             {/* ✅ FIX: navbar ab hamesha LOGGED-IN user ka naam/photo dikhata hai,
                 chahe kisi bhi profile ([userId]) ko view kar rahe ho */}
             <ProfileNavbar
