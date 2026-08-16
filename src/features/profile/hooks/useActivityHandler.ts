@@ -95,8 +95,21 @@ export const useActivityHandlers = ({
         });
         setPostLikes(likesMap);
         setPostReactions(reactionsMap);
-        setPostSaves(savesMap); // ✅ NEW
-        setPostPins(pinsMap); // ✅ NEW
+        // ✅ FIX: sirf naye posts ke liye seed karo — jo postId already
+        // postSaves/postPins me maujood hai (matlab user pehle hi
+        // save/unsave ya pin/unpin kar chuka hai), usko is re-sync se
+        // overwrite mat karo. Warna posts prop reference change hote hi
+        // (parent re-render, socket event, etc.) optimistic save/unsave
+        // 1-2 second baad stale backend value se revert ho jaata tha.
+        setPostSaves(prev => {
+            const merged = { ...savesMap, ...prev };
+            // naye posts jo prev me nahi the unhe savesMap se le lo (already upar hai)
+            return merged;
+        });
+        setPostPins(prev => {
+            const merged = { ...pinsMap, ...prev };
+            return merged;
+        });
     }, [posts]);
 
     // ✅ NEW: seed like-state for a post that does NOT belong to the current
@@ -172,20 +185,22 @@ emitPostContentUpdated(postId, newContent);
 
 
     const handleSavePost = async (postId: string, alreadySaved: boolean) => {
-        // ✅ FIX: ProfileService me alag "unsavePost" method exist hi nahi karta —
-        // ek hi combined "savePost(postId, isSaved)" hai jo backend ko
-        // { isSaved: true/false } bhejta hai. Pehle hum non-existent
-        // unsavePost() call kar rahe the jo turant TypeError deta tha aur
-        // silently revert ho jaata tha — isliye Unsave kabhi kaam nahi karta tha.
         setPostSaves(prev => ({ ...prev, [postId]: !alreadySaved }));
         try {
           await ProfileService.savePost(postId, !alreadySaved);
-        } catch (err) {
+        } catch (err: any) {
+          // 🔍 DEBUG: exact error dekhne ke liye — fix hote hi hata denge
+          console.error('🔍 [SAVE_POST_DEBUG] Failed:', {
+            postId,
+            alreadySaved,
+            status: err?.response?.status,
+            data: err?.response?.data,
+            message: err?.message,
+          });
           setPostSaves(prev => ({ ...prev, [postId]: alreadySaved })); // revert
           throw err;
         }
       };
-
 
 
     const handleLikeToggle = async (postId: string) => {
