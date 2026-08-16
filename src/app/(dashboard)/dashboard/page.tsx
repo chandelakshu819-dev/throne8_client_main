@@ -24,7 +24,7 @@ import ProfileNavbar from '@/features/profile/components/home/ProfileNavbar';
 import ConnectionService from '@/lib/api/connection.service';
 import { useSocket } from '@/core/realtime/useSocket';
 import { SOCKET_EVENTS } from '@/core/realtime/socket.events';
-
+import UpdatePostModal from '@/features/profile/components/home/UpdatePostModal';
 export default function Home() {
     const { user, isLoading } = useAuth();
 
@@ -67,7 +67,7 @@ export default function Home() {
     const [repostProgress, setRepostProgress] = useState(0);
     const [showRepostProgressBar, setShowRepostProgressBar] = useState(false);
 
-    const { allPosts, isLoadingAllPosts, isLoadingMore, hasMore, fetchAllUsersPosts, loadMorePosts, prependPost } = useAllUsersPosts();
+    const { allPosts, isLoadingAllPosts, isLoadingMore, hasMore, fetchAllUsersPosts, loadMorePosts, prependPost ,updatePostInFeed} = useAllUsersPosts();
 
     const { socket } = useSocket();
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -102,6 +102,7 @@ export default function Home() {
     const [postTitle, setPostTitle] = useState('');
     const [isSubmittingPost, setIsSubmittingPost] = useState(false);
     const [postError, setPostError] = useState('');
+    const [editingPost, setEditingPost] = useState<{ postId: string; content: string } | null>(null);
 
     const {
         userProfileData,
@@ -437,13 +438,39 @@ export default function Home() {
         setOpenMenuIndex(openMenuIndex === index ? null : index);
     };
 
-    const handlePostAction = (action: any, postIndex: any) => {
+    const handlePostAction = (action: any, postKeyOrIndex: any) => {
         if (action === 'analytics') {
-            const post = allPosts[postIndex];
+            const post = allPosts[postKeyOrIndex];
             setSelectedAnalyticsPost(post);
+        } else if (action === 'edit') {
+            // postKeyOrIndex repost ke liye entryId (string) hai,
+            // normal PostCard ke liye numeric index — dono handle karo
+            const post =
+                typeof postKeyOrIndex === 'number'
+                    ? allPosts[postKeyOrIndex]
+                    : allPosts.find(
+                          (p: any) =>
+                              (p.entryId || p.postId) === postKeyOrIndex ||
+                              p.originalPost?.entryId === postKeyOrIndex
+                      );
+    
+            const isRepostOriginal = post?.feedItemType === 'repost';
+            const targetPostId = isRepostOriginal
+                ? post.originalPost.entryId
+                : post?.entryId || post?.postId || postKeyOrIndex;
+            const targetContent = isRepostOriginal
+                ? post.originalPost.content
+                : post?.content || post?.text || '';
+    
+            setEditingPost({ postId: targetPostId, content: targetContent });
         }
         setOpenMenuIndex(null);
     };
+    const handleUpdatePost = async (postId: string, newContent: string) => {
+        await HomePostService.updatePost(postId, { content: newContent, title: newContent.substring(0, 100) });
+        updatePostInFeed(postId, newContent);
+    };
+
 
     const toggleRepostMenu = (index: any) => {
         setOpenRepostIndex(openRepostIndex === index ? null : index);
@@ -1642,6 +1669,8 @@ if (post?.userId && post.userId !== user?.userId) {
         isDarkMode={isDarkMode}
     />
 
+   
+
     {/* Confirm Repost Modal (no thoughts) */ }
     <ConfirmRepostModal
         isOpen={isConfirmRepostOpen}
@@ -1649,6 +1678,18 @@ if (post?.userId && post.userId !== user?.userId) {
         onConfirm={handleConfirmRepostWithoutThoughts}
         isDarkMode={isDarkMode}
     />
+
+    {/* Update Post Modal */}
+    {editingPost && (
+        <UpdatePostModal
+            postId={editingPost.postId}
+            isOpen={!!editingPost}
+            currentTitle={editingPost.content}
+            onClose={() => setEditingPost(null)}
+            onUpdate={handleUpdatePost}
+        />
+    )}
+
 
     {selectedAnalyticsPost && (
         <div 

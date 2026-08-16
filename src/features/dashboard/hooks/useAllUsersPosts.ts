@@ -1,9 +1,10 @@
 // src/features/dashboard/hooks/useAllUsersPosts.ts
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef,useEffect} from 'react';
 import { transformApiPostToFeedPost } from '@/shared/utils/postTransformers';
 import ProfileService from '@/lib/api/profile.service';
 import AuthService from '@/lib/api/auth.service';
+import { onPostContentUpdated } from '@/shared/utils/postEvents';
 
 export const useAllUsersPosts = () => {
     const [allPosts, setAllPosts] = useState<any[]>([]);
@@ -59,6 +60,8 @@ export const useAllUsersPosts = () => {
             }
         }
 
+        
+
         const headlineIdsToFetch = uniqueUserIds
             .map((id) => usersData[id]?.headlineId)
             .filter((id): id is string => !!id && !headlinesCacheRef.current[id]);
@@ -79,6 +82,9 @@ export const useAllUsersPosts = () => {
         const headlinesMap = headlinesCacheRef.current;
 
         const fallbackUser = { firstName: 'Unknown', lastName: 'User', profilePhotoId: null, headlineId: null };
+
+
+
 
         return posts.map((post: any) => {
             if (post.feedItemType === 'repost') {
@@ -216,6 +222,46 @@ export const useAllUsersPosts = () => {
         }
     }, [transformPosts]);
 
+
+    // ✅ FIX: caption update hone par local feed state sync karne ke liye
+    // naya function — pehle ye missing tha isliye home feed stale reh jaata tha
+    const updatePostInFeed = useCallback((postId: string, newContent: string) => {
+        console.log('🔍 Trying to update:', postId);
+
+        setAllPosts((prev) =>
+
+            prev.map((item: any) => {
+                console.log('🔍 Available IDs:', prev.map((p: any) => p.entryId || p.postId));
+
+                // normal post
+                if ((item.entryId || item.postId) === postId) {
+                    console.log('✅ MATCH FOUND');
+
+                    return { ...item, content: newContent, text: newContent };
+                }
+                // ✅ FIX: repost ka apna caption/thoughtText update (missing case tha)
+                // jab user repost pe khud ka thought/caption edit karta hai,
+                // us update ka id `repostId` hota hai, na ki entryId/postId
+                if (item.feedItemType === 'repost' && item.repostId === postId) {
+                    return { ...item, thoughtText: newContent };
+                }
+                // agar ye kisi repost ke andar wala original post hai
+                if (item.feedItemType === 'repost' && item.originalPost?.entryId === postId) {
+                    return {
+                        ...item,
+                        originalPost: { ...item.originalPost, content: newContent },
+                    };
+                }
+                return item;
+            })
+        );
+    }, []);
+
+
+    useEffect(() => {
+        return onPostContentUpdated(updatePostInFeed);
+    }, [updatePostInFeed]);
+
     return {
         allPosts,
         isLoadingAllPosts,
@@ -224,5 +270,7 @@ export const useAllUsersPosts = () => {
         fetchAllUsersPosts,
         loadMorePosts,
         prependPost,
+        updatePostInFeed,
+
     };
 };

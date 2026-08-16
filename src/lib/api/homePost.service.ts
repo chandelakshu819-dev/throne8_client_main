@@ -30,6 +30,24 @@ class HomePostService {
         }
     }
 
+
+
+    /**
+     * ✅ FIX: Update caption/content API — ye pehle missing thi.
+     * PUT/PATCH /api/v1/profile/home-post/:postId
+     */
+    static async updatePost(postId: string, payload: { title?: string; content?: string }): Promise<any> {
+        try {
+            const { data } = await api.patch(`/profile/home-post/${postId}`, payload);
+            return data;
+        } catch (error: any) {
+            if (error?.response?.data?.message) {
+                throw new Error(error.response.data.message);
+            }
+            throw new Error('Failed to update post.');
+        }
+    }
+
     static async createPostWithMedia(formData: FormData): Promise<any> {
         try {
             const { data } = await api.post('/profile/home-post/create', formData, {

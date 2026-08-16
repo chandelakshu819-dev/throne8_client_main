@@ -6,6 +6,7 @@ import { useComments } from './useComments';
 import { Post, PostLikeState } from '../types';
 import ProfileService from '@/lib/api/profile.service';
 import { ReactionCounts, ReactionType } from '@/types/profile.types';
+import { emitPostContentUpdated } from '@/shared/utils/postEvents';
 
 interface UseActivityHandlersProps {
     posts: Post[];
@@ -121,6 +122,8 @@ export const useActivityHandlers = ({
             // Ab correct field "content" update ho raha hai.
             await ProfileService.updatePost(postId, { content: newContent });
             onPostCreated?.();
+           // ✅ NEW: broadcast karo taaki Home feed (ya koi bhi doosra page) bhi sync ho jaaye
+emitPostContentUpdated(postId, newContent);
         } catch (error: any) {
             alert(error.message || 'Failed to update post');
         }
