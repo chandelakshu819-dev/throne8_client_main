@@ -165,12 +165,6 @@ const PostActions = ({
                 onRepostInstant={(idx: any) => {
                   handleRepostInstant?.(idx);
                   toggleRepostMenu(idx);
-
-                  // ✅ NEW: Analytics collection me share record karo
-                  // hint: post.userId = postOwnerId (PostCard.tsx me isi naam se pass hota hai)
-                  if (post.userId && postKey) {
-                    AnalyticsService.recordShare(post.userId, postKey, 'repost');
-                  }
                 }}
               />
             )}

@@ -52,6 +52,8 @@ export default function Home() {
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
     const [editCommentText, setEditCommentText] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [postStatsMap, setPostStatsMap] = useState<Record<string, { impressions: number; shares: number }>>({});
+    const [selectedPostStats, setSelectedPostStats] = useState<{ impressions: number; shares: number } | null>(null);
 
     const [weeklyPerformance, setWeeklyPerformance] = useState<{
         profileViewsChange: number;
@@ -133,12 +135,78 @@ export default function Home() {
         }
     }, [user, fetchUserProfile]);
 
+
+
+    useEffect(() => {
+        if (isAnalyticsOpen || isPostCreatorOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [isAnalyticsOpen, isPostCreatorOpen]);
+
+
+    useEffect(() => {
+        if (!isAnalyticsOpen || userPosts.length === 0) return;
+        let cancelled = false;
+    
+        Promise.all(
+            userPosts.map((post: any) => {
+                const pid = post.entryId || post.postId;
+                return AnalyticsService.getPostImpressionStats(pid)
+                    .then((res) => ({
+                        postId: pid,
+                        impressions: res?.data?.totalImpressions ?? 0,
+                        shares: res?.data?.shares ?? 0,
+                    }))
+                    .catch(() => ({ postId: pid, impressions: 0, shares: 0 }));
+            })
+        ).then((results) => {
+            if (cancelled) return;
+            const map: Record<string, { impressions: number; shares: number }> = {};
+            results.forEach((r) => {
+                map[r.postId] = { impressions: r.impressions, shares: r.shares };
+            });
+            setPostStatsMap(map);
+        });
+    
+        return () => { cancelled = true; };
+    }, [isAnalyticsOpen, userPosts]);
+
     useEffect(() => {
         if (user) {
             fetchUserProfile();
             fetchAllUsersPosts();
         }
     }, [user, fetchUserProfile, fetchAllUsersPosts]);
+
+
+
+    useEffect(() => {
+        if (!selectedAnalyticsPost) {
+            setSelectedPostStats(null);
+            return;
+        }
+        let cancelled = false;
+        const postId = selectedAnalyticsPost.entryId || selectedAnalyticsPost.postId;
+    
+        AnalyticsService.getPostImpressionStats(postId)
+            .then((res) => {
+                if (cancelled) return;
+                setSelectedPostStats({
+                    impressions: res?.data?.totalImpressions ?? 0,
+                    shares: res?.data?.shares ?? 0,
+                });
+            })
+            .catch(() => {
+                if (!cancelled) setSelectedPostStats({ impressions: 0, shares: 0 });
+            });
+    
+        return () => { cancelled = true; };
+    }, [selectedAnalyticsPost]);
 
     useEffect(() => {
         if (allPosts?.length > 0) {
@@ -1569,9 +1637,11 @@ if (post?.userId && post.userId !== user?.userId) {
                         Top Posts
                     </h3>
                     <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
-                        {userPosts.map((post) => (
+                        {userPosts.map((post) => {
+                            const pid = post.entryId || post.postId;
+                            return (
                             <div
-                                key={post.postId}
+                                key={pid}
                                 className={`rounded-xl p-3 sm:p-4 border ${isDarkMode ? 'bg-slate-700/60 border-slate-600/60' : 'bg-white/60 border-[#4a3728]/20'}`}
                             >
                                 <div className="flex gap-2 sm:gap-3 mb-2 sm:mb-3">
@@ -1589,7 +1659,7 @@ if (post?.userId && post.userId !== user?.userId) {
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 text-xs">
                                             <div className={`p-2 rounded ${isDarkMode ? 'bg-slate-800/50' : 'bg-[#e0d8cf]/50'}`}>
                                                 <p className={isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}>Impressions</p>
-                                                <p className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>{post.viewsCount ?? post.impressions ?? 0}</p>
+                                                <p className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>{postStatsMap[pid]?.impressions ?? 0}</p>
                                             </div>
                                             <div className={`p-2 rounded ${isDarkMode ? 'bg-slate-800/50' : 'bg-[#e0d8cf]/50'}`}>
                                                 <p className={isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}>Likes</p>
@@ -1601,7 +1671,7 @@ if (post?.userId && post.userId !== user?.userId) {
                                             </div>
                                             <div className={`p-2 rounded ${isDarkMode ? 'bg-slate-800/50' : 'bg-[#e0d8cf]/50'}`}>
                                                 <p className={isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}>Shares</p>
-                                                <p className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>{post.shares ?? 0}</p>
+                                                <p className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>{postStatsMap[pid]?.shares ?? 0}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1612,16 +1682,17 @@ if (post?.userId && post.userId !== user?.userId) {
                                         <div className="flex-1 bg-gradient-to-r from-[#4a3728]/20 to-[#8b7355]/20 rounded-full h-2">
                                             <div
                                                 className="bg-gradient-to-r from-[#4a3728] to-[#8b7355] h-2 rounded-full"
-                                                style={{ width: `${Math.min((post.likesCount + post.commentsCount + (post.shares ?? 0)) / 2, 100)}%` }}
+                                                style={{ width: `${Math.min((post.likesCount + post.commentsCount + (postStatsMap[pid]?.shares ?? 0)) / 2, 100)}%` }}
                                             ></div>
                                         </div>
                                         <span className={`text-xs sm:text-sm font-bold ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
-                                            {Math.round((post.likesCount + post.commentsCount + (post.shares ?? 0)) / 2)}%
+                                        {Math.round((post.likesCount + post.commentsCount + (postStatsMap[pid]?.shares ?? 0)) / 2)}%
                                         </span>
                                     </div>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                     {/* Weekly Performance */}
                     <h3 className={`text-base sm:text-lg font-bold mb-3 sm:mb-4 ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
@@ -1739,7 +1810,7 @@ if (post?.userId && post.userId !== user?.userId) {
                             Impressions
                         </span>
                         <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                            {selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 0}
+                        {selectedPostStats?.impressions ?? 0}
                         </span>
                     </div>
 
@@ -1778,28 +1849,28 @@ if (post?.userId && post.userId !== user?.userId) {
                             Engagement
                         </span>
                         <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                            {(((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) + (selectedAnalyticsPost.commentsCount || 0) + (selectedAnalyticsPost.sharesCount || selectedAnalyticsPost.shares || 0)) / (selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 1) * 100).toFixed(1)}%
+                            {(((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) + (selectedAnalyticsPost.commentsCount || 0) + (selectedPostStats?.shares ?? 0)) / (selectedPostStats?.impressions || 1) * 100).toFixed(1)}%
                         </span>
                     </div>
                 </div>
 
                 {/* Progress Bar visual indicator */}
                 <div className="space-y-2">
-                    <div className="flex justify-between text-xs font-bold text-[#4a3728]/60 dark:text-slate-400">
-                        <span>Engagement Level</span>
-                        <span className="text-[#4a3728] dark:text-white">
-                            {Math.min(100, Math.round((((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) + (selectedAnalyticsPost.commentsCount || 0) + (selectedAnalyticsPost.sharesCount || selectedAnalyticsPost.shares || 0)) / (selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 1) * 100) * 2))}%
-                        </span>
-                    </div>
-                    <div className="w-full h-3 bg-[#e0d8cf]/30 dark:bg-slate-700 rounded-full overflow-hidden">
-                        <div 
-                            className="h-full bg-gradient-to-r from-[#8b7355] to-[#4a3728] dark:from-[#9d8466] dark:to-white rounded-full transition-all duration-1000"
-                            style={{ 
-                                width: `${Math.min(100, Math.round((((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) + (selectedAnalyticsPost.commentsCount || 0) + (selectedAnalyticsPost.sharesCount || selectedAnalyticsPost.shares || 0)) / (selectedAnalyticsPost.viewsCount || selectedAnalyticsPost.impressions || 1) * 100) * 2))}%` 
-                            }}
-                        />
-                    </div>
-                </div>
+    <div className="flex justify-between text-xs font-bold text-[#4a3728]/60 dark:text-slate-400">
+        <span>Engagement Level</span>
+        <span className="text-[#4a3728] dark:text-white">
+            {Math.min(100, Math.round((((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) + (selectedAnalyticsPost.commentsCount || 0) + (selectedPostStats?.shares ?? 0)) / (selectedPostStats?.impressions || 1) * 100) * 2))}%
+        </span>
+    </div>
+    <div className="w-full h-3 bg-[#e0d8cf]/30 dark:bg-slate-700 rounded-full overflow-hidden">
+        <div 
+            className="h-full bg-gradient-to-r from-[#8b7355] to-[#4a3728] dark:from-[#9d8466] dark:to-white rounded-full transition-all duration-1000"
+            style={{ 
+                width: `${Math.min(100, Math.round((((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) + (selectedAnalyticsPost.commentsCount || 0) + (selectedPostStats?.shares ?? 0)) / (selectedPostStats?.impressions || 1) * 100) * 2))}%` 
+            }}
+        />
+    </div>
+</div>
             </div>
         </div>
     )}

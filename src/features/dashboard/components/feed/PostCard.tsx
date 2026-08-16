@@ -248,7 +248,7 @@ const PostCard = ({
   return (
     <div
       ref={trackPostImpression({
-        postId: post.postId,
+        postId: post.entryId || post.postId,   // ✅ fix
         postOwnerId: post.userId,
         source: 'feed'
       })}
