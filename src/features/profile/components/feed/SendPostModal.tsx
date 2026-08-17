@@ -5,15 +5,23 @@ import { createPortal } from 'react-dom';
 import { X, Search, Link as LinkIcon, Check } from 'lucide-react';
 import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData';
 import MessagingAPI from '@/lib/api/messaging.service';
-
 interface SendPostModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUserId: string;
   postId: string;
   postOwnerName?: string;
+  postImage?: string;          // ✅ NEW
+  postTitle?: string;          // ✅ NEW
+  postAuthorAvatar?: string;   // ✅ NEW
   isDarkMode?: boolean;
+  // ✅ NEW — full post data for rich chat preview
+  postContent?: string;
+  postImages?: string[];
+  postAuthorHeadline?: string;
+  postCreatedAt?: string;
 }
+
 
 interface ConnectionUser {
   id: string;
@@ -28,7 +36,15 @@ const SendPostModal: React.FC<SendPostModalProps> = ({
   currentUserId,
   postId,
   postOwnerName = 'this',
+  postImage,          // ✅ NEW
+  postTitle,          // ✅ NEW
+  postAuthorAvatar,   // ✅ NEW
   isDarkMode = false,
+  // ✅ NEW
+  postContent,
+  postImages,
+  postAuthorHeadline,
+  postCreatedAt,
 }) => {
   const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState('');
@@ -127,17 +143,38 @@ const SendPostModal: React.FC<SendPostModalProps> = ({
     try {
       const targetIds = Array.from(selectedIds);
 
-      // Har selected user ke saath: direct conversation get/create karo, phir post link message bhejo
+      // Har selected user ke saath: direct conversation get/create karo, phir
+      // post preview (rich metadata) ke saath message bhejo — sirf raw link nahi
       await Promise.all(
         targetIds.map(async (targetUserId) => {
           const conversation = await MessagingAPI.getOrCreateDirectConversation(targetUserId);
           await MessagingAPI.sendMessage({
             conversationId: conversation.conversationId,
-            text: postUrl,
             type: 'text',
+            // ✅ FIX: backend text ko required maanta hai (400 Bad Request
+            // aa raha tha khali string pe) — isliye postUrl ko fallback
+            // text ki tarah bhejo. Chat UI postPreview ko priority deta
+            // hai, isliye rich card hi dikhega, ye text sirf backup hai.
+            text: postUrl,
+            metadata: {
+              postPreview: {
+                postId,
+                title: postTitle || '',
+                image: postImage || '',
+                authorName: postOwnerName,
+                authorAvatar: postAuthorAvatar || '',
+                // ✅ NEW fields — full post render ke liye
+                content: postContent || '',
+                images: postImages && postImages.length > 0 ? postImages : (postImage ? [postImage] : []),
+                authorHeadline: postAuthorHeadline || '',
+                createdAt: postCreatedAt || new Date().toISOString(),
+              },
+            },
           });
         })
       );
+
+
 
       setSentDone(true);
       setTimeout(() => {

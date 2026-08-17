@@ -18,6 +18,9 @@ interface PostActionsProps {
   currentUserId?: string;
   postReactions?: any;
   onReact?: any;
+  profileImage?: string;   // ✅ NEW
+  fullName?: string;       // ✅ NEW
+  headline?: string;       // ✅ NEW — full post preview ke liye
 }
 
 // ✅ SIMPLIFIED: ab yeh bilkul dashboard/feed ke PostActions jaisa hai —
@@ -28,7 +31,7 @@ interface PostActionsProps {
 const PostActions = ({
   post, index, isDarkMode, likedPosts, handleLike, openRepostIndex, toggleRepostMenu,
   handleRepost, toggleComments, onOpenWithPerspectiveModal, handleRepostInstant,
-  currentUserId,
+  currentUserId, profileImage, fullName, headline,   // ✅ NEW
 }: PostActionsProps) => {
   const postKey = post.entryId || post.postId;
 
@@ -144,15 +147,23 @@ const PostActions = ({
       </div>
 
       {showSendModal && currentUserId && (
-        <SendPostModal
-          isOpen={showSendModal}
-          onClose={() => setShowSendModal(false)}
-          currentUserId={currentUserId}
-          postId={postKey}
-          postOwnerName={post.firstName || post.fullName || 'this'}
-          isDarkMode={isDarkMode}
-        />
-      )}
+ <SendPostModal
+ isOpen={showSendModal}
+ onClose={() => setShowSendModal(false)}
+ currentUserId={currentUserId}
+ postId={postKey}
+ postOwnerName={post.user || post.fullName || post.firstName || fullName || 'this'}
+ postImage={post.image || post.images?.[0]?.cloudinarySecureUrl || ''}
+ postTitle={post.content || post.title || post.text || ''}
+ postAuthorAvatar={post.avatar || profileImage || ''}
+ isDarkMode={isDarkMode}
+ // ✅ NEW — poora post data chat preview ke liye
+ postContent={post.content || post.title || post.text || ''}
+ postImages={(post.images || []).map((img: any) => img?.cloudinarySecureUrl || img?.url || img).filter(Boolean)}
+ postAuthorHeadline={headline || post.headline || ''}
+ postCreatedAt={post.createdAt || ''}
+/>
+)}
     </div>
   );
 };
