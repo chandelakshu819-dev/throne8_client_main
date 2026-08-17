@@ -47,34 +47,207 @@ function formatPreviewText(text?: string) {
 
 // Rich card — used when the message carries metadata.postPreview
 // (attach this metadata when the "Send" action on a post creates the message)
-function PostPreviewCardRich({ preview, url, colors }: { preview: any; url: string; colors: any }) {
+function timeAgo(dateStr?: string) {
+  if (!dateStr) return '';
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d`;
+}
+
+// Full LinkedIn-style shared post card — author name, headline, time, caption, images
+// ============================================================
+// ✅ NEW — Full-screen image lightbox/gallery viewer
+// Post preview ke images par click karne se ye khulta hai —
+// prev/next arrows ke saath, jaise screenshot 2 mein dikhaya gaya
+// ============================================================
+function ImageLightbox({
+  images,
+  initialIndex,
+  onClose,
+}: {
+  images: string[];
+  initialIndex: number;
+  onClose: () => void;
+}) {
+  const [currentIndex, setCurrentIndex] = React.useState(initialIndex);
+
+  const goPrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+  };
+
+  const goNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+  };
+
+  // Escape key se close, arrow keys se navigate
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+      if (e.key === 'ArrowRight') setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [images.length, onClose]);
+
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block rounded-xl overflow-hidden border hover:shadow-md transition-all bg-white/40"
-      style={{ borderColor: colors.bgSoft }}
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-sm"
+      onClick={onClose}
     >
-      {preview.image && (
-        <div className="w-full h-36 overflow-hidden">
-          <img src={preview.image} alt="" className="w-full h-full object-cover" />
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-colors"
+      >
+        <Icon.X className="w-6 h-6" />
+      </button>
+
+      {/* Counter */}
+      {images.length > 1 && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/80 text-sm font-medium bg-white/10 px-3 py-1 rounded-full">
+          {currentIndex + 1} / {images.length}
         </div>
       )}
-      <div className="p-3">
-        <div className="flex items-center gap-2 mb-1.5">
-          {preview.authorAvatar
-            ? <img src={preview.authorAvatar} className="w-6 h-6 rounded-full object-cover" alt="" />
-            : <AvatarCircle name={preview.authorName || 'U'} size={6} />}
-          <span className="text-xs font-medium opacity-70 truncate">{preview.authorName || 'Someone'}</span>
-        </div>
-        <p className="text-sm font-semibold leading-snug line-clamp-2">{preview.title || 'Shared a post'}</p>
-        <p className="text-[11px] mt-1.5 font-medium text-blue-500">View post →</p>
-      </div>
-    </a>
+
+      {/* Prev arrow */}
+      {images.length > 1 && (
+        <button
+          onClick={goPrev}
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-colors"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-6 h-6">
+            <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+      )}
+
+      {/* Image */}
+      <img
+        src={images[currentIndex]}
+        alt=""
+        onClick={(e) => e.stopPropagation()}
+        className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg select-none"
+      />
+
+      {/* Next arrow */}
+      {images.length > 1 && (
+        <button
+          onClick={goNext}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-colors"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-6 h-6">
+            <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
+    </div>
   );
 }
 
+// Full LinkedIn-style shared post card — author name, headline, time, caption, images
+// ✅ FIX: (1) images ab clickable hain — click karne par full-screen lightbox khulta
+// hai prev/next navigation ke saath. (2) card ki width thodi kam kar di gayi hai
+// (max-w-[300px]) taaki chat bubble mein zyada bhara-bhara na lage.
+function PostPreviewCardRich({ preview, url, colors }: { preview: any; url: string; colors: any }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [lightboxIndex, setLightboxIndex] = React.useState<number | null>(null);
+  const images: string[] = preview.images?.length ? preview.images : (preview.image ? [preview.image] : []);
+  const content: string = preview.content || preview.title || '';
+  const isLong = content.length > 150;
+  const displayText = expanded || !isLong ? content : content.slice(0, 150) + '…';
+
+  return (
+    <div
+      className="rounded-xl overflow-hidden border bg-white/40 max-w-[300px]"
+      style={{ borderColor: colors.bgSoft }}
+    >
+      {/* Header: avatar + name + headline + time */}
+      <div className="flex items-start gap-2 p-3 pb-2">
+        {preview.authorAvatar
+          ? <img src={preview.authorAvatar} className="w-10 h-10 rounded-full object-cover flex-shrink-0" alt="" />
+          : <AvatarCircle name={preview.authorName || 'U'} size={10} />}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold truncate">{preview.authorName || 'Someone'}</p>
+          {preview.authorHeadline && (
+            <p className="text-xs opacity-60 truncate leading-tight">{preview.authorHeadline}</p>
+          )}
+          <p className="text-[11px] opacity-45">{timeAgo(preview.createdAt)}</p>
+        </div>
+      </div>
+
+      {/* Caption text */}
+      {content && (
+        <div className="px-3 pb-2">
+          <p className="text-sm whitespace-pre-wrap break-words leading-snug">
+            {displayText}
+            {isLong && (
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(!expanded); }}
+                className="text-blue-500 font-medium ml-1"
+              >
+                {expanded ? 'less' : '...more'}
+              </button>
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* Images — ab clickable, lightbox kholte hain */}
+      {images.length > 0 && (
+        <div className={`grid gap-0.5 ${images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+          {images.slice(0, 4).map((img, i) => (
+            <div
+              key={i}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLightboxIndex(i); }}
+              className={`relative overflow-hidden cursor-pointer ${images.length === 1 ? 'h-52' : 'h-32'}`}
+            >
+              <img src={img} className="w-full h-full object-cover hover:opacity-90 transition-opacity" alt="" />
+              {i === 3 && images.length > 4 && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-semibold">
+                  +{images.length - 4}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Footer link */}
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="block px-3 py-2 text-[12px] font-medium text-blue-500 border-t"
+        style={{ borderColor: colors.bgSoft }}
+      >
+        View post →
+      </a>
+
+      {/* Lightbox overlay */}
+      {lightboxIndex !== null && images.length > 0 && (
+        <ImageLightbox
+          images={images}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
+    </div>
+  );
+}
 // Fallback card — used when we only have the raw URL (no rich metadata yet)
 function PostPreviewCardBasic({ url, colors }: { url: string; colors: any }) {
   return (
@@ -592,16 +765,13 @@ export default function MessagingPage() {
                         className={`max-w-[75%] ${isMe ? 'ml-auto' : isSystem ? 'mx-auto' : 'mr-auto'}`}
                       >
                         <div
-                          className="rounded-2xl px-4 py-3 shadow-sm relative group hover:shadow-md transition-all duration-200"
-                          style={{
-                            background: isSystem
-                              ? '#6b7280'
-                              : isMe
-                                ? colors.bgSoft
-                                : '#efe3da',
-                            color: isSystem ? '#fff' : colors.text,
-                          }}
-                        >
+  className={`rounded-2xl px-4 py-3 shadow-sm relative group hover:shadow-md transition-all duration-200 ${postPreview ? 'inline-block' : ''}`}
+  style={{
+    background: isSystem ? '#6b7280' : isMe ? colors.bgSoft : '#efe3da',
+    color: isSystem ? '#fff' : colors.text,
+  }}
+>
+                        
                           {/* Sender name (group mein) */}
                           {!isMe && !isSystem && activeConversation?.type === 'group' && (
                             <p className="text-xs font-semibold opacity-60 mb-1">

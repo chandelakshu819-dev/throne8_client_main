@@ -281,7 +281,6 @@ const PostCard = ({
         >
           <PostContent post={post} isDarkMode={isDarkMode} />
         </div>
-
         <PostActions
           post={post}
           index={index}
@@ -294,7 +293,10 @@ const PostCard = ({
           toggleComments={toggleComments}
           onOpenWithPerspectiveModal={onOpenWithPerspectiveModal}
           handleRepostInstant={handleRepostInstant}
-          currentUserId={currentUserId} 
+          currentUserId={currentUserId}
+          profileImage={profileImage}   // ✅ NEW
+          fullName={fullName}           // ✅ NEW
+          headline={headline}           // ✅ NEW
         />
 
         {openCommentsIndex === postKey && (

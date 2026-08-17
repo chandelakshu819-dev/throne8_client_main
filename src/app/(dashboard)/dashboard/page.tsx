@@ -1179,6 +1179,7 @@ if (post?.userId && post.userId !== user?.userId) {
                         feedReposts={feedReposts}
                         profileData={profileData}
                         fullName={fullName}
+                        headline={headlineData?.title || ''}
                         repostingPostId={repostingPostId}
                         fetchCommentsForPost={fetchCommentsForPost}
                     />

@@ -19,6 +19,22 @@ interface SendPostModalProps {
   // kitne logo ko bheja gaya — taaki "X sends" count optimistically
   // turant update ho jaye, poori feed refetch kiye bina.
   onSendSuccess?: (recipientCount: number) => void;
+
+  // ✅ FIX: ye props PostActions.tsx (dashboard) pehle se hi pass kar raha
+  // tha, lekin is component ke interface/handleSend mein use hi nahi ho
+  // rahe the — isliye homepage se share karne par chat mein sirf bare
+  // link jaata tha, rich card nahi banta tha. Ab profile/feed wale
+  // SendPostModal jaisa hi in sab ko metadata.postPreview mein bhejenge.
+  postImage?: string;
+  postTitle?: string;
+  postAuthorAvatar?: string;
+  postContent?: string;
+  postImages?: string[];
+  postAuthorHeadline?: string;
+  postCreatedAt?: string;
+  profileImage?: string;
+  fullName?: string;
+  headline?: string;
 }
 
 interface ConnectionUser {
@@ -36,6 +52,17 @@ const SendPostModal: React.FC<SendPostModalProps> = ({
   postOwnerName = 'this',
   isDarkMode = false,
   onSendSuccess,
+  // ✅ NEW
+  postImage,
+  postTitle,
+  postAuthorAvatar,
+  postContent,
+  postImages,
+  postAuthorHeadline,
+  postCreatedAt,
+  profileImage,
+  fullName,
+  headline,
 }) => {
   const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState('');
@@ -134,23 +161,42 @@ const SendPostModal: React.FC<SendPostModalProps> = ({
     try {
       const targetIds = Array.from(selectedIds);
 
-      // Har selected user ke saath: direct conversation get/create karo, phir post link message bhejo
+      // Har selected user ke saath: direct conversation get/create karo, phir
+      // post preview (rich metadata) ke saath message bhejo — sirf raw link nahi.
+      // ✅ FIX: pehle yahan sirf `text: postUrl` jaata tha, koi metadata nahi —
+      // isliye chat mein rich card ke bajaye fallback "Shared post" link dikhta
+      // tha. Ab profile/feed wale SendPostModal jaisa hi postPreview bhej rahe hain.
       await Promise.all(
         targetIds.map(async (targetUserId) => {
           const conversation = await MessagingAPI.getOrCreateDirectConversation(targetUserId);
           await MessagingAPI.sendMessage({
             conversationId: conversation.conversationId,
-            text: postUrl,
             type: 'text',
+            text: postUrl,
+            metadata: {
+              postPreview: {
+                postId,
+                title: postTitle || '',
+                image: postImage || '',
+                authorName: postOwnerName || fullName || '',
+                authorAvatar: postAuthorAvatar || profileImage || '',
+                content: postContent || '',
+                images:
+                  postImages && postImages.length > 0
+                    ? postImages
+                    : postImage
+                    ? [postImage]
+                    : [],
+                authorHeadline: postAuthorHeadline || headline || '',
+                createdAt: postCreatedAt || new Date().toISOString(),
+              },
+            },
           });
         })
       );
 
-      // ✅ FIX: pehle koi bhi "send" event kahin record nahi hota tha —
-      // isliye "X sends" count feed pe hamesha 0/missing rehta tha.
-      // Ab har successful send ke baad, backend counter badhta hai
-      // (targetIds.length se, i.e. jitne logo ko bheja utna hi add hota hai)
-      // aur parent (PostActions) ko turant optimistic update ke liye batao.
+      // Har successful send ke baad backend counter badhta hai, aur parent
+      // (PostActions) ko turant optimistic update ke liye batao.
       await HomePostService.recordSend(postId, targetIds.length);
       onSendSuccess?.(targetIds.length);
 
@@ -174,7 +220,7 @@ const SendPostModal: React.FC<SendPostModalProps> = ({
   const borderColor = isDarkMode ? 'border-slate-700' : 'border-[#e0d8cf]';
   const hoverRow = isDarkMode ? 'hover:bg-slate-700/60' : 'hover:bg-[#f6ede8]';
 
- return createPortal(
+  return createPortal(
     <div className="fixed inset-0 z-[110] flex items-center justify-center px-4">
       {/* Overlay */}
       <div
