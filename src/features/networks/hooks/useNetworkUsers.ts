@@ -77,28 +77,25 @@ export const useNetworkUsers = () => {
                 }
             }
 
-            // ✅ NEW STEP: Fetch mutual connections for each suggested user in parallel
-            // ✅ FIX: N parallel calls ki jagah ek hi bulk call
-const targetUserIds = usersData.map((user: any) => user.userId);
-let mutualsResults: any[] = usersData.map(() => ({ mutuals: [], count: 0 })); // default fallback
+            // ✅ Fetch mutual connections for all suggested users in ONE bulk call
+            const targetUserIds = usersData.map((user: any) => user.userId);
+            let mutualsResults: any[] = usersData.map(() => ({ mutuals: [], count: 0 }));
 
-if (targetUserIds.length > 0) {
-    try {
-        const bulkRes = await ConnectionService.getBulkMutualConnections(userId, targetUserIds, 3);
-        const resultsMap = bulkRes?.data?.data || {}; // { "userId-targetId": { mutuals, count } }
+            if (targetUserIds.length > 0) {
+                try {
+                    const bulkRes = await ConnectionService.getBulkMutualConnections(userId, targetUserIds, 3);
+                    const resultsMap = bulkRes?.data?.data || {}; // { "userId-targetId": { mutuals, count } }
 
-        mutualsResults = usersData.map((user: any) => {
-            const key = `${userId}-${user.userId}`;
-            return resultsMap[key] || { mutuals: [], count: 0 };
-        });
-    } catch (err) {
-        console.warn('⚠️ Failed to fetch bulk mutual connections:', err);
-        // mutualsResults already default fallback pe hai
-    }
-}
+                    mutualsResults = usersData.map((user: any) => {
+                        const key = `${userId}-${user.userId}`;
+                        return resultsMap[key] || { mutuals: [], count: 0 };
+                    });
+                } catch (err) {
+                    console.warn('⚠️ Failed to fetch bulk mutual connections:', err);
+                }
+            }
 
             // ✅ Collect the actual "mutual person" IDs (not connection record IDs)
-            // Har mutual record me fromUserId/toUserId hai — jo current suggested user nahi hai wahi mutual person hai
             const mutualPersonIdsSet = new Set<string>();
             usersData.forEach((suggestedUser: any, index: number) => {
                 const rawMutuals = mutualsResults[index]?.mutuals || [];
@@ -110,17 +107,46 @@ if (targetUserIds.length > 0) {
                 });
             });
 
-            // ✅ Bulk fetch mutual persons' basic info (name) for display
-            let mutualPersonsMap: Record<string, { name: string }> = {};
+            // ✅ Bulk fetch mutual persons' basic info (name + avatar) for display
+            let mutualPersonsMap: Record<string, { name: string; avatar: string | null }> = {};
             const mutualPersonIds = Array.from(mutualPersonIdsSet);
+
             if (mutualPersonIds.length > 0) {
                 try {
                     const mutualUsersResponse = await AuthService.getUsersBulk(mutualPersonIds);
                     const mutualUsersData = mutualUsersResponse.data?.users || [];
-                    mutualPersonsMap = mutualUsersData.reduce((acc: Record<string, { name: string }>, u: any) => {
-                        acc[u.userId] = { name: `${u.firstName} ${u.lastName}`.trim() };
-                        return acc;
-                    }, {});
+
+                    // in mutual users ke profilePhotoId collect karo
+                    const mutualPhotoIds = mutualUsersData
+                        .map((u: any) => u.profilePhotoId)
+                        .filter(Boolean);
+
+                    let mutualPhotosMap: Record<string, string> = {};
+                    if (mutualPhotoIds.length > 0) {
+                        try {
+                            const mutualPhotosResponse = await ProfileService.getMultipleProfilePhotosByIds(mutualPhotoIds);
+                            mutualPhotosMap = mutualPhotosResponse.data.photos.reduce(
+                                (acc: Record<string, string>, photo: any) => {
+                                    acc[photo.photoId] = photo.cloudinarySecureUrl;
+                                    return acc;
+                                },
+                                {}
+                            );
+                        } catch (error) {
+                            console.warn('⚠️ Failed to fetch mutual profile photos:', error);
+                        }
+                    }
+
+                    mutualPersonsMap = mutualUsersData.reduce(
+                        (acc: Record<string, { name: string; avatar: string | null }>, u: any) => {
+                            acc[u.userId] = {
+                                name: `${u.firstName} ${u.lastName}`.trim(),
+                                avatar: u.profilePhotoId ? mutualPhotosMap[u.profilePhotoId] || null : null,
+                            };
+                            return acc;
+                        },
+                        {}
+                    );
                 } catch (error) {
                     console.warn('⚠️ Failed to fetch mutual persons info:', error);
                 }
@@ -153,11 +179,21 @@ if (targetUserIds.length > 0) {
                         : `${firstMutualName} and ${mutualCount - 1} other mutual connection${mutualCount - 1 > 1 ? 's' : ''}`;
                 }
 
+                // ✅ Top 3 mutual avatars for the little overlapping bubbles in PersonCard
+                const mutualAvatars = rawMutuals
+                    .slice(0, 3)
+                    .map((m: any) => {
+                        const mutualPersonId = m.fromUserId === userId ? m.toUserId : m.fromUserId;
+                        return mutualPersonsMap[mutualPersonId]?.avatar;
+                    })
+                    .filter(Boolean) as string[];
+
                 return {
                     id: user.userId,
                     name: `${user.firstName} ${user.lastName}`.trim(),
                     title: headlineText || '',
                     mutuals: mutualsText,
+                    mutualAvatars,
                     image: profileImageUrl || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s',
                     location: user.location || '',
                 };
