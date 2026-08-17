@@ -18,6 +18,10 @@ interface PostActionsProps {
   onOpenWithPerspectiveModal?: any;
   handleRepostInstant?: any;
   currentUserId?: string;
+  // ✅ NEW — full post preview ke liye
+  profileImage?: string;
+  fullName?: string;
+  headline?: string;
 }
 
 const PostActions = ({
@@ -33,6 +37,12 @@ const PostActions = ({
   onOpenWithPerspectiveModal,
   handleRepostInstant,
   currentUserId,
+  // ✅ NEW
+  profileImage,
+  fullName,
+  headline,
+
+
 }: PostActionsProps) => {
   const postKey = post.entryId || post.postId;
   const isLiked = likedPosts[postKey] ?? post.isLikedByCurrentUser ?? false;
@@ -184,9 +194,20 @@ const PostActions = ({
           isOpen={showSendModal}
           onClose={() => setShowSendModal(false)}
           currentUserId={currentUserId}
+          profileImage={profileImage}
+fullName={fullName}
+headline={headline}
           postId={postKey}
-          postOwnerName={post.firstName || post.fullName || post.user || 'this'}
+          postOwnerName={post.firstName || post.fullName || post.user || fullName || 'this'}
+          postImage={post.image || post.images?.[0]?.cloudinarySecureUrl || ''}
+          postTitle={post.content || post.title || post.text || ''}
+          postAuthorAvatar={post.avatar || profileImage || ''}
           isDarkMode={isDarkMode}
+          // ✅ NEW — poora post data chat preview ke liye
+          postContent={post.content || post.title || post.text || ''}
+          postImages={(post.images || []).map((img: any) => img?.cloudinarySecureUrl || img?.url || img).filter(Boolean)}
+          postAuthorHeadline={headline || post.headline || ''}
+          postCreatedAt={post.createdAt || ''}
         />
       )}
 

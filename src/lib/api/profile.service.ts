@@ -1397,23 +1397,41 @@ static async getAllExperiencesByUserId(userId: string): Promise<any> {
         }
     }
 
-    /**
+   /**
      * 💾 SAVE/UNSAVE POST
      */
-    static async savePost(postId: string, isSaved: boolean): Promise<any> {
-        try {
-            console.log('💾 [SAVE_POST] Save/Unsave post:', postId, { isSaved });
+   static async savePost(postId: string, isSaved: boolean): Promise<any> {
+    try {
+        console.log('💾 [SAVE_POST] Save/Unsave post:', postId, { isSaved });
 
-            const { data } = await api.put(`${config?.NEXT_PUBLIC_ACTIVITY_ENDPOINT || process.env.NEXT_PUBLIC_ACTIVITY_ENDPOINT}/posts/${postId}/save`, { isSaved });
+        const { data } = await api.put(`${config?.NEXT_PUBLIC_ACTIVITY_ENDPOINT || process.env.NEXT_PUBLIC_ACTIVITY_ENDPOINT}/posts/${postId}/save`, { isSaved });
 
-            console.log('✅ [SAVE_POST] Post save status updated');
-            return data;
+        console.log('✅ [SAVE_POST] Post save status updated');
+        return data;
 
-        } catch (error: any) {
-            console.error('❌ [SAVE_POST] Failed:', error);
-            throw new Error(error.response?.data?.message || 'Failed to save post');
-        }
+    } catch (error: any) {
+        console.error('❌ [SAVE_POST] Failed:', error);
+        throw new Error(error.response?.data?.message || 'Failed to save post');
     }
+}
+
+/**
+ * 📑 GET SAVED POSTS (current logged-in user ke)
+ */
+static async getSavedPosts(): Promise<any> {
+    try {
+        console.log('📑 [GET_SAVED_POSTS] Fetching saved posts...');
+
+        const { data } = await api.get(`${config?.NEXT_PUBLIC_ACTIVITY_ENDPOINT || process.env.NEXT_PUBLIC_ACTIVITY_ENDPOINT}/posts/saved`);
+
+        console.log('✅ [GET_SAVED_POSTS] Saved posts fetched:', data.data?.total);
+        return data;
+
+    } catch (error: any) {
+        console.error('❌ [GET_SAVED_POSTS] Failed:', error);
+        throw new Error(error.response?.data?.message || 'Failed to fetch saved posts');
+    }
+}
 
     /**
  * ❤️ LIKE POST

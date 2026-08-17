@@ -112,11 +112,14 @@ const PostCard = ({
           toggleRepostMenu={toggleRepostMenu}
           handleRepost={handleRepost}
           toggleComments={handleOpenDetailModal}
+          headline={headline}
           onOpenWithPerspectiveModal={onOpenWithPerspectiveModal}
           handleRepostInstant={handleRepostInstant}
           postReactions={postReactions}
           onReact={onReact}
           currentUserId={currentUserId}
+          profileImage={profileImage}   // ✅ NEW
+          fullName={fullName}           // ✅ NEW
         />
         </div>
 

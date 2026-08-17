@@ -4,8 +4,8 @@ import AnalyticsService from '@/lib/api/analytics.service';
 
 
 const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = false, disableToggle = false }: { post: any; isDarkMode: boolean; forceExpanded?: boolean; hideMedia?: boolean; disableToggle?: boolean }) => {  const [expanded, setExpanded] = useState(!!forceExpanded);
-  const content: string = post.content || '';
-
+  const content: string = post.content || post.title || '';
+  
   // Get lines and filter out empty ones to find the first real line
   const lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
   const firstLine = lines[0] || '';

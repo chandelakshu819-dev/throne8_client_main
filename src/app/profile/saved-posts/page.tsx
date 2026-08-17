@@ -21,8 +21,8 @@ const SavedPostsPage: React.FC = () => {
     const fetchSaved = async () => {
         try {
             setIsLoading(true);
-            const res = await ProfileService.getAllUserPosts();
-            setSavedPosts(res?.data?.savedPosts || []);
+            const res = await ProfileService.getSavedPosts();   // ✅ FIX — sahi method
+            setSavedPosts(res?.data?.posts || []);               // ✅ FIX — sahi field
         } catch (err) {
             setSavedPosts([]);
         } finally {
@@ -156,8 +156,10 @@ const SavedPostsPage: React.FC = () => {
                                         fetchCommentsByPost={handlers.fetchCommentsByPost}
                                         handlePostAction={async (action: string, postId: string) => {
                                             if (action === 'save') {
-                                                const wasSaved = handlers.postSaves[postId] ?? true;
-                                                await handlers.handleSavePost(postId, wasSaved);
+                                                // Is page pe har post already saved hai (isliye yahan hai),
+                                                // isliye action hamesha "unsave" hona chahiye.
+                                                const isCurrentlySaved = handlers.postSaves[postId] ?? true;
+                                                await handlers.handleSavePost(postId, !isCurrentlySaved);
                                                 fetchSaved();
                                             }
                                         }}

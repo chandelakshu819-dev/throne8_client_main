@@ -188,8 +188,16 @@ const PostCard: React.FC<PostCardProps> = ({
 
             {/* ── Content ── */}
             <div className="relative z-10">
-                <p className="text-[#4a3728] mb-4 text-base leading-relaxed" dangerouslySetInnerHTML={{ __html: post.text }} />
-
+            {(post.title || post.text) && (
+    <div className="text-[#4a3728] mb-4 text-base leading-relaxed">
+        {post.title && (
+            <p className="font-semibold">{post.title}</p>
+        )}
+        {post.text && (
+            <p dangerouslySetInnerHTML={{ __html: post.text }} />
+        )}
+    </div>
+)}
                 {/* Images */}
                 {post.images && post.images.length > 0 && (
                     <div className={`grid gap-2 mb-4 ${post.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>

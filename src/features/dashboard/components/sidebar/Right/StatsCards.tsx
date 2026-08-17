@@ -49,6 +49,16 @@ const StatsCards: React.FC<StatsCardsProps> = ({ isDarkMode, currentUserId }) =>
     return `${num}`;
   };
 
+  // change % ko -100 se +100 ke beech clamp karo
+  const CHANGE_LIMIT = 100;
+  const clampChange = (value: number): number => {
+    if (Number.isNaN(value) || !Number.isFinite(value)) return 0;
+    return Math.min(CHANGE_LIMIT, Math.max(-CHANGE_LIMIT, value));
+  };
+
+
+
+
   const handleProfileViewsClick = () => {
     router.push(`/profile/analytics/${currentUserId}?tab=views`);
   };
@@ -76,7 +86,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ isDarkMode, currentUserId }) =>
           </p>
           {!isLoading && viewsChangePercent !== 0 && (
             <span className={`text-xs font-semibold ${viewsChangePercent >= 0 ? (isDarkMode ? 'text-green-400' : 'text-green-600') : (isDarkMode ? 'text-red-400' : 'text-red-600')}`}>
-              {viewsChangePercent >= 0 ? '+' : ''}{viewsChangePercent}%
+             {clampChange(viewsChangePercent) >= 0 ? '+' : ''}{clampChange(viewsChangePercent)}%
             </span>
           )}
         </div>
