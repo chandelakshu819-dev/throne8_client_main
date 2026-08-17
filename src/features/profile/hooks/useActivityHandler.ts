@@ -136,7 +136,7 @@ export const useActivityHandlers = ({
             await ProfileService.updatePost(postId, { content: newContent });
             onPostCreated?.();
            // ✅ NEW: broadcast karo taaki Home feed (ya koi bhi doosra page) bhi sync ho jaaye
-emitPostContentUpdated(postId, newContent);
+            emitPostContentUpdated(postId, newContent);
         } catch (error: any) {
             alert(error.message || 'Failed to update post');
         }

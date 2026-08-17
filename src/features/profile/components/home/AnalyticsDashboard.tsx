@@ -37,11 +37,21 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ userId }) => {
         return Math.min(100, Math.max(0, pct));
     };
 
-    // Helper: format change badge text with sign
-    const formatChange = (value: number) => {
-        const sign = value > 0 ? '+' : '';
-        return `${sign}${value}%`;
-    };
+// Helper: change % ko -100 se +100 ke beech clamp karo
+const CHANGE_LIMIT = 100;
+const clampChange = (value: number) => {
+    if (Number.isNaN(value) || !Number.isFinite(value)) return 0;
+    return Math.min(CHANGE_LIMIT, Math.max(-CHANGE_LIMIT, value));
+};
+
+// Helper: format change badge text with sign
+const formatChange = (value: number) => {
+    const clamped = clampChange(value);
+    const sign = clamped > 0 ? '+' : '';
+    const suffix = Math.abs(value) > CHANGE_LIMIT ? '+' : '';
+    return `${sign}${clamped}%${suffix}`;
+};
+
 
     useEffect(() => {
         const fetchAnalytics = async () => {
