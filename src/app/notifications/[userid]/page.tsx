@@ -5,7 +5,7 @@ import TokenStorage from "@/store/token.storage";
 import config from "@/config/env.config";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-    Bell, MessageCircle, Users, Edit3, CheckCircle, X, Heart, MessageSquare, Share2, Bookmark, Search, Filter, Settings, Moon, Sun, Volume2, VolumeX, Zap, TrendingUp, Award, Calendar, MapPin, Eye, EyeOff, Loader2, Wifi, WifiOff, RefreshCw, Trash2
+    Bell, MessageCircle, Users, Edit3, CheckCircle, X, Heart, MessageSquare, Bookmark, Search, Filter, Settings, Moon, Sun, Volume2, VolumeX, Zap, TrendingUp, Award, Calendar, MapPin, Eye, EyeOff, Loader2, Wifi, WifiOff, RefreshCw, Trash2
 } from "lucide-react";
 
 import NotificationService from "@/lib/api/notification.service";
@@ -819,7 +819,7 @@ const NotificationsPage = () => {
                                                                 `https://api.dicebear.com/7.x/initials/svg?seed=${notification.senderName}`
                                                             }
                                                             alt={notification.senderName}
-                                                            className="w-12 h-12 rounded-xl object-cover border-2 border-white shadow-lg group-hover:scale-110 transition-transform duration-300"
+                                                            className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-lg group-hover:scale-110 transition-transform duration-300"
                                                             onError={(e) => {
                                                                 (e.target as HTMLImageElement).src =
                                                                     `https://api.dicebear.com/7.x/initials/svg?seed=${notification.senderName}`;
@@ -854,7 +854,7 @@ const NotificationsPage = () => {
                                                                     </span>
                                                                 )}
 
-                                                                <div className="flex items-center justify-between mt-3">
+                                                                <div className="flex items-center mt-3">
                                                                     <p
                                                                         className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"} flex items-center gap-2`}
                                                                     >
@@ -866,18 +866,6 @@ const NotificationsPage = () => {
                                                                             {notification.type.replace(/_/g, " ")}
                                                                         </span>
                                                                     </p>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <button
-                                                                            className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"} transition-colors hover:text-[#4a3728]`}
-                                                                        >
-                                                                            Reply
-                                                                        </button>
-                                                                        <button
-                                                                            className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"} transition-colors hover:text-[#4a3728]`}
-                                                                        >
-                                                                            React
-                                                                        </button>
-                                                                    </div>
                                                                 </div>
 
                                                                 {/* Accept / Ignore for connection requests */}
@@ -945,36 +933,17 @@ const NotificationsPage = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Hover Actions Bar */}
-                                            <div
-                                                className={`absolute bottom-0 left-0 right-0 p-2 ${darkMode ? "bg-gray-800/80" : "bg-white/80"} backdrop-blur-sm transform translate-y-full group-hover:translate-y-0 transition-transform duration-300`}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        {[
-                                                            { icon: Heart, label: "Like" },
-                                                            { icon: MessageSquare, label: "Comment" },
-                                                            { icon: Share2, label: "Share" },
-                                                        ].map(({ icon: Icon, label }) => (
-                                                            <button
-                                                                key={label}
-                                                                className="flex items-center gap-1 px-3 py-1 bg-gray-500/10 text-[#4a3728] rounded-lg hover:bg-[#6a5748] hover:text-white transition-colors"
-                                                            >
-                                                                <Icon className="w-3 h-3" />
-                                                                <span className="text-xs">{label}</span>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                    {notification.entityType === "post" && (
-                                                        <button 
-                                                            onClick={() => router.push(`/post/${notification.entityId}`)}
-                                                            className="text-xs text-[#4a3728] hover:underline transition-colors"
-                                                        >
-                                                            View Post →
-                                                        </button>
-                                                    )}
+                                            {/* View Post link for post notifications */}
+                                            {notification.entityType === "post" && (
+                                                <div className={`px-4 pb-3`}>
+                                                    <button 
+                                                        onClick={() => router.push(`/post/${notification.entityId}`)}
+                                                        className="text-xs text-[#4a3728] hover:underline transition-colors font-medium"
+                                                    >
+                                                        View Post →
+                                                    </button>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
