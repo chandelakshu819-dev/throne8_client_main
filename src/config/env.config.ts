@@ -34,7 +34,7 @@ const _config = {
     // ============================================================
     // 1. CORE API CONFIG
     // ============================================================
-    NEXT_PUBLIC_API_BASE_URL: requireEnv('NEXT_PUBLIC_API_BASE_URL', process.env.NEXT_PUBLIC_API_BASE_URL),
+NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || 'https://throne8-servers-production-90bb.up.railway.app/api/v1',
     NEXT_PUBLIC_WS_URL: optionalEnv('NEXT_PUBLIC_WS_URL', process.env.NEXT_PUBLIC_WS_URL),
     NEXT_PUBLIC_API_VERSION: optionalEnv('NEXT_PUBLIC_API_VERSION', process.env.NEXT_PUBLIC_API_VERSION),
     NEXT_PUBLIC_API_TIMEOUT: numberEnv('NEXT_PUBLIC_API_TIMEOUT', process.env.NEXT_PUBLIC_API_TIMEOUT, 30000),
