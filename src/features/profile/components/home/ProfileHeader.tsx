@@ -6,6 +6,8 @@ import EditIntroModal from './EditIntroModal';
 import ProfileImageModal from './ProfileImageModal';
 import Contactact from './Contactact';
 import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import ConnectionService from '@/lib/api/connection.service';
 
 interface ProfileHeaderProps {
     currentUserId?: string;
@@ -81,6 +83,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     onDeclineRequest,
 }) => {
     const router = useRouter();
+    const { user: loggedInUser } = useAuth();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isProfileImageModalOpen, setIsProfileImageModalOpen] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -92,6 +95,11 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             ? profileImage
             : `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=4a3728&color=fff&size=256`
     );
+
+    // ✅ NEW — Mutual connections count (LinkedIn-style "X mutual connections" badge)
+    const [mutualCount, setMutualCount] = useState<number>(0);
+    const [isLoadingMutuals, setIsLoadingMutuals] = useState(false);
+
     useEffect(() => {
         if (profileImage && profileImage.trim() !== '') {
             setCurrentProfileImage(profileImage);
@@ -111,6 +119,40 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             fetchConnectionsData(currentUserId);
         }
     }, [currentUserId, fetchConnectionsData]);
+
+    // ✅ NEW — fetch mutual connections count between logged-in user and the
+    // profile being viewed. Sirf tab chalta hai jab yeh apni profile na ho
+    // (khud ke sath mutual dikhana faltu hai) aur dono IDs available hon.
+    useEffect(() => {
+        const loggedInUserId = loggedInUser?.userId;
+
+        if (isOwnProfile || !currentUserId || !loggedInUserId || currentUserId === loggedInUserId) {
+            setMutualCount(0);
+            return;
+        }
+
+        let cancelled = false;
+        setIsLoadingMutuals(true);
+
+        ConnectionService.getBulkMutualConnections(loggedInUserId, [currentUserId], 3)
+            .then((res: any) => {
+                if (cancelled) return;
+                const resultsMap = res?.data?.data || {};
+                const key = `${loggedInUserId}-${currentUserId}`;
+                const count = resultsMap[key]?.count || 0;
+                setMutualCount(count);
+            })
+            .catch(() => {
+                if (!cancelled) setMutualCount(0);
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoadingMutuals(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isOwnProfile, currentUserId, loggedInUser?.userId]);
 
     const handleProfileUpdate = async () => {
         if (onDataRefresh) {
@@ -282,6 +324,21 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                             {isLoadingConnections ? '' : totalConnections}
                                         </span> connections
                                     </button>
+
+                                    {/* ✅ NEW — "X mutual connections" badge, LinkedIn-style.
+                                        Sirf dikhta hai jab: apni profile na ho, loading khatam ho
+                                        chuki ho, aur count 0 se zyada ho — 0 dikhana faltu/noisy hai */}
+                                    {!isOwnProfile && !isLoadingMutuals && mutualCount > 0 && (
+                                        <button
+                                            className="connectionsShowButton group px-3 py-1.5 bg-white text-[#4a3728] rounded-full text-xs shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-1.5 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white"
+                                            onClick={() => router.push(`/network/connections?userId=${currentUserId}&tab=connections`)}
+                                        >
+                                            <svg className="w-4 h-4 text-[#4a3728] group-hover:animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                            </svg>
+                                            <span className="font-semibold">{mutualCount}</span> mutual connection{mutualCount > 1 ? 's' : ''}
+                                        </button>
+                                    )}
                                 </div>
 
                                 {!isOwnProfile && (

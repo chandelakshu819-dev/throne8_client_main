@@ -1,5 +1,5 @@
 'use client';
-
+//src/features/networks/components/suggestions/PersonCard.tsx
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Person } from '@/features/networks/types';
@@ -18,6 +18,7 @@ export const PersonCard: React.FC<PersonCardProps> = ({
     isLoading = false
 }) => {
     const router = useRouter();
+
 
     const goToProfile = () => {
         router.push(`/profile/${person.id}`);

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import AuthService from '@/lib/api/auth.service';
 import ConnectionService from '@/lib/api/connection.service';
 import ProfileService from '@/lib/api/profile.service';
@@ -8,7 +8,17 @@ export const useNetworkUsers = () => {
     const [isLoadingUsers, setIsLoadingUsers] = useState(true);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
+    // ✅ NEW — race guard. Har fetchNetworkUsers call ko ek unique id milta hai.
+    // Agar koi purani (stale) call baad me complete ho (StrictMode double-invoke,
+    // ya userId change hone se dobara call), uska result IGNORE ho jata hai —
+    // sirf sabse LATEST call ka result state me jaata hai. Isse intermittent
+    // "stuck loading" / galat data wala race condition fix hota hai.
+    const latestRequestId = useRef(0);
+
     const fetchNetworkUsers = useCallback(async (userId: string) => {
+        const requestId = ++latestRequestId.current;
+        console.log(`🟢 [DEBUG #${requestId}] fetchNetworkUsers STARTED for userId:`, userId);
+
         try {
             setIsLoadingUsers(true);
             setCurrentUserId(userId);
@@ -17,6 +27,13 @@ export const useNetworkUsers = () => {
                 AuthService.getAllUsers({ limit: 100 }),
                 ConnectionService.getUserConnections(userId).catch(() => ({ data: { data: [] } }))
             ]);
+
+            // ✅ RACE CHECK — agar ismeen ek naya request start ho chuka hai
+            // (dusra fetchNetworkUsers call), to yeh purana wala yahi ruk jaye
+            if (requestId !== latestRequestId.current) {
+                console.log(`🟡 [DEBUG #${requestId}] STALE — newer request (#${latestRequestId.current}) exists, abandoning`);
+                return;
+            }
 
             const users = usersResponse.data.users;
             const connections = connectionsResponse.data.data || [];
@@ -40,6 +57,11 @@ export const useNetworkUsers = () => {
                     console.warn('⚠️ Failed to fetch users in bulk:', err);
                     usersData = [];
                 }
+            }
+
+            if (requestId !== latestRequestId.current) {
+                console.log(`🟡 [DEBUG #${requestId}] STALE after bulk users fetch — abandoning`);
+                return;
             }
 
             const profilePhotoIds = usersData
@@ -77,13 +99,20 @@ export const useNetworkUsers = () => {
                 }
             }
 
+            if (requestId !== latestRequestId.current) {
+                console.log(`🟡 [DEBUG #${requestId}] STALE after photos/headlines — abandoning`);
+                return;
+            }
+
             // ✅ Fetch mutual connections for all suggested users in ONE bulk call
             const targetUserIds = usersData.map((user: any) => user.userId);
             let mutualsResults: any[] = usersData.map(() => ({ mutuals: [], count: 0 }));
 
             if (targetUserIds.length > 0) {
                 try {
+                    console.log(`🟡 [DEBUG #${requestId}] calling getBulkMutualConnections, targets:`, targetUserIds.length);
                     const bulkRes = await ConnectionService.getBulkMutualConnections(userId, targetUserIds, 3);
+                    console.log(`✅ [DEBUG #${requestId}] mutuals bulk response:`, bulkRes?.data);
                     const resultsMap = bulkRes?.data?.data || {}; // { "userId-targetId": { mutuals, count } }
 
                     mutualsResults = usersData.map((user: any) => {
@@ -93,6 +122,11 @@ export const useNetworkUsers = () => {
                 } catch (err) {
                     console.warn('⚠️ Failed to fetch bulk mutual connections:', err);
                 }
+            }
+
+            if (requestId !== latestRequestId.current) {
+                console.log(`🟡 [DEBUG #${requestId}] STALE after mutuals fetch — abandoning`);
+                return;
             }
 
             // ✅ Collect the actual "mutual person" IDs (not connection record IDs)
@@ -152,6 +186,11 @@ export const useNetworkUsers = () => {
                 }
             }
 
+            if (requestId !== latestRequestId.current) {
+                console.log(`🟡 [DEBUG #${requestId}] STALE after mutual persons fetch — abandoning`);
+                return;
+            }
+
             const transformedUsers = usersData.map((user: any, index: number) => {
                 const profileImageUrl = user.profilePhotoId
                     ? profilePhotosMap[user.profilePhotoId] || null
@@ -199,12 +238,23 @@ export const useNetworkUsers = () => {
                 };
             });
 
+            console.log(`✅ [DEBUG #${requestId}] COMPLETED — ${transformedUsers.length} users, applying to state`);
             setNetworkUsers(transformedUsers);
 
         } catch (error: any) {
-            setNetworkUsers([]);
+            console.log(`🔴 [DEBUG #${requestId}] CRASHED:`, error);
+            if (requestId === latestRequestId.current) {
+                setNetworkUsers([]);
+            }
         } finally {
-            setIsLoadingUsers(false);
+            // ✅ Sirf sabse latest request hi loading state control kare —
+            // stale/abandoned requests ka finally block state ko touch na kare
+            if (requestId === latestRequestId.current) {
+                console.log(`🔵 [DEBUG #${requestId}] FINALLY — setting isLoadingUsers = false (this is the winning request)`);
+                setIsLoadingUsers(false);
+            } else {
+                console.log(`⚪ [DEBUG #${requestId}] FINALLY — skipped, stale request`);
+            }
         }
     }, []);
 
