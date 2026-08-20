@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { MoreVertical, Pin, Archive, Trash2, Edit, Loader2 } from 'lucide-react';
+import { MoreVertical, Pin, Archive, Trash2, Edit, Loader2, Zap, Plus } from 'lucide-react';
 import { useSkillsData } from '@/features/profile/hooks/useSkillsData';
 import AuthService from '@/lib/api/auth.service';
 import AddSkillModal, { SkillFormData } from '@/features/study-group/modals/AddSkillModal';
@@ -26,6 +26,24 @@ interface SkillsSectionProps {
     userId?: string;          // target user ka id (public profile ke liye)
     isOwnProfile?: boolean;   // default true - purana behavior nahi tootega
 }
+
+// design tokens — matched to the app's actual palette (same cream used by
+// Interests / other sections) instead of a flat white that breaks continuity
+const TOKENS = {
+    sectionBg: '#F6EDE8',   // outer wrapper — same warm cream as rest of the app
+    cardBg: '#FBF6F0',      // inner skill card — subtle cream, not stark white
+    border: '#E5D9CE',
+    borderHover: '#4A3728',
+    accent: '#4A3728',
+    accentHover: '#3A2A1E',
+    chipBg: '#EFE3D8',
+    textPrimary: '#4A3728',
+    textSecondary: 'rgba(74,55,40,0.6)',
+    textOnChip: '#6B5D48',
+    danger: '#B4442E',
+};
+
+const STRENGTH_LEVELS = ['beginner', 'intermediate', 'advanced', 'expert'];
 
 const SkillsSection: React.FC<SkillsSectionProps> = ({
     userId,
@@ -73,30 +91,9 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
         }
     };
 
-    if (isLoadingSkills) {
-        return (
-            <div className="bg-[#f6ede8]/95 rounded-3xl p-8 mb-8">
-                <div className="flex items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-[#4a3728]" />
-                    <p className="ml-3 text-[#4a3728]">Loading skills...</p>
-                </div>
-            </div>
-        );
-    }
-
-    // Public profile pe agar koi skill nahi, poora section hide
-    if (!isOwnProfile && skillsList.length === 0) {
-        return null;
-    }
-
     const getStrengthLevel = (strength: string) => {
-        const levels = {
-            beginner: 2,
-            intermediate: 3,
-            advanced: 4,
-            expert: 5,
-        };
-        return levels[strength as keyof typeof levels] || 3;
+        const index = STRENGTH_LEVELS.indexOf(strength);
+        return index === -1 ? 2 : index + 1; // 1-4
     };
 
     const getStrengthLabel = (strength: string) => {
@@ -107,16 +104,6 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
             expert: 'Expert',
         };
         return labels[strength as keyof typeof labels] || 'Intermediate';
-    };
-
-    const getStrengthPercentage = (strength: string) => {
-        const percentages = {
-            beginner: 40,
-            intermediate: 60,
-            advanced: 80,
-            expert: 100,
-        };
-        return percentages[strength as keyof typeof percentages] || 60;
     };
 
     const handleMenuToggle = (skillId: string) => {
@@ -134,15 +121,12 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
 
     const handleArchiveSkill = async (skillId: string) => {
         try {
-
             setIsArchivingSkillId(skillId);
             setOpenMenuId(null);
             const response = await ProfileService.archiveSkill(skillId);
 
             if (response?.data?.skill) {
-
                 removeSkillFromList(skillId);
-
             }
 
             setIsArchivingSkillId(null);
@@ -160,7 +144,6 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
                 setOpenMenuId(null);
                 return;
             }
-
 
             setIsPinningSkillId(skillId);
             setOpenMenuId(null);
@@ -183,7 +166,6 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
                 await fetchSkillsData();
                 setIsPinningSkillId(null);
             }, 300);
-
         } catch (error: any) {
             console.error('Failed to pin/unpin skill:', error);
             alert(error.message || 'Failed to update pin status');
@@ -204,13 +186,11 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
         if (!skillToDelete) return;
 
         try {
-
             setIsDeletingSkillId(skillToDelete.skillId);
 
             const response = await ProfileService.deleteSkill(skillToDelete.skillId);
 
             if (response) {
-
                 removeSkillFromList(skillToDelete.skillId);
 
                 setIsDeleteConfirmModalOpen(false);
@@ -227,15 +207,11 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
 
     const handleUpdateSkillConfirm = async (skillId: string, updatedData: UpdateSkillFormData) => {
         try {
-
             const response = await ProfileService.updateSkill(skillId, updatedData);
 
             if (response?.data?.skill) {
-
                 updateSkillInList(skillId, updatedData);
-
                 await fetchSkillsData();
-
             }
         } catch (error: any) {
             console.error('Failed to update skill:', error);
@@ -243,210 +219,245 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
         }
     };
 
-    const getCategoryIcon = (category: string) => {
+    // ---- loading state ----
+    if (isLoadingSkills) {
         return (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+            <div
+                className="rounded-3xl p-8 mb-6 shadow-sm"
+                style={{ backgroundColor: TOKENS.sectionBg, border: `1px solid ${TOKENS.border}` }}
+            >
+                <div className="flex items-center justify-center gap-3">
+                    <Loader2 className="h-5 w-5 animate-spin" style={{ color: TOKENS.accent }} />
+                    <p className="text-sm" style={{ color: TOKENS.textSecondary }}>Loading skills…</p>
+                </div>
+            </div>
         );
-    };
+    }
+
+    // Public profile pe agar koi skill nahi, poora section hide
+    if (!isOwnProfile && skillsList.length === 0) {
+        return null;
+    }
 
     const visibleSkills = showAllSkills ? skillsList : skillsList.slice(0, 2);
-
+    const isEmpty = skillsList.length === 0;
 
     return (
         <>
-            <div className="relative bg-[#f6ede8]/95 via-[#f6ede8]/85 to-[#e0d8cf]/70 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-[#e0d8cf]/50 mb-8 overflow-hidd group">
-                <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-[#e0d8cf]/30 to-[#4a3728]/10 rounded-full blur-2xl animate-pulse"></div>
-                <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-gradient-to-tr from-[#7a5c3e]/20 to-transparent rounded-full blur-xl group-hover:scale-150 transition-transform duration-1000"></div>
-                <div className="absolute top-1/4 right-1/4 w-2 h-2 bg-[#4a3728]/20 rounded-full animate-bounce"></div>
-                <div className="absolute bottom-1/3 left-1/5 w-1 h-1 bg-[#7a5c3e]/30 rounded-full animate-ping"></div>
-
-                <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-8">
-                        <div className="flex items-center gap-3">
-                            <div className="relative">
-                                <div className="w-12 h-12 bg-gradient-to-br from-[#4a3728] to-[#7a5c3e] rounded-2xl flex items-center justify-center shadow-lg transform">
-                                    <svg className="w-6 h-6 text-[#f6ede8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    </svg>
-                                </div>
-                            </div>
-                            <div>
-                                <h3 className="text-2xl font-bold text-[#4a3728] tracking-tight">Skills</h3>
-                                <p className="text-sm text-[#4a3728]/60 font-medium">Professional Expertise</p>
-                            </div>
+            <div
+                className="rounded-3xl p-6 mb-6 shadow-sm"
+                style={{ backgroundColor: TOKENS.sectionBg, border: `1px solid ${TOKENS.border}` }}
+            >
+                {/* header */}
+                <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-3">
+                        <div
+                            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: TOKENS.accent }}
+                        >
+                            <Zap size={16} style={{ color: TOKENS.chipBg }} />
                         </div>
-                        {/* Add Skill button sirf apni profile pe */}
-                        {isOwnProfile && (
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setIsAddSkillModalOpen(true)}
-                                    className="AddSkillButton text-sm font-bold text-[#fff] bg-[#4a3728] px-4 py-2 rounded-full backdrop-blur-sm hover:shadow-lg hover:from-[#7a5c3e] transition-all duration-200"
-                                >
-                                    Add Skill
-                                </button>
-                            </div>
-                        )}
+                        <div>
+                            <h3 className="text-[16px] font-semibold leading-tight" style={{ color: TOKENS.textPrimary }}>
+                                Skills
+                            </h3>
+                            <p className="text-[12px]" style={{ color: TOKENS.textSecondary }}>
+                                Professional expertise
+                            </p>
+                        </div>
                     </div>
-                    
 
-                    <div className="space-y-6">
-                        
-                    {visibleSkills.map((skill) => {         
-                                const isLoading = isPinningSkillId === skill.skillId ||
+                    {isOwnProfile && (
+                        <button
+                            onClick={() => setIsAddSkillModalOpen(true)}
+                            className="AddSkillButton flex items-center gap-1.5 text-[13px] font-medium rounded-full px-4 py-1.5 transition-colors"
+                            style={{ backgroundColor: TOKENS.accent, color: TOKENS.chipBg }}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = TOKENS.accentHover)}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = TOKENS.accent)}
+                        >
+                            <Plus size={14} />
+                            Add skill
+                        </button>
+                    )}
+                </div>
+
+                {/* empty state */}
+                {isEmpty && isOwnProfile && (
+                    <div
+                        className="rounded-xl px-5 py-8 text-center"
+                        style={{ border: `1px dashed ${TOKENS.border}` }}
+                    >
+                        <p className="text-[14px] font-medium mb-1" style={{ color: TOKENS.textPrimary }}>
+                            Add your first skill
+                        </p>
+                        <p className="text-[12px] mb-4" style={{ color: TOKENS.textSecondary }}>
+                            Skills help others find you for the right opportunities.
+                        </p>
+                        <button
+                            onClick={() => setIsAddSkillModalOpen(true)}
+                            className="text-[13px] font-medium rounded-full px-4 py-1.5"
+                            style={{ backgroundColor: TOKENS.accent, color: TOKENS.chipBg }}
+                        >
+                            Add skill
+                        </button>
+                    </div>
+                )}
+
+                {/* skill cards */}
+                {!isEmpty && (
+                    <div className="flex flex-col gap-3">
+                        {visibleSkills.map((skill) => {
+                            const isLoading = isPinningSkillId === skill.skillId ||
                                 isArchivingSkillId === skill.skillId ||
                                 isDeletingSkillId === skill.skillId;
+                            const level = getStrengthLevel(skill.skillStrength);
 
                             return (
                                 <div
                                     key={skill.skillId}
-                                    className={`group/skill relative ${openMenuId === skill.skillId ? 'z-50' : 'z-0'
+                                    className={`group/skill relative rounded-2xl px-5 py-4 transition-colors ${openMenuId === skill.skillId ? 'z-50' : 'z-0'
                                         } ${isLoading ? 'opacity-60 pointer-events-none' : ''}`}
+                                    style={{ backgroundColor: TOKENS.cardBg, border: `1px solid ${TOKENS.border}` }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = TOKENS.borderHover)}
+                                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = TOKENS.border)}
                                 >
-                                    <div className="bg-gradient-to-r from-[#e0d8cf]/40 via-[#e0d8cf]/20 to-transparent backdrop-blur-sm rounded-2xl p-6 border border-[#e0d8cf]/40 hover:border-[#4a3728]/30 transform transition-all duration-500 relative overflow-visib">
-                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#4a3728]/5 to-transparent opacity-0 group-hover/skill:opacity-100 transition-opacity duration-500"></div>
-
-                                        <div className="flex items-start gap-4 z-10">
-                                            <div className="relative">
-                                                <div className="w-14 h-14 bg-gradient-to-br from-[#4a3728] to-[#7a5c3e] rounded-2xl flex items-center justify-center text-[#f6ede8] shadow-lg transition-all duration-300">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-start gap-3 min-w-0">
+                                            <div className="relative shrink-0">
+                                                <div
+                                                    className="w-9 h-9 rounded-xl flex items-center justify-center"
+                                                    style={{ backgroundColor: TOKENS.accent }}
+                                                >
                                                     {isLoading ? (
-                                                        <Loader2 className="w-6 h-6 animate-spin" />
+                                                        <Loader2 className="w-4 h-4 animate-spin" style={{ color: TOKENS.chipBg }} />
                                                     ) : (
-                                                        getCategoryIcon(skill.category)
+                                                        <Zap size={16} style={{ color: TOKENS.chipBg }} />
                                                     )}
                                                 </div>
                                                 {skill.isPinned && !isLoading && (
-                                                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-[#7a5c3e] rounded-full flex items-center justify-center shadow-lg animate-pulse">
-                                                        <Pin className="w-3 h-3 text-[#f6ede8] fill-current" />
+                                                    <div
+                                                        className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center"
+                                                        style={{ backgroundColor: TOKENS.accentHover }}
+                                                    >
+                                                        <Pin className="w-2.5 h-2.5 fill-current" style={{ color: TOKENS.chipBg }} />
                                                     </div>
                                                 )}
                                             </div>
 
-                                            <div className="flex-1 min-w-0 relative">
-                                                <div className="relative flex items-center justify-between mb-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <h4 className="text-lg font-bold text-[#4a3728] group-hover/skill:text-[#7a5c3e] transition-colors duration-300">
-                                                            {skill.skillName}
-                                                        </h4>
-                                                    </div>
-
-                                                    {/* Three Dot Menu sirf apni profile pe */}
-                                                    {isOwnProfile && (
-                                                        <div className="relative">
-                                                            <button
-                                                                onClick={() => handleMenuToggle(skill.skillId)}
-                                                                className="p-2 hover:bg-[#e0d8cf]/50 rounded-lg transition-colors duration-200"
-                                                            >
-                                                                <MoreVertical className="w-5 h-5 text-[#4a3728]" />
-                                                            </button>
-
-                                                            {openMenuId === skill.skillId && (
-                                                                <>
-                                                                    {/* Backdrop */}
-                                                                    <div
-                                                                        className="fixed inset-0 z-[9998]"
-                                                                        onClick={() => setOpenMenuId(null)}
-                                                                    ></div>
-
-                                                                    {/* Menu */}
-                                                                    <div className="absolute right-8 top-2 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-[#e0d8cf]/50 py-2 z-[9999] animate-in fade-in slide-in-from-top-2 duration-200">
-                                                                        <button
-                                                                            onClick={() => handleUpdateSkill(skill.skillId)}
-                                                                            className="w-full flex cursor-pointer  items-center gap-3 px-4 py-3 hover:bg-[#f6ede8] transition-colors duration-200 text-left"
-                                                                        >
-                                                                            <Edit className="w-4 h-4 text-[#4a3728]" />
-                                                                            <span className="text-sm font-medium text-[#4a3728]">Update Skill</span>
-                                                                        </button>
-
-                                                                        <button
-                                                                            onClick={() => handlePinSkill(skill.skillId, skill.isPinned)}
-                                                                            className="w-full flex cursor-pointer  items-center gap-3 px-4 py-3 hover:bg-[#f6ede8] transition-colors duration-200 text-left"
-                                                                        >
-                                                                            <Pin className="w-4 h-4 text-[#4a3728]" />
-                                                                            <span className="text-sm font-medium text-[#4a3728]">
-                                                                                {skill.isPinned ? 'Unpin Skill' : 'Pin Skill'}
-                                                                            </span>
-                                                                        </button>
-
-                                                                        <button
-                                                                            onClick={() => handleArchiveSkill(skill.skillId)}
-                                                                            className="w-full flex cursor-pointer  items-center gap-3 px-4 py-3 hover:bg-[#f6ede8] transition-colors duration-200 text-left"
-                                                                        >
-                                                                            <Archive className="w-4 h-4 text-[#4a3728]" />
-                                                                            <span className="text-sm font-medium text-[#4a3728]">Archive Skill</span>
-                                                                        </button>
-
-                                                                        <div className="h-px bg-[#e0d8cf] my-2"></div>
-
-                                                                        <button
-                                                                            onClick={() => handleDeleteSkill(skill.skillId)}
-                                                                            className="w-full flex cursor-pointer  items-center gap-3 px-4 py-3 hover:bg-red-50 transition-colors duration-200 text-left"
-                                                                        >
-                                                                            <Trash2 className="w-4 h-4 text-red-600" />
-                                                                            <span className="text-sm font-medium text-red-600">Delete Skill</span>
-                                                                        </button>
-                                                                    </div>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <p className="text-sm text-[#4a3728]/70 leading-relaxed mb-3">{skill.category}</p>
-
-                                                <div className="w-full bg-[#e0d8cf]/50 rounded-full h-2 overflow-hidden">
-                                                    <div
-                                                        className="h-full bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] rounded-full transition-all duration-1000"
-                                                        style={{ width: `${getStrengthPercentage(skill.skillStrength)}%` }}
-                                                    ></div>
-                                                </div>
-
-                                                <div className="flex items-center justify-between mt-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-[#4a3728]/60 font-medium">
-                                                            {getStrengthLabel(skill.skillStrength)}
-                                                        </span>
-                                                        <div className="flex items-center gap-1">
-                                                            {[...Array(5)].map((_, i) => (
-                                                                <div
-                                                                    key={i}
-                                                                    className={`w-2 h-2 rounded-full ${i < getStrengthLevel(skill.skillStrength)
-                                                                        ? 'bg-[#4a3728]'
-                                                                        : 'bg-[#e0d8cf]'
-                                                                        }`}
-                                                                ></div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                    <span className="text-xs text-[#4a3728]/60 font-medium">
-                                                        {skill.yearsOfExperience}+ {skill.yearsOfExperience === 1 ? 'Year' : 'Years'}
-                                                    </span>
-                                                </div>
+                                            <div className="min-w-0">
+                                                <h4 className="text-[15px] font-semibold capitalize leading-tight truncate" style={{ color: TOKENS.textPrimary }}>
+                                                    {skill.skillName}
+                                                </h4>
+                                                <p className="mt-0.5 text-[13px]" style={{ color: TOKENS.textSecondary }}>
+                                                    {skill.category}
+                                                </p>
                                             </div>
                                         </div>
+
+                                        {isOwnProfile && (
+                                            <div className="relative shrink-0">
+                                                <button
+                                                    onClick={() => handleMenuToggle(skill.skillId)}
+                                                    className="rounded-lg p-1.5 transition-colors"
+                                                    style={{ color: TOKENS.textSecondary }}
+                                                    aria-label="Skill options"
+                                                >
+                                                    <MoreVertical size={16} />
+                                                </button>
+
+                                                {openMenuId === skill.skillId && (
+                                                    <>
+                                                        <div
+                                                            className="fixed inset-0 z-[9998]"
+                                                            onClick={() => setOpenMenuId(null)}
+                                                        ></div>
+
+                                                        <div
+                                                            className="absolute right-0 top-9 mt-1 w-52 rounded-xl py-1.5 z-[9999]"
+                                                            style={{ backgroundColor: TOKENS.cardBg, border: `1px solid ${TOKENS.border}`, boxShadow: '0 8px 24px rgba(74,55,40,0.14)' }}
+                                                        >
+                                                            <button
+                                                                onClick={() => handleUpdateSkill(skill.skillId)}
+                                                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-[#F6EDE8] transition-colors"
+                                                            >
+                                                                <Edit className="w-4 h-4" style={{ color: TOKENS.accent }} />
+                                                                <span className="text-[13px] font-medium" style={{ color: TOKENS.textPrimary }}>Update skill</span>
+                                                            </button>
+
+                                                            <button
+                                                                onClick={() => handlePinSkill(skill.skillId, skill.isPinned)}
+                                                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-[#F6EDE8] transition-colors"
+                                                            >
+                                                                <Pin className="w-4 h-4" style={{ color: TOKENS.accent }} />
+                                                                <span className="text-[13px] font-medium" style={{ color: TOKENS.textPrimary }}>
+                                                                    {skill.isPinned ? 'Unpin skill' : 'Pin skill'}
+                                                                </span>
+                                                            </button>
+
+                                                            <button
+                                                                onClick={() => handleArchiveSkill(skill.skillId)}
+                                                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-[#F6EDE8] transition-colors"
+                                                            >
+                                                                <Archive className="w-4 h-4" style={{ color: TOKENS.accent }} />
+                                                                <span className="text-[13px] font-medium" style={{ color: TOKENS.textPrimary }}>Archive skill</span>
+                                                            </button>
+
+                                                            <div className="h-px my-1.5" style={{ backgroundColor: TOKENS.border }}></div>
+
+                                                            <button
+                                                                onClick={() => handleDeleteSkill(skill.skillId)}
+                                                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-[#FBEAE6] transition-colors"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" style={{ color: TOKENS.danger }} />
+                                                                <span className="text-[13px] font-medium" style={{ color: TOKENS.danger }}>Remove skill</span>
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="mt-3.5 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[12px] font-medium" style={{ color: TOKENS.accent }}>
+                                                {getStrengthLabel(skill.skillStrength)}
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                                {STRENGTH_LEVELS.map((_, i) => (
+                                                    <span
+                                                        key={i}
+                                                        className="h-1.5 w-5 rounded-full"
+                                                        style={{ backgroundColor: i < level ? TOKENS.accent : TOKENS.chipBg }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <span
+                                            className="rounded-full px-2.5 py-1 text-[11px] font-medium"
+                                            style={{ backgroundColor: TOKENS.chipBg, color: TOKENS.textOnChip }}
+                                        >
+                                            {skill.yearsOfExperience}+ {skill.yearsOfExperience === 1 ? 'Year' : 'Years'}
+                                        </span>
                                     </div>
                                 </div>
                             );
                         })}
                     </div>
+                )}
 
-                    <div className="mt-8 text-center">
-                        {skillsList.length > 2 && (
-                            <button
-                            onClick={() => setShowAllSkills(!showAllSkills)}
-                                className="group/btn relative inline-flex items-center gap-3 bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] text-[#f6ede8] px-8 py-4 rounded-2xl font-semibold text-sm hover:shadow-2xl transition-all duration-300 overflow-hidden"
-                            >
-                                <div className="absolute inset-0 bg-gradient-to-r from-[#7a5c3e] to-[#4a3728] opacity-0 group-hover/btn:opacity-100 transition-opacity duration-300"></div>
-                                <span className="showAllSkills relative z-10">{showAllSkills ? 'Show less' : 'Show more'}</span>
-                                <svg className="w-5 h-5 relative z-10 group-hover/btn:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                                </svg>
-                            </button>
-                        )}
-                    </div>
-                </div>
-
+                {skillsList.length > 2 && (
+                    <button
+                        onClick={() => setShowAllSkills(!showAllSkills)}
+                        className="showAllSkills mt-4 w-full rounded-xl py-2.5 text-[13px] font-medium transition-colors"
+                        style={{ border: `1px solid ${TOKENS.border}`, color: TOKENS.accent }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = TOKENS.chipBg)}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                        {showAllSkills ? 'Show less' : 'Show more'}
+                    </button>
+                )}
             </div>
 
             {/* Modals sirf apni profile pe render honi chahiye */}

@@ -1,3 +1,5 @@
+import ProtectedRoute from '@/features/auth/components/ProtectedRoute';
+
 export default function RootLayout({
   children,
 }: {
@@ -6,7 +8,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        {children}
+        <ProtectedRoute>
+          {children}
+        </ProtectedRoute>
       </body>
     </html>
   );
