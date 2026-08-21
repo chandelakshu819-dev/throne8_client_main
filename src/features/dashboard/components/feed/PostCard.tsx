@@ -136,7 +136,7 @@ const PostCard = ({
     );
   };
 
-  // ✅ "Commented by connections you know" — same pattern as likes
+  // "Commented by connections you know" — same pattern as likes
   const renderCommentedByConnections = () => {
     const names: string[] = post.commentedByConnections || [];
     const totalCount: number = post.commentedByConnectionsCount || 0;
@@ -245,6 +245,28 @@ const PostCard = ({
     );
   };
 
+  // ✅ NEW: Show only ONE line — whichever is more recent (like OR comment), never both.
+  // Falls back to "comment takes priority" if no timestamp fields are available from backend.
+  const renderRecentActivity = () => {
+    const hasLikes = (post.likedByConnections || []).length > 0 && !dismissedLikedBy;
+    const hasComments = (post.commentedByConnections || []).length > 0 && !dismissedCommentedBy;
+
+    if (!hasLikes && !hasComments) return null;
+    if (hasLikes && !hasComments) return renderLikedByConnections();
+    if (!hasLikes && hasComments) return renderCommentedByConnections();
+
+    // Both exist — decide by recency if timestamps are available
+    const likedAt = post.likedByConnectionsAt ? new Date(post.likedByConnectionsAt).getTime() : null;
+    const commentedAt = post.commentedByConnectionsAt ? new Date(post.commentedByConnectionsAt).getTime() : null;
+
+    if (likedAt && commentedAt) {
+      return commentedAt >= likedAt ? renderCommentedByConnections() : renderLikedByConnections();
+    }
+
+    // No timestamp info from backend yet — default to showing the comment (stronger signal)
+    return renderCommentedByConnections();
+  };
+
   return (
     <div
       ref={trackPostImpression({
@@ -258,8 +280,7 @@ const PostCard = ({
     >
       <div className="absolute inset-0 bg-gradient-to-br from-[#6b5643]/3 via-[#8b7355]/3 to-[#4a3728]/3 rounded-3xl"></div>
       <div className="relative z-10">
-        {renderLikedByConnections()}
-        {renderCommentedByConnections()}
+        {renderRecentActivity()}
 
         <PostHeader
           currentUserId={currentUserId}

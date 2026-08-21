@@ -51,22 +51,3 @@ export const useNetworkConnections = () => {
 
 
 
-
-
-
-
-// // src/hooks/network/useNetworkConnections.ts
-// import { useState } from 'react';
-
-// export const useNetworkConnections = () => {
-//     const [connectedUsers, setConnectedUsers] = useState<Set<string>>(new Set());
-
-//     const handleConnect = (userId: string) => {
-//         setConnectedUsers(prev => new Set(prev).add(userId));
-//     };
-
-//     return {
-//         connectedUsers,
-//         handleConnect
-//     };
-// };
