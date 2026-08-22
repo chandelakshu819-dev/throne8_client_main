@@ -129,11 +129,13 @@ export const useActivityHandlers = ({
     // ── Post Handlers ─────────────────────────────────────────────
     const handleUpdatePost = async (postId: string, newContent: string) => {
         try {
-            // ✅ FIX: pehle { title: newTitle } bhej rahe the, lekin card pe
-            // hamesha post.content render hota hai (PostContent.tsx confirm
-            // karta hai) — isliye title update kabhi screen pe nahi dikhta tha.
-            // Ab correct field "content" update ho raha hai.
-            await ProfileService.updatePost(postId, { content: newContent });
+            // ✅ FIX: content ke saath-saath title bhi bhejo (home page jaisa),
+            // warna backend ki title field kabhi update nahi hoti aur
+            // Recent Posts sidebar (jo title dikhata hai) stale reh jaata hai.
+            const rawTitle = newContent.trim().substring(0, 100);
+            const title = rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1);
+
+            await ProfileService.updatePost(postId, { content: newContent, title });
             onPostCreated?.();
            // ✅ NEW: broadcast karo taaki Home feed (ya koi bhi doosra page) bhi sync ho jaaye
             emitPostContentUpdated(postId, newContent);

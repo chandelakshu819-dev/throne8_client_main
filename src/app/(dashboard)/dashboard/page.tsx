@@ -535,7 +535,10 @@ export default function Home() {
         setOpenMenuIndex(null);
     };
     const handleUpdatePost = async (postId: string, newContent: string) => {
-        await HomePostService.updatePost(postId, { content: newContent, title: newContent.substring(0, 100) });
+        const rawTitle = newContent.trim().substring(0, 100);
+        const title = rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1);
+
+        await HomePostService.updatePost(postId, { content: newContent, title });
         updatePostInFeed(postId, newContent);
     };
 

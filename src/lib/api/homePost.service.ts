@@ -32,21 +32,27 @@ class HomePostService {
 
 
 
-    /**
-     * ✅ FIX: Update caption/content API — ye pehle missing thi.
-     * PUT/PATCH /api/v1/profile/home-post/:postId
+        /**
+     * ✅ FIX: pehle ye galat/non-existent endpoint (PATCH /profile/home-post/:postId)
+     * hit kar raha tha — backend mein wo route exist hi nahi karta (404),
+     * isliye caption update sirf UI mein "success" dikhta tha (catch block
+     * user-facing throw nahi hota agar caller await na kare properly), par
+     * backend mein kabhi save hi nahi hota tha — isi wajah se homepage
+     * refresh karne par purana caption wapas aa jaata tha.
+     * Ab already-working, tested route use kar rahe hain jo activityRoutes
+     * ke through registered hai: PUT /api/v1/profile/activity/update-post/:postId
      */
-    static async updatePost(postId: string, payload: { title?: string; content?: string }): Promise<any> {
-        try {
-            const { data } = await api.patch(`/profile/home-post/${postId}`, payload);
-            return data;
-        } catch (error: any) {
-            if (error?.response?.data?.message) {
-                throw new Error(error.response.data.message);
+        static async updatePost(postId: string, payload: { title?: string; content?: string }): Promise<any> {
+            try {
+                const { data } = await api.put(`/profile/activity/update-post/${postId}`, payload);
+                return data;
+            } catch (error: any) {
+                if (error?.response?.data?.message) {
+                    throw new Error(error.response.data.message);
+                }
+                throw new Error('Failed to update post.');
             }
-            throw new Error('Failed to update post.');
         }
-    }
 
     static async createPostWithMedia(formData: FormData): Promise<any> {
         try {

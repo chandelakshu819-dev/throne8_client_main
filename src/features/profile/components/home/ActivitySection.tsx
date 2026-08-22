@@ -744,10 +744,7 @@ const ImageCard = ({ post, img }: { post: any; img: any }) => {
       </div>
       <div className="p-4">
         <p className="text-[#4a3728] font-semibold text-sm truncate">{post.title}</p>
-        <div className="flex items-center justify-between mt-1">
-          <span className="text-xs text-[#4a3728]/50 uppercase">{img.format}</span>
-          <span className="text-xs text-[#4a3728]/50">{img.width}x{img.height}</span>
-        </div>
+      
       </div>
     </div>
   );
