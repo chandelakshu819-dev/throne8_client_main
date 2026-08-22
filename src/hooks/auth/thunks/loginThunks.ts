@@ -2,7 +2,7 @@
 
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import AuthService from '@/lib/api/auth.service';
-import TokenStorage from '@/store/token.storage';
+import TokenStorage from '@/lib/store/token.storage';
 
 import config from '@/config/env.config';
 import { LoginCredentials, LoginResponse, UserData } from '@/features/auth/interface';

@@ -1,4 +1,4 @@
-// lib/storage/token.storage.ts
+// lib/store/token.storage.ts
 
 interface UserData {
     userId: string;
@@ -12,11 +12,32 @@ interface TokenData {
     expiresIn: string | number; // ✅ Accept both string and number
 }
 
+// ✅ Naam jo middleware.ts mein bhi use hoga — dono jagah EXACT match hona chahiye
+const AUTH_COOKIE_NAME = 'throne8_auth';
+
 class TokenStorage {
     private static readonly ACCESS_TOKEN_KEY = 'throne8_access_token';
     private static readonly REFRESH_TOKEN_KEY = 'throne8_refresh_token';
     private static readonly USER_DATA_KEY = 'throne8_user_data';
     private static readonly TOKEN_EXPIRY_KEY = 'throne8_token_expiry';
+
+    // ==================== 🆕 COOKIE HELPERS (for middleware) ====================
+    // Middleware Edge runtime par chalta hai — usko localStorage nahi dikhta.
+    // Isliye ek lightweight, non-sensitive "logged in hai ya nahi" flag
+    // cookie mein bhi rakhte hain. Actual tokens sirf localStorage mein hi
+    // rehte hain — security posture wahi purana hai.
+
+    private static setAuthCookie(): void {
+        if (typeof document === 'undefined') return;
+        // 7 din ki cookie — refresh token jitni hi lambi rakho (adjust as needed)
+        const maxAgeSeconds = 7 * 24 * 60 * 60;
+        document.cookie = `${AUTH_COOKIE_NAME}=1; path=/; max-age=${maxAgeSeconds}; SameSite=Lax`;
+    }
+
+    private static clearAuthCookie(): void {
+        if (typeof document === 'undefined') return;
+        document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+    }
 
     /**
      * 💾 Store tokens and user data after successful login
@@ -47,6 +68,9 @@ class TokenStorage {
             const expiryTime = Date.now() + (expiryMinutes * 60 * 1000);
             localStorage.setItem(this.TOKEN_EXPIRY_KEY, expiryTime.toString());
 
+            // 🆕 Set the middleware-visible cookie
+            this.setAuthCookie();
+
             console.log('✅ [TokenStorage] Auth data stored successfully', {
                 userId: user.userId,
                 email: user.email,
@@ -69,7 +93,6 @@ class TokenStorage {
         return localStorage.getItem(this.ACCESS_TOKEN_KEY);
     }
 
-    // ✅ नया method — refresh token update सही तरीके से
     static updateRefreshToken(refreshToken: string): void {
         if (typeof window === 'undefined') return;
         localStorage.setItem(this.REFRESH_TOKEN_KEY, refreshToken);
@@ -161,6 +184,10 @@ class TokenStorage {
             localStorage.removeItem(this.REFRESH_TOKEN_KEY);
             localStorage.removeItem(this.USER_DATA_KEY);
             localStorage.removeItem(this.TOKEN_EXPIRY_KEY);
+
+            // 🆕 Clear the middleware-visible cookie too
+            this.clearAuthCookie();
+
             console.log('✅ [TokenStorage] All auth data cleared');
         } catch (error) {
             console.error('❌ [TokenStorage] Error clearing auth data:', error);
@@ -187,6 +214,9 @@ class TokenStorage {
             const expiryTime = Date.now() + (expiryMinutes * 60 * 1000);
             localStorage.setItem(this.TOKEN_EXPIRY_KEY, expiryTime.toString());
 
+            // 🆕 Refresh worked, so user is still logged in — keep cookie alive
+            this.setAuthCookie();
+
             console.log('✅ [TokenStorage] Access token updated');
         } catch (error) {
             console.error('❌ [TokenStorage] Error updating access token:', error);
@@ -209,5 +239,3 @@ class TokenStorage {
 
 export default TokenStorage;
 export type { UserData, TokenData };
-
-

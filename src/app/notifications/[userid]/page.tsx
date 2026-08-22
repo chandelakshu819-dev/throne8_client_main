@@ -1,6 +1,6 @@
 // src/app/notifications/[userid]/page.tsx
 "use client";
-import TokenStorage from "@/store/token.storage";
+import TokenStorage from "@/lib/store/token.storage";
 
 import config from "@/config/env.config";
 import React, { useState, useEffect, useCallback, useRef } from "react";
