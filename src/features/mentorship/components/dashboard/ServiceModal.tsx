@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useMemo, useEffect } from 'react';
 import {
     X, DollarSign, Image as ImageIcon, Upload, FileText,
     Briefcase, Clock, Users
@@ -89,6 +90,24 @@ export default function ServiceModal({
     const needsDescription = currentServiceType?.needsDescription ?? true;
     const needsParticipants = currentServiceType?.needsParticipants ?? true;
 
+    const thumbnailPreview = useMemo(() => {
+        if (!formData?.thumbnailImage) return null;
+        if (typeof formData.thumbnailImage === 'string') return formData.thumbnailImage;
+        try {
+            return URL.createObjectURL(formData.thumbnailImage);
+        } catch (e) {
+            return null;
+        }
+    }, [formData?.thumbnailImage]);
+
+    useEffect(() => {
+        return () => {
+            if (thumbnailPreview && typeof formData?.thumbnailImage !== 'string') {
+                URL.revokeObjectURL(thumbnailPreview);
+            }
+        };
+    }, [thumbnailPreview, formData?.thumbnailImage]);
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
             <div
@@ -118,20 +137,52 @@ export default function ServiceModal({
                 <div className="space-y-6">
 
                     {/* Image Upload */}
-                    <div className="p-8 rounded-2xl border-2 border-dashed" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
-                        <div className="text-center">
-                            <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
-                                style={{ border: '2px solid #e0d8cf' }}>
-                                <ImageIcon className="w-12 h-12" style={{ color: '#7a5c3e' }} />
+                    <div className="p-8 rounded-2xl border-2 border-dashed relative overflow-hidden" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
+                        {thumbnailPreview ? (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/5 group">
+                                <img src={thumbnailPreview} alt="Preview" className="w-full h-full object-cover" />
+                                <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                    <input 
+                                        type="file" 
+                                        accept="image/jpeg,image/png,image/webp" 
+                                        className="hidden" 
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) setFormData({ ...formData, thumbnailImage: file });
+                                        }}
+                                        disabled={isSaving}
+                                    />
+                                    <div className="text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300 flex items-center gap-2" style={{ backgroundColor: '#4a3728' }}>
+                                        <Upload className="w-5 h-5" />
+                                        Change Image
+                                    </div>
+                                </label>
                             </div>
-                            <h4 className="text-xl font-bold mb-2" style={{ color: '#4a3728' }}>Upload Service Image</h4>
-                            <p className="text-sm mb-4" style={{ color: '#8a7a6a' }}>Add a professional image for your service</p>
-                            <button className="text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300 flex items-center gap-2 mx-auto"
-                                style={{ backgroundColor: '#4a3728' }}>
-                                <Upload className="w-5 h-5" />
-                                Choose Image
-                            </button>
-                        </div>
+                        ) : (
+                            <div className="text-center">
+                                <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
+                                    style={{ border: '2px solid #e0d8cf' }}>
+                                    <ImageIcon className="w-12 h-12" style={{ color: '#7a5c3e' }} />
+                                </div>
+                                <h4 className="text-xl font-bold mb-2" style={{ color: '#4a3728' }}>Upload Service Image</h4>
+                                <p className="text-sm mb-4" style={{ color: '#8a7a6a' }}>Add a professional image for your service</p>
+                                <label className="cursor-pointer text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300 flex items-center gap-2 mx-auto w-fit"
+                                    style={{ backgroundColor: '#4a3728' }}>
+                                    <input 
+                                        type="file" 
+                                        accept="image/jpeg,image/png,image/webp" 
+                                        className="hidden" 
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) setFormData({ ...formData, thumbnailImage: file });
+                                        }}
+                                        disabled={isSaving}
+                                    />
+                                    <Upload className="w-5 h-5" />
+                                    Choose Image
+                                </label>
+                            </div>
+                        )}
                     </div>
 
                     {/* Service Type Display */}
@@ -162,11 +213,20 @@ export default function ServiceModal({
                                 type="text"
                                 placeholder="e.g., Advanced React Mentoring"
                                 className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                                style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+                                style={{
+                                    borderColor: fieldErrors?.serviceName ? '#dc2626' : '#e0d8cf',
+                                    backgroundColor: '#fbf7f3',
+                                    color: '#4a3728'
+                                }}
                                 value={formData?.serviceName || ''}
                                 onChange={(e) => setFormData({ ...formData, serviceName: e.target.value })}
                                 disabled={isSaving}
                             />
+                            {fieldErrors?.serviceName && (
+                                <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
+                                    {fieldErrors.serviceName}
+                                </p>
+                            )}
                         </div>
                         <div>
                             <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
@@ -179,12 +239,21 @@ export default function ServiceModal({
                                     type="number"
                                     placeholder="500"
                                     className="w-full p-4 pl-10 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                                    style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+                                    style={{
+                                        borderColor: fieldErrors?.price ? '#dc2626' : '#e0d8cf',
+                                        backgroundColor: '#fbf7f3',
+                                        color: '#4a3728'
+                                    }}
                                     value={formData?.price || ''}
                                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                                     disabled={isSaving}
                                 />
                             </div>
+                            {fieldErrors?.price && (
+                                <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
+                                    {fieldErrors.price}
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -216,33 +285,33 @@ export default function ServiceModal({
 
                     {/* Payment Method */}
                     <div>
-                        <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                            💳 Payment Method
-                        </label>
-                        <select
-                            className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                            style={{
-                                borderColor: fieldErrors?.paymentMethod ? '#dc2626' : '#e0d8cf',
-                                backgroundColor: '#fbf7f3',
-                                color: '#4a3728'
-                            }}
-                            value={formData?.paymentMethod || ''}
-                            onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                            disabled={isSaving}
-                        >
-                            <option value="">Select payment method</option>
-                            <option value="free">🆓 Free (No Charge)</option>
-                            <option value="razorpay">Razorpay</option>
-                            <option value="stripe">Stripe</option>
-                            <option value="cash">Cash</option>
-                            <option value="bank_transfer">Bank Transfer</option>
-                        </select>
-                        {fieldErrors?.paymentMethod && (
-                            <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
-                                {fieldErrors.paymentMethod}
-                            </p>
-                        )}
-                    </div>
+                            <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
+                                💳 Payment Method
+                            </label>
+                            <select
+                                className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
+                                style={{
+                                    borderColor: fieldErrors?.paymentMethod ? '#dc2626' : '#e0d8cf',
+                                    backgroundColor: '#fbf7f3',
+                                    color: '#4a3728'
+                                }}
+                                value={formData?.paymentMethod || ''}
+                                onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                                disabled={isSaving}
+                            >
+                                <option value="">Select payment method</option>
+                                <option value="free">🆓 Free (No Charge)</option>
+                                <option value="razorpay">Razorpay</option>
+                                <option value="stripe">Stripe</option>
+                                <option value="cash">Cash</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                            </select>
+                            {fieldErrors?.paymentMethod && (
+                                <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
+                                    {fieldErrors.paymentMethod}
+                                </p>
+                            )}
+                        </div>
 
                     {/* Description */}
                     {needsDescription && (
@@ -255,20 +324,57 @@ export default function ServiceModal({
                                 rows={5}
                                 placeholder="Describe your service in detail..."
                                 className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg resize-none"
-                                style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+                                style={{
+                                    borderColor: fieldErrors?.description ? '#dc2626' : '#e0d8cf',
+                                    backgroundColor: '#fbf7f3',
+                                    color: '#4a3728'
+                                }}
                                 value={formData?.description || ''}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                 disabled={isSaving}
                             />
+                            {fieldErrors?.description && (
+                                <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
+                                    {fieldErrors.description}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Topic */}
+                    {needsParticipants && (
+                        <div>
+                            <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
+                                <FileText className="w-5 h-5 inline mr-2" />
+                                Topic
+                            </label>
+                            <input
+                                type="text"
+                                placeholder="e.g., React System Design"
+                                className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
+                                style={{
+                                    borderColor: fieldErrors?.topic ? '#dc2626' : '#e0d8cf',
+                                    backgroundColor: '#fbf7f3',
+                                    color: '#4a3728'
+                                }}
+                                value={formData?.topic || ''}
+                                onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
+                                disabled={isSaving}
+                            />
+                            {fieldErrors?.topic && (
+                                <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
+                                    {fieldErrors.topic}
+                                </p>
+                            )}
                         </div>
                     )}
 
                     {/* Duration & Participants */}
-                    <div className={`grid ${needsParticipants ? 'grid-cols-2' : 'grid-cols-1'} gap-6`}>
+                    <div className={`grid ${needsParticipants ? 'grid-cols-3' : 'grid-cols-1'} gap-6`}>
                         <div>
                             <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
                                 <Clock className="w-5 h-5 inline mr-2" />
-                                Duration (minutes)
+                                Duration (min)
                             </label>
                             <input
                                 type="number"
@@ -281,21 +387,56 @@ export default function ServiceModal({
                             />
                         </div>
                         {needsParticipants && (
-                            <div>
-                                <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                                    <Users className="w-5 h-5 inline mr-2" />
-                                    Max Participants
-                                </label>
-                                <input
-                                    type="number"
-                                    placeholder="1"
-                                    className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                                    style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
-                                    value={formData?.maxParticipants || ''}
-                                    onChange={(e) => setFormData({ ...formData, maxParticipants: e.target.value })}
-                                    disabled={isSaving}
-                                />
-                            </div>
+                            <>
+                                <div>
+                                    <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
+                                        <Users className="w-5 h-5 inline mr-2" />
+                                        Min Participants
+                                    </label>
+                                    <input
+                                        type="number"
+                                        placeholder="1"
+                                        className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
+                                        style={{
+                                            borderColor: fieldErrors?.minParticipants ? '#dc2626' : '#e0d8cf',
+                                            backgroundColor: '#fbf7f3',
+                                            color: '#4a3728'
+                                        }}
+                                        value={formData?.minParticipants || ''}
+                                        onChange={(e) => setFormData({ ...formData, minParticipants: e.target.value })}
+                                        disabled={isSaving}
+                                    />
+                                    {fieldErrors?.minParticipants && (
+                                        <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
+                                            {fieldErrors.minParticipants}
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
+                                        <Users className="w-5 h-5 inline mr-2" />
+                                        Max Participants
+                                    </label>
+                                    <input
+                                        type="number"
+                                        placeholder="10"
+                                        className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
+                                        style={{
+                                            borderColor: fieldErrors?.maxParticipants ? '#dc2626' : '#e0d8cf',
+                                            backgroundColor: '#fbf7f3',
+                                            color: '#4a3728'
+                                        }}
+                                        value={formData?.maxParticipants || ''}
+                                        onChange={(e) => setFormData({ ...formData, maxParticipants: e.target.value })}
+                                        disabled={isSaving}
+                                    />
+                                    {fieldErrors?.maxParticipants && (
+                                        <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
+                                            {fieldErrors.maxParticipants}
+                                        </p>
+                                    )}
+                                </div>
+                            </>
                         )}
                     </div>
 

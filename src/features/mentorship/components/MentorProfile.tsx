@@ -1,5 +1,4 @@
-// components/mentor-profile/MentorProfile.tsx
-"use client";
+// components/mentor-profile/MentorProfile.tsx"use client";
 
 import React, { useEffect, useState } from "react";
 import { C } from "../types/data";
@@ -13,6 +12,8 @@ import PaymentStep from "./PaymentStep";
 import ConfirmationStep from "./ConfirmationStep";
 import MentorService from "@/lib/api/mentorship.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useSearchParams } from "next/navigation";
+import SessionService from "@/lib/api/session.service";
 
 interface MentorProfileProps {
     mentorId: string;
@@ -38,6 +39,51 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
             .catch(() => setMentorData(null));
     }, [mentorId]);
 
+    const searchParams = useSearchParams();
+    
+    useEffect(() => {
+        const serviceId = searchParams.get('serviceId');
+        if (serviceId && !bookingStep) {
+            // Fetch services and pre-select
+            SessionService.getAllSessionsFromDB({ limit: 50 })
+                .then((res) => {
+                    const allSessions = res?.data ?? [];
+                    const mentorSessions = allSessions.filter((s: any) => s.mentorId === mentorId);
+                    const foundService = mentorSessions.find((s: any) => (s._id === serviceId || s.id === serviceId || s.sessionId === serviceId));
+                    if (foundService) {
+                        const mappedService: Service = {
+                            id: foundService._id || foundService.id,
+                            type: foundService.sessionType === "group_session" ? "1:1 Call" : "1:1 Call",
+                            title: foundService.title,
+                            duration: `${foundService.duration} mins`,
+                            originalPrice: null,
+                            price: foundService.pricing?.totalAmount === 0 || !foundService.pricing ? "Free" : (foundService.pricing?.totalAmount || foundService.pricing?.basePrice)
+                        };
+                        handleServiceClick(mappedService);
+                    } else {
+                        // Fallback: it might be a Group Session
+                        MentorService.getGroupSessionById(serviceId)
+                            .then((groupRes: any) => {
+                                const groupSession = groupRes?.data || groupRes?.session || groupRes;
+                                if (groupSession && groupSession.mentorId === mentorId) {
+                                    const mappedGroupService: Service = {
+                                        id: groupSession.sessionId || groupSession._id || serviceId,
+                                        type: "Group Session",
+                                        title: groupSession.title,
+                                        duration: `${groupSession.duration} mins`,
+                                        originalPrice: null,
+                                        price: groupSession.pricing?.pricePerPerson === 0 ? "Free" : groupSession.pricing?.pricePerPerson
+                                    };
+                                    handleServiceClick(mappedGroupService);
+                                }
+                            })
+                            .catch(err => console.error("Failed to fetch group session fallback", err));
+                    }
+                })
+                .catch(err => console.error("Failed to preselect service", err));
+        }
+    }, [mentorId, searchParams]);
+
     const handleServiceClick = (service: Service): void => {
         setSelectedService(service);
         setBookingStep(service.type === "Resource" || service.price === "Free" ? "confirmation" : "calendar");
@@ -50,39 +96,48 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-    if (bookingStep === "calendar") return <CalendarStep mentorId={mentorData?.mentorId || ""} selectedService={selectedService} onBack={() => setBookingStep(null)} onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }} />;
-    if (bookingStep === "details") return <DetailsStep selectedService={selectedService} calendarData={calendarData!} onBack={() => setBookingStep("calendar")} onContinue={(d: BookingFormData) => { setFormData(d); setBookingStep("payment"); }} />;
-    if (bookingStep === "payment") return (
-        <PaymentStep
-            selectedService={selectedService}
-            calendarData={calendarData!}
-            formData={formData!}
-            mentorId={mentorData?.mentorId || ""}
-            onBack={() => setBookingStep("details")}
-            onConfirm={() => setBookingStep("confirmation")}
-            onBookingSuccess={() => {
-                if (selectedService?.id) {
-                    setBookedSessionIds(prev => [...prev, String(selectedService.id)]);
-                }
-                resetBooking();
-            }}
-        />
-    );
-    if (bookingStep === "confirmation") return <ConfirmationStep selectedService={selectedService} calendarData={calendarData} formData={formData} onReset={resetBooking} />;
-
     return (
         <div style={{ minHeight: "100vh", background: C.bg }}>
             <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "24px 16px", display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
                 <MentorSidebar mentorData={mentorData} />
                 <div>
-                    <ServicesSection
-                        onServiceClick={handleServiceClick}
-                        mentorId={mentorData?.mentorId || ""}
-                        bookedSessionIds={bookedSessionIds}
-                        currentUserId={user?.userId || ""}
-                    />
+                    {bookingStep === "calendar" && (
+                        <CalendarStep mentorId={mentorData?.mentorId || ""} selectedService={selectedService} onBack={() => setBookingStep(null)} onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }} />
+                    )}
+                    {bookingStep === "details" && (
+                        <DetailsStep selectedService={selectedService} calendarData={calendarData!} onBack={() => setBookingStep("calendar")} onContinue={(d: BookingFormData) => { setFormData(d); setBookingStep("payment"); }} />
+                    )}
+                    {bookingStep === "payment" && (
+                        <PaymentStep
+                            selectedService={selectedService}
+                            calendarData={calendarData!}
+                            formData={formData!}
+                            mentorId={mentorData?.mentorId || ""}
+                            onBack={() => setBookingStep("details")}
+                            onConfirm={() => setBookingStep("confirmation")}
+                            onBookingSuccess={() => {
+                                if (selectedService?.id) {
+                                    setBookedSessionIds(prev => [...prev, String(selectedService.id)]);
+                                }
+                                resetBooking();
+                            }}
+                        />
+                    )}
+                    {bookingStep === "confirmation" && (
+                        <ConfirmationStep selectedService={selectedService} calendarData={calendarData} formData={formData} onReset={resetBooking} />
+                    )}
 
-                    <ReviewsSection />
+                    {!bookingStep && (
+                        <>
+                            <ServicesSection
+                                onServiceClick={handleServiceClick}
+                                mentorId={mentorData?.mentorId || ""}
+                                bookedSessionIds={bookedSessionIds}
+                                currentUserId={user?.userId || ""}
+                            />
+                            <ReviewsSection />
+                        </>
+                    )}
                 </div>
             </div>
         </div>

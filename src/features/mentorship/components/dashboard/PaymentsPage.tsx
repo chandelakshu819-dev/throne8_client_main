@@ -14,22 +14,31 @@ interface PaymentsPageProps {
 }
 
 export default function PaymentsPage({ sessions = [] }: PaymentsPageProps) {
-  // Compute earnings from real session data
-  const allBookings = sessions.flatMap((s: any) => s.bookings || []);
-  const confirmedBookings = allBookings.filter((b: any) => b.status === "confirmed");
+  // Compute earnings from real session data by mapping bookings to their resolved pricing
+  const allBookings = sessions.flatMap((s: any) => 
+    (s.bookings || []).map((b: any) => ({
+      ...b,
+      resolvedTotalAmount: b.pricing?.totalAmount ?? s.pricing?.totalAmount ?? 0
+    }))
+  );
 
-  const totalEarnings = confirmedBookings.reduce((sum: number, b: any) => sum + (b.pricing?.totalAmount || 0), 0);
+  // Consider any booking that the mentor has accepted as "earned"
+  const earnedBookings = allBookings.filter((b: any) => 
+    ["confirmed", "rescheduled", "in_progress", "completed"].includes(b.status)
+  );
+
+  const totalEarnings = earnedBookings.reduce((sum: number, b: any) => sum + b.resolvedTotalAmount, 0);
 
   const now = new Date();
-  const thisMonthBookings = confirmedBookings.filter((b: any) => {
-    const d = new Date(b.scheduledAt || b.bookedAt);
+  const thisMonthBookings = earnedBookings.filter((b: any) => {
+    const d = new Date(b.scheduledAt || b.bookedAt || now);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
-  const thisMonthEarnings = thisMonthBookings.reduce((sum: number, b: any) => sum + (b.pricing?.totalAmount || 0), 0);
+  const thisMonthEarnings = thisMonthBookings.reduce((sum: number, b: any) => sum + b.resolvedTotalAmount, 0);
 
-  const pendingAmount = sessions
-    .filter((s: any) => s.payment?.status === "pending" && (s.bookings || []).length === 0)
-    .reduce((sum: number, s: any) => sum + (s.pricing?.totalAmount ?? 0), 0);
+  // Pending Amount = requests waiting for mentor to accept
+  const pendingBookings = allBookings.filter((b: any) => b.status === "pending");
+  const pendingAmount = pendingBookings.reduce((sum: number, b: any) => sum + b.resolvedTotalAmount, 0);
 
   const earningsStats = [
     {

@@ -3,12 +3,14 @@
 
 import React from 'react';
 import { Search, Globe } from 'lucide-react';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
 interface NavbarProps {
   activeTimezone?: string; // optional: default "IST (UTC+5:30)"
 }
 
 export default function Navbar({ activeTimezone = "IST (UTC+5:30)" }: NavbarProps) {
+  const { user } = useAuth();
   return (
     <nav className="fixed top-0 w-full z-[100] bg-white/70 backdrop-blur-xl border-b border-[#ece7e2] px-6 py-4 flex justify-between items-center">
       {/* Left side: Logo + Search */}
@@ -38,9 +40,11 @@ export default function Navbar({ activeTimezone = "IST (UTC+5:30)" }: NavbarProp
         </div>
 
         {/* Dashboard Button */}
-        <button className="bg-[#4a3728] text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[2px] shadow-lg hover:bg-[#8b7355] transition-all">
-          DASHBOAR
-        </button>
+        {user && user.role !== 'user' && (
+          <button className="bg-[#4a3728] text-white px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[2px] shadow-lg hover:bg-[#8b7355] transition-all">
+            DASHBOARD
+          </button>
+        )}
       </div>
     </nav>
   );

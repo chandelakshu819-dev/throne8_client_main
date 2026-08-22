@@ -46,7 +46,7 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
     const phone = userProfileData?.phoneNumber
         || '';
 
-    console.log("👤 User Profile Data in Detail page-:",
+    console.log("ðŸ‘¤ User Profile Data in Detail page-:",
         fullName, email, phone
     );
 
@@ -82,7 +82,7 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
     return (
         <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px" }}>
             <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: C.mid, display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", fontWeight: 500, marginBottom: "24px" }}>
-                ← Back to Calendar
+                â† Back to Calendar
             </button>
 
             <div style={{ maxWidth: "700px", margin: "0 auto", borderRadius: "24px", padding: "40px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)" }}>
@@ -123,7 +123,7 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
                         ["Service", selectedService?.title ?? ""],
                         ["Date", `${selectedDate} ${MONTHS[month]} ${year}`],
                         ["Time", selectedTime],
-                        ["Total", `₹${selectedService?.price}`],
+                        ["Total", `â‚¹${selectedService?.price}`],
                     ] as [string, string][]).map(([k, v]) => (
                         <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: C.dark, marginBottom: "5px" }}>
                             <span style={{ color: C.mid }}>{k}:</span><span style={{ fontWeight: 500 }}>{v}</span>
@@ -132,7 +132,7 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
                 </div>
 
                 <button onClick={() => onContinue(formData)} disabled={!canProceed} style={{ ...btnPrimary, width: "100%", padding: "16px", borderRadius: "12px", fontSize: "17px", opacity: canProceed ? 1 : 0.5, cursor: canProceed ? "pointer" : "not-allowed" }}>
-                    Proceed to Payment →
+                    Proceed to Payment â†’
                 </button>
             </div>
         </div>

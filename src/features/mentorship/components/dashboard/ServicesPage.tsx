@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Briefcase, Users, Clock, Star, Plus, Video, MessageSquare, Package, FileText, RefreshCw } from 'lucide-react';
 import ServiceModal from './ServiceModal';
 import EditSessionModal from '@/features/study-group/modals/EditSessionModal';
+import MentorService, { CreateGroupSessionInput } from "@/lib/api/mentorship.service";
 import SessionService, { CreateSessionInput } from "@/lib/api/session.service";
 import { validateSessionForm } from '@/features/profile/validators/session.schema';
 interface ServicesPageProps {
@@ -125,36 +126,57 @@ export default function ServicesPage({
 
     try {
       const scheduledAtISO = new Date(formData.scheduledAt).toISOString();
-      const isFree = formData.paymentMethod === "free";   // ← NEW CHECK
 
+      if (formData.serviceType === "group_session") {
+        const groupSessionInput: CreateGroupSessionInput = {
+          title: formData.serviceName,
+          description: formData.description || "",
+          topic: formData.topic,
+          scheduledAt: scheduledAtISO,
+          duration: Number(formData.duration) || 60,
+          timezone: "Asia/Kolkata",
+          maxParticipants: Number(formData.maxParticipants),
+          minParticipants: Number(formData.minParticipants),
+          pricePerPerson: Number(formData.price) || 0,
+          paymentMethod: formData.paymentMethod,
+          bufferTimeMinutes: Number(formData.bufferTime) || 0,
+          followUp: {
+            allowed: formData.followUpAllowed === '1',
+            periodDays: Number(formData.followUpPeriod) || 0,
+          },
+          thumbnailImage: formData.thumbnailImage,
+        };
+        await MentorService.createGroupSession(groupSessionInput);
+      } else {
+        const isFree = formData.paymentMethod === "free";
+        const sessionInput: CreateSessionInput = {
+          sessionType: formData.serviceType,
+          scheduledAt: scheduledAtISO,
+          timezone: "Asia/Kolkata",
+          title: formData.serviceName,
+          description: formData.description || "",
+          paymentMethod: formData.paymentMethod,
+          duration: Number(formData.duration) || 60,
+          followUp: {
+            allowed: false,
+            periodDays: Number(formData.followUpPeriod) || 0,
+          },
+          bufferTimeMinutes: Number(formData.bufferTime) || 0,
+          ...(isFree ? {
+            pricing: { basePrice: 0, platformFee: 0, totalAmount: 0, currency: "INR" }
+          } : {
+            pricing: {
+              basePrice: Number(formData.price),
+              platformFee: Math.round(Number(formData.price) * 0.15),
+              totalAmount: Number(formData.price) + Math.round(Number(formData.price) * 0.15),
+              currency: "INR",
+            }
+          }),
+          thumbnailImage: formData.thumbnailImage,
+        };
+        await SessionService.createSession(sessionInput);
+      }
 
-
-      const sessionInput: CreateSessionInput = {
-        sessionType: formData.serviceType,
-        scheduledAt: scheduledAtISO,
-        timezone: "Asia/Kolkata",
-        title: formData.serviceName,
-        description: formData.description || "",
-        paymentMethod: formData.paymentMethod,
-        duration: Number(formData.duration) || 60,  // ✅ ADD
-        followUp: {                                  // ✅ ADD
-          allowed: false,
-          periodDays: Number(formData.followUpPeriod) || 0,
-        },
-        bufferTimeMinutes: Number(formData.bufferTime) || 0, // ✅ ADD
-        ...(isFree ? {
-          pricing: { basePrice: 0, platformFee: 0, totalAmount: 0, currency: "INR" }
-        } : {
-          pricing: {
-            basePrice: Number(formData.price),
-            platformFee: Math.round(Number(formData.price) * 0.15),
-            totalAmount: Number(formData.price) + Math.round(Number(formData.price) * 0.15),
-            currency: "INR",
-          }
-        }),
-      };
-
-      await SessionService.createSession(sessionInput);
       handleCreateService();
       await fetchAllSessions();
       setShowServiceForm(false);

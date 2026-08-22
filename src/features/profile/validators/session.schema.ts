@@ -91,14 +91,26 @@ export type CreateSessionFormData = z.infer<typeof createSessionSchema>;
 export const validateSessionForm = (data: any): Record<string, string> => {
   const errors: Record<string, string> = {};
 
-  if (!data.serviceName || data.serviceName.trim().length < 5) {
-    errors.serviceName = "Title must be at least 5 characters";
+  if (data.serviceType === "group_session") {
+    if (!data.serviceName || data.serviceName.trim().length < 10) {
+      errors.serviceName = "Title must be at least 10 characters";
+    }
+  } else {
+    if (!data.serviceName || data.serviceName.trim().length < 5) {
+      errors.serviceName = "Title must be at least 5 characters";
+    }
   }
 
-  // ← Price validate only karo agar free nahi hai
-  if (data.paymentMethod !== "free") {
-    if (!data.price || Number(data.price) <= 0) {
-      errors.price = "Price must be greater than 0";
+  // Price validation
+  if (data.serviceType === "group_session") {
+    if (data.price === undefined || data.price === null || Number(data.price) < 0) {
+      errors.price = "Price cannot be negative";
+    }
+  } else {
+    if (data.paymentMethod !== "free") {
+      if (!data.price || Number(data.price) <= 0) {
+        errors.price = "Price must be greater than 0";
+      }
     }
   }
 
@@ -121,6 +133,25 @@ export const validateSessionForm = (data: any): Record<string, string> => {
   }
   if (data.serviceType === "portfolio_review" && !data.portfolioUrl) {
     errors.portfolioUrl = "Portfolio URL is required for portfolio review";
+  }
+  if (data.serviceType === "group_session") {
+    if (!data.description || data.description.trim().length < 50) {
+      errors.description = "Description must be at least 50 characters";
+    }
+    if (!data.topic || data.topic.trim().length < 5) {
+      errors.topic = "Topic must be at least 5 characters";
+    }
+    const minP = Number(data.minParticipants);
+    const maxP = Number(data.maxParticipants);
+    if (!minP || minP < 1) {
+      errors.minParticipants = "Minimum participants must be at least 1";
+    }
+    if (!maxP || maxP < 3) {
+      errors.maxParticipants = "Maximum participants must be at least 3";
+    }
+    if (minP && maxP && minP > maxP) {
+      errors.minParticipants = "Min participants cannot exceed Max participants";
+    }
   }
 
   return errors;

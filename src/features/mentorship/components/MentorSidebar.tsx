@@ -22,7 +22,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData }) => {
     const totalSessions = mentorData?.stats?.totalSessions ?? MENTOR.totalEngagements;
     const completionRate = mentorData?.stats?.completionRate ? `${mentorData.stats.completionRate}%` : MENTOR.attendance;
     const responseTime = mentorData?.stats?.responseTime ? `< ${mentorData.stats.responseTime} hrs` : MENTOR.responseTime;
-    const successRate = mentorData?.stats?.completionRate ? `${mentorData.stats.completionRate}%` : MENTOR.successRate;
+    const trustScoreVal = mentorData?.trustScore?.overall ?? "N/A";
     const currentRole = mentorData?.experience?.currentRole || MENTOR.title;
     const previousRoles = mentorData?.experience?.previousRoles || [];
     const linkedinUrl = mentorData?.socialProof?.linkedinUrl || "#";
@@ -50,7 +50,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData }) => {
                         <div style={{ position: "relative" }}>
                             <img src={image} alt={name} style={{ width: "96px", height: "96px", borderRadius: "50%", border: `4px solid ${C.bg}`, objectFit: "cover" }} />
                             {verified && (
-                                <div style={{ position: "absolute", bottom: "2px", right: "2px", width: "24px", height: "24px", borderRadius: "50%", background: "#10b981", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "12px", border: "2px solid #fff" }}>✓</div>
+                                <div style={{ position: "absolute", bottom: "2px", right: "2px", width: "24px", height: "24px", borderRadius: "50%", background: "#10b981", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "12px", border: "2px solid #fff" }}>âœ“</div>
                             )}
                         </div>
                     </div>
@@ -74,7 +74,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData }) => {
                             ["Total Sessions", totalSessions],
                             ["Completion Rate", completionRate],
                             ["Response Time", responseTime],
-                            ["Success Rate", successRate],
+                            ["Trust Score", trustScoreVal],
                         ] as [string, string | number][]).map(([label, val]) => (
                             <div key={label} style={{ borderRadius: "12px", padding: "12px", background: C.surface, border: `1px solid ${C.border}` }}>
                                 <div style={{ fontSize: "15px", fontWeight: "bold", color: C.dark }}>{val}</div>
@@ -122,7 +122,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData }) => {
                         {/* Current Role */}
                         <div style={{ borderRadius: "12px", padding: "14px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "10px" }}>
                             <div style={{ fontWeight: "bold", color: C.dark, fontSize: "13px", marginBottom: "2px" }}>{currentRole}</div>
-                            <div style={{ fontSize: "11px", color: C.mid }}>📅 Present</div>
+                            <div style={{ fontSize: "11px", color: C.mid }}>ðŸ“… Present</div>
                         </div>
 
                         {/* Previous Roles */}
@@ -131,8 +131,8 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData }) => {
                                 <div key={i} style={{ borderRadius: "12px", padding: "14px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "10px" }}>
                                     <div style={{ fontWeight: "bold", color: C.dark, fontSize: "13px", marginBottom: "2px" }}>{w.title || w.position}</div>
                                     <div style={{ color: C.mid, fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>{w.company}</div>
-                                    {w.location && <div style={{ fontSize: "11px", color: C.mid, marginBottom: "2px" }}>📍 {w.location}</div>}
-                                    {w.duration && <div style={{ fontSize: "11px", color: C.mid, marginBottom: "6px" }}>📅 {w.duration}</div>}
+                                    {w.location && <div style={{ fontSize: "11px", color: C.mid, marginBottom: "2px" }}>ðŸ“ {w.location}</div>}
+                                    {w.duration && <div style={{ fontSize: "11px", color: C.mid, marginBottom: "6px" }}>ðŸ“… {w.duration}</div>}
                                     {w.description && <div style={{ fontSize: "12px", color: C.dark }}>{w.description}</div>}
                                 </div>
                             ))
@@ -142,8 +142,8 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData }) => {
                                 <div key={i} style={{ borderRadius: "12px", padding: "14px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "10px" }}>
                                     <div style={{ fontWeight: "bold", color: C.dark, fontSize: "13px", marginBottom: "2px" }}>{w.position}</div>
                                     <div style={{ color: C.mid, fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>{w.company}</div>
-                                    <div style={{ fontSize: "11px", color: C.mid, marginBottom: "2px" }}>📍 {w.location}</div>
-                                    <div style={{ fontSize: "11px", color: C.mid, marginBottom: "6px" }}>📅 {w.duration}</div>
+                                    <div style={{ fontSize: "11px", color: C.mid, marginBottom: "2px" }}>ðŸ“ {w.location}</div>
+                                    <div style={{ fontSize: "11px", color: C.mid, marginBottom: "6px" }}>ðŸ“… {w.duration}</div>
                                     <div style={{ fontSize: "12px", color: C.dark }}>{w.description}</div>
                                 </div>
                             ))

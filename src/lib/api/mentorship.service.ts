@@ -3,6 +3,28 @@ import api from "./api.intance";
 import { MentorResponse } from '@/features/mentorship/types/mentorship.types';
 import config from '@/config/env.config';
 
+export interface CreateGroupSessionInput {
+    title: string;
+    description: string;
+    topic: string;
+    category?: string;
+    scheduledAt: string;
+    duration: number;
+    timezone: string;
+    maxParticipants: number;
+    minParticipants: number;
+    pricePerPerson: number;
+    agenda?: string;
+    outcomes?: string[];
+    thumbnailImage?: File; // For FormData
+    paymentMethod: string;
+    bufferTimeMinutes?: number;
+    followUp?: {
+        allowed: boolean;
+        periodDays: number;
+    };
+}
+
 class MentorService {
 
   /**
@@ -115,6 +137,21 @@ class MentorService {
   }
 
   /**
+   * 🛡️ GET MENTOR TRUST SCORE
+   */
+  static async getTrustScore(): Promise<any> {
+    try {
+      console.log('🛡️ [GET_TRUST_SCORE] Fetching trust score...');
+      const { data } = await api.get('/mentorship/mentors/me/trust-score');
+      console.log('✅ [GET_TRUST_SCORE] Fetched:', data);
+      return data;
+    } catch (error: any) {
+      console.error('❌ [GET_TRUST_SCORE] Failed:', error);
+      throw new Error('Failed to fetch trust score.');
+    }
+  }
+
+  /**
    * 👤 GET MY MENTOR PROFILE
    */
   static async getMyMentorProfile(mentorId: string): Promise<MentorResponse> {
@@ -158,6 +195,85 @@ class MentorService {
         if (apiError?.message) throw new Error(apiError.message);
       }
       throw new Error('Failed to fetch mentors. Please try again.');
+    }
+  }
+
+  /**
+   * 👥 CREATE GROUP SESSION
+   */
+  static async createGroupSession(input: CreateGroupSessionInput): Promise<any> {
+    try {
+      console.log("👥 [CREATE_GROUP_SESSION] Creating...", {
+        title: input.title,
+        scheduledAt: input.scheduledAt,
+      });
+
+      const formData = new FormData();
+      Object.entries(input).forEach(([key, value]) => {
+        if (value !== undefined) {
+          if (key === 'thumbnailImage') {
+            formData.append(key, value as File);
+          } else if (typeof value === 'object') {
+            formData.append(key, JSON.stringify(value));
+          } else {
+            formData.append(key, String(value));
+          }
+        }
+      });
+
+      const { data } = await api.post(
+        `/mentorship/group-sessions/create`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      return data;
+    } catch (error: any) {
+      console.error("❌ [CREATE_GROUP_SESSION] Failed", error?.response?.data || error?.message);
+      if (error?.response?.status === 400) throw new Error(error.response.data?.message || "Invalid group session data.");
+      if (error?.response?.status === 404) throw new Error("Mentor not found.");
+      if (error?.code === "ERR_NETWORK") throw new Error("Unable to connect to server.");
+      throw new Error(error?.response?.data?.message || "Failed to create group session.");
+    }
+  }
+
+  /**
+   * 👥 GET ALL GROUP SESSIONS
+   */
+  static async getAllGroupSessions(filters: { mentorId?: string; page?: number; limit?: number; status?: string } = {}): Promise<any> {
+    try {
+      console.log('👥 [GET_ALL_GROUP_SESSIONS] Fetching group sessions...', filters);
+
+      const { data } = await api.get(`/mentorship/group-sessions`, { params: filters });
+
+      console.log('✅ [GET_ALL_GROUP_SESSIONS] Fetched:', data);
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (apiError?.message) throw new Error(apiError.message);
+      }
+      throw new Error('Failed to fetch group sessions. Please try again.');
+    }
+  }
+
+  /**
+   * 👥 GET GROUP SESSION BY ID
+   */
+  static async getGroupSessionById(id: string): Promise<any> {
+    try {
+      console.log(`👥 [GET_GROUP_SESSION_BY_ID] Fetching group session ${id}...`);
+
+      const { data } = await api.get(`/mentorship/group-sessions/${id}`);
+
+      console.log('✅ [GET_GROUP_SESSION_BY_ID] Fetched:', data);
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (apiError?.message) throw new Error(apiError.message);
+      }
+      throw new Error('Failed to fetch group session details. Please try again.');
     }
   }
 }

@@ -22,6 +22,8 @@ import {
     BecomeMentorModal,
     GlobalStyles,
 } from "@/features/index";
+import MentorshipServicesSection from "@/features/mentorship/components/sections/MentorshipServicesSection";
+import GroupSessionsSection from "@/features/mentorship/components/sections/GroupSessionsSection";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useParams, useRouter } from "next/navigation";
 import { useProfile } from "@/features/profile/hooks/useProfile";
@@ -31,7 +33,6 @@ import FindMentorModal from "@/features/mentorship/components/sections/FindMento
 export default function ThroneUltraPremium() {
     const router = useRouter();
     const [compareList, setCompareList] = useState<number[]>([]);
-    const [selectedDate, setSelectedDate] = useState(0);
     const [activeTimezone, setActiveTimezone] = useState("IST (UTC+5:30)");
     const [openFaq, setOpenFaq] = useState<number | null>(null);
     const [showMentorForm, setShowMentorForm] = useState(false);
@@ -39,10 +40,13 @@ export default function ThroneUltraPremium() {
     const [isMentor, setIsMentor] = useState(false);
     const params = useParams();
     const { user: currentUser } = useAuth();
-    const userId = params.userId as string;
+    const userId = params.userid as string;
     const [findMentorOpen, setFindMentorOpen] = useState(false);
     const [findMentorMentors, setFindMentorMentors] = useState<any[]>([]);
     const [findMentorLoading, setFindMentorLoading] = useState(false);
+    
+    // Mentor Data for the landing page mentor
+    const [pageMentorData, setPageMentorData] = useState<any>(null);
 
     const { profileImageUrl, loadProfile } = useProfile();
 
@@ -64,6 +68,17 @@ export default function ThroneUltraPremium() {
                 .catch(() => setIsMentor(false));
         }
     }, [user]);
+
+    useEffect(() => {
+        if (userId) {
+            MentorService.getAllMentors()
+                .then((res) => {
+                    const found = res?.data?.find((m: any) => m.mentorId === userId || m.userId === userId || m.user?.username === userId || m.user?.slug === userId) ?? null;
+                    setPageMentorData(found);
+                })
+                .catch(() => setPageMentorData(null));
+        }
+    }, [userId]);
 
     useEffect(() => {
         const observer = new IntersectionObserver(
@@ -136,6 +151,7 @@ export default function ThroneUltraPremium() {
                 onBecomeMentorClick={() => setShowMentorForm(true)}
                 onFindMentorClick={handleFindMentorOpen}
                 isMentor={isMentor}
+                userId={user?.userId}
             />
 
             <FindMentorModal
@@ -176,17 +192,21 @@ export default function ThroneUltraPremium() {
             {/* Company Logos */}
             <CompanyLogosSection />
 
-            {/* Slot Picker */}
-            <SlotPickerSection
-                selectedDate={selectedDate}
-                setSelectedDate={setSelectedDate}
+            {/* 1-to-1 Mentorship Services */}
+            <MentorshipServicesSection 
+                mentorId={pageMentorData?.mentorId || userId} 
+                mentorName={pageMentorData ? `${pageMentorData.user?.firstName ?? ""} ${pageMentorData.user?.lastName ?? ""}`.trim() : ""}
+                mentorImage={pageMentorData?.profilePic}
+                mentorRole={pageMentorData?.experience?.currentRole?.split(" at ")[0]}
             />
 
-            {/* Masterclasses */}
-            <MasterclassesSection />
-
-            {/* Upcoming Masterclasses */}
-            <UpcomingMasterclassesSection />
+            {/* Group Sessions */}
+            <GroupSessionsSection 
+                mentorId={pageMentorData?.mentorId || userId} 
+                mentorName={pageMentorData ? `${pageMentorData.user?.firstName ?? ""} ${pageMentorData.user?.lastName ?? ""}`.trim() : ""}
+                mentorImage={pageMentorData?.profilePic}
+                mentorRole={pageMentorData?.experience?.currentRole?.split(" at ")[0]}
+            />
 
             {/* Our Impact */}
             <OurImpactSection />

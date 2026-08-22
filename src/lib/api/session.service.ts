@@ -21,6 +21,7 @@ export interface CreateSessionInput {
         totalAmount: number;
         currency?: string;
     };
+    thumbnailImage?: File;
 }
 
 export interface SessionFilters {
@@ -40,7 +41,7 @@ interface ApiResponse {
 }
 
 export interface BookSessionInput {
-    sessionId: string;    // ✅ ADD
+    sessionId: string;    
     mentorId: string;
     availabilityId: string;
     slotTime: string;
@@ -57,18 +58,30 @@ export interface BookSessionInput {
 
 class SessionService {
 
-    // ── CREATE SESSION ─────────────────────────────────────
     static async createSession(input: CreateSessionInput): Promise<ApiResponse> {
         try {
             console.log("📅 [CREATE_SESSION] Creating...", {
-                // mentorId: input.mentorId,
                 sessionType: input.sessionType,
                 scheduledAt: input.scheduledAt,
             });
 
+            const formData = new FormData();
+            Object.entries(input).forEach(([key, value]) => {
+                if (value !== undefined) {
+                    if (key === 'thumbnailImage') {
+                        formData.append(key, value as File);
+                    } else if (typeof value === 'object') {
+                        formData.append(key, JSON.stringify(value));
+                    } else {
+                        formData.append(key, String(value));
+                    }
+                }
+            });
+
             const { data } = await api.post<ApiResponse>(
                 `${config.NEXT_PUBLIC_SESSIONS_CREATE_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_CREATE_ENDPOINT}`,
-                input
+                formData,
+                { headers: { 'Content-Type': 'multipart/form-data' } }
             );
 
             // console.log("✅ [CREATE_SESSION] Created:", data.data?.sessionId);
@@ -176,6 +189,53 @@ class SessionService {
             return data;
         } catch (error: any) {
             throw new Error(error?.response?.data?.message || "Failed to confirm session.");
+        }
+    }
+
+    static async startSession(sessionId: string): Promise<ApiResponse> {
+        try {
+            const { data } = await api.post<ApiResponse>(
+                `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/start`
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.message || "Failed to start session.");
+        }
+    }
+
+    static async completeSession(sessionId: string, payload: { actualDuration?: number, wasSuccessful?: boolean, followUpRequired?: boolean, followUpNotes?: string }): Promise<ApiResponse> {
+        try {
+            const { data } = await api.post<ApiResponse>(
+                `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/complete`,
+                payload
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.message || "Failed to complete session.");
+        }
+    }
+
+    static async cancelSession(sessionId: string, reason: string, bookingId: string): Promise<ApiResponse> {
+        try {
+            const { data } = await api.post<ApiResponse>(
+                `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/cancel`,
+                { reason, bookingId }
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.message || "Failed to cancel session.");
+        }
+    }
+
+    static async rescheduleSession(sessionId: string, newScheduledAt: string, reason: string, bookingId: string): Promise<ApiResponse> {
+        try {
+            const { data } = await api.post<ApiResponse>(
+                `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/reschedule`,
+                { newScheduledAt, reason, bookingId }
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.message || "Failed to reschedule session.");
         }
     }
 }
