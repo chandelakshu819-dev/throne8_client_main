@@ -1,7 +1,6 @@
 // src/core/realtime/socket.client.ts
 import { io, Socket } from 'socket.io-client';
 import TokenStorage from '@/lib/store/token.storage';
-
 import config from '@/config/env.config';
 
 let socket: Socket | null = null;
@@ -14,18 +13,17 @@ export const initializeSocket = (): Socket => {
 
     const token = TokenStorage.getAccessToken();
 
-    // ✅ ADD: Token validation
     if (!token) {
         console.error('❌ No token available for socket');
         throw new Error('No authentication token available');
     }
 
-    console.log('🔐 Connecting socket with token:', token.substring(0, 20) + '...'); // ✅ Debug log
-    console.log('🔐 [Socket] Token being sent:', token.substring(0, 30) + '...'); // ✅ ADD
+    console.log('🔐 Connecting socket with token:', token.substring(0, 20) + '...');
 
-    socket = io( config?.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL, {
+    // ✅ FIXED: WS_URL use ho raha hai (bina /api/v1 path ke), API_BASE_URL nahi
+    socket = io(config?.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_WS_URL, {
         auth: {
-            token: token 
+            token: token
         },
         transports: ['websocket', 'polling'],
         reconnection: true,
@@ -33,7 +31,6 @@ export const initializeSocket = (): Socket => {
         reconnectionDelay: 1000,
     });
 
-    // ✅ ADD: Reconnect with fresh token
     socket.io.on('reconnect_attempt', () => {
         const freshToken = TokenStorage.getAccessToken();
         if (freshToken) {
@@ -69,4 +66,3 @@ export const disconnectSocket = () => {
 };
 
 export { socket };
-

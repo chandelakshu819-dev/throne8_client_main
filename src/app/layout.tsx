@@ -1,7 +1,5 @@
 ﻿import type { Metadata } from "next";
-// @ts-ignore: Suppress "Cannot find module or type declarations" for CSS side-effect import
 import "./globals.css";
-// @ts-ignore: Suppress "Cannot find module or type declarations" for CSS side-effect import
 import 'remixicon/fonts/remixicon.css';
 import ReduxProvider from "@/store/providers/ReduxProvider";
 import AuthProvider from "@/providers/AuthProvider";
