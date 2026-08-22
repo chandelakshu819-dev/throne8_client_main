@@ -1,4 +1,5 @@
-// components/mentor-profile/MentorProfile.tsx"use client";
+// components/mentor-profile/MentorProfile.tsx
+"use client";
 
 import React, { useEffect, useState } from "react";
 import { C } from "../types/data";
