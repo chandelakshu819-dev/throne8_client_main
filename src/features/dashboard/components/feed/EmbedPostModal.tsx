@@ -33,6 +33,9 @@ interface EmbedPostModalProps {
     const [copied, setCopied] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [showLikesList, setShowLikesList] = useState(false);
+    const [captionExpanded, setCaptionExpanded] = useState(false);
+
+
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
@@ -77,9 +80,9 @@ interface EmbedPostModalProps {
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={onClose}
     >
-      <div
+           <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl ${
+        className={`w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl shadow-2xl ${
           isDarkMode ? 'bg-slate-800' : 'bg-white'
         }`}
       >
@@ -140,8 +143,8 @@ interface EmbedPostModalProps {
           </div>
         </div>
 
-        {/* Preview */}
-        <div className={`mx-6 mb-6 rounded-xl border overflow-hidden ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
+               {/* Preview */}
+               <div className={`mx-6 mb-6 rounded-xl border overflow-y-auto flex-1 min-h-0 ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
           <div className="p-4">
             <div className="flex items-center gap-3 mb-3">
               {authorAvatar ? (
@@ -165,10 +168,15 @@ interface EmbedPostModalProps {
             </div>
 
             <p className={`text-sm mb-1 ${isDarkMode ? 'text-slate-200' : 'text-gray-800'}`}>
-              {embedMode === 'less' ? truncated : content}
+              {embedMode === 'less' && !captionExpanded ? truncated : content}
             </p>
             {embedMode === 'less' && content.length > 120 && (
-              <button className="text-sm font-semibold text-[#4a3728] hover:underline mb-3">Read more</button>
+              <button
+                onClick={() => setCaptionExpanded((prev) => !prev)}
+                className="text-sm font-semibold text-[#4a3728] hover:underline mb-3"
+              >
+                {captionExpanded ? 'Show less' : 'Read more'}
+              </button>
             )}
 
             {image && (
