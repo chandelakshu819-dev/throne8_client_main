@@ -47,7 +47,24 @@ const FeedContainer = (props: any) => {
     repostProgress,
     profileData,
     fullName,
+    postPins = {},
   } = props;
+
+  // ✅ NEW FIX: pinned posts ko feedReposts se bhi upar rakhne ke liye
+  // 'posts' array ko pinned/unpinned indices mein split karo. Original
+  // index yahin preserve karte hain kyunki handlePostAction() 'visiblePosts'
+  // (yehi 'posts' prop) ka index use karta hai — index badalna nahi chahiye.
+  const pinnedIndices: number[] = [];
+  const unpinnedIndices: number[] = [];
+  posts.forEach((p: any, i: number) => {
+    const key = p.entryId || p.postId;
+    const isPinned = (postPins[key] ?? p.isPinned ?? false) && p.feedItemType !== 'repost';
+    if (isPinned) {
+      pinnedIndices.push(i);
+    } else {
+      unpinnedIndices.push(i);
+    }
+  });
 
   // ✅ Infinite scroll trigger — jab yeh sentinel div viewport mein aata hai,
   // aur hasMore true hai aur pehle se loadMore chal nahi raha, agla page fetch karo
@@ -104,13 +121,32 @@ const FeedContainer = (props: any) => {
         progress={repostProgress}
         isDarkMode={isDarkMode}
       />
-      <div className="space-y-8">
-        {/* ✅ FIX: client-side reposts (jo abhi-abhi create hui hain) sabse
-            top pe render karo — turant dikhengi, refresh ka wait nahi karna
-            padega. Backend refetch/refresh ke baad yeh hi reposts
-            `posts` array ke andar `feedItemType: 'repost'` ban ke aa jaayengi
-            (neeche wale block se render hongi), isliye duplicate render se
-            bachne ke liye unique `repostId` key use ki hai dono jagah. */}
+           <div className="space-y-8">
+        {/* ✅ FIX: pinned posts sabse top par — feedReposts se bhi upar */}
+        {pinnedIndices.map((index) => {
+          const post = posts[index];
+          return (
+            <PostCard
+              likedPosts={likedPosts}
+              currentUserId={currentUserId}
+              key={post.entryId || post.postId || index}
+              post={post}
+              profileImage={props.profileImage}
+              index={index}
+              onOpenWithPerspectiveModal={props.onOpenWithPerspectiveModal}
+              handleRepostInstant={props.handleRepostInstant}
+              {...props}
+            />
+          );
+        })}
+
+        {/* ✅ client-side reposts (jo abhi-abhi create hui hain) pinned ke
+            turant baad, baaki normal posts se pehle render karo — turant
+            dikhengi, refresh ka wait nahi karna padega. Backend refetch/
+            refresh ke baad yeh hi reposts `posts` array ke andar
+            `feedItemType: 'repost'` ban ke aa jaayengi (neeche wale block se
+            render hongi), isliye duplicate render se bachne ke liye unique
+            `repostId` key use ki hai dono jagah. */}
         {feedReposts.map((repostItem: any) => (
           <FeedRepostCard
             key={`local-${repostItem.repostId}`}
@@ -128,8 +164,9 @@ const FeedContainer = (props: any) => {
           />
         ))}
 
-        {posts.map((post: any, index: number) =>
-          post.feedItemType === 'repost' ? (
+        {unpinnedIndices.map((index) => {
+          const post = posts[index];
+          return post.feedItemType === 'repost' ? (
             <FeedRepostCard
               key={post.repostId}
               {...props}
@@ -156,8 +193,8 @@ const FeedContainer = (props: any) => {
               handleRepostInstant={props.handleRepostInstant}
               {...props}
             />
-          )
-        )}
+          );
+        })}
       </div>
 
       {/* ✅ Sentinel element — jab yeh screen pe aata hai, next page load hota hai */}

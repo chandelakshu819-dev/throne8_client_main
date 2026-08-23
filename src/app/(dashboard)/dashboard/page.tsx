@@ -22,9 +22,14 @@ import { useHeadlineData } from '@/features/profile/hooks/useHeadlineData';
 import { transformToProfileData } from '@/shared/utils/profileTransformers';
 import ProfileNavbar from '@/features/profile/components/home/ProfileNavbar';
 import ConnectionService from '@/lib/api/connection.service';
+import FollowService from '@/lib/api/follow.service';
+import ReportService from '@/lib/api/report.service';
 import { useSocket } from '@/core/realtime/useSocket';
 import { SOCKET_EVENTS } from '@/core/realtime/socket.events';
 import UpdatePostModal from '@/features/profile/components/home/UpdatePostModal';
+import Toast from '@/shared/uiComponents/Toast';
+import EmbedPostModal from '@/features/dashboard/components/feed/EmbedPostModal';
+import DeleteConfirmModal from '@/features/dashboard/components/feed/DeleteConfirmModal';
 export default function Home() {
     const { user, isLoading } = useAuth();
 
@@ -105,6 +110,16 @@ export default function Home() {
     const [isSubmittingPost, setIsSubmittingPost] = useState(false);
     const [postError, setPostError] = useState('');
     const [editingPost, setEditingPost] = useState<{ postId: string; content: string } | null>(null);
+
+    // ✅ NEW: home feed post-menu actions ke liye local state
+    const [postSaves, setPostSaves] = useState<Record<string, boolean>>({});
+    const [postPins, setPostPins] = useState<Record<string, boolean>>({});
+    const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
+
+     // ✅ NEW: toast + embed modal state
+     const [toast, setToast] = useState<{ message: string; linkText?: string; linkHref?: string } | null>(null);
+     const [embedPost, setEmbedPost] = useState<any | null>(null);
+         const [deleteConfirm, setDeleteConfirm] = useState<{ postId: string; isRepost?: boolean } | null>(null);
 
     const {
         userProfileData,
@@ -505,35 +520,173 @@ export default function Home() {
     const togglePostMenu = (index: any) => {
         setOpenMenuIndex(openMenuIndex === index ? null : index);
     };
+    const handlePostAction = async (action: any, postKeyOrIndex: any) => {
+        // postKeyOrIndex numeric index (normal post) ya string id (repost) ho sakta hai
+        // ✅ FIX: PostCard ko jo `index` milta hai wo 'visiblePosts' (sorted + filtered
+        // feed) ka index hota hai, 'allPosts' (raw/unsorted) ka nahi. Pehle
+        // allPosts[index] se galat post uth raha tha — isliye pin/save/delete
+        // kabhi kisi aur post par apply ho jaata tha aur pinned post top par
+        // kabhi nahi aati thi.
+        const post =
+            typeof postKeyOrIndex === 'number'
+                ? visiblePosts[postKeyOrIndex]
+                : allPosts.find(
+                      (p: any) =>
+                          (p.entryId || p.postId) === postKeyOrIndex ||
+                          p.originalPost?.entryId === postKeyOrIndex
+                  );
 
-    const handlePostAction = (action: any, postKeyOrIndex: any) => {
+        if (!post) {
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        const isRepostOriginal = post.feedItemType === 'repost';
+        const postId = isRepostOriginal ? post.originalPost.entryId : (post.entryId || post.postId);
+
         if (action === 'analytics') {
-            const post = allPosts[postKeyOrIndex];
-            setSelectedAnalyticsPost(post);
-        } else if (action === 'edit') {
-            // postKeyOrIndex repost ke liye entryId (string) hai,
-            // normal PostCard ke liye numeric index — dono handle karo
-            const post =
-                typeof postKeyOrIndex === 'number'
-                    ? allPosts[postKeyOrIndex]
-                    : allPosts.find(
-                          (p: any) =>
-                              (p.entryId || p.postId) === postKeyOrIndex ||
-                              p.originalPost?.entryId === postKeyOrIndex
-                      );
-    
-            const isRepostOriginal = post?.feedItemType === 'repost';
-            const targetPostId = isRepostOriginal
-                ? post.originalPost.entryId
-                : post?.entryId || post?.postId || postKeyOrIndex;
+            setSelectedAnalyticsPost(isRepostOriginal ? post.originalPost : post);
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'edit') {
             const targetContent = isRepostOriginal
                 ? post.originalPost.content
-                : post?.content || post?.text || '';
-    
-            setEditingPost({ postId: targetPostId, content: targetContent });
+                : post.content || post.text || '';
+            setEditingPost({ postId, content: targetContent });
+            setOpenMenuIndex(null);
+            return;
         }
+
+        if (action === 'copy') {
+            try {
+                const postUrl = `${window.location.origin}/post/${postId}`;
+                await navigator.clipboard.writeText(postUrl);
+                setToast({ message: 'Link copied to clipboard.', linkText: 'View post', linkHref: postUrl });
+            } catch (err) {
+                setToast({ message: 'Failed to copy link.' });
+            }
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'embed') {
+            setEmbedPost(isRepostOriginal ? post.originalPost : post);
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'save') {
+            const wasSaved = postSaves[postId] ?? (post as any).isSaved ?? false;
+            setPostSaves(prev => ({ ...prev, [postId]: !wasSaved }));
+            try {
+                await ProfileService.savePost(postId, !wasSaved);
+                setToast({ message: wasSaved ? 'Post unsaved.' : 'Post saved.' });
+            } catch (err: any) {
+                setPostSaves(prev => ({ ...prev, [postId]: wasSaved }));
+                setToast({ message: err.message || 'Failed to save post' });
+            }
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'pin') {
+            const wasPinned = postPins[postId] ?? (post as any).isPinned ?? false;
+            setPostPins(prev => ({ ...prev, [postId]: !wasPinned }));
+            try {
+                await ProfileService.pinPost(postId, !wasPinned);
+                setToast({ message: wasPinned ? 'Post unpinned.' : 'Post pinned to profile.' });
+            } catch (err: any) {
+                setPostPins(prev => ({ ...prev, [postId]: wasPinned }));
+                setToast({ message: err.message || 'Failed to pin post' });
+            }
+            setOpenMenuIndex(null);
+            return;
+        }
+        if (action === 'delete') {
+            setDeleteConfirm({ postId, isRepost: isRepostOriginal });
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'archive' || action === 'hide') {
+            try {
+                await ProfileService.archivePost(postId);
+                setHiddenPostIds(prev => new Set(prev).add(postId));
+                alert('Post archived.');
+            } catch (err: any) {
+                alert(err.message || 'Failed to archive post');
+            }
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'not-interested') {
+            setHiddenPostIds(prev => new Set(prev).add(postId));
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'unfollow') {
+            const targetUserId = post.userId || post.userid || post.authorId;
+            if (!targetUserId) {
+                alert('Unable to identify this user.');
+                setOpenMenuIndex(null);
+                return;
+            }
+            if (!confirm(`Unfollow ${post.user || 'this user'}? You will stop seeing their posts.`)) {
+                setOpenMenuIndex(null);
+                return;
+            }
+            try {
+                await FollowService.unfollowUser(targetUserId);
+                setHiddenPostIds(prev => new Set(prev).add(postId));
+                alert(`Unfollowed ${post.user || 'this user'}.`);
+            } catch (err: any) {
+                alert(err.message || 'Failed to unfollow');
+            }
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'report') {
+            if (!confirm('Report this post?')) {
+                setOpenMenuIndex(null);
+                return;
+            }
+            try {
+                await ReportService.reportPost(postId, 'other');
+                alert('Post reported. Our team will review it shortly.');
+            } catch (err: any) {
+                alert('Report received. Our team will review it shortly.');
+            }
+            setOpenMenuIndex(null);
+            return;
+        }
+
         setOpenMenuIndex(null);
     };
+
+
+
+        // ✅ NEW: DeleteConfirmModal se "Delete" click hone par actual delete yahan hota hai
+        const confirmDeletePost = async () => {
+            if (!deleteConfirm) return;
+            const { postId } = deleteConfirm;
+            try {
+                await ProfileService.deletePost(postId, false);
+                setHiddenPostIds(prev => new Set(prev).add(postId));
+                setToast({ message: 'Post deleted.' });
+            } catch (err: any) {
+                setToast({ message: err.message || 'Failed to delete post' });
+            }
+            setDeleteConfirm(null);
+        };
+    
+            
+
+
     const handleUpdatePost = async (postId: string, newContent: string) => {
         const rawTitle = newContent.trim().substring(0, 100);
         const title = rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1);
@@ -1076,6 +1229,23 @@ if (post?.userId && post.userId !== user?.userId) {
         };
     }, [openMenuIndex]);
 
+        // ✅ NEW: pinned posts ko hamesha top par rakho, baaki order same rehne do
+        const visiblePosts = allPosts
+        .filter((p: any) => {
+            const key = p.entryId || p.postId;
+            return !hiddenPostIds.has(key);
+        })
+        .slice()
+        .sort((a: any, b: any) => {
+            const aKey = a.entryId || a.postId;
+            const bKey = b.entryId || b.postId;
+            const aPinned = postPins[aKey] ?? a.isPinned ?? false;
+            const bPinned = postPins[bKey] ?? b.isPinned ?? false;
+            if (aPinned && !bPinned) return -1;
+            if (!aPinned && bPinned) return 1;
+            return 0; // baaki posts ka relative order waisa hi rahega (stable sort)
+        });
+
     return (
         <div className={`min-h-screen transition-all duration-500 ${isDarkMode ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900' : 'bg-[#d4c9bc]'} font-['Poppins'] overflow-x-clip`}>
             {/* Header */}
@@ -1174,7 +1344,9 @@ if (post?.userId && post.userId !== user?.userId) {
                         handleRepostInstant={handleRepostInstant}
                         showRepostProgressBar={showRepostProgressBar}
                         repostProgress={repostProgress}
-                        posts={allPosts}
+                        posts={visiblePosts}
+                        postSaves={postSaves}
+                        postPins={postPins}
                         isLoadingPosts={isLoadingAllPosts}
                         isLoadingMore={isLoadingMore}          
                         hasMore={hasMore}                     
@@ -1754,8 +1926,8 @@ if (post?.userId && post.userId !== user?.userId) {
         isDarkMode={isDarkMode}
     />
 
-    {/* Update Post Modal */}
-    {editingPost && (
+        {/* Update Post Modal */}
+        {editingPost && (
         <UpdatePostModal
             postId={editingPost.postId}
             isOpen={!!editingPost}
@@ -1765,6 +1937,47 @@ if (post?.userId && post.userId !== user?.userId) {
         />
     )}
 
+    {/* ✅ NEW: Toast — Save/Unsave, Copy link, etc ke liye */}
+    {toast && (
+        <Toast
+            message={toast.message}
+            linkText={toast.linkText}
+            linkHref={toast.linkHref}
+            avatarUrl={profileData.profileImage}
+            avatarInitial={fullName?.charAt(0) || 'N'}
+            onClose={() => setToast(null)}
+        />
+    )}
+
+       {/* ✅ NEW: Embed post modal */}
+       {embedPost && (
+        <EmbedPostModal
+            post={embedPost}
+            isOpen={!!embedPost}
+            onClose={() => setEmbedPost(null)}
+            isDarkMode={isDarkMode}
+            authorName={embedPost.userName || embedPost.fullName || embedPost.user || fullName}
+            authorHeadline={embedPost.headline || headlineData?.title || ''}
+            authorAvatar={embedPost.userAvatar || embedPost.avatar || profileData.profileImage}
+            comments={postComments[embedPost.entryId || embedPost.postId] || []}
+            commentsLoading={commentsLoading[embedPost.entryId || embedPost.postId] || false}
+            onRequestComments={() => fetchCommentsForPost(embedPost.entryId || embedPost.postId)}
+        />
+    )}
+
+    {/* ✅ NEW: Delete confirmation modal */}
+    <DeleteConfirmModal
+        isOpen={!!deleteConfirm}
+        isDarkMode={isDarkMode}
+        title={deleteConfirm?.isRepost ? 'Delete post?' : 'Delete post?'}
+        description={
+            deleteConfirm?.isRepost
+                ? 'Are you sure you want to delete this repost permanently?'
+                : 'Are you sure you want to delete this post permanently?'
+        }
+        onCancel={() => setDeleteConfirm(null)}
+        onConfirm={confirmDeletePost}
+    />
 
     {selectedAnalyticsPost && (
         <div 
