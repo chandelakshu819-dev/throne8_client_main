@@ -1,6 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import ConnectionService from '@/lib/api/connection.service';
+import FollowService from '@/lib/api/follow.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+
+// ✅ Multiple components apna-apna useConnectionStats() instance banate hai
+// (koi shared Context/Store nahi hai), isliye ek component me accept hone
+// par doosre component ka state kabhi update nahi hota tha. Ye global event
+// sab instances ko "refetch karo" bolne ke liye use hoga.
+export const CONNECTION_STATS_REFRESH_EVENT = 'connection-stats:refresh';
+
 
 interface ConnectionStats {
     totalConnections: number;
@@ -23,17 +31,34 @@ export const useConnectionStats = () => {
         }
     }, [user]);
 
+    // ✅ Jab bhi kahin bhi (RequestsModal accept, follow/unfollow, etc.)
+    // se ye event fire ho, ye instance bhi apna data refetch kar lega.
+    useEffect(() => {
+        const handleRefresh = () => {
+            if (user?.userId) {
+                fetchStats();
+            }
+        };
+        window.addEventListener(CONNECTION_STATS_REFRESH_EVENT, handleRefresh);
+        return () => window.removeEventListener(CONNECTION_STATS_REFRESH_EVENT, handleRefresh);
+    }, [user]);
+
     const fetchStats = async () => {
         try {
             setIsLoading(true);
-            const response = await ConnectionService.getConnectionStats(user!.userId);
 
-            const statsData = response.data;
+            const [connectionRes, followRes] = await Promise.all([
+                ConnectionService.getConnectionStats(user!.userId),
+                FollowService.getFollowCounts(user!.userId),
+            ]);
+
+            const statsData = connectionRes.data;
+            const followData = followRes?.data;
 
             setStats({
                 totalConnections: statsData.totalConnections || 0,
-                following: statsData.outgoingRequests || 0, // ✅ Pending sent requests
-                followers: statsData.incomingRequests || 0, // ✅ Pending received requests
+                following: followData?.followingCount || 0, // ✅ Actual Follow collection se
+                followers: followData?.followersCount || 0, // ✅ Actual Follow collection se
             });
 
         } catch (error: any) {

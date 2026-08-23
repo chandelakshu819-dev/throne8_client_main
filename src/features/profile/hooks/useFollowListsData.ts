@@ -1,9 +1,9 @@
 // src/features/profile/hooks/useFollowListsData.ts
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import FollowService from '@/lib/api/follow.service';
 import AuthService from '@/lib/api/auth.service';
 import ProfileService from '@/lib/api/profile.service';
-
+import { CONNECTION_STATS_REFRESH_EVENT } from '@/features/networks/hooks/useConnectionStats';
 /**
  * ✅ NEW HOOK — companion to `useFollowCounts`. That hook only gives you
  * numbers (followersCount / followingCount). This hook gives you the
@@ -154,11 +154,26 @@ export const useFollowListsData = () => {
         }
     }, []);
 
-    // Call after a follow/unfollow action so the list refreshes immediately
+        // Call after a follow/unfollow action so the list refreshes immediately
     // instead of waiting out the cache TTL.
     const invalidateFollowLists = useCallback((userId: string) => {
         resultCache.delete(userId);
     }, []);
+
+    // ✅ Jab kahin bhi connection request accept ho (ya follow/unfollow ho
+    // aur wo bhi is event ko dispatch kare), ye hook apni cache clear karke
+    // fresh followers/following list le lega — page reload ki zaroorat nahi.
+    useEffect(() => {
+        const handleRefresh = () => {
+            const userId = lastRequestedUserId.current;
+            if (userId) {
+                invalidateFollowLists(userId);
+                fetchFollowLists(userId);
+            }
+        };
+        window.addEventListener(CONNECTION_STATS_REFRESH_EVENT, handleRefresh);
+        return () => window.removeEventListener(CONNECTION_STATS_REFRESH_EVENT, handleRefresh);
+    }, [invalidateFollowLists, fetchFollowLists]);
 
     return {
         followersList,
