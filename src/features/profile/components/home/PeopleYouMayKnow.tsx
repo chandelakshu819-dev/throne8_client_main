@@ -18,6 +18,7 @@ const PeopleYouMayKnow: React.FC<PeopleYouMayKnowProps> = ({ userId }) => {
 
     // ✅ NEW: jinke liye request abhi in-flight hai — duplicate click/submit rokne ke liye
     const [connectingIds, setConnectingIds] = useState<Set<string>>(new Set());
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
 
     useEffect(() => {
         if (userId) {
@@ -25,17 +26,32 @@ const PeopleYouMayKnow: React.FC<PeopleYouMayKnowProps> = ({ userId }) => {
         }
     }, [userId, fetchNetworkUsers]);
 
+    // ✅ Listen for connection requests sent from elsewhere in the app
+    useEffect(() => {
+        const handleGlobalRequestSent = (event: any) => {
+            const targetId = event.detail?.targetUserId;
+            if (targetId) {
+                setHiddenIds((prev) => new Set(prev).add(targetId));
+            }
+        };
+        window.addEventListener('connection-request:sent', handleGlobalRequestSent);
+        return () => window.removeEventListener('connection-request:sent', handleGlobalRequestSent);
+    }, []);
+
+    // Auto-dismiss toast
+    useEffect(() => {
+        if (!toastMessage) return;
+        const timer = setTimeout(() => setToastMessage(null), 3000);
+        return () => clearTimeout(timer);
+    }, [toastMessage]);
+
     const handleCardClick = (targetUserId: string) => {
         router.push(`/profile/${targetUserId}`);
     };
 
-    const handleConnect = async (e: React.MouseEvent, targetUserId: string) => {
+    const handleConnect = async (e: React.MouseEvent, targetUserId: string, targetName?: string) => {
         e.stopPropagation(); // ✅ card navigation trigger na ho
 
-        // ✅ NEW: agar is user ke liye request already in-flight hai to dobara fire mat karo
-        // (isse ek hi click pe multiple POST /connections/requests jaane se bachte hain,
-        // jo dusri/teesri request ko "already exists" wali state me daal deta tha aur
-        // us wajah se aane wala 500/409 error create ho raha tha)
         if (connectingIds.has(targetUserId)) {
             return;
         }
@@ -44,27 +60,26 @@ const PeopleYouMayKnow: React.FC<PeopleYouMayKnowProps> = ({ userId }) => {
 
         try {
             await ConnectionService.sendConnectionRequest({ toUserId: targetUserId });
+            setToastMessage(`Connection request sent to ${targetName || 'user'}!`);
+            window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId } }));
         } catch (error: any) {
             const alreadyExists = error.message?.includes('already exists');
             if (!alreadyExists) {
                 alert(error.message || 'Failed to send connection request');
 
-                // ✅ NEW: real error pe in-flight flag hata do taaki user retry kar sake
                 setConnectingIds((prev) => {
                     const next = new Set(prev);
                     next.delete(targetUserId);
                     return next;
                 });
-                return; // ✅ real error pe list se mat hatao, retry allow karo
+                return;
             }
-            // already exists ho to bhi list se hata denge (neeche wahi hoga)
+            setToastMessage(`Connection request already pending.`);
+            window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId } }));
         }
 
-        // ✅ CONNECT + card dono list se hata do — agla user apne aap queue se aa jayega
+        // ✅ Card list se hata do — agla user apne aap queue se aa jayega
         setHiddenIds((prev) => new Set(prev).add(targetUserId));
-
-        // NOTE: success/already-exists case me connectingIds se hatane ki zaroorat nahi,
-        // kyunki targetUserId ab hiddenIds me chala gaya aur list se hi gayab ho jayega.
     };
 
     if (!userId) return null;
@@ -147,7 +162,7 @@ const PeopleYouMayKnow: React.FC<PeopleYouMayKnowProps> = ({ userId }) => {
                                         </p>
                                         
                                         <button
-                                            onClick={(e) => handleConnect(e, person.id)}
+                                            onClick={(e) => handleConnect(e, person.id, person.name)}
                                             disabled={isConnecting}
                                             className="px-4 py-2 bg-transparent border border-[#4a3728] text-[#4a3728] rounded-xl text-sm font-semibold shadow-lg hover:bg-[#4a3728] hover:text-[#f6ede8] transition-all duration-300 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#4a3728]"
                                         >
@@ -160,6 +175,14 @@ const PeopleYouMayKnow: React.FC<PeopleYouMayKnowProps> = ({ userId }) => {
                                 </div>
                             );
                         })}
+                    </div>
+                )}
+
+                {/* Toast Notification */}
+                {toastMessage && (
+                    <div className="mt-4 p-3 bg-[#4a3728] text-[#f6ede8] text-xs font-semibold rounded-xl text-center shadow-lg transition-all animate-fade-in flex items-center justify-center gap-2">
+                        <span>✓</span>
+                        <span>{toastMessage}</span>
                     </div>
                 )}
             </div>

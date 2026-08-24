@@ -23,9 +23,10 @@ export const useNetworkUsers = () => {
             setIsLoadingUsers(true);
             setCurrentUserId(userId);
 
-            const [usersResponse, connectionsResponse] = await Promise.all([
+            const [usersResponse, connectionsResponse, outgoingRequestsResponse] = await Promise.all([
                 AuthService.getAllUsers({ limit: 100 }),
-                ConnectionService.getUserConnections(userId).catch(() => ({ data: { data: [] } }))
+                ConnectionService.getUserConnections(userId).catch(() => ({ data: { data: [] } })),
+                ConnectionService.getOutgoingRequests(userId).catch(() => ({ data: { data: [] } }))
             ]);
 
             // ✅ RACE CHECK — agar ismeen ek naya request start ho chuka hai
@@ -35,14 +36,24 @@ export const useNetworkUsers = () => {
                 return;
             }
 
-            const users = usersResponse.data.users;
-            const connections = connectionsResponse.data.data || [];
+            const users = usersResponse.data.users || [];
+            const connections = connectionsResponse.data?.data || [];
+            const outgoingRequests = outgoingRequestsResponse.data?.data || outgoingRequestsResponse.data || [];
 
             const connectedUserIds = new Set<string>();
             connections.forEach((conn: any) => {
                 if (conn.fromUserId !== userId) connectedUserIds.add(conn.fromUserId);
                 if (conn.toUserId !== userId) connectedUserIds.add(conn.toUserId);
             });
+
+            // ✅ Also exclude users with pending outgoing requests
+            if (Array.isArray(outgoingRequests)) {
+                outgoingRequests.forEach((req: any) => {
+                    if (req.toUserId && req.status !== 'declined' && req.status !== 'cancelled') {
+                        connectedUserIds.add(req.toUserId);
+                    }
+                });
+            }
 
             const userIds = users
                 .map((user: any) => user.userId)
