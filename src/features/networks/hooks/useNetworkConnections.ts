@@ -43,28 +43,30 @@ export const useNetworkConnections = () => {
     }, [user?.userId]);
 
     const handleConnect = async (userId: string) => {
-        if (connectedUsers.has(userId) || loadingUsers.has(userId)) {
+        if (!userId || connectedUsers.has(userId) || loadingUsers.has(userId)) {
            return;
         }
 
         setLoadingUsers(prev => new Set(prev).add(userId));
+        // Optimistically mark as pending & broadcast global event
+        setConnectedUsers(prev => new Set(prev).add(userId));
+        window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId: userId } }));
 
         try {
             await ConnectionService.sendConnectionRequest({
                 toUserId: userId,
                 message: "Hi! I'd like to connect with you.",
-                priority: 'medium',
-                templateId: 'welcome-template',
             });
-            setConnectedUsers(prev => new Set(prev).add(userId));
-            window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId: userId } }));
         } catch (error: any) {
             const alreadyExists = error.message?.includes('already exists');
-            if (alreadyExists) {
-                setConnectedUsers(prev => new Set(prev).add(userId));
-                window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId: userId } }));
-            } else {
+            if (!alreadyExists) {
                 console.error('❌ Failed to send request:', error.message);
+                // Revert optimistic pending state on real error
+                setConnectedUsers(prev => {
+                    const next = new Set(prev);
+                    next.delete(userId);
+                    return next;
+                });
                 alert(error.message || 'Failed to send connection request');
             }
         } finally {

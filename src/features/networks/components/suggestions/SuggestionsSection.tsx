@@ -8,6 +8,7 @@ interface SuggestionsSectionProps {
     title?: string;
     people: Person[];
     connectedUsers: Set<string>;
+    loadingUsers?: Set<string>;
     onConnect: (userId: string) => void;
     isLoading?: boolean;
 }
@@ -23,6 +24,7 @@ export const SuggestionsSection: React.FC<SuggestionsSectionProps> = ({
     title = "People You May Know",
     people,
     connectedUsers,
+    loadingUsers,
     onConnect,
     isLoading = false
 }) => {
@@ -97,6 +99,7 @@ export const SuggestionsSection: React.FC<SuggestionsSectionProps> = ({
             <PeopleGrid
                 people={displayedPeople}
                 connectedUsers={connectedUsers}
+                loadingUsers={loadingUsers}
                 onConnect={onConnect}
             />
 

@@ -56,7 +56,7 @@ export default function NetworkPage() {
     } = useNetworkCompanies();
 
     // Custom hooks
-    const { connectedUsers, handleConnect } = useNetworkConnections();
+    const { connectedUsers, loadingUsers, handleConnect } = useNetworkConnections();
 
     const {
         requests,
@@ -188,6 +188,7 @@ export default function NetworkPage() {
                                 <SuggestionsSection
                                     people={networkUsers}
                                     connectedUsers={connectedUsers}
+                                    loadingUsers={loadingUsers}
                                     onConnect={handleConnect}
                                     isLoading={isLoadingUsers}
                                 />

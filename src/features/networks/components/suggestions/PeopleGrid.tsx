@@ -4,13 +4,15 @@ import { PersonCard } from './PersonCard';
 
 interface PeopleGridProps {
     people: Person[];
-    connectedUsers: Set<string>; // ✅ Changed from Set<number> to Set<string>
+    connectedUsers: Set<string>;
+    loadingUsers?: Set<string>;
     onConnect: (userId: string) => void;
 }
 
 export const PeopleGrid: React.FC<PeopleGridProps> = ({
     people,
     connectedUsers,
+    loadingUsers,
     onConnect
 }) => {
     return (
@@ -20,6 +22,7 @@ export const PeopleGrid: React.FC<PeopleGridProps> = ({
                     key={person.id}
                     person={person}
                     isConnected={connectedUsers.has(person.id)}
+                    isLoading={loadingUsers?.has(person.id)}
                     onConnect={onConnect}
                 />
             ))}
