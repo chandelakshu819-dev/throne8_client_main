@@ -1,11 +1,46 @@
-import { useState } from "react";
-import { useConnectionSocket } from "./useConnectionSocket";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import ConnectionService from "@/lib/api/connection.service";
 
 export const useNetworkConnections = () => {
+    const { user } = useAuth();
     const [connectedUsers, setConnectedUsers] = useState<Set<string>>(new Set());
     const [loadingUsers, setLoadingUsers] = useState<Set<string>>(new Set());
-    // const { decrementCount } = useConnectionSocket();
+
+    // ✅ Initial load of pending outgoing requests from backend
+    useEffect(() => {
+        if (!user?.userId) return;
+
+        const loadPendingRequests = async () => {
+            try {
+                const res = await ConnectionService.getOutgoingRequests(user.userId);
+                const requests = res?.data?.data || res?.data || [];
+                if (Array.isArray(requests)) {
+                    const pendingIds = new Set<string>();
+                    requests.forEach((req: any) => {
+                        if (req.toUserId && req.status !== 'declined' && req.status !== 'cancelled') {
+                            pendingIds.add(req.toUserId);
+                        }
+                    });
+                    setConnectedUsers(pendingIds);
+                }
+            } catch (err) {
+                console.warn('Failed to load initial outgoing requests in useNetworkConnections:', err);
+            }
+        };
+
+        loadPendingRequests();
+
+        // Listen for global connection-request:sent events
+        const handleGlobalRequestSent = (event: any) => {
+            const targetId = event.detail?.targetUserId;
+            if (targetId) {
+                setConnectedUsers(prev => new Set(prev).add(targetId));
+            }
+        };
+        window.addEventListener('connection-request:sent', handleGlobalRequestSent);
+        return () => window.removeEventListener('connection-request:sent', handleGlobalRequestSent);
+    }, [user?.userId]);
 
     const handleConnect = async (userId: string) => {
         if (connectedUsers.has(userId) || loadingUsers.has(userId)) {
@@ -15,22 +50,23 @@ export const useNetworkConnections = () => {
         setLoadingUsers(prev => new Set(prev).add(userId));
 
         try {
-             // ✅ CALL API
             await ConnectionService.sendConnectionRequest({
                 toUserId: userId,
                 message: "Hi! I'd like to connect with you.",
                 priority: 'medium',
                 templateId: 'welcome-template',
             });
-            // ✅ UPDATE STATE
-            // Note: following/followers count sirf accept hone par badhega
-            // (Follow document tabhi backend me create hota hai), isliye
-            // yaha optimistic increment nahi karte — request sirf "pending" state hai.
             setConnectedUsers(prev => new Set(prev).add(userId));
-
+            window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId: userId } }));
         } catch (error: any) {
-            console.error('❌ Failed to send request:', error.message);
-            alert(error.message || 'Failed to send connection request');
+            const alreadyExists = error.message?.includes('already exists');
+            if (alreadyExists) {
+                setConnectedUsers(prev => new Set(prev).add(userId));
+                window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId: userId } }));
+            } else {
+                console.error('❌ Failed to send request:', error.message);
+                alert(error.message || 'Failed to send connection request');
+            }
         } finally {
             setLoadingUsers(prev => {
                 const newSet = new Set(prev);

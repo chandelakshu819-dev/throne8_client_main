@@ -30,6 +30,18 @@ const PostHeader = ({
   const [isSending, setIsSending] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
+  // ✅ Listen for connection requests sent anywhere in the app
+  React.useEffect(() => {
+    if (!post.userId) return;
+    const handleGlobalRequestSent = (event: any) => {
+      if (event.detail?.targetUserId === post.userId) {
+        setConnectionStatus('pending_sent');
+      }
+    };
+    window.addEventListener('connection-request:sent', handleGlobalRequestSent);
+    return () => window.removeEventListener('connection-request:sent', handleGlobalRequestSent);
+  }, [post.userId]);
+
   const handleProfileClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!post.userId) return;
@@ -49,10 +61,12 @@ const PostHeader = ({
     try {
       await ConnectionService.sendConnectionRequest({ toUserId: post.userId });
       setConnectionStatus('pending_sent');
+      window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId: post.userId } }));
     } catch (error: any) {
       console.error('❌ Connect failed:', error.message);
       if (error.message?.includes('already exists')) {
         setConnectionStatus('pending_sent');
+        window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId: post.userId } }));
       }
     } finally {
       setIsSending(false);

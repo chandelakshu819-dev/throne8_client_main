@@ -99,10 +99,11 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
         const loadData = async () => {
             setIsLoadingViewers(true);
             try {
-                const [detailRes, trendRes, connectionsRes] = await Promise.all([
+                const [detailRes, trendRes, connectionsRes, outgoingRes] = await Promise.all([
                     AnalyticsService.getProfileViewsDetail(true, 1, 20),
                     AnalyticsService.getProfileViewsTrend(timeRange, 'day'),
-                    user?.userId ? ConnectionService.getUserConnections(user.userId) : Promise.resolve(null)
+                    user?.userId ? ConnectionService.getUserConnections(user.userId) : Promise.resolve(null),
+                    user?.userId ? ConnectionService.getOutgoingRequests(user.userId).catch(() => null) : Promise.resolve(null),
                 ]);
 
                 setViewers(detailRes?.data?.views || []);
@@ -115,8 +116,7 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
                     views: trend.map((t: any) => t.views)
                 });
 
-                // ✅ FIX: connections list se ek Set banao — jisme doosre wale user ki id ho
-                // (fromUserId/toUserId mein se jo current user nahi hai wo), sirf 'active' status wale
+                // ✅ Connections list
                 if (connectionsRes && user?.userId) {
                     const connections = connectionsRes?.data?.data || connectionsRes?.data || [];
                     const ids = new Set<string>(
@@ -127,6 +127,20 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
                             )
                     );
                     setConnectedUserIds(ids);
+                }
+
+                // ✅ Outgoing pending requests
+                if (outgoingRes && user?.userId) {
+                    const outgoing = outgoingRes?.data?.data || outgoingRes?.data || [];
+                    if (Array.isArray(outgoing)) {
+                        const pendingIds = new Set<string>();
+                        outgoing.forEach((req: any) => {
+                            if (req.toUserId && req.status !== 'declined' && req.status !== 'cancelled') {
+                                pendingIds.add(req.toUserId);
+                            }
+                        });
+                        setPendingRequestIds(pendingIds);
+                    }
                 }
             } catch (error) {
                 console.error('Failed to load profile views data:', error);
@@ -140,7 +154,7 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
         loadData();
     }, [isOpen, timeRange, user?.userId]);
 
-     // ✅ Scroll lock effect — YAHA ADD KARO
+     // ✅ Scroll lock effect
      useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
@@ -155,17 +169,20 @@ const ProfileViewsModal: React.FC<ProfileViewsModalProps> = ({
 
     // ✅ FIX: Connect button click hone par connection request bhejta hai
     const handleConnect = async (targetUserId: string) => {
-        if (connectingId) return; // ek time pe ek hi request
+        if (connectingId) return;
         try {
             setConnectingId(targetUserId);
             await ConnectionService.sendConnectionRequest({ toUserId: targetUserId });
             setPendingRequestIds((prev) => new Set(prev).add(targetUserId));
+            window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId } }));
         } catch (error: any) {
-            alert(
-                error.message?.includes('already exists')
-                    ? 'Connection request already sent'
-                    : (error.message || 'Failed to send connection request')
-            );
+            const alreadyExists = error.message?.includes('already exists');
+            if (alreadyExists) {
+                setPendingRequestIds((prev) => new Set(prev).add(targetUserId));
+                window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId } }));
+            } else {
+                alert(error.message || 'Failed to send connection request');
+            }
         } finally {
             setConnectingId(null);
         }

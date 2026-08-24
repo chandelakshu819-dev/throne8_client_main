@@ -192,6 +192,8 @@ export default function SearchUserProfilePage() {
         checkConnection();
     }, [userId, user?.userId]);
 
+    const [isConnecting, setIsConnecting] = useState(false);
+
     useEffect(() => {
         if (!user?.userId || !userId || userId === user.userId) return;
         const checkPendingStatus = async () => {
@@ -207,6 +209,14 @@ export default function SearchUserProfilePage() {
             }
         };
         checkPendingStatus();
+
+        const handleGlobalRequestSent = (event: any) => {
+            if (event.detail?.targetUserId === userId) {
+                setConnectionPending(true);
+            }
+        };
+        window.addEventListener('connection-request:sent', handleGlobalRequestSent);
+        return () => window.removeEventListener('connection-request:sent', handleGlobalRequestSent);
     }, [userId, user?.userId]);
 
     const [incomingRequestId, setIncomingRequestId] = useState<string | null>(null);
@@ -229,15 +239,22 @@ export default function SearchUserProfilePage() {
     }, [userId, user?.userId]);
 
     const handleConnect = async () => {
-        if (!userId || connectionPending) return;
+        if (!userId || connectionPending || isConnecting) return;
         try {
+            setIsConnecting(true);
             setConnectionPending(true);
             await ConnectionService.sendConnectionRequest({ toUserId: userId });
-            alert('Connection request sent!');
+            window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId: userId } }));
         } catch (error: any) {
-            alert(error.message?.includes('already exists') ? 'Connection request already sent' : (error.message || 'Failed to send connection request'));
+            const alreadyExists = error.message?.includes('already exists');
+            if (alreadyExists) {
+                setConnectionPending(true);
+            } else {
+                setConnectionPending(false);
+                alert(error.message || 'Failed to send connection request');
+            }
         } finally {
-            setConnectionPending(false);
+            setIsConnecting(false);
         }
     };
 

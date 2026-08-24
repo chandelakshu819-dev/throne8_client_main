@@ -378,9 +378,24 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     <button
         onClick={onConnect}
         disabled={connectionPending}
-        className="px-4 py-2 bg-[#4a3728] text-white rounded-full text-xs font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-60"
+        className={`px-4 py-2 rounded-full text-xs font-semibold shadow-lg transition-all duration-300 flex items-center gap-1.5 ${
+            connectionPending
+                ? 'bg-[#e0d8cf] text-[#4a3728] cursor-not-allowed border border-[#4a3728]/30 font-bold'
+                : 'bg-[#4a3728] text-white hover:shadow-xl hover:scale-105'
+        }`}
     >
-        {connectionPending ? 'Pending...' : 'Connect'}
+        {connectionPending ? (
+            <>
+                <svg className="w-3.5 h-3.5 text-[#4a3728]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Pending...</span>
+            </>
+        ) : (
+            <>
+                <span>+</span> Connect
+            </>
+        )}
     </button>
 )}
 

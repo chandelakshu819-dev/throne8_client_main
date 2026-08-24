@@ -799,6 +799,27 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
   const [deleteConfirmPostId, setDeleteConfirmPostId] = useState<string | null>(null);
   const [isDeletingConfirmed, setIsDeletingConfirmed] = useState(false);
 
+  // ✅ Live followers count sync for Activity badge
+  const [displayFollowers, setDisplayFollowers] = useState<number>(followers);
+
+  useEffect(() => {
+    setDisplayFollowers(followers);
+  }, [followers]);
+
+  useEffect(() => {
+    const targetId = userId || currentUserId;
+    if (targetId) {
+      FollowService.getFollowCounts(targetId)
+        .then((res: any) => {
+          const count = res?.data?.followersCount ?? res?.followersCount;
+          if (typeof count === 'number') {
+            setDisplayFollowers(count);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [userId, currentUserId]);
+
  
   useEffect(() => {
     if (reportingPostId) {
@@ -1253,7 +1274,7 @@ const engagementPercent = analyticsData
           </div>
           <div className="flex items-center gap-2 bg-[#4a3728]/10 px-4 py-2 rounded-full backdrop-blur-sm">
             <div className="w-2 h-2 bg-[#4a3728] rounded-full animate-pulse" />
-            <p className="text-sm font-semibold text-[#4a3728]">{followers} followers</p>
+            <p className="text-sm font-semibold text-[#4a3728]">{displayFollowers} followers</p>
           </div>
         </div>
 

@@ -98,10 +98,11 @@ export const PersonCard: React.FC<PersonCardProps> = ({
                     <button
                         onClick={() => onConnect(person.id)}
                         disabled={isConnected || isLoading}
-                        className={`w-full py-2.5 px-4 rounded-xl text-sm font-bold shadow-lg transform transition-all duration-300 ${isConnected
-                            ? 'bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] text-white cursor-default'
-                            : 'text-[#4a3728] hover:bg-[#f6ede8] hover:border hover:border-[#4a3728] hover:shadow-md hover:opacity-90 active:scale-95'
-                            }`}
+                        className={`w-full py-2.5 px-4 rounded-xl text-sm font-bold shadow-lg transform transition-all duration-300 ${
+                            isConnected
+                                ? 'bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] text-white cursor-not-allowed opacity-90'
+                                : 'text-[#4a3728] hover:bg-[#f6ede8] hover:border hover:border-[#4a3728] hover:shadow-md hover:opacity-90 active:scale-95'
+                        }`}
                         style={{
                             background: isConnected
                                 ? 'linear-gradient(135deg, #4a3728, #7a5c3e)'
@@ -109,16 +110,24 @@ export const PersonCard: React.FC<PersonCardProps> = ({
                         }}
                     >
                         <span className="flex items-center justify-center gap-2">
-                            {isConnected ? (
+                            {isLoading ? (
                                 <>
-                                    <span className="w-4 h-4 bg-white rounded-full flex items-center justify-center">
-                                        <span className="text-[#7a5c3e] text-xs">✓</span>
-                                    </span>
+                                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Connecting...
+                                </>
+                            ) : isConnected ? (
+                                <>
+                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
                                     Pending...
                                 </>
                             ) : (
                                 <>
-                                    <span className="animate-pulse">✨</span>
+                                    <span className="text-base font-normal">+</span>
                                     Connect
                                 </>
                             )}
