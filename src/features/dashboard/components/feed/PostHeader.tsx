@@ -30,17 +30,43 @@ const PostHeader = ({
   const [isSending, setIsSending] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
-  // ✅ Listen for connection requests sent anywhere in the app
+  // ✅ Listen for connection requests sent anywhere in the app & check pending status
   React.useEffect(() => {
-    if (!post.userId) return;
+    if (!post.userId || !currentUserId || isOwnPost) return;
+
+    const targetAuthorId = post.userId || post.originalPost?.userId;
+
     const handleGlobalRequestSent = (event: any) => {
-      if (event.detail?.targetUserId === post.userId) {
+      const targetId = event.detail?.targetUserId;
+      if (targetId && (targetId === post.userId || targetId === post.originalPost?.userId)) {
         setConnectionStatus('pending_sent');
       }
     };
     window.addEventListener('connection-request:sent', handleGlobalRequestSent);
-    return () => window.removeEventListener('connection-request:sent', handleGlobalRequestSent);
-  }, [post.userId]);
+
+    let isMounted = true;
+    if (connectionStatus === 'none' && targetAuthorId) {
+      ConnectionService.getOutgoingRequests(currentUserId)
+        .then((res: any) => {
+          if (!isMounted) return;
+          const outgoing = res?.data?.data || res?.data || [];
+          if (Array.isArray(outgoing)) {
+            const isPending = outgoing.some(
+              (r: any) => r.toUserId === targetAuthorId && r.status !== 'declined' && r.status !== 'cancelled'
+            );
+            if (isPending) {
+              setConnectionStatus('pending_sent');
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('connection-request:sent', handleGlobalRequestSent);
+    };
+  }, [post.userId, post.originalPost?.userId, currentUserId, isOwnPost, connectionStatus]);
 
   const handleProfileClick = (e: React.MouseEvent) => {
     e.stopPropagation();
