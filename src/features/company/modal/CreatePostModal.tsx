@@ -1,5 +1,5 @@
 'use client';
-
+// src/features/company/modal/CreatePostModal.tsx
 import { useState, useRef, useCallback, memo } from 'react';
 import Image from 'next/image';
 import type { Post } from '@/features/company/store/slices/postsSlice';

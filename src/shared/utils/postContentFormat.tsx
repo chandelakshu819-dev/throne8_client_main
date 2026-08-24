@@ -1,7 +1,8 @@
 // src/shared/utils/postContentFormat.tsx
 //
 // ✅ Lightweight markdown-lite formatter for post/comment content.
-// Supports: **bold**, _italic_, "- " bullet lines, @[Name](userId) mentions.
+// Supports: **bold**, _italic_, "- " bullet lines, @[Name](userId) mentions,
+// #hashtag highlighting/links.
 //
 // Deliberately does NOT use dangerouslySetInnerHTML — everything is
 // parsed straight into React elements, so it's XSS-safe by construction.
@@ -13,15 +14,26 @@ import Link from 'next/link';
 
 const MENTION_PATTERN = /@\[([^\]]+)\]\(([^)]+)\)/;
 
+// ✅ NEW: hashtag pattern — matches a "#" followed by letters/numbers/
+// underscores (no spaces, no punctuation breaking it). Requires the "#"
+// to be at the start of the token boundary created by the split regex
+// below, so "word#nothashtag" won't false-positive since the split regex
+// itself only grabs "#word" chunks, never mid-word.
+const HASHTAG_PATTERN = /^#([a-zA-Z0-9_]+)$/;
+
 /**
- * Parses **bold**, _italic_, and @[Name](userId) mention markers inside
- * a single line of text.
+ * Parses **bold**, _italic_, @[Name](userId) mentions, and #hashtags
+ * inside a single line of text.
  */
 function parseInline(text: string, keyPrefix: string): React.ReactNode[] {
     if (!text) return [];
 
+    // ✅ CHANGED: added a hashtag alternative to the split regex —
+    // `#[a-zA-Z0-9_]+` — right alongside bold/italic/mention, so hashtags
+    // get tokenized out just like the others instead of falling through
+    // as plain text.
     const tokens = text
-        .split(/(\*\*[^*\n]+\*\*|_[^_\n]+_|@\[[^\]]+\]\([^)]+\))/g)
+        .split(/(\*\*[^*\n]+\*\*|_[^_\n]+_|@\[[^\]]+\]\([^)]+\)|#[a-zA-Z0-9_]+)/g)
         .filter((t) => t.length > 0);
 
     return tokens.map((token, i) => {
@@ -38,6 +50,24 @@ function parseInline(text: string, keyPrefix: string): React.ReactNode[] {
                     className="font-semibold text-[#4a3728] hover:underline"
                 >
                     @{name}
+                </Link>
+            );
+        }
+
+        // ✅ NEW: hashtag → styled + clickable, links to a hashtag search/
+        // feed page. Route assumed as /search?hashtag=<tag> (adjust if the
+        // app uses a different hashtag search route).
+        const hashtagMatch = token.match(HASHTAG_PATTERN);
+        if (hashtagMatch) {
+            const [, tag] = hashtagMatch;
+            return (
+                <Link
+                    key={key}
+                    href={`/search?hashtag=${encodeURIComponent(tag)}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="font-semibold text-[#6b5643] hover:underline"
+                >
+                    #{tag}
                 </Link>
             );
         }

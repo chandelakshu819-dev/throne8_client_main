@@ -294,9 +294,18 @@ const PostCard = ({
           isPinned={postPins ? (postPins[postKey] ?? (post as any).isPinned ?? false) : ((post as any).isPinned ?? false)}
         />
 
-        {/* Click on post body opens the LinkedIn-style expanded modal */}
+            {/* Click on post body opens the LinkedIn-style expanded modal.
+            ✅ FIX: agar click @mention ya #hashtag link (<a> tag) par hua hai
+            to modal mat kholo, us link ko normally navigate hone do. Pehle
+            sirf mention Link ke apne onClick mein stopPropagation() tha jo
+            reliably kaam nahi kar raha tha — is explicit guard se pakka ho
+            jaata hai ki link click hamesha navigate karega, modal open nahi
+            hoga. */}
         <div
-          onClick={() => {
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('a')) return;
+
             setIsDetailOpen(true);
             AnalyticsService.recordClick(post.userId, 'post_link', undefined, post.postId);
           }}
