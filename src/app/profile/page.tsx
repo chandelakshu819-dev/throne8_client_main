@@ -303,8 +303,9 @@ export default function ProfilePage() {
                             isOwnProfile={isOwnProfile}
                             posts={userPosts}
                             currentUserId={user?.userId}
+                            userId={user?.userId}
                             onPostCreated={loadPosts}
-                            followers={profileData.followers}
+                            followers={followersCount}
                             isLoading={isLoadingPosts}
                             profileImage={profileImageUrl}
                             fullName={fullName}
