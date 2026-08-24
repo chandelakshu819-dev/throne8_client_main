@@ -200,149 +200,149 @@ export default function ProfilePage() {
     }
 
     return (
-        // ✅ FIX: dashboard jaisa hi 'zoom' apply kiya (0.9) taaki density match ho.
-        // Manually browser 90% zoom karne pe jo layout accha lag raha tha,
-        // wahi effect ab yahin se milega — bina user ko khud zoom karne ki zarurat ke.
-        // Note: CSS `zoom` Chromium browsers (Chrome/Edge/Brave) mein hi reliably kaam
-        // karta hai — Firefox mein support nahi hai. Dashboard bhi isi wajah se
-        // `zoom` use kar raha hai, isliye consistency ke liye yahi approach rakha.
-        <div
-            className="min-h-screen bg-[#f6ede8] py-12 px-4 font-sans"
-            style={{ zoom: 0.85 } as React.CSSProperties}
-        >
-            <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-8">
-                {/* Navbar */}
-                <ProfileNavbar
-                    profileImage={profileImageUrl}
-                    userName={profileData.userName}
-                    currentUserId={user?.userId}
-                    companyId={profileData?.company}
-                />
+        // ✅ FIX: Navbar ab is outer wrapper ke andar hai lekin zoom-wrapper
+        // ke BAHAR — isliye navbar full scale (100%) pe render hota hai,
+        // dashboard jaisa hi consistent size/look milta hai.
+        <div className="min-h-screen bg-[#f6ede8] font-sans">
+            {/* Navbar — zoom se bahar rakha, dashboard jaisa full scale */}
+            <ProfileNavbar
+                profileImage={profileImageUrl}
+                userName={profileData.userName}
+                currentUserId={user?.userId}
+                companyId={profileData?.company}
+            />
 
-                {/* Main Content (Left) */}
-                <div className="flex-1 min-w-0 pt-20">
-                    {/* Banner */}
-                    <ProfileBanner
-                        bannerImage={bannerUrl}
-                        onBannerUpdate={(newUrl) => {
-                            updateBanner(newUrl);
-                        }}
-                        onDataRefresh={loadProfile}
-                        coverId={coverPhotoId}
-                        isOwnProfile={isOwnProfile}
-                    />
+            {/* ✅ Zoom sirf page content pe apply hota hai, navbar pe nahi */}
+            <div
+                className="py-12 px-4"
+                style={{ zoom: 0.85 } as React.CSSProperties}
+            >
+                <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-8">
+                    {/* Main Content (Left) */}
+                    <div className="flex-1 min-w-0 pt-20">
+                        {/* Banner */}
+                        <ProfileBanner
+                            bannerImage={bannerUrl}
+                            onBannerUpdate={(newUrl) => {
+                                updateBanner(newUrl);
+                            }}
+                            onDataRefresh={loadProfile}
+                            coverId={coverPhotoId}
+                            isOwnProfile={isOwnProfile}
+                        />
 
-                    {/* Profile Header */}
-                    <ProfileHeader
-                        isOwnProfile={isOwnProfile}
-                        currentUserId={user?.userId}
-                        profileImage={profileImageUrl}
-                        name={profileData.name}
-                        // pronouns={profileData.pronouns}
-                        headline={headlineData?.title || profileData.headline}
-                        headlineId={headlineId}
-                        onHeadlineCreated={fetchHeadlineData}
-                        company={profileData.company}
-                        description={profileData.description}
-                        location={profileData.location}
-                        // followers={profileData.followers}
-                        followers={followersCount}
-                        connections={profileData.connections}
-                        firstName={userProfileData?.firstName || ''}
-                        lastName={userProfileData?.lastName || ''}
-                        currentPosition={userProfileData?.currentPosition || ''}
-                        education={userProfileData?.education || ''}
-                        educationData={profileData.education}
-                        educationList={educationList}
-                        experienceList={experienceList}
-                        contactInfo={userProfileData?.contactInfo || ''}
-                        onDataRefresh={loadProfile}
-                        onProfileImageUpdate={(newUrl) => updateProfileImage(newUrl)}
-                    />
+                        {/* Profile Header */}
+                        <ProfileHeader
+                            isOwnProfile={isOwnProfile}
+                            currentUserId={user?.userId}
+                            profileImage={profileImageUrl}
+                            name={profileData.name}
+                            // pronouns={profileData.pronouns}
+                            headline={headlineData?.title || profileData.headline}
+                            headlineId={headlineId}
+                            onHeadlineCreated={fetchHeadlineData}
+                            company={profileData.company}
+                            description={profileData.description}
+                            location={profileData.location}
+                            // followers={profileData.followers}
+                            followers={followersCount}
+                            connections={profileData.connections}
+                            firstName={userProfileData?.firstName || ''}
+                            lastName={userProfileData?.lastName || ''}
+                            currentPosition={userProfileData?.currentPosition || ''}
+                            education={userProfileData?.education || ''}
+                            educationData={profileData.education}
+                            educationList={educationList}
+                            experienceList={experienceList}
+                            contactInfo={userProfileData?.contactInfo || ''}
+                            onDataRefresh={loadProfile}
+                            onProfileImageUpdate={(newUrl) => updateProfileImage(newUrl)}
+                        />
 
-                    {/* Profile Actions */}
-                    <ProfileActions />
+                        {/* Profile Actions */}
+                        <ProfileActions />
 
-                    {/* Analytics Dashboard */}
-                    <AnalyticsDashboard userId={user?.userId || ''} />
+                        {/* Analytics Dashboard */}
+                        <AnalyticsDashboard userId={user?.userId || ''} />
 
 
-                    {/* About Section */}
-                    <AboutSection
-                        isOwnProfile={isOwnProfile}
-                        aboutData={aboutData}
-                        isLoading={isLoadingAbout}
-                        onAboutCreated={fetchAboutData}
-                        aboutId={aboutId}
-                        videoUrl={videoUrl}
-                        onVideoUpload={handleVideoUpload}
-                        isUploadingVideo={isUploadingVideo}
-                    />
+                        {/* About Section */}
+                        <AboutSection
+                            isOwnProfile={isOwnProfile}
+                            aboutData={aboutData}
+                            isLoading={isLoadingAbout}
+                            onAboutCreated={fetchAboutData}
+                            aboutId={aboutId}
+                            videoUrl={videoUrl}
+                            onVideoUpload={handleVideoUpload}
+                            isUploadingVideo={isUploadingVideo}
+                        />
 
-                    {/* Education Section */}
-                    <EducationSection
-                        isOwnProfile={isOwnProfile}
-                        collegeName={profileData.education.collegeName}
-                        degree={profileData.education.degree}
-                        fieldOfStudy={profileData.education.fieldOfStudy}
-                        graduationYear={profileData.education.graduationYear}
-                    />
+                        {/* Education Section */}
+                        <EducationSection
+                            isOwnProfile={isOwnProfile}
+                            collegeName={profileData.education.collegeName}
+                            degree={profileData.education.degree}
+                            fieldOfStudy={profileData.education.fieldOfStudy}
+                            graduationYear={profileData.education.graduationYear}
+                        />
 
-                    {/* ✅ FIXED: Experience Section — stable experienceIds reference */}
-                    <ExperienceSection
-                        isOwnProfile={isOwnProfile}
-                        experienceIds={experienceIds}
-                    />
+                        {/* ✅ FIXED: Experience Section — stable experienceIds reference */}
+                        <ExperienceSection
+                            isOwnProfile={isOwnProfile}
+                            experienceIds={experienceIds}
+                        />
 
-                    {/* Premium Features */}
-                    <PremiumFeatures />
+                        {/* Premium Features */}
+                        <PremiumFeatures />
 
-                    {/* Activity Section */}
-                    <div id="activity-section">
+                        {/* Activity Section */}
+                        <div id="activity-section">
 
-                    <ActivitySection
-                        isOwnProfile={isOwnProfile}
-                        posts={userPosts}
-                        currentUserId={user?.userId}
-                        onPostCreated={loadPosts}
-                        followers={profileData.followers}
-                        isLoading={isLoadingPosts}
-                        profileImage={profileImageUrl}
-                        fullName={fullName}
-                        headline={profileData.headline}
-                        userReposts={userReposts}
-                        isLoadingReposts={isLoadingReposts}
-                        onCreateRepost={createRepost}
-                        onDeleteRepost={removeRepost}
-                    />
+                        <ActivitySection
+                            isOwnProfile={isOwnProfile}
+                            posts={userPosts}
+                            currentUserId={user?.userId}
+                            onPostCreated={loadPosts}
+                            followers={profileData.followers}
+                            isLoading={isLoadingPosts}
+                            profileImage={profileImageUrl}
+                            fullName={fullName}
+                            headline={profileData.headline}
+                            userReposts={userReposts}
+                            isLoadingReposts={isLoadingReposts}
+                            onCreateRepost={createRepost}
+                            onDeleteRepost={removeRepost}
+                        />
+                        </div>
+
+                        {/* Skills Section */}
+                        <SkillsSection isOwnProfile={isOwnProfile} />
+
+                        {/* Interests Section */}
+                        <InterestsSection />
                     </div>
 
-                    {/* Skills Section */}
-                    <SkillsSection isOwnProfile={isOwnProfile} />
-
-                    {/* Interests Section */}
-                    <InterestsSection />
-                </div>
-
-                {/* Sidebar (Right) */}
-                <div className="w-full md:w-80 md:min-w-[20rem]">
-                    {/* Profile Progress */}
-                    <ProfileProgress
-                        profileImageUrl={profileImageUrl}
-                        bannerUrl={bannerUrl}
-                        headline={headlineData?.title || profileData.headline}
-                        about={aboutData}
-                        educationList={educationList}
-                        experienceList={experienceList}
-                        skillsCount={skillsList.length}
-                        connectionsCount={totalConnections}
-                        //{/* ✅ FIX: profileData.connections (jo transformer mein hamesha '' hardcoded hai)
-                            // ki jagah ab totalConnections use ho raha hai — same real
-                            // source jo ProfileHeader ke "8 connections" mein dikhta hai *///
-                        postsCount={userPosts?.length || 0}
-                    />
-                    {/* People You May Know */}
-                    <PeopleYouMayKnow userId={user?.userId} />
+                    {/* Sidebar (Right) */}
+                    <div className="w-full md:w-80 md:min-w-[20rem]">
+                        {/* Profile Progress */}
+                        <ProfileProgress
+                            profileImageUrl={profileImageUrl}
+                            bannerUrl={bannerUrl}
+                            headline={headlineData?.title || profileData.headline}
+                            about={aboutData}
+                            educationList={educationList}
+                            experienceList={experienceList}
+                            skillsCount={skillsList.length}
+                            connectionsCount={totalConnections}
+                            //{/* ✅ FIX: profileData.connections (jo transformer mein hamesha '' hardcoded hai)
+                                // ki jagah ab totalConnections use ho raha hai — same real
+                                // source jo ProfileHeader ke "8 connections" mein dikhta hai *///
+                            postsCount={userPosts?.length || 0}
+                        />
+                        {/* People You May Know */}
+                        <PeopleYouMayKnow userId={user?.userId} />
+                    </div>
                 </div>
             </div>
         </div>

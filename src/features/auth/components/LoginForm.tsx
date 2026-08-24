@@ -134,7 +134,7 @@ export default function LoginForm() {
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={loading || !rememberMe}
+        disabled={loading}
         className={`w-full py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-semibold transition shadow-lg text-sm sm:text-base
             ${rememberMe
             ? 'bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white hover:opacity-90'
@@ -147,7 +147,7 @@ export default function LoginForm() {
       </button>
 
       {/* Helpful message */}
-      {!rememberMe}
+      {/* {!rememberMe} */}
     </form>
   );
 }

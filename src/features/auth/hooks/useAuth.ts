@@ -78,10 +78,12 @@ export function useProtectedRoute() {
             const hasUserData = !!TokenStorage.getUserData();
             const hasSession = hasRefreshToken && hasUserData;
 
-            if (!hasSession) {
-                router.replace('/login');
-                return;
-            }
+           if (!hasSession) {
+    TokenStorage.clearAuthData(); // cookie bhi clear karega, loop tootega
+    setIsChecking(false);
+    router.replace('/login');
+    return;
+}
 
             // ✅ AccessToken expire hua? Ek authenticated call karo —
             // agar 401 aaya to api.instance.ts ka interceptor khud refresh

@@ -5,7 +5,6 @@ import { useEducation } from "@/features/profile/hooks/useEducation";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import HeroSection from "@/features/public/components/HeroSection";
 
 export default function Home() {
   const router = useRouter();
@@ -14,16 +13,17 @@ export default function Home() {
   const { loadEducation } = useEducation();
 
   useEffect(() => {
+    if (isLoading) return;
+
     if (user) {
       loadProfile();
       loadPosts();
       loadEducation();
       router.replace("/dashboard");
+    } else {
+      router.replace("/login");
     }
-  }, [user]);
+  }, [user, isLoading]);
 
-  if (isLoading) return null;
-  if (user) return null;
-
-  return <HeroSection />;
+  return null;
 }

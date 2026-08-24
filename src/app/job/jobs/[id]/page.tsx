@@ -1,4 +1,5 @@
 'use client'
+// src/app/job/jobs/[id]/page.
 import { useState, memo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
