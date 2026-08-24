@@ -59,6 +59,11 @@ export const transformApiPostToFeedPost = (
     connectionDegree: apiPost.connectionDegree ?? null,
     degreeLabel: getDegreeLabel(apiPost.connectionDegree, connectionStatus),
 
+    // ✅ FIXED: isPinned/isSaved backend se aate the lekin yahan drop ho rahe
+    // the — isliye refresh ke baad pinned/saved post ka state gum ho jaata tha
+    isPinned: apiPost.isPinned || false,
+    isSaved: apiPost.isSaved || false,
+
     likedByConnections: apiPost.likedByConnections || [],
     likedByConnectionsAvatars: apiPost.likedByConnectionsAvatars || [],
     likedByConnectionsCount: apiPost.likedByConnectionsCount || 0,

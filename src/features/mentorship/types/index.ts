@@ -96,3 +96,4 @@ export interface Service {
 
 // ─── Tab Definition ───────────────────────────────────────────────────────────
 export type TabId = "one-on-one" | "queries" | "resources" | "history";
+export type { Mentor } from "@/features/mentor/interface";

@@ -22,7 +22,7 @@ const ReviewsSection: React.FC = () => {
                         const pct: number = stars === 5 ? 80 : stars === 4 ? 15 : 5;
                         return (
                             <div key={stars} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                                <span style={{ fontSize: "12px", color: C.mid, width: "20px" }}>{stars}★</span>
+                                <span style={{ fontSize: "12px", color: C.mid, width: "20px" }}>{stars}â˜…</span>
                                 <div style={{ flex: 1, height: "8px", borderRadius: "4px", background: C.border, overflow: "hidden" }}>
                                     <div style={{ height: "100%", borderRadius: "4px", background: C.mid, width: `${pct}%` }} />
                                 </div>
@@ -44,7 +44,7 @@ const ReviewsSection: React.FC = () => {
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                                     <span style={{ fontWeight: "bold", color: C.dark, fontSize: "14px" }}>{review.name}</span>
-                                    {review.verified && <span style={{ fontSize: "10px", background: "#e0f2fe", color: "#0277bd", padding: "2px 8px", borderRadius: "10px" }}>✓ Verified</span>}
+                                    {review.verified && <span style={{ fontSize: "10px", background: "#e0f2fe", color: "#0277bd", padding: "2px 8px", borderRadius: "10px" }}>âœ“ Verified</span>}
                                 </div>
                             </div>
                             <span style={{ fontSize: "12px", color: C.mid }}>{review.date}</span>
@@ -53,7 +53,7 @@ const ReviewsSection: React.FC = () => {
                             {[...Array(5)].map((_, i) => <Star key={i} filled={i < Math.floor(review.rating)} style={{ color: "#f59e0b", width: "13px", height: "13px" }} />)}
                         </div>
                         <p style={{ fontSize: "13px", color: C.dark, lineHeight: "1.6", marginBottom: "8px" }}>{review.comment}</p>
-                        <span style={{ fontSize: "11px", color: C.mid, background: C.border, padding: "3px 10px", borderRadius: "10px" }}>📌 {review.service}</span>
+                        <span style={{ fontSize: "11px", color: C.mid, background: C.border, padding: "3px 10px", borderRadius: "10px" }}>ðŸ“Œ {review.service}</span>
                     </div>
                 ))}
             </div>

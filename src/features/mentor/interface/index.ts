@@ -1,7 +1,7 @@
 // components/mentor-profile/types.ts
 
 import { ReactNode } from "react";
-import { TabId } from "../../mentorship/types";
+import { TabId } from "@/features/mentorship/types";
 
 export interface WorkExperience {
     company: string;

@@ -1,29 +1,39 @@
 // app/(dashboard)/components/feed/PostMenuDropdown.tsx
 import React from 'react';
-
-const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUserId }: {
+const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUserId, isSaved = false, isPinned = false }: {
   isDarkMode: boolean;
   index: number;
   handlePostAction: (action: string, index: number) => void,
   post: any; // The post object
   currentUserId: string; // ID of the currently logged-in user
+  isSaved?: boolean;
+  isPinned?: boolean;
 }) => {
 
   const isOwn = post.userId === currentUserId;
+
+  // ✅ NEW: menu khulte hi background page ko scroll hone se roko
+  React.useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
 
   return (
     <div
       className={`absolute right-10 top-0 w-64 rounded-2xl shadow-2xl border z-50  overflow-hidden ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-[#4a3728]/20'
         }`}
     >
-      {/* SAVE */}
-      <button
+            {/* SAVE */}
+            <button
         onClick={() => handlePostAction('save', index)}
         className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-[#e0d8cf]/50 text-[#4a3728]'
           }`}
       >
-        <i className="ri-bookmark-line text-lg"></i>
-        <span className="font-medium">Save</span>
+        <i className={`ri-bookmark-${isSaved ? 'fill' : 'line'} text-lg`}></i>
+        <span className="font-medium">{isSaved ? 'Unsave' : 'Save'}</span>
       </button>
 
       {/* COPY */}
@@ -48,14 +58,14 @@ const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUs
 
       <div className={`h-px my-2 ${isDarkMode ? 'bg-slate-700' : 'bg-[#4a3728]/20'}`}></div>
 
-      {/* PIN */}
-      {isOwn && <button
+        {/* PIN */}
+        {isOwn && <button
         onClick={() => handlePostAction('pin', index)}
         className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-[#e0d8cf]/50 text-[#4a3728]'
           }`}
       >
-        <i className="ri-pushpin-line text-lg"></i>
-        <span className="font-medium">Pin to profile</span>
+        <i className={`ri-pushpin-${isPinned ? 'fill' : 'line'} text-lg`}></i>
+        <span className="font-medium">{isPinned ? 'Unpin from profile' : 'Pin to profile'}</span>
       </button>
       }
 

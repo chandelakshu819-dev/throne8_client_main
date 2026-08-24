@@ -6,7 +6,7 @@ import { useConnectionSocket } from './useConnectionSocket';
 import ConnectionService from '@/lib/api/connection.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import AuthService from '@/lib/api/auth.service';
-import { useConnectionStats } from './useConnectionStats';
+import { useConnectionStats, CONNECTION_STATS_REFRESH_EVENT } from './useConnectionStats';
 import ProfileService from '@/lib/api/profile.service';
 
 export const useConnectionRequests = () => {
@@ -245,8 +245,16 @@ export const useConnectionRequests = () => {
         try {
             await ConnectionService.acceptConnectionRequest(requestId);
             setRequests(prev => prev.filter(req => req.id !== requestId));
+
+            // ✅ Is instance ka apna local optimistic update (isi component ke
+            // andar kahin ye numbers dikhte ho to turant badle)
             incrementFollowers();
             incrementConnections();
+
+            // ✅ Baaki sab jagah (ProfileHeader, ConnectionsPageClient, etc.)
+            // jaha useConnectionStats() ka alag instance chal raha hai, unhe
+            // bhi bata do ki data stale ho gaya — wo apna fresh count le lenge.
+            window.dispatchEvent(new Event(CONNECTION_STATS_REFRESH_EVENT));
         } catch (error: any) {
             console.error('❌ Failed to accept:', error.message);
             alert(error.message || 'Failed to accept request');

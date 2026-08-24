@@ -1,8 +1,42 @@
 // mentorDashboard/components/TrustScorePage.tsx
-import React from "react"
+import React, { useEffect, useState } from "react"
 import { Shield } from "lucide-react"
+import MentorService from "@/lib/api/mentorship.service"
 
 export default function TrustScorePage() {
+  const [loading, setLoading] = useState(true);
+  const [trustScore, setTrustScore] = useState<any>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    MentorService.getTrustScore()
+      .then((res) => {
+        // Distinguish between actual error and simply no data calculated yet
+        if (!res?.data) {
+          setTrustScore(null);
+          setError(false);
+        } else {
+          setTrustScore(res.data);
+          setError(false);
+        }
+      })
+      .catch(() => {
+        setError(true);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  const overallScore = loading ? "██" : error ? "Error" : !trustScore ? "Pending" : trustScore.overall;
+
+  const breakdown = [
+    { label: "Profile Completeness", score: trustScore?.breakdown?.profileCompleteness },
+    { label: "Reliability", score: trustScore?.breakdown?.reliability },
+    { label: "Student Satisfaction", score: trustScore?.breakdown?.studentSatisfaction },
+    { label: "Engagement", score: trustScore?.breakdown?.engagement },
+  ];
+
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Header */}
@@ -26,13 +60,13 @@ export default function TrustScorePage() {
           className="inline-block p-12 rounded-full shadow-2xl transform hover:scale-105 transition-all duration-300"
           style={{ backgroundColor: "#4a3728" }}
         >
-          <span className="text-7xl font-bold text-white">92</span>
+          <span className={`text-5xl font-bold text-white ${loading ? 'animate-pulse' : ''}`}>{overallScore}</span>
         </div>
         <p className="text-2xl font-bold mt-6" style={{ color: "#4a3728" }}>
-          Excellent Trust Score
+          Trust Score
         </p>
         <p className="mt-2" style={{ color: "#8a7a6a" }}>
-          You're in the top 10% of mentors!
+          {loading ? "Calculating..." : error || !trustScore ? "Complete more sessions to unlock your score" : "Based on your platform activity"}
         </p>
       </div>
 
@@ -44,26 +78,21 @@ export default function TrustScorePage() {
             Score Breakdown
           </h3>
 
-          {[
-            { label: "Profile Completeness", score: 95 },
-            { label: "Response Rate", score: 98 },
-            { label: "Session Completion", score: 88 },
-            { label: "Student Satisfaction", score: 92 },
-          ].map((item, idx) => (
+          {breakdown.map((item, idx) => (
             <div key={idx} className="mb-5">
               <div className="flex justify-between mb-2">
                 <span className="text-sm font-semibold" style={{ color: "#8a7a6a" }}>
                   {item.label}
                 </span>
                 <span className="text-sm font-bold" style={{ color: "#4a3728" }}>
-                  {item.score}%
+                  {loading ? "██%" : !trustScore ? "Pending" : `${item.score}%`}
                 </span>
               </div>
               <div className="w-full h-3 rounded-full bg-[#d8cec4]">
                 <div
-                  className="h-3 rounded-full transition-all duration-500"
+                  className={`h-3 rounded-full transition-all duration-500 ${loading ? 'animate-pulse' : ''}`}
                   style={{
-                    width: `${item.score}%`,
+                    width: loading ? "10%" : !trustScore ? "0%" : `${item.score}%`,
                     backgroundColor: "#4a3728",
                   }}
                 />

@@ -16,7 +16,7 @@ const DOMAINS_OPTIONS = [
     { value: "interview_prep", label: "Interview Prep" },
     { value: "data_science", label: "Data Science / AI" },
     { value: "product_management", label: "Product Management" },
-    { value: "design", label: "Design (UI/UX)" },
+    { value: "ui_ux_design", label: "Design (UI/UX)" },
     { value: "mobile_development", label: "Mobile Development" },
     { value: "devops", label: "DevOps" },
     { value: "blockchain", label: "Blockchain" },

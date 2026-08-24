@@ -62,7 +62,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
 
   // if (loading) return <div style={{ padding: "32px", textAlign: "center" }}>Loading sessions...</div>;
 
-  // Dynamic filters — session types se generate karo
+  // Dynamic filters â€” session types se generate karo
   const uniqueTypes = Array.from(new Set(sessions.map((s) => s.sessionType)));
   const dynamicFilters = ["All", ...uniqueTypes.map((t) => SESSION_TYPE_FILTER[t] || t)];
 
@@ -83,8 +83,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   });
 
   const getIcon = (sessionType: string): string => {
-    if (sessionType === "group_session") return "👥";
-    return "📞";
+    if (sessionType === "group_session") return "ðŸ‘¥";
+    return "ðŸ“ž";
   };
 
   return (
@@ -163,18 +163,18 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontWeight: "bold", color: session.pricing?.basePrice === 0 ? "#10b981" : C.dark, fontSize: "15px" }}>
-                  {session.pricing?.basePrice === 0 ? "Free" : `₹${session.pricing?.basePrice}`}
+                  {session.pricing?.basePrice === 0 ? "Free" : `â‚¹${session.pricing?.basePrice}`}
                 </span>
                 {isBooked ? (
                   <div style={{ textAlign: "right" }}>
                     {myBooking?.status === "confirmed" ? (
                       <>
-                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>✅ Session Confirmed</div>
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>âœ… Session Confirmed</div>
                         <div style={{ fontSize: "10px", color: C.mid, marginTop: "2px" }}>Mentor has confirmed your session</div>
                       </>
                     ) : (
                       <>
-                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>✅ Session Booked</div>
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>âœ… Session Booked</div>
                         <div style={{ fontSize: "10px", color: C.mid, marginTop: "2px" }}>Session Confirmation coming soon by Mentor</div>
                       </>
                     )}

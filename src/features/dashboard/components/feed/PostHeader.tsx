@@ -17,9 +17,9 @@ const MOOD_EMOJI_MAP: Record<string, string> = {
 };
 
 const PostHeader = ({
-  post, index, isDarkMode, openMenuIndex, togglePostMenu, handlePostAction, currentUserId
+  post, index, isDarkMode, openMenuIndex, togglePostMenu, handlePostAction, currentUserId, isSaved, isPinned
 }: {
-  post: any; index: number; isDarkMode: boolean; openMenuIndex: number | null; togglePostMenu: (index: number) => void; handlePostAction: (action: string, index: number) => void; currentUserId: string;
+  post: any; index: number; isDarkMode: boolean; openMenuIndex: number | null; togglePostMenu: (index: number) => void; handlePostAction: (action: string, index: number) => void; currentUserId: string; isSaved?: boolean; isPinned?: boolean;
 }) => {
   const router = useRouter();
   const isOwnPost = post.userId && currentUserId && post.userId === currentUserId;
@@ -137,11 +137,17 @@ const PostHeader = ({
             )}
             {renderConnectButton()}
           </div>
-          <p className="text-sm font-semibold bg-gradient-to-r from-[#6b5643] to-[#8b7355] bg-clip-text text-transparent">
+          <p className={`text-sm font-semibold bg-gradient-to-r from-[#6b5643] to-[#8b7355] bg-clip-text text-transparent`}>
             {post.role}
           </p>
-          <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
+          <p className={`text-xs flex items-center gap-1 ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
             {post.time}
+            {isPinned && (
+              <span className="flex items-center gap-0.5 font-semibold">
+                <i className="ri-pushpin-fill text-[11px]"></i>
+                Pinned
+              </span>
+            )}
           </p>
         </div>
       </div>
@@ -159,6 +165,8 @@ const PostHeader = ({
             handlePostAction={handlePostAction}
             post={post}
             currentUserId={currentUserId}
+            isSaved={isSaved}
+            isPinned={isPinned}
           />
         )}
       </div>

@@ -25,8 +25,8 @@ const ConfirmationStep: React.FC<ConfirmationStepProps> = ({ selectedService, ca
     return (
         <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg, padding: "32px 16px" }}>
             <div style={{ maxWidth: "480px", width: "100%", borderRadius: "24px", padding: "48px 40px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)", textAlign: "center" }}>
-                <div style={{ fontSize: "64px", marginBottom: "16px" }}>{isRes ? "📥" : "✅"}</div>
-                <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "8px" }}>{isRes ? "Download Ready! 🎉" : "Booking Confirmed! 🎉"}</h2>
+                <div style={{ fontSize: "64px", marginBottom: "16px" }}>{isRes ? "ðŸ“¥" : "âœ…"}</div>
+                <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "8px" }}>{isRes ? "Download Ready! ðŸŽ‰" : "Booking Confirmed! ðŸŽ‰"}</h2>
                 <p style={{ color: C.mid, marginBottom: "24px", fontSize: "14px" }}>{isRes ? "Your resource is ready to download" : "Your session has been successfully booked"}</p>
 
                 <div style={{ borderRadius: "16px", padding: "20px", background: C.bg, border: `1px solid ${C.border}`, marginBottom: "20px", textAlign: "left" }}>
@@ -40,11 +40,11 @@ const ConfirmationStep: React.FC<ConfirmationStepProps> = ({ selectedService, ca
 
                 <div style={{ borderRadius: "12px", padding: "14px 16px", background: "#e8f5e9", border: "1px solid #c8e6c9", marginBottom: "24px", textAlign: "left" }}>
                     {isRes ? (
-                        <p style={{ margin: 0, fontSize: "13px", color: "#2e7d32" }}>📥 Your download will begin shortly</p>
+                        <p style={{ margin: 0, fontSize: "13px", color: "#2e7d32" }}>ðŸ“¥ Your download will begin shortly</p>
                     ) : (
                         <>
-                            <p style={{ margin: "0 0 6px 0", fontSize: "13px", color: "#2e7d32" }}>📧 A confirmation email has been sent to {formData?.email}</p>
-                            <p style={{ margin: 0, fontSize: "13px", color: "#2e7d32" }}>📅 Add this session to your calendar to get reminded</p>
+                            <p style={{ margin: "0 0 6px 0", fontSize: "13px", color: "#2e7d32" }}>ðŸ“§ A confirmation email has been sent to {formData?.email}</p>
+                            <p style={{ margin: 0, fontSize: "13px", color: "#2e7d32" }}>ðŸ“… Add this session to your calendar to get reminded</p>
                         </>
                     )}
                 </div>

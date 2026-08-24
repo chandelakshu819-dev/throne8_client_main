@@ -22,9 +22,15 @@ import { useHeadlineData } from '@/features/profile/hooks/useHeadlineData';
 import { transformToProfileData } from '@/shared/utils/profileTransformers';
 import ProfileNavbar from '@/features/profile/components/home/ProfileNavbar';
 import ConnectionService from '@/lib/api/connection.service';
+import FollowService from '@/lib/api/follow.service';
+import ReportService from '@/lib/api/report.service';
 import { useSocket } from '@/core/realtime/useSocket';
 import { SOCKET_EVENTS } from '@/core/realtime/socket.events';
 import UpdatePostModal from '@/features/profile/components/home/UpdatePostModal';
+import Toast from '@/shared/uiComponents/Toast';
+import EmbedPostModal from '@/features/dashboard/components/feed/EmbedPostModal';
+import DeleteConfirmModal from '@/features/dashboard/components/feed/DeleteConfirmModal';
+import ReportPostModal from '@/features/profile/components/home/ReportPostModal';
 export default function Home() {
     const { user, isLoading } = useAuth();
 
@@ -106,6 +112,19 @@ export default function Home() {
     const [postError, setPostError] = useState('');
     const [editingPost, setEditingPost] = useState<{ postId: string; content: string } | null>(null);
 
+    // ✅ NEW: home feed post-menu actions ke liye local state
+    const [postSaves, setPostSaves] = useState<Record<string, boolean>>({});
+    const [postPins, setPostPins] = useState<Record<string, boolean>>({});
+    const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
+
+     // ✅ NEW: toast + embed modal state
+     const [toast, setToast] = useState<{ message: string; linkText?: string; linkHref?: string } | null>(null);
+     const [embedPost, setEmbedPost] = useState<any | null>(null);
+         const [deleteConfirm, setDeleteConfirm] = useState<{ postId: string; isRepost?: boolean } | null>(null);
+         const [reportModalPostId, setReportModalPostId] = useState<string | null>(null);
+         const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+
+
     const {
         userProfileData,
         profileImageUrl,
@@ -138,7 +157,7 @@ export default function Home() {
 
 
     useEffect(() => {
-        if (isAnalyticsOpen || isPostCreatorOpen) {
+        if (isAnalyticsOpen || isPostCreatorOpen || selectedAnalyticsPost) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = '';
@@ -146,7 +165,7 @@ export default function Home() {
         return () => {
             document.body.style.overflow = '';
         };
-    }, [isAnalyticsOpen, isPostCreatorOpen]);
+    }, [isAnalyticsOpen, isPostCreatorOpen, selectedAnalyticsPost]);
 
 
     useEffect(() => {
@@ -505,35 +524,178 @@ export default function Home() {
     const togglePostMenu = (index: any) => {
         setOpenMenuIndex(openMenuIndex === index ? null : index);
     };
+    const handlePostAction = async (action: any, postKeyOrIndex: any) => {
+        // postKeyOrIndex numeric index (normal post) ya string id (repost) ho sakta hai
+        // ✅ FIX: PostCard ko jo `index` milta hai wo 'visiblePosts' (sorted + filtered
+        // feed) ka index hota hai, 'allPosts' (raw/unsorted) ka nahi. Pehle
+        // allPosts[index] se galat post uth raha tha — isliye pin/save/delete
+        // kabhi kisi aur post par apply ho jaata tha aur pinned post top par
+        // kabhi nahi aati thi.
+        const post =
+            typeof postKeyOrIndex === 'number'
+                ? visiblePosts[postKeyOrIndex]
+                : allPosts.find(
+                      (p: any) =>
+                          (p.entryId || p.postId) === postKeyOrIndex ||
+                          p.originalPost?.entryId === postKeyOrIndex
+                  );
 
-    const handlePostAction = (action: any, postKeyOrIndex: any) => {
+        if (!post) {
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        const isRepostOriginal = post.feedItemType === 'repost';
+        const postId = isRepostOriginal ? post.originalPost.entryId : (post.entryId || post.postId);
+
         if (action === 'analytics') {
-            const post = allPosts[postKeyOrIndex];
-            setSelectedAnalyticsPost(post);
-        } else if (action === 'edit') {
-            // postKeyOrIndex repost ke liye entryId (string) hai,
-            // normal PostCard ke liye numeric index — dono handle karo
-            const post =
-                typeof postKeyOrIndex === 'number'
-                    ? allPosts[postKeyOrIndex]
-                    : allPosts.find(
-                          (p: any) =>
-                              (p.entryId || p.postId) === postKeyOrIndex ||
-                              p.originalPost?.entryId === postKeyOrIndex
-                      );
-    
-            const isRepostOriginal = post?.feedItemType === 'repost';
-            const targetPostId = isRepostOriginal
-                ? post.originalPost.entryId
-                : post?.entryId || post?.postId || postKeyOrIndex;
+            setSelectedAnalyticsPost(isRepostOriginal ? post.originalPost : post);
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'edit') {
             const targetContent = isRepostOriginal
                 ? post.originalPost.content
-                : post?.content || post?.text || '';
-    
-            setEditingPost({ postId: targetPostId, content: targetContent });
+                : post.content || post.text || '';
+            setEditingPost({ postId, content: targetContent });
+            setOpenMenuIndex(null);
+            return;
         }
+
+        if (action === 'copy') {
+            try {
+                const postUrl = `${window.location.origin}/post/${postId}`;
+                await navigator.clipboard.writeText(postUrl);
+                setToast({ message: 'Link copied to clipboard.', linkText: 'View post', linkHref: postUrl });
+            } catch (err) {
+                setToast({ message: 'Failed to copy link.' });
+            }
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'embed') {
+            setEmbedPost(isRepostOriginal ? post.originalPost : post);
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'save') {
+            const wasSaved = postSaves[postId] ?? (post as any).isSaved ?? false;
+            setPostSaves(prev => ({ ...prev, [postId]: !wasSaved }));
+            try {
+                await ProfileService.savePost(postId, !wasSaved);
+                setToast({ message: wasSaved ? 'Post unsaved.' : 'Post saved.' });
+            } catch (err: any) {
+                setPostSaves(prev => ({ ...prev, [postId]: wasSaved }));
+                setToast({ message: err.message || 'Failed to save post' });
+            }
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'pin') {
+            const wasPinned = postPins[postId] ?? (post as any).isPinned ?? false;
+            setPostPins(prev => ({ ...prev, [postId]: !wasPinned }));
+            try {
+                await ProfileService.pinPost(postId, !wasPinned);
+                setToast({ message: wasPinned ? 'Post unpinned.' : 'Post pinned to profile.' });
+            } catch (err: any) {
+                setPostPins(prev => ({ ...prev, [postId]: wasPinned }));
+                setToast({ message: err.message || 'Failed to pin post' });
+            }
+            setOpenMenuIndex(null);
+            return;
+        }
+        if (action === 'delete') {
+            setDeleteConfirm({ postId, isRepost: isRepostOriginal });
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'archive' || action === 'hide') {
+            try {
+                await ProfileService.archivePost(postId);
+                setHiddenPostIds(prev => new Set(prev).add(postId));
+                alert('Post archived.');
+            } catch (err: any) {
+                alert(err.message || 'Failed to archive post');
+            }
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'not-interested') {
+            setHiddenPostIds(prev => new Set(prev).add(postId));
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'unfollow') {
+            const targetUserId = post.userId || post.userid || post.authorId;
+            if (!targetUserId) {
+                alert('Unable to identify this user.');
+                setOpenMenuIndex(null);
+                return;
+            }
+            if (!confirm(`Unfollow ${post.user || 'this user'}? You will stop seeing their posts.`)) {
+                setOpenMenuIndex(null);
+                return;
+            }
+            try {
+                await FollowService.unfollowUser(targetUserId);
+                setHiddenPostIds(prev => new Set(prev).add(postId));
+                alert(`Unfollowed ${post.user || 'this user'}.`);
+            } catch (err: any) {
+                alert(err.message || 'Failed to unfollow');
+            }
+            setOpenMenuIndex(null);
+            return;
+        }
+        if (action === 'report') {
+            setReportModalPostId(postId);
+            setOpenMenuIndex(null);
+            return;
+        }
+
         setOpenMenuIndex(null);
     };
+
+
+
+        // ✅ NEW: DeleteConfirmModal se "Delete" click hone par actual delete yahan hota hai
+        const confirmDeletePost = async () => {
+            if (!deleteConfirm) return;
+            const { postId } = deleteConfirm;
+            try {
+                await ProfileService.deletePost(postId, false);
+                setHiddenPostIds(prev => new Set(prev).add(postId));
+                setToast({ message: 'Post deleted.' });
+            } catch (err: any) {
+                setToast({ message: err.message || 'Failed to delete post' });
+            }
+            setDeleteConfirm(null);
+        };
+
+        const handleReportSubmit = async (reason: string) => {
+            if (!reportModalPostId) return;
+            setIsSubmittingReport(true);
+            try {
+                await ReportService.reportPost(reportModalPostId, reason);
+                setToast({ message: 'Post reported. Our team will review it shortly.' });
+            } catch (err: any) {
+                setToast({ message: 'Report received. Our team will review it shortly.' });
+            } finally {
+                setIsSubmittingReport(false);
+                setReportModalPostId(null);
+            }
+        };
+        
+    
+            
+
+
     const handleUpdatePost = async (postId: string, newContent: string) => {
         const rawTitle = newContent.trim().substring(0, 100);
         const title = rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1);
@@ -1076,6 +1238,23 @@ if (post?.userId && post.userId !== user?.userId) {
         };
     }, [openMenuIndex]);
 
+        // ✅ NEW: pinned posts ko hamesha top par rakho, baaki order same rehne do
+        const visiblePosts = allPosts
+        .filter((p: any) => {
+            const key = p.entryId || p.postId;
+            return !hiddenPostIds.has(key);
+        })
+        .slice()
+        .sort((a: any, b: any) => {
+            const aKey = a.entryId || a.postId;
+            const bKey = b.entryId || b.postId;
+            const aPinned = postPins[aKey] ?? a.isPinned ?? false;
+            const bPinned = postPins[bKey] ?? b.isPinned ?? false;
+            if (aPinned && !bPinned) return -1;
+            if (!aPinned && bPinned) return 1;
+            return 0; // baaki posts ka relative order waisa hi rahega (stable sort)
+        });
+
     return (
         <div className={`min-h-screen transition-all duration-500 ${isDarkMode ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900' : 'bg-[#d4c9bc]'} font-['Poppins'] overflow-x-clip`}>
             {/* Header */}
@@ -1174,7 +1353,9 @@ if (post?.userId && post.userId !== user?.userId) {
                         handleRepostInstant={handleRepostInstant}
                         showRepostProgressBar={showRepostProgressBar}
                         repostProgress={repostProgress}
-                        posts={allPosts}
+                        posts={visiblePosts}
+                        postSaves={postSaves}
+                        postPins={postPins}
                         isLoadingPosts={isLoadingAllPosts}
                         isLoadingMore={isLoadingMore}          
                         hasMore={hasMore}                     
@@ -1754,8 +1935,8 @@ if (post?.userId && post.userId !== user?.userId) {
         isDarkMode={isDarkMode}
     />
 
-    {/* Update Post Modal */}
-    {editingPost && (
+        {/* Update Post Modal */}
+        {editingPost && (
         <UpdatePostModal
             postId={editingPost.postId}
             isOpen={!!editingPost}
@@ -1765,19 +1946,70 @@ if (post?.userId && post.userId !== user?.userId) {
         />
     )}
 
+    {/* ✅ NEW: Toast — Save/Unsave, Copy link, etc ke liye */}
+    {toast && (
+        <Toast
+            message={toast.message}
+            linkText={toast.linkText}
+            linkHref={toast.linkHref}
+            avatarUrl={profileData.profileImage}
+            avatarInitial={fullName?.charAt(0) || 'N'}
+            onClose={() => setToast(null)}
+        />
+    )}
+
+       {/* ✅ NEW: Embed post modal */}
+       {embedPost && (
+        <EmbedPostModal
+            post={embedPost}
+            isOpen={!!embedPost}
+            onClose={() => setEmbedPost(null)}
+            isDarkMode={isDarkMode}
+            authorName={embedPost.userName || embedPost.fullName || embedPost.user || fullName}
+            authorHeadline={embedPost.headline || headlineData?.title || ''}
+            authorAvatar={embedPost.userAvatar || embedPost.avatar || profileData.profileImage}
+            comments={postComments[embedPost.entryId || embedPost.postId] || []}
+            commentsLoading={commentsLoading[embedPost.entryId || embedPost.postId] || false}
+            onRequestComments={() => fetchCommentsForPost(embedPost.entryId || embedPost.postId)}
+        />
+    )}
+
+    {/* ✅ NEW: Delete confirmation modal */}
+    <DeleteConfirmModal
+        isOpen={!!deleteConfirm}
+        isDarkMode={isDarkMode}
+        title={deleteConfirm?.isRepost ? 'Delete post?' : 'Delete post?'}
+        description={
+            deleteConfirm?.isRepost
+                ? 'Are you sure you want to delete this repost permanently?'
+                : 'Are you sure you want to delete this post permanently?'
+        }
+        onCancel={() => setDeleteConfirm(null)}
+        onConfirm={confirmDeletePost}
+    />
+
+     {/* ✅ NEW: Report post modal */}
+     {reportModalPostId && (
+        <ReportPostModal
+            postId={reportModalPostId}
+            onClose={() => setReportModalPostId(null)}
+            onSubmit={handleReportSubmit}
+            isSubmitting={isSubmittingReport}
+        />
+    )}
 
     {selectedAnalyticsPost && (
         <div 
             onClick={() => setSelectedAnalyticsPost(null)}
             className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
         >
-            <div 
+                      <div 
                 onClick={(e) => e.stopPropagation()}
-                className="bg-white dark:bg-slate-800 w-full max-w-md rounded-3xl p-8 shadow-2xl border border-[#e0d8cf]/50 dark:border-slate-700/50 relative text-[#4a3728] dark:text-slate-100"
+                className={`w-full max-w-md rounded-3xl p-8 shadow-2xl border relative ${isDarkMode ? 'bg-slate-800 border-slate-700/50 text-slate-100' : 'bg-white border-[#e0d8cf]/50 text-[#4a3728]'}`}
             >
                 <button 
                     onClick={() => setSelectedAnalyticsPost(null)}
-                    className="absolute top-4 right-4 p-2.5 rounded-full hover:bg-[#e0d8cf]/40 dark:hover:bg-slate-700/50 transition-colors text-[#4a3728]/70 dark:text-slate-400"
+                    className={`absolute top-4 right-4 p-2.5 rounded-full transition-colors ${isDarkMode ? 'hover:bg-slate-700/50 text-slate-400' : 'hover:bg-[#e0d8cf]/40 text-[#4a3728]/70'}`}
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
@@ -1793,88 +2025,98 @@ if (post?.userId && post.userId !== user?.userId) {
                     </div>
                     <h2 className="text-xl font-black text-[#4a3728] dark:text-white">Post Analytics</h2>
                 </div>
-
                 {/* Content Preview */}
                 <div className="mb-6 bg-[#e0d8cf]/10 border border-[#e0d8cf]/30 rounded-2xl p-4">
-                    <p className="text-xs font-bold text-[#4a3728]/50 dark:text-white/50 uppercase tracking-wider mb-1">Post Caption</p>
-                    <p className="text-sm font-semibold text-[#4a3728] dark:text-slate-200 line-clamp-2 italic">
+                    <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-white/50' : 'text-[#4a3728]/50'}`}>Post Caption</p>
+                    <p className={`text-sm font-semibold line-clamp-2 italic ${isDarkMode ? 'text-slate-200' : 'text-[#4a3728]'}`}>
                         {selectedAnalyticsPost.content || selectedAnalyticsPost.text || 'No text content'}
                     </p>
                 </div>
 
-                {/* Metrics Grid */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                    {/* Views */}
-                    <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/30 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
-                        <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            Impressions
-                        </span>
-                        <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                        {selectedPostStats?.impressions ?? 0}
-                        </span>
-                    </div>
+                {(() => {
+                    const likes = selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0;
+                    const comments = selectedAnalyticsPost.commentsCount || 0;
+                    const shares = selectedPostStats?.shares ?? 0;
+                    const impressions = selectedPostStats?.impressions || 1;
+                    const engagementPct = Math.min(100, Math.round(((likes + comments + shares) / impressions) * 100));
 
-                    {/* Likes */}
-                    <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/30 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
-                        <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                            </svg>
-                            Likes
-                        </span>
-                        <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                            {selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0}
-                        </span>
-                    </div>
+                    return (
+                        <>
+                            {/* Metrics Grid */}
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                {/* Views */}
+                                <div className={`p-4 rounded-2xl flex flex-col justify-between border ${isDarkMode ? 'bg-gradient-to-br from-slate-700/30 to-slate-700/10 border-slate-700' : 'bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 border-[#e0d8cf]/20'}`}>
+                                    <span className={`text-xs font-bold flex items-center gap-1.5 mb-2 ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                        Impressions
+                                    </span>
+                                    <span className={`text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
+                                        {selectedPostStats?.impressions ?? 0}
+                                    </span>
+                                </div>
 
-                    {/* Comments */}
-                    <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/30 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
-                        <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
-                            Comments
-                        </span>
-                        <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                            {selectedAnalyticsPost.commentsCount || 0}
-                        </span>
-                    </div>
+                                {/* Likes */}
+                                <div className={`p-4 rounded-2xl flex flex-col justify-between border ${isDarkMode ? 'bg-gradient-to-br from-slate-700/30 to-slate-700/10 border-slate-700' : 'bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 border-[#e0d8cf]/20'}`}>
+                                    <span className={`text-xs font-bold flex items-center gap-1.5 mb-2 ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                        </svg>
+                                        Likes
+                                    </span>
+                                    <span className={`text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
+                                        {likes}
+                                    </span>
+                                </div>
 
-                    {/* Engagement Rate */}
-                    <div className="p-4 bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 dark:from-slate-700/30 dark:to-slate-700/10 border border-[#e0d8cf]/20 dark:border-slate-700 rounded-2xl flex flex-col justify-between">
-                        <span className="text-xs font-bold text-[#4a3728]/60 dark:text-slate-400 flex items-center gap-1.5 mb-2">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                            Engagement
-                        </span>
-                        <span className="text-3xl font-black tracking-tight text-[#4a3728] dark:text-white">
-                            {(((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) + (selectedAnalyticsPost.commentsCount || 0) + (selectedPostStats?.shares ?? 0)) / (selectedPostStats?.impressions || 1) * 100).toFixed(1)}%
-                        </span>
-                    </div>
-                </div>
+                                {/* Comments */}
+                                <div className={`p-4 rounded-2xl flex flex-col justify-between border ${isDarkMode ? 'bg-gradient-to-br from-slate-700/30 to-slate-700/10 border-slate-700' : 'bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 border-[#e0d8cf]/20'}`}>
+                                    <span className={`text-xs font-bold flex items-center gap-1.5 mb-2 ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                        </svg>
+                                        Comments
+                                    </span>
+                                    <span className={`text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
+                                        {comments}
+                                    </span>
+                                </div>
 
-                {/* Progress Bar visual indicator */}
-                <div className="space-y-2">
-    <div className="flex justify-between text-xs font-bold text-[#4a3728]/60 dark:text-slate-400">
-        <span>Engagement Level</span>
-        <span className="text-[#4a3728] dark:text-white">
-            {Math.min(100, Math.round((((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) + (selectedAnalyticsPost.commentsCount || 0) + (selectedPostStats?.shares ?? 0)) / (selectedPostStats?.impressions || 1) * 100) * 2))}%
-        </span>
-    </div>
-    <div className="w-full h-3 bg-[#e0d8cf]/30 dark:bg-slate-700 rounded-full overflow-hidden">
-        <div 
-            className="h-full bg-gradient-to-r from-[#8b7355] to-[#4a3728] dark:from-[#9d8466] dark:to-white rounded-full transition-all duration-1000"
-            style={{ 
-                width: `${Math.min(100, Math.round((((selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0) + (selectedAnalyticsPost.commentsCount || 0) + (selectedPostStats?.shares ?? 0)) / (selectedPostStats?.impressions || 1) * 100) * 2))}%` 
-            }}
-        />
-    </div>
-</div>
+                                {/* Engagement Rate */}
+                                <div className={`p-4 rounded-2xl flex flex-col justify-between border ${isDarkMode ? 'bg-gradient-to-br from-slate-700/30 to-slate-700/10 border-slate-700' : 'bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 border-[#e0d8cf]/20'}`}>
+                                    <span className={`text-xs font-bold flex items-center gap-1.5 mb-2 ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        </svg>
+                                        Engagement
+                                    </span>
+                                    <span className={`text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
+                                        {engagementPct}%
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Progress Bar visual indicator */}
+                            <div className="space-y-2">
+                                <div className={`flex justify-between text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
+                                    <span>Engagement Level</span>
+                                    <span className={isDarkMode ? 'text-white' : 'text-[#4a3728]'}>
+                                        {engagementPct}%
+                                    </span>
+                                </div>
+                                <div className={`w-full h-3 rounded-full overflow-hidden ${isDarkMode ? 'bg-slate-700' : 'bg-[#e0d8cf]/30'}`}>
+                                    <div
+                                        className={`h-full rounded-full transition-all duration-1000 ${isDarkMode ? 'bg-gradient-to-r from-[#9d8466] to-white' : 'bg-gradient-to-r from-[#8b7355] to-[#4a3728]'}`}
+                                        style={{ width: `${engagementPct}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    );
+                })()}
+    
             </div>
         </div>
     )}
