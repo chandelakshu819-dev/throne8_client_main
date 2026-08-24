@@ -68,11 +68,12 @@ export const useConnectionsData = () => {
             return profiles.map(user => ({
                 id: user.userId,
                 connectionId: connectionIdMap[user.userId] || '',
-                name: `${user.firstName} ${user.lastName}`.trim(),
+                name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown User',
                 headline: user.headlineId ? headlinesMap[user.headlineId] || '' : '',
                 image: user.profilePhotoId
                     ? profilePhotosMap[user.profilePhotoId] || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s'
                     : 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s',
+                location: user.location || '',
                 isFollowing: true,
             }));
 

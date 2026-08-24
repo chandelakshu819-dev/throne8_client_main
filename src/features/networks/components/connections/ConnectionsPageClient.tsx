@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData';
 import { useFollowListsData } from '@/features/profile/hooks/useFollowListsData';
+import { useFollowCounts } from '@/features/profile/hooks/useFollowCounts';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import ConnectionService from '@/lib/api/connection.service';
 import FollowService from '@/lib/api/follow.service';
@@ -70,14 +71,23 @@ const ConnectionsPageClient: React.FC = () => {
         invalidateFollowLists,
     } = useFollowListsData();
 
+    const {
+        followersCount,
+        followingCount,
+        isLoadingFollowCounts,
+        fetchFollowCounts,
+        invalidateFollowCounts,
+    } = useFollowCounts();
+
     const isOwnProfile = !!authUser?.userId && authUser.userId === targetUserId;
 
     useEffect(() => {
         if (targetUserId) {
             fetchConnectionsData(targetUserId);
             fetchFollowLists(targetUserId);
+            fetchFollowCounts(targetUserId);
         }
-    }, [targetUserId, fetchConnectionsData, fetchFollowLists]);
+    }, [targetUserId, fetchConnectionsData, fetchFollowLists, fetchFollowCounts]);
 
     // Fetch display name for the header ("Honey's Network")
     useEffect(() => {
@@ -135,8 +145,8 @@ const ConnectionsPageClient: React.FC = () => {
 
     const tabCount = (tab: TabType) =>
         tab === 'connections' ? totalConnections
-        : tab === 'following' ? followSystemFollowing.length
-        : followSystemFollowers.length;
+        : tab === 'following' ? (typeof followingCount === 'number' ? followingCount : followSystemFollowing.length)
+        : (typeof followersCount === 'number' ? followersCount : followSystemFollowers.length);
 
     const handleRemoveConnection = async (user: ListUser) => {
         if (!user.connectionId) {
@@ -146,7 +156,13 @@ const ConnectionsPageClient: React.FC = () => {
         try {
             setRemovingId(user.id);
             await ConnectionService.deleteConnection(user.connectionId);
-            await fetchConnectionsData(targetUserId);
+            invalidateFollowLists(targetUserId);
+            invalidateFollowCounts(targetUserId);
+            await Promise.all([
+                fetchConnectionsData(targetUserId),
+                fetchFollowLists(targetUserId),
+                fetchFollowCounts(targetUserId),
+            ]);
         } catch (err: any) {
             alert(err.message || 'Failed to remove connection');
         } finally {
@@ -163,7 +179,11 @@ const ConnectionsPageClient: React.FC = () => {
             setUnfollowingId(user.id);
             await FollowService.unfollowUser(user.id);
             invalidateFollowLists(targetUserId);
-            await fetchFollowLists(targetUserId);
+            invalidateFollowCounts(targetUserId);
+            await Promise.all([
+                fetchFollowLists(targetUserId),
+                fetchFollowCounts(targetUserId),
+            ]);
         } catch (err: any) {
             alert(err.message || 'Failed to unfollow');
         } finally {
@@ -218,7 +238,7 @@ const ConnectionsPageClient: React.FC = () => {
                                         : 'text-[#4a3728]/50 hover:text-[#4a3728]/70'
                                 }`}
                             >
-                                {tab} <span className="ml-1 text-xs font-bold">({isLoadingConnections || isLoadingFollowLists ? '…' : tabCount(tab)})</span>
+                                {tab} <span className="ml-1 text-xs font-bold">({(tab === 'connections' ? isLoadingConnections : isLoadingFollowCounts && isLoadingFollowLists) ? '…' : tabCount(tab)})</span>
                                 {activeTab === tab && (
                                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#4a3728] to-[#6a5748]" />
                                 )}

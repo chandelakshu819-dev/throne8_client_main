@@ -52,13 +52,14 @@ export const useConnectionStats = () => {
                 FollowService.getFollowCounts(user!.userId),
             ]);
 
-            const statsData = connectionRes.data;
-            const followData = followRes?.data;
+            const statsData = connectionRes?.data || {};
+            const followers = followRes?.data?.followersCount ?? followRes?.followersCount ?? 0;
+            const following = followRes?.data?.followingCount ?? followRes?.followingCount ?? 0;
 
             setStats({
                 totalConnections: statsData.totalConnections || 0,
-                following: followData?.followingCount || 0, // ✅ Actual Follow collection se
-                followers: followData?.followersCount || 0, // ✅ Actual Follow collection se
+                following,
+                followers,
             });
 
         } catch (error: any) {
