@@ -33,8 +33,10 @@ type MentorBookingRow = {
   status: 'pending' | 'confirmed' | 'rescheduled' | 'in_progress' | 'completed' | 'cancelled';
 };
 
+type BookingTab = 'all' | 'pending' | 'upcoming' | 'in_progress' | 'completed';
+
 export default function BookingsPage({ mentorData }: BookingProps) {
-  const [bookingTab, setBookingTab] = useState<'pending' | 'upcoming' | 'in_progress' | 'completed'>('upcoming');
+  const [bookingTab, setBookingTab] = useState<BookingTab>('all');
   const [allBookings, setAllBookings] = useState<MentorBookingRow[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [loadingData, setLoadingData] = useState(true);
@@ -55,12 +57,12 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   const fetchSessions = async () => {
     if (!mentorData?.mentorId) return;
     setLoadingData(true);
-    return SessionService.getAllSessionsFromDB()
+    return SessionService.getMentorSessions(mentorData.mentorId)
       .then((res) => {
         const _all = res.data as any[];
         // Only get sessions for this mentor that contain bookings
         const filtered = _all.filter(
-          (s) => s.mentorId === mentorData.mentorId && (s.bookings?.length ?? 0) > 0
+          (s) => (s.bookings?.length ?? 0) > 0
         );
         
         // Normalize: Flatten distinct bookings so each row corresponds to ONE mentee transaction.
@@ -69,15 +71,21 @@ export default function BookingsPage({ mentorData }: BookingProps) {
             bookingId: b._id,
             sessionId: s.sessionId,
             menteeId: b.menteeId,
-            menteeName: s.bookedMenteeName || s.menteeName || b.bookedBy || `Student`,
+            menteeName: b.mentee?.fullName || s.bookedMenteeName || s.menteeName || b.bookedBy || `Student`,
+            menteeProfilePhoto: b.mentee?.profilePic || s.menteeProfilePhoto || null,
             serviceName: s.title || s.sessionType || "Session",
             scheduledAt: b.scheduledAt || s.scheduledAt,
             slotTime: b.slotTime || s.slotTime,
             status: b.status,
           }));
         });
+        const sorted = flattened.sort((a, b) => {
+          const dateA = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0;
+          const dateB = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
+          return (Number.isNaN(dateB) ? 0 : dateB) - (Number.isNaN(dateA) ? 0 : dateA);
+        });
         
-        setAllBookings(flattened);
+        setAllBookings(sorted);
       })
       .catch((err) => {
         console.error("Failed to fetch sessions: ", err);
@@ -91,13 +99,18 @@ export default function BookingsPage({ mentorData }: BookingProps) {
 
   // Fetch photos for unique menteeIds in the background
   useEffect(() => {
-    const ids = Array.from(new Set(allBookings.map(b => b.menteeId).filter((id): id is string => !!id && !photoUrls[id])));
-    if(ids.length > 0) {
+    const mappings = allBookings
+      .filter(b => b.menteeId && b.menteeProfilePhoto && !photoUrls[b.menteeId])
+      .map(b => ({ menteeId: b.menteeId as string, photoId: b.menteeProfilePhoto as string }));
+
+    const uniqueMappings = Array.from(new Map(mappings.map(m => [m.menteeId, m])).values());
+
+    if(uniqueMappings.length > 0) {
       Promise.all(
-        ids.map(id => 
-          ProfileService.getProfilePhotoById(id)
-            .then((res: any) => ({ id, url: res?.data?.cloudinarySecureUrl }))
-            .catch(() => ({ id, url: null }))
+        uniqueMappings.map(m => 
+          ProfileService.getProfilePhotoById(m.photoId)
+            .then((res: any) => ({ id: m.menteeId, url: res?.data?.photo?.cloudinarySecureUrl }))
+            .catch(() => ({ id: m.menteeId, url: null }))
         )
       ).then(results => {
         setPhotoUrls(prev => {
@@ -119,11 +132,12 @@ export default function BookingsPage({ mentorData }: BookingProps) {
 
   const getCurrentBookings = () => {
     switch (bookingTab) {
+      case 'all': return allBookings.filter(b => b.status !== 'completed');
       case 'pending': return pendingBookings;
       case 'upcoming': return upcomingBookings;
       case 'in_progress': return inProgressBookings;
       case 'completed': return completedBookings;
-      default: return upcomingBookings;
+      default: return allBookings.filter(b => b.status !== 'completed');
     }
   };
 
@@ -272,12 +286,14 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       {/* ── Tabs ── */}
       <div className="bg-white p-2 rounded-2xl shadow-xl overflow-x-auto" style={{ border: '2px solid #e0d8cf' }}>
         <div className="flex gap-2 min-w-max">
-          {(['pending', 'upcoming', 'in_progress', 'completed'] as const).map((tab) => {
-            const count = tab === 'pending' ? pendingBookings.length : 
+          {(['all', 'pending', 'upcoming', 'in_progress', 'completed'] as const).map((tab) => {
+            const count = tab === 'all' ? allBookings.filter(b => b.status !== 'completed').length :
+                          tab === 'pending' ? pendingBookings.length : 
                           tab === 'upcoming' ? upcomingBookings.length : 
                           tab === 'in_progress' ? inProgressBookings.length : completedBookings.length;
             
             const titles = {
+              'all': 'All Active',
               'pending': 'Pending',
               'upcoming': 'Upcoming',
               'in_progress': 'In Progress',
@@ -285,6 +301,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
             };
 
             const icons = {
+              'all': <Clock className="w-5 h-5 flex-shrink-0" />,
               'pending': <Clock className="w-5 h-5 flex-shrink-0" />,
               'upcoming': <Calendar className="w-5 h-5 flex-shrink-0" />,
               'in_progress': <Play className="w-5 h-5 flex-shrink-0" />,
@@ -301,7 +318,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   color: bookingTab === tab ? '#fff' : '#7a5c3e'
                 }}
               >
-                <div className="flex items-center justify-center gap-2 sm:gap-3">
+                <div className="flex items-center justify-center gap-2 sm:gap-3 whitespace-nowrap">
                   {icons[tab]}
                   <span>{titles[tab]}</span>
                   <span className={`px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-bold ${bookingTab === tab ? 'bg-white' : 'bg-gray-200'}`}
