@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const REPORT_REASONS = [
     'Spam or misleading',
@@ -22,6 +22,14 @@ const ReportPostModal = ({
     isSubmitting: boolean;
 }) => {
     const [selectedReason, setSelectedReason] = useState('');
+
+    useEffect(() => {
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = originalOverflow;
+        };
+    }, []);
 
     return (
         <div onClick={onClose} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">

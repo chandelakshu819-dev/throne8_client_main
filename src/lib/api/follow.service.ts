@@ -2,16 +2,17 @@ import config from "@/config/env.config";
 import api from "./api.intance";
 
 class FollowService {
+    private static getEndpoint(): string {
+        return config?.NEXT_PUBLIC_FOLLOW_ENDPOINT || process.env.NEXT_PUBLIC_FOLLOW_ENDPOINT || '/connections/follow';
+    }
+
     /**
      * Follow a user
-     * POST /api/v1/follow
+     * POST /api/v1/connections/follow
      */
     static async followUser(followingId: string) {
         try {
-            const { data } = await api.post(
-                `${config?.NEXT_PUBLIC_FOLLOW_ENDPOINT || process.env.NEXT_PUBLIC_FOLLOW_ENDPOINT}`,
-                { followingId }
-            );
+            const { data } = await api.post(FollowService.getEndpoint(), { followingId });
             return data;
         } catch (error: any) {
             console.error("[FOLLOW_USER] Failed:", error?.response?.data || error);
@@ -34,12 +35,12 @@ class FollowService {
 
     /**
      * Unfollow a user
-     * DELETE /api/v1/follow/:userId
+     * DELETE /api/v1/connections/follow/:userId
      */
     static async unfollowUser(followingId: string) {
         try {
             const { data } = await api.delete(
-                `${config?.NEXT_PUBLIC_FOLLOW_ENDPOINT || process.env.NEXT_PUBLIC_FOLLOW_ENDPOINT}/${followingId}`
+                `${FollowService.getEndpoint()}/${followingId}`
             );
             return data;
         } catch (error: any) {
@@ -52,12 +53,12 @@ class FollowService {
 
     /**
      * Check follow status
-     * GET /api/v1/follow/status/:userId
+     * GET /api/v1/connections/follow/status/:userId
      */
     static async checkFollowStatus(userId: string) {
         try {
             const { data } = await api.get(
-                `${config?.NEXT_PUBLIC_FOLLOW_ENDPOINT || process.env.NEXT_PUBLIC_FOLLOW_ENDPOINT}/status/${userId}`
+                `${FollowService.getEndpoint()}/status/${userId}`
             );
             return data;
         } catch (error: any) {
@@ -68,12 +69,12 @@ class FollowService {
 
     /**
      * 📊 GET FOLLOW COUNTS FOR A USER (followers + following)
-     * GET /api/v1/follow/counts/:userId
+     * GET /api/v1/connections/follow/counts/:userId
      */
     static async getFollowCounts(userId: string) {
         try {
             const { data } = await api.get(
-                `${config?.NEXT_PUBLIC_FOLLOW_ENDPOINT || process.env.NEXT_PUBLIC_FOLLOW_ENDPOINT}/counts/${userId}`
+                `${FollowService.getEndpoint()}/counts/${userId}`
             );
             return data;
         } catch (error: any) {
@@ -83,23 +84,13 @@ class FollowService {
     }
 
     /**
-     * ✅ GET user's FOLLOWERS LIST (real one-directional follow system,
-     * not "connections"). Backend: GET /api/v1/follow/followers/:userId
-     * Response body: { success, data: { data: FollowDoc[], pagination }, message }
-     * Each FollowDoc only has { followerId, createdAt, ... } — no profile
-     * info — caller is expected to bulk-fetch user profiles separately
-     * (see useFollowListsData hook).
-     *
-     * ⚠️ FIX: pehle yeh call silently `null` return karta tha kyunki backend
-     * ka `getFollowListSchema` Joi schema `.strict()` ke saath tha, jo query
-     * string params (jo hamesha string hote hain, e.g. `limit=100`) ko number
-     * mein convert hone se rok deta tha — isse Joi validation fail hokar 400
-     * error deta tha. Ab error ko throw kar rahe hain taaki silent failure na ho.
+     * ✅ GET user's FOLLOWERS LIST
+     * GET /api/v1/connections/follow/followers/:userId
      */
     static async getFollowers(userId: string, params?: { page?: number; limit?: number }) {
         try {
             const { data } = await api.get(
-                `${config?.NEXT_PUBLIC_FOLLOW_ENDPOINT || process.env.NEXT_PUBLIC_FOLLOW_ENDPOINT}/followers/${userId}`,
+                `${FollowService.getEndpoint()}/followers/${userId}`,
                 { params }
             );
             return data;
@@ -110,17 +101,13 @@ class FollowService {
     }
 
     /**
-     * ✅ GET user's FOLLOWING LIST (real one-directional follow system).
-     * Backend: GET /api/v1/follow/following/:userId
-     * Response body: { success, data: { data: FollowDoc[], pagination }, message }
-     * Each FollowDoc only has { followingId, createdAt, ... }.
-     *
-     * ⚠️ Same fix as getFollowers — throwing instead of silently returning null.
+     * ✅ GET user's FOLLOWING LIST
+     * GET /api/v1/connections/follow/following/:userId
      */
     static async getFollowing(userId: string, params?: { page?: number; limit?: number }) {
         try {
             const { data } = await api.get(
-                `${config?.NEXT_PUBLIC_FOLLOW_ENDPOINT || process.env.NEXT_PUBLIC_FOLLOW_ENDPOINT}/following/${userId}`,
+                `${FollowService.getEndpoint()}/following/${userId}`,
                 { params }
             );
             return data;
@@ -133,7 +120,7 @@ class FollowService {
     static async getUserFollowingCompanies(userId: string) {
         try {
             const { data } = await api.get(
-                `${config?.NEXT_PUBLIC_FOLLOW_ENDPOINT || process.env.NEXT_PUBLIC_FOLLOW_ENDPOINT}/user/${userId}/companies`
+                `${FollowService.getEndpoint()}/user/${userId}/companies`
             );
             return data;
         } catch (error: any) {
