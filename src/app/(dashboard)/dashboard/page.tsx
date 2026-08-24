@@ -344,7 +344,7 @@ export default function Home() {
         setSearchQuery(e.target.value);
     };
 
-    const handlePostSubmit = async () => {
+      const handlePostSubmit = async () => {
         if (!postContent.trim()) {
             setPostError('Please write something before posting.');
             return;
@@ -374,6 +374,12 @@ export default function Home() {
             const rawTitle = postContent.trim().substring(0, 100);
             const title = rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1);
 
+            // ✅ FIX: response ab capture kiya jaata hai. Pehle discard ho jaata
+            // tha aur end mein poori feed dobara backend se (score-sorted) fetch
+            // hoti thi — jisme apni fresh post ka top-pe-hona guaranteed nahi tha,
+            // aur poora feed reload/flicker hota tha.
+            let apiResult: any;
+
             if (selectedImages.length > 0 || selectedVideos.length > 0) {
                 const formData = new FormData();
                 formData.append('title', title);
@@ -388,7 +394,7 @@ export default function Home() {
                 selectedImages.forEach(img => formData.append('images', img));
                 selectedVideos.forEach(vid => formData.append('videos', vid));
 
-                await HomePostService.createPostWithMedia(formData);
+                apiResult = await HomePostService.createPostWithMedia(formData);
             } else {
                 const payload: any = {
                     title,
@@ -413,12 +419,30 @@ export default function Home() {
                     payload.eventData = eventData;
                 }
 
-                await HomePostService.createPost(payload);
+                apiResult = await HomePostService.createPost(payload);
             }
 
             resetPostModal();
             setIsPostCreatorOpen(false);
-            fetchAllUsersPosts();
+
+            // ✅ NEW: turant, bina refresh/refetch ke apni post feed ke top pe
+            // insert karo — full re-fetch nahi karna, sirf is ek naye post ko
+            // prepend karna hai. Scheduled posts ko turant feed mein nahi
+            // dikhana (unka time future mein hai).
+            const newPost = apiResult?.data || apiResult;
+            if (newPost && !newPost.isScheduled) {
+                await prependPost({
+                    ...newPost,
+                    // fallback safety — agar kabhi backend response mein
+                    // userId chhoot jaaye to bhi "Unknown User" na dikhe
+                    userId: newPost.userId || user?.userId,
+                    likesCount: newPost.likesCount ?? 0,
+                    commentsCount: newPost.commentsCount ?? 0,
+                    likedBy: newPost.likedBy ?? [],
+                    isLikedByCurrentUser: false,
+                    createdAt: newPost.createdAt || new Date().toISOString(),
+                });
+            }
 
         } catch (error: any) {
             setPostError(error.message || 'Failed to post. Try again.');
@@ -426,7 +450,6 @@ export default function Home() {
             setIsSubmittingPost(false);
         }
     };
-
     const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         if (files.length + selectedImages.length > 10) {
@@ -1239,22 +1262,18 @@ if (post?.userId && post.userId !== user?.userId) {
     }, [openMenuIndex]);
 
         // ✅ NEW: pinned posts ko hamesha top par rakho, baaki order same rehne do
-        const visiblePosts = allPosts
-        .filter((p: any) => {
+            // ✅ FIX: home feed mein pinning ka koi role nahi hona chahiye — pin
+        // sirf profile page (apni posts ki list) ke liye hai. Pehle yahan
+        // pinned posts ko hamesha feed ke top par force kiya ja raha tha,
+        // jiski wajah se nayi/fresh post kabhi bhi #1 slot par nahi aa paati
+        // thi agar koi purani post pinned thi. Ab feed apne natural order
+        // mein hi rahegi (jisme sabse naya prepended post already sabse
+        // upar hota hai).
+        const visiblePosts = allPosts.filter((p: any) => {
             const key = p.entryId || p.postId;
             return !hiddenPostIds.has(key);
-        })
-        .slice()
-        .sort((a: any, b: any) => {
-            const aKey = a.entryId || a.postId;
-            const bKey = b.entryId || b.postId;
-            const aPinned = postPins[aKey] ?? a.isPinned ?? false;
-            const bPinned = postPins[bKey] ?? b.isPinned ?? false;
-            if (aPinned && !bPinned) return -1;
-            if (!aPinned && bPinned) return 1;
-            return 0; // baaki posts ka relative order waisa hi rahega (stable sort)
         });
-
+        
     return (
         <div className={`min-h-screen transition-all duration-500 ${isDarkMode ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900' : 'bg-[#d4c9bc]'} font-['Poppins'] overflow-x-clip`}>
             {/* Header */}

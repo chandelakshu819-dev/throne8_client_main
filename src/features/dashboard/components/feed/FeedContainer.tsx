@@ -31,10 +31,6 @@ const PostSkeleton = () => (
 const FeedContainer = (props: any) => {
   const {
     posts = [],
-    // ✅ FIX: feedReposts pehle destructure hi nahi hota tha, isliye page.tsx
-    // se pass hone ke baad bhi kabhi render hi nahi ho raha tha. Isi wajah
-    // se repost successfully backend me create ho raha tha lekin feed pe
-    // turant (bina refresh) kabhi dikhta hi nahi tha.
     feedReposts = [],
     isLoadingPosts = false,
     isLoadingMore = false,
@@ -47,24 +43,15 @@ const FeedContainer = (props: any) => {
     repostProgress,
     profileData,
     fullName,
-    postPins = {},
   } = props;
 
-  // ✅ NEW FIX: pinned posts ko feedReposts se bhi upar rakhne ke liye
-  // 'posts' array ko pinned/unpinned indices mein split karo. Original
-  // index yahin preserve karte hain kyunki handlePostAction() 'visiblePosts'
-  // (yehi 'posts' prop) ka index use karta hai — index badalna nahi chahiye.
-  const pinnedIndices: number[] = [];
-  const unpinnedIndices: number[] = [];
-  posts.forEach((p: any, i: number) => {
-    const key = p.entryId || p.postId;
-    const isPinned = (postPins[key] ?? p.isPinned ?? false) && p.feedItemType !== 'repost';
-    if (isPinned) {
-      pinnedIndices.push(i);
-    } else {
-      unpinnedIndices.push(i);
-    }
-  });
+  // ✅ FIX: pehle yahan posts ko pinned/unpinned mein split karke pinned
+  // posts ko hamesha feed ke top par force kiya jaata tha. Pinning sirf
+  // profile page (apni posts ki list) ke liye hona chahiye — home feed
+  // mein nahi. Isi wajah se nayi/fresh post kabhi #1 slot par nahi aa
+  // paati thi agar koi purani post pinned thi. Ab `posts` prop jis order
+  // mein aata hai (jahan sabse naya prepended post already sabse upar
+  // hota hai), usi natural order mein render karte hain — koi re-sort nahi.
 
   // ✅ Infinite scroll trigger — jab yeh sentinel div viewport mein aata hai,
   // aur hasMore true hai aur pehle se loadMore chal nahi raha, agla page fetch karo
@@ -121,32 +108,13 @@ const FeedContainer = (props: any) => {
         progress={repostProgress}
         isDarkMode={isDarkMode}
       />
-           <div className="space-y-8">
-        {/* ✅ FIX: pinned posts sabse top par — feedReposts se bhi upar */}
-        {pinnedIndices.map((index) => {
-          const post = posts[index];
-          return (
-            <PostCard
-              likedPosts={likedPosts}
-              currentUserId={currentUserId}
-              key={post.entryId || post.postId || index}
-              post={post}
-              profileImage={props.profileImage}
-              index={index}
-              onOpenWithPerspectiveModal={props.onOpenWithPerspectiveModal}
-              handleRepostInstant={props.handleRepostInstant}
-              {...props}
-            />
-          );
-        })}
-
-        {/* ✅ client-side reposts (jo abhi-abhi create hui hain) pinned ke
-            turant baad, baaki normal posts se pehle render karo — turant
-            dikhengi, refresh ka wait nahi karna padega. Backend refetch/
-            refresh ke baad yeh hi reposts `posts` array ke andar
-            `feedItemType: 'repost'` ban ke aa jaayengi (neeche wale block se
-            render hongi), isliye duplicate render se bachne ke liye unique
-            `repostId` key use ki hai dono jagah. */}
+      <div className="space-y-8">
+        {/* client-side reposts (jo abhi-abhi create hui hain) sabse upar —
+            turant dikhengi, refresh ka wait nahi karna padega. Backend
+            refetch/refresh ke baad yeh hi reposts `posts` array ke andar
+            `feedItemType: 'repost'` ban ke aa jaayengi (neeche wale block
+            se render hongi), isliye duplicate render se bachne ke liye
+            unique `repostId` key use ki hai dono jagah. */}
         {feedReposts.map((repostItem: any) => (
           <FeedRepostCard
             key={`local-${repostItem.repostId}`}
@@ -164,9 +132,10 @@ const FeedContainer = (props: any) => {
           />
         ))}
 
-        {unpinnedIndices.map((index) => {
-          const post = posts[index];
-          return post.feedItemType === 'repost' ? (
+        {/* ✅ FIX: ab pinned/unpinned split nahi hota — `posts` array ke
+            natural order mein hi render karte hain */}
+        {posts.map((post: any, index: number) =>
+          post.feedItemType === 'repost' ? (
             <FeedRepostCard
               key={post.repostId}
               {...props}
@@ -193,8 +162,8 @@ const FeedContainer = (props: any) => {
               handleRepostInstant={props.handleRepostInstant}
               {...props}
             />
-          );
-        })}
+          )
+        )}
       </div>
 
       {/* ✅ Sentinel element — jab yeh screen pe aata hai, next page load hota hai */}
