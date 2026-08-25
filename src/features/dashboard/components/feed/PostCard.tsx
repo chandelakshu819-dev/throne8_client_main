@@ -51,8 +51,11 @@ const PostCard = ({
     const firstLikerInitial = names[0]?.charAt(0)?.toUpperCase() || '?';
 
     return (
+      // ✅ SPACING FIX: mb-4 pb-3 → mb-2 pb-2 — yeh strip har post mein
+      // repeat hoti hai isliye iska padding poore feed pe bada asar
+      // daalta tha, isko tight kiya.
       <div
-        className={`relative flex items-center justify-between gap-2 mb-2 pb-3 border-b text-sm ${isDarkMode ? 'text-slate-300 border-slate-700/50' : 'text-[#4a3728]/80 border-[#4a3728]/10'
+        className={`relative flex items-center justify-between gap-2 mb-2 pb-2 border-b text-sm ${isDarkMode ? 'text-slate-300 border-slate-700/50' : 'text-[#4a3728]/80 border-[#4a3728]/10'
           }`}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -160,8 +163,9 @@ const PostCard = ({
     const firstCommenterInitial = names[0]?.charAt(0)?.toUpperCase() || '?';
 
     return (
+      // ✅ SPACING FIX: mb-4 pb-3 → mb-2 pb-2 (same reasoning as the liked-by strip above)
       <div
-        className={`relative flex items-center justify-between gap-2 mb-4 pb-3 border-b text-sm ${isDarkMode ? 'text-slate-300 border-slate-700/50' : 'text-[#4a3728]/80 border-[#4a3728]/10'
+        className={`relative flex items-center justify-between gap-2 mb-2 pb-2 border-b text-sm ${isDarkMode ? 'text-slate-300 border-slate-700/50' : 'text-[#4a3728]/80 border-[#4a3728]/10'
           }`}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -275,7 +279,8 @@ const PostCard = ({
         source: 'feed'
       })}
       key={post.postId}
-      className={`p-6 rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1 ${isDarkMode ? 'bg-slate-800/60 border-slate-700/50' : 'bg-[#f6ede8]/95 border-[#4a3728]/20'
+      // ✅ SPACING FIX: p-6 → p-5 — card ka outer padding thoda tight kiya
+      className={`p-5 rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1 ${isDarkMode ? 'bg-slate-800/60 border-slate-700/50' : 'bg-[#f6ede8]/95 border-[#4a3728]/20'
         } relative`}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-[#6b5643]/3 via-[#8b7355]/3 to-[#4a3728]/3 rounded-3xl"></div>

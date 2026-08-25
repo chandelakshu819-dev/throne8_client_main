@@ -79,8 +79,11 @@ const FeedContainer = (props: any) => {
 
   if (isLoadingPosts) {
     return (
-      <main className="postLoader flex-1 space-y-8">
-        <div className="space-y-8">
+      // ✅ SPACING FIX: space-y-8 → space-y-4 — posts ke beech gap sabse
+      // bada spacing culprit tha, poore feed pe iska sabse bada asar padta
+      // tha. Loading skeleton bhi consistent rehne ke liye same tight kiya.
+      <main className="postLoader flex-1 space-y-4">
+        <div className="space-y-4">
           {[1, 2, 3].map((index) => (
             <PostSkeleton key={`skeleton-${index}`} />
           ))}
@@ -102,13 +105,14 @@ const FeedContainer = (props: any) => {
   }
 
   return (
-    <main className="flex-1 space-y-8">
+    // ✅ SPACING FIX: space-y-8 → space-y-4 (see note above)
+    <main className="flex-1 space-y-4">
       <RepostProgressBar
         isVisible={showRepostProgressBar}
         progress={repostProgress}
         isDarkMode={isDarkMode}
       />
-      <div className="space-y-8">
+      <div className="space-y-4">
         {/* client-side reposts (jo abhi-abhi create hui hain) sabse upar —
             turant dikhengi, refresh ka wait nahi karna padega. Backend
             refetch/refresh ke baad yeh hi reposts `posts` array ke andar
@@ -170,7 +174,7 @@ const FeedContainer = (props: any) => {
       {hasMore && (
         <div ref={observerTarget} className="py-4">
           {isLoadingMore && (
-            <div className="space-y-8">
+            <div className="space-y-4">
               <PostSkeleton />
             </div>
           )}

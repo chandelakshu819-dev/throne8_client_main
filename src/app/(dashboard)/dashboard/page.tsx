@@ -1,7 +1,7 @@
 // Home Page - Dashboard
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, MapPin, Hash, Users, Image as LucideImage, Video, Sparkles, X, BarChart2 } from 'lucide-react';
 import Left from '@/features/dashboard/components/sidebar/Left/LeftSidebar';
 import LeftSidebarPanel from '@/features/dashboard/components/sidebar/Left/LeftSidebarPanel'
@@ -31,6 +31,20 @@ import Toast from '@/shared/uiComponents/Toast';
 import EmbedPostModal from '@/features/dashboard/components/feed/EmbedPostModal';
 import DeleteConfirmModal from '@/features/dashboard/components/feed/DeleteConfirmModal';
 import ReportPostModal from '@/features/profile/components/home/ReportPostModal';
+// ✅ NEW: @mention autocomplete wiring for the dashboard's inline create-post
+// textarea. CreatePostModal.tsx (profile/home) already had this, but this
+// page's own hard-coded post-creator modal was never wired up to it —
+// that's why typing "@" here did nothing.
+import { useMentionAutocomplete, MentionUser } from '@/shared/hooks/useMentionAutocomplete';
+import MentionAutocomplete from '@/shared/uiComponents/MentionAutocomplete';
+// ✅ NEW: contentEditable-based rich mention input — replaces the plain
+// <textarea> below. A plain textarea can only show literal characters, so
+// once a mention was picked it showed the raw "@[Name](userId)" markdown,
+// UUID and all. MentionRichInput renders mentions as atomic "@Name" chips
+// (id hidden in a data-attribute) while still round-tripping the exact
+// same raw storage format the rest of the app (parser, backend) expects.
+import MentionRichInput, { MentionRichInputHandle } from '@/shared/uiComponents/MentionRichInput';
+
 export default function Home() {
     const { user, isLoading } = useAuth();
 
@@ -76,6 +90,61 @@ export default function Home() {
     const [showRepostProgressBar, setShowRepostProgressBar] = useState(false);
 
     const { allPosts, isLoadingAllPosts, isLoadingMore, hasMore, fetchAllUsersPosts, loadMorePosts, prependPost ,updatePostInFeed} = useAllUsersPosts();
+
+    // ✅ CHANGED: create-post modal ke content input ke liye @mention wiring.
+    // Ab ref ka type MentionRichInputHandle hai (textarea nahi), kyunki
+    // input khud ab contentEditable-based MentionRichInput hai.
+    const postContentTextareaRef = useRef<MentionRichInputHandle>(null);
+    // ✅ NEW: sabse recent plain-text cursor offset — MentionRichInput ye
+    // har edit par deta hai. Mention select karte waqt hume yehi cursor pos
+    // chahiye hota hai (contentEditable me DOM selection click ke time tak
+    // shift ho chuki hoti hai, isliye event ke time hi capture karte hain).
+    const lastCursorPosRef = useRef(0);
+    const postMention = useMentionAutocomplete({
+        value: postContent,
+        onChange: setPostContent,
+    });
+
+    // ✅ CHANGED: ab MentionRichInput se aata hai (raw, plainText, cursorPos)
+    // — textarea ka ChangeEvent nahi. `raw` (@[Name](id) format) seedha
+    // postContent state me jaata hai — yehi backend/parser expect karta hai.
+    // `plainText` (mentions "@Name" collapsed) sirf "@" detection/autocomplete
+    // ke liye use hoti hai.
+    const handlePostContentChange = (raw: string, plainText: string, plainCursorPos: number) => {
+        if (raw.length > 5000) return; // maxLength ab yahan manually enforce
+        lastCursorPosRef.current = plainCursorPos;
+        postMention.handleTextChange(plainText, plainCursorPos);
+        setPostContent(raw);
+        if (postError) setPostError('');
+    };
+
+    const handlePostContentKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (!postMention.isOpen || postMention.results.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            postMention.setActiveIndex((i) => (i + 1) % postMention.results.length);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            postMention.setActiveIndex((i) => (i - 1 + postMention.results.length) % postMention.results.length);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSelectPostMention(postMention.results[postMention.activeIndex]);
+        } else if (e.key === 'Escape') {
+            postMention.closeMention();
+        }
+    };
+
+    // ✅ CHANGED: ab textarea.selectionStart ke bajaye lastCursorPosRef (jo
+    // MentionRichInput har edit par plain-text offset ke roop me deta hai)
+    // use hota hai, aur focus/caret restore MentionRichInput ke apne
+    // `focusAtOffset` handle se hota hai (textarea.setSelectionRange nahi).
+    const handleSelectPostMention = (mentionUser: MentionUser) => {
+        const newCursorPos = postMention.selectMention(mentionUser, lastCursorPosRef.current);
+        requestAnimationFrame(() => {
+            postContentTextareaRef.current?.focusAtOffset(newCursorPos);
+        });
+    };
 
     const { socket } = useSocket();
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -344,7 +413,7 @@ export default function Home() {
         setSearchQuery(e.target.value);
     };
 
-      const handlePostSubmit = async () => {
+    const handlePostSubmit = async () => {
         if (!postContent.trim()) {
             setPostError('Please write something before posting.');
             return;
@@ -450,6 +519,7 @@ export default function Home() {
             setIsSubmittingPost(false);
         }
     };
+
     const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         if (files.length + selectedImages.length > 10) {
@@ -797,7 +867,21 @@ export default function Home() {
                 originalPost: {
                     ...post,
                     entryId: postId,
-                    userName: post.userName || post.fullName || post.userId || 'User',
+                    // ✅ FIX: `post` yahan transformed feed object hai
+                    // (transformApiPostToFeedPost ka output) — usme
+                    // userName/fullName fields kabhi exist nahi karte,
+                    // sirf `user` (naam) aur `avatar` hote hain. Pehle
+                    // fallback seedha post.userId (raw UUID) pe gir jaata
+                    // tha, isliye dashboard pe naam ki jagah UUID dikhta tha.
+                    userName: post.user || post.userName || post.fullName || 'Unknown User',
+                    fullName: post.user || post.userName || post.fullName || 'Unknown User',
+                    userAvatar: post.avatar || post.userAvatar || null,
+                    // ✅ FIX: transformed post mein raw createdAt nahi hota
+                    // (sirf formatted "Xh ago" string 'time' hota hai) —
+                    // isliye timeAgo() ko invalid date milti thi aur
+                    // "NaNd ago" dikhta tha. postTransformers.ts ab raw
+                    // createdAt bhi return karta hai, wahi yahan use karo.
+                    createdAt: post.createdAt || new Date().toISOString(),
                 },
             };
 
@@ -858,7 +942,13 @@ export default function Home() {
             originalPost: {
                 ...post,
                 entryId: postId,
-                userName: post.userName || post.fullName || post.userId || 'User',
+                // ✅ FIX: same reasoning as confirmRepost above — `user`/`avatar`
+                // hote hain transformed post mein, userName/fullName nahi.
+                userName: post.user || post.userName || post.fullName || 'Unknown User',
+                fullName: post.user || post.userName || post.fullName || 'Unknown User',
+                userAvatar: post.avatar || post.userAvatar || null,
+                // ✅ FIX: raw createdAt use karo, warna NaNd ago dikhta tha
+                createdAt: post.createdAt || new Date().toISOString(),
             },
         };
 
@@ -1261,8 +1351,7 @@ if (post?.userId && post.userId !== user?.userId) {
         };
     }, [openMenuIndex]);
 
-        // ✅ NEW: pinned posts ko hamesha top par rakho, baaki order same rehne do
-            // ✅ FIX: home feed mein pinning ka koi role nahi hona chahiye — pin
+        // ✅ FIX: home feed mein pinning ka koi role nahi hona chahiye — pin
         // sirf profile page (apni posts ki list) ke liye hai. Pehle yahan
         // pinned posts ko hamesha feed ke top par force kiya ja raha tha,
         // jiski wajah se nayi/fresh post kabhi bhi #1 slot par nahi aa paati
@@ -1273,7 +1362,7 @@ if (post?.userId && post.userId !== user?.userId) {
             const key = p.entryId || p.postId;
             return !hiddenPostIds.has(key);
         });
-        
+
     return (
         <div className={`min-h-screen transition-all duration-500 ${isDarkMode ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900' : 'bg-[#d4c9bc]'} font-['Poppins'] overflow-x-clip`}>
             {/* Header */}
@@ -1463,13 +1552,25 @@ if (post?.userId && post.userId !== user?.userId) {
                     {/* Text Input */}
                     <div className="mb-3 sm:mb-4">
                         <div className="relative">
-                            <textarea
+                            <MentionRichInput
+                                ref={postContentTextareaRef}
                                 value={postContent}
-                                onChange={(e) => setPostContent(e.target.value)}
-                                placeholder="Share your thoughts, ideas, or experiences... ✨"
-                                className={`w-full h-24 sm:h-28 rounded-2xl px-3 sm:px-4 py-2 sm:py-3 resize-none focus:outline-none focus:ring-2 focus:ring-[#6b5643]/50 transition-all duration-300 text-xs sm:text-sm border ${isDarkMode ? 'bg-slate-700/50 border-slate-600/50 text-white placeholder-slate-400' : 'bg-[#e0d8cf]/50 border-[#4a3728]/30 text-[#4a3728] placeholder-[#4a3728]/60'}`}
-                                maxLength={5000}
+                                onValueChange={handlePostContentChange}
+                                onKeyDownExtra={handlePostContentKeyDown}
+                                onBlur={() => setTimeout(() => postMention.closeMention(), 150)}
+                                placeholder="Share your thoughts, ideas, or experiences... (type @ to mention someone) ✨"
+                                className={`w-full min-h-[6rem] sm:min-h-[7rem] max-h-56 rounded-2xl px-3 sm:px-4 py-2 sm:py-3 pr-14 overflow-y-auto focus:outline-none focus:ring-2 focus:ring-[#6b5643]/50 transition-all duration-300 text-xs sm:text-sm border ${isDarkMode ? 'bg-slate-700/50 border-slate-600/50 text-white' : 'bg-[#e0d8cf]/50 border-[#4a3728]/30 text-[#4a3728]'}`}
                             />
+                            {postMention.isOpen && (
+                                <MentionAutocomplete
+                                    results={postMention.results}
+                                    isSearching={postMention.isSearching}
+                                    activeIndex={postMention.activeIndex}
+                                    onSelect={handleSelectPostMention}
+                                    onHover={postMention.setActiveIndex}
+                                    isDarkMode={isDarkMode}
+                                />
+                            )}
                             <div className={`absolute bottom-2 right-2 sm:right-3 text-xs ${isDarkMode ? 'text-slate-500' : 'text-[#4a3728]/40'}`}>
                                 {postContent.length}/5000
                             </div>
@@ -2196,6 +2297,23 @@ if (post?.userId && post.userId !== user?.userId) {
                 }
                 .animate-slideUp {
                     animation: slideUp 0.4s ease-out;
+                }
+
+                /* ✅ NEW: MentionRichInput styling — placeholder text (shown only
+                   when the contentEditable div is empty) + the "@Name" chip that
+                   replaces the old raw "@[Name](userId)" text. */
+                .mention-rich-input:empty:before {
+                    content: attr(data-placeholder);
+                    color: ${isDarkMode ? 'rgba(148,163,184,0.8)' : 'rgba(74,55,40,0.6)'};
+                    pointer-events: none;
+                }
+                .mention-chip {
+                    display: inline;
+                    font-weight: 600;
+                    color: ${isDarkMode ? '#93c5fd' : '#4a3728'};
+                    background: ${isDarkMode ? 'rgba(96,165,250,0.15)' : 'rgba(74,55,40,0.12)'};
+                    border-radius: 4px;
+                    padding: 0 2px;
                 }
             `}</style>
         </div >

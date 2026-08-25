@@ -97,10 +97,13 @@ const ProfileCard: React.FC<ProfileCardProps> = ({currentUserId, isDarkMode }) =
   };
 
   return (
-    <div className={`p-8 rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-500 hover:scale-105 hover:-translate-y-2 ${isDarkMode ? 'bg-slate-800/60 border-slate-700/50' : 'bg-[#f6ede8]/95 border-[#4a3728]/20'} relative overflow-hidden`}>
+    // ✅ SPACING FIX: p-8 → p-5. Card ka outer padding kaafi zyada tha,
+    // isliye poora card unnecessarily lamba/loose lag raha tha.
+    <div className={`p-5 rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-500 hover:scale-105 hover:-translate-y-2 ${isDarkMode ? 'bg-slate-800/60 border-slate-700/50' : 'bg-[#f6ede8]/95 border-[#4a3728]/20'} relative overflow-hidden`}>
       <div className="absolute inset-0 bg-gradient-to-br from-[#6b5643]/10 via-[#8b7355]/10 to-[#4a3728]/10"></div>
       <div className="relative z-10 text-center">
-        <div className="relative inline-block mb-6">
+        {/* ✅ SPACING FIX: mb-6 → mb-4 — image aur naam ke beech gap tight kiya */}
+        <div className="relative inline-block mb-4">
           <img
             // src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face"
             src={profileData.profileImage}
@@ -119,7 +122,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({currentUserId, isDarkMode }) =
         </p> */}
 
         {/* Stats Grid */}
-        <div className="mt-6 grid grid-cols-2 gap-4 mb-6">
+        {/* ✅ SPACING FIX: mt-6 gap-4 mb-6 → mt-4 gap-3 mb-4 */}
+        <div className="mt-4 grid grid-cols-2 gap-3 mb-4">
           {[
             {
               label: 'Connections',
@@ -139,7 +143,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({currentUserId, isDarkMode }) =
               key={idx}
               type="button"
               onClick={stat.onClick}
-              className={`p-4 rounded-2xl backdrop-blur-sm border transition-all duration-300 hover:scale-105 text-center cursor-pointer ${isDarkMode ? 'bg-slate-700/30 border-slate-600/30' : 'bg-[#e0d8cf]/50 border-[#4a3728]/20'}`}
+              // ✅ SPACING FIX: p-4 → p-3 — stat box padding tighter
+              className={`p-3 rounded-2xl backdrop-blur-sm border transition-all duration-300 hover:scale-105 text-center cursor-pointer ${isDarkMode ? 'bg-slate-700/30 border-slate-600/30' : 'bg-[#e0d8cf]/50 border-[#4a3728]/20'}`}
             >
               <p className={`text-2xl font-black bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
                 {stat.value}
@@ -160,7 +165,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({currentUserId, isDarkMode }) =
 
         <button
           onClick={handleHomePage}
-          className="w-full bg-gradient-to-r from-[#4a3728] via-[#6b5643] to-[#8b7355] text-white py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 relative overflow-hidden">
+          // ✅ SPACING FIX: py-4 → py-3 — button ki height thodi kam ki
+          className="w-full bg-gradient-to-r from-[#4a3728] via-[#6b5643] to-[#8b7355] text-white py-3 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent"></div>
           <span className="relative z-10">View Full Profile</span>
         </button>

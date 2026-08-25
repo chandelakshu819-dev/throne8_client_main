@@ -182,8 +182,11 @@ const FeedRepostCard = ({
     const isMenuOpen = openMenuIndex === postKey;
 
     return (
+        // ✅ SPACING FIX: p-8 → p-5 — baaki feed cards (PostCard) ke
+        // padding ke sath consistent kiya, pehle yeh sabse zyada padding
+        // wala card tha.
         <div
-            className={`p-8 rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-500 hover:scale-[1.01] hover:-translate-y-0.5 ${isDarkMode
+            className={`p-5 rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-500 hover:scale-[1.01] hover:-translate-y-0.5 ${isDarkMode
                 ? 'bg-slate-800/60 border-slate-700/50'
                 : 'bg-[#f6ede8]/95 border-[#4a3728]/20'
                 } relative overflow-hidden`}
@@ -192,7 +195,11 @@ const FeedRepostCard = ({
 
             <div className="relative z-10">
                 {/* ── Repost Header ── */}
-                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[#4a3728]/10">
+                {/* ✅ SPACING FIX: mb-4 pb-3 → mb-2 pb-2 — "You reposted"
+                    row aur uske neeche wali border-line ke beech ka gap
+                    yehi tha jo screenshot me sabse zyada khali space
+                    dikha raha tha, ab tight kar diya. */}
+                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-[#4a3728]/10">
                     <i className="ri-repeat-line text-lg text-[#6b5643]" />
                     <div className="w-6 h-6 rounded-full overflow-hidden border border-[#4a3728]/20 flex-shrink-0">
                         {displayAvatar ? (
@@ -224,7 +231,8 @@ const FeedRepostCard = ({
                     const shouldTruncateThought = hasMultipleLines || thought.length > 80;
 
                     return (
-                        <div className="mb-4 pl-3 border-l-2 border-[#6b5643]/40">
+                        // ✅ SPACING FIX: mb-4 → mb-2
+                        <div className="mb-2 pl-3 border-l-2 border-[#6b5643]/40">
                             <p
                                 className={`text-sm italic whitespace-pre-wrap break-words ${!isThoughtExpanded && shouldTruncateThought ? 'line-clamp-1' : ''
                                     } ${isDarkMode ? 'text-slate-300' : 'text-[#4a3728]/80'}`}
@@ -249,10 +257,12 @@ const FeedRepostCard = ({
                 })()}
 
                 {/* ── Original Post Content ── */}
+                {/* ✅ SPACING FIX: p-5 → p-4 — inner nested post box ka padding thoda tight */}
                 <div
-                    className={`relative rounded-2xl border p-5 ${isDarkMode ? 'bg-slate-700/40 border-slate-600/50' : 'bg-white/60 border-[#4a3728]/15'}`}
+                    className={`relative rounded-2xl border p-4 ${isDarkMode ? 'bg-slate-700/40 border-slate-600/50' : 'bg-white/60 border-[#4a3728]/15'}`}
                 >
-                    <div className="flex items-center gap-3 mb-3">
+                    {/* ✅ SPACING FIX: mb-3 → mb-2 */}
+                    <div className="flex items-center gap-3 mb-2">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${isDarkMode ? 'bg-slate-600 border-slate-500' : 'bg-[#e0d8cf] border-[#4a3728]/10'}`}>
                             {originalPost.userAvatar ? (
                                 <img src={originalPost.userAvatar} alt="Author" className="w-full h-full object-cover rounded-full" />
@@ -309,7 +319,8 @@ const FeedRepostCard = ({
                         <PostContent post={syntheticPost} isDarkMode={isDarkMode} />
                     </div>
 
-                    <div className={`mt-4 pt-3 border-t ${isDarkMode ? 'border-slate-600/50' : 'border-[#4a3728]/10'}`}>
+                    {/* ✅ SPACING FIX: mt-4 pt-3 → mt-2 pt-2 */}
+                    <div className={`mt-2 pt-2 border-t ${isDarkMode ? 'border-slate-600/50' : 'border-[#4a3728]/10'}`}>
                         <PostActions
                             post={syntheticPost}
                             index={postKey}

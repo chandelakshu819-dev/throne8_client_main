@@ -27,6 +27,11 @@ export const transformApiPostToFeedPost = (
     avatar: profileImageUrl || userData?.profilePhotoUrl || '',
     role: headlineText || userData?.headline || '',
     time: calculateTimeAgo(apiPost.createdAt),
+    // ✅ NEW: raw date preserve karo — 'time' sirf formatted string hai
+    // ("2h ago"), usse date reconstruct nahi ho sakti. Reposts (optimistic
+    // create ke waqt) ko original createdAt chahiye hota hai warna
+    // timeAgo() Invalid Date → "NaNd ago" deta hai.
+    createdAt: apiPost.createdAt || null,
     content: apiPost.content || apiPost.text || '',
 
     // ✅ ADDED: mood tha model/backend mein save, lekin yahan return object

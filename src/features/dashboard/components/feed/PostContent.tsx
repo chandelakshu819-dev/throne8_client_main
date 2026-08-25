@@ -84,11 +84,12 @@ const getTileClass = (index: number): string => {
     );
   };
 
+  // ✅ SPACING FIX: mb-2 → mb-1 — content text ke baad gap tight kiya
   const contentTextClass = [
     'text-base',
     'font-medium',
     'leading-relaxed',
-    'mb-2',
+    'mb-1',
     'whitespace-pre-wrap',
     !expanded && isLong ? 'line-clamp-1' : '',
     isDarkMode ? 'text-slate-200' : 'text-[#4a3728]',
@@ -96,11 +97,13 @@ const getTileClass = (index: number): string => {
     .filter(Boolean)
     .join(' ');
 
+  // ✅ SPACING FIX: mb-4 → mb-2 — "Read more" button ke baad gap tight kiya
   const readMoreClass = isDarkMode
-    ? 'text-sm font-semibold mb-4 text-slate-300 hover:text-white'
-    : 'text-sm font-semibold mb-4 text-[#6b5643] hover:text-[#4a3728]';
+    ? 'text-sm font-semibold mb-2 text-slate-300 hover:text-white'
+    : 'text-sm font-semibold mb-2 text-[#6b5643] hover:text-[#4a3728]';
 
-  const imageGridClass = 'mb-6 rounded-2xl overflow-hidden grid gap-1 cursor-pointer ' + getGridColsClass();
+  // ✅ SPACING FIX: mb-6 → mb-3 — image grid ke neeche gap tight kiya
+  const imageGridClass = 'mb-3 rounded-2xl overflow-hidden grid gap-1 cursor-pointer ' + getGridColsClass();
 
   return (
     <>
@@ -139,7 +142,8 @@ const getTileClass = (index: number): string => {
       {post.videos && post.videos.length > 0 && (
         <div
           onClick={handleVideoContainerClick}
-          className="mb-6 rounded-2xl overflow-hidden bg-black w-full h-80 flex justify-center cursor-pointer"
+          // ✅ SPACING FIX: mb-6 → mb-3
+          className="mb-3 rounded-2xl overflow-hidden bg-black w-full h-80 flex justify-center cursor-pointer"
         >
           <video
             src={post.videos[0].cloudinarySecureUrl}
@@ -153,7 +157,8 @@ const getTileClass = (index: number): string => {
       {post.documents && post.documents.length > 0 && (
         <div
           onClick={handleDocumentContainerClick}
-          className="mb-6 bg-gradient-to-br from-[#e0d8cf]/40 to-[#f6ede8]/30 border border-[#e0d8cf]/50 p-4 rounded-2xl flex items-center justify-between gap-4"
+          // ✅ SPACING FIX: mb-6 → mb-3
+          className="mb-3 bg-gradient-to-br from-[#e0d8cf]/40 to-[#f6ede8]/30 border border-[#e0d8cf]/50 p-4 rounded-2xl flex items-center justify-between gap-4"
         >
           <div className="flex items-center gap-3 min-w-0">
             <div className="p-2.5 bg-[#4a3728] text-[#f6ede8] rounded-xl flex-shrink-0">
