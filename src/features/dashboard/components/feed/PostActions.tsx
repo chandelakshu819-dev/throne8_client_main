@@ -44,7 +44,7 @@ const PostActions = ({
 
 
 }: PostActionsProps) => {
-  const postKey = post.entryId || post.postId;
+  const postKey = post?.entryId || post?.postId || post?.id || post?._id || (post?.originalPost ? (post.originalPost.entryId || post.originalPost.postId || post.originalPost.id || post.originalPost._id) : '');
   const isLiked = likedPosts[postKey] ?? post.isLikedByCurrentUser ?? false;
 
   const [hasReposted, setHasReposted] = useState(false);

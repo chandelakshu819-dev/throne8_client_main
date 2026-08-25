@@ -34,7 +34,7 @@ const PostActions = ({
   handleRepost, toggleComments, onOpenWithPerspectiveModal, handleRepostInstant,
   currentUserId, profileImage, fullName, headline,   // ✅ NEW
 }: PostActionsProps) => {
-  const postKey = post.entryId || post.postId;
+  const postKey = post?.entryId || post?.postId || post?.id || post?._id || (post?.originalPost ? (post.originalPost.entryId || post.originalPost.postId || post.originalPost.id || post.originalPost._id) : '');
 
   const isLiked =
     (typeof likedPosts?.[postKey] === 'object' ? likedPosts[postKey]?.isLiked : likedPosts?.[postKey])

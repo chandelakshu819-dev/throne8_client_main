@@ -58,7 +58,7 @@ interface EmbedPostModalProps {
 
   if (!isOpen || !mounted || !post) return null;
 
-  const postId = post.entryId || post.postId;
+  const postId = post.entryId || post.postId || post.id || post._id || (post.originalPost ? (post.originalPost.entryId || post.originalPost.postId || post.originalPost.id || post.originalPost._id) : '');
   const embedUrl = `${window.location.origin}/post/${postId}`;
   const iframeCode = `<iframe src="${embedUrl}" height="570" width="504" frameborder="0" allowfullscreen title="Embedded post"></iframe>`;
 
