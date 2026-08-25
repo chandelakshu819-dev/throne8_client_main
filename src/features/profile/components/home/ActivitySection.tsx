@@ -681,9 +681,9 @@ const postForCard = isQuote
       )}
 
 
-{showEmbedLikesModal && postKey ? (
+{showEmbedLikesModal && (originalPost?.entryId || originalPost?.postId || postKey) ? (
   <ReactionsModal
-    postId={postKey}
+    postId={originalPost?.entryId || originalPost?.postId || postKey}
     isOpen={showEmbedLikesModal}
     onClose={() => setShowEmbedLikesModal(false)}
     isDarkMode={false}
@@ -1891,7 +1891,10 @@ const engagementPercent = analyticsData
 
       {showEmbedLikesModal && embedPostId ? (
         <ReactionsModal
-          postId={embedPostId}
+          postId={(() => {
+            const ep = posts.find((p: any) => (p.entryId || p.postId) === embedPostId);
+            return ep?.originalPost?.entryId || ep?.originalPost?.postId || embedPostId;
+          })()}
           isOpen={showEmbedLikesModal}
           onClose={() => setShowEmbedLikesModal(false)}
           isDarkMode={false}

@@ -22,28 +22,39 @@ export const usePostReactors = () => {
         try {
             setIsLoading(true);
 
-           const res = await HomePostService.getPostReactors(postId);
-           const { reactions = [], countsByType: counts = {} } = res.data;
-            setCountsByType(counts);
+            const res = await HomePostService.getPostReactors(postId);
+            const payload = res?.data?.reactions ? res.data : (res?.reactions ? res : res?.data?.data || {});
+            const reactions = payload.reactions || [];
+            const counts = payload.countsByType || {};
 
             const userIds = reactions.map((r: any) => r.userId);
             if (userIds.length === 0) {
                 setReactors([]);
+                setCountsByType({});
                 return;
             }
 
             // ✅ Bulk fetch — same pattern as useConnectionsData (one call, not N calls)
-            const bulkResponse = await AuthService.getUsersBulk(userIds);
-            const users = bulkResponse.data?.users || [];
+            let users: any[] = [];
+            try {
+                const bulkResponse = await AuthService.getUsersBulk(userIds);
+                users = bulkResponse.data?.users || bulkResponse.users || [];
+            } catch (err) {
+                console.warn('⚠️ Failed to fetch bulk users for reactors:', err);
+            }
 
             const photoIds = users.map((u: any) => u.profilePhotoId).filter(Boolean);
             let photosMap: Record<string, string> = {};
             if (photoIds.length > 0) {
-                const photosResponse = await ProfileService.getMultipleProfilePhotosByIds(photoIds);
-                photosMap = photosResponse.data.photos.reduce((acc: Record<string, string>, photo: any) => {
-                    acc[photo.photoId] = photo.cloudinarySecureUrl;
-                    return acc;
-                }, {});
+                try {
+                    const photosResponse = await ProfileService.getMultipleProfilePhotosByIds(photoIds);
+                    photosMap = photosResponse.data.photos.reduce((acc: Record<string, string>, photo: any) => {
+                        acc[photo.photoId] = photo.cloudinarySecureUrl;
+                        return acc;
+                    }, {});
+                } catch (error) {
+                    console.warn('⚠️ Failed to fetch photos for reactors:', error);
+                }
             }
 
             const headlineIds = users.map((u: any) => u.headlineId).filter(Boolean);
@@ -62,16 +73,25 @@ export const usePostReactors = () => {
             }
 
             const merged: Reactor[] = reactions.map((r: any) => {
-                const user = users.find((u: any) => u.userId === r.userId);
+                const user = users.find((u: any) => String(u.userId) === String(r.userId));
+                const name = user
+                    ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'User'
+                    : 'User';
                 return {
                     userId: r.userId,
-                    type: r.type,
-                    name: user ? `${user.firstName} ${user.lastName}`.trim() : 'Unknown User',
+                    type: r.type || 'like',
+                    name,
                     headline: user?.headlineId ? headlinesMap[user.headlineId] || '' : '',
                     avatar: user?.profilePhotoId ? photosMap[user.profilePhotoId] || null : null,
                 };
             });
 
+            const calculatedCounts: Record<string, number> = {};
+            merged.forEach((r: Reactor) => {
+                calculatedCounts[r.type] = (calculatedCounts[r.type] || 0) + 1;
+            });
+
+            setCountsByType(Object.keys(counts).length > 0 ? counts : calculatedCounts);
             setReactors(merged);
 
         } catch (error) {

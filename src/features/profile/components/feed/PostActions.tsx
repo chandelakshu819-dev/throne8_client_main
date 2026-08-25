@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import RepostMenuDropdown from './RepostMenuDropdown';
 import SendPostModal from './SendPostModal';
+import ReactionsModal from './ReactionsModal';
 
 interface PostActionsProps {
   post: any;
@@ -53,6 +54,7 @@ const PostActions = ({
   const [hasReposted, setHasReposted] = useState(false);
   const [isReposting, setIsReposting] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
+  const [showReactionsModal, setShowReactionsModal] = useState(false);
 
   const mutedText = isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60';
   const hoverBg = isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-[#e0d8cf]/60';
@@ -65,10 +67,17 @@ const PostActions = ({
         <div className={`flex items-center justify-between px-1 pb-2 text-sm ${mutedText}`}>
           <div className="flex items-center gap-1.5">
             {likeCount > 0 && (
-              <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReactionsModal(true);
+                }}
+                className="flex items-center gap-1 hover:underline cursor-pointer"
+              >
                 <i className="ri-thumb-up-fill text-[#0a66c2] text-sm"></i>
                 <span>{likeCount}</span>
-              </>
+              </button>
             )}
           </div>
           {commentCount > 0 && (
@@ -164,6 +173,15 @@ const PostActions = ({
  postCreatedAt={post.createdAt || ''}
 />
 )}
+
+      {showReactionsModal && (
+        <ReactionsModal
+          postId={postKey}
+          isOpen={showReactionsModal}
+          onClose={() => setShowReactionsModal(false)}
+          isDarkMode={isDarkMode}
+        />
+      )}
     </div>
   );
 };

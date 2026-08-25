@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import ReactionsModal from '@/features/profile/components/feed/ReactionsModal';
 
 interface EmbedPostModalProps {
     post: any;
@@ -183,14 +184,14 @@ interface EmbedPostModalProps {
               <img src={image} alt="post" className="w-full max-h-64 object-cover rounded-lg mt-2 mb-3" />
             )}
 
-<div
+            <div
               className={`relative flex items-center gap-4 text-xs pt-3 border-t ${
                 isDarkMode ? 'border-slate-700 text-slate-400' : 'border-gray-100 text-gray-500'
               }`}
             >
               <button
                 type="button"
-                onClick={() => setShowLikesList((prev) => !prev)}
+                onClick={() => setShowLikesList(true)}
                 className={`hover:underline cursor-pointer ${
                   isDarkMode ? 'hover:text-white' : 'hover:text-[#4a3728]'
                 }`}
@@ -208,40 +209,12 @@ interface EmbedPostModalProps {
               </button>
 
               {showLikesList && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowLikesList(false)} />
-                  <div
-                    className={`absolute left-0 top-full mt-1 z-20 w-56 max-h-48 overflow-y-auto rounded-xl shadow-2xl border py-2 ${
-                      isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'
-                    }`}
-                  >
-                    {(post.likedByConnectionsFull || []).length === 0 ? (
-                      <p className={`px-4 py-2 text-sm ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                        {post.likesCount || post.likes || 0} people liked this
-                      </p>
-                    ) : (
-                      (post.likedByConnectionsFull || []).map((liker: any) => (
-                        <div
-                          key={liker.userId}
-                          className={`flex items-center gap-2 px-4 py-2 ${
-                            isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-gray-50'
-                          }`}
-                        >
-                          {liker.avatar ? (
-                            <img src={liker.avatar} className="w-7 h-7 rounded-full object-cover" alt="" />
-                          ) : (
-                            <div className="w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold text-white">
-                              {liker.name?.charAt(0)}
-                            </div>
-                          )}
-                          <span className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-[#1a1a1a]'}`}>
-                            {liker.name}
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </>
+                <ReactionsModal
+                  postId={postId}
+                  isOpen={showLikesList}
+                  onClose={() => setShowLikesList(false)}
+                  isDarkMode={isDarkMode}
+                />
               )}
             </div>
 
