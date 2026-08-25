@@ -104,16 +104,7 @@ const PostHeader = ({
     if (connectionStatus === 'connected') return null;
     if (connectionStatus === 'pending_sent') return null;
 
-    if (connectionStatus === 'pending_received') {
-      return (
-        <span
-          className={`px-4 py-1.5 rounded-full text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'
-            }`}
-        >
-          Wants to connect
-        </span>
-      );
-    }
+    if (connectionStatus === 'pending_received') return null;
 
     return (
       <button
