@@ -10,6 +10,7 @@ interface EmbedPostModalProps {
     isOpen: boolean;
     onClose: () => void;
     isDarkMode?: boolean;
+    likedPosts?: Record<string, boolean>;
     authorName: string;
     authorHeadline?: string;
     authorAvatar?: string;
@@ -23,6 +24,7 @@ interface EmbedPostModalProps {
     isOpen,
     onClose,
     isDarkMode,
+    likedPosts,
     authorName,
     authorHeadline,
     authorAvatar,
@@ -59,6 +61,11 @@ interface EmbedPostModalProps {
   if (!isOpen || !mounted || !post) return null;
 
   const postId = post.entryId || post.postId || post.id || post._id || (post.originalPost ? (post.originalPost.entryId || post.originalPost.postId || post.originalPost.id || post.originalPost._id) : '');
+  const isLiked = likedPosts ? (likedPosts[postId] ?? post.isLikedByCurrentUser ?? false) : (post.isLikedByCurrentUser ?? false);
+  const likesCount =
+    (post.likesCount || post.likes || 0) +
+    (isLiked && !post.isLikedByCurrentUser ? 1 : 0) +
+    (!isLiked && post.isLikedByCurrentUser ? -1 : 0);
   const embedUrl = `${window.location.origin}/post/${postId}`;
   const iframeCode = `<iframe src="${embedUrl}" height="570" width="504" frameborder="0" allowfullscreen title="Embedded post"></iframe>`;
 
@@ -196,7 +203,7 @@ interface EmbedPostModalProps {
                   isDarkMode ? 'hover:text-white' : 'hover:text-[#4a3728]'
                 }`}
               >
-                {post.likesCount || post.likes || 0} likes
+                {likesCount} likes
               </button>
               <button
                 type="button"

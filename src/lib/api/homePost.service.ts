@@ -86,12 +86,12 @@ class HomePostService {
     }
 
     /**
-     * GET /api/v1/activity/posts/:postId/reactors
+     * GET /api/v1/profile/activity/posts/:postId/reactors
      * Post ke saare reactions/likes ki list (Reactions modal ke liye)
      */
     static async getPostReactors(postId: string): Promise<any> {
         try {
-            const { data } = await api.get(`/activity/posts/${postId}/reactors`);
+            const { data } = await api.get(`/profile/activity/posts/${postId}/reactors`);
             return data;
         } catch (error: any) {
             if (error?.response?.data?.message) {
@@ -102,7 +102,7 @@ class HomePostService {
     }
 
     /**
-     * ✅ NEW: POST /api/v1/activity/posts/:postId/record-send
+     * ✅ NEW: POST /api/v1/profile/activity/posts/:postId/record-send
      * SendPostModal se post successfully send hone ke baad call hota hai —
      * `recipientCount` batata hai kitne logo ko ek saath bheja gaya, taaki
      * total "sends" count usi hisaab se badhe (5 logo ko bheja = +5, sirf +1 nahi).
@@ -112,7 +112,7 @@ class HomePostService {
      */
     static async recordSend(postId: string, recipientCount: number): Promise<any> {
         try {
-            const { data } = await api.post(`/activity/posts/${postId}/record-send`, {
+            const { data } = await api.post(`/profile/activity/posts/${postId}/record-send`, {
                 recipientCount,
             });
             return data;

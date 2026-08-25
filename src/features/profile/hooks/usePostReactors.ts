@@ -91,7 +91,8 @@ export const usePostReactors = () => {
                 calculatedCounts[r.type] = (calculatedCounts[r.type] || 0) + 1;
             });
 
-            setCountsByType(Object.keys(counts).length > 0 ? counts : calculatedCounts);
+            const hasNonZeroCount = Object.values(counts).some((c: any) => Number(c) > 0);
+            setCountsByType(hasNonZeroCount ? counts : calculatedCounts);
             setReactors(merged);
 
         } catch (error) {

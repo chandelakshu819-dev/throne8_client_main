@@ -386,8 +386,25 @@ export default function Home() {
     const handleLike = async (postId: string) => {
         const post = allPosts.find(p => (p.entryId || p.postId) === postId);
         const isCurrentlyLiked = likedPosts[postId] ?? post?.isLikedByCurrentUser ?? false;
+        const newIsLiked = !isCurrentlyLiked;
     
-        setLikedPosts(prev => ({ ...prev, [postId]: !isCurrentlyLiked }));
+        setLikedPosts(prev => ({ ...prev, [postId]: newIsLiked }));
+        setAllPosts(prev => prev.map(p => {
+            const key = p.entryId || p.postId;
+            if (key === postId) {
+                const wasLiked = p.isLikedByCurrentUser ?? false;
+                const countDiff = (newIsLiked ? 1 : 0) - (wasLiked ? 1 : 0);
+                const baseCount = p.likesCount ?? p.likes ?? 0;
+                const updatedCount = Math.max(0, baseCount + countDiff);
+                return {
+                    ...p,
+                    isLikedByCurrentUser: newIsLiked,
+                    likesCount: updatedCount,
+                    likes: updatedCount,
+                };
+            }
+            return p;
+        }));
     
         try {
             if (isCurrentlyLiked) {
@@ -402,6 +419,22 @@ export default function Home() {
         } catch (error: any) {
             console.error('Like/Unlike failed:', error);
             setLikedPosts(prev => ({ ...prev, [postId]: isCurrentlyLiked }));
+            setAllPosts(prev => prev.map(p => {
+                const key = p.entryId || p.postId;
+                if (key === postId) {
+                    const wasLiked = p.isLikedByCurrentUser ?? false;
+                    const countDiff = (isCurrentlyLiked ? 1 : 0) - (wasLiked ? 1 : 0);
+                    const baseCount = p.likesCount ?? p.likes ?? 0;
+                    const updatedCount = Math.max(0, baseCount + countDiff);
+                    return {
+                        ...p,
+                        isLikedByCurrentUser: isCurrentlyLiked,
+                        likesCount: updatedCount,
+                        likes: updatedCount,
+                    };
+                }
+                return p;
+            }));
         }
     };
 
@@ -2085,6 +2118,7 @@ if (post?.userId && post.userId !== user?.userId) {
             isOpen={!!embedPost}
             onClose={() => setEmbedPost(null)}
             isDarkMode={isDarkMode}
+            likedPosts={likedPosts}
             authorName={embedPost.userName || embedPost.fullName || embedPost.user || fullName}
             authorHeadline={embedPost.headline || headlineData?.title || ''}
             authorAvatar={embedPost.userAvatar || embedPost.avatar || profileData.profileImage}
