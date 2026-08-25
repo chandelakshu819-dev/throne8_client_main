@@ -14,7 +14,13 @@ export const useNetworkConnections = () => {
         const loadPendingRequests = async () => {
             try {
                 const res = await ConnectionService.getOutgoingRequests(user.userId);
-                const requests = res?.data?.data || res?.data || [];
+                const requests = Array.isArray(res?.data?.data?.data)
+                    ? res.data.data.data
+                    : Array.isArray(res?.data?.data)
+                        ? res.data.data
+                        : Array.isArray(res?.data)
+                            ? res.data
+                            : [];
                 if (Array.isArray(requests)) {
                     const pendingIds = new Set<string>();
                     requests.forEach((req: any) => {

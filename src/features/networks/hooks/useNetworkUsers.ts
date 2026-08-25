@@ -36,9 +36,21 @@ export const useNetworkUsers = () => {
                 return;
             }
 
-            const users = usersResponse.data.users || [];
-            const connections = connectionsResponse.data?.data || [];
-            const outgoingRequests = outgoingRequestsResponse.data?.data || outgoingRequestsResponse.data || [];
+            const users = usersResponse?.data?.users || usersResponse?.data || [];
+            const connections = Array.isArray(connectionsResponse?.data?.data?.data)
+                ? connectionsResponse.data.data.data
+                : Array.isArray(connectionsResponse?.data?.data)
+                    ? connectionsResponse.data.data
+                    : Array.isArray(connectionsResponse?.data)
+                        ? connectionsResponse.data
+                        : [];
+            const outgoingRequests = Array.isArray(outgoingRequestsResponse?.data?.data?.data)
+                ? outgoingRequestsResponse.data.data.data
+                : Array.isArray(outgoingRequestsResponse?.data?.data)
+                    ? outgoingRequestsResponse.data.data
+                    : Array.isArray(outgoingRequestsResponse?.data)
+                        ? outgoingRequestsResponse.data
+                        : [];
 
             const connectedUserIds = new Set<string>();
             connections.forEach((conn: any) => {
@@ -46,15 +58,8 @@ export const useNetworkUsers = () => {
                 if (conn.toUserId !== userId) connectedUserIds.add(conn.toUserId);
             });
 
-            // ✅ Also exclude users with pending outgoing requests
-            if (Array.isArray(outgoingRequests)) {
-                outgoingRequests.forEach((req: any) => {
-                    if (req.toUserId && req.status !== 'declined' && req.status !== 'cancelled') {
-                        connectedUserIds.add(req.toUserId);
-                    }
-                });
-            }
-
+            // Note: Keep suggested users in userIds list so they appear in suggestions,
+            // but useNetworkConnections will set connectedUsers so PersonCard renders 'Pending...'
             const userIds = users
                 .map((user: any) => user.userId)
                 .filter((id: string) => id !== userId && !connectedUserIds.has(id));

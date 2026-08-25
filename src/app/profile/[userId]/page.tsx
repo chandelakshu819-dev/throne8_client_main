@@ -199,7 +199,13 @@ export default function SearchUserProfilePage() {
         const checkPendingStatus = async () => {
             try {
                 const res = await ConnectionService.getOutgoingRequests(user.userId);
-                const outgoingRequests = res?.data?.data || res?.data || [];
+                const outgoingRequests = Array.isArray(res?.data?.data?.data)
+                    ? res.data.data.data
+                    : Array.isArray(res?.data?.data)
+                        ? res.data.data
+                        : Array.isArray(res?.data)
+                            ? res.data
+                            : [];
                 const isPending = outgoingRequests.some(
                     (r: { toUserId?: string }) => r.toUserId === userId
                 );
@@ -226,7 +232,13 @@ export default function SearchUserProfilePage() {
         const checkIncomingRequest = async () => {
             try {
                 const res = await ConnectionService.getIncomingRequests(user.userId);
-                const incomingRequests = res?.data?.data || res?.data || [];
+                const incomingRequests = Array.isArray(res?.data?.data?.data)
+                    ? res.data.data.data
+                    : Array.isArray(res?.data?.data)
+                        ? res.data.data
+                        : Array.isArray(res?.data)
+                            ? res.data
+                            : [];
                 const matchedRequest = incomingRequests.find(
                     (r: { fromUserId?: string }) => r.fromUserId === userId
                 );

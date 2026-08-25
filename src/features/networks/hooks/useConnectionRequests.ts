@@ -38,7 +38,13 @@ export const useConnectionRequests = () => {
             setIsLoading(true);
             const response = await ConnectionService.getIncomingRequests(user!.userId);
 
-            const requestsArray = response.data.data;
+            const requestsArray = Array.isArray(response?.data?.data?.data)
+                ? response.data.data.data
+                : Array.isArray(response?.data?.data)
+                    ? response.data.data
+                    : Array.isArray(response?.data)
+                        ? response.data
+                        : [];
 
             if (!Array.isArray(requestsArray)) {
                 console.error('❌ Invalid response format');
@@ -140,7 +146,13 @@ export const useConnectionRequests = () => {
             const response = await ConnectionService.getOutgoingRequests(user!.userId);
             clearTimeout(timeoutId);
 
-            const requestsArray = response.data.data;
+            const requestsArray = Array.isArray(response?.data?.data?.data)
+                ? response.data.data.data
+                : Array.isArray(response?.data?.data)
+                    ? response.data.data
+                    : Array.isArray(response?.data)
+                        ? response.data
+                        : [];
 
             if (!Array.isArray(requestsArray)) {
                 console.error('❌ Invalid response format for outgoing requests');
