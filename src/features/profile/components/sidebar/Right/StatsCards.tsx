@@ -18,7 +18,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ isDarkMode }) => {
       try {
         const [viewsRes, changeRes, impressionsRes] = await Promise.all([
           AnalyticsService.getProfileViewsCount(90).catch(() => null),
-          AnalyticsService.getProfileViewsChange(30).catch(() => null),
+          AnalyticsService.getProfileViewsChange(7).catch(() => null),
           AnalyticsService.getPostImpressionsCount(20).catch(() => null),
         ]);
 

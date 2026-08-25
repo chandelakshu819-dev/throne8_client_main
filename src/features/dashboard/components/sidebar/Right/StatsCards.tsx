@@ -1,4 +1,4 @@
-﻿// app/(dashboard)/components/sidebar/StatsCards.tsx
+// app/(dashboard)/components/sidebar/StatsCards.tsx
 'use client';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -21,7 +21,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ isDarkMode, currentUserId }) =>
       try {
         const [viewsRes, changeRes, impressionsRes] = await Promise.all([
           AnalyticsService.getProfileViewsCount(90).catch(() => null),
-          AnalyticsService.getProfileViewsChange(30).catch(() => null),
+          AnalyticsService.getProfileViewsChange(7).catch(() => null),
           AnalyticsService.getPostImpressionsCount(20).catch(() => null),
         ]);
 
