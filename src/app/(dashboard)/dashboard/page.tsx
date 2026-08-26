@@ -2152,19 +2152,13 @@ if (post?.userId && post.userId !== user?.userId) {
         />
     )}
 
-    {selectedAnalyticsPost && (
-        <div 
-            onClick={() => setSelectedAnalyticsPost(null)}
-            className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
-        >
-                      <div 
-                onClick={(e) => e.stopPropagation()}
-                className={`w-full max-w-md rounded-3xl p-8 shadow-2xl border relative ${isDarkMode ? 'bg-slate-800 border-slate-700/50 text-slate-100' : 'bg-white border-[#e0d8cf]/50 text-[#4a3728]'}`}
-            >
-                <button 
-                    onClick={() => setSelectedAnalyticsPost(null)}
-                    className={`absolute top-4 right-4 p-2.5 rounded-full transition-colors ${isDarkMode ? 'hover:bg-slate-700/50 text-slate-400' : 'hover:bg-[#e0d8cf]/40 text-[#4a3728]/70'}`}
-                >
+         {selectedAnalyticsPost && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-end p-4 md:p-6 overflow-y-auto">
+                <div className="bg-[#f6ede8] dark:bg-slate-800 p-6 rounded-3xl shadow-2xl max-w-md w-full my-auto max-h-[85vh] overflow-y-auto flex flex-col border border-[#e0d8cf] dark:border-slate-700 relative">
+                    <button 
+                        onClick={() => setSelectedAnalyticsPost(null)}
+                        className={`absolute top-4 right-4 p-2.5 rounded-full transition-colors ${isDarkMode ? 'hover:bg-slate-700/50 text-slate-400' : 'hover:bg-[#e0d8cf]/40 text-[#4a3728]/70'}`}
+                    >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
                     </svg>

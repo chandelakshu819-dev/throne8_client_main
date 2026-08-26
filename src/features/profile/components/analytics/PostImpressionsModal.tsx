@@ -345,8 +345,8 @@ useEffect(() => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-[#f6ede8] rounded-3xl shadow-2xl border border-[#e0d8cf] max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center p-4 md:p-6 overflow-y-auto">
+            <div className="bg-[#f6ede8] rounded-3xl shadow-2xl border border-[#e0d8cf] max-w-6xl w-full max-h-[88vh] my-auto overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] p-6 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -544,8 +544,8 @@ useEffect(() => {
         {!postsStatsLoading && postsWithStats.length === 0 && (
             <p className="text-sm text-[#7a5c3e]">No posts yet.</p>
         )}
-        {postsWithStats.map((post) => (
-            <div key={post.id} className="bg-white rounded-xl p-5 shadow border border-[#e0d8cf] hover:shadow-lg transition-all">
+                {postsWithStats.map((post, idx) => (
+            <div key={post.id || `post-stat-${idx}`} className="bg-white rounded-xl p-5 shadow border border-[#e0d8cf] hover:shadow-lg transition-all">
                 <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
                         <p className="font-semibold text-[#4a3728] mb-1">{post.title}</p>
