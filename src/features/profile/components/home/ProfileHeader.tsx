@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import EditIntroModal from './EditIntroModal';
 import ProfileImageModal from './ProfileImageModal';
 import Contactact from './Contactact';
+import AboutMemberModal from './modals/AboutMemberModal';
+import ShareProfileModal from './modals/ShareProfileModal';
+import ReportMemberModal from './modals/ReportMemberModal';
+import BlockMemberModal from './modals/BlockMemberModal';
 import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import ConnectionService from '@/lib/api/connection.service';
@@ -90,6 +94,10 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     const [previewUrl, setPreviewUrl] = useState<string>('');
     const [isUpdating, setIsUpdating] = useState(false);
     const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+    const [isAboutMemberOpen, setIsAboutMemberOpen] = useState(false);
+    const [isShareProfileOpen, setIsShareProfileOpen] = useState(false);
+    const [isReportMemberOpen, setIsReportMemberOpen] = useState(false);
+    const [isBlockMemberOpen, setIsBlockMemberOpen] = useState(false);
     const [currentProfileImage, setCurrentProfileImage] = useState(
         profileImage && profileImage.trim() !== ''
             ? profileImage
@@ -431,8 +439,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     <button
         onClick={() => {
             setIsMoreMenuOpen(false);
-            const el = document.getElementById('about');
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
+            setIsAboutMemberOpen(true);
         }}
         className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors duration-200"
     >
@@ -441,10 +448,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
     <button
         onClick={() => {
-            const profileUrl = `${window.location.origin}/profile/${currentUserId}`;
-            navigator.clipboard.writeText(profileUrl);
-            alert('Profile link copied to clipboard!');
             setIsMoreMenuOpen(false);
+            setIsShareProfileOpen(true);
         }}
         className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors duration-200"
     >
@@ -453,8 +458,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
     <button
         onClick={() => {
-            alert('Report feature coming soon');
             setIsMoreMenuOpen(false);
+            setIsReportMemberOpen(true);
         }}
         className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors duration-200"
     >
@@ -463,8 +468,8 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
     <button
         onClick={() => {
-            alert('Block feature coming soon');
             setIsMoreMenuOpen(false);
+            setIsBlockMemberOpen(true);
         }}
         className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200"
     >
@@ -510,6 +515,45 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                     />
                 </>
             )}
+
+            {/* Additional Modals for Profile Actions */}
+            <AboutMemberModal
+                isOpen={isAboutMemberOpen}
+                onClose={() => setIsAboutMemberOpen(false)}
+                name={name}
+                profileImage={currentProfileImage}
+                headline={headline}
+                location={location}
+                company={company}
+                education={education}
+                followersCount={followers}
+                connectionsCount={connections}
+                mutualCount={mutualCount}
+                userId={currentUserId}
+            />
+
+            <ShareProfileModal
+                isOpen={isShareProfileOpen}
+                onClose={() => setIsShareProfileOpen(false)}
+                name={name}
+                profileImage={currentProfileImage}
+                headline={headline}
+                userId={currentUserId}
+            />
+
+            <ReportMemberModal
+                isOpen={isReportMemberOpen}
+                onClose={() => setIsReportMemberOpen(false)}
+                name={name}
+                userId={currentUserId || ''}
+            />
+
+            <BlockMemberModal
+                isOpen={isBlockMemberOpen}
+                onClose={() => setIsBlockMemberOpen(false)}
+                name={name}
+                userId={currentUserId || ''}
+            />
         </>
     );
 };
