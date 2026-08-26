@@ -33,8 +33,8 @@ export const PersonCard: React.FC<PersonCardProps> = ({
             className="group relative overflow-hidden rounded-2xl shadow-md border border-[#4a3728]/15 flex flex-col justify-between transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
             style={{ backgroundColor: '#f6ede8' }}
         >
-            {/* Top Banner Cover */}
-            <div className="relative h-16 w-full bg-gradient-to-r from-[#e0d8cf] via-[#ebdcd0] to-[#e0d8cf] overflow-hidden">
+                        {/* Top Banner Cover */}
+                        <div className="relative h-10 w-full bg-gradient-to-r from-[#e0d8cf] via-[#ebdcd0] to-[#e0d8cf] overflow-hidden">
                 {/* Dismiss button (X) top-right */}
                 <button
                     onClick={(e) => {
@@ -42,34 +42,34 @@ export const PersonCard: React.FC<PersonCardProps> = ({
                         if (onDismiss) onDismiss(person.id);
                         else setDismissed(true);
                     }}
-                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#4a3728]/20 hover:bg-[#4a3728]/40 text-[#4a3728] flex items-center justify-center text-xs font-bold transition z-20"
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[#4a3728]/20 hover:bg-[#4a3728]/40 text-[#4a3728] flex items-center justify-center text-[10px] font-bold transition z-20"
                     title="Dismiss suggestion"
                 >
-                    ✕
+                    ✕            
                 </button>
             </div>
 
             {/* Profile Body */}
-            <div className="px-4 pb-4 flex flex-col items-center text-center flex-1">
+            <div className="px-3 pb-3 flex flex-col items-center text-center flex-1">
                 {/* Profile Image overlapping banner */}
                 <div
-                    className="relative -mt-10 mb-2 cursor-pointer group-hover:scale-105 transition-transform duration-300"
+                    className="relative -mt-8 mb-1.5 cursor-pointer group-hover:scale-105 transition-transform duration-300"
                     onClick={goToProfile}
                 >
                     <img
                         src={person.image}
                         alt={person.name}
-                        className="w-20 h-20 rounded-full object-cover border-4 border-[#f6ede8] shadow-md bg-white"
+                        className="w-14 h-14 rounded-full object-cover border-[3px] border-[#f6ede8] shadow-md bg-white"
                         onError={(e) => {
                             (e.target as HTMLImageElement).src = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s';
                         }}
                     />
                 </div>
 
-                {/* Name */}
-                <h3
+                                {/* Name */}
+                                <h3
                     onClick={goToProfile}
-                    className="cursor-pointer font-bold text-sm sm:text-base mb-0.5 line-clamp-1 hover:underline transition-colors"
+                    className="cursor-pointer font-bold text-xs sm:text-sm mb-0.5 line-clamp-1 hover:underline transition-colors"
                     style={{ color: '#4a3728' }}
                 >
                     {person.name}
@@ -77,14 +77,14 @@ export const PersonCard: React.FC<PersonCardProps> = ({
 
                 {/* Title / Headline */}
                 <p
-                    className="text-xs opacity-75 line-clamp-2 min-h-[32px] font-medium leading-tight mb-2 px-1"
+                    className="text-[11px] opacity-75 line-clamp-2 min-h-[26px] font-medium leading-tight mb-1.5 px-1"
                     style={{ color: '#4a3728' }}
                 >
                     {person.title || (person.location ? `Based in ${person.location}` : 'Professional Member')}
                 </p>
 
-                {/* Mutual Connection Section (LinkedIn Style) */}
-                <div className="w-full min-h-[38px] flex items-center justify-center gap-1.5 my-2 px-1">
+                                {/* Mutual Connection Section (LinkedIn Style) */}
+                                <div className="w-full min-h-[34px] flex items-center justify-center gap-1.5 my-1.5 px-1">
                     {person.mutuals ? (
                         <>
                             {person.mutualAvatars && person.mutualAvatars.length > 0 ? (
@@ -94,7 +94,7 @@ export const PersonCard: React.FC<PersonCardProps> = ({
                                             key={idx}
                                             src={avatarUrl}
                                             alt="mutual"
-                                            className="w-4 h-4 rounded-full object-cover border border-white shadow-xs"
+                                            className="w-3.5 h-3.5 rounded-full object-cover border border-white shadow-xs"
                                             onError={(e) => {
                                                 (e.target as HTMLImageElement).style.display = 'none';
                                             }}
@@ -102,12 +102,12 @@ export const PersonCard: React.FC<PersonCardProps> = ({
                                     ))}
                                 </div>
                             ) : (
-                                <div className="w-4 h-4 rounded-full bg-[#4a3728]/15 flex items-center justify-center shrink-0">
-                                    <i className="ri-user-shared-line text-[10px] text-[#4a3728]"></i>
+                                <div className="w-3.5 h-3.5 rounded-full bg-[#4a3728]/15 flex items-center justify-center shrink-0">
+                                    <i className="ri-user-shared-line text-[9px] text-[#4a3728]"></i>
                                 </div>
                             )}
                             <span
-                                className="text-[11px] font-medium opacity-80 line-clamp-2 leading-tight text-left"
+                                className="text-[10px] font-medium opacity-80 line-clamp-3 leading-[1.25] text-left"
                                 style={{ color: '#4a3728' }}
                             >
                                 {person.mutuals}
