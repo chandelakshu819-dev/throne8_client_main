@@ -184,6 +184,10 @@ export default function Home() {
     const [postSaves, setPostSaves] = useState<Record<string, boolean>>({});
     const [postPins, setPostPins] = useState<Record<string, boolean>>({});
     const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
+    // ✅ NEW: unfollow confirmation — browser confirm()/alert() ki jagah themed modal
+    const [unfollowConfirm, setUnfollowConfirm] = useState<{ postId: string; targetUserId: string; targetName: string } | null>(null);
+    const [isUnfollowing, setIsUnfollowing] = useState(false);
+
 
      // ✅ NEW: toast + embed modal state
      const [toast, setToast] = useState<{ message: string; linkText?: string; linkHref?: string } | null>(null);
@@ -760,21 +764,15 @@ export default function Home() {
         if (action === 'unfollow') {
             const targetUserId = post.userId || post.userid || post.authorId;
             if (!targetUserId) {
-                alert('Unable to identify this user.');
+                setToast({ message: 'Unable to identify this user.' });
                 setOpenMenuIndex(null);
                 return;
             }
-            if (!confirm(`Unfollow ${post.user || 'this user'}? You will stop seeing their posts.`)) {
-                setOpenMenuIndex(null);
-                return;
-            }
-            try {
-                await FollowService.unfollowUser(targetUserId);
-                setHiddenPostIds(prev => new Set(prev).add(postId));
-                alert(`Unfollowed ${post.user || 'this user'}.`);
-            } catch (err: any) {
-                alert(err.message || 'Failed to unfollow');
-            }
+            setUnfollowConfirm({
+                postId,
+                targetUserId,
+                targetName: post.user || post.fullName || post.userName || 'this user',
+            });
             setOpenMenuIndex(null);
             return;
         }
@@ -789,8 +787,25 @@ export default function Home() {
 
 
 
-        // ✅ NEW: DeleteConfirmModal se "Delete" click hone par actual delete yahan hota hai
-        const confirmDeletePost = async () => {
+                // ✅ NEW: unfollow confirmation modal se "Unfollow" click hone par yahan hota hai
+                const confirmUnfollowUser = async () => {
+                    if (!unfollowConfirm) return;
+                    const { postId, targetUserId, targetName } = unfollowConfirm;
+                    setIsUnfollowing(true);
+                    try {
+                        await FollowService.unfollowUser(targetUserId);
+                        setHiddenPostIds(prev => new Set(prev).add(postId));
+                        setToast({ message: `Unfollowed ${targetName}.` });
+                    } catch (err: any) {
+                        setToast({ message: err.message || 'Failed to unfollow' });
+                    } finally {
+                        setIsUnfollowing(false);
+                        setUnfollowConfirm(null);
+                    }
+                };
+        
+                // ✅ NEW: DeleteConfirmModal se "Delete" click hone par actual delete yahan hota hai
+                const confirmDeletePost = async () => {
             if (!deleteConfirm) return;
             const { postId } = deleteConfirm;
             try {
@@ -2131,8 +2146,8 @@ if (post?.userId && post.userId !== user?.userId) {
         />
     )}
 
-    {/* ✅ NEW: Delete confirmation modal */}
-    <DeleteConfirmModal
+       {/* ✅ NEW: Delete confirmation modal */}
+       <DeleteConfirmModal
         isOpen={!!deleteConfirm}
         isDarkMode={isDarkMode}
         title={deleteConfirm?.isRepost ? 'Delete post?' : 'Delete post?'}
@@ -2143,6 +2158,16 @@ if (post?.userId && post.userId !== user?.userId) {
         }
         onCancel={() => setDeleteConfirm(null)}
         onConfirm={confirmDeletePost}
+    />
+
+    {/* ✅ NEW: Unfollow confirmation modal — LinkedIn jaisa themed popup, browser confirm() nahi */}
+    <DeleteConfirmModal
+        isOpen={!!unfollowConfirm}
+        isDarkMode={isDarkMode}
+        title={`Unfollow ${unfollowConfirm?.targetName || 'this user'}?`}
+        description="You will stop seeing their posts in your feed. Your connection will not be affected."
+        onCancel={() => setUnfollowConfirm(null)}
+        onConfirm={confirmUnfollowUser}
     />
 
      {/* ✅ NEW: Report post modal */}
