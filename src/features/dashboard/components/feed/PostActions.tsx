@@ -58,10 +58,7 @@ const PostActions = ({
   const [showSendModal, setShowSendModal] = useState(false);
   const [showReactionsModal, setShowReactionsModal] = useState(false);
 
-  const likeCount =
-    (post.likesCount || post.likes || 0) +
-    (isLiked && !post.isLikedByCurrentUser ? 1 : 0) +
-    (!isLiked && post.isLikedByCurrentUser ? -1 : 0);
+  const likeCount = post.likesCount ?? post.likes ?? 0;
 
   const ActionButton = ({
     icon,

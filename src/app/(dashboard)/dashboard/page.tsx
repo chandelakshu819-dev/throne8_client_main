@@ -89,8 +89,7 @@ export default function Home() {
     const [repostProgress, setRepostProgress] = useState(0);
     const [showRepostProgressBar, setShowRepostProgressBar] = useState(false);
 
-    const { allPosts, isLoadingAllPosts, isLoadingMore, hasMore, fetchAllUsersPosts, loadMorePosts, prependPost ,updatePostInFeed} = useAllUsersPosts();
-
+    const { allPosts, setAllPosts, isLoadingAllPosts, isLoadingMore, hasMore, fetchAllUsersPosts, loadMorePosts, prependPost ,updatePostInFeed} = useAllUsersPosts();
     // ✅ CHANGED: create-post modal ke content input ke liye @mention wiring.
     // Ab ref ka type MentionRichInputHandle hai (textarea nahi), kyunki
     // input khud ab contentEditable-based MentionRichInput hai.

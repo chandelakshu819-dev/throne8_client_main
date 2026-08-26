@@ -261,9 +261,9 @@ export const useAllUsersPosts = () => {
     useEffect(() => {
         return onPostContentUpdated(updatePostInFeed);
     }, [updatePostInFeed]);
-
     return {
         allPosts,
+        setAllPosts,
         isLoadingAllPosts,
         isLoadingMore,
         hasMore,
