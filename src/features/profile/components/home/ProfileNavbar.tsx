@@ -24,8 +24,7 @@ const NAV_ITEMS = ['Home', 'Network', 'Jobs', 'Study Group', 'Messaging', 'Notif
 const ROUTE_PREFIX: Record<string, string> = {
     'Home': '/dashboard',
     'Network': '/profile/network',
-    'Jobs':'/job',
-     'Jobs': '/job',
+    'Jobs': '/job',
     'Study Group': '/study',
     'Messaging': '/message',
     'Notifications': '/notifications',
@@ -89,10 +88,8 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                 router.push(`/profile/network/${currentUserId}`);
                 break;
             case 'Jobs':
-                router.push('job/jobs');
+                router.push('/job/jobs');
                 break;
-    router.push(`/job/jobs`);
-    break;
             case 'Study Group':
                 router.push('/study/groups');
                 break;

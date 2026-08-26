@@ -41,7 +41,7 @@ export const NetworkSidebar: React.FC = () => {
     return (
         <div className="w-full lg:w-80">
             <div
-                className="rounded-3xl shadow-2xl border-2 overflow-hidden transform hover:scal-105 transition-all duration-300"
+                className="rounded-3xl shadow-2xl border-2 overflow-hidden transform hover:scale-105 transition-all duration-300"
                 style={{ backgroundColor: '#e0d8cf', borderColor: '#4a3728' }}
             >
                 <div className="p-8 relative overflow-hidden">

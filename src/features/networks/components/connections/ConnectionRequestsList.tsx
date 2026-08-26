@@ -40,7 +40,7 @@ export const ConnectionRequestsList: React.FC<ConnectionRequestsListProps> = ({
     return (
         <>
             <div
-                className="rounded-3xl shadow-2xl p-8 border-2 mb-10"
+                className="rounded-3xl shadow-2xl p-8 border-2"
                 style={{ backgroundColor: '#e0d8cf', borderColor: '#4a3728' }}
             >
                 <div className="flex items-center gap-4 mb-6">

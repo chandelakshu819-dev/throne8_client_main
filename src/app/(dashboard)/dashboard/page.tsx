@@ -1942,23 +1942,26 @@ if (post?.userId && post.userId !== user?.userId) {
         )
     }
 
-    {/* POST ANALYTICS MODAL */ }
-    {
+       {/* POST ANALYTICS MODAL */ }
+       {
         isAnalyticsOpen && (
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-center md:justify-end md:pr-[2%] bg-black/40 backdrop-blur-sm animate-fadeIn">
                 <div
-                    className={`w-full sm:w-[95%] md:w-[90%] lg:w-[520px] max-h-[95vh] sm:max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl p-4 sm:p-6 md:p-8 relative shadow-2xl transform transition-all duration-500 animate-slideUp ${isDarkMode ? 'bg-slate-800/95' : 'bg-[#f6ede8]/95'} backdrop-blur-xl`}
+                    className={`w-full sm:w-[95%] md:w-[90%] lg:w-[520px] max-h-[95vh] sm:max-h-[90vh] rounded-t-3xl sm:rounded-3xl relative shadow-2xl transform transition-all duration-500 animate-slideUp flex flex-col ${isDarkMode ? 'bg-slate-800/95' : 'bg-[#f6ede8]/95'} backdrop-blur-xl`}
                 >
-                    <button
-                        onClick={() => setIsAnalyticsOpen(false)}
-                        className={`absolute top-3 sm:top-4 right-3 sm:right-4 p-2 rounded-full transition-all duration-300 ${isDarkMode ? 'text-white hover:bg-slate-700' : 'text-[#4a3728] hover:bg-[#e0d8cf]'}`}
-                    >
-                        <X className="w-5 sm:w-6 h-5 sm:h-6" />
-                    </button>
-                    <h2 className={`text-lg sm:text-2xl font-bold mb-4 sm:mb-6 pr-8 ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
-                        <BarChart2 className="inline mr-2 w-5 sm:w-6 h-5 sm:h-6" />
-                        Post Analytics
-                    </h2>
+                    <div className={`flex items-center justify-between p-4 sm:p-6 md:p-8 pb-3 sm:pb-4 border-b flex-shrink-0 ${isDarkMode ? 'border-slate-700' : 'border-[#4a3728]/10'}`}>
+                        <h2 className={`text-lg sm:text-2xl font-bold pr-8 ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
+                            <BarChart2 className="inline mr-2 w-5 sm:w-6 h-5 sm:h-6" />
+                            Post Analytics
+                        </h2>
+                        <button
+                            onClick={() => setIsAnalyticsOpen(false)}
+                            className={`absolute top-3 sm:top-4 right-3 sm:right-4 p-2 rounded-full transition-all duration-300 ${isDarkMode ? 'text-white hover:bg-slate-700' : 'text-[#4a3728] hover:bg-[#e0d8cf]'}`}
+                        >
+                            <X className="w-5 sm:w-6 h-5 sm:h-6" />
+                        </button>
+                    </div>
+                    <div className="overflow-y-auto p-4 sm:p-6 md:p-8 pt-4 sm:pt-6">
                     {/* Overview Stats */}
                     <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-4 sm:mb-6">
                         <div className={`p-3 sm:p-4 rounded-2xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-white/60'}`}>
@@ -2052,7 +2055,8 @@ if (post?.userId && post.userId !== user?.userId) {
                                     ? '...'
                                     : `${weeklyPerformance && weeklyPerformance.postReachChange >= 0 ? '+' : ''}${weeklyPerformance?.postReachChange ?? 0}%`}
                             </p>
-                        </div>
+                            </div>
+                    </div>
                     </div>
                 </div>
             </div>

@@ -153,35 +153,33 @@ export default function NetworkPage() {
                 currentUserId={user?.userId}
             />
 
-            <div className="min-h-screen mt-12" style={{ backgroundColor: '#f6ede8' }}>
+            <div className="min-h-screen pt-20 pb-12" style={{ backgroundColor: '#f6ede8' }}>
                 <div className="fixed inset-0 overflow-hidden pointer-events-none">
                     <div className="absolute top-20 left-10 w-32 h-32 rounded-full opacity-5" style={{ backgroundColor: '#4a3728' }}></div>
                     <div className="absolute top-60 right-20 w-24 h-24 rounded-full opacity-5" style={{ backgroundColor: '#4a3728' }}></div>
                     <div className="absolute bottom-40 left-1/4 w-40 h-40 rounded-full opacity-5" style={{ backgroundColor: '#4a3728' }}></div>
                 </div>
 
-                <div className="relative max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 p-6">
+                <div className="relative max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 px-4 sm:px-6 lg:px-8">
                     <NetworkSidebar />
 
-                    <div className="flex-1 space-y-8">
-                        <div className="max-w-4xl mx-auto p-6 space-y-8">
-                            <NetworkTab activeTab={activeTab} setActiveTab={setActiveTab} />
+                    <div className="flex-1 min-w-0 space-y-8">
+                        <NetworkTab activeTab={activeTab} setActiveTab={setActiveTab} />
 
-                            <ConnectionRequestsList
-                                requests={requests}
-                                sentRequests={sentRequests}
-                                isLoading={isLoadingRequests}
-                                showRequestsPanel={showRequestsPanel}
-                                activeReqTab={activeReqTab}
-                                setActiveReqTab={setActiveReqTab}
-                                onTogglePanel={toggleRequestsPanel}
-                                onAccept={handleAccept}
-                                onIgnore={handleIgnore}
-                                onWithdraw={handleWithdraw}
-                            />
+                        <ConnectionRequestsList
+                            requests={requests}
+                            sentRequests={sentRequests}
+                            isLoading={isLoadingRequests}
+                            showRequestsPanel={showRequestsPanel}
+                            activeReqTab={activeReqTab}
+                            setActiveReqTab={setActiveReqTab}
+                            onTogglePanel={toggleRequestsPanel}
+                            onAccept={handleAccept}
+                            onIgnore={handleIgnore}
+                            onWithdraw={handleWithdraw}
+                        />
 
-                            <ProfileViewerCard />
-                        </div>
+                        <ProfileViewerCard />
 
                         {activeTab === 'grow' && (
                             <>

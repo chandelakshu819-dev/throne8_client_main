@@ -28,8 +28,8 @@ export const SuggestionsForCompaniesSection: React.FC<SuggestionsForCompaniesSec
                 className="rounded-3xl shadow-2xl p-8 border-2"
                 style={{ backgroundColor: '#e0d8cf', borderColor: '#4a3728' }}
             >
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 py-12">
-                    {[...Array(4)].map((_, index) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 py-12">
+                    {[...Array(3)].map((_, index) => (
                         <PersonCardLoader key={index} />
                     ))}
                 </div>
