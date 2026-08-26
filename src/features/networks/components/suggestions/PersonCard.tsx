@@ -1,24 +1,28 @@
 'use client';
-//src/features/networks/components/suggestions/PersonCard.tsx
-import React from 'react';
+// src/features/networks/components/suggestions/PersonCard.tsx
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Person } from '@/features/networks/types';
 
 interface PersonCardProps {
-    person: Person; 
+    person: Person;
     isConnected: boolean;
     onConnect: (userId: string) => void;
     isLoading?: boolean;
+    onDismiss?: (userId: string) => void;
 }
 
 export const PersonCard: React.FC<PersonCardProps> = ({
     person,
     isConnected,
     onConnect,
-    isLoading = false
+    isLoading = false,
+    onDismiss
 }) => {
     const router = useRouter();
+    const [dismissed, setDismissed] = useState(false);
 
+    if (dismissed) return null;
 
     const goToProfile = () => {
         router.push(`/profile/${person.id}`);
@@ -26,120 +30,128 @@ export const PersonCard: React.FC<PersonCardProps> = ({
 
     return (
         <div
-            className="group relative overflow-hidden rounded-2xl shadow-xl transition-all duration-700 transform hover:-translate-y-1 hover:border-[#4a3728] hover:shadow-[0_0_15px_rgba(74,55,40,0.3)]"
+            className="group relative overflow-hidden rounded-2xl shadow-md border border-[#4a3728]/15 flex flex-col justify-between transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
             style={{ backgroundColor: '#f6ede8' }}
         >
-            <div className="absolute top-0 right-0 w-16 h-16 opacity-10">
-                <div className="absolute inset-0 bg-gradient-to-br from-[#4a3728] to-[#7a5c3e] rounded-bl-3xl"></div>
+            {/* Top Banner Cover */}
+            <div className="relative h-16 w-full bg-gradient-to-r from-[#e0d8cf] via-[#ebdcd0] to-[#e0d8cf] overflow-hidden">
+                {/* Dismiss button (X) top-right */}
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (onDismiss) onDismiss(person.id);
+                        else setDismissed(true);
+                    }}
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#4a3728]/20 hover:bg-[#4a3728]/40 text-[#4a3728] flex items-center justify-center text-xs font-bold transition z-20"
+                    title="Dismiss suggestion"
+                >
+                    ✕
+                </button>
             </div>
 
-            <div className="relative p-5 flex flex-col h-full">
-                <div className="flex flex-col items-center text-center">
-                    <div
-                        className="relative mb-4 cursor-pointer"
-                        onClick={goToProfile}
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] rounded-full blur-md opacity-20 group-hover:opacity-40 transition-opacity duration-500 animate-pulse"></div>
-                        <div className="relative">
-                            <img
-                                src={person.image}
-                                alt={person.name}
-                                className="w-16 h-16 rounded-full object-cover border-3 border-white shadow-xl relative z-10"
-                                onError={(e) => {
-                                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64';
-                                }}
-                            />
-                        </div>
-                    </div>
-
-                    <h3
-                        onClick={goToProfile}
-                        className="cursor-pointer font-bold text-base mb-1 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-violet-600 group-hover:to-pink-600 transition-all duration-500"
-                        style={{ color: '#4a3728' }}
-                    >
-                        {person.name}
-                    </h3>
-
-                    <p className="text-xs opacity-75 mb-2 font-medium leading-tight line-clamp-2" style={{ color: '#4a3728' }}>
-                        {person.title}
-                    </p>
-
-                    <div className="flex items-center gap-1 mb-2">
-                        <div className="w-2 h-2 bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] rounded-full"></div>
-                        <span className="text-xs opacity-60 font-medium" style={{ color: '#4a3728' }}>
-                            {person.location}
-                        </span>
-                    </div>
-
-                    {person.mutuals && (
-    <div className="flex items-center gap-1 mb-4">
-        {person.mutualAvatars && person.mutualAvatars.length > 0 && (
-            <div className="flex -space-x-2">
-                {person.mutualAvatars.map((avatarUrl: string, idx: number) => (
+            {/* Profile Body */}
+            <div className="px-4 pb-4 flex flex-col items-center text-center flex-1">
+                {/* Profile Image overlapping banner */}
+                <div
+                    className="relative -mt-10 mb-2 cursor-pointer group-hover:scale-105 transition-transform duration-300"
+                    onClick={goToProfile}
+                >
                     <img
-                        key={idx}
-                        src={avatarUrl}
-                        alt="mutual connection"
-                        className="w-5 h-5 rounded-full object-cover border-2 border-white shadow-sm"
-                        style={{ zIndex: person.mutualAvatars!.length - idx }}
+                        src={person.image}
+                        alt={person.name}
+                        className="w-20 h-20 rounded-full object-cover border-4 border-[#f6ede8] shadow-md bg-white"
                         onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).src = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s';
                         }}
                     />
-                ))}
-            </div>
-        )}
-        <span className="text-xs opacity-50 font-medium ml-1 line-clamp-1" style={{ color: '#4a3728' }}>
-            {person.mutuals}
-        </span>
-    </div>
-)}
-
-                    <button
-                        onClick={() => onConnect(person.id)}
-                        disabled={isConnected || isLoading}
-                        className={`w-full py-2.5 px-4 rounded-xl text-sm font-bold shadow-lg transform transition-all duration-300 ${
-                            isConnected
-                                ? 'bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] text-white cursor-not-allowed opacity-90'
-                                : 'text-[#4a3728] hover:bg-[#f6ede8] hover:border hover:border-[#4a3728] hover:shadow-md hover:opacity-90 active:scale-95'
-                        }`}
-                        style={{
-                            background: isConnected
-                                ? 'linear-gradient(135deg, #4a3728, #7a5c3e)'
-                                : '#e0d8cf'
-                        }}
-                    >
-                        <span className="flex items-center justify-center gap-2">
-                            {isLoading ? (
-                                <>
-                                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Connecting...
-                                </>
-                            ) : isConnected ? (
-                                <>
-                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Pending...
-                                </>
-                            ) : (
-                                <>
-                                    <span className="text-base font-normal">+</span>
-                                    Connect
-                                </>
-                            )}
-                        </span>
-                    </button>
                 </div>
-            </div>
 
-            <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-700">
-                <div className="absolute top-4 left-4 w-1 h-3 bg-[#f6ede8] rounded-full animate-pulse"></div>
-                <div className="absolute top-8 right-6 w-1 h-3 bg-[#e0d8cf] rounded-full animate-pulse"></div>
-                <div className="absolute bottom-6 left-6 w-1 h-3 bg-[#f6ede8] rounded-full animate-pulse"></div>
+                {/* Name */}
+                <h3
+                    onClick={goToProfile}
+                    className="cursor-pointer font-bold text-sm sm:text-base mb-0.5 line-clamp-1 hover:underline transition-colors"
+                    style={{ color: '#4a3728' }}
+                >
+                    {person.name}
+                </h3>
+
+                {/* Title / Headline */}
+                <p
+                    className="text-xs opacity-75 line-clamp-2 min-h-[32px] font-medium leading-tight mb-2 px-1"
+                    style={{ color: '#4a3728' }}
+                >
+                    {person.title || (person.location ? `Based in ${person.location}` : 'Professional Member')}
+                </p>
+
+                {/* Mutual Connection Section (LinkedIn Style) */}
+                <div className="w-full min-h-[38px] flex items-center justify-center gap-1.5 my-2 px-1">
+                    {person.mutuals ? (
+                        <>
+                            {person.mutualAvatars && person.mutualAvatars.length > 0 ? (
+                                <div className="flex -space-x-1.5 shrink-0">
+                                    {person.mutualAvatars.slice(0, 2).map((avatarUrl: string, idx: number) => (
+                                        <img
+                                            key={idx}
+                                            src={avatarUrl}
+                                            alt="mutual"
+                                            className="w-4 h-4 rounded-full object-cover border border-white shadow-xs"
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).style.display = 'none';
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="w-4 h-4 rounded-full bg-[#4a3728]/15 flex items-center justify-center shrink-0">
+                                    <i className="ri-user-shared-line text-[10px] text-[#4a3728]"></i>
+                                </div>
+                            )}
+                            <span
+                                className="text-[11px] font-medium opacity-80 line-clamp-2 leading-tight text-left"
+                                style={{ color: '#4a3728' }}
+                            >
+                                {person.mutuals}
+                            </span>
+                        </>
+                    ) : (
+                        <span className="text-[11px] opacity-40 font-medium text-center" style={{ color: '#4a3728' }}>
+                            Suggested for you
+                        </span>
+                    )}
+                </div>
+
+                {/* Connect Button */}
+                <button
+                    onClick={() => onConnect(person.id)}
+                    disabled={isConnected || isLoading}
+                    className={`w-full mt-auto py-1.5 px-4 rounded-full text-xs sm:text-sm font-bold border-2 transition-all duration-300 shadow-sm flex items-center justify-center gap-1.5 ${
+                        isConnected
+                            ? 'bg-[#4a3728] border-[#4a3728] text-white cursor-not-allowed opacity-90'
+                            : 'border-[#4a3728] text-[#4a3728] hover:bg-[#4a3728] hover:text-white active:scale-95'
+                    }`}
+                >
+                    {isLoading ? (
+                        <>
+                            <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Connecting...
+                        </>
+                    ) : isConnected ? (
+                        <>
+                            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Pending...
+                        </>
+                    ) : (
+                        <>
+                            <span className="text-base font-semibold">+</span>
+                            Connect
+                        </>
+                    )}
+                </button>
             </div>
         </div>
     );

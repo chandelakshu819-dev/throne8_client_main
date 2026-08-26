@@ -129,7 +129,7 @@ export const useNetworkUsers = () => {
                     console.log(`🟡 [DEBUG #${requestId}] calling getBulkMutualConnections, targets:`, targetUserIds.length);
                     const bulkRes = await ConnectionService.getBulkMutualConnections(userId, targetUserIds, 3);
                     console.log(`✅ [DEBUG #${requestId}] mutuals bulk response:`, bulkRes?.data);
-                    const resultsMap = bulkRes?.data?.data || {}; // { "userId-targetId": { mutuals, count } }
+                    const resultsMap = bulkRes?.data?.data || bulkRes?.data || bulkRes || {}; // { "userId-targetId": { mutuals, count } }
 
                     mutualsResults = usersData.map((user: any) => {
                         const key = `${userId}-${user.userId}`;
@@ -150,7 +150,7 @@ export const useNetworkUsers = () => {
             usersData.forEach((suggestedUser: any, index: number) => {
                 const rawMutuals = mutualsResults[index]?.mutuals || [];
                 rawMutuals.forEach((m: any) => {
-                    const mutualPersonId = m.fromUserId === userId ? m.toUserId : m.fromUserId;
+                    const mutualPersonId = m.userId || (m.fromUserId === userId ? m.toUserId : m.fromUserId) || m.id;
                     if (mutualPersonId && mutualPersonId !== userId && mutualPersonId !== suggestedUser.userId) {
                         mutualPersonIdsSet.add(mutualPersonId);
                     }
@@ -221,27 +221,37 @@ export const useNetworkUsers = () => {
                 const mutualCount = mutualsResults[index]?.count || rawMutuals.length || 0;
 
                 let mutualsText = '';
+                let mutualAvatars: string[] = [];
+
                 if (mutualCount > 0) {
-                    const firstMutualId = rawMutuals[0]
-                        ? (rawMutuals[0].fromUserId === userId ? rawMutuals[0].toUserId : rawMutuals[0].fromUserId)
+                    const firstItem = rawMutuals[0];
+                    const firstMutualId = firstItem
+                        ? (firstItem.userId || (firstItem.fromUserId === userId ? firstItem.toUserId : firstItem.fromUserId) || firstItem.id)
                         : null;
-                    const firstMutualName = firstMutualId && mutualPersonsMap[firstMutualId]
-                        ? mutualPersonsMap[firstMutualId].name
-                        : 'Someone';
+
+                    let firstMutualName = '';
+                    if (firstMutualId && mutualPersonsMap[firstMutualId]?.name) {
+                        firstMutualName = mutualPersonsMap[firstMutualId].name;
+                    } else if (firstItem?.name && firstItem.name.trim() !== '' && firstItem.name !== 'Unknown') {
+                        firstMutualName = firstItem.name.trim();
+                    } else if (firstItem?.firstName) {
+                        firstMutualName = `${firstItem.firstName} ${firstItem.lastName || ''}`.trim();
+                    } else {
+                        firstMutualName = 'A mutual connection';
+                    }
 
                     mutualsText = mutualCount === 1
                         ? `${firstMutualName} is a mutual connection`
                         : `${firstMutualName} and ${mutualCount - 1} other mutual connection${mutualCount - 1 > 1 ? 's' : ''}`;
-                }
 
-                // ✅ Top 3 mutual avatars for the little overlapping bubbles in PersonCard
-                const mutualAvatars = rawMutuals
-                    .slice(0, 3)
-                    .map((m: any) => {
-                        const mutualPersonId = m.fromUserId === userId ? m.toUserId : m.fromUserId;
-                        return mutualPersonsMap[mutualPersonId]?.avatar;
-                    })
-                    .filter(Boolean) as string[];
+                    mutualAvatars = rawMutuals
+                        .slice(0, 3)
+                        .map((m: any) => {
+                            const mutualPersonId = m.userId || (m.fromUserId === userId ? m.toUserId : m.fromUserId) || m.id;
+                            return m.avatar || m.profilePhotoUrl || (mutualPersonId ? mutualPersonsMap[mutualPersonId]?.avatar : null);
+                        })
+                        .filter(Boolean) as string[];
+                }
 
                 return {
                     id: user.userId,
