@@ -10,9 +10,10 @@ export interface Notification {
     | "post_liked"
     | "post_commented"
     | "connection_request"
-    | "connection_accepted";
+    | "connection_accepted"
+    | "profile_viewed";
     entityId: string;
-    entityType: "post" | "connection";
+    entityType: "post" | "connection" | "user";
     message: string;
     isRead: boolean;
     createdAt: string;
