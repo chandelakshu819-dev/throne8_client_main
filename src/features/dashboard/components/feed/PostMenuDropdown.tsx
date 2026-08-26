@@ -1,6 +1,6 @@
 // app/(dashboard)/components/feed/PostMenuDropdown.tsx
 import React from 'react';
-const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUserId, isSaved = false, isPinned = false }: {
+const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUserId, isSaved = false, isPinned = false, isFollowing = true }: {
   isDarkMode: boolean;
   index: number;
   handlePostAction: (action: string, index: number) => void,
@@ -8,6 +8,7 @@ const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUs
   currentUserId: string; // ID of the currently logged-in user
   isSaved?: boolean;
   isPinned?: boolean;
+  isFollowing?: boolean; // ✅ NEW — actual follow-status, agar false hai to already unfollowed hai
 }) => {
 
   const isOwn = post.userId === currentUserId;
@@ -132,14 +133,14 @@ const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUs
           <span className="font-medium">Hide this post</span>
         </button>
       }
-      {!isOwn &&
+            {!isOwn &&
         <button
-          onClick={() => handlePostAction('unfollow', index)}
+          onClick={() => handlePostAction(isFollowing ? 'unfollow' : 'follow', index)}
           className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-[#e0d8cf]/50 text-[#4a3728]'
             }`}
         >
-          <i className="ri-user-unfollow-line text-lg"></i>
-          <span className="font-medium">Unfollow {post.user}</span>
+          <i className={`ri-user-${isFollowing ? 'unfollow' : 'follow'}-line text-lg`}></i>
+          <span className="font-medium">{isFollowing ? `Unfollow ${post.user}` : `Follow ${post.user}`}</span>
         </button>}
 
       <div className={`h-px my-2 ${isDarkMode ? 'bg-slate-700' : 'bg-[#4a3728]/20'}`}></div>

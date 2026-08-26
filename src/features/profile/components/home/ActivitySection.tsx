@@ -799,9 +799,12 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
   const [deleteConfirmPostId, setDeleteConfirmPostId] = useState<string | null>(null);
   const [isDeletingConfirmed, setIsDeletingConfirmed] = useState(false);
 
-  // ✅ Live followers count sync for Activity badge
-  const [displayFollowers, setDisplayFollowers] = useState<number>(followers);
-
+   // ✅ Live followers count sync for Activity badge
+   const [displayFollowers, setDisplayFollowers] = useState<number>(followers);
+   // ✅ NEW: is profile ke owner ko current user follow kar raha hai ya nahi —
+   // isi se dropdown mein "Follow"/"Unfollow" sahi label decide hoga, sirf
+   // hardcoded "Unfollow" text nahi dikhega
+   const [isFollowingAuthor, setIsFollowingAuthor] = useState<boolean>(true);
   useEffect(() => {
     setDisplayFollowers(followers);
   }, [followers]);
@@ -819,6 +822,22 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
         .catch(() => {});
     }
   }, [userId, currentUserId]);
+
+  // ✅ NEW: doosre user ki profile khulte hi actual follow-status backend
+  // se check karo — isi se pata chalega ki dropdown mein "Follow" dikhana
+  // hai ya "Unfollow" (ab hardcoded "Unfollow" nahi rahega)
+  useEffect(() => {
+    if (!isOwnProfile && userId) {
+      FollowService.checkFollowStatus(userId)
+        .then((res: any) => {
+          const following = res?.data?.isFollowing ?? res?.isFollowing ?? false;
+          setIsFollowingAuthor(!!following);
+        })
+        .catch(() => {
+          // fail-safe: pata nahi chala to purana default (true) rehne do
+        });
+    }
+  }, [userId, isOwnProfile]);
 
  
   useEffect(() => {
@@ -1105,7 +1124,8 @@ const engagementPercent = analyticsData
   };
 
   const handlePostAction = async (action: string, postId: string) => {
-    const viewerAllowedActions = ['copy', 'embed', 'analytics', 'save', 'not-interested', 'unfollow', 'report'];
+    const viewerAllowedActions = ['copy', 'embed', 'analytics', 'save', 'not-interested', 'unfollow', 'follow', 'report'];
+
 
     if (!isOwnProfile && viewerAllowedActions.indexOf(action) === -1) {
       return;
@@ -1221,6 +1241,9 @@ const engagementPercent = analyticsData
 
       try {
         await FollowService.unfollowUser(targetUserId);
+        // ✅ FIX: real follow-status turant update karo taaki dropdown
+        // agli baar khulte hi "Follow" dikhaye, na ki stale "Unfollow"
+        setIsFollowingAuthor(false);
         setHiddenPostIds((prev) => {
           const next = new Set(prev);
           next.add(postId);
@@ -1237,6 +1260,25 @@ const engagementPercent = analyticsData
         }, 6000);
       } catch (err: any) {
         alert(err.message || 'Failed to unfollow');
+      }
+      return;
+    }
+
+    // ✅ NEW: agar user pehle se unfollowed hai aur dropdown se "Follow"
+    // dabaya, to yahan se dubara follow ho jayega
+    if (action === 'follow') {
+      const targetUserId = post.userId || post.userid || post.authorId;
+      if (!targetUserId) {
+        alert('Unable to identify this user.');
+        return;
+      }
+      const targetName = post.userName || post.fullName || 'this user';
+      try {
+        await FollowService.followUser(targetUserId);
+        setIsFollowingAuthor(true);
+        setActionToast({ message: 'Following ' + targetName + '.' });
+      } catch (err: any) {
+        alert(err.message || 'Failed to follow');
       }
       return;
     }
@@ -1453,6 +1495,7 @@ const engagementPercent = analyticsData
                             handleRepost={handleRepostInstant}
                             postCommentCounts={undefined}
                             fetchCommentsByPost={handlers.fetchCommentsByPost}
+                            isFollowing={isOwnProfile ? true : isFollowingAuthor}
                           />
                         </div>
 

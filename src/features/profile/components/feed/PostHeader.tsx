@@ -4,10 +4,10 @@ import { useRouter } from 'next/navigation';
 import PostMenuDropdown from './PostMenuDropdown';
 
 const PostHeader = ({
-  post, index, isDarkMode, openMenuIndex, togglePostMenu, handlePostAction, currentUserId, fullName, profileImage, headline, isOwnProfile, showMenu = true, isSaved = false, isPinned = false,
+  post, index, isDarkMode, openMenuIndex, togglePostMenu, handlePostAction, currentUserId, fullName, profileImage, headline, isOwnProfile, showMenu = true, isSaved = false, isPinned = false, isFollowing = true,
 }: {
   post: any; index: string; isDarkMode: boolean; openMenuIndex: string | null; togglePostMenu: (index: string) => void; handlePostAction: (action: string, index: string) => void; currentUserId: string;
-  fullName?: string; profileImage?: string; headline?: string; isOwnProfile?: boolean; showMenu?: boolean; isSaved?: boolean; isPinned?: boolean; // ✅ NEW
+  fullName?: string; profileImage?: string; headline?: string; isOwnProfile?: boolean; showMenu?: boolean; isSaved?: boolean; isPinned?: boolean; isFollowing?: boolean; // ✅ NEW
 }) => {
   const router = useRouter();
   const isOwnPost = post.userId && currentUserId && post.userId === currentUserId;
@@ -83,6 +83,7 @@ const PostHeader = ({
               currentUserId={currentUserId}
               isSaved={isSaved} // ✅ NEW
               isPinned={isPinned} // ✅ NEW
+              isFollowing={isFollowing} // ✅ NEW — real follow-status, dropdown mein sahi "Follow"/"Unfollow" label dikhayega
             />
           )}
          

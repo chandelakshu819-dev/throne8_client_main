@@ -49,6 +49,7 @@ const PostDetailModal = ({
   postComments,
   postCommentCounts,
   isLoadingComments,
+  isFollowing,
 }: {
   post: any;
   index: any;
@@ -91,6 +92,7 @@ const PostDetailModal = ({
   postComments: any;
   postCommentCounts: any;
   isLoadingComments?: { [postId: string]: boolean };
+  isFollowing?: boolean;
 }) => {
   const postKey = post.entryId || post.postId;
   const mediaUrl = post.image || post.mediaUrl || post.postImage || null;
@@ -165,6 +167,7 @@ const PostDetailModal = ({
             fullName={fullName}
             profileImage={profileImage}
             headline={headline}
+            isFollowing={isFollowing}
           />
 
           <PostContent post={post} isDarkMode={isDarkMode} forceExpanded hideMedia />

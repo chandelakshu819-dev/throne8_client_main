@@ -15,7 +15,7 @@ const PostCard = ({
   fullName, headline, postLikes, openMenuId, setOpenMenuId, onLikeToggle, onPinPost, onSavePost, onDeletePost, onArchivePost, onOpenUpdateModal, onToggleComments, commentsByPost, isLoadingComments, isSubmittingComment, commentLikes, formatCommentTime, isDeletingCommentId, setIsDeletingCommentId, replyingToCommentId, setReplyingToCommentId, currentUserId, post, index, isOwnProfile = true, isDarkMode, likedPosts, handleLike, openMenuIndex, openRepostIndex, openCommentsIndex, commentText, setCommentText, replyingTo, openCommentMenuIndex, editingCommentId, editCommentText, setEditCommentText, showEmojiPicker, setShowEmojiPicker, handlePostAction, handleRepost, toggleComments, handleCommentSubmit, handleReply, handleCommentReaction, toggleCommentMenu, handleCommentAction, handleEditSubmit, handleEmojiClick, postComments, emojiList, togglePostMenu, toggleRepostMenu, postCommentCounts, profileImage, onOpenWithPerspectiveModal, handleRepostInstant, replyText, setReplyText, handleReplySubmit, likeCommentToggle, commentLikeStatus, setReplyingTo,showMenu = true, 
   // ✅ ADDED: reaction system props — must be accepted here or JSX below throws
   // "postReactions is not defined" since it's used in the PostActions call.
-  postReactions, onReact, fetchCommentsByPost, postSaves, postPins,
+  postReactions, onReact, fetchCommentsByPost, postSaves, postPins, isFollowing,
 }: {
   fullName: string; headline: string; postLikes: any; openMenuId: any; setOpenMenuId: any; onLikeToggle: any; onPinPost: any; onSavePost: any; onDeletePost: any; onArchivePost: any; onOpenUpdateModal: any; onToggleComments: any; commentsByPost: any; isLoadingComments: any; isSubmittingComment: any; commentLikes: any; formatCommentTime: any; isDeletingCommentId: any; setIsDeletingCommentId: any; replyingToCommentId: any; setReplyingToCommentId: any; currentUserId: string; post: any; index: any; isOwnProfile?: boolean; isDarkMode: any; likedPosts: any; handleLike: any; openMenuIndex: any; openRepostIndex: any; openCommentsIndex: any; commentText: any; setCommentText: any; replyingTo: any; openCommentMenuIndex: any; editingCommentId: any; editCommentText: any; setEditCommentText: any; showEmojiPicker: any; setShowEmojiPicker: any; handlePostAction: any; handleRepost: any; toggleComments: any; handleCommentSubmit: any; handleReply: any; handleCommentReaction: any; toggleCommentMenu: any; handleCommentAction: any; handleEditSubmit: any; handleEmojiClick: any; postComments: any; emojiList: any; togglePostMenu: any; toggleRepostMenu: any; postCommentCounts: any; profileImage: any; onOpenWithPerspectiveModal?: any; handleRepostInstant?: any; replyText?: any; setReplyText?: any; handleReplySubmit?: any; likeCommentToggle?: any; commentLikeStatus?: any; setReplyingTo?: any;
   // ✅ ADDED
@@ -25,6 +25,7 @@ const PostCard = ({
   showMenu?: boolean; // ✅ NEW
   postSaves?: Record<string, boolean>; // ✅ NEW
   postPins?: Record<string, boolean>; // ✅ NEW
+  isFollowing?: boolean; // ✅ NEW — profile owner ko current user follow kar raha hai ya nahi
 
 }) => {
   const { trackPostImpression } = usePostImpressionTracking();
@@ -89,10 +90,9 @@ const PostCard = ({
             showMenu={showMenu} // ✅ NEW
             isSaved={postSaves ? (postSaves[postKey] ?? (post as any).isSaved ?? false) : ((post as any).isSaved ?? false)} // ✅ NEW
             isPinned={postPins ? (postPins[postKey] ?? (post as any).isPinned ?? false) : ((post as any).isPinned ?? false)} // ✅ NEW
+            isFollowing={isFollowing} // ✅ NEW — PostMenuDropdown tak yahi se aage jayega
 
           />
-
-
           {/* Click on post body opens the LinkedIn-style expanded modal */}
           <div onClick={handleOpenDetailModal} className="cursor-pointer">
             <PostContent post={post} isDarkMode={isDarkMode} disableToggle />
@@ -196,6 +196,7 @@ const PostCard = ({
           postComments={postComments}
           postCommentCounts={postCommentCounts}
           isLoadingComments={isLoadingComments}
+          isFollowing={isFollowing} // ✅ NEW
         />
       )}
     </div>
