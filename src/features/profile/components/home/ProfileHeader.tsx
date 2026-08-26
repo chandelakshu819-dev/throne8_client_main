@@ -1,6 +1,6 @@
 // src/features/profile/components/home/ProfileHeader.tsx
 // 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import EditIntroModal from './EditIntroModal';
 import ProfileImageModal from './ProfileImageModal';
@@ -98,6 +98,25 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     const [isShareProfileOpen, setIsShareProfileOpen] = useState(false);
     const [isReportMemberOpen, setIsReportMemberOpen] = useState(false);
     const [isBlockMemberOpen, setIsBlockMemberOpen] = useState(false);
+    const moreMenuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+            if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+                setIsMoreMenuOpen(false);
+            }
+        };
+
+        if (isMoreMenuOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('touchstart', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        };
+    }, [isMoreMenuOpen]);
     const [currentProfileImage, setCurrentProfileImage] = useState(
         profileImage && profileImage.trim() !== ''
             ? profileImage
@@ -407,76 +426,68 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     </button>
 )}
 
-                                        <div className="relative">
+                                        <div className="relative" ref={moreMenuRef}>
                                             <button
-                                                onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+                                                onClick={() => setIsMoreMenuOpen((prev) => !prev)}
                                                 className="px-4 py-2 bg-white text-[#4a3728] border border-[#e0d8cf] rounded-full text-xs font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                                             >
                                                 More
                                             </button>
                                             {isMoreMenuOpen && (
-                                                <>
-                                                    <div
-                                                        className="fixed inset-0 z-40"
-                                                        onClick={() => setIsMoreMenuOpen(false)}
-                                                    ></div>
-                                                   <div className="absolute left-0 top-full mt-2 w-56 bg-white rounded-xl shadow-2xl border border-[#e0d8cf] py-2 z-50">
-    <button
-    onClick={async () => {
-        setIsMoreMenuOpen(false);
-        await onFollow?.();
-        if (currentUserId) {
-            await fetchConnectionsData(currentUserId);
-        }
-    }}
-    className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors duration-200"
->
-    {isFollowing ? 'Unfollow' : 'Follow'}
-</button>
+                                                <div className="absolute left-0 top-full mt-2 w-56 bg-white rounded-xl shadow-2xl border border-[#e0d8cf] py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                                                    <button
+                                                        onClick={async () => {
+                                                            setIsMoreMenuOpen(false);
+                                                            await onFollow?.();
+                                                            if (currentUserId) {
+                                                                await fetchConnectionsData(currentUserId);
+                                                            }
+                                                        }}
+                                                        className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors duration-200"
+                                                    >
+                                                        {isFollowing ? 'Unfollow' : 'Follow'}
+                                                    </button>
 
+                                                    <button
+                                                        onClick={() => {
+                                                            setIsMoreMenuOpen(false);
+                                                            setIsAboutMemberOpen(true);
+                                                        }}
+                                                        className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors duration-200"
+                                                    >
+                                                        About this member
+                                                    </button>
 
+                                                    <button
+                                                        onClick={() => {
+                                                            setIsMoreMenuOpen(false);
+                                                            setIsShareProfileOpen(true);
+                                                        }}
+                                                        className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors duration-200"
+                                                    >
+                                                        Share Profile
+                                                    </button>
 
-    <button
-        onClick={() => {
-            setIsMoreMenuOpen(false);
-            setIsAboutMemberOpen(true);
-        }}
-        className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors duration-200"
-    >
-        About this member
-    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setIsMoreMenuOpen(false);
+                                                            setIsReportMemberOpen(true);
+                                                        }}
+                                                        className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors duration-200"
+                                                    >
+                                                        Report
+                                                    </button>
 
-    <button
-        onClick={() => {
-            setIsMoreMenuOpen(false);
-            setIsShareProfileOpen(true);
-        }}
-        className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors duration-200"
-    >
-        Share Profile
-    </button>
-
-    <button
-        onClick={() => {
-            setIsMoreMenuOpen(false);
-            setIsReportMemberOpen(true);
-        }}
-        className="w-full text-left px-4 py-2.5 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors duration-200"
-    >
-        Report
-    </button>
-
-    <button
-        onClick={() => {
-            setIsMoreMenuOpen(false);
-            setIsBlockMemberOpen(true);
-        }}
-        className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200"
-    >
-        Block
-    </button>
-</div>
-                                                </>
+                                                    <button
+                                                        onClick={() => {
+                                                            setIsMoreMenuOpen(false);
+                                                            setIsBlockMemberOpen(true);
+                                                        }}
+                                                        className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200"
+                                                    >
+                                                        Block
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
