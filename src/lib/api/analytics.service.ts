@@ -42,9 +42,12 @@ class AnalyticsService {
         }
     ): Promise<any> {
         try {
-            const { data } = await api.post('/profile/analytics/record-profile-view', {
-                profileOwnerId,
-                ...viewerData
+            const { data } = await api.post('/connections/profile-views/record', {
+                viewedUserId: profileOwnerId,
+                metadata: {
+                    source: 'profile'
+                },
+                anonymous: !viewerData?.viewerId
             });
             return data;
         } catch (error: any) {
