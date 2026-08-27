@@ -20,6 +20,8 @@ const transformPosts = (rawPosts: any[]): TransformedPost[] => {
 
         // postId: post.postId || post._id || post.entryId,
         entryId: post.entryId || post.postId || post._id,
+        userId: post.userId, // ✅ FIX: missing tha — isi wajah se Unfollow "Unable to identify this user" deta tha, aur post.user (author naam) bhi undefined aata tha
+        user: `${post.firstName || ''} ${post.lastName || ''}`.trim() || (typeof post.user === 'string' && post.user !== 'Unknown User' ? post.user : '') || post.authorName || post.fullName || post.name || '',
         title: post.title,
         text: post.content,
         image: post.images?.[0]?.cloudinarySecureUrl

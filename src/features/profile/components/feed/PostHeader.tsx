@@ -49,7 +49,7 @@ const PostHeader = ({
               onClick={handleProfileClick}
               className={`text-lg font-bold cursor-pointer hover:underline ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}
             >
-              {post.user || fullName || 'Unknown User'}
+              {(post.user && post.user !== 'Unknown User') ? post.user : (fullName || 'Unknown User')}
             </h4>
           </div>
           <p className="text-sm font-semibold bg-gradient-to-r from-[#6b5643] to-[#8b7355] bg-clip-text text-transparent">
@@ -81,6 +81,7 @@ const PostHeader = ({
               handlePostAction={handlePostAction}
               post={post}
               currentUserId={currentUserId}
+              fullName={fullName}
               isSaved={isSaved} // ✅ NEW
               isPinned={isPinned} // ✅ NEW
               isFollowing={isFollowing} // ✅ NEW — real follow-status, dropdown mein sahi "Follow"/"Unfollow" label dikhayega

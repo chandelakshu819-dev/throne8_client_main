@@ -68,6 +68,12 @@ export interface TransformedPost {
     // ✅ ADDED: entryId — same value as postId, kept explicit since the rest
     // of the app reads `post.entryId || post.postId` as the canonical key
     entryId: string;
+    // ✅ FIX: author ka userId — pehle missing tha isliye Unfollow action
+    // "Unable to identify this user" deta tha (targetUserId hamesha undefined)
+    userId: string;
+    // ✅ FIX: author ka display naam — dropdown mein "Unfollow {post.user}"
+    // ke liye chahiye, pehle missing tha isliye naam khali dikhta tha
+    user?: string;
     title: string;
     text: string;
     image: string;

@@ -1,14 +1,16 @@
-﻿// app/feature/components/feed/PostMenuDropdown.tsx
+// app/feature/components/feed/PostMenuDropdown.tsx
 import React from 'react';
 
-const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUserId, isSaved = false, isPinned = false }: {
+const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUserId, fullName, isSaved = false, isPinned = false, isFollowing = true }: {
   isDarkMode: boolean;
   index: string;
   handlePostAction: (action: string, index: string) => void,
   post: any;
   currentUserId: string;
+  fullName?: string;
   isSaved?: boolean;
-  isPinned?: boolean; // ✅ NEW
+  isPinned?: boolean;
+  isFollowing?: boolean;
 }) => {
 
   const isOwn = post.userId === currentUserId;
@@ -18,6 +20,10 @@ const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUs
   const itemClass = (extra = '') =>
     `w-full text-left px-4 py-2.5 text-sm transition-colors duration-200 flex items-center gap-2 ${extra} ${isDarkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-[#e0d8cf]/50 text-[#4a3728]'
     }`;
+
+  const authorName = (post.user && post.user !== 'Unknown User')
+    ? post.user
+    : (fullName || post.userName || post.fullName || post.authorName || post.name || 'User');
 
   return (
     <div
@@ -96,8 +102,8 @@ const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUs
       )}
       {!isOwn && (
         <button onClick={() => handlePostAction('unfollow', index)} className={itemClass()}>
-          <i className="ri-user-unfollow-line text-base"></i>
-          <span>Unfollow {post.user}</span>
+          <i className={`${isFollowing ? 'ri-user-unfollow-line' : 'ri-user-follow-line'} text-base`}></i>
+          <span>{isFollowing ? `Unfollow ${authorName}` : `Follow ${authorName}`}</span>
         </button>
       )}
 

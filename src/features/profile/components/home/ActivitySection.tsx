@@ -26,6 +26,7 @@ import PostHeader from '../feed/PostHeader'; // ✅ NEW — embed preview ke liy
 import PostContent from '../feed/PostContent'; // ✅ NEW — embed preview ke liye
 import ReactionsModal from '../feed/ReactionsModal'; // ✅ NEW — embed preview ke likes modal ke liye
 import DeleteConfirmModal from './DeleteConfirmModal';
+import UnfollowConfirmModal from '../feed/UnfollowConfirmModal';
 
 const EmptyState = ({ label }: { label: string }) => {
   return (
@@ -798,6 +799,8 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
 
   const [deleteConfirmPostId, setDeleteConfirmPostId] = useState<string | null>(null);
   const [isDeletingConfirmed, setIsDeletingConfirmed] = useState(false);
+  const [unfollowModalTarget, setUnfollowModalTarget] = useState<{ userId: string; name: string; postId: string } | null>(null);
+  const [isUnfollowingAction, setIsUnfollowingAction] = useState<boolean>(false);
 
    // ✅ Live followers count sync for Activity badge
    const [displayFollowers, setDisplayFollowers] = useState<number>(followers);
@@ -1231,36 +1234,20 @@ const engagementPercent = analyticsData
     }
 
     if (action === 'unfollow') {
-      const targetUserId = post.userId || post.userid || post.authorId;
+      const targetUserId = post.userId || post.userid || post.authorId || userId;
       if (!targetUserId) {
-        alert('Unable to identify this user.');
+        setActionToast({ message: 'Unable to identify this user.' });
         return;
       }
-      const targetName = post.userName || post.fullName || 'this user';
-      if (!confirm('Unfollow ' + targetName + '? You will stop seeing their posts.')) return;
+      const targetName = (post.user && post.user !== 'Unknown User')
+        ? post.user
+        : (post.userName || post.fullName || fullName || 'this user');
 
-      try {
-        await FollowService.unfollowUser(targetUserId);
-        // ✅ FIX: real follow-status turant update karo taaki dropdown
-        // agli baar khulte hi "Follow" dikhaye, na ki stale "Unfollow"
-        setIsFollowingAuthor(false);
-        setHiddenPostIds((prev) => {
-          const next = new Set(prev);
-          next.add(postId);
-          return next;
-        });
-        setUndoToast({
-          postId: postId,
-          message: 'Unfollowed ' + targetName + '.',
-          action: 'unfollow',
-          targetUserId: targetUserId,
-        });
-        setTimeout(() => {
-          setUndoToast((prev: any) => (prev && prev.postId === postId ? null : prev));
-        }, 6000);
-      } catch (err: any) {
-        alert(err.message || 'Failed to unfollow');
-      }
+      setUnfollowModalTarget({
+        userId: targetUserId,
+        name: targetName,
+        postId: postId,
+      });
       return;
     }
 
@@ -1958,6 +1945,34 @@ const engagementPercent = analyticsData
         onConfirm={confirmDeletePost}
         isDeleting={isDeletingConfirmed}
         message="Are you sure you want to delete this post permanently?"
+      />
+
+      <UnfollowConfirmModal
+        isOpen={!!unfollowModalTarget}
+        onClose={() => setUnfollowModalTarget(null)}
+        onConfirm={async () => {
+          if (!unfollowModalTarget) return;
+          const { userId: targetUserId, name: targetName, postId } = unfollowModalTarget;
+          setIsUnfollowingAction(true);
+          try {
+            await FollowService.unfollowUser(targetUserId);
+            setIsFollowingAuthor(false);
+            setHiddenPostIds((prev) => {
+              const next = new Set(prev);
+              next.add(postId);
+              return next;
+            });
+            setActionToast({ message: `Unfollowed ${targetName}.` });
+          } catch (err: any) {
+            console.error('Failed to unfollow user:', err);
+            setActionToast({ message: err.message || 'Failed to unfollow user.' });
+          } finally {
+            setIsUnfollowingAction(false);
+            setUnfollowModalTarget(null);
+          }
+        }}
+        targetName={unfollowModalTarget?.name || 'this user'}
+        isUnfollowing={isUnfollowingAction}
       />
 
 {actionToast ? (
