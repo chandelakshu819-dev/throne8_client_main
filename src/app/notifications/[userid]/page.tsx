@@ -390,7 +390,8 @@ const NotificationsPage = () => {
         const isConnectionNotif =
             n.entityType === "connection" ||
             n.type === "connection_request" ||
-            n.type === "connection_accepted";
+            n.type === "connection_accepted" ||
+            n.type === "profile_viewed";
         const matchesTab =
             selectedTab === "all" ||
             (selectedTab === "unread" && !n.isRead) ||
@@ -412,6 +413,8 @@ const NotificationsPage = () => {
                 return <Users className="w-4 h-4 text-orange-500" />;
             case "connection_accepted":
                 return <CheckCircle className="w-4 h-4 text-green-500" />;
+            case "profile_viewed":
+                return <Eye className="w-4 h-4 text-purple-500" />;
             default:
                 return <Bell className="w-4 h-4 text-gray-500" />;
         }
@@ -429,6 +432,8 @@ const NotificationsPage = () => {
                 return "from-orange-500 to-yellow-500";
             case "connection_accepted":
                 return "from-green-500 to-emerald-500";
+            case "profile_viewed":
+                return "from-purple-500 to-pink-500";
             default:
                 return "from-gray-500 to-slate-500";
         }
@@ -755,6 +760,9 @@ const NotificationsPage = () => {
                                     </option>
                                     <option value="connection_accepted">
                                         Connections Accepted
+                                    </option>
+                                    <option value="profile_viewed">
+                                        Profile Views
                                     </option>
                                 </select>
                             </div>
