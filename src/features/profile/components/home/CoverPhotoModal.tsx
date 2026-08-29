@@ -1,8 +1,8 @@
 // src/profile/components/CoverPhotoModal.tsx
 'use client';
 
-import React, { useState, useRef } from 'react';
-import { X, Upload, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useRef, useEffect} from 'react';
+import { X, Upload} from 'lucide-react';
 import AuthService from '@/lib/api/auth.service';
 import { useProfile } from '@/features/profile/hooks/useProfile';
 
@@ -132,11 +132,21 @@ const CoverPhotoModal: React.FC<CoverPhotoModalProps> = ({
             fileInputRef.current.value = '';
         }
     };
-
     const handleClose = () => {
         resetModal();
         onClose();
     };
+
+    // Lock background page scroll while modal is open
+    useEffect(() => {
+        if (isOpen) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -168,17 +178,17 @@ const CoverPhotoModal: React.FC<CoverPhotoModalProps> = ({
                 {/* Body */}
                 <div className="overflow-y-scroll max-h-[calc(90vh-80px)] p-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                     <div className="space-y-6">
-                        {/* Current Cover Preview */}
-                        {hasActualImage && !previewUrl && (
+                                               {/* Current Cover Preview */}
+                                               {hasActualImage && !previewUrl && (
                             <div className="mb-6">
                                 <label className="block mb-3 text-sm font-semibold text-[#4a3728]">
                                     Current Cover Photo
                                 </label>
-                                <div className="relative w-full h-48 rounded-2xl overflow-hidden border-2 border-[#e0d8cf] bg-gray-100">
+                                <div className="relative w-full rounded-2xl overflow-hidden border-2 border-[#e0d8cf] flex items-center justify-center">
                                     <img
                                         src={currentImageUrl}
                                         alt="Current Cover"
-                                        className="w-full h-full object-cover"
+                                        className="max-w-full max-h-[50vh] w-auto h-auto object-contain"
                                     />
                                 </div>
                             </div>
@@ -281,9 +291,9 @@ const CoverPhotoModal: React.FC<CoverPhotoModalProps> = ({
                             </div>
                         )}
 
-                        {/* Change Photo Button */}
-                        {hasActualImage && !previewUrl && (
-                            <div className="flex gap-3 mt-4">
+                                               {/* Change Photo Button */}
+                                               {hasActualImage && !previewUrl && (
+                            <div className="flex gap-3">
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
@@ -302,23 +312,11 @@ const CoverPhotoModal: React.FC<CoverPhotoModalProps> = ({
                             </div>
                         )}
 
-                        {/* Guidelines */}
-                        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-2">
-                            <h4 className="font-semibold text-blue-900 flex items-center gap-2">
-                                <ImageIcon className="w-4 h-4" />
-                                Cover Photo Guidelines
-                            </h4>
-                            <ul className="text-sm text-blue-800 space-y-1">
-                                <li>• Use high-quality, professional images</li>
-                                <li>• Recommended dimensions: 1584 x 396 pixels</li>
-                                <li>• Avoid text-heavy or cluttered images</li>
-                                <li>• Choose images that represent your brand</li>
-                            </ul>
-                        </div>
+                      
                     </div>
 
-                    {/* Footer */}
-                    <div className="sticky bottom-0 flex gap-3 mt-8 pt-6 border-t border-[#e0d8cf] bg-white">
+                                       {/* Footer */}
+                                       <div className="sticky bottom-0 flex gap-3 mt-4 pt-3 bg-white">
                         <button
                             type="button"
                             onClick={handleClose}

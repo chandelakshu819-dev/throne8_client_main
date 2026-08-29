@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
-import { X, Upload, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useRef, useEffect  } from 'react';
+import { X, Upload} from 'lucide-react';
 import AuthService from '@/lib/api/auth.service';
 import { useProfile } from '@/features/profile/hooks/useProfile';
 import { profilePhotoValidationSchema } from '../../validators/profilePhoto.validation';
@@ -130,6 +130,17 @@ const ProfileImageModal: React.FC<ProfileImageModalProps> = ({
         resetModal();
         onClose();
     };
+
+    // Lock background page scroll while modal is open
+    useEffect(() => {
+        if (isOpen) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
@@ -295,23 +306,10 @@ const ProfileImageModal: React.FC<ProfileImageModalProps> = ({
                             </div>
                         )}
 
-                        {/* Guidelines Section */}
-                        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 space-y-2">
-                            <h4 className="font-semibold text-blue-900 flex items-center gap-2">
-                                <ImageIcon className="w-4 h-4" />
-                                Image Guidelines
-                            </h4>
-                            <ul className="text-sm text-blue-800 space-y-1">
-                                <li>• Use a clear, professional photo</li>
-                                <li>• Face should be clearly visible and well-lit</li>
-                                <li>• Avoid filters or heavy editing</li>
-                                <li>• Minimum dimensions: 400x400 pixels</li>
-                            </ul>
-                        </div>
-                    </div>
+</div>
 
-                    {/* Footer */}
-                    <div className="sticky bottom-0 flex gap-3 mt-8 pt-6 border-t border-[#e0d8cf] bg-white">
+{/* Footer */}
+<div className="sticky bottom-0 flex gap-3 mt-4 pt-3 bg-white">
                         <button
                             type="button"
                             onClick={handleClose}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState , useEffect} from 'react';
 import { X } from 'lucide-react';
 
 interface Experience {
@@ -33,8 +33,18 @@ const ShowAllExperiencesModal: React.FC<ShowAllExperiencesModalProps> = ({
         experiences.length > 0 ? experiences[0] : null
     );
 
-    if (!isOpen) return null;
+    // Lock background page scroll while modal is open
+    useEffect(() => {
+        if (isOpen) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [isOpen]);
 
+    if (!isOpen) return null;
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-[#f6ede8] rounded-2xl shadow-2xl border border-[#e0d8cf] max-w-4xl w-full max-h-[90vh] overflow-y-auto">

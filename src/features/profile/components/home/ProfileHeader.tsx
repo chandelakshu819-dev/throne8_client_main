@@ -302,13 +302,13 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                     )}
                                 </div>
                                 {/* ✅ FIX (density pass): px-3 py-2 -> px-2.5 py-1.5 */}
-                                <div className="flex items-center gap-2 justify-center md:justify-start bg-white/50 rounded-full px-2.5 py-1.5 backdrop-blur-sm border border-[#e0d8cf]/50 min-w-0">
+                                <div className="flex items-center gap-2 justify-center md:justify-start min-w-0">
                                     <svg className="w-4 h-4 text-[#4a3728] animate-pulse flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                     </svg>
                                     {/* ✅ FIX: break-words so a long location string can't
-                                        overflow the pill / push the row wider */}
+                                        overflow the row wider */}
                                     <p className="text-xs text-[#4a3728] break-words min-w-0">
                                         <span className="font-semibold">Location:</span> {location}
                                     </p>

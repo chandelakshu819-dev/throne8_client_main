@@ -41,6 +41,18 @@ export default function UpdatePostModal({
         }
     }, [isOpen, onClose]);
 
+
+     // Lock background page scroll while modal is open
+     useEffect(() => {
+        if (isOpen) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [isOpen]);
+
     const handleSubmit = async () => {
         if (!title.trim()) {
             alert('Title cannot be empty');

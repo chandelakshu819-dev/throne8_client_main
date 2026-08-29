@@ -49,12 +49,12 @@ const ProfileBanner: React.FC<ProfileBannerProps> = ({
 
     return (
         <>
-            <div className="relative h-48 w-full overflow-hidden group">
+                        <div className="relative h-48 w-full overflow-hidden group bg-[#e8dfd7]">
                 {hasCustomBanner ? (
                     <img
                         src={currentBannerImage}
                         alt="Banner"
-                        className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110 group-hover:brightness-110"
+                        className="w-full h-full object-contain transition-all duration-700 group-hover:scale-110 group-hover:brightness-110"
                         onError={(e) => {
                             // ✅ Agar upload ki hui image bhi load fail ho jaye,
                             // to hardcoded default pe mat jao — bas hide kar do.

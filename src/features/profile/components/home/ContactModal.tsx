@@ -193,27 +193,27 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
             {/* Modal */}
             <div className="relative z-10 w-full max-w-4xl mx-auto max-h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden">
                 {/* Header */}
-                <div className="sticky top-0 bg-gradient-to-r from-[#4a3728] to-[#6a5748] px-8 py-6 z-20 flex items-center justify-between">
+                <div className="sticky top-0 bg-gradient-to-r from-[#4a3728] to-[#6a5748] px-6 py-4 z-20 flex items-center justify-between">
                     <div>
-                        <h2 className="text-3xl font-bold text-white">Contact Information</h2>
-                        <p className="text-white/70 text-sm mt-1">Manage your contact details and privacy settings</p>
+                        <h2 className="text-xl font-bold text-white">Contact Information</h2>
+                        <p className="text-white/70 text-xs mt-0.5">Manage your contact details and privacy settings</p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-white/10 rounded-full transition-colors duration-200"
+                        className="p-1.5 hover:bg-white/10 rounded-full transition-colors duration-200"
                     >
-                        <X className="w-6 h-6 text-white" />
+                        <X className="w-5 h-5 text-white" />
                     </button>
                 </div>
 
-                {/* Content */}
-                <div className="overflow-y-auto max-h-[calc(90vh-140px)] px-8 py-6">
-                    <div className="space-y-8">
+                              {/* Content */}
+                              <div className="overflow-y-auto max-h-[calc(90vh-140px)] px-6 py-3">
+                              <div className="space-y-3">
                         {/* Profile URL */}
-                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-6 border border-[#e0d8cf]">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Globe className="w-6 h-6 text-[#4a3728]" />
-                                <h3 className="text-xl font-semibold text-[#4a3728]">Profile URL</h3>
+                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-4 border border-[#e0d8cf]">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Globe className="w-4 h-4 text-[#4a3728]" />
+                                <h3 className="text-base font-semibold text-[#4a3728]">Profile URL</h3>
                             </div>
                             <div className="flex gap-3">
                                 <input
@@ -231,11 +231,11 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                         </div>
 
                         {/* Email Addresses */}
-                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-6 border border-[#e0d8cf]">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    <Mail className="w-6 h-6 text-[#4a3728]" />
-                                    <h3 className="text-xl font-semibold text-[#4a3728]">Email Addresses</h3>
+                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-4 border border-[#e0d8cf]">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <Mail className="w-4 h-4 text-[#4a3728]" />
+                                    <h3 className="text-base font-semibold text-[#4a3728]">Email Addresses</h3>
                                     <span className="text-sm text-[#4a3728]/60">({emails.length}/3)</span>
                                 </div>
                                 {emails.length < 3 && (
@@ -285,11 +285,11 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                         </div>
 
                         {/* Phone Numbers */}
-                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-6 border border-[#e0d8cf]">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    <Phone className="w-6 h-6 text-[#4a3728]" />
-                                    <h3 className="text-xl font-semibold text-[#4a3728]">Phone Numbers</h3>
+                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-4 border border-[#e0d8cf]">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <Phone className="w-4 h-4 text-[#4a3728]" />
+                                    <h3 className="text-base font-semibold text-[#4a3728]">Phone Numbers</h3>
                                     <span className="text-sm text-[#4a3728]/60">({phones.length}/3)</span>
                                 </div>
                                 {phones.length < 3 && (
@@ -339,10 +339,10 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                         </div>
 
                         {/* Birthday */}
-                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-6 border border-[#e0d8cf]">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Calendar className="w-6 h-6 text-[#4a3728]" />
-                                <h3 className="text-xl font-semibold text-[#4a3728]">Birthday</h3>
+                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-4 border border-[#e0d8cf]">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Calendar className="w-4 h-4 text-[#4a3728]" />
+                                <h3 className="text-base font-semibold text-[#4a3728]">Birthday</h3>
                             </div>
                             <div className="space-y-4">
                                 <input
@@ -374,10 +374,10 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                         </div>
 
                         {/* Address/Location */}
-                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-6 border border-[#e0d8cf]">
-                            <div className="flex items-center gap-3 mb-4">
-                                <MapPin className="w-6 h-6 text-[#4a3728]" />
-                                <h3 className="text-xl font-semibold text-[#4a3728]">Address/Location</h3>
+                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-4 border border-[#e0d8cf]">
+                            <div className="flex items-center gap-2 mb-3">
+                                <MapPin className="w-4 h-4 text-[#4a3728]" />
+                                <h3 className="text-base font-semibold text-[#4a3728]">Address/Location</h3>
                             </div>
                             <div className="space-y-4">
                                 <input
@@ -405,11 +405,11 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                         </div>
 
                         {/* Websites */}
-                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-6 border border-[#e0d8cf]">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    <LinkIcon className="w-6 h-6 text-[#4a3728]" />
-                                    <h3 className="text-xl font-semibold text-[#4a3728]">Websites</h3>
+                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-4 border border-[#e0d8cf]">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <LinkIcon className="w-4 h-4 text-[#4a3728]" />
+                                    <h3 className="text-base font-semibold text-[#4a3728]">Websites</h3>
                                     <span className="text-sm text-[#4a3728]/60">({websites.length}/3)</span>
                                 </div>
                                 {websites.length < 3 && (
@@ -454,11 +454,11 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                         </div>
 
                         {/* IM Handles */}
-                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-6 border border-[#e0d8cf]">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    <MessageCircle className="w-6 h-6 text-[#4a3728]" />
-                                    <h3 className="text-xl font-semibold text-[#4a3728]">IM Handles</h3>
+                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-4 border border-[#e0d8cf]">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <MessageCircle className="w-4 h-4 text-[#4a3728]" />
+                                    <h3 className="text-base font-semibold text-[#4a3728]">IM Handles</h3>
                                 </div>
                                 {imHandles.length < 4 && (
                                     <button
@@ -504,10 +504,10 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                         </div>
 
                         {/* Twitter Handle */}
-                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-6 border border-[#e0d8cf]">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Twitter className="w-6 h-6 text-[#4a3728]" />
-                                <h3 className="text-xl font-semibold text-[#4a3728]">Twitter Handle</h3>
+                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-4 border border-[#e0d8cf]">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Twitter className="w-4 h-4 text-[#4a3728]" />
+                                <h3 className="text-base font-semibold text-[#4a3728]">Twitter Handle</h3>
                             </div>
                             <input
                                 type="text"
@@ -519,10 +519,10 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                         </div>
 
                         {/* Connected Apps */}
-                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-6 border border-[#e0d8cf]">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Globe className="w-6 h-6 text-[#4a3728]" />
-                                <h3 className="text-xl font-semibold text-[#4a3728]">Connected Apps & Sync</h3>
+                        <div className="bg-gradient-to-r from-[#f6ede8] to-[#e0d8cf]/50 rounded-2xl p-4 border border-[#e0d8cf]">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Globe className="w-4 h-4 text-[#4a3728]" />
+                                <h3 className="text-base font-semibold text-[#4a3728]">Connected Apps & Sync</h3>
                             </div>
                             <div className="space-y-3">
                                 {Object.entries({
@@ -533,7 +533,7 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                                 }).map(([key, label]) => (
                                     <div key={key} className="bg-white rounded-lg p-4 border border-[#e0d8cf] flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <Globe className="w-5 h-5 text-[#4a3728]" />
+                                            <Globe className="w-4 h-4 text-[#4a3728]" />
                                             <span className="text-[#4a3728] font-medium">{label}</span>
                                         </div>
                                         <button
@@ -559,7 +559,9 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                     </div>
                 </div>
 
-                {/* Footer */}
+
+                                {/* Footer */}
+
                 <div className="sticky bottom-0 px-8 py-4 border-t border-[#e0d8cf] bg-white flex gap-3">
                     <button
                         onClick={onClose}
