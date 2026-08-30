@@ -324,7 +324,11 @@ export default function SearchUserProfilePage() {
         aboutData,
         videoUrl,
         isLoadingAbout,
+        isUploadingVideo,
+        isDeletingVideo,
         fetchAboutData,
+        handleVideoUpload,
+        handleVideoDelete,
     } = useAboutData(aboutId);
 
     const { headlineData, fetchHeadlineData } = useHeadlineData(headlineId);
@@ -486,7 +490,10 @@ return (
                             onAboutCreated={() => { }}
                             aboutId={aboutId}
                             videoUrl={videoUrl}
-                            isUploadingVideo={false}
+                            onVideoUpload={handleVideoUpload}
+                            onVideoDelete={handleVideoDelete}
+                            isUploadingVideo={isUploadingVideo}
+                            isDeletingVideo={isDeletingVideo}
                         />
                     </div>
 

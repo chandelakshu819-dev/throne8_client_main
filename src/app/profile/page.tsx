@@ -94,8 +94,10 @@ export default function ProfilePage() {
         videoUrl,
         isLoadingAbout,
         isUploadingVideo,
+        isDeletingVideo,
         fetchAboutData,
         handleVideoUpload,
+        handleVideoDelete,
     } = useAboutData(aboutId);
 
     const { headlineData, fetchHeadlineData } = useHeadlineData(headlineId);
@@ -275,7 +277,9 @@ export default function ProfilePage() {
                             aboutId={aboutId}
                             videoUrl={videoUrl}
                             onVideoUpload={handleVideoUpload}
+                            onVideoDelete={handleVideoDelete}
                             isUploadingVideo={isUploadingVideo}
+                            isDeletingVideo={isDeletingVideo}
                         />
 
                         {/* Education Section */}

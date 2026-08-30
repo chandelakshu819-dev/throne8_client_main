@@ -131,12 +131,14 @@ const ModalRepostCard = ({ repost, profileImage, fullName, currentUserId, postLi
                 )}
 
                 {originalPost.images?.length > 0 && (
-                    <img
-                        src={originalPost.images[0].cloudinarySecureUrl}
-                        alt={originalPost.title}
-                        className="w-full h-40 object-cover rounded-lg mt-2"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
+                    <div className="relative mt-2 mb-3 rounded-xl overflow-hidden bg-[#4a3728]/5 w-full flex justify-center items-center">
+                        <img
+                            src={originalPost.images[0].cloudinarySecureUrl}
+                            alt={originalPost.title}
+                            className="w-full h-auto max-h-[380px] object-contain rounded-xl"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                    </div>
                 )}
 
                 {/* ✅ CHANGED: like is now a real button wired to onLikeToggle;
@@ -417,34 +419,17 @@ const ShowAllActivityModal: React.FC<ShowAllActivityModalProps> = ({
 
                                                 {/* Images */}
                                                 {post.images && post.images.length > 0 && (
-                                                    post.images.length === 1 ? (
-                                                        <div className="mb-4 rounded-xl overflow-hidden bg-transparent w-full h-[300px] flex justify-center">
-                                                            <img
-                                                                src={post.images[0].cloudinarySecureUrl}
-                                                                alt="Post content"
-                                                                className="w-full h-full object-contain"
-                                                                onError={(e) => {
-                                                                    (e.target as HTMLImageElement).src =
-                                                                        'https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&h=280&fit=crop';
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    ) : (
-                                                        <div className="grid gap-2 mb-4 grid-cols-2">
-                                                            {post.images.map((img: any, i: number) => (
-                                                                <img
-                                                                    key={i}
-                                                                    src={img.cloudinarySecureUrl}
-                                                                    alt={`Post image ${i + 1}`}
-                                                                    className="w-full h-64 object-cover rounded-xl shadow"
-                                                                    onError={(e) => {
-                                                                        (e.target as HTMLImageElement).src =
-                                                                            'https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&h=280&fit=crop';
-                                                                    }}
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    )
+                                                    <div className="mb-4 rounded-xl overflow-hidden bg-[#4a3728]/5 w-full min-h-[200px] flex justify-center items-center">
+                                                        <img
+                                                            src={post.images[0].cloudinarySecureUrl}
+                                                            alt="Post content"
+                                                            className="w-full h-auto max-h-[440px] object-contain rounded-xl"
+                                                            onError={(e) => {
+                                                                (e.target as HTMLImageElement).src =
+                                                                    'https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&h=280&fit=crop';
+                                                            }}
+                                                        />
+                                                    </div>
                                                 )}
 
                                                 {/* Videos */}
@@ -539,20 +524,20 @@ const ShowAllActivityModal: React.FC<ShowAllActivityModalProps> = ({
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                     {allImages.map(({ post, img }, idx) => (
-                                        <div key={`${post.postId}-${idx}`} className="group bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/40 to-[#f6ede8]/30 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-500 border border-[#e0d8cf]/40">
-                                            <div className="relative overflow-hidden h-56">
+                                        <div key={`${post.postId}-${idx}`} className="group bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/40 to-[#f6ede8]/30 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-500 border border-[#e0d8cf]/40 flex flex-col h-full">
+                                            <div className="relative overflow-hidden h-56 bg-black flex items-center justify-center">
                                                 <img
                                                     src={img.cloudinarySecureUrl}
                                                     alt={post.title}
-                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                                                     onError={(e) => {
                                                         (e.target as HTMLImageElement).src =
                                                             'https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&h=500&fit=crop';
                                                     }}
                                                 />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                                             </div>
-                                            <div className="p-4">
+                                            <div className="p-4 flex-shrink-0">
                                                 <p className="text-[#4a3728] font-semibold text-sm truncate">{post.title}</p>
                                                 <div className="flex items-center justify-between mt-1">
                                                     <span className="text-xs text-[#4a3728]/50 uppercase">{img.format}</span>

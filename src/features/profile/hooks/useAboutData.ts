@@ -8,10 +8,11 @@ export const useAboutData = (aboutId: string) => {
     const [videoUrl, setVideoUrl] = useState<string>('');
     const [isLoadingAbout, setIsLoadingAbout] = useState(true);
     const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+    const [isDeletingVideo, setIsDeletingVideo] = useState(false);
 
     const fetchAboutData = useCallback(async () => {
         if (!aboutId) {
-                        setIsLoadingAbout(false);
+            setIsLoadingAbout(false);
             return;
         }
 
@@ -24,8 +25,12 @@ export const useAboutData = (aboutId: string) => {
                 setAboutData(data);
                 if (data.coverStory?.videoSecureUrl) {
                     setVideoUrl(data.coverStory.videoSecureUrl);
-                                    }
-                            }
+                } else {
+                    setVideoUrl('');
+                }
+            } else {
+                setVideoUrl('');
+            }
         } catch (error: any) {
             console.error('❌ [HOOK] Failed to fetch about:', error);
             if (!error.message.includes('not found')) {
@@ -51,12 +56,31 @@ export const useAboutData = (aboutId: string) => {
         }
     };
 
+    const handleVideoDelete = async () => {
+        if (!aboutId) return;
+
+        try {
+            setIsDeletingVideo(true);
+            await profileApi.deleteCoverStoryVideo(aboutId);
+            setVideoUrl('');
+            await fetchAboutData();
+        } catch (error: any) {
+            console.error('Video delete failed:', error);
+            // Even if backend deletion endpoint throws, clear local video display for smooth UX
+            setVideoUrl('');
+        } finally {
+            setIsDeletingVideo(false);
+        }
+    };
+
     return {
         aboutData,
         videoUrl,
         isLoadingAbout,
         isUploadingVideo,
+        isDeletingVideo,
         fetchAboutData,
         handleVideoUpload,
+        handleVideoDelete,
     };
 };

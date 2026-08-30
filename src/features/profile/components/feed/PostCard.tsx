@@ -74,7 +74,7 @@ const PostCard = ({
     >
       <div className="absolute inset-0 bg-gradient-to-br from-[#6b5643]/3 via-[#8b7355]/3 to-[#4a3728]/3 rounded-3xl"></div>
       <div className="relative z-10 flex flex-col justify-between h-full flex-1 min-h-0">
-      <div className="overflow-hidden flex-1 min-h-0">
+      <div className="flex-1 min-h-0">
       <PostHeader
             currentUserId={currentUserId}
             post={post}

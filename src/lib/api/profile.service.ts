@@ -670,6 +670,39 @@ class ProfileService {
     }
 
     /**
+    * 🗑️ Delete Cover Story Video
+    */
+    static async deleteCoverStoryVideo(aboutId: string): Promise<any> {
+        try {
+            console.log('🗑️ [DELETE_VIDEO] Deleting cover story video...', { aboutId });
+
+            const { data } = await api.delete(
+                `${config?.NEXT_PUBLIC_ABOUT_ENDPOINT || process.env.NEXT_PUBLIC_ABOUT_ENDPOINT}/delete-video/${aboutId}`
+            );
+
+            console.log('✅ [DELETE_VIDEO] Video deleted successfully', data);
+            return data;
+
+        } catch (error: any) {
+            console.error('❌ [DELETE_VIDEO] Delete failed', error);
+
+            if (axios.isAxiosError(error)) {
+                const apiError = error.response?.data as ApiError;
+
+                if (error.response?.status === 404) {
+                    throw new Error('About section or video not found');
+                }
+
+                if (apiError?.message) {
+                    throw new Error(apiError.message);
+                }
+            }
+
+            throw new Error('Failed to delete video. Please try again.');
+        }
+    }
+
+    /**
     * 🎓 Create Education
     */
     static async createEducation(educationData: {

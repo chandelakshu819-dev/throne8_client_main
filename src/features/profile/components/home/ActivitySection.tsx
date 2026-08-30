@@ -672,6 +672,7 @@ const postForCard = isQuote
       handleEmojiClick={handlers.handleEmojiClick}
       currentUserId={currentUserId || ''}
       isDarkMode={false}
+      emojiList={undefined}
     />
   </div>
 ) : null}
@@ -733,19 +734,18 @@ const VideoCard = ({ post, video }: { post: any; video: any }) => {
 
 const ImageCard = ({ post, img }: { post: any; img: any }) => {
   return (
-    <div className="group bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/40 to-[#f6ede8]/30 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-500 border border-[#e0d8cf]/40">
-      <div className="relative overflow-hidden h-56">
+    <div className="group bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/40 to-[#f6ede8]/30 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-500 border border-[#e0d8cf]/40 flex flex-col h-full">
+      <div className="relative overflow-hidden h-56 bg-black flex items-center justify-center">
         <img
           src={img.cloudinarySecureUrl}
           alt={post.title}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
           onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=500&h=500&fit=crop'; }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       </div>
-      <div className="p-4">
+      <div className="p-4 flex-shrink-0">
         <p className="text-[#4a3728] font-semibold text-sm truncate">{post.title}</p>
-      
       </div>
     </div>
   );
@@ -1051,9 +1051,9 @@ const engagementPercent = analyticsData
   }, [currentUserId]);
 
   const ShowAllButton = ({ label }: { label: string }) => (
-    <button onClick={() => setShowAllModal(true)} className="w-full group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border-2 border-dashed border-[#4a3728]/30 hover:border-[#4a3728]/50 rounded-2xl p-6 transition-all duration-300 flex items-center justify-center gap-3 relative z-30">
-      <span className="text-[#4a3728] font-bold text-lg">{label}</span>
-      <svg className="w-5 h-5 text-[#4a3728] group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <button onClick={() => setShowAllModal(true)} className="w-full group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border border-solid border-[#4a3728]/30 hover:border-[#4a3728]/60 rounded-2xl py-3 px-4 transition-all duration-300 flex items-center justify-center gap-2 relative z-30">
+      <span className="text-[#4a3728] font-bold text-sm md:text-base">{label}</span>
+      <svg className="w-4 h-4 text-[#4a3728] group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
       </svg>
     </button>
@@ -1371,7 +1371,7 @@ const engagementPercent = analyticsData
                       if (item.type === 'repost') {
                         return (
                           // <div key={'repost-' + item.data.repostId} className="w-[calc(100%-16px)] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-11px)] flex-shrink-0 flex flex-col h-[560px]">
-<div key={'repost-' + item.data.repostId} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col h-[500px]">                            
+<div key={'repost-' + item.data.repostId} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col h-[520px]">                            
                           <RepostCard
                               repost={item.data}
                               onDeleteRepost={onDeleteRepost}
@@ -1400,8 +1400,7 @@ const engagementPercent = analyticsData
                       const idxToUse = originalIndex !== -1 ? originalIndex : idx;
 
                       return (
-                        // <div key={'post-' + postKey} className="w-[calc(100%-16px)] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-11px)] flex-shrink-0 flex flex-col h-[560px]">
-                        <div key={'post-' + postKey} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col h-[500px]">
+                        <div key={'post-' + postKey} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col h-[520px]">
                           <PostCard
                             post={post}
                             index={idxToUse}
@@ -1493,7 +1492,7 @@ const engagementPercent = analyticsData
                   </div>
                 </div>
                 {hasMorePosts ? (
-                  <div className="relative z-30 mt-6 w-full">
+                  <div className="relative z-30 mt-4 w-full">
                     <ShowAllButton label={'Show All Posts (' + (filteredPosts.length + userReposts.length) + ')'} />
                   </div>
                 ) : null}
@@ -1537,7 +1536,7 @@ const engagementPercent = analyticsData
                   {userComments.length > visibleCommentsCount ? (
                     <button
                       onClick={() => setVisibleCommentsCount((prev) => prev + 3)}
-                      className="w-full mt-6 group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border-2 border-dashed border-[#4a3728]/30 hover:border-[#4a3728]/50 rounded-2xl p-4 transition-all duration-300 flex items-center justify-center gap-2 relative z-30 text-[#4a3728] font-bold text-sm"
+                      className="w-full mt-6 group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border-2 border-solid border-[#4a3728]/30 hover:border-[#4a3728]/60 rounded-2xl p-4 transition-all duration-300 flex items-center justify-center gap-2 relative z-30 text-[#4a3728] font-bold text-sm"
                     >
                       <span>Show More</span>
                       <svg className="w-4 h-4 text-[#4a3728] group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1579,7 +1578,7 @@ const engagementPercent = analyticsData
                   {allImages.length > visibleImagesCount ? (
                     <button
                       onClick={() => setVisibleImagesCount((prev) => prev + 3)}
-                      className="w-full mt-6 group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border-2 border-dashed border-[#4a3728]/30 hover:border-[#4a3728]/50 rounded-2xl p-4 transition-all duration-300 flex items-center justify-center gap-2 relative z-30 text-[#4a3728] font-bold text-sm"
+                      className="w-full mt-6 group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border-2 border-solid border-[#4a3728]/30 hover:border-[#4a3728]/60 rounded-2xl p-4 transition-all duration-300 flex items-center justify-center gap-2 relative z-30 text-[#4a3728] font-bold text-sm"
                     >
                       <span>Show all images</span>
                       <svg className="w-4 h-4 text-[#4a3728] group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1909,6 +1908,8 @@ const engagementPercent = analyticsData
                       handleEmojiClick={handlers.handleEmojiClick}
                       currentUserId={currentUserId || ''}
                       isDarkMode={false}
+                      handleEditSubmit={handlers.handleEditSubmit}
+                      emojiList={undefined}
                     />
                   </div>
                 ) : null}

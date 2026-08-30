@@ -2,7 +2,7 @@
 'use client';
 import AuthService from '@/lib/api/auth.service';
 import ProfileService from '@/lib/api/profile.service';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 interface AboutSectionProps {
     aboutData?: any;
@@ -11,7 +11,9 @@ interface AboutSectionProps {
     aboutId?: string;
     videoUrl?: string;
     onVideoUpload?: (file: File) => Promise<void>;
+    onVideoDelete?: () => Promise<void>;
     isUploadingVideo?: boolean;
+    isDeletingVideo?: boolean;
     isOwnProfile?: boolean; // ✅ NAYA PROP
 }
 
@@ -24,7 +26,9 @@ const AboutSection: React.FC<AboutSectionProps> = ({
     aboutId,
     videoUrl,
     onVideoUpload,
+    onVideoDelete,
     isUploadingVideo = false,
+    isDeletingVideo = false,
     isOwnProfile = true, // ✅ default true, purana behavior nahi tootega
 }) => {
     const [isEditMode, setIsEditMode] = useState(false);
@@ -33,6 +37,22 @@ const AboutSection: React.FC<AboutSectionProps> = ({
     const [error, setError] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isAboutExpanded, setIsAboutExpanded] = useState(false); // ✅ NAYA STATE for read more/less
+    const [isVideoMenuOpen, setIsVideoMenuOpen] = useState(false);
+    const videoMenuRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // ✅ Close video dropdown menu on click outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (videoMenuRef.current && !videoMenuRef.current.contains(event.target as Node)) {
+                setIsVideoMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     useEffect(() => {
         if (aboutData?.aboutText) {
@@ -279,16 +299,71 @@ const AboutSection: React.FC<AboutSectionProps> = ({
                                         </video>
 
                                         {isOwnProfile && (
-                                            <label className="absolute top-2 right-2 bg-[#4a3728]/80 text-white px-3 py-1 text-xs rounded-md hover:bg-[#4a3728] transition cursor-pointer">
-                                                {isUploadingVideo ? 'Uploading...' : '🔄 Replace'}
+                                            <div className="absolute top-2 right-2 z-20" ref={videoMenuRef}>
+                                                {/* 3-Dot Options Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsVideoMenuOpen((prev) => !prev)}
+                                                    disabled={isUploadingVideo || isDeletingVideo}
+                                                    className="w-8 h-8 rounded-full bg-[#4a3728]/80 text-white hover:bg-[#4a3728] transition flex items-center justify-center shadow-md focus:outline-none"
+                                                    title="Options"
+                                                >
+                                                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                                                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                                                    </svg>
+                                                </button>
+
+                                                {/* Dropdown Menu */}
+                                                {isVideoMenuOpen && (
+                                                    <div className="absolute right-0 mt-2 w-36 bg-white rounded-xl shadow-xl border border-[#e0d8cf] py-1 z-30 animate-in fade-in zoom-in-95 duration-150">
+                                                        {/* Replace Option */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setIsVideoMenuOpen(false);
+                                                                fileInputRef.current?.click();
+                                                            }}
+                                                            disabled={isUploadingVideo || isDeletingVideo}
+                                                            className="w-full text-left px-4 py-2 text-xs font-semibold text-[#4a3728] hover:bg-[#f6ede8] flex items-center gap-2 transition disabled:opacity-50"
+                                                        >
+                                                            <svg className="w-4 h-4 text-[#4a3728]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                            </svg>
+                                                            {isUploadingVideo ? 'Replacing...' : 'Replace'}
+                                                        </button>
+
+                                                        {/* Delete Option */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                setIsVideoMenuOpen(false);
+                                                                if (confirm('Are you sure you want to delete this video?')) {
+                                                                    if (onVideoDelete) {
+                                                                        await onVideoDelete();
+                                                                    }
+                                                                }
+                                                            }}
+                                                            disabled={isUploadingVideo || isDeletingVideo}
+                                                            className="w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 transition disabled:opacity-50"
+                                                        >
+                                                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                            {isDeletingVideo ? 'Deleting...' : 'Delete'}
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {/* Hidden File Input for Replace */}
                                                 <input
+                                                    ref={fileInputRef}
                                                     type="file"
                                                     accept="video/mp4,video/webm,video/quicktime"
                                                     onChange={handleVideoUpload}
-                                                    disabled={isUploadingVideo}
+                                                    disabled={isUploadingVideo || isDeletingVideo}
                                                     className="hidden"
                                                 />
-                                            </label>
+                                            </div>
                                         )}
                                     </div>
                                 ) : isOwnProfile ? (

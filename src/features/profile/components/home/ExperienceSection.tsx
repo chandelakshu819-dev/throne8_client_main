@@ -484,7 +484,7 @@ const ExperienceSection: React.FC<ExperienceSectionProps> = ({
 
                 <div className="grid grid-cols-5 gap-3 min-w-0">
                     <div className="col-span-2 relative min-w-0">
-                        <div className="absolute left-5 top-12 bottom-12 w-0.5 bg-gradient-to-b from-[#8b6f47] via-[#d4c4b5] to-[#8b6f47]/30"></div>
+                        <div className={`absolute left-5 top-5 ${experiences.length > 3 ? 'bottom-28' : 'bottom-5'} w-0.5 bg-gradient-to-b from-[#4a3728] via-[#8b6f47] to-[#d4c4b5]`}></div>
                         <div className="space-y-10 relative">
                             {experiences.slice(0, 3).map((exp, i) => {
                                 const active = i === currentIndex;
@@ -496,14 +496,15 @@ const ExperienceSection: React.FC<ExperienceSectionProps> = ({
                                     >
                                         <div className="relative z-10 flex-shrink-0">
                                             <div
-                                                className={`w-10 h-10 rounded-full border-4 flex items-center justify-center transition-all duration-500 shadow-xl overflow-hidden
-                                                ${active
-                                                        ? 'bg-[#4a3728] border-[#f6ede8] scale-125 shadow-2xl'
-                                                        : 'bg-white border-[#d4c4b5] hover:border-[#8b6f47] group-hover:scale-110'
-                                                    }
-                                            `}
+                                                className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-300 shadow-md ${
+                                                    active
+                                                        ? 'bg-gradient-to-br from-[#4a3728] via-[#5c4634] to-[#7a5c3e] border-[#f6ede8] text-[#f6ede8] scale-110 shadow-xl'
+                                                        : 'bg-[#f6ede8] border-[#4a3728]/30 text-[#4a3728] hover:border-[#4a3728] group-hover:scale-105'
+                                                }`}
                                             >
-                                                <img src={exp.logo} alt={exp.company} className="w-8 h-8 object-contain" />
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M3 21h18M3 7v14M21 7v14M6 21V7a2 2 0 012-2h8a2 2 0 012 2v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" />
+                                                </svg>
                                             </div>
                                         </div>
 

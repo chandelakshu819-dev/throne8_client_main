@@ -57,7 +57,7 @@ const RecentPosts: React.FC<RecentPostsProps> = ({ isDarkMode, userPosts }) => {
       <div className="space-y-3">
         {sortedPosts.slice(0, 3).map((post) => (
           <div
-            key={post.postId}
+          key={post.entryId || post.postId}
             onClick={goToActivity}
             className={`rounded-xl p-3 border transition-all duration-300 hover:scale-105 cursor-pointer ${
               isDarkMode

@@ -37,5 +37,10 @@ export const profileApi = {
     // Upload cover story video
     async uploadCoverStoryVideo(aboutId: string, file: File) {
         return await ProfileService.uploadCoverStoryVideo(aboutId, file);
+    },
+
+    // Delete cover story video
+    async deleteCoverStoryVideo(aboutId: string) {
+        return await ProfileService.deleteCoverStoryVideo(aboutId);
     }
 };

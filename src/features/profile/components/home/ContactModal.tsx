@@ -49,24 +49,24 @@ interface IMHandle {
 }
 
 const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
-    const [profileUrl, setProfileUrl] = useState('your-custom-url');
+    const [profileUrl, setProfileUrl] = useState('');
     const [emails, setEmails] = useState<EmailEntry[]>([
-        { id: '1', value: 'primary@example.com', privacy: 'public' }
+        { id: '1', value: '', privacy: 'public' }
     ]);
     const [phones, setPhones] = useState<PhoneEntry[]>([
-        { id: '1', value: '+1 (555) 123-4567', privacy: 'limited' }
+        { id: '1', value: '', privacy: 'limited' }
     ]);
-    const [birthday, setBirthday] = useState('1995-05-15');
+    const [birthday, setBirthday] = useState('');
     const [hideYear, setHideYear] = useState(false);
-    const [address, setAddress] = useState('San Francisco, CA, USA');
+    const [address, setAddress] = useState('');
     const [addressPrivacy, setAddressPrivacy] = useState<'public' | 'registered' | 'limited' | 'private'>('limited');
     const [websites, setWebsites] = useState<WebsiteEntry[]>([
-        { id: '1', value: 'https://example.com', label: 'Portfolio' }
+        { id: '1', value: '', label: '' }
     ]);
     const [imHandles, setImHandles] = useState<IMHandle[]>([
-        { id: '1', platform: 'whatsapp', value: '+1 (555) 123-4567' }
+        { id: '1', platform: 'whatsapp', value: '' }
     ]);
-    const [twitter, setTwitter] = useState('@yourhandle');
+    const [twitter, setTwitter] = useState('');
     const [connectedApps, setConnectedApps] = useState({
         instagram: false,
         linkedin: false,

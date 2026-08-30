@@ -84,11 +84,11 @@ const ShowAllExperiencesModal: React.FC<ShowAllExperiencesModalProps> = ({
                                         }`}
                                     >
                                         <div className="flex items-start gap-3">
-                                            <img
-                                                src={exp.logo}
-                                                alt={exp.company}
-                                                className="w-8 h-8 object-contain flex-shrink-0 mt-1"
-                                            />
+                                            <div className={`p-2 rounded-lg flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-[#f6ede8] text-[#4a3728]' : 'bg-[#4a3728] text-[#f6ede8]'}`}>
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M3 21h18M3 7v14M21 7v14M6 21V7a2 2 0 012-2h8a2 2 0 012 2v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" />
+                                                </svg>
+                                            </div>
                                             <div className="flex-1 min-w-0">
                                                 <h4 className="font-bold text-sm leading-tight truncate">
                                                     {exp.company.split(' (')[0]}
@@ -121,11 +121,11 @@ const ShowAllExperiencesModal: React.FC<ShowAllExperiencesModalProps> = ({
                             <div className="space-y-4">
                                 <div className="bg-[#e0d8cf]/70 rounded-lg p-4 border border-[#d4c4b5] shadow-md">
                                     <div className="flex items-center gap-3 mb-2">
-                                        <img
-                                            src={selectedExp.logo}
-                                            alt={selectedExp.company}
-                                            className="w-10 h-10 object-contain"
-                                        />
+                                        <div className="p-2 bg-[#4a3728] text-[#f6ede8] rounded-lg flex items-center justify-center flex-shrink-0">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M3 21h18M3 7v14M21 7v14M6 21V7a2 2 0 012-2h8a2 2 0 012 2v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" />
+                                            </svg>
+                                        </div>
                                         <div>
                                             <h5 className="text-xs font-bold text-[#4a3728] uppercase">Company</h5>
                                             <p className="text-sm font-bold text-[#6b5038]">{selectedExp.company}</p>
