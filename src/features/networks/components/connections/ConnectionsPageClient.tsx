@@ -13,6 +13,7 @@ import {
     Calendar,
     Newspaper,
     Hash,
+    EyeOff,
 } from 'lucide-react';
 import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData';
 import { useFollowListsData } from '@/features/profile/hooks/useFollowListsData';
@@ -194,6 +195,7 @@ const ConnectionsPageClient: React.FC = () => {
 
     const quickLinks = [
         { label: 'Saved posts', icon: Bookmark },
+        { label: 'Hidden posts', icon: EyeOff },
         { label: 'Groups', icon: Users2 },
         { label: 'Events', icon: Calendar },
         { label: 'Followed Hashtags', icon: Hash },
@@ -363,21 +365,23 @@ const ConnectionsPageClient: React.FC = () => {
                         </div>
                         <div className="py-2">
                         {quickLinks.map(({ label, icon: Icon }) => (
-    <button
-        key={label}
-        onClick={() => {
-            if (label === 'Saved posts') {
-                router.push('/profile/saved-posts');
-            } else {
-                alert('Coming soon');
-            }
-        }}
-        className="w-full flex items-center gap-3 px-5 py-3 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors text-left"
-    >
-        <Icon className="w-4 h-4 text-[#4a3728]/70 flex-shrink-0" />
-        {label}
-    </button>
-  ))}
+                            <button
+                                key={label}
+                                onClick={() => {
+                                    if (label === 'Saved posts') {
+                                        router.push('/profile/saved-posts');
+                                    } else if (label === 'Hidden posts') {
+                                        router.push('/profile/hidden-posts');
+                                    } else {
+                                        alert('Coming soon');
+                                    }
+                                }}
+                                className="w-full flex items-center gap-3 px-5 py-3 text-sm text-[#4a3728] hover:bg-[#f6ede8] transition-colors text-left"
+                            >
+                                <Icon className="w-4 h-4 text-[#4a3728]/70 flex-shrink-0" />
+                                {label}
+                            </button>
+                        ))}
                         </div>
                     </div>
                 </div>

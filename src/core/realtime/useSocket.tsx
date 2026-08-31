@@ -31,7 +31,8 @@ export function useSocket() {
             });
 
             return () => {
-                disconnectSocket();
+                socketInstance.off('connect');
+                socketInstance.off('disconnect');
             };
         } catch (error) {
             console.error('❌ [useSocket] Failed to initialize:', error);

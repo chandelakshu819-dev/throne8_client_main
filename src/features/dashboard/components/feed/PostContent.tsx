@@ -17,9 +17,7 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
 
   const displayNode = expanded
     ? renderFormattedContent(content)
-    : isMultiline
-    ? renderFormattedLine(firstLine)
-    : renderFormattedContent(content);
+    : renderFormattedLine(firstLine);
 
   // ✅ Multi-image support (LinkedIn-style grid)
   const images: any[] = post.images || [];
@@ -31,7 +29,7 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
   };
 
 const getTileClass = (index: number): string => {
-    const classes = ['relative', 'overflow-hidden', 'bg-black/5'];
+    const classes = ['relative', 'overflow-hidden', isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'];
 
     const isFirstOfThree = imageCount === 3 && index === 0;
     if (isFirstOfThree) {
@@ -39,7 +37,7 @@ const getTileClass = (index: number): string => {
     }
 
     if (imageCount === 1) {
-      classes.push('max-h-[600px]');
+      classes.push(`max-h-[650px] w-full flex items-center justify-center ${isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'} rounded-2xl`);
     } else {
       classes.push('h-[150px]');
       classes.push('sm:h-[200px]');
@@ -90,8 +88,7 @@ const getTileClass = (index: number): string => {
     'font-medium',
     'leading-relaxed',
     'mb-1',
-    'whitespace-pre-wrap',
-    !expanded && isLong ? 'line-clamp-1' : '',
+    expanded ? 'whitespace-pre-wrap' : 'truncate',
     isDarkMode ? 'text-slate-200' : 'text-[#4a3728]',
   ]
     .filter(Boolean)
@@ -126,7 +123,7 @@ const getTileClass = (index: number): string => {
                 <img
                 src={img.cloudinarySecureUrl}
                 alt={'Post image ' + (i + 1)}
-                className={`w-full ${imageCount === 1 ? 'h-auto max-h-[600px] object-contain' : 'h-full object-cover'} hover:scale-[1.02] transition-transform duration-500`}
+                className={`w-full ${imageCount === 1 ? 'h-auto max-h-[650px] object-contain rounded-2xl' : 'h-full object-cover'} hover:scale-[1.01] transition-transform duration-500`}
               />
                 {isOverlayTile && extraCount > 0 && (
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
@@ -143,7 +140,7 @@ const getTileClass = (index: number): string => {
         <div
           onClick={handleVideoContainerClick}
           // ✅ SPACING FIX: mb-6 → mb-3
-          className="mb-3 rounded-2xl overflow-hidden bg-black w-full h-80 flex justify-center cursor-pointer"
+          className={`mb-3 rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'} w-full h-80 flex justify-center cursor-pointer`}
         >
           <video
             src={post.videos[0].cloudinarySecureUrl}

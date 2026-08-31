@@ -49,12 +49,12 @@ const ProfileBanner: React.FC<ProfileBannerProps> = ({
 
     return (
         <>
-                        <div className="relative h-48 w-full overflow-hidden group bg-[#e8dfd7]">
+                        <div className="relative h-56 sm:h-64 w-full rounded-t-2xl overflow-hidden bg-[#e8dfd7]">
                 {hasCustomBanner ? (
                     <img
                         src={currentBannerImage}
                         alt="Banner"
-                        className="w-full h-full object-contain transition-all duration-700 group-hover:scale-110 group-hover:brightness-110"
+                        className="w-full h-full object-cover"
                         onError={(e) => {
                             // ✅ Agar upload ki hui image bhi load fail ho jaye,
                             // to hardcoded default pe mat jao — bas hide kar do.
@@ -68,7 +68,7 @@ const ProfileBanner: React.FC<ProfileBannerProps> = ({
 
                 <div className="absolute inset-0 bg-gradient-to-t from-[#4a3728]/40 to-transparent"></div>
 
-                <div className="absolute bottom-36 left-4 rounded-2xl border-2 text-white/80 text-xs font-medium bg-black/20 px-2 py-1 backdrop-blur-sm">
+                <div className="absolute top-4 left-4 rounded-2xl border-2 border-white/30 text-white/90 text-xs font-medium bg-black/30 px-3 py-1 backdrop-blur-md shadow-sm">
                     ✨ Professional Networker
                 </div>
 

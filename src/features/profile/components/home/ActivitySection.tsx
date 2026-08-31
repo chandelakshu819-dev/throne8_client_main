@@ -23,6 +23,7 @@ import ReportService from '@/lib/api/report.service';
 import AnalyticsService from '@/lib/api/analytics.service'; // ✅ NEW — real post analytics ke liye
 import RepostService from '@/lib/api/repost.service'; // ✅ NEW
 import PostHeader from '../feed/PostHeader'; // ✅ NEW — embed preview ke liye
+import { hidePost, getHiddenPosts, isPostHidden } from '@/lib/utils/hiddenPosts';
 import PostContent from '../feed/PostContent'; // ✅ NEW — embed preview ke liye
 import ReactionsModal from '../feed/ReactionsModal'; // ✅ NEW — embed preview ke likes modal ke liye
 import DeleteConfirmModal from './DeleteConfirmModal';
@@ -783,6 +784,23 @@ const ActivitySection: React.FC<ActivitySectionProps> = (props) => {
   const [visibleCommentsCount, setVisibleCommentsCount] = useState(3);
   const [visibleImagesCount, setVisibleImagesCount] = useState(3);
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const syncHiddenPosts = () => {
+      const hidden = getHiddenPosts();
+      const ids = new Set<string>();
+      hidden.forEach((item) => {
+        if (item.id) ids.add(item.id);
+        if (item.post?.entryId) ids.add(item.post.entryId);
+        if (item.post?.postId) ids.add(item.post.postId);
+        if (item.post?._id) ids.add(item.post._id);
+      });
+      setHiddenPostIds(ids);
+    };
+    syncHiddenPosts();
+    window.addEventListener('hidden_posts_changed', syncHiddenPosts);
+    return () => window.removeEventListener('hidden_posts_changed', syncHiddenPosts);
+  }, []);
   const [reportingPostId, setReportingPostId] = useState<string | null>(null);
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [undoToast, setUndoToast] = useState<any>(null);
@@ -978,8 +996,8 @@ const engagementPercent = analyticsData
   const repostedEntryIds = new Set(userReposts.map((r: any) => r.originalPost ? r.originalPost.entryId : null).filter(Boolean));
 
   const filteredPosts = posts.filter((p: any) => {
-    const key = p.entryId || p.postId;
-    return !repostedEntryIds.has(key) && !hiddenPostIds.has(key);
+    const key = p.entryId || p.postId || p._id || p.id;
+    return !repostedEntryIds.has(key) && !hiddenPostIds.has(key) && !isPostHidden(key);
   });
   const hasMorePosts = (filteredPosts.length + userReposts.length) > 2;
 
@@ -1205,7 +1223,21 @@ const engagementPercent = analyticsData
 
 
 
-    if (action === 'archive' || action === 'hide') {
+    if (action === 'hide') {
+      const realPost = post || posts.find((p: any) => (p.entryId || p.postId || p._id || p.id) === postId);
+      const targetKey = realPost ? (realPost.entryId || realPost.postId || realPost._id || realPost.id) : postId;
+      hidePost(realPost || { id: targetKey, entryId: targetKey });
+      setHiddenPostIds((prev) => {
+        const next = new Set(prev);
+        if (targetKey) next.add(targetKey);
+        if (postId) next.add(postId);
+        return next;
+      });
+      setActionToast({ message: 'Post hidden. You can view it in Hidden Posts under Manage.' });
+      return;
+    }
+
+    if (action === 'archive') {
       await handlers.handleArchivePost(postId);
       setActionToast({ message: 'Post archived.' });
       return;
@@ -1403,7 +1435,7 @@ const engagementPercent = analyticsData
                         <div key={'post-' + postKey} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col h-[520px]">
                           <PostCard
                             post={post}
-                            index={idxToUse}
+                            index={postKey}
                             isOwnProfile={isOwnProfile}
                             profileImage={profileImage}
                             fullName={fullName}

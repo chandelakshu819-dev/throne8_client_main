@@ -82,7 +82,7 @@ const FeedContainer = (props: any) => {
       // ✅ SPACING FIX: space-y-8 → space-y-4 — posts ke beech gap sabse
       // bada spacing culprit tha, poore feed pe iska sabse bada asar padta
       // tha. Loading skeleton bhi consistent rehne ke liye same tight kiya.
-      <main className="postLoader flex-1 space-y-4">
+      <main className="postLoader flex-1 min-w-0 max-w-[640px] w-full space-y-4">
         <div className="space-y-4">
           {[1, 2, 3].map((index) => (
             <PostSkeleton key={`skeleton-${index}`} />
@@ -97,7 +97,7 @@ const FeedContainer = (props: any) => {
   // wala empty state galat trigger na ho
   if (posts.length === 0 && feedReposts.length === 0) {
     return (
-      <main className="flex-1 text-center py-20">
+      <main className="flex-1 min-w-0 max-w-[640px] w-full text-center py-20">
         <p className="text-gray-500 text-lg">No posts available yet</p>
         <p className="text-gray-400 text-sm mt-2">Check back later for updates!</p>
       </main>
@@ -106,7 +106,7 @@ const FeedContainer = (props: any) => {
 
   return (
     // ✅ SPACING FIX: space-y-8 → space-y-4 (see note above)
-    <main className="flex-1 space-y-4">
+    <main className="flex-1 min-w-0 max-w-[640px] w-full space-y-4">
       <RepostProgressBar
         isVisible={showRepostProgressBar}
         progress={repostProgress}

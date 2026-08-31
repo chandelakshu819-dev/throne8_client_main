@@ -484,16 +484,21 @@ const ExperienceSection: React.FC<ExperienceSectionProps> = ({
 
                 <div className="grid grid-cols-5 gap-3 min-w-0">
                     <div className="col-span-2 relative min-w-0">
-                        <div className={`absolute left-5 top-5 ${experiences.length > 3 ? 'bottom-28' : 'bottom-5'} w-0.5 bg-gradient-to-b from-[#4a3728] via-[#8b6f47] to-[#d4c4b5]`}></div>
                         <div className="space-y-10 relative">
                             {experiences.slice(0, 3).map((exp, i) => {
                                 const active = i === currentIndex;
+                                const isLastItem = i === Math.min(experiences.length, 3) - 1;
                                 return (
                                     <div
                                         key={exp.experienceId}
-                                        className="flex items-center gap-5 group cursor-pointer min-w-0"
+                                        className="flex items-center gap-5 group cursor-pointer min-w-0 relative"
                                         onClick={() => setCurrentIndex(i)}
                                     >
+                                        {/* ✅ Continuous connecting line to next item center (stops at last item circle) */}
+                                        {!isLastItem && (
+                                            <div className="absolute left-5 top-5 bottom-0 -mb-10 w-0.5 -translate-x-1/2 bg-gradient-to-b from-[#4a3728] via-[#8b6f47] to-[#d4c4b5] z-0"></div>
+                                        )}
+
                                         <div className="relative z-10 flex-shrink-0">
                                             <div
                                                 className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-300 shadow-md ${

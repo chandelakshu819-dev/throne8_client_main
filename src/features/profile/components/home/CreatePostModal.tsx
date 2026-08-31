@@ -266,22 +266,22 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
             {/* Modal */}
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="bg-gradient-to-br from-[#f6ede8]/95 via-[#f6ede8]/90 to-[#e0d8cf]/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-[#e0d8cf]/60 w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
-                    {/* Close Button */}
-                    <button
-                        onClick={handleClose}
-                        className="absolute top-6 right-6 p-2 text-[#4a3728]/60 hover:text-[#4a3728] hover:bg-[#e0d8cf]/30 rounded-xl transition-all duration-200 z-10"
-                    >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-
                     {/* Header */}
-                    <div className="sticky top-0 bg-gradient-to-r from-[#f6ede8] via-[#f6ede8] to-[#e0d8cf]/50 backdrop-blur-sm p-8 border-b border-[#e0d8cf]/30">
+                    <div className="sticky top-0 bg-gradient-to-r from-[#f6ede8] via-[#f6ede8] to-[#e0d8cf]/50 backdrop-blur-sm p-8 border-b border-[#e0d8cf]/30 flex items-center justify-between z-20">
                         <div className="flex items-center gap-3">
                             <div className="w-2 h-8 bg-gradient-to-b from-[#4a3728] to-[#7a5c3e] rounded-full"></div>
                             <h2 className="text-3xl font-bold text-[#4a3728] tracking-tight">Create a Post</h2>
                         </div>
+                        {/* Close Button */}
+                        <button
+                            type="button"
+                            onClick={handleClose}
+                            className="p-2 text-[#4a3728]/60 hover:text-[#4a3728] hover:bg-[#e0d8cf]/30 rounded-xl transition-all duration-200"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
                     </div>
               {/* Form Content */}
              <form onSubmit={handleSubmit} className="p-8 pt-10 space-y-6">
@@ -364,7 +364,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
                                 </svg>
                                 Attach Images
                             </label>
-                            <label htmlFor="image-upload" className="block px-4 py-3 bg-[#e0d8cf]/30 border-2 border-dashed border-[#4a3728]/30 rounded-xl text-center cursor-pointer hover:bg-[#e0d8cf]/50 hover:border-[#4a3728]/50 transition-all duration-300">
+                            <label htmlFor="image-upload" className="block px-4 py-3 bg-[#e0d8cf]/30 border-2 border-solid border-[#4a3728]/30 rounded-xl text-center cursor-pointer hover:bg-[#e0d8cf]/50 hover:border-[#4a3728]/50 transition-all duration-300">
                                 <input
                                     id="image-upload"
                                     type="file"
@@ -405,7 +405,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
                                 </svg>
                                 Attach Videos
                             </label>
-                            <label htmlFor="video-upload" className="block px-4 py-3 bg-[#e0d8cf]/30 border-2 border-dashed border-[#4a3728]/30 rounded-xl text-center cursor-pointer hover:bg-[#e0d8cf]/50 hover:border-[#4a3728]/50 transition-all duration-300">
+                            <label htmlFor="video-upload" className="block px-4 py-3 bg-[#e0d8cf]/30 border-2 border-solid border-[#4a3728]/30 rounded-xl text-center cursor-pointer hover:bg-[#e0d8cf]/50 hover:border-[#4a3728]/50 transition-all duration-300">
                                 <input
                                     id="video-upload"
                                     type="file"
@@ -450,7 +450,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, onSu
                                 </svg>
                                 Attach Documents
                             </label>
-                            <label htmlFor="document-upload" className="block px-4 py-3 bg-[#e0d8cf]/30 border-2 border-dashed border-[#4a3728]/30 rounded-xl text-center cursor-pointer hover:bg-[#e0d8cf]/50 hover:border-[#4a3728]/50 transition-all duration-300">
+                            <label htmlFor="document-upload" className="block px-4 py-3 bg-[#e0d8cf]/30 border-2 border-solid border-[#4a3728]/30 rounded-xl text-center cursor-pointer hover:bg-[#e0d8cf]/50 hover:border-[#4a3728]/50 transition-all duration-300">
                                 <input
                                     id="document-upload"
                                     type="file"

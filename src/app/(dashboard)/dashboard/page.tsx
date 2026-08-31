@@ -1455,7 +1455,7 @@ if (post?.userId && post.userId !== user?.userId) {
                 </div>
 
                 {/* Main Content Wrapper */}
-                <div className="flex flex-col lg:flex-row flex-1 gap-4 lg:gap-6">
+                <div className="flex flex-col lg:flex-row flex-1 gap-4 lg:gap-6 min-w-0">
                     {/* Mobile Search Bar - appears at top on phone */}
                     <div className="lg:hidden w-full">
                         <Right

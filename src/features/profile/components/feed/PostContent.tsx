@@ -1,6 +1,7 @@
 // src/features/profile/components/feed/PostContent.tsx
 import React, { useState } from 'react';
 import AnalyticsService from '@/lib/api/analytics.service';
+import { renderFormattedContent, renderFormattedLine } from '@/shared/utils/postContentFormat';
 
 const extractImageUrl = (item: any): string | null => {
   if (!item) return null;
@@ -18,7 +19,7 @@ const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = fals
   const [expanded, setExpanded] = useState(!!forceExpanded);
   const [currentImgIndex, setCurrentImgIndex] = useState(0);
 
-  const content: string = post.content || post.title || '';
+  const content: string = post.content || post.text || post.title || post.caption || post.description || '';
   
   // Get lines and filter out empty ones to find the first real line
   const lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
@@ -27,6 +28,10 @@ const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = fals
   const isMultiline = lines.length > 1;
   const isTooLong = content.length > 40;
   const isLong = isMultiline || isTooLong;
+
+  const displayNode = expanded
+    ? renderFormattedContent(content)
+    : renderFormattedLine(firstLine);
 
   const rawImages: any[] = Array.isArray(post.images) && post.images.length > 0
     ? post.images
@@ -50,14 +55,15 @@ const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = fals
 
   return (
     <>
-      <p className={`text-base font-medium leading-relaxed mb-2 whitespace-pre-wrap ${!expanded && isLong ? 'line-clamp-1' : ''} ${isDarkMode ? 'text-slate-200' : 'text-[#4a3728]'}`}>
-        {expanded ? content : (isMultiline ? firstLine : content)}
+      <p className={`text-base font-medium leading-relaxed mb-2 ${expanded ? 'whitespace-pre-wrap' : 'truncate'} ${isDarkMode ? 'text-slate-200' : 'text-[#4a3728]'}`}>
+        {displayNode}
       </p>
 
       {isLong && (
         <button
-          onClick={() => {
-            if (disableToggle) return; // card ke andar: sirf bubble ho ke modal khole, khud expand na ho
+          onClick={(e) => {
+            if (disableToggle) return; // card ke andar: bubble hone do taaki parent handleOpenDetailModal modal khole
+            e.stopPropagation();
             setExpanded(v => !v);
           }}
           className={`text-sm font-semibold mb-4 ${isDarkMode ? 'text-slate-300 hover:text-white' : 'text-[#6b5643] hover:text-[#4a3728]'}`}
@@ -67,7 +73,7 @@ const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = fals
       )}
 
       {!hideMedia && imageList.length > 0 && (
-        <div className="relative mb-2 rounded-2xl overflow-hidden bg-black w-full h-52 md:h-60 flex items-center justify-center flex-shrink-0">
+        <div className={`relative mb-2 rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'} w-full h-52 md:h-60 flex items-center justify-center flex-shrink-0`}>
           <img
             src={imageList[currentImgIndex]}
             alt="Post content"
@@ -110,7 +116,7 @@ const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = fals
       )}
 
       {post.videos && post.videos.length > 0 && (
-        <div className="mb-6 rounded-2xl overflow-hidden bg-black w-full h-64 flex justify-center">
+        <div className={`mb-6 rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'} w-full h-64 flex justify-center`}>
           <video
             src={post.videos[0].cloudinarySecureUrl}
             controls
