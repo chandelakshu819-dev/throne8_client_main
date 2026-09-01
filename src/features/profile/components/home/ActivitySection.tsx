@@ -1609,12 +1609,22 @@ const engagementPercent = analyticsData
                   </div>
                   {allImages.length > visibleImagesCount ? (
                     <button
-                      onClick={() => setVisibleImagesCount((prev) => prev + 3)}
+                      onClick={() => setVisibleImagesCount(allImages.length)}
                       className="w-full mt-6 group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border-2 border-solid border-[#4a3728]/30 hover:border-[#4a3728]/60 rounded-2xl p-4 transition-all duration-300 flex items-center justify-center gap-2 relative z-30 text-[#4a3728] font-bold text-sm"
                     >
                       <span>Show all images</span>
                       <svg className="w-4 h-4 text-[#4a3728] group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  ) : visibleImagesCount > 3 ? (
+                    <button
+                      onClick={() => setVisibleImagesCount(3)}
+                      className="w-full mt-6 group bg-gradient-to-r from-[#4a3728]/10 via-[#4a3728]/5 to-[#e0d8cf]/20 hover:from-[#4a3728]/20 hover:via-[#4a3728]/15 hover:to-[#e0d8cf]/30 border-2 border-solid border-[#4a3728]/30 hover:border-[#4a3728]/60 rounded-2xl p-4 transition-all duration-300 flex items-center justify-center gap-2 relative z-30 text-[#4a3728] font-bold text-sm"
+                    >
+                      <span>Show less</span>
+                      <svg className="w-4 h-4 text-[#4a3728] group-hover:-translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" />
                       </svg>
                     </button>
                   ) : null}

@@ -13,8 +13,8 @@ export const transformToProfileData = (
     return {
         bannerImage: '', // ✅ hardcoded unsplash URL hataya — pages already alag bannerUrl use kar rahe hain
         profileImage: profileImageUrl,
-        pronouns: userProfileData?.pronouns || '', // ✅ hardcode hataya; abhi empty rahega jab tak backend field na bheje
-        description: userProfileData?.bio || '', // ✅ hardcode hataya; abhi empty rahega jab tak backend field na bheje
+        pronouns: (userProfileData as any)?.pronouns || '',
+        description: (userProfileData as any)?.bio || '',
         followers: 0,
         connections: '',
         userName: userProfileData?.firstName || '',

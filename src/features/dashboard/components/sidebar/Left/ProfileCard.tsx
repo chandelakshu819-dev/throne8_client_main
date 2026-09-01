@@ -105,10 +105,12 @@ const ProfileCard: React.FC<ProfileCardProps> = ({currentUserId, isDarkMode }) =
         {/* ✅ SPACING FIX: mb-6 → mb-4 — image aur naam ke beech gap tight kiya */}
         <div className="relative inline-block mb-4">
           <img
-            // src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face"
-            src={profileData.profileImage}
+            src={profileData.profileImage && profileData.profileImage.trim() !== '' ? profileData.profileImage : `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName || 'User')}&background=4a3728&color=fff&size=256`}
             alt="Profile"
-            className="w-32 h-32 rounded-3xl object-cover text-black flex justify-center items-center border-4 border-[#6b5643] shadow-2xl"
+            className="w-32 h-32 rounded-3xl object-cover text-black flex justify-center items-center border-4 border-[#6b5643] shadow-2xl bg-[#4a3728]"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName || 'User')}&background=4a3728&color=fff&size=256`;
+            }}
           />
         </div>
         <h3 className={`text-2xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>

@@ -29,6 +29,16 @@ interface UpdateSkillModalProps {
 }
 
 const UpdateSkillModal: React.FC<UpdateSkillModalProps> = ({ isOpen, onClose, onUpdateSkill, skill }) => {
+    useEffect(() => {
+        if (isOpen) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [isOpen]);
+
     const [formData, setFormData] = useState<UpdateSkillFormData>({
         skillName: '',
         category: '',

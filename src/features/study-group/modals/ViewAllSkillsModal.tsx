@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X, Pin } from 'lucide-react';
 
 interface Skill {
@@ -21,6 +21,15 @@ interface ViewAllSkillsModalProps {
 }
 
 const ViewAllSkillsModal: React.FC<ViewAllSkillsModalProps> = ({ isOpen, onClose, skills }) => {
+    useEffect(() => {
+        if (isOpen) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [isOpen]);
     const getStrengthLevel = (strength: string) => {
         const levels = {
             beginner: 2,

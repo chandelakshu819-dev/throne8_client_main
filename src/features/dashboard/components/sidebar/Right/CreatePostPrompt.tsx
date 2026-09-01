@@ -54,9 +54,12 @@ const CreatePostPrompt: React.FC<CreatePostPromptProps> = ({ isDarkMode, setIsPo
         }`}
     >
       <img
-        src={profileData.profileImage}
-        className="w-14 h-14 rounded-2xl object-cover border-2 border-[#6b5643]"
+        src={profileData.profileImage && profileData.profileImage.trim() !== '' ? profileData.profileImage : `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.userName || 'User')}&background=4a3728&color=fff&size=128`}
+        className="w-14 h-14 rounded-2xl object-cover border-2 border-[#6b5643] bg-[#4a3728]"
         alt="Profile"
+        onError={(e) => {
+          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profileData.userName || 'User')}&background=4a3728&color=fff&size=128`;
+        }}
       />
       <div className={`text-lg font-semibold ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/70'}`}>
         Create a post...

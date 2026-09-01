@@ -1,6 +1,6 @@
 // src/profile/components/ProfileNavbar.tsx
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Crown, Search as SearchIcon } from 'lucide-react';
 import AuthService from '@/lib/api/auth.service';
 import SearchBar from './SearchBar';
@@ -8,6 +8,7 @@ import ProfileSidePanel from './ProfileSidePanel';
 import { useRouter, usePathname } from 'next/navigation';
 import { MessageNotificationBadge } from './MessageNotificationBadge';
 import { NetworkNotificationBadge } from '@/features/networks/components/notifications/NetworkNotificationBadge';
+import DefaultAvatar from '@/shared/uiComponents/DefaultAvatar';
 
 interface ProfileNavbarProps {
     profileImage: string;
@@ -39,6 +40,11 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [isProfilePanelOpen, setIsProfilePanelOpen] = useState(false);
+    const [imgError, setImgError] = useState(false);
+
+    useEffect(() => {
+        setImgError(false);
+    }, [profileImage]);
 
     const handleMenuClick = async (item: string) => {
         switch (item) {
@@ -220,8 +226,21 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                                     className="flex items-center gap-2 hover:bg-[#EFE3D8] rounded-full pl-1 pr-2 py-1 transition-colors duration-200"
                                 >
-                                    <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-white shadow-sm flex-shrink-0">
-                                        <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+                                    <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-white shadow-sm flex-shrink-0 bg-[#4a3728] flex items-center justify-center">
+                                        {profileImage && profileImage.trim() !== '' && !imgError ? (
+                                            <img
+                                                src={profileImage}
+                                                alt={userName || "Profile"}
+                                                className="w-full h-full object-cover"
+                                                onError={() => setImgError(true)}
+                                            />
+                                        ) : (
+                                            <img
+                                                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(userName || 'User')}&background=4a3728&color=fff&size=128`}
+                                                alt={userName || "Profile"}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        )}
                                     </div>
                                     <span className="text-sm font-medium hidden md:inline text-[#4a3728] whitespace-nowrap">{userName}</span>
                                     <svg

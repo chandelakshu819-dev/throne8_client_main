@@ -55,7 +55,7 @@ export default function NavbarProvider({ children }: { children: React.ReactNode
             {!hideNavbar && (
                 <ProfileNavbar
                     profileImage={profileData.profileImage}
-                    userName={profileData.userName}
+                    userName={fullName !== 'Loading...' && fullName ? fullName : (profileData.userName || user?.email?.split('@')[0] || 'User')}
                     currentUserId={user?.userId}
                 />
             )}

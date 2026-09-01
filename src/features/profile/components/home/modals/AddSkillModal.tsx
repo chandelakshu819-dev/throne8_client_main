@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { createSkillSchema } from '@/features/profile/validators/skillValidation';
 // import { createSkillSchema } from '@/features/profile/schemas/skillValidation';
@@ -22,6 +22,16 @@ const AddSkillModal: React.FC<AddSkillModalProps> = ({
     onClose,
     onAddSkill
 }) => {
+    useEffect(() => {
+        if (isOpen) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [isOpen]);
+
     const [showCustomCategory, setShowCustomCategory] = useState(false);
     const [customCategory, setCustomCategory] = useState('');
     const [errors, setErrors] = useState<Record<string, string>>({});
