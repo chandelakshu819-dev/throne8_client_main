@@ -302,9 +302,9 @@ const AboutSection: React.FC<AboutSectionProps> = ({
 
                                 {/* ✅ Video section — public profile pe sirf tab dikhega jab video already hai, upload option nahi */}
                                 {videoUrl ? (
-                                    <div className="relative min-w-0">
+                                    <div className="relative min-w-0 h-full flex flex-col">
                                         <video
-                                            className="w-full h-40 rounded-xl object-cover"
+                                            className="w-full h-full rounded-xl object-cover"
                                             controls
                                             src={videoUrl}
                                         >
@@ -376,7 +376,7 @@ const AboutSection: React.FC<AboutSectionProps> = ({
                                         )}
                                     </div>
                                 ) : isOwnProfile ? (
-                                    <div className="rounded-xl bg-[#4a3728]/10 border border-[#4a3728]/30 w-full h-40 flex flex-col items-center justify-center gap-2 min-w-0">
+                                    <div className="rounded-xl bg-[#4a3728]/10 border border-[#4a3728]/30 w-full h-full min-h-[160px] flex flex-col items-center justify-center gap-2 min-w-0 p-4">
                                         <div className="w-10 h-10 rounded-full bg-[#4a3728]/20 border border-[#4a3728]/30 flex items-center justify-center text-[#4a3728]/70 flex-shrink-0">
                                             🎬
                                         </div>
