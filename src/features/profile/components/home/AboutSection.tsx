@@ -38,6 +38,7 @@ const AboutSection: React.FC<AboutSectionProps> = ({
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isAboutExpanded, setIsAboutExpanded] = useState(false); // ✅ NAYA STATE for read more/less
     const [isVideoMenuOpen, setIsVideoMenuOpen] = useState(false);
+    const [showDeleteVideoConfirm, setShowDeleteVideoConfirm] = useState(false); // ✅ NEW
     const videoMenuRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,6 +76,18 @@ const AboutSection: React.FC<AboutSectionProps> = ({
             document.body.style.overflow = '';
         };
     }, [isModalOpen]);
+
+    // ✅ NEW: Delete-video confirm modal khulne par bhi background scroll lock ho
+    useEffect(() => {
+        if (showDeleteVideoConfirm) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [showDeleteVideoConfirm]);
 
     const handleOpenModal = (editMode: boolean = false) => {
         setIsEditMode(editMode);
@@ -316,8 +329,8 @@ const AboutSection: React.FC<AboutSectionProps> = ({
                                                 {/* Dropdown Menu */}
                                                 {isVideoMenuOpen && (
                                                     <div className="absolute right-0 mt-2 w-36 bg-white rounded-xl shadow-xl border border-[#e0d8cf] py-1 z-30 animate-in fade-in zoom-in-95 duration-150">
-                                                        {/* Replace Option */}
-                                                        <button
+                                                                                                                {/* Replace Option */}
+                                                                                                                <button
                                                             type="button"
                                                             onClick={() => {
                                                                 setIsVideoMenuOpen(false);
@@ -335,13 +348,9 @@ const AboutSection: React.FC<AboutSectionProps> = ({
                                                         {/* Delete Option */}
                                                         <button
                                                             type="button"
-                                                            onClick={async () => {
+                                                            onClick={() => {
                                                                 setIsVideoMenuOpen(false);
-                                                                if (confirm('Are you sure you want to delete this video?')) {
-                                                                    if (onVideoDelete) {
-                                                                        await onVideoDelete();
-                                                                    }
-                                                                }
+                                                                setShowDeleteVideoConfirm(true); // ✅ native confirm() ki jagah custom modal khulega
                                                             }}
                                                             disabled={isUploadingVideo || isDeletingVideo}
                                                             className="w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 transition disabled:opacity-50"
@@ -477,6 +486,63 @@ const AboutSection: React.FC<AboutSectionProps> = ({
                                 className="flex-1 px-6 py-3 rounded-full bg-gradient-to-r from-[#4a3728] to-[#6a5748] text-white font-semibold hover:shadow-lg transition-all disabled:opacity-50"
                             >
                                 {isSaving ? 'Saving...' : isEditMode ? 'Update About' : 'Add About'}
+                            </button>
+                        </div>
+                        </div>
+                </div>
+            )}
+
+            {/* ✅ NEW: Custom "Delete video?" confirm modal — native confirm() ki jagah */}
+            {isOwnProfile && showDeleteVideoConfirm && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center">
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        onClick={() => setShowDeleteVideoConfirm(false)}
+                    ></div>
+
+                    <div className="relative z-10 w-full max-w-sm mx-4 bg-[#f6ede8] rounded-2xl shadow-2xl p-6">
+                        <div className="flex items-start justify-between mb-3">
+                            <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+                            <button
+                                onClick={() => setShowDeleteVideoConfirm(false)}
+                                className="text-[#4a3728]/60 hover:text-[#4a3728] transition-colors"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <h3 className="text-lg font-bold text-[#4a3728] mb-1">Delete video?</h3>
+                        <p className="text-sm text-[#4a3728]/70 mb-6">
+                            Are you sure you want to delete this video permanently?
+                        </p>
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowDeleteVideoConfirm(false)}
+                                disabled={isDeletingVideo}
+                                className="px-5 py-2 rounded-full border-2 border-[#e0d8cf] text-[#4a3728] font-semibold text-sm hover:bg-[#e0d8cf]/50 transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    setShowDeleteVideoConfirm(false);
+                                    if (onVideoDelete) {
+                                        await onVideoDelete();
+                                    }
+                                }}
+                                disabled={isDeletingVideo}
+                                className="px-5 py-2 rounded-full bg-red-600 text-white font-semibold text-sm hover:bg-red-700 transition-colors disabled:opacity-50"
+                            >
+                                {isDeletingVideo ? 'Deleting...' : 'Delete'}
                             </button>
                         </div>
                     </div>

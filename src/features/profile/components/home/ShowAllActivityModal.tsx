@@ -248,7 +248,7 @@ const ModalVideoCard = ({ post, video }: { post: any; video: any }) => {
             <div className="relative">
                 <video
                     controls
-                    className="w-full h-64 object-cover bg-black"
+                    className="w-full h-72 object-contain bg-black"
                     src={video.cloudinarySecureUrl}
                     preload="metadata"
                 />
@@ -439,7 +439,7 @@ const ShowAllActivityModal: React.FC<ShowAllActivityModalProps> = ({
                                                             <video
                                                                 key={i}
                                                                 controls
-                                                                className="w-full h-64 rounded-xl bg-black"
+                                                                className="w-full h-72 object-contain rounded-xl bg-black"
                                                                 src={video.cloudinarySecureUrl}
                                                                 preload="metadata"
                                                             />

@@ -716,7 +716,7 @@ const VideoCard = ({ post, video }: { post: any; video: any }) => {
     <div className="group bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/40 to-[#f6ede8]/30 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 border border-[#e0d8cf]/40 relative">
       <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-[#4a3728]/5 to-transparent rounded-full blur-xl group-hover:scale-150 transition-transform duration-700 z-[1]" />
       <div className="relative">
-        <video controls className="w-full h-64 object-cover bg-black" src={video.cloudinarySecureUrl} preload="metadata" />
+        <video controls className="w-full h-72 object-contain bg-black" src={video.cloudinarySecureUrl} preload="metadata" />
         {duration ? (
           <div className="absolute bottom-3 right-3 bg-black/70 text-white px-3 py-1 rounded-lg text-sm font-semibold z-[2]">{duration}</div>
         ) : null}

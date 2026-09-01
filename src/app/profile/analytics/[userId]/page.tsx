@@ -11,10 +11,7 @@ import {
     Search, Calendar, Users, MousePointer, Share2
 } from 'lucide-react';
 import PostImpressionsModal from '../../../../features/profile/components/analytics/PostImpressionsModal';
-import ProfileNavbar from '../../../../features/profile/components/home/ProfileNavbar';
-import { useProfileData } from '@/features/profile/hooks/useProfileData';
-import { useHeadlineData } from '@/features/profile/hooks/useHeadlineData';
-import { transformToProfileData } from '@/shared/utils/profileTransformers';
+import { useNavbarData } from '@/features/profile/components/home/NavbarProvider';
 import SearchAppearancesModal from '../../../../features/profile/components/analytics/SearchAppearancesModal';
 import ProfileViewsModal from '../../../../features/profile/components/analytics/ProfileViewsModal';
 import AudienceInsights from '../../../../features/profile/components/analytics/AudienceInsights';
@@ -43,31 +40,7 @@ export default function AnalyticsDetailsPage() {
 
     const [demographics, setDemographics] = useState<any>(null);
 
-    const {
-        userProfileData,
-        profileImageUrl,
-        headlineId,
-        fetchUserProfile
-    } = useProfileData();
-
-    const { headlineData, isLoadingHeadline, fetchHeadlineData } = useHeadlineData(headlineId);
-
-    useEffect(() => {
-        if (user) {
-            fetchUserProfile();
-        }
-    }, [user, fetchUserProfile]);
-
-    const profileData = transformToProfileData(
-        userProfileData,
-        profileImageUrl,
-        headlineData
-    );
-
-    const fullName = userProfileData
-        ? `${userProfileData.firstName} ${userProfileData.lastName}`.trim()
-        : 'Loading...';
-
+    const { profileData, fullName } = useNavbarData();
     useEffect(() => {
         loadDetailedAnalytics();
     }, [userId, timeRange]);
@@ -75,24 +48,25 @@ export default function AnalyticsDetailsPage() {
     const loadDetailedAnalytics = async () => {
         try {
             setIsLoading(true);
-            const response = await AnalyticsService.getAllAnalytics(timeRange);
-            setAnalytics(response.data);
-            // ✅ Fetch real engagement breakdown
-            const [clicksRes, sharesRes, visitorsRes,demographicsRes] = await Promise.all([
+            // ✅ FIX: ab saari 5 API calls EK SAATH (parallel) fire hoti hain,
+            // pehle getAllAnalytics ka poora response aane ka wait nahi karna
+            // padta baaki 4 calls shuru karne ke liye — isse total load time
+            // roughly aadha ho jaata hai (2 sequential round-trips → 1 parallel batch).
+            const [response, clicksRes, sharesRes, visitorsRes, demographicsRes] = await Promise.all([
+                AnalyticsService.getAllAnalytics(timeRange),
                 AnalyticsService.getClicksCount(timeRange),
                 AnalyticsService.getSharesCount(timeRange),
                 AnalyticsService.getUniqueVisitorsCount(timeRange),
                 AnalyticsService.getViewerDemographics(),
-
             ]);
 
+            setAnalytics(response.data);
             setEngagementData({
                 clicks: clicksRes?.data?.total || 0,
                 shares: sharesRes?.data?.total || 0,
                 uniqueVisitors: visitorsRes?.data?.total || 0,
             });
             setDemographics(demographicsRes?.data || null);
-            console.log('🔍 Demographics data:', demographicsRes?.data);
 
         } catch (error) {
             console.error('Failed to load analytics:', error);
@@ -100,7 +74,6 @@ export default function AnalyticsDetailsPage() {
             setIsLoading(false);
         }
     };
-
     // ✅ Real progress bar width — relative to max (90-day) value
     const getInsightWidth = (value: number, max: number): string => {
         if (!max || max === 0) return '0%';
@@ -170,12 +143,6 @@ export default function AnalyticsDetailsPage() {
 
     return (
         <>
-            <ProfileNavbar
-                profileImage={profileData.profileImage}
-                userName={profileData.userName}
-                currentUserId={user?.userId}
-            />
-            
             <div className="min-h-screen bg-[#f6ede8] py-8 px-4">
                 <div className="max-w-7xl mx-auto">
 

@@ -4,9 +4,13 @@
 // HELPERS
 // ============================================================
 
-function requireEnv(key: string): string {
+function requireEnv(key: string, fallback?: string): string {
     const value = process.env[key];
     if (!value || value.trim() === '') {
+        if (fallback) {
+            console.warn(`⚠️  [CONFIG] Missing environment variable "${key}". Using fallback: "${fallback}"`);
+            return fallback;
+        }
         // In development, warn but don't crash - env vars load after first request
         if (process.env.NODE_ENV === 'development') {
             console.warn(`⚠️  [CONFIG] Env var not loaded yet at import time: "${key}"`);
@@ -42,7 +46,7 @@ const _config = {
     // ============================================================
     // 1. CORE API CONFIG
     // ============================================================
-    NEXT_PUBLIC_API_BASE_URL: requireEnv('NEXT_PUBLIC_API_BASE_URL'),
+    NEXT_PUBLIC_API_BASE_URL: requireEnv('NEXT_PUBLIC_API_BASE_URL', 'https://throne8-entry-server-production.up.railway.app/api/v1'),
     NEXT_PUBLIC_WS_URL: optionalEnv('NEXT_PUBLIC_WS_URL'),
     NEXT_PUBLIC_API_VERSION: optionalEnv('NEXT_PUBLIC_API_VERSION'),
     NEXT_PUBLIC_API_TIMEOUT: numberEnv('NEXT_PUBLIC_API_TIMEOUT', 30000),

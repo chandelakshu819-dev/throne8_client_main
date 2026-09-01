@@ -20,22 +20,26 @@ export function useConnectionSocket() {
     const [unreadCount, setUnreadCount] = useState(0);
     const [latestRequest, setLatestRequest] = useState<ConnectionRequestPayload | null>(null);
 
-    // ✅ Fetch initial pending count on mount
-    useEffect(() => {
-        const fetchInitialCount = async () => {
-            if (!user?.userId) return;
+    // // ✅ Fetch initial pending count on mount
+    // useEffect(() => {
+    //     const fetchInitialCount = async () => {
+    //         if (!user?.userId) return;
 
-            try {
-                const response = await ConnectionService.getIncomingRequests(user.userId);
-                const pendingCount = response.data?.length || 0;
-                setUnreadCount(pendingCount);
-            } catch (error) {
-                console.error('❌ [Socket] Failed to fetch initial count:', error);
-            }
-        };
+    //         try {
+    //             const response = await ConnectionService.getIncomingRequests(user.userId);
+    //             const pendingCount = response.data?.length || 0;
+    //             setUnreadCount(pendingCount);
+    //         } catch (error) {
+    //             console.error('❌ [Socket] Failed to fetch initial count:', error);
+    //         }
+    //     };
 
-        fetchInitialCount();
-    }, [user]);
+    //     fetchInitialCount();
+    // }, [user]);
+
+        // ✅ REMOVED: duplicate fetch — useConnectionRequests already fetches
+    // this same data via fetchIncomingRequests(). unreadCount yahan kabhi
+    // consume nahi hota tha, sirf ek extra API call kar raha tha.
 
 
     useEffect(() => {

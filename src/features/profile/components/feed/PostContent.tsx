@@ -20,18 +20,13 @@ const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = fals
   const [currentImgIndex, setCurrentImgIndex] = useState(0);
 
   const content: string = post.content || post.text || post.title || post.caption || post.description || '';
-  
-  // Get lines and filter out empty ones to find the first real line
-  const lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-  const firstLine = lines[0] || '';
 
-  const isMultiline = lines.length > 1;
   const isTooLong = content.length > 40;
-  const isLong = isMultiline || isTooLong;
+  const isLong = isTooLong;
 
-  const displayNode = expanded
-    ? renderFormattedContent(content)
-    : renderFormattedLine(firstLine);
+  // ✅ Collapsed state me bhi poora formatted content render hota hai,
+  // CSS `line-clamp-1` usko visually 1 line tak clip karta hai.
+  const displayNode = renderFormattedContent(content);
 
   const rawImages: any[] = Array.isArray(post.images) && post.images.length > 0
     ? post.images
@@ -55,10 +50,9 @@ const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = fals
 
   return (
     <>
-      <p className={`text-base font-medium leading-relaxed mb-2 ${expanded ? 'whitespace-pre-wrap' : 'truncate'} ${isDarkMode ? 'text-slate-200' : 'text-[#4a3728]'}`}>
+           <p className={`text-base font-medium leading-relaxed mb-2 ${expanded ? 'whitespace-pre-wrap' : 'line-clamp-1'} ${isDarkMode ? 'text-slate-200' : 'text-[#4a3728]'}`}>
         {displayNode}
       </p>
-
       {isLong && (
         <button
           onClick={(e) => {

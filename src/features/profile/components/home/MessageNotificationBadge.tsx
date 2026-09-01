@@ -21,7 +21,8 @@ export function MessageNotificationBadge() {
         fetchUnread();
 
         // Har 30 second mein refresh
-        const interval = setInterval(fetchUnread, config.NEXT_PUBLIC_API_TIMEOUT || Number(process.env.NEXT_PUBLIC_API_TIMEOUT));
+        // const interval = setInterval(fetchUnread, config.NEXT_PUBLIC_API_TIMEOUT || Number(process.env.NEXT_PUBLIC_API_TIMEOUT));
+        const interval = setInterval(fetchUnread, 30000); // 30 seconds — matches comment intent
         return () => clearInterval(interval);
     }, []);
 

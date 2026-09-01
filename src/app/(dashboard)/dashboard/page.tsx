@@ -17,10 +17,8 @@ import HomePostService from '@/lib/api/homePost.service';
 import RepostService from '@/lib/api/repost.service';
 import AuthService from '@/lib/api/auth.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useProfileData } from '@/features/profile/hooks/useProfileData';
-import { useHeadlineData } from '@/features/profile/hooks/useHeadlineData';
+import { useNavbarData } from '@/features/profile/components/home/NavbarProvider';
 import { transformToProfileData } from '@/shared/utils/profileTransformers';
-import ProfileNavbar from '@/features/profile/components/home/ProfileNavbar';
 import ConnectionService from '@/lib/api/connection.service';
 import FollowService from '@/lib/api/follow.service';
 import ReportService from '@/lib/api/report.service';
@@ -197,32 +195,25 @@ export default function Home() {
          const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
 
-    const {
-        userProfileData,
-        profileImageUrl,
-        headlineId,
-        fetchUserProfile
-    } = useProfileData();
+         const { userProfileData, profileData, headlineData, fullName, fetchUserProfile } = useNavbarData();
 
     const {
         userPosts,
         isLoadingPosts,
         loadProfile,
         loadPosts,
-    } = useProfile();
+    } = useProfile()
     useEffect(() => {
     if (userPosts?.length > 0) {
         console.log('SAMPLE POST OBJECT:', JSON.stringify(userPosts[0], null, 2));
     }
 }, [userPosts]);
 
-    const { headlineData, isLoadingHeadline, fetchHeadlineData } = useHeadlineData(headlineId);
 
     useEffect(() => {
         if (user) {
             loadProfile();  
             loadPosts();
-            fetchUserProfile();
         }
     }, [user, fetchUserProfile]);
 
@@ -269,7 +260,6 @@ export default function Home() {
 
     useEffect(() => {
         if (user) {
-            fetchUserProfile();
             fetchAllUsersPosts();
         }
     }, [user, fetchUserProfile, fetchAllUsersPosts]);
@@ -351,15 +341,7 @@ export default function Home() {
         return () => { cancelled = true; };
     }, [isAnalyticsOpen]);
 
-    const profileData = transformToProfileData(
-        userProfileData,
-        profileImageUrl,
-        headlineData
-    );
 
-    const fullName = userProfileData
-        ? `${userProfileData.firstName} ${userProfileData.lastName}`.trim()
-        : 'Loading...';
 
     const totalEngagement = userPosts.reduce(
         (sum: number, p: any) => sum + (p.likesCount || 0) + (p.commentsCount || 0) + (p.shares ?? p.sharesCount ?? 0),
@@ -1413,13 +1395,7 @@ if (post?.userId && post.userId !== user?.userId) {
     return (
         <div className={`min-h-screen transition-all duration-500 ${isDarkMode ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900' : 'bg-[#d4c9bc]'} font-['Poppins'] overflow-x-clip`}>
             {/* Header */}
-            <ProfileNavbar
-                profileImage={profileData.profileImage}
-                userName={profileData.userName}
-                currentUserId={user?.userId}
-                onOpenLeftPanel={() => setIsLeftPanelOpen(true)}
-            />
-
+        
             {/* Repost Progress Bar */}
             {showRepostProgressBar && (
                 <div className="fixed top-0 left-0 right-0 z-[100]">

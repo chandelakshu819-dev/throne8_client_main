@@ -4,7 +4,6 @@ import { useAuth, useProtectedRoute } from '@/features/auth/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 
-import ProfileNavbar from '../../features/profile/components/home/ProfileNavbar';
 import ProfileBanner from '../../features/profile/components/home/ProfileBanner';
 import ProfileHeader from '../../features/profile/components/home/ProfileHeader';
 import ProfileActions from '../../features/profile/components/home/ProfileActions';
@@ -206,14 +205,7 @@ export default function ProfilePage() {
         // ke BAHAR — isliye navbar full scale (100%) pe render hota hai,
         // dashboard jaisa hi consistent size/look milta hai.
         <div className="min-h-screen bg-[#f6ede8] font-sans">
-            {/* Navbar — zoom se bahar rakha, dashboard jaisa full scale */}
-            <ProfileNavbar
-                profileImage={profileImageUrl}
-                userName={profileData.userName}
-                currentUserId={user?.userId}
-                companyId={profileData?.company}
-            />
-
+                       {/* Navbar ab NavbarProvider (root layout) se globally render hota hai — yahan alag se render nahi karna */}
             {/* ✅ Zoom sirf page content pe apply hota hai, navbar pe nahi */}
             <div
                 className="py-12 px-4"

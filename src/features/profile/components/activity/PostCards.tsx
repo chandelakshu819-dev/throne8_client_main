@@ -1,4 +1,4 @@
-// src/features/profile/components/PostCard.tsx
+// src/features/profile/components/activity/PostCard.tsx
 
 'use client';
 import React from 'react';
@@ -225,12 +225,12 @@ const PostCard: React.FC<PostCardProps> = ({
                                 : '';
                             return (
                                 <div key={i} className="relative rounded-2xl overflow-hidden shadow-lg">
-                                    <video
-                                        controls
-                                        className="w-full h-72 bg-black object-cover"
-                                        src={video.cloudinarySecureUrl}
-                                        preload="metadata"
-                                    />
+                                <video
+                                    controls
+                                    className="w-full h-72 bg-black object-contain"
+                                    src={video.cloudinarySecureUrl}
+                                    preload="metadata"
+                                />
                                     {duration && (
                                         <div className="absolute bottom-3 right-3 bg-black/70 text-white px-3 py-1 rounded-lg text-sm font-semibold">
                                             {duration}
