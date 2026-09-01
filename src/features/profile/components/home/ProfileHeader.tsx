@@ -218,7 +218,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 <div className="flex flex-col lg:flex-row items-start gap-5 -mt-10 min-w-0">
                     {/* ✅ FIX (density pass v2): w-28 h-28 -> w-32 h-32 for better proportion */}
                     <div
-                        className={`profileImageClick relative w-32 h-32 group flex-shrink-0 ${isOwnProfile ? 'cursor-pointer' : ''}`}
+                        className={`profileImageClick relative w-32 h-32 flex-shrink-0 ${isOwnProfile ? 'cursor-pointer' : ''}`}
                         onClick={() => {
                             if (isOwnProfile) setIsProfileImageModalOpen(true);
                         }}
@@ -226,14 +226,11 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                         <img
                             src={currentProfileImage}
                             alt="Profile"
-                            className="w-full h-full rounded-2xl border-4 border-white shadow-xl object-cover transition-all duration-500 group-hover:shadow-2xl group-hover:scale-105"
+                            className="w-full h-full rounded-2xl border-4 border-white shadow-xl object-cover"
                             onError={(e) => {
                                 (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=4a3728&color=fff&size=256`;
                             }}
                         />
-                        {isOwnProfile && (
-                            <div className="absolute inset-0 rounded-2xl border-2 border-transparent bg-gradient-to-r from-blue-500/20 to-purple-600/20 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
-                        )}
                     </div>
                     {/* ✅ FIX: added w-full + min-w-0 so this flex item shrinks to fit
                         its row instead of expanding to its content's natural width
