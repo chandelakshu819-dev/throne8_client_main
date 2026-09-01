@@ -289,16 +289,16 @@ const _config = {
     // ============================================================
     // 7. CLOUDINARY
     // ============================================================
-    NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: requireEnv('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME'),
-    NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: requireEnv('NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET'),
+    NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: requireEnv('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME', 'rghhemendra7676'),
+    NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: requireEnv('NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET', 'throne8_builder'),
     NEXT_PUBLIC_CLOUDINARY_BASE_URL: optionalEnv('NEXT_PUBLIC_CLOUDINARY_BASE_URL'),
 
     // ============================================================
     // 8. APP CONFIG
     // ============================================================
-    NEXT_PUBLIC_APP_URL: requireEnv('NEXT_PUBLIC_APP_URL'),
-    NEXT_PUBLIC_APP_NAME: requireEnv('NEXT_PUBLIC_APP_NAME'),
-    NEXT_PUBLIC_APP_ENV: requireEnv('NEXT_PUBLIC_APP_ENV'),
+    NEXT_PUBLIC_APP_URL: requireEnv('NEXT_PUBLIC_APP_URL', 'https://throne8-entry-server-production.up.railway.app/api/v1'),
+    NEXT_PUBLIC_APP_NAME: requireEnv('NEXT_PUBLIC_APP_NAME', 'Throne8'),
+    NEXT_PUBLIC_APP_ENV: requireEnv('NEXT_PUBLIC_APP_ENV', 'production'),
 
     // ============================================================
     // 9. FILE UPLOAD LIMITS
