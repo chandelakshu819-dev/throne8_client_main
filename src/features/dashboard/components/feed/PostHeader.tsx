@@ -161,6 +161,11 @@ const PostHeader = ({
                 </span>
               )}
             </h4>
+            {(post.username || post.userName) && (
+              <span className={`text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
+                @{post.username || post.userName}
+              </span>
+            )}
             {post.degreeLabel && !isOwnPost && (
               <span className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/50'}`}>
                 · {post.degreeLabel}
