@@ -237,38 +237,19 @@ const AboutSection: React.FC<AboutSectionProps> = ({
                                 or a long video-upload label could force this
                                 2-column grid (and everything above it) wider than
                                 the viewport. */}
-                            <div className="grid md:grid-cols-2 gap-6 min-w-0">
-                                <div className="bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/50 to-[#e0d8cf]/40 rounded-2xl border border-[#4a3728]/20 p-5 shadow-md hover:shadow-lg transition scale-[1] hover:scale-[1.02] duration-300 relative min-w-0">
-                                    <h3 className="text-xl font-semibold bg-gradient-to-r from-[#4a3728] to-[#6b4e3d] bg-clip-text text-transparent mb-3">
-                                        About Me
-                                    </h3>
-
-                                    {aboutData?.aboutText ? (
-                                        <>
-                                            {/* ✅ FIX: break-words added — whitespace-pre-wrap alone
-                                                preserves line breaks but does NOT wrap a single long
-                                                unbroken word/URL; break-words does. */}
-                                            <p className="text-[#4a3728]/90 leading-relaxed font-medium tracking-wide text-sm whitespace-pre-wrap break-words">
-                                                {displayedAboutText}
-                                                {shouldTruncate && !isAboutExpanded ? '...' : ''}
-                                            </p>
-
-                                            {/* ✅ Read more / Show less toggle */}
-                                            {shouldTruncate && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setIsAboutExpanded((prev) => !prev)}
-                                                    className="mt-2 text-[#4a3728] font-semibold text-sm hover:underline focus:outline-none"
-                                                >
-                                                    {isAboutExpanded ? 'Show less' : 'Read more'}
-                                                </button>
-                                            )}
+                            <div className="grid md:grid-cols-2 gap-6 min-w-0 items-start">
+                                <div className={`bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/50 to-[#e0d8cf]/40 rounded-2xl border border-[#4a3728]/20 p-5 shadow-md hover:shadow-lg transition duration-300 relative min-w-0 flex flex-col justify-between ${isAboutExpanded ? 'min-h-[210px] h-auto' : 'h-[210px]'}`}>
+                                    <div className="overflow-hidden">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h3 className="text-xl font-semibold bg-gradient-to-r from-[#4a3728] to-[#6b4e3d] bg-clip-text text-transparent">
+                                                About Me
+                                            </h3>
 
                                             {/* ✅ Edit button sirf apni profile pe */}
-                                            {isOwnProfile && (
+                                            {isOwnProfile && aboutData?.aboutText && (
                                                 <button
                                                     onClick={() => handleOpenModal(true)}
-                                                    className="absolute top-4 right-4 flex items-center gap-1.5 bg-[#4a3728]/10 text-[#4a3728] px-3 py-1.5 text-xs font-semibold rounded-full hover:bg-[#4a3728]/20 transition"
+                                                    className="flex items-center gap-1.5 bg-[#4a3728]/10 text-[#4a3728] px-3 py-1 text-xs font-semibold rounded-full hover:bg-[#4a3728]/20 transition"
                                                 >
                                                     <svg
                                                         className="w-3.5 h-3.5"
@@ -286,25 +267,45 @@ const AboutSection: React.FC<AboutSectionProps> = ({
                                                     Edit
                                                 </button>
                                             )}
-                                        </>
-                                    ) : isOwnProfile ? (
-                                        <div className="text-center py-8">
-                                            <p className="text-[#4a3728]/60 mb-4 text-sm">No about text added yet</p>
+                                        </div>
+
+                                        {aboutData?.aboutText ? (
+                                            <p className="text-[#4a3728]/90 leading-relaxed font-medium tracking-wide text-xs sm:text-sm whitespace-pre-wrap break-words">
+                                                {displayedAboutText}
+                                                {shouldTruncate && !isAboutExpanded ? '...' : ''}
+                                            </p>
+                                        ) : isOwnProfile ? (
+                                            <div className="text-center py-4">
+                                                <p className="text-[#4a3728]/60 mb-3 text-xs sm:text-sm">No about text added yet</p>
+                                                <button
+                                                    onClick={() => handleOpenModal(false)}
+                                                    className="px-4 py-2 bg-gradient-to-r from-[#4a3728] to-[#6a5748] text-white rounded-full text-xs font-semibold hover:shadow-lg transition-all"
+                                                >
+                                                    + Add About
+                                                </button>
+                                            </div>
+                                        ) : null}
+                                    </div>
+
+                                    {/* ✅ Read more / Show less toggle */}
+                                    {shouldTruncate && (
+                                        <div className="pt-2">
                                             <button
-                                                onClick={() => handleOpenModal(false)}
-                                                className="px-4 py-2 bg-gradient-to-r from-[#4a3728] to-[#6a5748] text-white rounded-full text-xs font-semibold hover:shadow-lg transition-all"
+                                                type="button"
+                                                onClick={() => setIsAboutExpanded((prev) => !prev)}
+                                                className="text-[#4a3728] font-semibold text-xs sm:text-sm hover:underline focus:outline-none"
                                             >
-                                                + Add About
+                                                {isAboutExpanded ? 'Show less' : 'Read more'}
                                             </button>
                                         </div>
-                                    ) : null}
+                                    )}
                                 </div>
 
                                 {/* ✅ Video section — public profile pe sirf tab dikhega jab video already hai, upload option nahi */}
                                 {videoUrl ? (
-                                    <div className="relative min-w-0 h-full flex flex-col">
+                                    <div className="relative min-w-0 h-[210px] flex flex-col rounded-2xl overflow-hidden bg-black/90 shadow-md">
                                         <video
-                                            className="w-full h-full rounded-xl object-cover"
+                                            className="w-full h-full rounded-2xl object-cover"
                                             controls
                                             src={videoUrl}
                                         >
@@ -329,8 +330,8 @@ const AboutSection: React.FC<AboutSectionProps> = ({
                                                 {/* Dropdown Menu */}
                                                 {isVideoMenuOpen && (
                                                     <div className="absolute right-0 mt-2 w-36 bg-white rounded-xl shadow-xl border border-[#e0d8cf] py-1 z-30 animate-in fade-in zoom-in-95 duration-150">
-                                                                                                                {/* Replace Option */}
-                                                                                                                <button
+                                                        {/* Replace Option */}
+                                                        <button
                                                             type="button"
                                                             onClick={() => {
                                                                 setIsVideoMenuOpen(false);
@@ -350,7 +351,7 @@ const AboutSection: React.FC<AboutSectionProps> = ({
                                                             type="button"
                                                             onClick={() => {
                                                                 setIsVideoMenuOpen(false);
-                                                                setShowDeleteVideoConfirm(true); // ✅ native confirm() ki jagah custom modal khulega
+                                                                setShowDeleteVideoConfirm(true);
                                                             }}
                                                             disabled={isUploadingVideo || isDeletingVideo}
                                                             className="w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 transition disabled:opacity-50"
@@ -376,7 +377,7 @@ const AboutSection: React.FC<AboutSectionProps> = ({
                                         )}
                                     </div>
                                 ) : isOwnProfile ? (
-                                    <div className="rounded-xl bg-[#4a3728]/10 border border-[#4a3728]/30 w-full h-full min-h-[160px] flex flex-col items-center justify-center gap-2 min-w-0 p-4">
+                                    <div className="rounded-2xl bg-[#4a3728]/10 border border-[#4a3728]/30 w-full h-[210px] flex flex-col items-center justify-center gap-2 min-w-0 p-4">
                                         <div className="w-10 h-10 rounded-full bg-[#4a3728]/20 border border-[#4a3728]/30 flex items-center justify-center text-[#4a3728]/70 flex-shrink-0">
                                             🎬
                                         </div>

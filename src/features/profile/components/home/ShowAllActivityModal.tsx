@@ -525,7 +525,7 @@ const ShowAllActivityModal: React.FC<ShowAllActivityModalProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                     {allImages.map(({ post, img }, idx) => (
                                         <div key={`${post.postId}-${idx}`} className="group bg-gradient-to-br from-[#e0d8cf]/60 via-[#e0d8cf]/40 to-[#f6ede8]/30 backdrop-blur-sm rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-500 border border-[#e0d8cf]/40 flex flex-col h-full">
-                                            <div className="relative overflow-hidden h-56 bg-black flex items-center justify-center">
+                                            <div className="relative overflow-hidden h-56 bg-[#efe9e1] flex items-center justify-center">
                                                 <img
                                                     src={img.cloudinarySecureUrl}
                                                     alt={post.title}
