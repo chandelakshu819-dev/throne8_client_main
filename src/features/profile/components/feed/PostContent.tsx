@@ -37,6 +37,7 @@ const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = fals
     .filter((url): url is string => !!url);
 
   const hasMultipleImages = imageList.length > 1;
+  const hasImage = imageList.length > 0;
 
   const goToPrev = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -48,30 +49,38 @@ const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = fals
     setCurrentImgIndex((prev) => (prev === imageList.length - 1 ? 0 : prev + 1));
   };
 
+  // ✅ FIX: root ab "flex flex-col h-full" hai. Text/Read-more block
+  // flex-shrink-0 hai (apni natural height leta hai), image block
+  // "flex-1 min-h-0" hai — bachi hui saari available height khud fill
+  // kar leta hai (object-cover se, crop hoga par letterbox/gap nahi
+  // banega). Isse fixed-height card mein bhi neeche khaali gap nahi
+  // bachta, chahe post ka text chhota ho ya bada.
   return (
-    <>
-           <p className={`text-base font-medium leading-relaxed mb-2 ${expanded ? 'whitespace-pre-wrap' : 'line-clamp-1'} ${isDarkMode ? 'text-slate-200' : 'text-[#4a3728]'}`}>
-        {displayNode}
-      </p>
-      {isLong && (
-        <button
-          onClick={(e) => {
-            if (disableToggle) return; // card ke andar: bubble hone do taaki parent handleOpenDetailModal modal khole
-            e.stopPropagation();
-            setExpanded(v => !v);
-          }}
-          className={`text-sm font-semibold mb-4 ${isDarkMode ? 'text-slate-300 hover:text-white' : 'text-[#6b5643] hover:text-[#4a3728]'}`}
-        >
-          {expanded ? 'Show less' : 'Read more'}
-        </button>
-      )}
+    <div className="flex flex-col h-full">
+      <div className="flex-shrink-0">
+        <p className={`text-base font-medium leading-relaxed mb-2 ${expanded ? 'whitespace-pre-wrap' : 'line-clamp-1'} ${isDarkMode ? 'text-slate-200' : 'text-[#4a3728]'}`}>
+          {displayNode}
+        </p>
+        {isLong && (
+          <button
+            onClick={(e) => {
+              if (disableToggle) return; // card ke andar: bubble hone do taaki parent handleOpenDetailModal modal khole
+              e.stopPropagation();
+              setExpanded(v => !v);
+            }}
+            className={`text-sm font-semibold mb-2 ${isDarkMode ? 'text-slate-300 hover:text-white' : 'text-[#6b5643] hover:text-[#4a3728]'}`}
+          >
+            {expanded ? 'Show less' : 'Read more'}
+          </button>
+        )}
+      </div>
 
-      {!hideMedia && imageList.length > 0 && (
-        <div className={`relative mb-2 rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'} w-full h-52 md:h-60 flex items-center justify-center flex-shrink-0`}>
+      {!hideMedia && hasImage && (
+        <div className={`relative rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'} w-full flex-1 min-h-[140px] flex items-center justify-center`}>
           <img
             src={imageList[currentImgIndex]}
             alt="Post content"
-            className="w-full h-full object-contain hover:scale-[1.01] transition-transform duration-500"
+            className="w-full h-full object-cover hover:scale-[1.01] transition-transform duration-500"
             onError={(e) => {
               (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=400&fit=crop';
             }}
@@ -109,19 +118,19 @@ const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = fals
         </div>
       )}
 
-      {post.videos && post.videos.length > 0 && (
-        <div className={`mb-6 rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'} w-full h-64 flex justify-center`}>
+      {!hasImage && post.videos && post.videos.length > 0 && (
+        <div className={`flex-1 min-h-[140px] rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'} w-full flex justify-center`}>
           <video
             src={post.videos[0].cloudinarySecureUrl}
             controls
             preload="metadata"
-            className="w-full h-full object-contain"
+            className="w-full h-full object-cover"
           />
         </div>
       )}
 
       {post.documents && post.documents.length > 0 && (
-        <div className="mb-6 bg-gradient-to-br from-[#e0d8cf]/40 to-[#f6ede8]/30 border border-[#e0d8cf]/50 p-4 rounded-2xl flex items-center justify-between gap-4">
+        <div className="flex-shrink-0 mt-2 bg-gradient-to-br from-[#e0d8cf]/40 to-[#f6ede8]/30 border border-[#e0d8cf]/50 p-4 rounded-2xl flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="p-2.5 bg-[#4a3728] text-[#f6ede8] rounded-xl flex-shrink-0">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -155,7 +164,7 @@ const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = fals
           </a>
         </div>
       )}
-    </>
+    </div>
   );
 };
 

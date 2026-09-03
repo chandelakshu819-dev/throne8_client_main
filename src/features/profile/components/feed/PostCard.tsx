@@ -1,4 +1,3 @@
-
 // features/profile/components/feed/PostCard.tsx
 
 // Force rebuild comment section slice update
@@ -34,10 +33,6 @@ const PostCard = ({
   // LinkedIn-style expanded post modal
   const [isDetailOpen, setIsDetailOpen] = React.useState(false);
 
-  // ✅ NEW: modal kholte waqt, agar comments pehle se fetch nahi hui hain
-  // to onToggleComments (= handlers.toggleCommentsPanel) call karo taaki
-  // comments load ho jayein — modal me purane comments dikhne lagenge
-  
   const handleOpenDetailModal = () => {
     setIsDetailOpen(true);
     if (postKey && (!commentsByPost || !commentsByPost[postKey]) && fetchCommentsByPost) {
@@ -45,22 +40,12 @@ const PostCard = ({
     }
   };
 
-
-//   const contentWrapperRef = React.useRef<HTMLDivElement>(null);
-// const [contentScale, setContentScale] = React.useState(1);
-
-// React.useLayoutEffect(() => {
-//   const el = contentWrapperRef.current;
-//   if (!el) return;
-//   const parentHeight = el.parentElement?.clientHeight || 0;
-//   const contentHeight = el.scrollHeight;
-//   if (contentHeight > parentHeight && parentHeight > 0) {
-//     setContentScale(parentHeight / contentHeight);
-//   } else {
-//     setContentScale(1);
-//   }
-// }, [post]);
-
+  // ✅ FIX: card fixed-height parent (ActivitySection ke h-[640px] wrapper)
+  // ko "h-full" ke saath fill karta hai. Andar PostHeader fixed height leta
+  // hai, PostContent ka wrapper "flex-1 min-h-0" hai — PostContent khud
+  // image ko flex-1 se stretch karta hai taaki bachi hui height poori fill
+  // ho jaye. Isse: na scroll, na scrollbar, na neeche khaali gap — aur
+  // Actions bar hamesha bilkul card ke bottom pe touch karta hai.
   return (
     <div
       ref={trackPostImpression({
@@ -73,9 +58,9 @@ const PostCard = ({
         } relative h-full flex flex-col overflow-hidden`}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-[#6b5643]/3 via-[#8b7355]/3 to-[#4a3728]/3 rounded-3xl"></div>
-      <div className="relative z-10 flex flex-col justify-between h-full flex-1 min-h-0">
-      <div className="flex-1 min-h-0">
-      <PostHeader
+      <div className="relative z-10 flex flex-col h-full">
+        <div className="flex-1 min-h-0 flex flex-col">
+        <PostHeader
             currentUserId={currentUserId}
             post={post}
             index={postKey}
@@ -94,14 +79,12 @@ const PostCard = ({
 
           />
           {/* Click on post body opens the LinkedIn-style expanded modal */}
-          <div onClick={handleOpenDetailModal} className="cursor-pointer">
+          <div onClick={handleOpenDetailModal} className="cursor-pointer flex-1 min-h-0 flex flex-col">
             <PostContent post={post} isDarkMode={isDarkMode} disableToggle />
           </div>
         </div>
 
         <div className="flex-shrink-0">
-
-
         <PostActions
           post={post}
           index={index}
@@ -122,35 +105,6 @@ const PostCard = ({
           fullName={fullName}           // ✅ NEW
         />
         </div>
-
-        {/* {openCommentsIndex === postKey && (
-          <CommentsSection
-            isDarkMode={isDarkMode}
-            commentText={commentText}
-            setCommentText={setCommentText}
-            replyingTo={replyingTo}
-            openCommentMenuIndex={openCommentMenuIndex}
-            editingCommentId={editingCommentId}
-            editCommentText={editCommentText}
-            setEditCommentText={setEditCommentText}
-            showEmojiPicker={showEmojiPicker}
-            setShowEmojiPicker={setShowEmojiPicker}
-            commentCount={postCommentCounts?.[postKey] ?? post.commentsCount ?? 0}
-            handleReply={handleReply}
-            handleCommentReaction={handleCommentReaction}
-            toggleCommentMenu={toggleCommentMenu}
-            handleCommentAction={handleCommentAction}
-            handleEditSubmit={handleEditSubmit}
-            handleEmojiClick={handleEmojiClick}
-            postId={postKey}
-            comments={postComments?.[postKey] || []}
-            handleCommentSubmit={() => handleCommentSubmit(postKey)}
-            emojiList={emojiList}
-            profileImage={profileImage}
-            setReplyingTo={undefined}
-            currentUserId={currentUserId}
-          />
-        )} */}
       </div>
 
       {isDetailOpen && (

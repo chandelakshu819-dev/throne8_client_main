@@ -1403,8 +1403,7 @@ const engagementPercent = analyticsData
                       if (item.type === 'repost') {
                         return (
                           // <div key={'repost-' + item.data.repostId} className="w-[calc(100%-16px)] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-11px)] flex-shrink-0 flex flex-col h-[560px]">
-<div key={'repost-' + item.data.repostId} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col h-[520px]">                            
-                          <RepostCard
+                            <div key={'repost-' + item.data.repostId} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col h-[640px]">                          <RepostCard
                               repost={item.data}
                               onDeleteRepost={onDeleteRepost}
                               profileImage={profileImage}
@@ -1432,8 +1431,7 @@ const engagementPercent = analyticsData
                       const idxToUse = originalIndex !== -1 ? originalIndex : idx;
 
                       return (
-                        <div key={'post-' + postKey} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col h-[520px]">
-                          <PostCard
+                          <div key={'post-' + postKey} className="w-[calc(100%-16px)] md:w-[calc(50%-8px)] flex-shrink-0 flex flex-col h-[640px]"><PostCard
                             post={post}
                             index={postKey}
                             isOwnProfile={isOwnProfile}

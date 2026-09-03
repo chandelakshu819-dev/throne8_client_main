@@ -8,6 +8,12 @@ interface FeedRepostCardProps {
     profileImage: string;
     fullName: string;
     currentUserId?: string;
+    // ✅ NEW — action handlers for the ORIGINAL post inside the repost card
+    isLiked?: boolean;
+    onLikeToggle?: (postId: string) => void;
+    onToggleComments?: (postId: string) => void;
+    onRepost?: (postId: string) => void;
+    onSend?: (postId: string) => void;
 }
 
 const FeedRepostCard = ({
@@ -16,9 +22,16 @@ const FeedRepostCard = ({
     profileImage,
     fullName,
     currentUserId,
+    isLiked = false,
+    onLikeToggle,
+    onToggleComments,
+    onRepost,
+    onSend,
 }: FeedRepostCardProps) => {
     const originalPost = repostItem.originalPost;
     if (!originalPost) return null;
+
+    const originalPostId = originalPost.entryId || originalPost.postId;
 
     const timeAgo = (dateStr: string) => {
         const diff = Date.now() - new Date(dateStr).getTime();
@@ -150,27 +163,74 @@ const FeedRepostCard = ({
                             }}
                         />
                     )}
+                </div>
 
-                    {/* Original Post Stats */}
-                    <div
-                        className={`flex items-center gap-5 mt-4 pt-3 border-t ${isDarkMode ? 'border-slate-600/50' : 'border-[#4a3728]/10'
+                {/* ── Actions Bar (Like / Comment / Repost / Send) ── */}
+                <div
+                    className={`flex items-center justify-between mt-4 pt-3 border-t ${isDarkMode ? 'border-slate-600/50' : 'border-[#4a3728]/10'
+                        }`}
+                >
+                    <div className="flex gap-6">
+                        {/* Like */}
+                        <button
+                            onClick={() => onLikeToggle?.(originalPostId)}
+                            className={`group/btn flex items-center gap-2 transition-all duration-200 ${isLiked
+                                ? 'text-red-500'
+                                : isDarkMode
+                                    ? 'text-slate-400 hover:text-red-500'
+                                    : 'text-[#4a3728]/70 hover:text-red-500'
+                                }`}
+                        >
+                            <div className="p-2 rounded-xl group-hover/btn:bg-red-50 transition-colors duration-200">
+                                <i className={isLiked ? 'ri-heart-fill' : 'ri-heart-line'} />
+                            </div>
+                            <span className="text-sm font-semibold">
+                                {originalPost.likesCount || 0}
+                            </span>
+                        </button>
+
+                        {/* Comment */}
+                        <button
+                            onClick={() => onToggleComments?.(originalPostId)}
+                            className={`group/btn flex items-center gap-2 transition-all duration-200 ${isDarkMode ? 'text-slate-400 hover:text-blue-500' : 'text-[#4a3728]/70 hover:text-blue-500'
+                                }`}
+                        >
+                            <div className="p-2 rounded-xl group-hover/btn:bg-blue-50 transition-colors duration-200">
+                                <i className="ri-message-3-line" />
+                            </div>
+                            <span className="text-sm font-semibold">
+                                {originalPost.commentsCount || 0}
+                            </span>
+                        </button>
+
+                        {/* Repost */}
+                        <button
+                            onClick={() => onRepost?.(originalPostId)}
+                            className={`group/btn flex items-center gap-2 transition-all duration-200 ${isDarkMode ? 'text-slate-400 hover:text-green-500' : 'text-[#4a3728]/70 hover:text-green-500'
+                                }`}
+                        >
+                            <div className="p-2 rounded-xl group-hover/btn:bg-green-50 transition-colors duration-200">
+                                <i className="ri-repeat-line" />
+                            </div>
+                            <span className="text-sm font-semibold">
+                                {originalPost.repostsCount || 0}
+                            </span>
+                        </button>
+                    </div>
+
+                    {/* Send */}
+                    <button
+                        onClick={() => onSend?.(originalPostId)}
+                        className={`group/btn flex items-center gap-2 transition-all duration-200 ${isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-[#4a3728]/70 hover:text-[#4a3728]'
                             }`}
                     >
-                        <span
-                            className={`flex items-center gap-1.5 text-sm ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/50'
-                                }`}
-                        >
-                            <i className="ri-heart-line" />
-                            {originalPost.likesCount || 0}
-                        </span>
-                        <span
-                            className={`flex items-center gap-1.5 text-sm ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/50'
-                                }`}
-                        >
-                            <i className="ri-message-3-line" />
-                            {originalPost.commentsCount || 0}
-                        </span>
-                    </div>
+                        <div className="p-2 rounded-xl group-hover/btn:bg-[#e0d8cf]/30 transition-colors duration-200">
+                            <i className="ri-send-plane-line" />
+                        </div>
+                        {(originalPost.sendsCount || 0) > 0 && (
+                            <span className="text-sm font-semibold">{originalPost.sendsCount}</span>
+                        )}
+                    </button>
                 </div>
             </div>
         </div>
