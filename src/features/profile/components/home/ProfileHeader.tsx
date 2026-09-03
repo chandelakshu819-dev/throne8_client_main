@@ -12,6 +12,11 @@ import BlockMemberModal from './modals/BlockMemberModal';
 import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import ConnectionService from '@/lib/api/connection.service';
+import TrustScoreBadge from './TrustScoreBadge';
+import StudyStreakBadge from './StudyStreakBadge';
+
+
+
 
 interface ProfileHeaderProps {
     currentUserId?: string;
@@ -309,9 +314,19 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                     <p className="text-xs text-[#4a3728] break-words min-w-0">
                                         <span className="font-semibold">Location:</span> {location}
                                     </p>
+                                    
                                 </div>
-
+                                {/* ✅ Trust Score + Study Streak badges */}
+                                {currentUserId && (
+                                    <div className="flex items-center gap-2 flex-wrap justify-center md:justify-start">
+                                        <TrustScoreBadge userId={currentUserId} />
+                                        <StudyStreakBadge userId={currentUserId} />
+                                    </div>
+                                )}
+                                
                                 {isOwnProfile && <Contactact />}
+
+                        
 
                                 {/* ✅ FIX (density pass): gap-3 -> gap-2 */}
                                 <div className="flex gap-2 justify-center md:justify-start flex-wrap">
