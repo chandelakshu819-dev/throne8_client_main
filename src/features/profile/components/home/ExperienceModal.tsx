@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, X } from 'lucide-react';
+import { Loader2, X, Briefcase, Calendar, Image as ImageIcon, Award } from 'lucide-react';
 import React, { useEffect } from 'react';
 
 interface ExperienceModalProps {
@@ -108,7 +108,9 @@ const ExperienceModal: React.FC<ExperienceModalProps> = ({
 
                     {/* Section 1: Basic Info */}
                     <div>
-                        <label className="block text-sm font-bold text-[#4a3728] mb-2 uppercase">Basic Information</label>
+                        <label className="block text-sm font-bold text-[#4a3728] mb-2 uppercase flex items-center gap-1.5">
+                            <Briefcase className="w-4 h-4 text-[#8b6f47]" /> Basic Information
+                        </label>
                         <div className="space-y-3 bg-white/50 p-4 rounded-lg border border-[#d4c4b5]">
                             <input
                                 type="text"
@@ -137,7 +139,9 @@ const ExperienceModal: React.FC<ExperienceModalProps> = ({
 
                     {/* Section 2: Duration */}
                     <div>
-                        <label className="block text-sm font-bold text-[#4a3728] mb-2 uppercase">Employment Duration</label>
+                        <label className="block text-sm font-bold text-[#4a3728] mb-2 uppercase flex items-center gap-1.5">
+                            <Calendar className="w-4 h-4 text-[#8b6f47]" /> Employment Duration
+                        </label>
                         <div className="bg-white/50 p-4 rounded-lg border border-[#d4c4b5] space-y-3">
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
@@ -178,7 +182,9 @@ const ExperienceModal: React.FC<ExperienceModalProps> = ({
 
                     {/* Section 3: Company Logo */}
                     <div>
-                        <label className="block text-sm font-bold text-[#4a3728] mb-2 uppercase">Company Logo</label>
+                        <label className="block text-sm font-bold text-[#4a3728] mb-2 uppercase flex items-center gap-1.5">
+                            <ImageIcon className="w-4 h-4 text-[#8b6f47]" /> Company Logo
+                        </label>
                         <input
                             type="url"
                             placeholder="https://example.com/logo.png (optional)"
@@ -196,7 +202,9 @@ const ExperienceModal: React.FC<ExperienceModalProps> = ({
 
                     {/* Section 4: Achievements */}
                     <div>
-                        <label className="block text-sm font-bold text-[#4a3728] mb-2 uppercase">Key Achievements ({achievementsList.length}/10)</label>
+                        <label className="block text-sm font-bold text-[#4a3728] mb-2 uppercase flex items-center gap-1.5">
+                            <Award className="w-4 h-4 text-[#8b6f47]" /> Key Achievements ({achievementsList.length}/10)
+                        </label>
                         <div className="bg-white/50 p-4 rounded-lg border border-[#d4c4b5] space-y-3">
                             <div className="flex gap-2">
                                 <input

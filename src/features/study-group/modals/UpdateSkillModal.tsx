@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Sparkles, BarChart3, GraduationCap, Briefcase, BookOpen, Award } from 'lucide-react';
 
 interface Skill {
     skillId: string;
@@ -155,12 +155,12 @@ const UpdateSkillModal: React.FC<UpdateSkillModalProps> = ({ isOpen, onClose, on
                         {/* Skill Information Section */}
                         <div className="space-y-4">
                             <h3 className="text-lg font-semibold text-[#4a3728] flex items-center gap-2">
-                                <span className="text-2xl">⚡</span> Skill Information
+                                <Sparkles className="w-5 h-5 text-[#4a3728]" /> Skill Information
                             </h3>
 
                             <div>
-                                <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                    Skill Name <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                    <BookOpen className="w-4 h-4 text-[#8b6f47]" /> Skill Name <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -173,8 +173,8 @@ const UpdateSkillModal: React.FC<UpdateSkillModalProps> = ({ isOpen, onClose, on
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                    Category <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                    <GraduationCap className="w-4 h-4 text-[#8b6f47]" /> Category <span className="text-red-500">*</span>
                                 </label>
                                 <select
                                     name="category"
@@ -195,13 +195,13 @@ const UpdateSkillModal: React.FC<UpdateSkillModalProps> = ({ isOpen, onClose, on
                         {/* Skill Level Section */}
                         <div className="space-y-4">
                             <h3 className="text-lg font-semibold text-[#4a3728] flex items-center gap-2">
-                                <span className="text-2xl">📊</span> Skill Level & Experience
+                                <BarChart3 className="w-5 h-5 text-[#4a3728]" /> Skill Level & Experience
                             </h3>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                        Skill Strength
+                                    <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                        <Award className="w-4 h-4 text-[#8b6f47]" /> Skill Strength
                                     </label>
                                     <select
                                         name="skillStrength"
@@ -217,8 +217,8 @@ const UpdateSkillModal: React.FC<UpdateSkillModalProps> = ({ isOpen, onClose, on
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                        Years of Experience
+                                    <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                        <Briefcase className="w-4 h-4 text-[#8b6f47]" /> Years of Experience
                                     </label>
                                     <input
                                         type="number"
