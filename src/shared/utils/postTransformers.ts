@@ -20,12 +20,43 @@ export const transformApiPostToFeedPost = (
 ) => {
   const connectionStatus = apiPost.connectionStatus || 'none';
 
-  return {
-    user: userData
+  const resolvedName =
+    (userData && (userData.firstName || userData.lastName)
       ? `${userData.firstName || ''} ${userData.lastName || ''}`.trim()
-      : 'Unknown User',
-    avatar: profileImageUrl || userData?.profilePhotoUrl || '',
-    role: headlineText || userData?.headline || '',
+      : '') ||
+    (userData?.username ? userData.username : '') ||
+    (userData?.name ? userData.name : '') ||
+    apiPost.authorName ||
+    (typeof apiPost.author === 'object' && apiPost.author
+      ? (`${apiPost.author.firstName || ''} ${apiPost.author.lastName || ''}`.trim() || apiPost.author.username || apiPost.author.name)
+      : '') ||
+    (typeof apiPost.user === 'object' && apiPost.user
+      ? (`${apiPost.user.firstName || ''} ${apiPost.user.lastName || ''}`.trim() || apiPost.user.username || apiPost.user.name)
+      : '') ||
+    apiPost.fullName ||
+    apiPost.userName ||
+    apiPost.username ||
+    (typeof apiPost.user === 'string' && apiPost.user !== 'Unknown User' ? apiPost.user : '') ||
+    (typeof apiPost.author === 'string' && apiPost.author !== 'Unknown User' ? apiPost.author : '') ||
+    (apiPost.firstName || apiPost.lastName
+      ? `${apiPost.firstName || ''} ${apiPost.lastName || ''}`.trim()
+      : '') ||
+    apiPost.name ||
+    'Unknown User';
+
+  const resolvedUsername =
+    userData?.username ||
+    apiPost.username ||
+    apiPost.userName ||
+    (typeof apiPost.author === 'object' ? apiPost.author?.username : '') ||
+    (typeof apiPost.user === 'object' ? apiPost.user?.username : '') ||
+    '';
+
+  return {
+    user: resolvedName,
+    username: resolvedUsername,
+    avatar: profileImageUrl || userData?.profilePhotoUrl || apiPost.avatar || apiPost.author?.profilePhotoUrl || apiPost.user?.profilePhotoUrl || '',
+    role: headlineText || userData?.headline || apiPost.headline || apiPost.role || apiPost.author?.headline || apiPost.user?.headline || '',
     time: calculateTimeAgo(apiPost.createdAt),
     // ✅ NEW: raw date preserve karo — 'time' sirf formatted string hai
     // ("2h ago"), usse date reconstruct nahi ho sakti. Reposts (optimistic

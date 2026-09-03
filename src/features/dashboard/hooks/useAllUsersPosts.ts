@@ -106,8 +106,16 @@ export const useAllUsersPosts = () => {
                     thoughtText: post.thoughtText,
                     createdAt: post.createdAt,
                     userId: post.userId,
-                    reposterName: `${reposterData.firstName || ''} ${reposterData.lastName || ''}`.trim() || 'Unknown User',
-                    reposterAvatar: reposterProfileImageUrl,
+                    reposterName:
+                        (`${reposterData.firstName || ''} ${reposterData.lastName || ''}`.trim()) ||
+                        reposterData.username ||
+                        post.reposterName ||
+                        post.reposterUserName ||
+                        post.authorName ||
+                        post.userName ||
+                        (typeof post.user === 'string' && post.user !== 'Unknown User' ? post.user : '') ||
+                        'Unknown User',
+                    reposterAvatar: reposterProfileImageUrl || post.reposterAvatar || post.userAvatar || null,
                     isLikedByCurrentUser: post.isLikedByCurrentUser || false,
                     likesCount: post.likesCount || 0,
                     commentsCount: post.commentsCount || 0,
@@ -133,12 +141,24 @@ export const useAllUsersPosts = () => {
                         commentsCount: post.originalPost.commentsCount || 0,
                         isLikedByCurrentUser: post.originalPost.isLikedByCurrentUser || false,
                         createdAt: post.originalPost.createdAt,
-                        userAvatar: originalProfileImageUrl,
+                        userAvatar: originalProfileImageUrl || post.originalPost.userAvatar || post.originalPost.avatar || null,
                         userName:
-                            `${originalUserData.firstName || ''} ${originalUserData.lastName || ''}`.trim() ||
+                            (`${originalUserData.firstName || ''} ${originalUserData.lastName || ''}`.trim()) ||
+                            originalUserData.username ||
+                            post.originalPost.authorName ||
+                            post.originalPost.fullName ||
+                            post.originalPost.userName ||
+                            post.originalPost.username ||
+                            (typeof post.originalPost.user === 'string' && post.originalPost.user !== 'Unknown User' ? post.originalPost.user : '') ||
                             'Unknown User',
                         fullName:
-                            `${originalUserData.firstName || ''} ${originalUserData.lastName || ''}`.trim() ||
+                            (`${originalUserData.firstName || ''} ${originalUserData.lastName || ''}`.trim()) ||
+                            originalUserData.username ||
+                            post.originalPost.authorName ||
+                            post.originalPost.fullName ||
+                            post.originalPost.userName ||
+                            post.originalPost.username ||
+                            (typeof post.originalPost.user === 'string' && post.originalPost.user !== 'Unknown User' ? post.originalPost.user : '') ||
                             'Unknown User',
                         connectionStatus: post.originalPost.connectionStatus || 'none',
                         connectionDegree: post.originalPost.connectionDegree ?? null,

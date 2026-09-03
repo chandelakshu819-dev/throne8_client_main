@@ -51,6 +51,11 @@ const PostHeader = ({
             >
               {(post.user && post.user !== 'Unknown User') ? post.user : (fullName || 'Unknown User')}
             </h4>
+            {(post.username || post.userName) && (
+              <span className={`text-xs font-medium ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
+                @{post.username || post.userName}
+              </span>
+            )}
           </div>
           <p className="text-sm font-semibold bg-gradient-to-r from-[#6b5643] to-[#8b7355] bg-clip-text text-transparent">
             {post.role || headline || ''}

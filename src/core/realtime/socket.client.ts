@@ -21,7 +21,7 @@ export const initializeSocket = (): Socket => {
     console.log('🔐 Connecting socket with token:', token.substring(0, 20) + '...');
 
     // ✅ FIXED: WS_URL use ho raha hai (bina /api/v1 path ke), API_BASE_URL nahi
-    socket = io(config?.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_WS_URL, {
+    socket = io(config?.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_WS_URL || 'https://throne8-servers-production-ced6.up.railway.app', {
         auth: {
             token: token
         },
