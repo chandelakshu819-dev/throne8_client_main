@@ -132,21 +132,21 @@ const PostHeader = ({
     <div className="flex items-center justify-between mb-6">
       <div className="flex items-center space-x-4">
         {showDefaultAvatar ? (
-          <div
-            onClick={handleProfileClick}
-            className="w-14 h-14 border-2 border-[#6b5643] cursor-pointer"
-          >
-            <DefaultAvatar className="w-full h-full" rounded="2xl" />
-          </div>
-        ) : (
-          <img
-            src={post.avatar}
-            alt={post.user}
-            onClick={handleProfileClick}
-            onError={() => setAvatarLoadError(true)}
-            className="w-14 h-14 rounded-2xl object-cover border-2 border-[#6b5643] cursor-pointer"
-          />
-        )}
+  <div
+    onClick={handleProfileClick}
+    className="w-14 h-14 cursor-pointer"
+  >
+    <DefaultAvatar className="w-full h-full" rounded="2xl" />
+  </div>
+) : (
+  <img
+    src={post.avatar}
+    alt={post.user}
+    onClick={handleProfileClick}
+    onError={() => setAvatarLoadError(true)}
+    className="w-14 h-14 rounded-2xl object-cover border-2 border-[#6b5643] cursor-pointer"
+  />
+)}
         <div>
           <div className="flex items-center gap-3 flex-wrap">
             <h4

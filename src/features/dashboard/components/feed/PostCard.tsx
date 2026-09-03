@@ -1,6 +1,7 @@
 // features/dashboard/components/feed/PostCard.tsx
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import PostHeader from './PostHeader';
 import PostContent from './PostContent';
 import PostActions from './PostActions';
@@ -15,6 +16,7 @@ const PostCard = ({
   fullName: string; headline: string;postLikes: any; openMenuId: any; setOpenMenuId: any; onLikeToggle: any; onPinPost: any; onSavePost: any; onDeletePost: any; onArchivePost: any; onOpenUpdateModal: any; onToggleComments: any; commentsByPost: any; isLoadingComments: any; isSubmittingComment: any; commentLikes: any; formatCommentTime: any; isDeletingCommentId: any; setIsDeletingCommentId: any; replyingToCommentId: any; setReplyingToCommentId: any;  currentUserId: string; post: any; index: any; isDarkMode: any; likedPosts: any; handleLike: any; openMenuIndex: any; openRepostIndex: any; openCommentsIndex: any; commentText: any; setCommentText: any; replyingTo: any; openCommentMenuIndex: any; editingCommentId: any; editCommentText: any; setEditCommentText: any; showEmojiPicker: any; setShowEmojiPicker: any; handlePostAction: any; handleRepost: any; toggleComments: any; handleCommentSubmit: any; handleReply: any; handleCommentReaction: any; toggleCommentMenu: any; handleCommentAction: any; handleEditSubmit: any; handleEmojiClick: any; postComments: any; emojiList: any; togglePostMenu: any; toggleRepostMenu: any; postCommentCounts: any; profileImage: any; onOpenWithPerspectiveModal?: any; handleRepostInstant?: any; replyText?: any; setReplyText?: any; handleReplySubmit?: any; likeCommentToggle?: any; commentLikeStatus?: any; setReplyingTo?: any; commentsLoading?: any; fetchCommentsForPost?: any; postSaves?: Record<string, boolean>; postPins?: Record<string, boolean>;
 }) => {
   const { trackPostImpression } = usePostImpressionTracking();
+  const router = useRouter(); // ✅ NEW — liked-by/commented-by connections ke naam par click karke unki profile pe navigate karne ke liye
   const postKey = post.entryId || post.postId;
 
   // LinkedIn-style expanded post modal
@@ -36,16 +38,14 @@ const PostCard = ({
 
     if (names.length === 0 || dismissedLikedBy) return null;
 
-    let text = '';
-    if (names.length === 1) {
-      text = `${names[0]} likes this`;
-    } else if (names.length >= 2) {
-      const shown = names.slice(0, 2).join(' and ');
-      const remaining = totalCount - Math.min(names.length, 2);
-      text = remaining > 0
-        ? `${shown} and ${remaining} other${remaining > 1 ? 's' : ''} like this`
-        : `${shown} like this`;
-    }
+    // ✅ CHANGED: ab plain string nahi banate — har naam ke saath uska
+    // userId (fullList se, same index) pair karte hain taaki naam
+    // clickable ban sake aur us user ki profile pe navigate ho sake.
+    const shownPeople = names.slice(0, 2).map((n, i) => ({
+      name: n,
+      userId: fullList[i]?.userId || null,
+    }));
+    const remaining = totalCount - Math.min(names.length, 2);
 
     const firstLikerAvatar = post.likedByConnectionsAvatars?.[0] || null;
     const firstLikerInitial = names[0]?.charAt(0)?.toUpperCase() || '?';
@@ -73,8 +73,27 @@ const PostCard = ({
               {firstLikerInitial}
             </div>
           )}
+          {/* ✅ CHANGED: naam ab clickable spans hain, plain text nahi */}
           <p className="truncate">
-            <span className="font-semibold">{text}</span>
+            {shownPeople.map((person, i) => (
+              <React.Fragment key={person.userId || person.name}>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (person.userId) router.push(`/profile/${person.userId}`);
+                  }}
+                  className={`font-semibold ${person.userId ? 'cursor-pointer hover:underline' : 'cursor-default'}`}
+                >
+                  {person.name}
+                </span>
+                {i < shownPeople.length - 1 && <span className="font-semibold"> and </span>}
+              </React.Fragment>
+            ))}
+            {remaining > 0 ? (
+              <span className="font-semibold"> and {remaining} other{remaining > 1 ? 's' : ''} like this</span>
+            ) : (
+              <span className="font-semibold"> like this</span>
+            )}
           </p>
         </div>
 
@@ -110,7 +129,11 @@ const PostCard = ({
               {fullList.map((liker) => (
                 <div
                   key={liker.userId}
-                  className={`flex items-center gap-3 px-4 py-2 ${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-[#f6ede8]'
+                  onClick={() => {
+                    setShowLikersList(false);
+                    router.push(`/profile/${liker.userId}`);
+                  }}
+                  className={`flex items-center gap-3 px-4 py-2 cursor-pointer ${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-[#f6ede8]'
                     }`}
                 >
                   {liker.avatar ? (
@@ -148,16 +171,12 @@ const PostCard = ({
 
     if (names.length === 0 || dismissedCommentedBy) return null;
 
-    let text = '';
-    if (names.length === 1) {
-      text = `${names[0]} commented on this`;
-    } else if (names.length >= 2) {
-      const shown = names.slice(0, 2).join(' and ');
-      const remaining = totalCount - Math.min(names.length, 2);
-      text = remaining > 0
-        ? `${shown} and ${remaining} other${remaining > 1 ? 's' : ''} commented`
-        : `${shown} commented`;
-    }
+    // ✅ CHANGED: naam + userId pairing, same pattern jaisa likes wale mein
+    const shownPeople = names.slice(0, 2).map((n, i) => ({
+      name: n,
+      userId: fullList[i]?.userId || null,
+    }));
+    const remaining = totalCount - Math.min(names.length, 2);
 
     const firstCommenterAvatar = post.commentedByConnectionsAvatars?.[0] || null;
     const firstCommenterInitial = names[0]?.charAt(0)?.toUpperCase() || '?';
@@ -183,8 +202,27 @@ const PostCard = ({
               {firstCommenterInitial}
             </div>
           )}
+          {/* ✅ CHANGED: naam ab clickable spans hain, plain text nahi */}
           <p className="truncate">
-            <span className="font-semibold">{text}</span>
+            {shownPeople.map((person, i) => (
+              <React.Fragment key={person.userId || person.name}>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (person.userId) router.push(`/profile/${person.userId}`);
+                  }}
+                  className={`font-semibold ${person.userId ? 'cursor-pointer hover:underline' : 'cursor-default'}`}
+                >
+                  {person.name}
+                </span>
+                {i < shownPeople.length - 1 && <span className="font-semibold"> and </span>}
+              </React.Fragment>
+            ))}
+            {remaining > 0 ? (
+              <span className="font-semibold"> and {remaining} other{remaining > 1 ? 's' : ''} commented</span>
+            ) : (
+              <span className="font-semibold"> commented</span>
+            )}
           </p>
         </div>
 
@@ -220,7 +258,11 @@ const PostCard = ({
               {fullList.map((commenter) => (
                 <div
                   key={commenter.userId}
-                  className={`flex items-center gap-3 px-4 py-2 ${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-[#f6ede8]'
+                  onClick={() => {
+                    setShowCommentersList(false);
+                    router.push(`/profile/${commenter.userId}`);
+                  }}
+                  className={`flex items-center gap-3 px-4 py-2 cursor-pointer ${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-[#f6ede8]'
                     }`}
                 >
                   {commenter.avatar ? (

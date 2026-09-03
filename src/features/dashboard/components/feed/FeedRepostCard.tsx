@@ -1,6 +1,7 @@
 // src/features/dashboard/components/feed/FeedRepostCard.tsx
 'use client';
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import PostActions from './PostActions';
 import CommentsSection from './CommentsSection';
 import PostContent from './PostContent';
@@ -112,6 +113,10 @@ const FeedRepostCard = ({
     // liye read more/less state — pehle yeh hamesha poora dikh jaata tha.
     const [isThoughtExpanded, setIsThoughtExpanded] = React.useState(false);
 
+    // ✅ NEW: reposter aur original-post-author ki profile pe navigate
+    // karne ke liye router.
+    const router = useRouter();
+
     const originalPost = repostItem.originalPost;
     if (!originalPost) return null;
 
@@ -129,6 +134,17 @@ const FeedRepostCard = ({
         const hrs = Math.floor(mins / 60);
         if (hrs < 24) return `${hrs}h ago`;
         return `${Math.floor(hrs / 24)}d ago`;
+    };
+
+    // ✅ NEW: kisi bhi user (reposter ya original post author) ki profile
+    // page (/profile/[userId]) pe navigate karta hai. e.stopPropagation()
+    // isliye zaroori hai taaki click, neeche wale PostContent ke
+    // onClick={() => setIsDetailOpen(true)} tak bubble na kare.
+    const goToProfile = (userId?: string | null) => (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (userId) {
+            router.push(`/profile/${userId}`);
+        }
     };
 
     // PostContent / PostActions / PostHeader / PostDetailModal ko
@@ -201,19 +217,28 @@ const FeedRepostCard = ({
                     dikha raha tha, ab tight kar diya. */}
                 <div className="flex items-center gap-2 mb-2 pb-2 border-b border-[#4a3728]/10">
                     <i className="ri-repeat-line text-lg text-[#6b5643]" />
-                    <div className="w-6 h-6 rounded-full overflow-hidden border border-[#4a3728]/20 flex-shrink-0">
-                        {displayAvatar ? (
-                            <img src={displayAvatar} alt={displayName} className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full bg-[#4a3728]/20 flex items-center justify-center">
-                                <span className="text-xs text-[#4a3728] font-bold">{displayName?.charAt(0)}</span>
-                            </div>
-                        )}
+
+                    {/* ✅ CHANGED: avatar + naam ab clickable hai → reposter
+                        ki profile pe le jaata hai */}
+                    <div
+                        className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={goToProfile(repostItem.userId)}
+                    >
+                        <div className="w-6 h-6 rounded-full overflow-hidden border border-[#4a3728]/20 flex-shrink-0">
+                            {displayAvatar ? (
+                                <img src={displayAvatar} alt={displayName} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full bg-[#4a3728]/20 flex items-center justify-center">
+                                    <span className="text-xs text-[#4a3728] font-bold">{displayName?.charAt(0)}</span>
+                                </div>
+                            )}
+                        </div>
+                        <span className={`text-sm font-semibold hover:underline ${isDarkMode ? 'text-slate-300' : 'text-[#4a3728]/70'}`}>
+                            {displayName} reposted
+                            {repostItem.repostType === 'quote' && ' with thoughts'}
+                        </span>
                     </div>
-                    <span className={`text-sm font-semibold ${isDarkMode ? 'text-slate-300' : 'text-[#4a3728]/70'}`}>
-                        {displayName} reposted
-                        {repostItem.repostType === 'quote' && ' with thoughts'}
-                    </span>
+
                     <span className={`text-xs ml-auto ${isDarkMode ? 'text-slate-500' : 'text-[#4a3728]/40'}`}>
                         {timeAgo(repostItem.createdAt)}
                     </span>
@@ -263,20 +288,27 @@ const FeedRepostCard = ({
                 >
                     {/* ✅ SPACING FIX: mb-3 → mb-2 */}
                     <div className="flex items-center gap-3 mb-2">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${isDarkMode ? 'bg-slate-600 border-slate-500' : 'bg-[#e0d8cf] border-[#4a3728]/10'}`}>
-                            {originalPost.userAvatar ? (
-                                <img src={originalPost.userAvatar} alt="Author" className="w-full h-full object-cover rounded-full" />
-                            ) : (
-                                <i className="ri-user-line text-[#4a3728]/50 text-lg" />
-                            )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
-                                {originalPost.userName || originalPost.fullName || 'Unknown User'}
-                            </p>
-                            <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/50'}`}>
-                                {timeAgo(originalPost.createdAt)}
-                            </p>
+                        {/* ✅ CHANGED: avatar + naam ab clickable hai → original
+                            post author ki profile pe le jaata hai */}
+                        <div
+                            className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={goToProfile(originalPost.userId)}
+                        >
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${isDarkMode ? 'bg-slate-600 border-slate-500' : 'bg-[#e0d8cf] border-[#4a3728]/10'}`}>
+                                {originalPost.userAvatar ? (
+                                    <img src={originalPost.userAvatar} alt="Author" className="w-full h-full object-cover rounded-full" />
+                                ) : (
+                                    <i className="ri-user-line text-[#4a3728]/50 text-lg" />
+                                )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-bold hover:underline ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
+                                    {originalPost.userName || originalPost.fullName || 'Unknown User'}
+                                </p>
+                                <p className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/50'}`}>
+                                    {timeAgo(originalPost.createdAt)}
+                                </p>
+                            </div>
                         </div>
 
                         {/* ✅ NEW: 3-dot (⋯) menu button — original post ke liye.

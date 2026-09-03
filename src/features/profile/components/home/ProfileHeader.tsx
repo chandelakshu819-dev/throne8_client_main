@@ -17,8 +17,6 @@ import StudyStreakBadge from './StudyStreakBadge';
 
 
 
-
-
 interface ProfileHeaderProps {
     currentUserId?: string;
     isOwnProfile?: boolean;
