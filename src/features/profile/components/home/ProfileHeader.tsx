@@ -13,11 +13,13 @@ import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData'
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import ConnectionService from '@/lib/api/connection.service';
 
+
 interface ProfileHeaderProps {
     currentUserId?: string;
     isOwnProfile?: boolean;
     profileImage: string;
     name: string;
+    websiteUrl?: string;
     // ✅ pronouns poori tarah hataya — backend mein field exist nahi karti
     headline: string;
     company: string;
@@ -58,6 +60,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     isOwnProfile = true,
     profileImage,
     name,
+    websiteUrl = '',
     headline,
     company,
     description,
@@ -352,7 +355,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                     {/* ✅ NEW — "X mutual connections" badge, LinkedIn-style.
                                         Sirf dikhta hai jab: apni profile na ho, loading khatam ho
                                         chuki ho, aur count 0 se zyada ho — 0 dikhana faltu/noisy hai */}
-                                    {!isOwnProfile && !isLoadingMutuals && mutualCount > 0 && (
+                                                                   {!isOwnProfile && !isLoadingMutuals && mutualCount > 0 && (
                                         <button
                                             className="connectionsShowButton group px-3 py-1.5 bg-white text-[#4a3728] rounded-full text-xs shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-1.5 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white"
                                             onClick={() => router.push(`/network/connections?userId=${currentUserId}&tab=connections`)}
@@ -361,6 +364,34 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                                             </svg>
                                             <span className="font-semibold">{mutualCount}</span> mutual connection{mutualCount > 1 ? 's' : ''}
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="flex gap-2 justify-center md:justify-start flex-wrap mt-2">
+                                    {websiteUrl && websiteUrl.trim() !== '' && (
+                                        <button
+                                            onClick={() => window.open(websiteUrl, '_blank', 'noopener,noreferrer')}
+                                            className="connectionsShowButton group px-3 py-1.5 bg-white text-[#4a3728] rounded-full text-xs shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-1.5 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white"
+                                        >
+                                            <svg className="w-4 h-4 text-[#4a3728]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 010 18M12 3a15.3 15.3 0 000 18" />
+                                            </svg>
+                                            Website
+                                        </button>
+                                    )}
+
+                                    {currentUserId && (
+                                        <button
+                                            onClick={() => router.push(`/mentorship/${currentUserId}`)}
+                                            className="connectionsShowButton group px-3 py-1.5 bg-white text-[#4a3728] rounded-full text-xs shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-1.5 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white"
+                                        >
+                                            <svg className="w-4 h-4 text-[#4a3728]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422A12.083 12.083 0 0121 15.5v0M12 14v7m-9-9.5v0a12.083 12.083 0 002.84 5.922L12 21l6.16-3.578" />
+                                            </svg>
+                                            Mentorship
                                         </button>
                                     )}
                                 </div>

@@ -123,16 +123,14 @@ const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUs
           <span className="font-medium">Not interested</span>
         </button>
       }
-      {isOwn &&
-        <button
-          onClick={() => handlePostAction('hide', index)}
-          className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-[#e0d8cf]/50 text-[#4a3728]'
-            }`}
-        >
-          <i className="ri-eye-close-line text-lg"></i>
-          <span className="font-medium">Hide this post</span>
-        </button>
-      }
+      <button
+        onClick={() => handlePostAction('hide', index)}
+        className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-white' : 'hover:bg-[#e0d8cf]/50 text-[#4a3728]'
+          }`}
+      >
+        <i className="ri-eye-close-line text-lg"></i>
+        <span className="font-medium">Hide this post</span>
+      </button>
             {!isOwn &&
         <button
           onClick={() => handlePostAction(isFollowing ? 'unfollow' : 'follow', index)}
