@@ -348,9 +348,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
                                                 <h4 className="text-[15px] font-semibold capitalize leading-tight truncate" style={{ color: TOKENS.textPrimary }}>
                                                     {skill.skillName}
                                                 </h4>
-                                                <p className="mt-0.5 text-[13px]" style={{ color: TOKENS.textSecondary }}>
-                                                    {skill.category}
-                                                </p>
+                                             
                                             </div>
                                         </div>
 

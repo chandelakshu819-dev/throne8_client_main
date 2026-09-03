@@ -1568,14 +1568,12 @@ static async getSavedPosts(): Promise<any> {
  */
     static async createSkill(skillData: {
         skillName: string;
-        category: string;
         skillStrength: 'beginner' | 'intermediate' | 'advanced' | 'expert';
         yearsOfExperience: number;
     }): Promise<any> {
         try {
             console.log('💡 [CREATE_SKILL] Creating skill...', {
                 skillName: skillData.skillName,
-                category: skillData.category,
             });
 
             const { data } = await api.post(`${config?.NEXT_PUBLIC_SKILLS_ENDPOINT || process.env.NEXT_PUBLIC_SKILLS_ENDPOINT}/create-skill`, skillData);
@@ -1619,7 +1617,6 @@ static async getSavedPosts(): Promise<any> {
  */
     static async updateSkill(skillId: string, updates: {
         skillName?: string;
-        category?: string;
         skillStrength?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
         yearsOfExperience?: number;
     }): Promise<any> {

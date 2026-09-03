@@ -465,6 +465,7 @@ return (
                         location={profileData.location}
                         followers={followersCount}
                         connections={totalConnections.toString()}
+                        websiteUrl={userProfileData?.website || userProfileData?.websiteUrl || ''}
                         firstName={userProfileData?.firstName || ''}
                         lastName={userProfileData?.lastName || ''}
                         currentPosition={userProfileData?.currentPosition || ''}

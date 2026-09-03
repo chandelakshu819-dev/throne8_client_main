@@ -94,12 +94,10 @@ const PostMenuDropdown = ({ isDarkMode, index, handlePostAction, post, currentUs
           <span>Not interested</span>
         </button>
       )}
-      {isOwn && (
-        <button onClick={() => handlePostAction('hide', index)} className={itemClass()}>
-          <i className="ri-eye-close-line text-base"></i>
-          <span>Hide this post</span>
-        </button>
-      )}
+      <button onClick={() => handlePostAction('hide', index)} className={itemClass()}>
+        <i className="ri-eye-close-line text-base"></i>
+        <span>Hide this post</span>
+      </button>
       {!isOwn && (
         <button onClick={() => handlePostAction('unfollow', index)} className={itemClass()}>
           <i className={`${isFollowing ? 'ri-user-unfollow-line' : 'ri-user-follow-line'} text-base`}></i>

@@ -29,6 +29,7 @@ import Toast from '@/shared/uiComponents/Toast';
 import EmbedPostModal from '@/features/dashboard/components/feed/EmbedPostModal';
 import DeleteConfirmModal from '@/features/dashboard/components/feed/DeleteConfirmModal';
 import ReportPostModal from '@/features/profile/components/home/ReportPostModal';
+import { hidePost, getHiddenPosts, isPostHidden } from '@/lib/utils/hiddenPosts';
 // ✅ NEW: @mention autocomplete wiring for the dashboard's inline create-post
 // textarea. CreatePostModal.tsx (profile/home) already had this, but this
 // page's own hard-coded post-creator modal was never wired up to it —
@@ -182,6 +183,23 @@ export default function Home() {
     const [postSaves, setPostSaves] = useState<Record<string, boolean>>({});
     const [postPins, setPostPins] = useState<Record<string, boolean>>({});
     const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+        const syncHiddenPosts = () => {
+            const hidden = getHiddenPosts();
+            const ids = new Set<string>();
+            hidden.forEach((item) => {
+                if (item.id) ids.add(item.id);
+                if (item.post?.entryId) ids.add(item.post.entryId);
+                if (item.post?.postId) ids.add(item.post.postId);
+                if (item.post?._id) ids.add(item.post._id);
+            });
+            setHiddenPostIds(ids);
+        };
+        syncHiddenPosts();
+        window.addEventListener('hidden_posts_changed', syncHiddenPosts);
+        return () => window.removeEventListener('hidden_posts_changed', syncHiddenPosts);
+    }, []);
     // ✅ NEW: unfollow confirmation — browser confirm()/alert() ki jagah themed modal
     const [unfollowConfirm, setUnfollowConfirm] = useState<{ postId: string; targetUserId: string; targetName: string } | null>(null);
     const [isUnfollowing, setIsUnfollowing] = useState(false);
@@ -725,13 +743,23 @@ export default function Home() {
             return;
         }
 
-        if (action === 'archive' || action === 'hide') {
+        if (action === 'hide') {
+            const targetKey = isRepostOriginal ? post.originalPost?.entryId || postId : postId;
+            const postToHide = isRepostOriginal ? post.originalPost : post;
+            hidePost(postToHide || { id: targetKey, entryId: targetKey });
+            setHiddenPostIds(prev => new Set(prev).add(targetKey));
+            setToast({ message: 'Post hidden. You can view it in Hidden Posts under Manage.' });
+            setOpenMenuIndex(null);
+            return;
+        }
+
+        if (action === 'archive') {
             try {
                 await ProfileService.archivePost(postId);
                 setHiddenPostIds(prev => new Set(prev).add(postId));
-                alert('Post archived.');
+                setToast({ message: 'Post archived.' });
             } catch (err: any) {
-                alert(err.message || 'Failed to archive post');
+                setToast({ message: err.message || 'Failed to archive post' });
             }
             setOpenMenuIndex(null);
             return;
@@ -1388,8 +1416,8 @@ if (post?.userId && post.userId !== user?.userId) {
         // mein hi rahegi (jisme sabse naya prepended post already sabse
         // upar hota hai).
         const visiblePosts = allPosts.filter((p: any) => {
-            const key = p.entryId || p.postId;
-            return !hiddenPostIds.has(key);
+            const key = p.entryId || p.postId || p._id || p.id;
+            return !hiddenPostIds.has(key) && !isPostHidden(key);
         });
 
     return (

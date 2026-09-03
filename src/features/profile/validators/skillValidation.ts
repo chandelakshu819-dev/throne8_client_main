@@ -6,11 +6,6 @@ export const createSkillSchema = z.object({
         .max(100, 'Skill name must be less than 100 characters')
         .trim(),
 
-    category: z.string()
-        .min(2, 'Category must be at least 2 characters')
-        .max(50, 'Category must be less than 50 characters')
-        .trim(),
-
     skillStrength: z.enum(['beginner', 'intermediate', 'advanced', 'expert'], {
         errorMap: () => ({ message: 'Invalid skill strength' })
     }),

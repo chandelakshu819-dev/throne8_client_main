@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, GraduationCap, Building2, BookOpen, Award, Calendar, MapPin, FileText } from 'lucide-react';
 import z from 'zod';
 import AuthService from '@/lib/api/auth.service';
 import { useEducation } from '@/features/profile/hooks/useEducation';import { packFutureDate } from '@/shared/utils/educationDateHelper';
@@ -377,12 +377,12 @@ const AddEducationModal: React.FC<AddEducationModalProps> = ({
                         {/* Education Details Section */}
                         <div className="space-y-4">
                             <h3 className="text-lg font-semibold text-[#4a3728] flex items-center gap-2">
-                                <span className="text-2xl">🎓</span> Education Details
+                                <GraduationCap className="w-5 h-5 text-[#4a3728]" /> Education Details
                             </h3>
 
                             <div>
-                                <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                    College / University <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                    <Building2 className="w-4 h-4 text-[#8b6f47]" /> College / University <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -401,8 +401,8 @@ const AddEducationModal: React.FC<AddEducationModalProps> = ({
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                    Degree <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                    <GraduationCap className="w-4 h-4 text-[#8b6f47]" /> Degree <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     name="degree"
@@ -420,8 +420,8 @@ const AddEducationModal: React.FC<AddEducationModalProps> = ({
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                    Degree Type <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                    <BookOpen className="w-4 h-4 text-[#8b6f47]" /> Degree Type <span className="text-red-500">*</span>
                                 </label>
                                 <select
                                     name="degreeType"
@@ -447,8 +447,8 @@ const AddEducationModal: React.FC<AddEducationModalProps> = ({
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                    Field of Study <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                    <Award className="w-4 h-4 text-[#8b6f47]" /> Field of Study <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="text"
@@ -468,8 +468,8 @@ const AddEducationModal: React.FC<AddEducationModalProps> = ({
 
                             {/* Start Date */}
                             <div>
-                                <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                    Start Date <span className="text-red-500">*</span>
+                                <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                    <Calendar className="w-4 h-4 text-[#8b6f47]" /> Start Date <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     type="date"
@@ -488,8 +488,8 @@ const AddEducationModal: React.FC<AddEducationModalProps> = ({
 
                             {/* End Date */}
                             <div>
-                                <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                    End Date <span className="text-xs text-[#4a3728]/60">(Leave empty if ongoing)</span>
+                                <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                    <Calendar className="w-4 h-4 text-[#8b6f47]" /> End Date <span className="text-xs text-[#4a3728]/60">(Leave empty if ongoing)</span>
                                 </label>
                                 <input
                                     type="date"
@@ -505,8 +505,8 @@ const AddEducationModal: React.FC<AddEducationModalProps> = ({
 
                             {/* Education Type */}
                             <div>
-                                <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                    Education Type
+                                <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                    <GraduationCap className="w-4 h-4 text-[#8b6f47]" /> Education Type
                                 </label>
                                 <select
                                     name="educationType"
@@ -523,8 +523,8 @@ const AddEducationModal: React.FC<AddEducationModalProps> = ({
 
                             {/* Grade Type */}
                             <div>
-                                <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                    Grade Type
+                                <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                    <Award className="w-4 h-4 text-[#8b6f47]" /> Grade Type
                                 </label>
                                 <select
                                     name="gradeType"
@@ -545,8 +545,8 @@ const AddEducationModal: React.FC<AddEducationModalProps> = ({
 
                             {/* Grade Value */}
                             <div>
-                                <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                    Grade Value
+                                <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                    <Award className="w-4 h-4 text-[#8b6f47]" /> Grade Value
                                 </label>
                                 <input
                                     type="text"
@@ -566,8 +566,8 @@ const AddEducationModal: React.FC<AddEducationModalProps> = ({
 
                             {/* Location */}
                             <div>
-                                <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                    Location
+                                <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                    <MapPin className="w-4 h-4 text-[#8b6f47]" /> Location
                                 </label>
                                 <input
                                     type="text"
@@ -581,8 +581,8 @@ const AddEducationModal: React.FC<AddEducationModalProps> = ({
 
                             {/* Description */}
                             <div>
-                                <label className="block text-sm font-medium text-[#4a3728] mb-2">
-                                    Description
+                                <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
+                                    <FileText className="w-4 h-4 text-[#8b6f47]" /> Description
                                 </label>
                                 <textarea
                                     name="description"

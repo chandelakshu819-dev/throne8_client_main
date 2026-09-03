@@ -999,12 +999,18 @@ const engagementPercent = analyticsData
     const key = p.entryId || p.postId || p._id || p.id;
     return !repostedEntryIds.has(key) && !hiddenPostIds.has(key) && !isPostHidden(key);
   });
-  const hasMorePosts = (filteredPosts.length + userReposts.length) > 2;
 
- // ✅ FIX: pehle pinned post(s) sabse upar, uske baad baaki createdAt
+  const filteredUserReposts = userReposts.filter((repost: any) => {
+    const key = repost.repostId || (repost.originalPost ? (repost.originalPost.entryId || repost.originalPost.postId || repost.originalPost._id) : null);
+    return !key || (!hiddenPostIds.has(key) && !isPostHidden(key));
+  });
+
+  const hasMorePosts = (filteredPosts.length + filteredUserReposts.length) > 2;
+
+  // ✅ FIX: pehle pinned post(s) sabse upar, uske baad baaki createdAt
   // ke hisaab se real chronological order (jaise pehle tha)
   const combinedItems = [
-    ...userReposts.map((repost: any) => ({ type: 'repost' as const, data: repost, createdAt: repost.createdAt })),
+    ...filteredUserReposts.map((repost: any) => ({ type: 'repost' as const, data: repost, createdAt: repost.createdAt })),
     ...filteredPosts.map((post: any) => ({ type: 'post' as const, data: post, createdAt: post.createdAt })),
   ].sort((a, b) => {
     const aKey = a.type === 'post' ? (a.data.entryId || a.data.postId) : null;
@@ -1145,7 +1151,7 @@ const engagementPercent = analyticsData
   };
 
   const handlePostAction = async (action: string, postId: string) => {
-    const viewerAllowedActions = ['copy', 'embed', 'analytics', 'save', 'not-interested', 'unfollow', 'follow', 'report'];
+    const viewerAllowedActions = ['copy', 'embed', 'analytics', 'save', 'not-interested', 'unfollow', 'follow', 'report', 'hide'];
 
 
     if (!isOwnProfile && viewerAllowedActions.indexOf(action) === -1) {
