@@ -729,7 +729,10 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, onSaved })
                             if (website?.value?.trim()) {
                                 setIsSavingWebsite(true);
                                 try {
-                                    const cleanedUrl = website.value.trim();
+                                    let cleanedUrl = website.value.trim();
+                                    if (cleanedUrl && !cleanedUrl.startsWith('http://') && !cleanedUrl.startsWith('https://')) {
+                                        cleanedUrl = `https://${cleanedUrl}`;
+                                    }
                                     await saveWebsite({
                                         url: cleanedUrl,
                                         label: website.label?.trim() || 'Personal Portfolio',

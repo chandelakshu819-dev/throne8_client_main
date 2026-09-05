@@ -145,8 +145,13 @@ export const saveContactWebsite = createAsyncThunk(
         { rejectWithValue, getState }
     ) => {
         try {
+            let formattedUrl = url ? url.trim() : '';
+            if (formattedUrl && !formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+                formattedUrl = `https://${formattedUrl}`;
+            }
+
             const websites = [{
-                url,
+                url: formattedUrl,
                 type: (type as any) || 'portfolio',
                 label: label || 'Personal Portfolio',
             }];
