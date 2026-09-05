@@ -1,4 +1,5 @@
 // app/(dashboard)/components/sidebar/CreatePostPrompt.tsx
+'use client';
 
 import { useHeadlineData } from '@/features/profile/hooks/useHeadlineData';
 import { useProfileData } from '@/features/profile/hooks/useProfileData';
@@ -31,11 +32,14 @@ const CreatePostPrompt: React.FC<CreatePostPromptProps> = ({ isDarkMode, setIsPo
     }
   }, [headlineId, fetchHeadlineData]);
 
-  // console.log('👤 [PROFILE_CARD] User Profile Data:', headlineData);
-
+  // ✅ FIX: fetchUserProfile ko user.userId pass kiya (pehle bina argument
+  // ke call ho raha tha, isliye userProfileData kabhi load nahi hota tha
+  // aur transformToProfileData() fallback placeholder name deta tha —
+  // isi wajah se avatar mein "US" initials dikh rahe the, "honey gupta"
+  // (HG) nahi).
   useEffect(() => {
-    if (user) {
-      fetchUserProfile();
+    if (user?.userId) {
+      fetchUserProfile(user.userId);
     }
   }, [user, fetchUserProfile]);
 

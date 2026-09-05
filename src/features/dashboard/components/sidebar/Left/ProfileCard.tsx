@@ -17,7 +17,7 @@ interface ProfileCardProps {
   isDarkMode: boolean;
 }
 
-const ProfileCard: React.FC<ProfileCardProps> = ({currentUserId, isDarkMode }) => {
+const ProfileCard: React.FC<ProfileCardProps> = ({ currentUserId, isDarkMode }) => {
   const { user } = useAuth();
   const router = useRouter();
   const {
@@ -34,30 +34,27 @@ const ProfileCard: React.FC<ProfileCardProps> = ({currentUserId, isDarkMode }) =
     updateBanner,
   } = useProfile();
 
-
-
   const {
     userProfileData,
     profileImageUrl,
     headlineId,
-    fetchUserProfile
+    fetchUserProfile,
   } = useProfileData();
 
   const {
-          // followingList,
-          // followersList,
-          totalConnections,
-          isLoadingConnections,
-          fetchConnectionsData,
-      } = useConnectionsData();
-  
-      useEffect(() => {
-          if (currentUserId) {
-              fetchConnectionsData(currentUserId);
-          }
-      }, [currentUserId, fetchConnectionsData]);
-      console.log('👥 [profile CARD] Total Connections:', totalConnections);
-  
+    // followingList,
+    // followersList,
+    totalConnections,
+    isLoadingConnections,
+    fetchConnectionsData,
+  } = useConnectionsData();
+
+  useEffect(() => {
+    if (currentUserId) {
+      fetchConnectionsData(currentUserId);
+    }
+  }, [currentUserId, fetchConnectionsData]);
+  console.log('👥 [profile CARD] Total Connections:', totalConnections);
 
   const { headlineData, isLoadingHeadline, fetchHeadlineData } = useHeadlineData(headlineId);
 
@@ -69,13 +66,21 @@ const ProfileCard: React.FC<ProfileCardProps> = ({currentUserId, isDarkMode }) =
 
   console.log('👤 [PROFILE_CARD] User Profile Data:', headlineData);
 
+  // ✅ FIX: fetchUserProfile ab userId maangta hai (useProfileData.ts dekho —
+  // AuthService.getUserProfileById(userId) use hota hai). Pehle isko bina
+  // argument ke call kiya ja raha tha, jisse hook ke andar `if (!userId) return;`
+  // pe hi turant return ho jaata tha — isLoadingProfile kabhi false nahi hota
+  // aur userProfileData hamesha null rehta, isliye fullName hamesha "Loading..."
+  // aur avatar hamesha fallback "LO" show hota tha.
+  const resolvedUserId = currentUserId || user?.id;
+
   useEffect(() => {
-    if (user) {
+    if (user && resolvedUserId) {
       loadProfile();   // ← Redux action
       loadPosts();
-      fetchUserProfile();
+      fetchUserProfile(resolvedUserId);
     }
-  }, [user, fetchUserProfile]);
+  }, [user, resolvedUserId, fetchUserProfile]);
 
   const profileData = transformToProfileData(
     userProfileData,
@@ -157,7 +162,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({currentUserId, isDarkMode }) =
             </button>
           ))}
         </div>
-        
+
 
         <StatsCards
           isDarkMode={isDarkMode}

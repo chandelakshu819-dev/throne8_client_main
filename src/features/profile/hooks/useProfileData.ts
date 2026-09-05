@@ -6,25 +6,28 @@ import { UserProfileData } from '@/types/profile.types';
 export const useProfileData = () => {
     const [userProfileData, setUserProfileData] = useState<UserProfileData | null>(null);
     const [profileImageUrl, setProfileImageUrl] = useState('');
-    const [bannerUrl, setBannerUrl] = useState(
-        ''
-    );
+    const [bannerUrl, setBannerUrl] = useState('');
     const [coverPhotoId, setCoverPhotoId] = useState<string>('');
     const [aboutId, setAboutId] = useState<string>('');
     const [headlineId, setHeadlineId] = useState<string>('');
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [profileError, setProfileError] = useState<string | null>(null);
 
-    const fetchUserProfile = useCallback(async () => {
+    // ✅ CHANGED: ab userId zaroori hai — AuthService.getUserProfile() (jo
+    // sirf account-level fields deta hai: email/role/status, koi
+    // firstName/lastName/profilePhotoId nahi) ki jagah
+    // AuthService.getUserProfileById(userId) use karte hain, jo poora
+    // profile deta hai. Isi wajah se navbar hamesha "User" dikha raha tha.
+    const fetchUserProfile = useCallback(async (userId: string) => {
+        if (!userId) return;
         try {
             setIsLoadingProfile(true);
             setProfileError(null);
 
-            const data = await profileApi.fetchUserProfile();
+            const data = await profileApi.fetchUserProfile(userId);
 
             setUserProfileData(data);
 
-            // Fetch profile photo
             if (data?.profilePhotoId) {
                 try {
                     const photoUrl = await profileApi.fetchProfilePhoto(data.profilePhotoId);
@@ -36,7 +39,6 @@ export const useProfileData = () => {
                 }
             }
 
-            // Fetch cover photo
             if (data?.coverPhotoId) {
                 try {
                     const coverUrl = await profileApi.fetchCoverPhoto(data.coverPhotoId);
@@ -50,7 +52,6 @@ export const useProfileData = () => {
                 }
             }
 
-            // Set IDs
             if (data?.headlineId) {
                 setHeadlineId(data.headlineId);
             }

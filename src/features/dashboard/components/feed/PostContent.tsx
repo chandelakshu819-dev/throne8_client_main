@@ -1,4 +1,4 @@
-// features/dashboard/components/feed/PostContent.tsx
+// src/features/dashboard/components/feed/PostContent.tsx
 import React, { useState } from 'react';
 import { renderFormattedContent, renderFormattedLine } from '@/shared/utils/postContentFormat';
 import AnalyticsService from '@/lib/api/analytics.service';
@@ -19,32 +19,65 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
     ? renderFormattedContent(content)
     : renderFormattedLine(firstLine);
 
-  // ✅ Multi-image support (LinkedIn-style grid)
+  // ✅ Multi-image support (LinkedIn-style collage grid)
   const images: any[] = post.images || [];
   const imageCount = images.length;
 
+  // ✅ Har case (2 / 3 / 4 / 5+) ke liye sahi grid layout:
+  // 1 photo  -> full width, natural height
+  // 2 photos -> 2 columns, 1 row, equal height
+  // 3 photos -> left tile bada (2 rows span), right side 2 tiles stacked
+  // 4 photos -> 2x2 grid, equal tiles
+  // 5+ photos -> same 2x2 grid, sirf 4 tiles dikhte hain — 4th tile pe
+  //              "+N" overlay baaki count dikhata hai (5 photos => "+1",
+  //              6 photos => "+2", waghera)
   const getGridColsClass = (): string => {
     if (imageCount <= 1) return 'grid-cols-1';
     return 'grid-cols-2';
   };
 
-const getTileClass = (index: number): string => {
+  const getGridRowsClass = (): string => {
+    // 3+ images do rows mein arrange hote hain (grid ko explicit
+    // batana zaroori hai warna row-span-2 wali tile sahi se stretch
+    // nahi hoti)
+    if (imageCount >= 3) return 'grid-rows-2';
+    return '';
+  };
+
+  const getTileClass = (index: number): string => {
     const classes = ['relative', 'overflow-hidden', isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'];
 
-    const isFirstOfThree = imageCount === 3 && index === 0;
-    if (isFirstOfThree) {
-      classes.push('row-span-2');
-    }
-
     if (imageCount === 1) {
-      classes.push(`max-h-[650px] w-full flex items-center justify-center ${isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'} rounded-2xl`);
-    } else {
-      classes.push('h-[150px]');
-      classes.push('sm:h-[200px]');
+      classes.push(`max-h-[650px] w-full flex items-center justify-center rounded-2xl ${isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'}`);
+      return classes.join(' ');
     }
 
+    if (imageCount === 2) {
+      // ✅ 2 photos: dono ek row mein, poori decent height ke saath
+      // (pehle 150px tha jo squished dikhta tha)
+      classes.push('h-[240px] sm:h-[320px]');
+      return classes.join(' ');
+    }
+
+    if (imageCount === 3) {
+      const isFirstOfThree = index === 0;
+      if (isFirstOfThree) {
+        // ✅ FIX: pehle yahan h-[150px] bhi push ho raha tha jo
+        // row-span-2 ke against conflict karta tha aur tile chhoti
+        // reh jaati thi. Ab h-full — apni poori spanned row-height
+        // (dono rows + gap) fill karega.
+        classes.push('row-span-2 h-full');
+      } else {
+        classes.push('h-[150px]', 'sm:h-[190px]');
+      }
+      return classes.join(' ');
+    }
+
+    // 4 ya usse zyada (max 4 tiles hi render honge)
+    classes.push('h-[150px]', 'sm:h-[190px]');
     return classes.join(' ');
   };
+
   const handleReadMoreClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     setExpanded((v) => !v);
@@ -100,7 +133,25 @@ const getTileClass = (index: number): string => {
     : 'text-sm font-semibold mb-2 text-[#6b5643] hover:text-[#4a3728]';
 
   // ✅ SPACING FIX: mb-6 → mb-3 — image grid ke neeche gap tight kiya
-  const imageGridClass = 'mb-3 rounded-2xl overflow-hidden grid gap-1 cursor-pointer ' + getGridColsClass();
+  const imageGridClass = [
+    'mb-3',
+    'rounded-2xl',
+    'overflow-hidden',
+    'grid',
+    'gap-1',
+    'cursor-pointer',
+    getGridColsClass(),
+    getGridRowsClass(),
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  // ✅ FIX: 5+ photos ho toh bhi sirf 4 tiles render hongi (pehle
+  // slice(0,5) tha jo 5-tile ka broken/odd grid banata tha). 4th tile
+  // pe hi "+N" overlay lagega, N = baaki bachi hui photos.
+  const visibleCount = Math.min(imageCount, 4);
+  const visibleImages = images.slice(0, visibleCount);
+  const extraCount = imageCount - visibleCount;
 
   return (
     <>
@@ -114,18 +165,17 @@ const getTileClass = (index: number): string => {
 
       {imageCount > 0 && (
         <div onClick={handleImageContainerClick} className={imageGridClass}>
-          {images.slice(0, 5).map((img: any, i: number) => {
-            const isOverlayTile = imageCount > 4 && i === 3;
-            const extraCount = imageCount - 4;
+          {visibleImages.map((img: any, i: number) => {
+            const isOverlayTile = i === visibleCount - 1 && extraCount > 0;
 
             return (
               <div key={img.mediaId || i} className={getTileClass(i)}>
                 <img
-                src={img.cloudinarySecureUrl}
-                alt={'Post image ' + (i + 1)}
-                className={`w-full ${imageCount === 1 ? 'h-auto max-h-[650px] object-contain rounded-2xl' : 'h-full object-cover'} hover:scale-[1.01] transition-transform duration-500`}
-              />
-                {isOverlayTile && extraCount > 0 && (
+                  src={img.cloudinarySecureUrl}
+                  alt={'Post image ' + (i + 1)}
+                  className={`w-full ${imageCount === 1 ? 'h-auto max-h-[650px] object-contain rounded-2xl' : 'h-full object-cover'} hover:scale-[1.01] transition-transform duration-500`}
+                />
+                {isOverlayTile && (
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                     <span className="text-white text-2xl font-bold">+{extraCount}</span>
                   </div>

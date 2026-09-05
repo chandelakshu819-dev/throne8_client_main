@@ -23,6 +23,13 @@ const ProfileSidePanel: React.FC<ProfileSidePanelProps> = ({
 }) => {
   const router = useRouter();
 
+  // ✅ FIX: ab empty-string check ke saath — pehle seedha profileImage
+  // src mein chala jaata tha, aur ye <img> hamesha DOM mein mounted
+  // rehta hai (sirf CSS translate se panel hide hota hai, unmount nahi
+  // hota), isliye page load pe hi "empty string passed to src" warning
+  // aati thi jab tak profile data load na ho jaaye.
+  const hasProfileImage = !!(profileImage && profileImage.trim() !== '');
+
   const handleViewFullProfile = () => {
     if (onOpenLeftPanel) {
       // On mobile dashboard, open the left sidebar panel
@@ -70,12 +77,23 @@ const ProfileSidePanel: React.FC<ProfileSidePanelProps> = ({
               onClick={handleViewFullProfile}
               className="transform transition-transform hover:scale-105"
             >
-              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#4a3728] shadow-lg flex-shrink-0">
-                <img
-                  src={profileImage}
-                  alt="Profile"
-                  className="w-full h-full object-cover"
-                />
+              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#4a3728] shadow-lg flex-shrink-0 bg-[#4a3728] flex items-center justify-center">
+                {hasProfileImage ? (
+                  <img
+                    src={profileImage}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName || 'User')}&background=4a3728&color=fff&size=128`;
+                    }}
+                  />
+                ) : (
+                  <img
+                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(userName || 'User')}&background=4a3728&color=fff&size=128`}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </div>
             </button>
 
