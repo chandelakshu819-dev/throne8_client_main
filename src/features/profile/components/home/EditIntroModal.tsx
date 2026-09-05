@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, User, Briefcase, GraduationCap, MapPin } from 'lucide-react';
 import z from 'zod';
 import AuthService from '@/lib/api/auth.service';
 import { useProfile } from '@/features/profile/hooks/useProfile';
@@ -157,10 +157,9 @@ const EditIntroModal: React.FC<EditIntroModalProps> = ({
             
             }
 
-            // ✅ Redux: Create headline
-            if (formData.headline) {
+            // ✅ Redux: Create headline (sirf tab jab headline change hui ho ya nayi ho)
+            if (formData.headline && (formData.headline !== initialData.headline || !initialData.headlineId)) {
                 await createUserHeadline(formData.headline).unwrap();
-            
             }
 
             // ✅ Reload profile data
@@ -196,9 +195,9 @@ const EditIntroModal: React.FC<EditIntroModalProps> = ({
             ></div>
 
             {/* Modal Content */}
-            <div className="relative z-10 w-full max-w-2xl mx-auto max-h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden">
+            <div className="relative z-10 w-full max-w-2xl mx-auto max-h-[90vh] bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between sticky top-0 bg-gradient-to-r from-[#4a3728] to-[#6a5748] px-6 py-5 z-10">
+                <div className="flex items-center justify-between bg-gradient-to-r from-[#4a3728] to-[#6a5748] px-6 py-5 flex-shrink-0 z-10">
                     <div>
                         <h2 className="text-2xl font-bold text-white">Edit Intro Section</h2>
                         <p className="text-white/70 text-sm mt-1">Update your professional information</p>
@@ -213,8 +212,8 @@ const EditIntroModal: React.FC<EditIntroModalProps> = ({
                 </div>
 
                 {/* Form Body */}
-                <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-80px)] p-6">
-                    <div className="space-y-6">
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
+                    <div className="overflow-y-auto p-6 space-y-6 flex-1">
                         {/* Error Message */}
                         {errors.submit && (
                             <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
@@ -225,7 +224,7 @@ const EditIntroModal: React.FC<EditIntroModalProps> = ({
                         {/* Name Section */}
                         <div className="space-y-4">
                             <h3 className="text-lg font-semibold text-[#4a3728] flex items-center gap-2">
-                                <span className="text-2xl">👤</span> Name Information
+                                <User className="w-5 h-5 text-[#4a3728]" /> Name Information
                             </h3>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -291,7 +290,7 @@ const EditIntroModal: React.FC<EditIntroModalProps> = ({
                         {/* Professional Section */}
                         <div className="space-y-4">
                             <h3 className="text-lg font-semibold text-[#4a3728] flex items-center gap-2">
-                                <span className="text-2xl">💼</span> Professional Information
+                                <Briefcase className="w-5 h-5 text-[#4a3728]" /> Professional Information
                             </h3>
 
                             <div>
@@ -350,7 +349,7 @@ const EditIntroModal: React.FC<EditIntroModalProps> = ({
                         {/* Education Section */}
                         <div className="space-y-4">
                             <h3 className="text-lg font-semibold text-[#4a3728] flex items-center gap-2">
-                                <span className="text-2xl">🎓</span> Education
+                                <GraduationCap className="w-5 h-5 text-[#4a3728]" /> Education
                             </h3>
 
                             <div>
@@ -362,7 +361,6 @@ const EditIntroModal: React.FC<EditIntroModalProps> = ({
                                     value={formData.education}
                                     onChange={handleChange}
                                     placeholder="e.g., Bachelor's in Computer Science from MIT"
-                                    // rows={3}
                                     className="w-full px-4 py-2 rounded-xl border-2 border-[#e0d8cf] bg-white/50 focus:outline-none focus:border-[#4a3728] transition-colors duration-200 text-[#4a3728]"
                                 />
                             </div>
@@ -371,7 +369,7 @@ const EditIntroModal: React.FC<EditIntroModalProps> = ({
                         {/* Location & Contact Section */}
                         <div className="space-y-4">
                             <h3 className="text-lg font-semibold text-[#4a3728] flex items-center gap-2">
-                                <span className="text-2xl">📍</span> Location & Contact
+                                <MapPin className="w-5 h-5 text-[#4a3728]" /> Location & Contact
                             </h3>
 
                             <div>
@@ -387,13 +385,11 @@ const EditIntroModal: React.FC<EditIntroModalProps> = ({
                                     className="w-full px-4 py-2 rounded-xl border-2 border-[#e0d8cf] bg-white/50 focus:outline-none focus:border-[#4a3728] transition-colors duration-200 text-[#4a3728]"
                                 />
                             </div>
-
-                           
                         </div>
                     </div>
 
-                    {/* Footer */}
-                    <div className="sticky bottom-0 flex gap-3 mt-8 pt-6 border-t border-[#e0d8cf] bg-white">
+                    {/* Fixed Solid Footer */}
+                    <div className="flex gap-3 px-6 py-4 border-t border-[#e0d8cf] bg-white flex-shrink-0 z-10 shadow-lg">
                         <button
                             type="button"
                             onClick={onClose}

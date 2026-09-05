@@ -133,7 +133,7 @@ const AddSkillModal: React.FC<AddSkillModalProps> = ({
             setErrors({});
             onClose();
         } catch (error: any) {
-            alert(error.message || 'Failed to add skill');
+            setErrors({ submit: error.message || 'Failed to add skill. Please try again.' });
         } finally {
             setIsSubmitting(false);
         }
@@ -165,6 +165,11 @@ const AddSkillModal: React.FC<AddSkillModalProps> = ({
 
                 <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-80px)] p-6">
                     <div className="space-y-6">
+                        {errors.submit && (
+                            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+                                {errors.submit}
+                            </div>
+                        )}
                         <div className="space-y-4">
                             <h3 className="text-lg font-semibold text-[#4a3728] flex items-center gap-2">
                                 <Sparkles className="w-5 h-5 text-[#4a3728]" /> Skill Information

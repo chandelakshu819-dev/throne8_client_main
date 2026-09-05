@@ -67,6 +67,17 @@ const ExperienceSection: React.FC<ExperienceSectionProps> = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [experienceIdsKey, userId, isOwnProfile]);
 
+    // Lock background scroll while the delete-confirmation dialog is open
+    useEffect(() => {
+        if (isDeleteConfirmOpen) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [isDeleteConfirmOpen]);
+
     const fetchExperiences = async () => {
         try {
             setIsLoading(true);
@@ -86,7 +97,7 @@ const ExperienceSection: React.FC<ExperienceSectionProps> = ({
                     current: exp.currentlyWorking,
                     description: exp.description,
                     achievements: exp.keyAchievements || [],
-                    logo: 'https://img.icons8.com/color/96/briefcase.png',
+                    logo: exp.companyLogo || exp.logoUrl || '',
                     startDate: exp.startDate,
                     endDate: exp.endDate
                 };
@@ -217,7 +228,7 @@ const ExperienceSection: React.FC<ExperienceSectionProps> = ({
                     current: response.data.experience.currentlyWorking,
                     description: response.data.experience.description,
                     achievements: response.data.experience.keyAchievements || [],
-                    logo: logoUrl || 'https://img.icons8.com/color/96/briefcase.png',
+                    logo: logoUrl || '',
                     startDate: response.data.experience.startDate,
                     endDate: response.data.experience.endDate
                 };

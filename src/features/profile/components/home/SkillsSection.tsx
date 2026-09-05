@@ -88,7 +88,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
             }
         } catch (error: any) {
             console.error('Failed to add skill:', error);
-            alert(error.message || 'Failed to add skill');
+            throw error;
         }
     };
 

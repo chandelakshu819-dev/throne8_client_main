@@ -43,6 +43,22 @@ export const createHeadline = createAsyncThunk(
 );
 
 /**
+ * 🗑️ Delete Cover Photo (Remove Cover)
+ */
+export const deleteCoverPhoto = createAsyncThunk(
+    'profile/deleteCoverPhoto',
+    async (coverId: string, { rejectWithValue }) => {
+        try {
+            await ProfileService.deleteCoverPhoto(coverId);
+            return '';
+        } catch (error: any) {
+            console.error('❌ [THUNK] Cover delete failed:', error);
+            return rejectWithValue(error.message || 'Failed to delete cover photo');
+        }
+    }
+);
+
+/**
  * 📸 Upload Profile Image
  */
 export const uploadProfileImage = createAsyncThunk(

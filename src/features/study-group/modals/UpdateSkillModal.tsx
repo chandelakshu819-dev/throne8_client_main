@@ -47,6 +47,7 @@ const UpdateSkillModal: React.FC<UpdateSkillModalProps> = ({ isOpen, onClose, on
     });
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     const categories = [
         'Programming',
@@ -74,6 +75,7 @@ const UpdateSkillModal: React.FC<UpdateSkillModalProps> = ({ isOpen, onClose, on
                 skillStrength: skill.skillStrength || 'intermediate',
                 yearsOfExperience: skill.yearsOfExperience || 1,
             });
+            setErrors({});
         }
     }, [isOpen, skill]);
 
@@ -95,14 +97,15 @@ const UpdateSkillModal: React.FC<UpdateSkillModalProps> = ({ isOpen, onClose, on
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setErrors({});
 
-        if (!formData.skillName.trim() || !formData.category.trim()) {
-            alert('Please fill all required fields');
+        if (!formData.skillName.trim()) {
+            setErrors({ submit: 'Please enter skill name' });
             return;
         }
 
         if (!skill) {
-            alert('No skill selected for update');
+            setErrors({ submit: 'No skill selected for update' });
             return;
         }
 
@@ -114,9 +117,9 @@ const UpdateSkillModal: React.FC<UpdateSkillModalProps> = ({ isOpen, onClose, on
 
             // ✅ Close modal after successful update
             onClose();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to update:', error);
-            alert('Failed to update skill');
+            setErrors({ submit: error.message || 'Failed to update skill' });
         } finally {
             setIsSubmitting(false);
         }
@@ -152,6 +155,11 @@ const UpdateSkillModal: React.FC<UpdateSkillModalProps> = ({ isOpen, onClose, on
                 {/* Form Body */}
                 <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-80px)] p-6">
                     <div className="space-y-6">
+                        {errors.submit && (
+                            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+                                {errors.submit}
+                            </div>
+                        )}
                         {/* Skill Information Section */}
                         <div className="space-y-4">
                             <h3 className="text-lg font-semibold text-[#4a3728] flex items-center gap-2">

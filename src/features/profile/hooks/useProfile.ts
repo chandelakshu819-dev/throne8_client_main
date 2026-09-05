@@ -2,7 +2,7 @@
 
 import { useAppDispatch, useAppSelector } from "@/core/store/store.hooks";
 import RepostService from '@/lib/api/repost.service';
-import { createHeadline, fetchCoverPhotoUrl, fetchProfilePhotoUrl, fetchUserPosts, fetchUserProfile, setBannerUrl, setProfileImageUrl, updateCoverPhoto, updateUserProfile, uploadCoverPhoto, uploadProfileImage } from "@/hooks/profile";
+import { createHeadline, deleteCoverPhoto, fetchCoverPhotoUrl, fetchProfilePhotoUrl, fetchUserPosts, fetchUserProfile, setBannerUrl, setProfileImageUrl, updateCoverPhoto, updateUserProfile, uploadCoverPhoto, uploadProfileImage } from "@/hooks/profile";
 
 import { fetchMyReposts, fetchContactInfo, saveContactWebsite } from "@/hooks/profile/thunks/profileThunks";
 
@@ -44,6 +44,8 @@ export const useProfile = () => {
 
     const updateCover = (coverId: string, file: File) =>
         dispatch(updateCoverPhoto({ coverId, file }));
+
+    const removeCover = (coverId: string) => dispatch(deleteCoverPhoto(coverId));
 
     // Profile update actions
     const updateProfile = (updates: {
@@ -111,6 +113,7 @@ export const useProfile = () => {
         loadPosts,
         uploadCover,
         updateCover,
+        removeCover,
         updateProfile,
         createUserHeadline,
         uploadUserProfileImage,

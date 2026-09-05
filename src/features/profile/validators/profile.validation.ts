@@ -27,8 +27,7 @@ export const updateProfileSchema = z.object({
 
     location: z.string()
         .min(2, 'Location must be at least 2 characters')
-        .max(50, 'Location cannot exceed 50 characters')
-        .regex(/^[A-Z][a-zA-Z\s\-]{1,49}$/, 'Location must start with a capital letter')
+        .max(100, 'Location cannot exceed 100 characters')
         .optional()
         .or(z.literal('')),
 

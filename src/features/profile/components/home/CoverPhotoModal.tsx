@@ -26,6 +26,7 @@ const CoverPhotoModal: React.FC<CoverPhotoModalProps> = ({
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState<string>('');
     const [dragActive, setDragActive] = useState(false);
+    const [isRemoving, setIsRemoving] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // ✅ Ab sirf actual currentImageUrl ke hone/na hone par depend karta hai —
@@ -33,8 +34,7 @@ const CoverPhotoModal: React.FC<CoverPhotoModalProps> = ({
     const hasActualImage = !!(currentImageUrl && currentImageUrl.trim() !== '');
     const isDefaultImage = !hasActualImage;
 
-    const { uploadCover, updateCover } = useProfile();
-
+    const { uploadCover, updateCover, updateBanner, removeCover } = useProfile();
     const validateAndSetFile = (file: File) => {
         setError('');
 
@@ -135,6 +135,34 @@ const CoverPhotoModal: React.FC<CoverPhotoModalProps> = ({
     const handleClose = () => {
         resetModal();
         onClose();
+    };
+
+   
+   
+    const handleRemoveCover = async () => {
+        if (!coverId) {
+            setError('No cover photo to remove');
+            return;
+        }
+
+        try {
+            setIsRemoving(true);
+            setError('');
+
+            await removeCover(coverId).unwrap();
+
+            if (onUploadSuccess) {
+                onUploadSuccess('');
+            }
+
+            resetModal();
+            onClose();
+        } catch (error: any) {
+            console.error('❌ [COVER_MODAL] Error removing cover:', error);
+            setError(error.message || 'Failed to remove cover. Please try again.');
+        } finally {
+            setIsRemoving(false);
+        }
     };
 
     // Lock background page scroll while modal is open
@@ -319,11 +347,15 @@ const CoverPhotoModal: React.FC<CoverPhotoModalProps> = ({
                                        <div className="sticky bottom-0 flex gap-3 mt-4 pt-3 bg-white">
                         <button
                             type="button"
-                            onClick={handleClose}
-                            disabled={isUploading}
-                            className="flex-1 px-6 py-3 rounded-full border-2 border-[#e0d8cf] text-[#4a3728] font-semibold hover:bg-[#f6ede8]/50 transition-colors duration-200 disabled:opacity-50"
+                            onClick={previewUrl || !hasActualImage ? handleClose : handleRemoveCover}
+                            disabled={isUploading || isRemoving}
+                            className={`flex-1 rounded-full font-semibold transition-colors duration-200 disabled:opacity-50 ${
+                                previewUrl || !hasActualImage
+                                    ? 'px-6 py-3 border-2 border-[#e0d8cf] text-[#4a3728] hover:bg-[#f6ede8]/50'
+                                    : 'px-4 py-2 text-sm border border-red-200 text-red-600 hover:bg-red-50'
+                            }`}
                         >
-                            {previewUrl || !hasActualImage ? 'Cancel' : 'Close'}
+                            {previewUrl || !hasActualImage ? 'Cancel' : (isRemoving ? 'Removing...' : 'Remove Cover')}
                         </button>
                         {(previewUrl || isDefaultImage) && (
                             <button

@@ -13,7 +13,7 @@ import {
     saveContactWebsite,
 } from "./profileThunks";
 
-import { createHeadline, updateUserProfile, uploadProfileImage } from "./profileUpdateThunks";
+import { createHeadline, updateUserProfile, uploadProfileImage, deleteCoverPhoto } from "./profileUpdateThunks";
 
 export {
     fetchUserProfile,
@@ -29,6 +29,7 @@ export {
     updateUserProfile,
     createHeadline,
     uploadProfileImage,
+    deleteCoverPhoto,
 
     fetchAllEducation,
     createEducation,

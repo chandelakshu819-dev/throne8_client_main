@@ -6,6 +6,7 @@ import {
     fetchUserProfile,
     uploadCoverPhoto,
     updateCoverPhoto,
+    deleteCoverPhoto,
     fetchUserPosts,
     fetchCoverPhotoUrl,
     fetchProfilePhotoUrl,
@@ -108,6 +109,20 @@ const profileSlice = createSlice({
                 // console.log('✅ [SLICE] Cover updated');
             })
             .addCase(updateCoverPhoto.rejected, (state, action) => {
+                state.isLoadingProfile = false;
+                state.profileError = action.payload as string;
+            });
+        // ==================== DELETE COVER PHOTO ====================
+        builder
+            .addCase(deleteCoverPhoto.pending, (state) => {
+                state.isLoadingProfile = true;
+            })
+            .addCase(deleteCoverPhoto.fulfilled, (state) => {
+                state.isLoadingProfile = false;
+                state.bannerUrl = '';
+                state.coverPhotoId = '';
+            })
+            .addCase(deleteCoverPhoto.rejected, (state, action) => {
                 state.isLoadingProfile = false;
                 state.profileError = action.payload as string;
             });
