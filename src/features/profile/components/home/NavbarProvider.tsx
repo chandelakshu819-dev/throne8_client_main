@@ -1,4 +1,5 @@
 'use client';
+//src/features/profile/components/home/NavbarProvider.tsx
 
 import React, { createContext, useContext, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
@@ -27,11 +28,16 @@ export default function NavbarProvider({ children }: { children: React.ReactNode
     const { userProfileData, profileImageUrl, headlineId, fetchUserProfile } = useProfileData();
     const { headlineData, fetchHeadlineData } = useHeadlineData(headlineId);
 
-    // ✅ Ye sirf EK BAAR chalega — jab tak app ka is provider wala hissa
-    // mount rehta hai, page navigation pe re-fetch nahi hoga.
+    // ✅ FIX: fetchUserProfile ab userId maangta hai (useProfileData.ts mein
+    // `if (!userId) return;` hai). Pehle isko bina argument ke call kiya ja
+    // raha tha, isliye ye turant return ho jaata tha aur userProfileData
+    // kabhi set hi nahi hota — navbar mein naam hamesha "Loading..." rehta
+    // aur profileData.profileImage bhi empty/undefined rehta.
+    // ✅ Field ka sahi naam `user.userId` hai (useAuth.ts se confirm),
+    // `user.id` NAHI — wo field exist hi nahi karta.
     useEffect(() => {
-        if (user) {
-            fetchUserProfile();
+        if (user?.userId) {
+            fetchUserProfile(user.userId);
         }
     }, [user, fetchUserProfile]);
 
