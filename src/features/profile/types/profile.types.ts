@@ -43,6 +43,7 @@ export interface ProfileState {
     profileError: string | null;
 
     // Posts
+    userPosts: any[];
     userReposts: any[];
     isLoadingReposts: boolean;
     companyId: string | null;

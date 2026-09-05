@@ -74,7 +74,7 @@ export interface LoginResponse {
 }
 
 export interface LoginState {
-    name: string;
+    name?: string;
     loading: boolean;
     error: string | null;
     user: UserData | null;

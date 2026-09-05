@@ -96,16 +96,21 @@ export const useSearchUserProfileData = (userId: string) => {
                 }
             }
 
-                        // Fetch contact info for websiteUrl (public endpoint — kisi bhi user ke liye kaam karta hai)
-                        try {
-                            const publicContactRes = await ProfileService.getPublicContactByUserId(userId);
-                            const fetchedWeb = publicContactRes?.data?.contact?.websites?.[0]?.url || '';
-                            if (fetchedWeb) {
-                                setWebsiteUrl(fetchedWeb);
-                            }
-                        } catch (error) {
-                            console.warn('⚠️ [SEARCH_USER_HOOK] Failed to load contact info');
-                        }
+            // Fetch contact info for websiteUrl (public endpoint — kisi bhi user ke liye kaam karta hai)
+            try {
+                const publicContactRes = await ProfileService.getPublicContactByUserId(userId);
+                const fetchedWeb =
+                    publicContactRes?.data?.contact?.websites?.[0]?.url ||
+                    publicContactRes?.data?.websites?.[0]?.url ||
+                    publicContactRes?.websites?.[0]?.url ||
+                    publicContactRes?.contact?.websites?.[0]?.url ||
+                    '';
+                if (fetchedWeb) {
+                    setWebsiteUrl(fetchedWeb);
+                }
+            } catch (error) {
+                console.warn('⚠️ [SEARCH_USER_HOOK] Failed to load contact info');
+            }
             // Set IDs
             if (data?.headlineId) {
                 setHeadlineId(data.headlineId);

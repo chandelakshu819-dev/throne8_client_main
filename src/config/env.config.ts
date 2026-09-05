@@ -75,7 +75,7 @@ const _config = {
     NEXT_PUBLIC_EDUCATION_ENDPOINT: optionalEnv('NEXT_PUBLIC_EDUCATION_ENDPOINT'),
     NEXT_PUBLIC_EXPERIENCE_ENDPOINT: optionalEnv('NEXT_PUBLIC_EXPERIENCE_ENDPOINT'),
     NEXT_PUBLIC_SKILLS_ENDPOINT: optionalEnv('NEXT_PUBLIC_SKILLS_ENDPOINT'),
-    NEXT_PUBLIC_CONTACT_ENDPOINT: optionalEnv('NEXT_PUBLIC_CONTACT_ENDPOINT'),
+    NEXT_PUBLIC_CONTACT_ENDPOINT: optionalEnv('NEXT_PUBLIC_CONTACT_ENDPOINT') || '/profile/contact',
     
 
     // ============================================================

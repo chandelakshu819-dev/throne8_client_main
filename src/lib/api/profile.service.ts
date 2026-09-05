@@ -488,16 +488,17 @@ class ProfileService {
     }
 
         /**
-     * 📇 GET CONTACT INFO
-     */
+         * 📇 GET CONTACT INFO
+         */
         static async getContact(): Promise<any> {
-            if (!config?.NEXT_PUBLIC_CONTACT_ENDPOINT) {
-                return null;
-            }
+            const endpoint = config?.NEXT_PUBLIC_CONTACT_ENDPOINT || process.env.NEXT_PUBLIC_CONTACT_ENDPOINT || '/profile/contact';
             try {
-                const { data } = await api.get(`${config.NEXT_PUBLIC_CONTACT_ENDPOINT}/get-contact`);
+                const { data } = await api.get(`${endpoint}/get-contact`);
                 return data;
             } catch (error: any) {
+                if (error?.response?.status === 404 || error?.statusCode === 404 || error?.message?.includes('not found')) {
+                    return null;
+                }
                 console.error('❌ [GET_CONTACT] Failed:', error?.response?.data || error.message);
                 return null;
             }
@@ -507,11 +508,9 @@ class ProfileService {
          * 📇 GET CONTACT INFO BY ID
          */
         static async getContactById(contactId: string): Promise<any> {
-            if (!config?.NEXT_PUBLIC_CONTACT_ENDPOINT) {
-                return null;
-            }
+            const endpoint = config?.NEXT_PUBLIC_CONTACT_ENDPOINT || process.env.NEXT_PUBLIC_CONTACT_ENDPOINT || '/profile/contact';
             try {
-                const { data } = await api.get(`${config.NEXT_PUBLIC_CONTACT_ENDPOINT}/get-contact-id/${contactId}`);
+                const { data } = await api.get(`${endpoint}/get-contact-id/${contactId}`);
                 return data;
             } catch (error: any) {
                 console.error('❌ [GET_CONTACT_BY_ID] Failed:', error?.response?.data || error.message);
@@ -525,15 +524,13 @@ class ProfileService {
         static async createContact(payload: {
             websites?: Array<{ url: string; type: 'personal' | 'company' | 'portfolio' | 'blog' | 'social' | 'other'; label?: string }>;
         }): Promise<any> {
-            if (!config?.NEXT_PUBLIC_CONTACT_ENDPOINT) {
-                return null;
-            }
+            const endpoint = config?.NEXT_PUBLIC_CONTACT_ENDPOINT || process.env.NEXT_PUBLIC_CONTACT_ENDPOINT || '/profile/contact';
             try {
-                const { data } = await api.post(`${config.NEXT_PUBLIC_CONTACT_ENDPOINT}/create-contact`, payload);
+                const { data } = await api.post(`${endpoint}/create-contact`, payload);
                 return data;
             } catch (error: any) {
                 console.error('❌ [CREATE_CONTACT] Failed:', error?.response?.data || error.message);
-                return null;
+                throw error;
             }
         }
     
@@ -543,15 +540,13 @@ class ProfileService {
         static async updateContact(contactId: string, updates: {
             websites?: Array<{ url: string; type: 'personal' | 'company' | 'portfolio' | 'blog' | 'social' | 'other'; label?: string }>;
         }): Promise<any> {
-            if (!config?.NEXT_PUBLIC_CONTACT_ENDPOINT) {
-                return null;
-            }
+            const endpoint = config?.NEXT_PUBLIC_CONTACT_ENDPOINT || process.env.NEXT_PUBLIC_CONTACT_ENDPOINT || '/profile/contact';
             try {
-                const { data } = await api.put(`${config.NEXT_PUBLIC_CONTACT_ENDPOINT}/update-contact/${contactId}`, updates);
+                const { data } = await api.put(`${endpoint}/update-contact/${contactId}`, updates);
                 return data;
             } catch (error: any) {
                 console.error('❌ [UPDATE_CONTACT] Failed:', error?.response?.data || error.message);
-                return null;
+                throw error;
             }
         }
 
@@ -2107,9 +2102,9 @@ static async getCommentsByUserId(userId: string): Promise<any> {
 
     //12.
     static async getPublicContactByUserId(userId: string): Promise<any> {
-        if (!config?.NEXT_PUBLIC_CONTACT_ENDPOINT) return null;
+        const endpoint = config?.NEXT_PUBLIC_CONTACT_ENDPOINT || process.env.NEXT_PUBLIC_CONTACT_ENDPOINT || '/profile/contact';
         try {
-            const { data } = await api.get(`${config.NEXT_PUBLIC_CONTACT_ENDPOINT}/get-contact-public/${userId}`);
+            const { data } = await api.get(`${endpoint}/get-contact-public/${userId}`);
             return data;
         } catch (error: any) {
             console.error('❌ [GET_PUBLIC_CONTACT] Failed:', error?.response?.data || error.message);

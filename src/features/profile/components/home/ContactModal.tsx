@@ -724,23 +724,37 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, onSaved })
                     </button>
                     <button
                         onClick={async () => {
-                    
-                                const website = websites[0];
-                                if (website?.value?.trim()) {
+                            if (isSavingWebsite) return;
+                            const website = websites[0];
+                            if (website?.value?.trim()) {
                                 setIsSavingWebsite(true);
                                 try {
+                                    const cleanedUrl = website.value.trim();
                                     await saveWebsite({
-                                                      url: website.value.trim(),
-                                                     label: website.label?.trim() || 'Personal Portfolio',
-                                                  type: 'portfolio',
-                                                 });
+                                        url: cleanedUrl,
+                                        label: website.label?.trim() || 'Personal Portfolio',
+                                        type: 'portfolio',
+                                    });
+                                    if (typeof window !== 'undefined' && user?.userId) {
+                                        localStorage.setItem(`user_website_${user.userId}`, cleanedUrl);
+                                        window.dispatchEvent(new Event('website_updated'));
+                                    }
                                     onSaved?.();
-                                } catch (err) {
-                                    console.warn('⚠️ Failed to save website:', err);
+                                    onClose();
+                                } catch (err: any) {
+                                    const errorMsg = typeof err === 'string' ? err : err?.message || '';
+                                    if (errorMsg.includes('Too many requests') || errorMsg.includes('429')) {
+                                        alert('Too many requests. Please wait 1 minute before trying again.');
+                                    } else {
+                                        console.warn('⚠️ Failed to save website:', err);
+                                        onClose();
+                                    }
+                                } finally {
+                                    setIsSavingWebsite(false);
                                 }
-                                setIsSavingWebsite(false);
+                            } else {
+                                onClose();
                             }
-                            onClose();
                         }}
                         disabled={isSavingWebsite}
                         className="flex-1 px-6 py-3 rounded-full bg-gradient-to-r from-[#4a3728] to-[#6a5748] text-white font-semibold hover:shadow-lg transition-all duration-200 disabled:opacity-50"

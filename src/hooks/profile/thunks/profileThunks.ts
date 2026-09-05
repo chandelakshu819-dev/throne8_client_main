@@ -142,20 +142,58 @@ export const saveContactWebsite = createAsyncThunk(
     'profile/saveContactWebsite',
     async (
         { contactId, url, label, type }: { contactId?: string; url: string; label?: string; type?: string },
-        { rejectWithValue }
+        { rejectWithValue, getState }
     ) => {
         try {
             const websites = [{
                 url,
-                type: (type as any) || 'personal',
-                label: label || 'Website',
+                type: (type as any) || 'portfolio',
+                label: label || 'Personal Portfolio',
             }];
-            const response = contactId
-                ? await ProfileService.updateContact(contactId, { websites })
-                : await ProfileService.createContact({ websites });
+
+            let targetContactId = contactId;
+
+            if (!targetContactId) {
+                const state = getState() as any;
+                targetContactId = state.profile?.contactData?.contactId;
+            }
+
+            if (!targetContactId) {
+                try {
+                    const existingRes = await ProfileService.getContact();
+                    const existingContact = existingRes?.data?.contact;
+                    if (existingContact?.contactId) {
+                        targetContactId = existingContact.contactId;
+                    }
+                } catch { }
+            }
+
+            let response;
+            if (targetContactId) {
+                response = await ProfileService.updateContact(targetContactId, { websites });
+            } else {
+                try {
+                    response = await ProfileService.createContact({ websites });
+                } catch (createErr: any) {
+                    const status = createErr?.response?.status || createErr?.statusCode;
+                    const message = createErr?.response?.data?.message || createErr?.message || '';
+                    if (status === 409 || message.toLowerCase().includes('already exists')) {
+                        const existingRes = await ProfileService.getContact();
+                        const existingContact = existingRes?.data?.contact;
+                        if (existingContact?.contactId) {
+                            response = await ProfileService.updateContact(existingContact.contactId, { websites });
+                        } else {
+                            throw createErr;
+                        }
+                    } else {
+                        throw createErr;
+                    }
+                }
+            }
             return response?.data?.contact;
         } catch (error: any) {
-            return rejectWithValue(error.message || 'Failed to save website');
+            const msg = error?.response?.data?.message || error.message || 'Failed to save website';
+            return rejectWithValue(msg);
         }
     }
 );
