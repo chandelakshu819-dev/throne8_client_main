@@ -261,9 +261,9 @@ const EducationSection: React.FC<EducationSectionProps> = ({
                                             {/* ✅ 3-dot menu (delete/archive) sirf apni profile pe */}
                                             {isOwnProfile && (
                                                 <>
-                                                    <button
+                                                                                                        <button
                                                         onClick={() => setOpenMenuId(openMenuId === education.educationId ? null : education.educationId)}
-                                                        className="threeDots inline-flex items-center gap-2 bg-gradient-to-r from-[#c68f7a] to-[#f5b097] text-white px-3 py-2 rounded-full text-sm font-semibold shadow-lg mb-4 hover:shadow-xl transition-all duration-200 flex-shrink-0">
+                                                        className="threeDots inline-flex items-center gap-2 bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] text-white px-3 py-2 rounded-full text-sm font-semibold shadow-lg mb-4 hover:shadow-xl transition-all duration-200 flex-shrink-0">
                                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
                                                         </svg>

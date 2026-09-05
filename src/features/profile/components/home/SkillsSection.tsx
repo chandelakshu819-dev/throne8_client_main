@@ -61,6 +61,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
     const [isDeletingSkillId, setIsDeletingSkillId] = useState<string | null>(null);
     const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState(false);
     const [skillToDelete, setSkillToDelete] = useState<Skill | null>(null);
+    const [deleteError, setDeleteError] = useState('');
 
     const [showAllSkills, setShowAllSkills] = useState(false);
 
@@ -177,6 +178,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
         const skill = skillsList.find(s => s.skillId === skillId);
         if (skill) {
             setSkillToDelete(skill);
+            setDeleteError('');
             setIsDeleteConfirmModalOpen(true);
         }
         setOpenMenuId(null);
@@ -187,6 +189,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
 
         try {
             setIsDeletingSkillId(skillToDelete.skillId);
+            setDeleteError('');
 
             const response = await ProfileService.deleteSkill(skillToDelete.skillId);
 
@@ -200,7 +203,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
             setIsDeletingSkillId(null);
         } catch (error: any) {
             console.error('Failed to delete skill:', error);
-            alert(error.message || 'Failed to delete skill');
+            setDeleteError(error.message || 'Failed to delete skill');
             setIsDeletingSkillId(null);
         }
     };
@@ -392,16 +395,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
                                                                 </span>
                                                             </button>
 
-                                                            <button
-                                                                onClick={() => handleArchiveSkill(skill.skillId)}
-                                                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-[#F6EDE8] transition-colors"
-                                                            >
-                                                                <Archive className="w-4 h-4" style={{ color: TOKENS.accent }} />
-                                                                <span className="text-[13px] font-medium" style={{ color: TOKENS.textPrimary }}>Archive skill</span>
-                                                            </button>
-
                                                             <div className="h-px my-1.5" style={{ backgroundColor: TOKENS.border }}></div>
-
                                                             <button
                                                                 onClick={() => handleDeleteSkill(skill.skillId)}
                                                                 className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-[#FBEAE6] transition-colors"
@@ -482,15 +476,17 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({
                         onClose={() => setIsPinLimitModalOpen(false)}
                     />
 
-                    <DeleteSkillConfirmModal
+<DeleteSkillConfirmModal
                         isOpen={isDeleteConfirmModalOpen}
                         onClose={() => {
                             setIsDeleteConfirmModalOpen(false);
                             setSkillToDelete(null);
+                            setDeleteError('');
                         }}
                         onConfirm={handleDeleteSkillConfirm}
                         skillName={skillToDelete?.skillName || ''}
                         isDeleting={isDeletingSkillId === skillToDelete?.skillId}
+                        error={deleteError}
                     />
                 </>
             )}

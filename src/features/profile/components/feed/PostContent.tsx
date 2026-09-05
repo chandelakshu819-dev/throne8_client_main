@@ -76,7 +76,7 @@ const PostContent = ({ post, isDarkMode, forceExpanded = false, hideMedia = fals
       </div>
 
       {!hideMedia && hasImage && (
-        <div className={`relative rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'} w-full flex-1 min-h-[140px] flex items-center justify-center`}>
+        <div className={`relative rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'} w-full flex-1 min-h-[140px] max-h-[220px] flex items-center justify-center`}>
           <img
             src={imageList[currentImgIndex]}
             alt="Post content"

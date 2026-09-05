@@ -96,6 +96,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     const { user: loggedInUser } = useAuth();
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isProfileImageModalOpen, setIsProfileImageModalOpen] = useState(false);
+    const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string>('');
     const [isUpdating, setIsUpdating] = useState(false);
@@ -138,6 +139,17 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             setCurrentProfileImage(profileImage);
         }
     }, [profileImage]);
+
+    // Lock background scroll while the read-only image viewer is open
+    useEffect(() => {
+        if (isImageViewerOpen) {
+            const originalOverflow = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return () => {
+                document.body.style.overflow = originalOverflow;
+            };
+        }
+    }, [isImageViewerOpen]);
 
     const {
         followingList,
@@ -224,9 +236,13 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 <div className="flex flex-col lg:flex-row items-start gap-5 -mt-10 min-w-0">
                     {/* ✅ FIX (density pass v2): w-28 h-28 -> w-32 h-32 for better proportion */}
                     <div
-                        className={`profileImageClick relative w-32 h-32 flex-shrink-0 ${isOwnProfile ? 'cursor-pointer' : ''}`}
+                        className="profileImageClick relative w-32 h-32 flex-shrink-0 cursor-pointer"
                         onClick={() => {
-                            if (isOwnProfile) setIsProfileImageModalOpen(true);
+                            if (isOwnProfile) {
+                                setIsProfileImageModalOpen(true);
+                            } else {
+                                setIsImageViewerOpen(true);
+                            }
                         }}
                     >
                         <img
@@ -569,6 +585,33 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                         currentImageUrl={currentProfileImage}
                     />
                 </>
+            )}
+
+                        {/* Read-only full-size photo viewer — for viewing other users' profile photos */}
+                        {isImageViewerOpen && (
+                <div
+                    className="fixed inset-0 z-[9999] flex items-center justify-center"
+                    onClick={() => setIsImageViewerOpen(false)}
+                >
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+                    <div className="relative z-10 max-w-lg w-full mx-4">
+                        <button
+                            onClick={() => setIsImageViewerOpen(false)}
+                            className="absolute -top-10 right-0 text-white/80 hover:text-white transition-colors"
+                            aria-label="Close"
+                        >
+                            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <img
+                            src={currentProfileImage}
+                            alt={name}
+                            className="w-full h-auto rounded-2xl shadow-2xl object-contain"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                </div>
             )}
 
             {/* Additional Modals for Profile Actions */}
