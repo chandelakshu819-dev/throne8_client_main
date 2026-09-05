@@ -16,6 +16,8 @@ import {
     createEducation,
     updateEducation,
     deleteEducation,
+    fetchContactInfo,
+    saveContactWebsite,
 } from './thunks';
 
 // Thunks
@@ -35,6 +37,8 @@ export {
     updateEducation,
     deleteEducation,
     archiveEducation,
+    fetchContactInfo,
+    saveContactWebsite,
 };
 
 // Slice

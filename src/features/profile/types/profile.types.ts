@@ -26,7 +26,6 @@ export interface ProfileData {
 export interface ProfileState {
     // User Data
     userProfileData: UserProfileData | null;
-    companyId: string | null;
     profileImageUrl: string;
     bannerUrl: string;
     coverPhotoId: string;
@@ -44,9 +43,10 @@ export interface ProfileState {
     profileError: string | null;
 
     // Posts
-    userPosts: any[];
     userReposts: any[];
     isLoadingReposts: boolean;
+    companyId: string | null;
+    contactData: any | null;
 
     // About
     aboutData: any | null;

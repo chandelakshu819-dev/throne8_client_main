@@ -51,6 +51,7 @@ export default function SearchUserProfilePage() {
         coverPhotoId,
         aboutId,
         headlineId,
+        websiteUrl: searchedWebsiteUrl,
         isLoadingProfile,
         profileError,
         fetchUserProfileById,
@@ -465,7 +466,17 @@ return (
                         location={profileData.location}
                         followers={followersCount}
                         connections={totalConnections.toString()}
-                        websiteUrl={userProfileData?.website || userProfileData?.websiteUrl || ''}
+                        websiteUrl={(() => {
+                            let prefUrl = '';
+                            if (userProfileData?.preferences) {
+                                if (typeof userProfileData.preferences === 'string') {
+                                    try { prefUrl = JSON.parse(userProfileData.preferences)?.websiteUrl || ''; } catch {}
+                                } else {
+                                    prefUrl = (userProfileData.preferences as any)?.websiteUrl || '';
+                                }
+                            }
+                            return searchedWebsiteUrl || prefUrl || userProfileData?.website || userProfileData?.websiteUrl || '';
+                        })()}
                         firstName={userProfileData?.firstName || ''}
                         lastName={userProfileData?.lastName || ''}
                         currentPosition={userProfileData?.currentPosition || ''}

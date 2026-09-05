@@ -22,9 +22,13 @@ export interface TrustScoreData {
 }
 
 export const trustScoreService = {
-  getByUserId: async (userId: string): Promise<TrustScoreData> => {
-    const response = await api.get(`/mentorship/trust-score/${userId}`);
-    return response.data.data;
+  getByUserId: async (userId: string): Promise<TrustScoreData | null> => {
+    try {
+      const response = await api.get(`/mentorship/trust-score/${userId}`);
+      return response.data?.data || response.data || null;
+    } catch {
+      return null;
+    }
   },
 };
 

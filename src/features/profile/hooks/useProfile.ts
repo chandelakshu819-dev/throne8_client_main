@@ -2,8 +2,9 @@
 
 import { useAppDispatch, useAppSelector } from "@/core/store/store.hooks";
 import RepostService from '@/lib/api/repost.service';
-import { createHeadline, fetchCoverPhotoUrl, fetchProfilePhotoUrl, fetchUserPosts, fetchUserProfile, setBannerUrl, setProfileImageUrl, updateCoverPhoto, updateUserProfile, uploadCoverPhoto, uploadProfileImage  } from "@/hooks/profile";
-import { fetchMyReposts } from "@/hooks/profile/thunks/profileThunks";
+import { createHeadline, fetchCoverPhotoUrl, fetchProfilePhotoUrl, fetchUserPosts, fetchUserProfile, setBannerUrl, setProfileImageUrl, updateCoverPhoto, updateUserProfile, uploadCoverPhoto, uploadProfileImage } from "@/hooks/profile";
+
+import { fetchMyReposts, fetchContactInfo, saveContactWebsite } from "@/hooks/profile/thunks/profileThunks";
 
 export const useProfile = () => {
     const dispatch = useAppDispatch();
@@ -21,6 +22,7 @@ export const useProfile = () => {
         userPosts,
         userReposts,        // ← ADD
         isLoadingReposts,
+        contactData,
     } = useAppSelector((state) => state.profile);
 
     // ✅ Enhanced loadProfile with photo fetching
@@ -65,6 +67,15 @@ export const useProfile = () => {
 
     const loadMyReposts = () => dispatch(fetchMyReposts());
 
+    const loadContact = () => dispatch(fetchContactInfo());
+
+    const saveWebsite = (website: { url: string; label?: string; type?: string }) =>
+        dispatch(saveContactWebsite({
+            contactId: contactData?.contactId,
+            url: website.url,
+            label: website.label,
+            type: website.type,
+        }));
     const createRepost = async (entryId: string, type: 'repost' | 'quote' = 'repost', thoughtText?: string) => {
         const result = await RepostService.createRepost(entryId, type, thoughtText);
         // Refresh reposts after creating
@@ -112,5 +123,8 @@ export const useProfile = () => {
         createRepost,
         removeRepost,
         getRepostStatus,
+        contactData,
+        loadContact,
+        saveWebsite,
     };
 };

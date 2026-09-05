@@ -325,8 +325,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                     </div>
                                 )}
                                 
-                                {isOwnProfile && <Contactact />}
-
+                                {isOwnProfile && <Contactact onSaved={onDataRefresh} />}
                         
 
                                 {/* ✅ FIX (density pass): gap-3 -> gap-2 */}
@@ -379,22 +378,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                             <span className="font-semibold">{mutualCount}</span> mutual connection{mutualCount > 1 ? 's' : ''}
                                         </button>
                                     )}
+                                                                       {/* website button moved to mentorship row below */}
                                 </div>
-
                                 <div className="flex gap-2 justify-center md:justify-start flex-wrap mt-2">
-                                    {websiteUrl && websiteUrl.trim() !== '' && (
-                                        <button
-                                            onClick={() => window.open(websiteUrl, '_blank', 'noopener,noreferrer')}
-                                            className="connectionsShowButton group px-3 py-1.5 bg-white text-[#4a3728] rounded-full text-xs shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-1.5 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white"
-                                        >
-                                            <svg className="w-4 h-4 text-[#4a3728]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 010 18M12 3a15.3 15.3 0 000 18" />
-                                            </svg>
-                                            Website
-                                        </button>
-                                    )}
-
                                     {currentUserId && (
                                         <button
                                             onClick={() => router.push(`/mentorship/${currentUserId}`)}
@@ -405,6 +391,23 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422A12.083 12.083 0 0121 15.5v0M12 14v7m-9-9.5v0a12.083 12.083 0 002.84 5.922L12 21l6.16-3.578" />
                                             </svg>
                                             Mentorship
+                                        </button>
+                                    )}
+
+                                    {websiteUrl && websiteUrl.trim() !== '' && (
+                                        <button
+                                            onClick={() => {
+                                                const finalUrl = websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`;
+                                                window.open(finalUrl, '_blank', 'noopener,noreferrer');
+                                            }}
+                                            className="connectionsShowButton group px-3 py-1.5 bg-white text-[#4a3728] rounded-full text-xs shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-1.5 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white"
+                                            title={websiteUrl}
+                                        >
+                                            <svg className="w-4 h-4 text-[#4a3728]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 010 18M12 3a15.3 15.3 0 000 18" />
+                                            </svg>
+                                            Website
                                         </button>
                                     )}
                                 </div>

@@ -487,6 +487,74 @@ class ProfileService {
         }
     }
 
+        /**
+     * 📇 GET CONTACT INFO
+     */
+        static async getContact(): Promise<any> {
+            if (!config?.NEXT_PUBLIC_CONTACT_ENDPOINT) {
+                return null;
+            }
+            try {
+                const { data } = await api.get(`${config.NEXT_PUBLIC_CONTACT_ENDPOINT}/get-contact`);
+                return data;
+            } catch (error: any) {
+                console.error('❌ [GET_CONTACT] Failed:', error?.response?.data || error.message);
+                return null;
+            }
+        }
+    
+        /**
+         * 📇 GET CONTACT INFO BY ID
+         */
+        static async getContactById(contactId: string): Promise<any> {
+            if (!config?.NEXT_PUBLIC_CONTACT_ENDPOINT) {
+                return null;
+            }
+            try {
+                const { data } = await api.get(`${config.NEXT_PUBLIC_CONTACT_ENDPOINT}/get-contact-id/${contactId}`);
+                return data;
+            } catch (error: any) {
+                console.error('❌ [GET_CONTACT_BY_ID] Failed:', error?.response?.data || error.message);
+                return null;
+            }
+        }
+    
+        /**
+         * 📇 CREATE CONTACT
+         */
+        static async createContact(payload: {
+            websites?: Array<{ url: string; type: 'personal' | 'company' | 'portfolio' | 'blog' | 'social' | 'other'; label?: string }>;
+        }): Promise<any> {
+            if (!config?.NEXT_PUBLIC_CONTACT_ENDPOINT) {
+                return null;
+            }
+            try {
+                const { data } = await api.post(`${config.NEXT_PUBLIC_CONTACT_ENDPOINT}/create-contact`, payload);
+                return data;
+            } catch (error: any) {
+                console.error('❌ [CREATE_CONTACT] Failed:', error?.response?.data || error.message);
+                return null;
+            }
+        }
+    
+        /**
+         * 📇 UPDATE CONTACT
+         */
+        static async updateContact(contactId: string, updates: {
+            websites?: Array<{ url: string; type: 'personal' | 'company' | 'portfolio' | 'blog' | 'social' | 'other'; label?: string }>;
+        }): Promise<any> {
+            if (!config?.NEXT_PUBLIC_CONTACT_ENDPOINT) {
+                return null;
+            }
+            try {
+                const { data } = await api.put(`${config.NEXT_PUBLIC_CONTACT_ENDPOINT}/update-contact/${contactId}`, updates);
+                return data;
+            } catch (error: any) {
+                console.error('❌ [UPDATE_CONTACT] Failed:', error?.response?.data || error.message);
+                return null;
+            }
+        }
+
     /**
     * 📝 CREATE ABOUT
     */
@@ -2033,6 +2101,19 @@ static async getCommentsByUserId(userId: string): Promise<any> {
             return data;
         } catch (error: any) {
             throw new Error(error.response?.data?.message || 'Failed to mute thread');
+        }
+    }
+
+
+    //12.
+    static async getPublicContactByUserId(userId: string): Promise<any> {
+        if (!config?.NEXT_PUBLIC_CONTACT_ENDPOINT) return null;
+        try {
+            const { data } = await api.get(`${config.NEXT_PUBLIC_CONTACT_ENDPOINT}/get-contact-public/${userId}`);
+            return data;
+        } catch (error: any) {
+            console.error('❌ [GET_PUBLIC_CONTACT] Failed:', error?.response?.data || error.message);
+            return null;
         }
     }
 }

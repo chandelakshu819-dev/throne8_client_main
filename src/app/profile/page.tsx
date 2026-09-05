@@ -65,6 +65,8 @@ export default function ProfilePage() {
         loadMyReposts,
         createRepost,
         removeRepost,
+        contactData,
+        loadContact,
     } = useProfile();
 
     // ✅ FIX: stable reference — warna har render pe naya [] array banega
@@ -75,6 +77,30 @@ export default function ProfilePage() {
         () => userProfileData?.experienceIds || [],
         [userProfileData?.experienceIds]
     );
+
+    const [activeWebsiteUrl, setActiveWebsiteUrl] = useState('');
+
+    useEffect(() => {
+        const syncWebsite = () => {
+            const localWeb = typeof window !== 'undefined' && user?.userId
+                ? localStorage.getItem(`user_website_${user.userId}`) || ''
+                : '';
+            const remoteWeb = contactData?.websites?.[0]?.url || userProfileData?.website || userProfileData?.websiteUrl || userProfileData?.preferences?.websiteUrl || '';
+            setActiveWebsiteUrl(localWeb || remoteWeb);
+        };
+
+        syncWebsite();
+        if (typeof window !== 'undefined') {
+            window.addEventListener('storage', syncWebsite);
+            window.addEventListener('website_updated', syncWebsite);
+        }
+        return () => {
+            if (typeof window !== 'undefined') {
+                window.removeEventListener('storage', syncWebsite);
+                window.removeEventListener('website_updated', syncWebsite);
+            }
+        };
+    }, [user?.userId, contactData, userProfileData]);
 
     // ✅ Scroll to activity section after data loads
     useEffect(() => {
@@ -118,6 +144,7 @@ export default function ProfilePage() {
             loadMyReposts();
             fetchSkillsData();
             fetchConnectionsData(user.userId); // ✅ NEW
+            loadContact(); // ✅ NEW — website URL ke liye
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
@@ -249,6 +276,7 @@ export default function ProfilePage() {
                             educationList={educationList}
                             experienceList={experienceList}
                             contactInfo={userProfileData?.contactInfo || ''}
+                            websiteUrl={activeWebsiteUrl || contactData?.websites?.[0]?.url || userProfileData?.preferences?.websiteUrl || userProfileData?.website || userProfileData?.websiteUrl || ''}
                             onDataRefresh={loadProfile}
                             onProfileImageUpdate={(newUrl) => updateProfileImage(newUrl)}
                         />

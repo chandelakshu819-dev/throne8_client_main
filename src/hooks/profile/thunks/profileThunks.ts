@@ -105,9 +105,6 @@ export const fetchProfilePhotoUrl = createAsyncThunk(
     }
 );
 
-/**
- * 🖼️ Fetch Cover Photo URL
- */
 export const fetchCoverPhotoUrl = createAsyncThunk(
     'profile/fetchCoverPhotoUrl',
     async (coverId: string, { rejectWithValue }) => {
@@ -119,6 +116,46 @@ export const fetchCoverPhotoUrl = createAsyncThunk(
         } catch (error: any) {
             console.error('❌ [THUNK] Cover photo fetch failed:', error);
             return rejectWithValue(error.message || 'Failed to fetch cover');
+        }
+    }
+);
+
+/**
+ * 📇 Fetch Contact Info
+ */
+export const fetchContactInfo = createAsyncThunk(
+    'profile/fetchContactInfo',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await ProfileService.getContact();
+            return response?.data?.contact || null;
+        } catch (error: any) {
+            return rejectWithValue(error.message || 'Failed to fetch contact info');
+        }
+    }
+);
+
+/**
+ * 🔗 Save Website URL
+ */
+export const saveContactWebsite = createAsyncThunk(
+    'profile/saveContactWebsite',
+    async (
+        { contactId, url, label, type }: { contactId?: string; url: string; label?: string; type?: string },
+        { rejectWithValue }
+    ) => {
+        try {
+            const websites = [{
+                url,
+                type: (type as any) || 'personal',
+                label: label || 'Website',
+            }];
+            const response = contactId
+                ? await ProfileService.updateContact(contactId, { websites })
+                : await ProfileService.createContact({ websites });
+            return response?.data?.contact;
+        } catch (error: any) {
+            return rejectWithValue(error.message || 'Failed to save website');
         }
     }
 );

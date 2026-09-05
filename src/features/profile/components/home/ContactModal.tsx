@@ -20,11 +20,13 @@ import {
     ChevronDown
 } from 'lucide-react';
 
+import { useProfile } from '@/features/profile/hooks/useProfile';
+
 interface ContactModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onSaved?: () => void;
 }
-
 interface EmailEntry {
     id: string;
     value: string;
@@ -202,7 +204,8 @@ const CustomIMSelect: React.FC<CustomIMSelectProps> = ({ value, onChange }) => {
     );
 };
 
-const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
+const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, onSaved }) => {    const { contactData, loadContact, saveWebsite, updateProfile, user } = useProfile();
+    const [isSavingWebsite, setIsSavingWebsite] = useState(false);
     const [profileUrl, setProfileUrl] = useState('');
     const [emails, setEmails] = useState<EmailEntry[]>([
         { id: '1', value: '', privacy: 'public' }
@@ -323,6 +326,36 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
         return () => setMounted(false);
     }, []);
 
+    useEffect(() => {
+        if (isOpen) {
+            loadContact();
+
+            if (user) {
+                const slug = user.firstName && user.lastName
+                    ? `${user.firstName.toLowerCase()}-${user.lastName.toLowerCase()}`
+                    : '';
+                setProfileUrl(slug);
+                if (user.email) {
+                    setEmails([{ id: '1', value: user.email, privacy: 'public' }]);
+                }
+                if (user.phoneNumber) {
+                    setPhones([{ id: '1', value: user.phoneNumber, privacy: 'limited' }]);
+                }
+                if (user.location) {
+                    setAddress(user.location);
+                }
+            }
+
+            const storedWeb = typeof window !== 'undefined'
+                ? (user?.userId ? localStorage.getItem(`user_website_${user.userId}`) : null) || localStorage.getItem('user_saved_website_backup') || ''
+                : '';
+            const existingUrl = contactData?.websites?.[0]?.url || storedWeb;
+            if (existingUrl) {
+                setWebsites([{ id: '1', value: existingUrl, label: contactData?.websites?.[0]?.label || 'Personal Portfolio' }]);
+            }
+        }
+    }, [isOpen, contactData, user]);
+
     // ✅ Scroll lock when modal is open
     useEffect(() => {
         if (isOpen) {
@@ -370,13 +403,12 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                                 <Globe className="w-4 h-4 text-[#4a3728]" />
                                 <h3 className="text-base font-semibold text-[#4a3728]">Profile URL</h3>
                             </div>
-                            <div className="flex gap-3">
-                                <input
+                            <div className="flex gap-3">                                <input
                                     type="text"
                                     value={profileUrl}
                                     onChange={(e) => setProfileUrl(e.target.value)}
                                     className="flex-1 px-3 py-1.5 rounded-lg border border-[#d4ccc3] focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm text-[#4a3728] placeholder-[#4a3728]/50"
-                                    placeholder="your-custom-url"
+                                    placeholder="your-custom-profile-url"
                                 />
                                 <button className="px-5 py-1.5 bg-[#4a3728] text-white rounded-lg hover:bg-[#6a5748] transition-colors duration-200 text-sm font-semibold">
                                     Save
@@ -411,7 +443,7 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                                                     value={email.value}
                                                     onChange={(e) => updateEmail(email.id, e.target.value, email.privacy)}
                                                     className="flex-1 px-3 py-1.5 rounded border border-[#d4ccc3] focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm text-[#4a3728] font-medium"
-                                                    placeholder="your@email.com"
+                                                    placeholder="your.email@example.com"
                                                 />
                                                 <button
                                                     onClick={() => removeEmail(email.id)}
@@ -519,7 +551,7 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                                     value={address}
                                     onChange={(e) => setAddress(e.target.value)}
                                     className="w-full px-3 py-1.5 rounded-lg border border-[#d4ccc3] focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm text-[#4a3728] placeholder-[#4a3728]/50"
-                                    placeholder="City, State, Country"
+                                    placeholder="City, Country"
                                 />
                                 <CustomPrivacySelect
                                     value={addressPrivacy}
@@ -555,7 +587,7 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                                                     value={website.label}
                                                     onChange={(e) => updateWebsite(website.id, website.value, e.target.value)}
                                                     className="px-3 py-1.5 rounded border border-[#d4ccc3] focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm text-[#4a3728] font-medium"
-                                                    placeholder="e.g., Portfolio"
+                                                    placeholder="Personal Portfolio"
                                                 />
                                                 <div className="flex gap-2">
                                                     <input
@@ -563,7 +595,7 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                                                         value={website.value}
                                                         onChange={(e) => updateWebsite(website.id, e.target.value, website.label)}
                                                         className="flex-1 px-3 py-1.5 rounded border border-[#d4ccc3] focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm text-[#4a3728] font-medium"
-                                                        placeholder="https://example.com"
+                                                        placeholder="https://yourwebsite.com"
                                                     />
                                                     <button
                                                         onClick={() => removeWebsite(website.id)}
@@ -609,7 +641,7 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                                                     value={im.value}
                                                     onChange={(e) => updateIMHandle(im.id, im.platform, e.target.value)}
                                                     className="flex-1 px-3 py-1.5 rounded border border-[#d4ccc3] focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm text-[#4a3728] font-medium"
-                                                    placeholder="Handle/ID"
+                                                    placeholder="@username"
                                                 />
                                                 <button
                                                     onClick={() => removeIMHandle(im.id)}
@@ -635,7 +667,7 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                                 value={twitter}
                                 onChange={(e) => setTwitter(e.target.value)}
                                 className="w-full px-3 py-1.5 rounded-lg border border-[#d4ccc3] focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm text-[#4a3728] placeholder-[#4a3728]/50"
-                                placeholder="@yourhandle"
+                                placeholder="https://x.com/username"
                             />
                         </div>
 
@@ -691,10 +723,29 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose }) => {
                         Cancel
                     </button>
                     <button
-                        onClick={onClose}
-                        className="flex-1 px-6 py-3 rounded-full bg-gradient-to-r from-[#4a3728] to-[#6a5748] text-white font-semibold hover:shadow-lg transition-all duration-200"
+                        onClick={async () => {
+                    
+                                const website = websites[0];
+                                if (website?.value?.trim()) {
+                                setIsSavingWebsite(true);
+                                try {
+                                    await saveWebsite({
+                                                      url: website.value.trim(),
+                                                     label: website.label?.trim() || 'Personal Portfolio',
+                                                  type: 'portfolio',
+                                                 });
+                                    onSaved?.();
+                                } catch (err) {
+                                    console.warn('⚠️ Failed to save website:', err);
+                                }
+                                setIsSavingWebsite(false);
+                            }
+                            onClose();
+                        }}
+                        disabled={isSavingWebsite}
+                        className="flex-1 px-6 py-3 rounded-full bg-gradient-to-r from-[#4a3728] to-[#6a5748] text-white font-semibold hover:shadow-lg transition-all duration-200 disabled:opacity-50"
                     >
-                        Save Changes
+                        {isSavingWebsite ? 'Saving...' : 'Save Changes'}
                     </button>
                 </div>
             </div>

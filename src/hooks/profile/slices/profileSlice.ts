@@ -2,7 +2,6 @@
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { ProfileState } from '@/features/profile/types/profile.types';
-
 import {
     fetchUserProfile,
     uploadCoverPhoto,
@@ -14,6 +13,7 @@ import {
     createHeadline,
     updateUserProfile,
 } from '../thunks';
+import { fetchContactInfo, saveContactWebsite } from '../thunks/profileThunks';
 import { transformPostsData } from '@/shared/utils/profileTransformers';
 import { fetchMyReposts } from '../thunks/profileThunks';
 
@@ -39,7 +39,8 @@ const initialState: ProfileState = {
 
     userReposts: [],
     isLoadingReposts: false,
-    companyId: null
+    companyId: null,
+    contactData: null,
 };
 
 const profileSlice = createSlice({
@@ -187,20 +188,29 @@ const profileSlice = createSlice({
                 state.profileError = action.payload as string;
             });
 
-        // Existing extraReducers ke andar, end mein add karo:
-        builder
-            .addCase(fetchMyReposts.pending, (state) => {
-                state.isLoadingReposts = true;
-            })
-            .addCase(fetchMyReposts.fulfilled, (state, action) => {
-                state.isLoadingReposts = false;
-                state.userReposts = action.payload || [];
-            })
-            .addCase(fetchMyReposts.rejected, (state) => {
-                state.isLoadingReposts = false;
-            });
-    },
-});
+             // Existing extraReducers ke andar, end mein add karo:
+             builder
+             .addCase(fetchMyReposts.pending, (state) => {
+                 state.isLoadingReposts = true;
+             })
+             .addCase(fetchMyReposts.fulfilled, (state, action) => {
+                 state.isLoadingReposts = false;
+                 state.userReposts = action.payload || [];
+             })
+             .addCase(fetchMyReposts.rejected, (state) => {
+                 state.isLoadingReposts = false;
+             });
+ 
+         // ==================== CONTACT INFO (Website URL) ====================
+         builder
+             .addCase(fetchContactInfo.fulfilled, (state, action) => {
+                 state.contactData = action.payload;
+             })
+             .addCase(saveContactWebsite.fulfilled, (state, action) => {
+                 state.contactData = action.payload;
+             });
+     },
+ });
 
 export const {
     setProfileImageUrl,

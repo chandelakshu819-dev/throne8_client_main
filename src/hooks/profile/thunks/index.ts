@@ -8,6 +8,9 @@ import {
     fetchUserPosts,
     fetchCoverPhotoUrl,
     fetchProfilePhotoUrl,
+    fetchMyReposts,
+    fetchContactInfo,
+    saveContactWebsite,
 } from "./profileThunks";
 
 import { createHeadline, updateUserProfile, uploadProfileImage } from "./profileUpdateThunks";
@@ -19,6 +22,9 @@ export {
     uploadCoverPhoto,
     updateCoverPhoto,
     fetchUserPosts,
+    fetchMyReposts,
+    fetchContactInfo,
+    saveContactWebsite,
 
     updateUserProfile,
     createHeadline,

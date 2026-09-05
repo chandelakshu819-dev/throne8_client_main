@@ -3,7 +3,11 @@
 import React, { useState } from 'react';
 import ContactModal from './ContactModal';
 
-const Contactact = () => {
+interface ContactactProps {
+  onSaved?: () => void;
+}
+
+const Contactact: React.FC<ContactactProps> = ({ onSaved }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
@@ -14,7 +18,11 @@ const Contactact = () => {
       >
         Contact Information
       </div>
-      <ContactModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <ContactModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSaved={onSaved}
+      />
     </>
   );
 };

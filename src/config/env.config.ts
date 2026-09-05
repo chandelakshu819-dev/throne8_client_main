@@ -65,7 +65,7 @@ const _config = {
     NEXT_PUBLIC_LOGOUT_ENDPOINT: optionalEnv('NEXT_PUBLIC_LOGOUT_ENDPOINT'),
 
 
-    // ============================================================
+        // ============================================================
     // 3. PROFILE ENDPOINTS
     // ============================================================
     NEXT_PUBLIC_PROFILE_PHOTO_ENDPOINT: optionalEnv('NEXT_PUBLIC_PROFILE_PHOTO_ENDPOINT'),
@@ -75,6 +75,8 @@ const _config = {
     NEXT_PUBLIC_EDUCATION_ENDPOINT: optionalEnv('NEXT_PUBLIC_EDUCATION_ENDPOINT'),
     NEXT_PUBLIC_EXPERIENCE_ENDPOINT: optionalEnv('NEXT_PUBLIC_EXPERIENCE_ENDPOINT'),
     NEXT_PUBLIC_SKILLS_ENDPOINT: optionalEnv('NEXT_PUBLIC_SKILLS_ENDPOINT'),
+    NEXT_PUBLIC_CONTACT_ENDPOINT: optionalEnv('NEXT_PUBLIC_CONTACT_ENDPOINT'),
+    
 
     // ============================================================
     // 4. ACTIVITY / POSTS ENDPOINTS
