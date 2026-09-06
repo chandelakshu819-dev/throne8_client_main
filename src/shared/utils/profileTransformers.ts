@@ -1,14 +1,13 @@
 // src/shared/utils/profileTransformers.ts
 import { UserProfileData, ProfileData } from '../../types/profile.types';
+import { formatUserDisplayName } from './format';
 
 export const transformToProfileData = (
     userProfileData: UserProfileData | null,
     profileImageUrl: string,
     headlineData: any
 ): ProfileData => {
-    const fullName = userProfileData
-        ? `${userProfileData.firstName} ${userProfileData.lastName}`.trim()
-        : 'Loading...';
+    const fullName = formatUserDisplayName(userProfileData, null);
 
     return {
         bannerImage: '', // ✅ hardcoded unsplash URL hataya — pages already alag bannerUrl use kar rahe hain

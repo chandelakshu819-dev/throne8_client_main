@@ -6,6 +6,8 @@ import { useHeadlineData } from '@/features/profile/hooks/useHeadlineData';
 import { transformToProfileData } from '@/shared/utils/profileTransformers';
 import ProfileNavbar from '@/features/profile/components/home/ProfileNavbar';
 
+import { formatUserDisplayName } from '@/shared/utils/format';
+
 // Ye self-contained navbar hai — khud data fetch karta hai,
 // isliye kisi bhi layout.tsx mein bina props ke <GlobalNavbar /> daal do
 export default function GlobalNavbar() {
@@ -14,17 +16,15 @@ export default function GlobalNavbar() {
     const { headlineData } = useHeadlineData(headlineId);
 
     React.useEffect(() => {
-        if (user) {
-            fetchUserProfile();
+        if (user?.userId || user?.id) {
+            fetchUserProfile(user.userId || user.id);
         }
     }, [user, fetchUserProfile]);
 
     if (isLoading || !user) return null;
 
     const profileData = transformToProfileData(userProfileData, profileImageUrl, headlineData);
-    const fullName = userProfileData
-        ? `${userProfileData.firstName} ${userProfileData.lastName}`.trim()
-        : userName_fallback(user);
+    const fullName = formatUserDisplayName(userProfileData, user);
 
     return (
         <ProfileNavbar

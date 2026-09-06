@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 import { useProfile } from '@/features/profile/hooks/useProfile';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
 interface ContactModalProps {
     isOpen: boolean;
@@ -204,7 +205,9 @@ const CustomIMSelect: React.FC<CustomIMSelectProps> = ({ value, onChange }) => {
     );
 };
 
-const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, onSaved }) => {    const { contactData, loadContact, saveWebsite, updateProfile, user } = useProfile();
+const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, onSaved }) => {
+    const { contactData, loadContact, saveWebsite, updateProfile } = useProfile();
+    const { user } = useAuth();
     const [isSavingWebsite, setIsSavingWebsite] = useState(false);
     const [profileUrl, setProfileUrl] = useState('');
     const [emails, setEmails] = useState<EmailEntry[]>([

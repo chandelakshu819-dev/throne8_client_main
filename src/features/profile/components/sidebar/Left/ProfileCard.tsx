@@ -11,6 +11,8 @@ import StatsCards from '../Right/StatsCards';
 import { useProfile } from '@/store/hooks';
 import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData';
 
+import { formatUserDisplayName } from '@/shared/utils/format';
+
 interface ProfileCardProps {
   currentUserId: string;
   isDarkMode: boolean;
@@ -68,13 +70,15 @@ const ProfileCard: React.FC<ProfileCardProps> = ({currentUserId, isDarkMode }) =
 
   console.log('👤 [PROFILE_CARD] User Profile Data:', headlineData);
 
+  const resolvedUserId = currentUserId || user?.userId || user?.id;
+
   useEffect(() => {
-    if (user) {
+    if (user && resolvedUserId) {
       loadProfile();   // ← Redux action
       loadPosts();
-      fetchUserProfile();
+      fetchUserProfile(resolvedUserId);
     }
-  }, [user, fetchUserProfile]);
+  }, [user, resolvedUserId, fetchUserProfile]);
 
   const profileData = transformToProfileData(
     userProfileData,
@@ -87,8 +91,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({currentUserId, isDarkMode }) =
     profileData,
   );
 
-  const fullName = userProfileData
-    ? `${userProfileData.firstName} ${userProfileData.lastName}`.trim()
+  const fullName = userProfileData || user
+    ? formatUserDisplayName(userProfileData, user)
     : 'Loading...';
 
   const handleHomePage = () => {

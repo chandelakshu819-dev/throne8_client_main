@@ -9,6 +9,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { MessageNotificationBadge } from './MessageNotificationBadge';
 import { NetworkNotificationBadge } from '@/features/networks/components/notifications/NetworkNotificationBadge';
 import DefaultAvatar from '@/shared/uiComponents/DefaultAvatar';
+import { capitalizeName } from '@/shared/utils/format';
 
 interface ProfileNavbarProps {
     profileImage: string;
@@ -236,13 +237,13 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                             />
                                         ) : (
                                             <img
-                                                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(userName || 'User')}&background=4a3728&color=fff&size=128`}
-                                                alt={userName || "Profile"}
+                                                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(capitalizeName(userName || 'User'))}&background=4a3728&color=fff&size=128`}
+                                                alt={capitalizeName(userName || "Profile")}
                                                 className="w-full h-full object-cover"
                                             />
                                         )}
                                     </div>
-                                    <span className="text-sm font-medium hidden md:inline text-[#4a3728] whitespace-nowrap">{userName}</span>
+                                    <span className="text-sm font-medium hidden md:inline text-[#4a3728] whitespace-nowrap">{capitalizeName(userName || 'User')}</span>
                                     <svg
                                         className={`w-4 h-4 text-[#4a3728]/60 transition-transform duration-200 flex-shrink-0 hidden md:block ${isDropdownOpen ? 'rotate-180' : ''}`}
                                         fill="none"

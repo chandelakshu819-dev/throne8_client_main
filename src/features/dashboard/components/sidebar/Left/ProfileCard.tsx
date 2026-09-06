@@ -12,6 +12,8 @@ import StatsCards from '../Right/StatsCards';
 import { useProfile } from '@/store/hooks';
 import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData';
 
+import { formatUserDisplayName } from '@/shared/utils/format';
+
 interface ProfileCardProps {
   currentUserId: string;
   isDarkMode: boolean;
@@ -66,13 +68,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ currentUserId, isDarkMode }) 
 
   console.log('👤 [PROFILE_CARD] User Profile Data:', headlineData);
 
-  // ✅ FIX: fetchUserProfile ab userId maangta hai (useProfileData.ts dekho —
-  // AuthService.getUserProfileById(userId) use hota hai). Pehle isko bina
-  // argument ke call kiya ja raha tha, jisse hook ke andar `if (!userId) return;`
-  // pe hi turant return ho jaata tha — isLoadingProfile kabhi false nahi hota
-  // aur userProfileData hamesha null rehta, isliye fullName hamesha "Loading..."
-  // aur avatar hamesha fallback "LO" show hota tha.
-  const resolvedUserId = currentUserId || user?.id;
+  const resolvedUserId = currentUserId || user?.id || user?.userId;
 
   useEffect(() => {
     if (user && resolvedUserId) {
@@ -88,13 +84,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({ currentUserId, isDarkMode }) 
     headlineData
   );
 
-  console.log(
-    '📊 userPosts in ProfileCard:',
-    profileData,
-  );
-
-  const fullName = userProfileData
-    ? `${userProfileData.firstName} ${userProfileData.lastName}`.trim()
+  const fullName = userProfileData || user
+    ? formatUserDisplayName(userProfileData, user)
     : 'Loading...';
 
   const handleHomePage = () => {
