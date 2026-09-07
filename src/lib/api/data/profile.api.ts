@@ -1,4 +1,4 @@
-// src/profile/api/profile.api.ts
+// src/lib/api/profile.api.ts
 import AuthService from '@/lib/api/auth.service';
 import ProfileService from '../profile.service';
 

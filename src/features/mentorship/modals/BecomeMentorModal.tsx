@@ -42,8 +42,12 @@ export default function BecomeMentorModal({
     const router = useRouter();
     const { user } = useAuth();
 
-    const { userProfileData, fetchUserProfile } = useProfileData();
-    const { experienceList, fetchExperienceData } = useExperienceData();
+    const {
+        userProfileData,
+        fetchUserProfile,
+        isLoadingProfile: hookIsLoadingProfile,
+        profileError: hookProfileError,
+    } = useProfileData();    const { experienceList, fetchExperienceData } = useExperienceData();
     const { educationList, fetchEducationData } = useEducationData();
 
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,6 +61,7 @@ export default function BecomeMentorModal({
 
     // ✅ NEW: Profile loading state — jab tak data aa nahi jaata tab tak check nahi karte
     const [isProfileLoading, setIsProfileLoading] = useState(true);
+    const [profileLoadError, setProfileLoadError] = useState(false);
 
     const {
         register,
@@ -78,8 +83,8 @@ export default function BecomeMentorModal({
     const watchedDomains = watch('domains');
 
     useEffect(() => {
-        if (user) {
-            fetchUserProfile();
+        if (user?.userId) {
+            fetchUserProfile(user.userId);   // 👈 userId ab pass ho raha hai
             fetchEducationData();
         }
     }, [user, fetchUserProfile, fetchEducationData]);
@@ -97,8 +102,39 @@ export default function BecomeMentorModal({
 
             // ✅ NEW: userProfileData aa gaya — loading khatam
             setIsProfileLoading(false);
+            setProfileLoadError(false);
         }
     }, [userProfileData, fetchExperienceData]);
+
+       // ✅ NEW: Hook ne error diya (jaise 429, 401, network fail) — turant
+    // dikhao, 8 second timeout ka wait mat karo.
+    useEffect(() => {
+        if (isOpen && hookProfileError) {
+            console.warn('⚠️ [BecomeMentorModal] Profile fetch failed:', hookProfileError);
+            setIsProfileLoading(false);
+            setProfileLoadError(true);
+        }
+    }, [isOpen, hookProfileError]);
+
+    // ✅ NEW: Safety timeout — agar 8 seconds mein userProfileData nahi aaya,
+    // to loading state ko force-stop karo, chahe hook ne kabhi resolve/reject
+    // kuch bhi na kiya ho. Isse modal kabhi permanently stuck nahi rahega.
+    useEffect(() => {
+        if (!isOpen || !isProfileLoading) return;
+
+        const timeoutId = setTimeout(() => {
+            setIsProfileLoading((prev) => {
+                if (prev) {
+                    console.warn('⚠️ [BecomeMentorModal] Profile fetch timed out after 8s');
+                    setProfileLoadError(true);
+                }
+                return false;
+            });
+        }, 8000);
+
+        return () => clearTimeout(timeoutId);
+    }, [isOpen, isProfileLoading]);
+
 
     useEffect(() => {
         if (isOpen && profileImage) {
@@ -116,14 +152,15 @@ export default function BecomeMentorModal({
         }
     }, [isOpen, profileImage, setValue]);
 
-    // ✅ NEW: Modal open hone par loading reset karo
-    useEffect(() => {
+      // ✅ NEW: Modal open hone par loading reset karo
+      useEffect(() => {
         if (isOpen) {
             // Agar userProfileData pehle se hai to seedha false, warna wait karo
             if (userProfileData) {
                 setIsProfileLoading(false);
             } else {
                 setIsProfileLoading(true);
+                setProfileLoadError(false);   // 👈 ADD — purana error state clear karo har fresh open par
             }
         }
     }, [isOpen]);
@@ -237,8 +274,47 @@ export default function BecomeMentorModal({
         );
     }
 
-    // ✅ NEW: Profile incomplete screen
-    if (isOpen && !isProfileReady) {
+        // ✅ NEW: Fetch failed / timed out — retry option do, hang mat hone do
+        if (isOpen && profileLoadError) {
+            return (
+                <div
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6"
+                    onClick={handleClose}
+                >
+                    <div
+                        className="bg-white rounded-[32px] max-w-md w-full p-10 shadow-2xl text-center relative"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            onClick={handleClose}
+                            className="absolute top-5 right-5 w-9 h-9 bg-[#f8f6f4] hover:bg-[#4a3728] text-[#4a3728] hover:text-white rounded-full flex items-center justify-center transition-all"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                        <p className="text-sm font-bold text-red-500 mb-4">
+                            Couldn't load your profile. Please check your connection and try again.
+                        </p>
+                        <button
+                            onClick={() => {
+                                if (!user?.userId) return;
+                                setProfileLoadError(false);
+                                setIsProfileLoading(true);
+                                fetchUserProfile(user.userId);
+                            }}
+                            className="px-6 py-2.5 bg-[#4a3728] text-white rounded-xl text-sm font-bold"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+        console.log('🔍 [DEBUG] userProfileData:', userProfileData);
+console.log('🔍 [DEBUG] experienceList:', experienceList);
+console.log('🔍 [DEBUG] email:', email, 'currentRole:', currentRole);
+    
+        // ✅ NEW: Profile incomplete screen
+        if (isOpen && !isProfileReady) {
         return (
             <div
                 className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6"
