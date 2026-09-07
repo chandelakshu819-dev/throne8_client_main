@@ -182,7 +182,7 @@ export default function BecomeMentorModal({
     }, [currentRole, setValue]);
 
     const fullName = userProfileData
-        ? `${userProfileData.firstName} ${userProfileData.lastName}`.trim()
+        ? [userProfileData.firstName, userProfileData.lastName].filter(Boolean).join(' ').trim()
         : '';
     const email = userProfileData?.email || '';
     const location = userProfileData?.location || '';

@@ -12,6 +12,7 @@ import BlockMemberModal from './modals/BlockMemberModal';
 import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import ConnectionService from '@/lib/api/connection.service';
+import MentorService from '@/lib/api/mentorship.service';
 import TrustScoreBadge from './TrustScoreBadge';
 import StudyStreakBadge from './StudyStreakBadge';
 
@@ -129,10 +130,37 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             ? profileImage
             : `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=4a3728&color=fff&size=256`
     );
-
     // ✅ NEW — Mutual connections count (LinkedIn-style "X mutual connections" badge)
     const [mutualCount, setMutualCount] = useState<number>(0);
     const [isLoadingMutuals, setIsLoadingMutuals] = useState(false);
+
+    // ✅ NEW — Only true if this profile's user actually has a mentor
+    // profile in the Mentor collection. The "Mentor Profile" button below
+    // must stay hidden for everyone else — showing a mentorship link on a
+    // non-mentor's profile makes no sense and used to always show up.
+    const [isMentor, setIsMentor] = useState(false);
+
+    useEffect(() => {
+        if (!currentUserId) {
+            setIsMentor(false);
+            return;
+        }
+
+        let cancelled = false;
+
+        MentorService.getMentorByUserId(currentUserId)
+            .then(() => {
+                if (!cancelled) setIsMentor(true);
+            })
+            .catch(() => {
+                // 404 / not found → this user has no mentor profile yet
+                if (!cancelled) setIsMentor(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [currentUserId]);
 
     useEffect(() => {
         if (profileImage && profileImage.trim() !== '') {
@@ -397,19 +425,18 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                                                        {/* website button moved to mentorship row below */}
                                 </div>
                                 <div className="flex gap-2 justify-center md:justify-start flex-wrap mt-2">
-                                    {currentUserId && (
+                                    {currentUserId && isMentor && (
                                         <button
-                                            onClick={() => router.push(`/mentorship/${currentUserId}`)}
+                                            onClick={() => router.push(`/mentorship/mentorProfile/${currentUserId}`)}
                                             className="connectionsShowButton group px-3 py-1.5 bg-white text-[#4a3728] rounded-full text-xs shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-1.5 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white"
                                         >
                                             <svg className="w-4 h-4 text-[#4a3728]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422A12.083 12.083 0 0121 15.5v0M12 14v7m-9-9.5v0a12.083 12.083 0 002.84 5.922L12 21l6.16-3.578" />
                                             </svg>
-                                            Mentorship
+                                            Mentor Profile
                                         </button>
                                     )}
-
                                     {websiteUrl && websiteUrl.trim() !== '' && (
                                         <button
                                             onClick={() => {

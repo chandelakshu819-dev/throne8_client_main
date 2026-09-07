@@ -25,6 +25,7 @@ export const useProfileData = () => {
             setProfileError(null);
 
             const data = await profileApi.fetchUserProfile(userId);
+            console.log('🔍 [RAW PROFILE RESPONSE]', JSON.stringify(data, null, 2));
 
             setUserProfileData(data);
 
