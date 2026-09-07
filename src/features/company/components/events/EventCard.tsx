@@ -20,7 +20,7 @@ const MODE_ICONS: Record<string, string> = {
 
 interface Props {
   event: Event;
-  onDelete: (id: string) => void;
+  onDelete: (event: Event) => void;
 }
 
 // ── Info Popup ──────────────────────────────────────
@@ -52,8 +52,8 @@ function InfoPopup({ event, onClose }: { event: Event; onClose: () => void }) {
     {
       label: 'Location', value: event.location
         ? [event.location.venue, event.location.city, event.location.state]
-            .filter(Boolean)
-            .join(', ') || '—'
+          .filter(Boolean)
+          .join(', ') || '—'
         : '—'
     },
     { label: 'Capacity', value: event.capacity },
@@ -129,7 +129,7 @@ const EventCard = memo(function EventCard({ event, onDelete }: Props) {
   const [showUpdate, setShowUpdate] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const handleDelete = useCallback(() => onDelete(event.id), [event.id, onDelete]);
+  const handleDelete = useCallback(() => onDelete(event), [event, onDelete]);
 
   const handleUpdateSubmit = useCallback(
     async (id: string, title: string, description: string) => {
@@ -231,7 +231,7 @@ const EventCard = memo(function EventCard({ event, onDelete }: Props) {
             onClick={() => setShowUpdate(true)}
             className="flex-1 py-1.5 text-xs font-semibold text-blue-600 border border-blue-200
                rounded-lg hover:bg-blue-50 transition-colors">
-            Update
+            Update 
           </button>
           <button onClick={handleDelete}
             className="flex-1 py-1.5 text-xs font-semibold text-red-500 border border-red-200

@@ -353,31 +353,127 @@ class CompanyService {
     }
 
     static async createEvent(formData: FormData): Promise<any> {
+        const endpoint = config.NEXT_PUBLIC_COMPANY_EVENTS_CREATE_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EVENTS_CREATE_ENDPOINT || '/company/events/create-event';
         try {
+            console.log('🚀 [CREATE_EVENT] Requesting POST:', endpoint, { baseURL: api.defaults.baseURL });
             const { data } = await api.post(
-                `${config.NEXT_PUBLIC_COMPANY_EVENTS_CREATE_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EVENTS_CREATE_ENDPOINT}`,
+                endpoint,
                 formData,
                 {
                     headers: { 'Content-Type': 'multipart/form-data' },
                     transformRequest: [(data) => data],
                 }
             );
+            console.log('✅ [CREATE_EVENT] Success:', data);
             return data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to create event');
+            console.error('❌ [CREATE_EVENT] Failed:', {
+                status: error.response?.status,
+                url: error.config?.url,
+                baseURL: error.config?.baseURL,
+                data: error.response?.data,
+                message: error.message,
+            });
+            const backendMsg =
+                error.response?.data?.message ||
+                error.response?.data?.error ||
+                (Array.isArray(error.response?.data?.errors) ? error.response.data.errors.map((e: any) => e.message || e).join(', ') : null) ||
+                error.message ||
+                'Failed to create event';
+            throw new Error(backendMsg);
         }
     }
 
     static async getAllEvents(page = 1, pageSize = 10): Promise<any> {
+        const endpoint = config.NEXT_PUBLIC_COMPANY_EVENTS_GET_ALL_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EVENTS_GET_ALL_ENDPOINT || '/company/events/get-all-events';
         try {
-            const { data } = await api.get(`${config.NEXT_PUBLIC_COMPANY_EVENTS_GET_ALL_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EVENTS_GET_ALL_ENDPOINT}`, {
+            console.log('🚀 [GET_ALL_EVENTS] Requesting GET:', endpoint, { baseURL: api.defaults.baseURL });
+            const { data } = await api.get(endpoint, {
                 params: { page, pageSize },
             });
-            console.log("all events here ->>", data)
+            console.log("all events here ->>", data);
             return data;
         } catch (error: any) {
-            console.log("events getting error ->", error)
+            console.error('❌ [GET_ALL_EVENTS] Error:', {
+                status: error.response?.status,
+                url: error.config?.url,
+                baseURL: error.config?.baseURL,
+                data: error.response?.data,
+                message: error.message,
+            });
             throw new Error(error.response?.data?.message || 'Failed to fetch events');
+        }
+    }
+
+    static async deleteEvent(eventId: string): Promise<any> {
+        try {
+            console.log('🗑️ [DELETE_EVENT] Requesting DELETE for event:', eventId);
+            const { data } = await api.delete(`/company/events/${eventId}`);
+            console.log('✅ [DELETE_EVENT] Event deleted successfully:', data);
+            return data;
+        } catch (error: any) {
+            console.error('❌ [DELETE_EVENT] Error deleting event:', {
+                status: error.response?.status,
+                data: error.response?.data,
+                message: error.message,
+            });
+            throw new Error(error.response?.data?.message || 'Failed to delete event. Please try again.');
+        }
+    }
+
+    static async getEventById(eventId: string): Promise<any> {
+        try {
+            const { data } = await api.get(`/company/events/${eventId}`);
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to fetch event details');
+        }
+    }
+
+    static async updateEvent(eventId: string, formData: FormData | Record<string, any>): Promise<any> {
+        try {
+            const isFormData = typeof FormData !== 'undefined' && formData instanceof FormData;
+            const headers = isFormData ? { 'Content-Type': 'multipart/form-data' } : undefined;
+            const { data } = await api.put(`/company/events/${eventId}`, formData, { headers });
+            return data;
+        } catch (error: any) {
+            const backendMsg =
+                error.response?.data?.message ||
+                (Array.isArray(error.response?.data?.errors) ? error.response.data.errors.map((e: any) => e.message || e).join(', ') : null) ||
+                error.message ||
+                'Failed to update event';
+            throw new Error(backendMsg);
+        }
+    }
+
+    static async updateEventStatus(eventId: string, status: string): Promise<any> {
+        try {
+            const { data } = await api.patch(`/company/events/${eventId}/status`, { status });
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to update event status');
+        }
+    }
+
+    static async getEventAttendees(eventId: string, page = 1, pageSize = 20): Promise<any> {
+        try {
+            const { data } = await api.get(`/company/events/${eventId}/attendees`, {
+                params: { page, pageSize },
+            });
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to fetch attendees');
+        }
+    }
+
+    static async getEventStatistics(companyId?: string): Promise<any> {
+        try {
+            const { data } = await api.get('/company/events/stats', {
+                params: companyId ? { companyId } : {},
+            });
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to fetch event statistics');
         }
     }
 

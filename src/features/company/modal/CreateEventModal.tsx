@@ -82,10 +82,67 @@ const CreateEventModal = memo(function CreateEventModal({ onClose, onAdd, compan
     setImagePreview(URL.createObjectURL(file));
   }, []);
 
+  const TIME_OF_DAY_DEFAULT_HOURS: Record<string, string> = {
+    Morning: '09:00',
+    Afternoon: '14:00',
+    Evening: '18:00',
+    Night: '20:00',
+  };
+
   const handleSubmit = useCallback(async () => {
-    if (!title.trim()) { setError('Title is required'); return; }
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) { setError('Title is required'); return; }
+    if (trimmedTitle.length < 5) { setError('Event title must be at least 5 characters'); return; }
     if (!startDate) { setError('Start date is required'); return; }
     if (!companyId) { setError('Company not found. Please refresh.'); return; }
+
+    const effectiveStartTime = startTime || TIME_OF_DAY_DEFAULT_HOURS[startTimeOfDay] || '09:00';
+    const startDateFull = `${startDate}T${effectiveStartTime}:00.000Z`;
+    const startDateObj = new Date(startDateFull);
+
+    if (isNaN(startDateObj.getTime())) {
+      setError('Invalid start date format');
+      return;
+    }
+
+    if (startDateObj.getTime() <= Date.now()) {
+      setError('Event start date and time must be in the future');
+      return;
+    }
+
+    let endDateFull: string | undefined;
+    if (endDate) {
+      const effectiveEndTime = endTime || '23:59';
+      endDateFull = `${endDate}T${effectiveEndTime}:00.000Z`;
+      const endDateObj = new Date(endDateFull);
+      if (isNaN(endDateObj.getTime())) {
+        setError('Invalid end date format');
+        return;
+      }
+      if (endDateObj.getTime() <= startDateObj.getTime()) {
+        setError('End date must be after start date');
+        return;
+      }
+    }
+
+    let formattedLink = eventLink.trim();
+    if ((mode === 'Online' || mode === 'Hybrid') && formattedLink) {
+      if (!/^https?:\/\//i.test(formattedLink)) {
+        formattedLink = `https://${formattedLink}`;
+      }
+      try {
+        new URL(formattedLink);
+      } catch {
+        setError('Event link must be a valid URL (e.g. https://meet.google.com/...)');
+        return;
+      }
+    }
+
+    const parsedCapacity = parseInt(capacity, 10);
+    if (isNaN(parsedCapacity) || parsedCapacity < 1) {
+      setError('Capacity must be a positive number');
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -94,13 +151,8 @@ const CreateEventModal = memo(function CreateEventModal({ onClose, onAdd, compan
       const formData = new FormData();
 
       // Required
-      formData.append('title', title.trim());
+      formData.append('title', trimmedTitle);
       formData.append('companyId', companyId);
-
-      // startDate + time combine
-      const startDateFull = startTime
-        ? `${startDate}T${startTime}:00.000Z`
-        : `${startDate}T00:00:00.000Z`;
       formData.append('startDate', startDateFull);
 
       // Optional text fields
@@ -109,26 +161,22 @@ const CreateEventModal = memo(function CreateEventModal({ onClose, onAdd, compan
       formData.append('mode', mode);
       formData.append('startTimeOfDay', startTimeOfDay);
       formData.append('visibility', visibility);
-      if (capacity) formData.append('capacity', capacity);
-      if (eventLink.trim()) formData.append('eventLink', eventLink.trim());
+      formData.append('capacity', String(parsedCapacity));
+      if (formattedLink) formData.append('eventLink', formattedLink);
 
       // endDate
-      if (endDate) {
-        const endDateFull = endTime
-          ? `${endDate}T${endTime}:00.000Z`
-          : `${endDate}T23:59:00.000Z`;
+      if (endDateFull) {
         formData.append('endDate', endDateFull);
       }
 
       // Location as JSON string
-      if (venue || city) {
-        const locationObj = {
-          venue: venue.trim(),
-          address: address.trim(),
-          city: city.trim(),
-          state: state.trim(),
-          country: country.trim(),
-        };
+      if (venue || city || address) {
+        const locationObj: Record<string, string> = {};
+        if (venue.trim()) locationObj.venue = venue.trim();
+        if (address.trim()) locationObj.address = address.trim();
+        if (city.trim()) locationObj.city = city.trim();
+        if (state.trim()) locationObj.state = state.trim();
+        if (country.trim()) locationObj.country = country.trim();
         formData.append('location', JSON.stringify(locationObj));
       }
 
@@ -142,6 +190,7 @@ const CreateEventModal = memo(function CreateEventModal({ onClose, onAdd, compan
       onAdd(newEvent);
       onClose();
     } catch (err: any) {
+      console.error('❌ [CREATE_EVENT_MODAL] Error:', err);
       setError(err.message || 'Failed to create event');
     } finally {
       setLoading(false);
@@ -172,8 +221,11 @@ const CreateEventModal = memo(function CreateEventModal({ onClose, onAdd, compan
 
           {/* Error */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-xl px-3 py-2">
-              {error}
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl px-3.5 py-2.5 flex items-start gap-2">
+              <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="leading-relaxed font-medium">{error}</span>
             </div>
           )}
 
@@ -206,7 +258,7 @@ const CreateEventModal = memo(function CreateEventModal({ onClose, onAdd, compan
               Event Title <span className="text-red-400">*</span>
             </label>
             <input value={title} onChange={e => setTitle(e.target.value)}
-              placeholder="e.g. AI Summit 2026"
+              placeholder="e.g. AI Summit 2026 (min 5 characters)"
               className="w-full bg-white/60 border border-[#e0d8cf] rounded-xl px-3 py-2.5 text-sm text-[#4a3728] focus:outline-none focus:ring-2 focus:ring-[#4a3728]/20" />
           </div>
 
@@ -239,13 +291,20 @@ const CreateEventModal = memo(function CreateEventModal({ onClose, onAdd, compan
           </div>
 
           {/* Start Date + Time */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
               <label className="text-xs font-semibold text-[#4a3728]/70 mb-1 block">
                 Start Date <span className="text-red-400">*</span>
               </label>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
+                className="w-full bg-white/60 border border-[#e0d8cf] rounded-xl px-3 py-2.5 text-sm text-[#4a3728] focus:outline-none focus:ring-2 focus:ring-[#4a3728]/20" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-[#4a3728]/70 mb-1 block">
+                Start Time <span className="text-[#4a3728]/40">(optional)</span>
+              </label>
+              <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
                 className="w-full bg-white/60 border border-[#e0d8cf] rounded-xl px-3 py-2.5 text-sm text-[#4a3728] focus:outline-none focus:ring-2 focus:ring-[#4a3728]/20" />
             </div>
             <div>
@@ -257,14 +316,23 @@ const CreateEventModal = memo(function CreateEventModal({ onClose, onAdd, compan
             </div>
           </div>
 
-          {/* End Date */}
-          <div>
-            <label className="text-xs font-semibold text-[#4a3728]/70 mb-1 block">
-              End Date <span className="text-[#4a3728]/40">(optional)</span>
-            </label>
-            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-              min={startDate || new Date().toISOString().split('T')[0]}
-              className="w-full bg-white/60 border border-[#e0d8cf] rounded-xl px-3 py-2.5 text-sm text-[#4a3728] focus:outline-none focus:ring-2 focus:ring-[#4a3728]/20" />
+          {/* End Date + Time */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-[#4a3728]/70 mb-1 block">
+                End Date <span className="text-[#4a3728]/40">(optional)</span>
+              </label>
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+                min={startDate || new Date().toISOString().split('T')[0]}
+                className="w-full bg-white/60 border border-[#e0d8cf] rounded-xl px-3 py-2.5 text-sm text-[#4a3728] focus:outline-none focus:ring-2 focus:ring-[#4a3728]/20" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-[#4a3728]/70 mb-1 block">
+                End Time <span className="text-[#4a3728]/40">(optional)</span>
+              </label>
+              <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
+                className="w-full bg-white/60 border border-[#e0d8cf] rounded-xl px-3 py-2.5 text-sm text-[#4a3728] focus:outline-none focus:ring-2 focus:ring-[#4a3728]/20" />
+            </div>
           </div>
 
           {/* Visibility + Capacity */}
