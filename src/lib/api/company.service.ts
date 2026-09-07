@@ -285,6 +285,73 @@ class CompanyService {
         }
     }
 
+    static async deletePost(postId: string): Promise<any> {
+        try {
+            const { data } = await api.delete(
+                `${config.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT}/${postId}`
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to delete post');
+        }
+    }
+
+    static async togglePostLike(postId: string): Promise<any> {
+        try {
+            const { data } = await api.post(
+                `${config.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT}/${postId}/like`
+            );
+            return data;
+        } catch (error: any) {
+            console.warn('Failed to toggle post like:', error);
+        }
+    }
+
+    static async getPostComments(postId: string): Promise<any> {
+        try {
+            const { data } = await api.get(
+                `${config.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT}/${postId}/comments`
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to fetch comments');
+        }
+    }
+
+    static async addPostComment(postId: string, text: string): Promise<any> {
+        try {
+            const { data } = await api.post(
+                `${config.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT}/${postId}/comments`,
+                { text }
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to add comment');
+        }
+    }
+
+    static async deletePostComment(postId: string, commentId: string): Promise<any> {
+        try {
+            const { data } = await api.delete(
+                `${config.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT}/${postId}/comments/${commentId}`
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to delete comment');
+        }
+    }
+
+    static async incrementShares(postId: string): Promise<any> {
+        try {
+            const { data } = await api.patch(
+                `${config.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT}/${postId}/shares`
+            );
+            return data;
+        } catch (error: any) {
+            console.warn('Failed to increment shares:', error);
+        }
+    }
+
     static async createEvent(formData: FormData): Promise<any> {
         try {
             const { data } = await api.post(
