@@ -55,35 +55,7 @@ const generateDummyGraphData = (days: number) => {
     return { labels, impressions, engagements };
 };
 
-// const dummyPosts = [
-//     {
-//         id: 1,
-//         title: 'Excited to share our new product launch! 🚀',
-//         date: '2 days ago',
-//         impressions: 1250,
-//         engagements: 340,
-//         clicks: 120,
-//         shares: 45
-//     },
-//     {
-//         id: 2,
-//         title: 'Great insights from today\'s conference',
-//         date: '5 days ago',
-//         impressions: 890,
-//         engagements: 210,
-//         clicks: 85,
-//         shares: 28
-//     },
-//     {
-//         id: 3,
-//         title: 'Team building activity highlights',
-//         date: '1 week ago',
-//         impressions: 650,
-//         engagements: 180,
-//         clicks: 60,
-//         shares: 15
-//     }
-// ];
+
 
 const dummyFollowersData = {
     totalFollowers: 3282,

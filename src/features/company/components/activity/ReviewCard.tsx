@@ -50,7 +50,7 @@ const ReviewCard = memo(function ReviewCard({ itemId, review, postedResponse, on
   };
 
   return (
-    <div className="mx-4 mb-4 bg-white/60 border border-[#e0d8cf] rounded-xl p-4 space-y-3">
+    <div className="mx-3.5 sm:mx-4 mb-3.5 sm:mb-4 bg-white border border-[#e0d8cf] rounded-xl p-3.5 sm:p-4 space-y-3 shadow-xs">
       <div className="flex items-start gap-2 flex-wrap">
         <Stars rating={review.rating} />
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${SENTIMENT_STYLES[review.sentiment]}`}>

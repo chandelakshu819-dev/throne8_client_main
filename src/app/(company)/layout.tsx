@@ -12,7 +12,7 @@ export default function CompanyLayout({
     return (
         <div className="min-h-screen bg-white">
             <Sidebar collapsed={collapsed} onCollapse={setCollapsed} />
-            <main className={`transition-all duration-300 p-6 min-h-screen ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
+            <main className={`transition-all duration-300 p-6 pt-20 min-h-screen ${collapsed ? 'md:ml-20' : 'md:ml-64'}`}>
                 {children}
             </main>
         </div>

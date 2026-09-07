@@ -74,6 +74,25 @@ const postsSlice = createSlice({
     },
 
 
+    incrementComments(state, action: PayloadAction<string>) {
+      const post = state.items.find(p => p.id === action.payload || p.postId === action.payload);
+      if (post) {
+        post.comments = (post.comments || 0) + 1;
+      }
+    },
+    decrementComments(state, action: PayloadAction<string>) {
+      const post = state.items.find(p => p.id === action.payload || p.postId === action.payload);
+      if (post && post.comments > 0) {
+        post.comments = post.comments - 1;
+      }
+    },
+    setPostCommentsCount(state, action: PayloadAction<{ id: string; count: number }>) {
+      const post = state.items.find(p => p.id === action.payload.id || p.postId === action.payload.id);
+      if (post) {
+        post.comments = action.payload.count;
+      }
+    },
+
     setPosts(state, action: PayloadAction<Post[]>) {
       state.items = action.payload;
       state.loading = false;
@@ -91,6 +110,7 @@ const postsSlice = createSlice({
 
 export const {
   toggleLike, addPost, deletePost, updatePost,
+  incrementComments, decrementComments, setPostCommentsCount,
   setPosts, setPostsLoading, setPostsError,
 } = postsSlice.actions;
 

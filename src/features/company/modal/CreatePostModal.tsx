@@ -1,6 +1,6 @@
 'use client';
 // src/features/company/modal/CreatePostModal.tsx
-import { useState, useRef, useCallback, memo } from 'react';
+import { useState, useRef, useCallback, useEffect, memo } from 'react';
 import Image from 'next/image';
 import type { Post } from '@/features/company/store/slices/postsSlice';
 import CompanyService from '@/lib/api/company.service';
@@ -16,6 +16,7 @@ interface Props {
   onAdd: (post: Post) => void;
   companyId: string;
   employees: Employee[];
+  initialMode?: 'photo' | 'video' | 'document' | 'poll';
 }
 
 type MediaKind = 'image' | 'video' | 'document';
@@ -46,7 +47,7 @@ function generateTimeSlots(): string[] {
 const TIME_SLOTS = generateTimeSlots();
 
 const CreatePostModal = memo(function CreatePostModal({
-  onClose, onAdd, companyId, employees,
+  onClose, onAdd, companyId, employees, initialMode,
 }: Props) {
 
   // ── Form State ─────────────────────────────────────
@@ -63,10 +64,17 @@ const CreatePostModal = memo(function CreatePostModal({
   const documentRef = useRef<HTMLInputElement>(null);
 
   // ── Poll State ─────────────────────────────────────
-  const [showPoll, setShowPoll] = useState(false);
+  const [showPoll, setShowPoll] = useState(initialMode === 'poll');
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [pollDuration, setPollDuration] = useState(7);
+
+  // Trigger file picker on initialMode if requested
+  useEffect(() => {
+    if (initialMode === 'photo') setTimeout(() => imageRef.current?.click(), 150);
+    if (initialMode === 'video') setTimeout(() => videoRef.current?.click(), 150);
+    if (initialMode === 'document') setTimeout(() => documentRef.current?.click(), 150);
+  }, [initialMode]);
 
   // ── UI State ───────────────────────────────────────
   const [loading, setLoading] = useState(false);

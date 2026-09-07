@@ -154,7 +154,7 @@ export default function Sidebar({ collapsed, onCollapse }: SidebarProps) {
 
   return (
     <>
-      <aside className={`hidden md:flex flex-col fixed left-0 top-0 h-screen z-40 bg-[#f6ede8] border-r border-[#e0d8cf] shadow-lg transition-all duration-300 ease-in-out ${collapsed ? 'w-20' : 'w-64'}`}>
+      <aside className={`hidden md:flex flex-col fixed left-0 top-16 h-[calc(100vh-4rem)] z-40 bg-[#f6ede8] border-r border-[#e0d8cf] shadow-lg transition-all duration-300 ease-in-out ${collapsed ? 'w-20' : 'w-64'}`}>
 
         {/* ── Collapse toggle ── */}
         <button
