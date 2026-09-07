@@ -1,6 +1,5 @@
-// Home Page - Dashboard
 'use client';
-
+// app/(dashboard)/dashboard/page.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, MapPin, Hash, Users, Image as LucideImage, Video, Sparkles, X, BarChart2 } from 'lucide-react';
 import Left from '@/features/dashboard/components/sidebar/Left/LeftSidebar';
@@ -29,6 +28,8 @@ import Toast from '@/shared/uiComponents/Toast';
 import EmbedPostModal from '@/features/dashboard/components/feed/EmbedPostModal';
 import DeleteConfirmModal from '@/features/dashboard/components/feed/DeleteConfirmModal';
 import ReportPostModal from '@/features/profile/components/home/ReportPostModal';
+// ✅ NEW: LinkedIn-style full post analytics panel (Discovery / Engagement / Demographics)
+import PostAnalyticsPanel from '@/features/dashboard/components/analytics/PostAnalyticsPanel';
 import { hidePost, getHiddenPosts, isPostHidden } from '@/lib/utils/hiddenPosts';
 // ✅ NEW: @mention autocomplete wiring for the dashboard's inline create-post
 // textarea. CreatePostModal.tsx (profile/home) already had this, but this
@@ -72,7 +73,9 @@ export default function Home() {
     const [editCommentText, setEditCommentText] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [postStatsMap, setPostStatsMap] = useState<Record<string, { impressions: number; shares: number }>>({});
-    const [selectedPostStats, setSelectedPostStats] = useState<{ impressions: number; shares: number } | null>(null);
+    // ✅ REMOVED: selectedPostStats state — PostAnalyticsPanel now fetches its
+    // own stats internally (getPostImpressionStats + getViewerDemographics),
+    // so this page no longer needs to duplicate that fetch.
 
     const [weeklyPerformance, setWeeklyPerformance] = useState<{
         profileViewsChange: number;
@@ -283,29 +286,9 @@ export default function Home() {
     }, [user, fetchUserProfile, fetchAllUsersPosts]);
 
 
-
-    useEffect(() => {
-        if (!selectedAnalyticsPost) {
-            setSelectedPostStats(null);
-            return;
-        }
-        let cancelled = false;
-        const postId = selectedAnalyticsPost.entryId || selectedAnalyticsPost.postId;
-    
-        AnalyticsService.getPostImpressionStats(postId)
-            .then((res) => {
-                if (cancelled) return;
-                setSelectedPostStats({
-                    impressions: res?.data?.totalImpressions ?? 0,
-                    shares: res?.data?.shares ?? 0,
-                });
-            })
-            .catch(() => {
-                if (!cancelled) setSelectedPostStats({ impressions: 0, shares: 0 });
-            });
-    
-        return () => { cancelled = true; };
-    }, [selectedAnalyticsPost]);
+    // ✅ REMOVED: old selectedPostStats fetch effect — PostAnalyticsPanel
+    // now fetches getPostImpressionStats() + getViewerDemographics() itself
+    // when it receives a `post` prop, so this page doesn't need to.
 
     useEffect(() => {
         if (allPosts?.length > 0) {
@@ -1996,12 +1979,13 @@ if (post?.userId && post.userId !== user?.userId) {
                         Top Posts
                     </h3>
                     <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
-                        {userPosts.map((post) => {
+                                                {userPosts.map((post) => {
                             const pid = post.entryId || post.postId;
                             return (
                             <div
                                 key={pid}
-                                className={`rounded-xl p-3 sm:p-4 border ${isDarkMode ? 'bg-slate-700/60 border-slate-600/60' : 'bg-white/60 border-[#4a3728]/20'}`}
+                                onClick={() => setSelectedAnalyticsPost(post)}
+                                className={`rounded-xl p-3 sm:p-4 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.01] ${isDarkMode ? 'bg-slate-700/60 border-slate-600/60' : 'bg-white/60 border-[#4a3728]/20'}`}
                             >
                                 <div className="flex gap-2 sm:gap-3 mb-2 sm:mb-3">
                                     {post.images && post.images.length > 0 && (
@@ -2184,121 +2168,15 @@ if (post?.userId && post.userId !== user?.userId) {
         />
     )}
 
-         {selectedAnalyticsPost && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-end p-4 md:p-6 overflow-y-auto">
-                <div className="bg-[#f6ede8] dark:bg-slate-800 p-6 rounded-3xl shadow-2xl max-w-md w-full my-auto max-h-[85vh] overflow-y-auto flex flex-col border border-[#e0d8cf] dark:border-slate-700 relative">
-                    <button 
-                        onClick={() => setSelectedAnalyticsPost(null)}
-                        className={`absolute top-4 right-4 p-2.5 rounded-full transition-colors ${isDarkMode ? 'hover:bg-slate-700/50 text-slate-400' : 'hover:bg-[#e0d8cf]/40 text-[#4a3728]/70'}`}
-                    >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-                
-                {/* Title */}
-                <div className="flex items-center gap-2 mb-6">
-                    <div className="p-2 bg-[#4a3728] text-white rounded-xl">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                    </div>
-                    <h2 className="text-xl font-black text-[#4a3728] dark:text-white">Post Analytics</h2>
-                </div>
-                {/* Content Preview */}
-                <div className="mb-6 bg-[#e0d8cf]/10 border border-[#e0d8cf]/30 rounded-2xl p-4">
-                    <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${isDarkMode ? 'text-white/50' : 'text-[#4a3728]/50'}`}>Post Caption</p>
-                    <p className={`text-sm font-semibold line-clamp-2 italic ${isDarkMode ? 'text-slate-200' : 'text-[#4a3728]'}`}>
-                        {selectedAnalyticsPost.content || selectedAnalyticsPost.text || 'No text content'}
-                    </p>
-                </div>
-
-                {(() => {
-                    const likes = selectedAnalyticsPost.likesCount || selectedAnalyticsPost.likes || 0;
-                    const comments = selectedAnalyticsPost.commentsCount || 0;
-                    const shares = selectedPostStats?.shares ?? 0;
-                    const impressions = selectedPostStats?.impressions || 1;
-                    const engagementPct = Math.min(100, Math.round(((likes + comments + shares) / impressions) * 100));
-
-                    return (
-                        <>
-                            {/* Metrics Grid */}
-                            <div className="grid grid-cols-2 gap-4 mb-6">
-                                {/* Views */}
-                                <div className={`p-4 rounded-2xl flex flex-col justify-between border ${isDarkMode ? 'bg-gradient-to-br from-slate-700/30 to-slate-700/10 border-slate-700' : 'bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 border-[#e0d8cf]/20'}`}>
-                                    <span className={`text-xs font-bold flex items-center gap-1.5 mb-2 ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                        </svg>
-                                        Impressions
-                                    </span>
-                                    <span className={`text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
-                                        {selectedPostStats?.impressions ?? 0}
-                                    </span>
-                                </div>
-
-                                {/* Likes */}
-                                <div className={`p-4 rounded-2xl flex flex-col justify-between border ${isDarkMode ? 'bg-gradient-to-br from-slate-700/30 to-slate-700/10 border-slate-700' : 'bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 border-[#e0d8cf]/20'}`}>
-                                    <span className={`text-xs font-bold flex items-center gap-1.5 mb-2 ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                                        </svg>
-                                        Likes
-                                    </span>
-                                    <span className={`text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
-                                        {likes}
-                                    </span>
-                                </div>
-
-                                {/* Comments */}
-                                <div className={`p-4 rounded-2xl flex flex-col justify-between border ${isDarkMode ? 'bg-gradient-to-br from-slate-700/30 to-slate-700/10 border-slate-700' : 'bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 border-[#e0d8cf]/20'}`}>
-                                    <span className={`text-xs font-bold flex items-center gap-1.5 mb-2 ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                        </svg>
-                                        Comments
-                                    </span>
-                                    <span className={`text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
-                                        {comments}
-                                    </span>
-                                </div>
-
-                                {/* Engagement Rate */}
-                                <div className={`p-4 rounded-2xl flex flex-col justify-between border ${isDarkMode ? 'bg-gradient-to-br from-slate-700/30 to-slate-700/10 border-slate-700' : 'bg-gradient-to-br from-[#e0d8cf]/20 to-[#f6ede8]/10 border-[#e0d8cf]/20'}`}>
-                                    <span className={`text-xs font-bold flex items-center gap-1.5 mb-2 ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                        </svg>
-                                        Engagement
-                                    </span>
-                                    <span className={`text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}>
-                                        {engagementPct}%
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Progress Bar visual indicator */}
-                            <div className="space-y-2">
-                                <div className={`flex justify-between text-xs font-bold ${isDarkMode ? 'text-slate-400' : 'text-[#4a3728]/60'}`}>
-                                    <span>Engagement Level</span>
-                                    <span className={isDarkMode ? 'text-white' : 'text-[#4a3728]'}>
-                                        {engagementPct}%
-                                    </span>
-                                </div>
-                                <div className={`w-full h-3 rounded-full overflow-hidden ${isDarkMode ? 'bg-slate-700' : 'bg-[#e0d8cf]/30'}`}>
-                                    <div
-                                        className={`h-full rounded-full transition-all duration-1000 ${isDarkMode ? 'bg-gradient-to-r from-[#9d8466] to-white' : 'bg-gradient-to-r from-[#8b7355] to-[#4a3728]'}`}
-                                        style={{ width: `${engagementPct}%` }}
-                                    />
-                                </div>
-                            </div>
-                        </>
-                    );
-                })()}
-    
-            </div>
-        </div>
+    {/* ✅ CHANGED: purana chhota "popup-over-popup" analytics card hata diya —
+         ab yahan LinkedIn-style full slide-in panel use hota hai jo apna
+         Discovery/Engagement/Demographics data khud fetch karta hai. */}
+    {selectedAnalyticsPost && (
+        <PostAnalyticsPanel
+            post={selectedAnalyticsPost}
+            isDarkMode={isDarkMode}
+            onClose={() => setSelectedAnalyticsPost(null)}
+        />
     )}
 
     {/* Custom Styles */ }
