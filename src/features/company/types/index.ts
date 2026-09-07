@@ -211,8 +211,10 @@ export type TimeRange = '7d' | '30d' | '90d';
 export interface SocialLinks {
   linkedin: string;
   twitter: string;
-  github: string;
+  facebook: string;
   instagram: string;
+  youtube: string;
+  github: string;
 }
 
 export interface CompanyFormValues {
@@ -226,6 +228,8 @@ export interface CompanyFormValues {
   founded: string;
   website: string;
   social: SocialLinks;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
 }
 
 export type VerificationStatus = 'pending' | 'verified' | 'unverified';

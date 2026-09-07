@@ -1,4 +1,4 @@
-// components/mentor-profile/MentorProfile.tsx
+//src/features/mentorship/components/MentorProfile.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -41,11 +41,10 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     }, [mentorId]);
 
     const searchParams = useSearchParams();
-    
+
     useEffect(() => {
         const serviceId = searchParams.get('serviceId');
         if (serviceId && !bookingStep) {
-            // Fetch services and pre-select
             SessionService.getAllSessionsFromDB({ limit: 50 })
                 .then((res) => {
                     const allSessions = res?.data ?? [];
@@ -62,7 +61,6 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                         };
                         handleServiceClick(mappedService);
                     } else {
-                        // Fallback: it might be a Group Session
                         MentorService.getGroupSessionById(serviceId)
                             .then((groupRes: any) => {
                                 const groupSession = groupRes?.data || groupRes?.session || groupRes;
@@ -99,7 +97,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
 
     return (
         <div style={{ minHeight: "100vh", background: C.bg }}>
-            <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "24px 16px", display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
+            <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "88px 16px 24px", display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
                 <MentorSidebar mentorData={mentorData} />
                 <div>
                     {bookingStep === "calendar" && (
@@ -136,7 +134,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                                 bookedSessionIds={bookedSessionIds}
                                 currentUserId={user?.userId || ""}
                             />
-                            <ReviewsSection />
+                            <ReviewsSection mentorId={mentorData?.mentorId || ""} />
                         </>
                     )}
                 </div>

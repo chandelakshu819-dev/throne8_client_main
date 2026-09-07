@@ -47,15 +47,11 @@ class MentorService {
 
       const formData = new FormData();
 
-      // Simple fields
       formData.append('title', payload.title);
       formData.append('bio', payload.bio);
-
-      // Arrays — JSON string as form-data
       formData.append('domains', JSON.stringify(payload.domains));
       formData.append('skills', JSON.stringify(payload.skills));
 
-      // Nested object — JSON string
       formData.append(
         'experience',
         JSON.stringify({
@@ -64,7 +60,6 @@ class MentorService {
         })
       );
 
-      // Social proof — JSON string
       formData.append(
         'socialProof',
         JSON.stringify({
@@ -73,7 +68,6 @@ class MentorService {
         })
       );
 
-      // File — must be last
       formData.append('profilePic', payload.profilePic);
 
       const { data } = await api.post<MentorResponse>(
@@ -100,7 +94,6 @@ class MentorService {
         }
 
         if (error.response?.status === 400) {
-          // Validation errors array from backend
           const errors = apiError?.errors?.map((e: any) => e.message).join(', ');
           throw new Error(errors || apiError?.message || 'Validation failed');
         }
@@ -274,6 +267,48 @@ class MentorService {
         if (apiError?.message) throw new Error(apiError.message);
       }
       throw new Error('Failed to fetch group session details. Please try again.');
+    }
+  }
+
+  /**
+   * ⭐ GET REVIEWS FOR A MENTOR (real data — replaces hardcoded REVIEWS mock)
+   * GET /reviews/mentor/:mentorId
+   */
+  static async getMentorReviews(mentorId: string, params?: { page?: number; limit?: number }): Promise<any> {
+    try {
+      console.log(`⭐ [GET_MENTOR_REVIEWS] Fetching reviews for mentor: ${mentorId}`);
+
+      const { data } = await api.get(`/reviews/mentor/${mentorId}`, { params });
+
+      console.log('✅ [GET_MENTOR_REVIEWS] Fetched:', data);
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (apiError?.message) throw new Error(apiError.message);
+      }
+      throw new Error('Failed to fetch reviews. Please try again.');
+    }
+  }
+
+  /**
+   * 📊 GET REVIEW STATS FOR A MENTOR (average rating + star distribution)
+   * GET /reviews/mentor/:mentorId/stats
+   */
+  static async getMentorReviewStats(mentorId: string): Promise<any> {
+    try {
+      console.log(`📊 [GET_MENTOR_REVIEW_STATS] Fetching review stats for mentor: ${mentorId}`);
+
+      const { data } = await api.get(`/reviews/mentor/${mentorId}/stats`);
+
+      console.log('✅ [GET_MENTOR_REVIEW_STATS] Fetched:', data);
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (apiError?.message) throw new Error(apiError.message);
+      }
+      throw new Error('Failed to fetch review stats. Please try again.');
     }
   }
 }

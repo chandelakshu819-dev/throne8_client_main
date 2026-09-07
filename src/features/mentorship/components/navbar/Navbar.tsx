@@ -12,7 +12,11 @@ interface NavbarProps {
 export default function Navbar({ activeTimezone = "IST (UTC+5:30)" }: NavbarProps) {
   const { user } = useAuth();
   return (
-    <nav className="fixed top-0 w-full z-[100] bg-white/70 backdrop-blur-xl border-b border-[#ece7e2] px-6 py-4 flex justify-between items-center">
+    // ✅ FIX: explicit h-20 (80px) instead of letting py-4 decide the
+    // height implicitly. This gives us a fixed, known number to use as
+    // the spacer height in whatever renders below this navbar — without
+    // it, any change to padding here would silently break that spacer.
+    <nav className="fixed top-0 w-full z-[100] h-20 bg-white/70 backdrop-blur-xl border-b border-[#ece7e2] px-6 flex justify-between items-center">
       {/* Left side: Logo + Search */}
       <div className="flex items-center gap-10">
         {/* Logo */}

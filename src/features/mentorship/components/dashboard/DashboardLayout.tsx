@@ -1,4 +1,4 @@
-// mentorDashboard/MentorDashboard.tsx
+// src/features/mentorship/components/dashboard/DashboardLayout.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -137,43 +137,60 @@ export default function MentorDashboard(
   console.log("👤 Mentor Data in Dashboard-:", mentorData);
 
   return (
-    <div className="flex h-screen bg-[#f6ede8]">
-      <Sidebar
-        activePage={activePage}
-        setActivePage={setActivePage}
-        mentorData={mentorData}
-      />
+    // ✅ FIX 1: Navbar is `fixed top-0 h-20` (80px), so it's out of normal
+    // flow and was overlapping this dashboard's content. Wrapping
+    // everything in a flex-col with a shrink-0 h-20 spacer pushes the
+    // Sidebar + main content below the navbar, while the inner flex-1
+    // row still fills the remaining viewport height with its own scroll.
+    <div className="flex flex-col h-screen bg-[#f6ede8]">
+      {/* Spacer — reserves space for the fixed Navbar (h-20 = 80px) so
+          Sidebar/main don't render underneath it. Keep this in sync with
+          Navbar's height class. */}
+      <div className="h-20 shrink-0" aria-hidden="true" />
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="p-8 max-w-7xl mx-auto">
-          <CurrentPage
-            // Profile props
-            mentorData={mentorData}
-            profilePhoto={profilePhoto}
-            isVerified={isVerified}
-            agreedToTerms={agreedToTerms}
-            agreedToCode={agreedToCode}
-            setProfilePhoto={setProfilePhoto}
-            setIsVerified={setIsVerified}
-            setAgreedToTerms={setAgreedToTerms}
-            setAgreedToCode={setAgreedToCode}
-            handlePhotoUpload={handlePhotoUpload}
+      <div className="flex flex-1 min-h-0">
+        <Sidebar
+          activePage={activePage}
+          setActivePage={setActivePage}
+          mentorData={mentorData}
+        />
 
-            // Services props
-            showServiceForm={showServiceForm}
-            setShowServiceForm={setShowServiceForm}
-            selectedServiceType={selectedServiceType}
-            setSelectedServiceType={setSelectedServiceType}
-            completedServices={completedServices}
-            formData={serviceFormData}
-            setFormData={setServiceFormData}
-            handleCreateService={handleCreateService}
-            serviceTypes={SERVICE_TYPES}
+        <main className="flex-1 overflow-y-auto">
+          {/* ✅ FIX 2: was "p-8 max-w-7xl mx-auto" — max-w-7xl (1280px)
+              plus mx-auto centering left big empty gutters on both sides
+              on wider screens. Widened the cap and trimmed the padding
+              so this matches the fuller-width feel of the /dashboard
+              page. */}
+          <div className="px-4 md:px-6 py-8 max-w-[1600px] mx-auto">
+            <CurrentPage
+              // Profile props
+              mentorData={mentorData}
+              profilePhoto={profilePhoto}
+              isVerified={isVerified}
+              agreedToTerms={agreedToTerms}
+              agreedToCode={agreedToCode}
+              setProfilePhoto={setProfilePhoto}
+              setIsVerified={setIsVerified}
+              setAgreedToTerms={setAgreedToTerms}
+              setAgreedToCode={setAgreedToCode}
+              handlePhotoUpload={handlePhotoUpload}
 
-            sessions={sessions}
-          />
-        </div>
-      </main>
+              // Services props
+              showServiceForm={showServiceForm}
+              setShowServiceForm={setShowServiceForm}
+              selectedServiceType={selectedServiceType}
+              setSelectedServiceType={setSelectedServiceType}
+              completedServices={completedServices}
+              formData={serviceFormData}
+              setFormData={setServiceFormData}
+              handleCreateService={handleCreateService}
+              serviceTypes={SERVICE_TYPES}
+
+              sessions={sessions}
+            />
+          </div>
+        </main>
+      </div>
 
       {/* {showServiceForm && (
         <ServicePage

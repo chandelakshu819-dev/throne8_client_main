@@ -10,10 +10,19 @@ interface PageProps {
   }>
 }
 
-export const metadata: Metadata = {
-  title: "Dhananjay Sharma – Mentor Profile",
-  description: "Book 1:1 sessions, download resources, and get career guidance.",
-};
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { mentorname } = await params;
+
+  const displayName = decodeURIComponent(mentorname)
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+  return {
+    title: `${displayName} – Mentor Profile`,
+    description: "Book 1:1 sessions, download resources, and get career guidance.",
+  };
+}
 
 const page = async ({ params }: PageProps) => {
   const { mentorname, mentorid } = await params;

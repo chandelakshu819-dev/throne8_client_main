@@ -97,6 +97,27 @@ class ProfileService {
         }
     }
 
+        /**
+     * 📸 Get Active Cover Photo by User ID (Public — for viewing other profiles)
+     */
+    static async getActiveCoverPhotoByUserId(userId: string): Promise<any> {
+        try {
+            console.log('📸 [GET_ACTIVE_COVER_BY_USERID] Fetching active cover for user...', { userId });
+
+            const { data } = await api.get(`${config?.NEXT_PUBLIC_COVER_PHOTO_ENDPOINT || process.env.NEXT_PUBLIC_COVER_PHOTO_ENDPOINT}/user/${userId}/active`);
+
+            console.log('✅ [GET_ACTIVE_COVER_BY_USERID] Fetched', {
+                coverUrl: data.data?.cover?.cloudinarySecureUrl,
+            });
+
+            return data;
+
+        } catch (error: any) {
+            console.error('❌ [GET_ACTIVE_COVER_BY_USERID] Failed to fetch active cover', error);
+            // Don't throw — gradient fallback should kick in on the UI side
+            return null;
+        }
+    }
     /**
     * 🔄 Update Cover Photo (Replace existing)
     */

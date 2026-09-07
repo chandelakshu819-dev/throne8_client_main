@@ -607,6 +607,44 @@ class CompanyService {
             throw new Error(error.response?.data?.message || 'Failed to get followers count');
         }
     }
+
+    // Update company details (partial update)
+    static async updateCompany(companyId: string, payload: any): Promise<any> {
+        try {
+            const { data } = await api.patch(
+                `${config.NEXT_PUBLIC_COMPANY_COMPANIES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_COMPANIES_ENDPOINT || '/company/companies'}/${companyId}`,
+                payload
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to update company profile');
+        }
+    }
+
+    // Request or toggle company verification
+    static async verifyCompany(companyId: string): Promise<any> {
+        try {
+            const { data } = await api.patch(
+                `${config.NEXT_PUBLIC_COMPANY_COMPANIES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_COMPANIES_ENDPOINT || '/company/companies'}/${companyId}/verify`
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to update verification status');
+        }
+    }
+
+    // Update company social links specifically
+    static async updateCompanySocialLinks(companyId: string, socialLinks: any): Promise<any> {
+        try {
+            const { data } = await api.patch(
+                `${config.NEXT_PUBLIC_COMPANY_COMPANIES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_COMPANIES_ENDPOINT || '/company/companies'}/${companyId}/social`,
+                { socialLinks }
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to update social links');
+        }
+    }
 }
 
 export default CompanyService;

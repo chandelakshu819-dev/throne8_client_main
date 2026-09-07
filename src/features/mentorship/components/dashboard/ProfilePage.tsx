@@ -56,6 +56,19 @@ export default function ProfilePage({
   const [approvalStatus, setApprovalStatus] = useState<'idle' | 'pending' | 'approved' | 'submitting'>('idle');
   const [showUpdateModal, setShowUpdateModal] = useState(false);
 
+  // ✅ FIX: was hardcoded "1,234 views" for every mentor. Now reads the
+  // real count from mentorData, trying a few likely field-name shapes
+  // (top-level, nested under analytics, or nested under stats) and
+  // falling back to 0 if the backend doesn't send it yet.
+  // 👉 Once you confirm the exact field name from your console.log
+  // ("👤 Mentor Data in Dashboard-:"), simplify this to just that one
+  // path — e.g. mentorData?.profileViews ?? 0.
+  const profileViews =
+    mentorData?.profileViews ??
+    mentorData?.analytics?.views ??
+    mentorData?.stats?.profileViews ??
+    0;
+
   // Component mount par mentor ka current status check karo
   useEffect(() => {
     if (mentorData?.status === 'active') {
@@ -67,6 +80,22 @@ export default function ProfilePage({
 
   // Calculate if all verifications are complete
   const allVerified = Object.values(verificationStatuses).every(Boolean);
+
+  // ✅ FIX: "Verified Badge Status" used to be a plain checkbox the user
+  // could toggle on/off with no backend connection at all — anyone could
+  // fake it. Now it's derived from real data: prefer a persisted badge
+  // flag from mentorData if the backend sends one, otherwise fall back
+  // to allVerified (all four checks — email/phone/identity/professional
+  // — actually completed). It's no longer user-editable; setIsVerified
+  // is only called here, automatically, when the real status changes.
+  // 👉 If your backend does send an explicit badge field (e.g.
+  // mentorData.verifiedBadge), confirm the exact name and this can drop
+  // the allVerified fallback.
+  const badgeVerified = mentorData?.verifiedBadge ?? mentorData?.isVerified ?? allVerified;
+
+  useEffect(() => {
+    setIsVerified(badgeVerified);
+  }, [badgeVerified]);
 
   const handleRequestApproval = async () => {
     if (!allVerified || !agreedToCode) return;
@@ -138,7 +167,7 @@ export default function ProfilePage({
           <div className="flex items-center gap-2 px-4 py-2 rounded-xl" style={{ backgroundColor: "#fbf7f3", border: "2px solid #e0d8cf" }}>
             <Eye className="w-5 h-5" style={{ color: "#7a5c3e" }} />
             <span className="font-bold" style={{ color: "#4a3728" }}>
-              1,234 views
+              {Number(profileViews).toLocaleString()} views
             </span>
           </div>
         </div>
@@ -174,16 +203,19 @@ export default function ProfilePage({
                 <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
               </label>
               <div className="flex items-center gap-2 mt-4">
+                {/* Read-only now — reflects real verification status
+                    (see badgeVerified above), can't be faked by clicking. */}
                 <input
                   type="checkbox"
                   checked={isVerified}
-                  onChange={(e) => setIsVerified(e.target.checked)}
-                  className="w-5 h-5 rounded cursor-pointer"
+                  readOnly
+                  disabled
+                  className="w-5 h-5 rounded cursor-not-allowed"
                   style={{ accentColor: '#4a3728' }}
                 />
-                <label className="font-semibold flex items-center gap-2 cursor-pointer" style={{ color: '#7a5c3e' }}>
+                <label className="font-semibold flex items-center gap-2" style={{ color: '#7a5c3e' }}>
                   <ShieldCheck className="w-5 h-5" />
-                  Verified Badge Status
+                  {isVerified ? 'Verified Badge Active' : 'Verified Badge — Complete all verifications below to unlock'}
                 </label>
               </div>
             </div>
