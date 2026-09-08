@@ -169,8 +169,8 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                         ))}
                     </div>
 
-                    {/* Socials */}
-                    <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "20px" }}>
+                                    {/* Socials */}
+                                    <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "20px", flexWrap: "wrap" }}>
                         {linkedinUrl !== "#" && (
                             <a href={linkedinUrl} target="_blank" rel="noopener noreferrer">
                                 <button style={{ padding: "8px 18px", borderRadius: "8px", background: C.border, border: "none", cursor: "pointer", color: C.dark, fontWeight: "bold" }}>in</button>
@@ -179,6 +179,12 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                         {mentorData?.socialProof?.githubUrl && (
                             <a href={mentorData.socialProof.githubUrl} target="_blank" rel="noopener noreferrer">
                                 <button style={{ padding: "8px 18px", borderRadius: "8px", background: C.border, border: "none", cursor: "pointer", color: C.dark, fontWeight: "bold" }}>GitHub</button>
+                            </a>
+                        )}
+                        {/* ✅ FIX: Portfolio URL ka button add kiya — pehle missing tha */}
+                        {mentorData?.socialProof?.portfolioUrl && (
+                            <a href={mentorData.socialProof.portfolioUrl} target="_blank" rel="noopener noreferrer">
+                                <button style={{ padding: "8px 18px", borderRadius: "8px", background: C.border, border: "none", cursor: "pointer", color: C.dark, fontWeight: "bold" }}>Portfolio</button>
                             </a>
                         )}
                     </div>

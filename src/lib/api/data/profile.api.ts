@@ -3,11 +3,12 @@ import AuthService from '@/lib/api/auth.service';
 import ProfileService from '../profile.service';
 
 export const profileApi = {
-    // ✅ CHANGED: userId lekar getUserProfileById use karo — ye poora
-    // profile (firstName, lastName, profilePhotoId, headlineId) deta hai,
-    // getUserProfile() sirf account-level data deta tha
+      // ✅ FIXED: getUserProfileById(userId) galat/limited data deta tha
+    // (sirf userId, emailVerified, _meta). getUserProfile() (no userId)
+    // poora profile deta hai — firstName, lastName, profilePhotoId,
+    // coverPhotoId, headlineId, sab kuch.
     async fetchUserProfile(userId: string) {
-        const response = await AuthService.getUserProfileById(userId);
+        const response = await AuthService.getUserProfile();
         return response.data;
     },
 

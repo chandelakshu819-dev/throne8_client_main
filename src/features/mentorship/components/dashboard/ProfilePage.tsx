@@ -43,8 +43,14 @@ export default function ProfilePage({
   setAgreedToCode,
   handlePhotoUpload,
 }: ProfilePageProps) {
-  const user = mentorData?.user;
-  const exp = mentorData?.experience;
+  // ✅ FIX: local override state — save hone ke turant baad UI update ho, refresh na karna pade
+  const [liveMentorData, setLiveMentorData] = useState(mentorData);
+  useEffect(() => {
+    setLiveMentorData(mentorData);
+  }, [mentorData]);
+
+  const user = liveMentorData?.user;
+  const exp = liveMentorData?.experience;
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [verificationStatuses, setVerificationStatuses] = useState({
@@ -57,41 +63,29 @@ export default function ProfilePage({
   const [showUpdateModal, setShowUpdateModal] = useState(false);
 
   // ✅ FIX: was hardcoded "1,234 views" for every mentor. Now reads the
-  // real count from mentorData, trying a few likely field-name shapes
+  // real count from liveMentorData, trying a few likely field-name shapes
   // (top-level, nested under analytics, or nested under stats) and
   // falling back to 0 if the backend doesn't send it yet.
-  // 👉 Once you confirm the exact field name from your console.log
-  // ("👤 Mentor Data in Dashboard-:"), simplify this to just that one
-  // path — e.g. mentorData?.profileViews ?? 0.
   const profileViews =
-    mentorData?.profileViews ??
-    mentorData?.analytics?.views ??
-    mentorData?.stats?.profileViews ??
+    liveMentorData?.profileViews ??
+    liveMentorData?.analytics?.views ??
+    liveMentorData?.stats?.profileViews ??
     0;
 
-  // Component mount par mentor ka current status check karo
+  // Component mount / update par mentor ka current status check karo
   useEffect(() => {
-    if (mentorData?.status === 'active') {
+    if (liveMentorData?.status === 'active') {
       setApprovalStatus('approved');
-    } else if (mentorData?.status === 'pending_approval') {
+    } else if (liveMentorData?.status === 'pending_approval') {
       setApprovalStatus('pending');
     }
-  }, [mentorData]);
+  }, [liveMentorData]);
 
   // Calculate if all verifications are complete
   const allVerified = Object.values(verificationStatuses).every(Boolean);
 
-  // ✅ FIX: "Verified Badge Status" used to be a plain checkbox the user
-  // could toggle on/off with no backend connection at all — anyone could
-  // fake it. Now it's derived from real data: prefer a persisted badge
-  // flag from mentorData if the backend sends one, otherwise fall back
-  // to allVerified (all four checks — email/phone/identity/professional
-  // — actually completed). It's no longer user-editable; setIsVerified
-  // is only called here, automatically, when the real status changes.
-  // 👉 If your backend does send an explicit badge field (e.g.
-  // mentorData.verifiedBadge), confirm the exact name and this can drop
-  // the allVerified fallback.
-  const badgeVerified = mentorData?.verifiedBadge ?? mentorData?.isVerified ?? allVerified;
+  // ✅ FIX: "Verified Badge Status" — derived from real data now.
+  const badgeVerified = liveMentorData?.verifiedBadge ?? liveMentorData?.isVerified ?? allVerified;
 
   useEffect(() => {
     setIsVerified(badgeVerified);
@@ -182,8 +176,8 @@ export default function ProfilePage({
           <div className="flex items-center gap-8">
             <div className="relative group">
               <div className="w-32 h-32 rounded-2xl overflow-hidden shadow-lg group-hover:shadow-2xl transition-all duration-300" style={{ border: '4px solid #e0d8cf' }}>
-                {(profilePhoto || mentorData?.profilePic) ? (
-                  <img src={profilePhoto || mentorData?.profilePic} alt="Profile" className="w-full h-full object-cover" />
+                {(profilePhoto || liveMentorData?.profilePic) ? (
+                  <img src={profilePhoto || liveMentorData?.profilePic} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-[#4a3728]">
                     <span className="text-5xl font-bold text-white">
@@ -231,7 +225,7 @@ export default function ProfilePage({
               className="text-base font-bold mb-6 px-5 py-2 rounded-xl text-white transition-all hover:opacity-90"
               style={{ backgroundColor: "#4a3728" }}
             >
-              ✏️ Update Full Profile
+               Update Full Profile
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -247,18 +241,18 @@ export default function ProfilePage({
             {/* Status Badge */}
             <div className="p-4 rounded-2xl" style={{ backgroundColor: "#fbf7f3", border: "1.5px solid #e0d8cf" }}>
               <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "#a08070" }}>Account Status</p>
-              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${mentorData?.status === "active"
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${liveMentorData?.status === "active"
                   ? "bg-green-100 text-green-700"
-                  : mentorData?.status === "pending_approval"
+                  : liveMentorData?.status === "pending_approval"
                     ? "bg-yellow-100 text-yellow-700"
                     : "bg-gray-100 text-gray-600"
                 }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${mentorData?.status === "active" ? "bg-green-500" :
-                    mentorData?.status === "pending_approval" ? "bg-yellow-500" : "bg-gray-400"
+                <span className={`w-1.5 h-1.5 rounded-full ${liveMentorData?.status === "active" ? "bg-green-500" :
+                    liveMentorData?.status === "pending_approval" ? "bg-yellow-500" : "bg-gray-400"
                   }`} />
-                {mentorData?.status === "active" ? "Active" :
-                  mentorData?.status === "pending_approval" ? "Pending Approval" :
-                    mentorData?.status ?? "—"}
+                {liveMentorData?.status === "active" ? "Active" :
+                  liveMentorData?.status === "pending_approval" ? "Pending Approval" :
+                    liveMentorData?.status ?? "—"}
               </span>
             </div>
 
@@ -266,7 +260,7 @@ export default function ProfilePage({
             <div className="md:col-span-2 p-4 rounded-2xl" style={{ backgroundColor: "#fbf7f3", border: "1.5px solid #e0d8cf" }}>
               <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "#a08070" }}>Mentor Title</p>
               <p className="text-base font-semibold leading-snug" style={{ color: "#4a3728" }}>
-                {mentorData?.title || <span className="italic text-[#c0b0a0]">Not set</span>}
+                {liveMentorData?.title || <span className="italic text-[#c0b0a0]">Not set</span>}
               </p>
             </div>
 
@@ -296,9 +290,9 @@ export default function ProfilePage({
             {/* Domains — full width */}
             <div className="md:col-span-2 p-4 rounded-2xl" style={{ backgroundColor: "#fbf7f3", border: "1.5px solid #e0d8cf" }}>
               <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#a08070" }}>Domains</p>
-              {mentorData?.domains?.length > 0 ? (
+              {liveMentorData?.domains?.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {mentorData.domains.map((d: string) => (
+                  {liveMentorData.domains.map((d: string) => (
                     <span key={d} className="px-3 py-1 rounded-full text-xs font-bold text-white" style={{ backgroundColor: "#4a3728" }}>
                       {d.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}
                     </span>
@@ -310,9 +304,9 @@ export default function ProfilePage({
             {/* Skills — full width */}
             <div className="md:col-span-2 p-4 rounded-2xl" style={{ backgroundColor: "#fbf7f3", border: "1.5px solid #e0d8cf" }}>
               <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#a08070" }}>Skills</p>
-              {mentorData?.skills?.length > 0 ? (
+              {liveMentorData?.skills?.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {mentorData.skills.map((s: string) => (
+                  {liveMentorData.skills.map((s: string) => (
                     <span key={s} className="px-3 py-1 rounded-xl text-xs font-semibold" style={{ backgroundColor: "#ece7e2", color: "#4a3728" }}>
                       {s}
                     </span>
@@ -325,7 +319,7 @@ export default function ProfilePage({
             <div className="md:col-span-2 p-4 rounded-2xl" style={{ backgroundColor: "#fbf7f3", border: "1.5px solid #e0d8cf" }}>
               <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#a08070" }}>About Me</p>
               <p className="text-sm leading-relaxed" style={{ color: "#5a4535" }}>
-                {mentorData?.bio || <span className="italic text-[#c0b0a0]">No bio added yet</span>}
+                {liveMentorData?.bio || <span className="italic text-[#c0b0a0]">No bio added yet</span>}
               </p>
             </div>
           </div>
@@ -548,11 +542,12 @@ export default function ProfilePage({
       <UpdateProfileModal
         isOpen={showUpdateModal}
         onClose={() => setShowUpdateModal(false)}
-        mentorData={mentorData}
-        mentorId={mentorData?.mentorId ?? ""}
+        mentorData={liveMentorData}
+        mentorId={liveMentorData?.mentorId ?? ""}
         onUpdateSuccess={(updated) => {
-          // mentorData refresh — parent se refetch karo ya local update
+          // ✅ FIX: turant local state update — page refresh ki zarurat nahi
           console.log("✅ Profile updated:", updated);
+          setLiveMentorData((prev: any) => ({ ...prev, ...updated }));
           setShowUpdateModal(false);
         }}
       />
