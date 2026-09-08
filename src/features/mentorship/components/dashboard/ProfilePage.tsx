@@ -6,7 +6,7 @@ import {
   MapPin,
   FileText,
   Linkedin,
-  Instagram,
+  Github,
   Sparkles,
   CheckCircle,
   ShieldCheck,
@@ -329,23 +329,27 @@ export default function ProfilePage({
         <div className="bg-white p-8 rounded-2xl shadow-xl transform hover:shadow-2xl transition-all duration-300" style={{ border: '2px solid #e0d8cf' }}>
           <h3 className="text-xl font-bold mb-6" style={{ color: '#4a3728' }}>Social Media Integration</h3>
           <div className="space-y-4">
-            <div className="flex items-center gap-4 p-4 rounded-xl border-2 hover:shadow-lg transition-all duration-300" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
-              <Linkedin className="w-8 h-8 text-blue-600" />
+          <div className="flex items-center gap-4 p-4 rounded-xl border-2 hover:shadow-lg transition-all duration-300" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
+          <div className="w-8 h-8 rounded-lg bg-white border flex items-center justify-center flex-shrink-0" style={{ borderColor: '#e0d8cf' }}>
+                <Linkedin className="w-5 h-5 text-blue-600" />
+              </div>
               <div className="flex-1">
                 <p className="font-semibold" style={{ color: '#4a3728' }}>LinkedIn Profile</p>
                 <p className="text-sm" style={{ color: '#8a7a6a' }}>Connect your LinkedIn account</p>
               </div>
-              <button className="px-6 py-2 rounded-lg font-semibold shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-300 bg-blue-600 text-white">
+              <button className="px-6 py-2 rounded-lg font-semibold shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-300 text-white bg-[#4a3728] hover:bg-[#3a2b1f]">
                 Connect
               </button>
             </div>
             <div className="flex items-center gap-4 p-4 rounded-xl border-2 hover:shadow-lg transition-all duration-300" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
-              <Instagram className="w-8 h-8 text-black" />
+            <div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center flex-shrink-0" style={{ borderColor: '#e0d8cf' }}>
+                <Github className="w-5 h-5 text-black" />
+              </div>
               <div className="flex-1">
                 <p className="font-semibold" style={{ color: '#4a3728' }}>github</p>
                 <p className="text-sm" style={{ color: '#8a7a6a' }}>Link your gitbub account</p>
               </div>
-              <button className="px-6 py-2 rounded-lg font-semibold shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-300 text-white" style={{ background: 'linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%)' }}>
+              <button className="px-6 py-2 rounded-lg font-semibold shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-300 text-white bg-[#4a3728] hover:bg-[#3a2b1f]">
                 Connect
               </button>
             </div>
