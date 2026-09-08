@@ -155,35 +155,41 @@ class CompanyService {
         email: string;
         company: string;
         designation: string;
-        department: string;
+        department?: string;
         joinDate: string;
-        skills: string[];
-        bio: string;
+        skills?: string[];
+        bio?: string;
+        phone?: string;
     }): Promise<any> {
         try {
-            const { data } = await api.post(`${config.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT}/create`, employeeData);
+            const base = config.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || '/company/employees';
+            const { data } = await api.post(`${base}/create`, employeeData);
             return data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to create employee');
+            const msg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to create employee';
+            throw new Error(msg);
         }
     }
 
     static async getEmployeeById(employeeId: string): Promise<any> {
         try {
-            const { data } = await api.get(`${config.NEXT_PUBLIC_COMPANY_EMPLOYEE_GET_BY_ID_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEE_GET_BY_ID_ENDPOINT}/${employeeId}`);
+            const base = config.NEXT_PUBLIC_COMPANY_EMPLOYEE_GET_BY_ID_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEE_GET_BY_ID_ENDPOINT || '/company/employees';
+            const { data } = await api.get(`${base}/get-employee-by-id/${employeeId}`);
             return data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to fetch employee');
+            const msg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to fetch employee';
+            throw new Error(msg);
         }
     }
 
-    static async getAllEmployees(companyId: string): Promise<any> {
+    static async getAllEmployees(companyId: string, params?: { page?: number; pageSize?: number; search?: string }): Promise<any> {
         try {
-            const { data } = await api.get(`${config.NEXT_PUBLIC_COMPANY_EMPLOYEES_COMPANIES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEES_COMPANIES_ENDPOINT}/${companyId}`);
-            // console.log('✅ getAllEmployees result:', data);
+            const base = config.NEXT_PUBLIC_COMPANY_EMPLOYEES_COMPANIES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEES_COMPANIES_ENDPOINT || '/company/employees';
+            const { data } = await api.get(`${base}/${companyId}`, { params });
             return data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to fetch employees');
+            const msg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to fetch employees';
+            throw new Error(msg);
         }
     }
 
@@ -195,43 +201,52 @@ class CompanyService {
         joinDate: string;
         skills: string[];
         bio: string;
+        phone: string;
+        isActive: boolean;
     }>): Promise<any> {
         try {
-            const { data } = await api.put(`${config.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT}/${employeeId}`, employeeData);
+            const base = config.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || '/company/employees';
+            const { data } = await api.patch(`${base}/${employeeId}`, employeeData);
             return data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to update employee');
+            const msg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to update employee';
+            throw new Error(msg);
         }
     }
 
     static async deleteEmployee(employeeId: string): Promise<any> {
         try {
-            const { data } = await api.delete(`${config.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT}/${employeeId}`);
+            const base = config.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || '/company/employees';
+            const { data } = await api.delete(`${base}/${employeeId}`);
             return data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to delete employee');
+            const msg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to delete employee';
+            throw new Error(msg);
         }
     }
 
     static async toggleEmployeeStatus(employeeId: string): Promise<any> {
         try {
-            const { data } = await api.patch(`${config.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT}/${employeeId}/status`);
+            const base = config.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || '/company/employees';
+            const { data } = await api.patch(`${base}/${employeeId}/status`);
             return data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to toggle employee status');
+            const msg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to toggle employee status';
+            throw new Error(msg);
         }
     }
 
-    // toggleEmployeeStatus ke baad add karo
     static async toggleEmployeeAdvocacy(companyId: string, employeeId: string, isAdvocate: boolean): Promise<any> {
         try {
+            const base = config.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEES_ENDPOINT || '/company/employees';
             const { data } = await api.patch(
-                `${config.NEXT_PUBLIC_COMPANY_EMPLOYEE_ADVOCACY_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_EMPLOYEE_ADVOCACY_ENDPOINT}/${companyId}/${employeeId}`,
+                `${base}/advocacy/${companyId}/${employeeId}`,
                 { isAdvocate }
             );
             return data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to toggle employee advocacy');
+            const msg = error.response?.data?.message || error.response?.data?.error || error.message || 'Failed to toggle employee advocacy';
+            throw new Error(msg);
         }
     }
 
