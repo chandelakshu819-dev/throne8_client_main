@@ -446,7 +446,19 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                 <div className="flex gap-2 justify-center md:justify-start flex-wrap mt-2">
                                 {currentUserId && isMentor && (
                                         <button
-                                            onClick={() => router.push(routes.mentorCard(name, mentorId || currentUserId))}
+                                            onClick={() => {
+                                                // ✅ FIX: apni profile dekhte waqt "Mentor Profile"
+                                                // button ab edit page (Create/Edit Profile) kholta
+                                                // hai — pehle ye hardcoded mentorCard route pe hi
+                                                // ja raha tha chahe apni profile ho ya kisi aur ki,
+                                                // isliye khud ka profile dekhte hue bhi galat (public
+                                                // mentor-card) view khul raha tha.
+                                                if (isOwnProfile) {
+                                                    router.push(routes.mentorEditProfile(currentUserId));
+                                                } else {
+                                                    router.push(routes.mentorCard(name, mentorId || currentUserId));
+                                                }
+                                            }}
                                             className="connectionsShowButton group px-3 py-1.5 bg-white text-[#4a3728] rounded-full text-xs shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-1.5 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white"
                                         >
                                             <svg className="w-4 h-4 text-[#4a3728]" fill="none" stroke="currentColor" viewBox="0 0 24 24">

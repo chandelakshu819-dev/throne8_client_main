@@ -10,6 +10,7 @@ export const routes = {
     `/mentorship/mentor-card/${encodeURIComponent(
       (mentorName || "mentor").trim().toLowerCase().replace(/\s+/g, "-")
     )}/${mentorId}`,
+  mentorEditProfile: (userId: string) => `/mentorship/mentorProfile/${userId}`,
   login: "/login",
   signup: "/signup",
 } as const;
