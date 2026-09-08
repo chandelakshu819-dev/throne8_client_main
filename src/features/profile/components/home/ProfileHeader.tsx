@@ -13,6 +13,7 @@ import { useConnectionsData } from '@/features/profile/hooks/useConnectionsData'
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import ConnectionService from '@/lib/api/connection.service';
 import MentorService from '@/lib/api/mentorship.service';
+import { routes } from '@/config/routes';
 import TrustScoreBadge from './TrustScoreBadge';
 import StudyStreakBadge from './StudyStreakBadge';
 
@@ -139,28 +140,46 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     // must stay hidden for everyone else — showing a mentorship link on a
     // non-mentor's profile makes no sense and used to always show up.
     const [isMentor, setIsMentor] = useState(false);
+    const [mentorId, setMentorId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!currentUserId) {
             setIsMentor(false);
+            setMentorId(null);
             return;
         }
 
         let cancelled = false;
 
         MentorService.getMentorByUserId(currentUserId)
-            .then(() => {
-                if (!cancelled) setIsMentor(true);
+            .then((res: any) => {
+                if (cancelled) return;
+                setIsMentor(true);
+                // ✅ FIX: backend response se actual mentorId nikal ke store karo —
+                // pehle sirf isMentor=true set hota tha aur mentorId discard ho jata
+                // tha, isliye "Mentor Profile" button hamesha currentUserId (galat
+                // route: mentorProfile edit page) pe redirect karta tha instead of
+                // public mentor-card page.
+                                     // MentorService.getMentorByUserId() returns the full MentorResponse
+                // envelope: { success, message, data: { mentorId, userId, ... } }
+                // (confirmed via mentorship.service.ts createMentor's `data.data?.mentorId` log).
+                // So the actual mentorId lives at res.data.mentorId.
+                const id = res?.data?.mentorId || null;
+                setMentorId(id);
             })
             .catch(() => {
                 // 404 / not found → this user has no mentor profile yet
-                if (!cancelled) setIsMentor(false);
+                if (!cancelled) {
+                    setIsMentor(false);
+                    setMentorId(null);
+                }
             });
 
         return () => {
             cancelled = true;
         };
     }, [currentUserId]);
+
 
     useEffect(() => {
         if (profileImage && profileImage.trim() !== '') {
@@ -425,9 +444,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                                                                        {/* website button moved to mentorship row below */}
                                 </div>
                                 <div className="flex gap-2 justify-center md:justify-start flex-wrap mt-2">
-                                    {currentUserId && isMentor && (
+                                {currentUserId && isMentor && (
                                         <button
-                                            onClick={() => router.push(`/mentorship/mentorProfile/${currentUserId}`)}
+                                            onClick={() => router.push(routes.mentorCard(name, mentorId || currentUserId))}
                                             className="connectionsShowButton group px-3 py-1.5 bg-white text-[#4a3728] rounded-full text-xs shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-1.5 border border-[#e0d8cf] hover:scale-105 hover:bg-gradient-to-r hover:from-[#f6ede8] hover:to-white"
                                         >
                                             <svg className="w-4 h-4 text-[#4a3728]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
