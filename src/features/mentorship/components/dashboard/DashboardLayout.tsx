@@ -13,6 +13,8 @@ type ServiceType = {
 import { MessageCircle, Wrench, GraduationCap, Dumbbell, CheckSquare } from "lucide-react";
 
 import Sidebar from "./Sidebar";
+import DashboardOverviewPage from "./DashboardOverviewPage";
+import NotificationPage from "./NotificationPage";
 import ProfilePage from "./ProfilePage";
 import ServicesPage from "./ServicesPage";
 import BookingsPage from "./BookingsPage";
@@ -36,7 +38,9 @@ const SERVICE_TYPES: ServiceType[] = [
 ];
 
 const pageComponents: Record<string, React.FC<any>> = {
+  dashboard: DashboardOverviewPage,
   profile: ProfilePage,
+  notification: NotificationPage,
   services: ServicesPage,
   booking: BookingsPage,
   availability: AvailabilityPage,
@@ -51,7 +55,7 @@ const pageComponents: Record<string, React.FC<any>> = {
 export default function MentorDashboard(
   { userId }: { userId: string }
 ) {
-  const [activePage, setActivePage] = useState("profile");
+  const [activePage, setActivePage] = useState("dashboard");
 
   // ── Profile states ────────────────────────────────────────
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
@@ -132,7 +136,7 @@ export default function MentorDashboard(
     setSelectedServiceType(null);
   };
 
-  const CurrentPage = pageComponents[activePage] || ProfilePage;
+  const CurrentPage = pageComponents[activePage] || DashboardOverviewPage;
 
   console.log("👤 Mentor Data in Dashboard-:", mentorData);
 
@@ -163,6 +167,9 @@ export default function MentorDashboard(
               page. */}
           <div className="px-4 md:px-6 py-8 max-w-[1600px] mx-auto">
             <CurrentPage
+              // Navigation (used by Dashboard overview quick actions)
+              setActivePage={setActivePage}
+
               // Profile props
               mentorData={mentorData}
               profilePhoto={profilePhoto}

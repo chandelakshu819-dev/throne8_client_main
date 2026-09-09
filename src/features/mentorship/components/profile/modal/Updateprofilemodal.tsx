@@ -1,6 +1,5 @@
 "use client";
 
-
 import React, { useState, useEffect, useRef } from "react";
 import {
     X, Save, User, Code2, Globe,
@@ -45,12 +44,12 @@ interface UpdateProfileModalProps {
 type TabKey = "basic" | "expertise" | "social";
 
 const inputCls =
-    "w-full px-4 py-3 rounded-xl border-2 text-sm font-medium text-[#4a3728] outline-none transition-all focus:ring-2 focus:ring-[#4a3728]/20 focus:border-[#4a3728] bg-white border-[#e0d8cf] placeholder:text-[#b0a090]";
+    "w-full px-3.5 py-2.5 rounded-xl border text-sm font-medium text-[#4a3728] outline-none transition-colors focus:border-[#4a3728] bg-white border-[#e0d8cf] placeholder:text-[#b0a090]";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div className="space-y-1.5">
-            <label className="block text-sm font-bold" style={{ color: "#4a3728" }}>
+            <label className="block text-xs font-bold" style={{ color: "#4a3728" }}>
                 {label}
             </label>
             {children}
@@ -79,10 +78,8 @@ export default function UpdateProfileModal({
     const [domainOpen, setDomainOpen] = useState(false);
     const domainDropdownRef = useRef<HTMLDivElement>(null);
 
-    // ✅ FIX: dropdown ab bahar click karne par close ho jayega — pehle
-    // koi outside-click listener nahi tha isliye domain select karne ke
-    // baad bhi list khuli reh jaati thi jab tak dobara trigger button na
-    // dabao.
+    // Dropdown only closes on an explicit outside click — never on
+    // selecting an option, so multiple domains can be picked one by one.
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (domainDropdownRef.current && !domainDropdownRef.current.contains(event.target as Node)) {
@@ -94,7 +91,18 @@ export default function UpdateProfileModal({
         }
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [domainOpen]);
-    
+
+    // ✅ FIX: lock background page scroll while the modal is open — this
+    // was the cause of the "2 scrollbars" issue (page behind + modal body
+    // both scrollable at once).
+    useEffect(() => {
+        if (isOpen) {
+            const original = document.body.style.overflow;
+            document.body.style.overflow = "hidden";
+            return () => { document.body.style.overflow = original; };
+        }
+    }, [isOpen]);
+
     const [linkedinUrl, setLinkedinUrl] = useState("");
     const [githubUrl, setGithubUrl] = useState("");
     const [portfolioUrl, setPortfolioUrl] = useState("");
@@ -126,7 +134,11 @@ export default function UpdateProfileModal({
     if (!isOpen) return null;
 
     // ── Helpers ──────────────────────────────────────────────
-    const toggleDomain = (val: string) => {
+    // NOTE: this never touches domainOpen — selecting/deselecting a
+    // domain must never close the dropdown.
+    const toggleDomain = (val: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
         setDomains((prev) =>
             prev.includes(val)
                 ? prev.filter((d) => d !== val)
@@ -211,44 +223,41 @@ export default function UpdateProfileModal({
 
     return (
         <div
-            className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-[300] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
             onClick={onClose}
         >
             <div
-                className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl overflow-hidden shadow-2xl"
+                className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl overflow-hidden shadow-xl"
                 style={{ backgroundColor: "#fdf9f6" }}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* ── Header ── */}
                 <div
-                    className="relative px-8 pt-8 pb-0 flex-shrink-0 overflow-hidden"
-                    style={{ background: "linear-gradient(135deg, #4a3728 0%, #7a5c3e 100%)" }}
+                    className="relative px-6 pt-6 pb-0 flex-shrink-0"
+                    style={{ background: "linear-gradient(135deg, #4a3728 0%, #6b503a 100%)" }}
                 >
-                    <div className="absolute -top-6 -right-6 w-36 h-36 rounded-full bg-white/10" />
-                    <div className="absolute bottom-0 -left-4 w-20 h-20 rounded-full bg-white/5" />
-
-                    <div className="relative flex items-start justify-between mb-6">
+                    <div className="relative flex items-start justify-between mb-5">
                         <div>
-                            <h2 className="text-2xl font-black text-white tracking-tight">Update Profile</h2>
-                            <p className="text-white/65 text-sm mt-1">All fields are pre-filled from your current profile</p>
+                            <h2 className="text-xl font-bold text-white">Update Profile</h2>
+                            <p className="text-white/60 text-xs mt-1">All fields are pre-filled from your current profile</p>
                         </div>
                         <button
                             onClick={onClose}
-                            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center text-white transition-all mt-0.5"
+                            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors mt-0.5"
                         >
                             <X className="w-4 h-4" />
                         </button>
                     </div>
 
                     {/* Tabs */}
-                    <div className="relative flex gap-1 bg-white/10 p-1 rounded-t-2xl">
+                    <div className="relative flex gap-1 bg-white/10 p-1 rounded-t-xl">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
-                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-200 ${activeTab === tab.key
-                                        ? "bg-white text-[#4a3728] shadow"
-                                        : "text-white/65 hover:text-white"
+                                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-semibold transition-colors duration-150 ${activeTab === tab.key
+                                    ? "bg-white text-[#4a3728]"
+                                    : "text-white/60 hover:text-white"
                                     }`}
                             >
                                 {tab.icon}
@@ -258,26 +267,26 @@ export default function UpdateProfileModal({
                     </div>
                 </div>
 
-                {/* ── Scrollable Body ── */}
-                <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
+                {/* ── Scrollable Body — the ONLY scroll container ── */}
+                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
 
                     {/* Error / Success */}
                     {error && (
-                        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-red-50 border border-red-200">
-                            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                            <p className="text-sm text-red-600 font-medium">{error}</p>
+                        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-200">
+                            <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                            <p className="text-xs text-red-600 font-medium">{error}</p>
                         </div>
                     )}
                     {success && (
-                        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-green-50 border border-green-200">
-                            <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
-                            <p className="text-sm text-green-700 font-medium">Profile updated successfully! Closing...</p>
+                        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-green-50 border border-green-200">
+                            <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                            <p className="text-xs text-green-700 font-medium">Profile updated successfully! Closing...</p>
                         </div>
                     )}
 
                     {/* ── TAB: Basic Info ── */}
                     {activeTab === "basic" && (
-                        <div className="space-y-5">
+                        <div className="space-y-4">
                             <Field label="Mentor Title *">
                                 <input
                                     type="text"
@@ -312,7 +321,7 @@ export default function UpdateProfileModal({
 
                             <Field label={`Bio / About You * — ${bio.length} chars (min 50)`}>
                                 <textarea
-                                    rows={5}
+                                    rows={4}
                                     value={bio}
                                     onChange={(e) => setBio(e.target.value)}
                                     placeholder="Tell us about your journey, expertise, and what you love to mentor..."
@@ -327,12 +336,12 @@ export default function UpdateProfileModal({
 
                     {/* ── TAB: Expertise ── */}
                     {activeTab === "expertise" && (
-                        <div className="space-y-5">
-                                                       <Field label={`Domains * — ${domains.length}/5 selected`}>
+                        <div className="space-y-4">
+                            <Field label={`Domains * — ${domains.length}/5 selected`}>
                                 <div className="relative" ref={domainDropdownRef}>
                                     <button
                                         type="button"
-                                        onClick={() => setDomainOpen((p) => !p)}
+                                        onClick={(e) => { e.stopPropagation(); setDomainOpen((p) => !p); }}
                                         className={`${inputCls} flex items-center justify-between`}
                                     >
                                         <span className={domains.length ? "text-[#4a3728]" : "text-[#b0a090]"}>
@@ -344,7 +353,10 @@ export default function UpdateProfileModal({
                                     </button>
 
                                     {domainOpen && (
-                                        <div className="absolute z-50 w-full mt-1 bg-white border border-[#e0d8cf] rounded-2xl shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+                                        <div
+                                            className="absolute z-50 w-full mt-1 bg-white border border-[#e0d8cf] rounded-xl shadow-lg overflow-hidden max-h-52 overflow-y-auto"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
                                             {DOMAINS_OPTIONS.map((d) => {
                                                 const selected = domains.includes(d.value);
                                                 const disabled = !selected && domains.length >= 5;
@@ -353,8 +365,8 @@ export default function UpdateProfileModal({
                                                         key={d.value}
                                                         type="button"
                                                         disabled={disabled}
-                                                        onClick={() => toggleDomain(d.value)}
-                                                        className={`w-full px-4 py-2.5 text-left text-sm flex items-center justify-between transition-colors ${selected ? "bg-[#f8f4f0] text-[#4a3728] font-semibold" : "text-slate-600 hover:bg-[#fdf9f6]"
+                                                        onClick={(e) => toggleDomain(d.value, e)}
+                                                        className={`w-full px-3.5 py-2.5 text-left text-sm flex items-center justify-between transition-colors ${selected ? "bg-[#f3ece4] text-[#4a3728] font-semibold" : "text-slate-600 hover:bg-[#fdf9f6]"
                                                             } ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
                                                     >
                                                         {d.label}
@@ -371,9 +383,15 @@ export default function UpdateProfileModal({
                                         {domains.map((d) => {
                                             const label = DOMAINS_OPTIONS.find((o) => o.value === d)?.label ?? d;
                                             return (
-                                                <span key={d} className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold text-white" style={{ backgroundColor: "#4a3728" }}>
+                                                <span key={d} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: "#4a3728" }}>
                                                     {label}
-                                                    <button type="button" onClick={() => toggleDomain(d)} className="hover:text-red-300 ml-0.5">×</button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => toggleDomain(d, e)}
+                                                        className="hover:text-red-300 ml-0.5"
+                                                    >
+                                                        ×
+                                                    </button>
                                                 </span>
                                             );
                                         })}
@@ -394,7 +412,7 @@ export default function UpdateProfileModal({
                                     <button
                                         type="button"
                                         onClick={addSkill}
-                                        className="px-4 py-3 rounded-xl text-white font-bold transition-all hover:opacity-90 flex-shrink-0"
+                                        className="px-3.5 py-2.5 rounded-xl text-white font-bold transition-opacity hover:opacity-90 flex-shrink-0"
                                         style={{ backgroundColor: "#4a3728" }}
                                     >
                                         <Plus className="w-4 h-4" />
@@ -404,7 +422,7 @@ export default function UpdateProfileModal({
                                 {skills.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mt-3">
                                         {skills.map((skill) => (
-                                            <span key={skill} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: "#4a3728" }}>
+                                            <span key={skill} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ backgroundColor: "#4a3728" }}>
                                                 {skill}
                                                 <button type="button" onClick={() => setSkills((p) => p.filter((s) => s !== skill))} className="hover:text-red-300 ml-0.5">×</button>
                                             </span>
@@ -417,38 +435,38 @@ export default function UpdateProfileModal({
 
                     {/* ── TAB: Social Links ── */}
                     {activeTab === "social" && (
-                        <div className="space-y-5">
+                        <div className="space-y-4">
                             <Field label="LinkedIn URL *">
                                 <div className="relative">
-                                    <Linkedin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-600" />
-                                    <input type="url" value={linkedinUrl} onChange={(e) => setLinkedinUrl(e.target.value)} placeholder="https://linkedin.com/in/username" className={`${inputCls} pl-10`} />
+                                    <Linkedin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-600" />
+                                    <input type="url" value={linkedinUrl} onChange={(e) => setLinkedinUrl(e.target.value)} placeholder="https://linkedin.com/in/username" className={`${inputCls} pl-9`} />
                                 </div>
                             </Field>
 
                             <Field label="GitHub URL (optional)">
                                 <div className="relative">
-                                    <Github className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-700" />
-                                    <input type="url" value={githubUrl} onChange={(e) => setGithubUrl(e.target.value)} placeholder="https://github.com/username" className={`${inputCls} pl-10`} />
+                                    <Github className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-700" />
+                                    <input type="url" value={githubUrl} onChange={(e) => setGithubUrl(e.target.value)} placeholder="https://github.com/username" className={`${inputCls} pl-9`} />
                                 </div>
                             </Field>
 
                             <Field label="Portfolio / Website URL (optional)">
                                 <div className="relative">
-                                    <Link2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#7a5c3e]" />
-                                    <input type="url" value={portfolioUrl} onChange={(e) => setPortfolioUrl(e.target.value)} placeholder="https://yourportfolio.com" className={`${inputCls} pl-10`} />
+                                    <Link2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#7a5c3e]" />
+                                    <input type="url" value={portfolioUrl} onChange={(e) => setPortfolioUrl(e.target.value)} placeholder="https://yourportfolio.com" className={`${inputCls} pl-9`} />
                                 </div>
                             </Field>
 
                             {/* Links preview */}
-                            <div className="p-4 rounded-2xl border" style={{ backgroundColor: "#fbf7f3", borderColor: "#e0d8cf" }}>
-                                <p className="text-xs font-bold text-[#7a5c3e] mb-3 uppercase tracking-wide">Preview</p>
+                            <div className="p-3.5 rounded-xl border" style={{ backgroundColor: "#fbf7f3", borderColor: "#e0d8cf" }}>
+                                <p className="text-[11px] font-bold text-[#7a5c3e] mb-2.5 uppercase tracking-wide">Preview</p>
                                 <div className="space-y-2">
                                     {[
                                         { icon: <Linkedin className="w-4 h-4 text-blue-600" />, val: linkedinUrl, label: "LinkedIn" },
                                         { icon: <Github className="w-4 h-4 text-gray-700" />, val: githubUrl, label: "GitHub" },
                                         { icon: <Link2 className="w-4 h-4 text-[#7a5c3e]" />, val: portfolioUrl, label: "Portfolio" },
                                     ].map(({ icon, val, label }) => (
-                                        <div key={label} className="flex items-center gap-3">
+                                        <div key={label} className="flex items-center gap-2.5">
                                             {icon}
                                             <span className="text-sm text-[#4a3728] truncate">
                                                 {val || <span className="text-[#c0b0a0] italic text-xs">Not provided</span>}
@@ -463,13 +481,13 @@ export default function UpdateProfileModal({
 
                 {/* ── Footer ── */}
                 <div
-                    className="flex-shrink-0 px-8 py-4 flex items-center justify-between border-t"
+                    className="flex-shrink-0 px-6 py-3.5 flex items-center justify-between border-t"
                     style={{ borderColor: "#e0d8cf", backgroundColor: "#fdf9f6" }}
                 >
                     <button
                         onClick={onClose}
-                        className="px-5 py-2.5 rounded-xl font-semibold text-sm transition-all"
-                        style={{ color: "#7a5c3e", backgroundColor: "#f0ebe6" }}
+                        className="px-4 py-2 rounded-xl font-semibold text-sm transition-colors hover:bg-[#f0ebe6]"
+                        style={{ color: "#7a5c3e", backgroundColor: "#f5f0ea" }}
                     >
                         Cancel
                     </button>
@@ -478,7 +496,7 @@ export default function UpdateProfileModal({
                         {activeTab !== "basic" && (
                             <button
                                 onClick={() => goToTab(-1)}
-                                className="px-4 py-2.5 rounded-xl font-semibold text-sm border-2 transition-all"
+                                className="px-3.5 py-2 rounded-xl font-semibold text-sm border transition-colors hover:bg-[#f3ece4]"
                                 style={{ borderColor: "#e0d8cf", color: "#7a5c3e" }}
                             >
                                 ← Back
@@ -487,7 +505,7 @@ export default function UpdateProfileModal({
                         {activeTab !== "social" && (
                             <button
                                 onClick={() => goToTab(1)}
-                                className="px-5 py-2.5 rounded-xl font-semibold text-sm border-2 transition-all"
+                                className="px-4 py-2 rounded-xl font-semibold text-sm border transition-colors hover:bg-[#f3ece4]"
                                 style={{ borderColor: "#4a3728", color: "#4a3728" }}
                             >
                                 Next →
@@ -496,7 +514,7 @@ export default function UpdateProfileModal({
                         <button
                             onClick={handleSubmit}
                             disabled={saving || success}
-                            className="px-6 py-2.5 rounded-xl font-bold text-sm text-white flex items-center gap-2 transition-all hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed shadow-md"
+                            className="px-5 py-2 rounded-xl font-semibold text-sm text-white flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
                             style={{ backgroundColor: "#4a3728" }}
                         >
                             {saving ? (
