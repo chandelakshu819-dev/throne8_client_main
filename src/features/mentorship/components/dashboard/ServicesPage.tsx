@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Briefcase, Users, Clock, Star, Plus, Video, MessageSquare,
   Package, FileText, RefreshCw, ClipboardList, CheckCircle2,
+  MoreVertical, Pencil, Trash2,
 } from 'lucide-react';
 import ServiceModal from './ServiceModal';
 import EditSessionModal from '@/features/study-group/modals/EditSessionModal';
@@ -72,7 +73,9 @@ export default function ServicesPage({
   const [isSavingSession, setIsSavingSession] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingSession, setEditingSession] = useState<any>(null);
   // ── Edit Session Modal state ───────────────────────────
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<any>(null);
@@ -115,15 +118,85 @@ export default function ServicesPage({
     }
   };
 
-  // ── Create session via API ────────────────────────────
-  const handleCreateServiceWithApi = async () => {
-    const errors = validateSessionForm(formData);
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
-      setSaveError("Please fix the errors below.");
+    // ── Edit service: prefill formData & open modal ────────
+    const handleEditService = (service: any) => {
+      const raw = apiSessions.find((s: any) => s.sessionId === service.sessionId);
+      if (!raw) return;
+  
+      const type = serviceTypes.find(t => t.name === raw.sessionType) || null;
+      setSelectedServiceType(type);
+      setFormData({
+        ...formData,
+        serviceType: raw.sessionType,
+        serviceName: raw.title,
+        description: raw.description || '',
+        topic: raw.topic || '',
+        price: raw.pricing?.basePrice ?? raw.pricePerPerson ?? '',
+        scheduledAt: raw.scheduledAt ? new Date(raw.scheduledAt).toISOString().slice(0, 16) : '',
+        duration: raw.duration ?? '',
+        followUpPeriod: String(raw.followUp?.periodDays ?? '24'),
+        followUpAllowed: raw.followUp?.allowed ? '1' : '1',
+        bufferTime: String(raw.bufferTimeMinutes ?? '5'),
+        minParticipants: raw.minParticipants ?? '',
+        maxParticipants: raw.maxParticipants ?? '',
+        portfolioUrl: raw.portfolioUrl || '',
+      });
+      setEditingSession(raw);
+      setIsEditMode(true);
+      setSaveError(null);
+      setFieldErrors({});
+      setShowServiceForm(true);
+      setOpenMenuId(null);
+    };
+  
+        // ── Delete service (hard-delete if no active bookings, else must cancel bookings first) ──
+  const handleDeleteService = async (service: any) => {
+    setOpenMenuId(null);
+    if (!service.sessionId) return;
+
+    const bookings = (service as any).bookings ?? [];
+    const hasActiveBooking = bookings.some((b: any) => b.status !== 'cancelled');
+
+    if (service.type === 'group_session') {
+      const participantCount = (service as any).currentParticipants ?? 0;
+      if (participantCount > 0) {
+        alert('This group session has registered participants. Cancel it first before deleting.');
+        return;
+      }
+      if (!confirm(`Delete "${service.name}"? This cannot be undone.`)) return;
+      try {
+        await MentorService.deleteGroupSession(service.sessionId);
+        await fetchAllSessions();
+      } catch (err: any) {
+        alert(err.message || 'Failed to delete group session.');
+      }
       return;
     }
-    setFieldErrors({});
+
+    if (hasActiveBooking) {
+      alert('This service has active bookings. Please cancel the booking(s) first from Mentee Status before deleting.');
+      return;
+    }
+
+    if (!confirm(`Delete "${service.name}"? This cannot be undone.`)) return;
+
+    try {
+      await SessionService.deleteSession(service.sessionId);
+      await fetchAllSessions();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete service.');
+    }
+  };
+  
+    // ── Create/Update session via API ──────────────────────
+    const handleCreateServiceWithApi = async () => {
+      const errors = validateSessionForm(formData);
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
+        setSaveError("Please fix the errors below.");
+        return;
+      }
+      setFieldErrors({});
 
     if (!mentorData?.mentorId) {
       setSaveError("Mentor data not loaded. Please refresh.");
@@ -136,6 +209,34 @@ export default function ServicesPage({
     try {
       const scheduledAtISO = new Date(formData.scheduledAt).toISOString();
 
+      if (isEditMode && editingSession) {
+        if (formData.serviceType === "group_session") {
+          // updateGroupSessionValidator sirf ye fields accept karta hai
+          const groupUpdatePayload: Record<string, any> = {
+            title: formData.serviceName,
+            description: formData.description || "",
+          };
+          await MentorService.updateGroupSession(editingSession.sessionId, groupUpdatePayload);
+        } else {
+          // ⚠️ Backend service layer (mentorshipSessionService.updateSession)
+          // only allows: title, description, notes, thumbnailImage.
+          // Price/schedule/duration edits aren't supported by the backend yet.
+          const updatePayload: Record<string, any> = {
+            title: formData.serviceName,
+            description: formData.description || "",
+          };
+          await SessionService.updateSession(editingSession.sessionId, updatePayload);
+        }
+        setIsEditMode(false);
+        setEditingSession(null);
+        handleCreateService();
+        await fetchAllSessions();
+        setShowServiceForm(false);
+        setSaveError(null);
+        setFieldErrors({});
+        return;
+      }
+
       if (formData.serviceType === "group_session") {
         const groupSessionInput: CreateGroupSessionInput = {
           title: formData.serviceName,
@@ -147,7 +248,7 @@ export default function ServicesPage({
           maxParticipants: Number(formData.maxParticipants),
           minParticipants: Number(formData.minParticipants),
           pricePerPerson: Number(formData.price) || 0,
-          paymentMethod: formData.paymentMethod,
+          paymentMethod: "stripe",
           bufferTimeMinutes: Number(formData.bufferTime) || 0,
           followUp: {
             allowed: formData.followUpAllowed === '1',
@@ -157,14 +258,16 @@ export default function ServicesPage({
         };
         await MentorService.createGroupSession(groupSessionInput);
       } else {
-        const isFree = formData.paymentMethod === "free";
+        const isFree = false;
         const sessionInput: CreateSessionInput = {
           sessionType: formData.serviceType,
           scheduledAt: scheduledAtISO,
           timezone: "Asia/Kolkata",
           title: formData.serviceName,
           description: formData.description || "",
-          paymentMethod: formData.paymentMethod,
+          paymentMethod: "stripe",
+          ...(formData.serviceType === "mock_interview" ? { interviewType: "technical" } : {}),
+          ...(formData.serviceType === "career_planning" ? { targetCompany: "General", targetRole: "General" } : {}),
           duration: Number(formData.duration) || 60,
           followUp: {
             allowed: false,
@@ -396,18 +499,48 @@ export default function ServicesPage({
                       </div>
                       {(() => {
                         const bookings = (service as any).bookings ?? [];
-                        const available = service.status === 'available' ? 1 : 0;
                         const pending = bookings.filter((b: any) => b.status === 'pending').length;
                         const confirmed = bookings.filter((b: any) => b.status === 'confirmed').length;
                         const completed = bookings.filter((b: any) => b.status === 'completed').length;
+                        const menuKey = service.sessionId || String(idx);
 
                         return (
-                          <div className="flex items-center gap-1 flex-wrap justify-end">
-                            {available > 0 && (
-                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                                style={{ backgroundColor: '#f3f4f6', color: '#6b7280' }}>
-                                {available} open
-                              </span>
+                          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                            {service.isApi && (
+                              <div className="relative">
+                                <button
+                                  onClick={() => setOpenMenuId(openMenuId === menuKey ? null : menuKey)}
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#f3ece4] transition-colors"
+                                >
+                                  <MoreVertical className="w-4 h-4" style={{ color: '#8a7a6a' }} />
+                                </button>
+                                {openMenuId === menuKey && (
+                                  <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                                    <div
+                                      className="absolute right-0 top-8 z-20 w-32 rounded-lg shadow-lg overflow-hidden"
+                                      style={{ border: '1px solid #e0d8cf', backgroundColor: '#fff' }}
+                                    >
+                                      <button
+                                        onClick={() => handleEditService(service)}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[#f3ece4] transition-colors"
+                                        style={{ color: '#4a3728' }}
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                        Edit
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteService(service)}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[#fee2e2] transition-colors"
+                                        style={{ color: '#dc2626' }}
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
                             )}
                             {pending > 0 && (
                               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
@@ -481,7 +614,13 @@ export default function ServicesPage({
             description: 'Create a new service offering',
             emoji: selectedServiceType?.emoji || '📋',
           }}
-          onClose={() => { setShowServiceForm(false); setSaveError(null); }}
+
+          onClose={() => {
+            setShowServiceForm(false);
+            setSaveError(null);
+            setIsEditMode(false);
+            setEditingSession(null);
+          }}
           formData={formData}
           setFormData={setFormData}
           handleCreateService={handleCreateServiceWithApi}

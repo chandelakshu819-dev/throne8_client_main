@@ -9,6 +9,7 @@ export interface CreateSessionInput {
     title: string;
     description?: string;
     paymentMethod: string;
+    interviewType?: string;
     duration: number;
     followUp?: {
         allowed: boolean;
@@ -215,8 +216,32 @@ class SessionService {
         }
     }
 
-    static async cancelSession(sessionId: string, reason: string, bookingId: string): Promise<ApiResponse> {
+    static async deleteSession(sessionId: string): Promise<ApiResponse> {
         try {
+            const { data } = await api.delete<ApiResponse>(
+                `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}`
+            );
+            return data;
+        } catch (error: any) {
+            console.error("❌ [DELETE_SESSION] Failed", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to delete session.");
+        }
+    }
+
+    static async updateSession(sessionId: string, payload: Record<string, any>): Promise<ApiResponse> {
+        try {
+            const { data } = await api.put<ApiResponse>(
+                `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}`,
+                payload
+            );
+            return data;
+        } catch (error: any) {
+            console.error("❌ [UPDATE_SESSION] Failed", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to update session.");
+        }
+    }
+
+    static async cancelSession(sessionId: string, reason: string, bookingId: string): Promise<ApiResponse> {        try {
             const { data } = await api.post<ApiResponse>(
                 `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/cancel`,
                 { reason, bookingId }

@@ -3,7 +3,7 @@
 import React, { useMemo, useEffect } from 'react';
 import {
     X, DollarSign, Image as ImageIcon, Upload, FileText,
-    Briefcase, Clock, Users, CreditCard, AlertCircle
+    Briefcase, Clock, Users, AlertCircle
 } from 'lucide-react';
 import { Video, MessageSquare, Package } from 'lucide-react';
 
@@ -270,27 +270,7 @@ export default function ServiceModal({
                         )}
                     </div>
 
-                    {/* Payment Method */}
-                    <div>
-                        <FieldLabel icon={CreditCard}>Payment Method</FieldLabel>
-                        <select
-                            className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
-                            style={inputStyle(fieldErrors?.paymentMethod)}
-                            value={formData?.paymentMethod || ''}
-                            onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                            disabled={isSaving}
-                        >
-                            <option value="">Select payment method</option>
-                            <option value="free">Free (No Charge)</option>
-                            <option value="razorpay">Razorpay</option>
-                            <option value="stripe">Stripe</option>
-                            <option value="cash">Cash</option>
-                            <option value="bank_transfer">Bank Transfer</option>
-                        </select>
-                        {fieldErrors?.paymentMethod && (
-                            <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.paymentMethod}</p>
-                        )}
-                    </div>
+                
 
                     {/* Description */}
                     {needsDescription && (
@@ -307,6 +287,25 @@ export default function ServiceModal({
                             />
                             {fieldErrors?.description && (
                                 <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.description}</p>
+                            )}
+                        </div>
+                    )}
+
+                                     {/* Portfolio URL */}
+                                     {formData?.serviceType === 'portfolio_review' && (
+                        <div>
+                            <FieldLabel icon={Package}>Portfolio URL</FieldLabel>
+                            <input
+                                type="url"
+                                placeholder="https://your-portfolio.com"
+                                className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                style={inputStyle(fieldErrors?.portfolioUrl)}
+                                value={formData?.portfolioUrl || ''}
+                                onChange={(e) => setFormData({ ...formData, portfolioUrl: e.target.value })}
+                                disabled={isSaving}
+                            />
+                            {fieldErrors?.portfolioUrl && (
+                                <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.portfolioUrl}</p>
                             )}
                         </div>
                     )}

@@ -231,6 +231,86 @@ class MentorService {
   }
 
   /**
+   * 👥 DELETE GROUP SESSION
+   */
+  static async deleteGroupSession(id: string): Promise<any> {
+    try {
+      const { data } = await api.delete(`/mentorship/group-sessions/${id}`);
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (apiError?.message) throw new Error(apiError.message);
+      }
+      throw new Error('Failed to delete group session.');
+    }
+  }
+
+  /**
+   * 👥 UPDATE GROUP SESSION
+   */
+  static async updateGroupSession(id: string, payload: Record<string, any>): Promise<any> {
+    try {
+      const { data } = await api.patch(`/mentorship/group-sessions/${id}`, payload);
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (apiError?.message) throw new Error(apiError.message);
+      }
+      throw new Error('Failed to update group session.');
+    }
+  }
+
+    /**
+   * 👥 UPDATE GROUP SESSION
+   */
+    static async updateGroupSession(id: string, payload: Record<string, any>): Promise<any> {
+      try {
+        const { data } = await api.put(`/mentorship/group-sessions/${id}`, payload);
+        return data;
+      } catch (error: any) {
+        if (axios.isAxiosError(error)) {
+          const apiError = error.response?.data;
+          if (apiError?.message) throw new Error(apiError.message);
+        }
+        throw new Error('Failed to update group session.');
+      }
+    }
+  
+    /**
+     * 👥 DELETE GROUP SESSION
+     */
+    static async deleteGroupSession(id: string): Promise<any> {
+      try {
+        const { data } = await api.delete(`/mentorship/group-sessions/${id}`);
+        return data;
+      } catch (error: any) {
+        if (axios.isAxiosError(error)) {
+          const apiError = error.response?.data;
+          if (apiError?.message) throw new Error(apiError.message);
+        }
+        throw new Error('Failed to delete group session.');
+      }
+    }
+
+  /**
+   * 👥 CANCEL GROUP SESSION
+   */
+  static async cancelGroupSession(id: string, reason: string): Promise<any> {
+    try {
+      const { data } = await api.post(`/mentorship/group-sessions/${id}/cancel`, { reason });
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (apiError?.message) throw new Error(apiError.message);
+      }
+      throw new Error('Failed to cancel group session.');
+    }
+  }
+
+  /**
    * 👥 GET ALL GROUP SESSIONS
    */
   static async getAllGroupSessions(filters: { mentorId?: string; page?: number; limit?: number; status?: string } = {}): Promise<any> {

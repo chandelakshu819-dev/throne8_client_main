@@ -122,15 +122,10 @@ export const validateSessionForm = (data: any): Record<string, string> => {
       errors.scheduledAt = "Scheduled time must be at least 5 minutes in the future";
     }
   }
-  if (!data.paymentMethod) {
-    errors.paymentMethod = "Please select a payment method";
-  }
   if (!data.serviceType) {
     errors.serviceType = "Please select a service type";
   }
-  if (data.serviceType === "mock_interview" && !data.interviewType) {
-    errors.interviewType = "Interview type is required for mock interview";
-  }
+
   if (data.serviceType === "portfolio_review" && !data.portfolioUrl) {
     errors.portfolioUrl = "Portfolio URL is required for portfolio review";
   }
