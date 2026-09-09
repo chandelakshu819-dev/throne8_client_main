@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Briefcase, Users, Clock, Star, Plus, Video, MessageSquare,
   Package, FileText, RefreshCw, ClipboardList, CheckCircle2,
-  MoreVertical, Pencil, Trash2,
+  MoreVertical, Pencil, Trash2, X,
 } from 'lucide-react';
 import ServiceModal from './ServiceModal';
 import EditSessionModal from '@/features/study-group/modals/EditSessionModal';
@@ -76,6 +76,8 @@ export default function ServicesPage({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingSession, setEditingSession] = useState<any>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   // ── Edit Session Modal state ───────────────────────────
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<any>(null);
@@ -149,13 +151,10 @@ export default function ServicesPage({
       setOpenMenuId(null);
     };
   
-        // ── Delete service (hard-delete if no active bookings, else must cancel bookings first) ──
-  const handleDeleteService = async (service: any) => {
+         // ── Delete service: validate, then open the styled confirm modal ──
+  const handleDeleteService = (service: any) => {
     setOpenMenuId(null);
     if (!service.sessionId) return;
-
-    const bookings = (service as any).bookings ?? [];
-    const hasActiveBooking = bookings.some((b: any) => b.status !== 'cancelled');
 
     if (service.type === 'group_session') {
       const participantCount = (service as any).currentParticipants ?? 0;
@@ -163,31 +162,40 @@ export default function ServicesPage({
         alert('This group session has registered participants. Cancel it first before deleting.');
         return;
       }
-      if (!confirm(`Delete "${service.name}"? This cannot be undone.`)) return;
-      try {
-        await MentorService.deleteGroupSession(service.sessionId);
-        await fetchAllSessions();
-      } catch (err: any) {
-        alert(err.message || 'Failed to delete group session.');
-      }
+      setDeleteTarget(service);
       return;
     }
 
+    const bookings = (service as any).bookings ?? [];
+    const hasActiveBooking = bookings.some((b: any) => b.status !== 'cancelled');
     if (hasActiveBooking) {
       alert('This service has active bookings. Please cancel the booking(s) first from Mentee Status before deleting.');
       return;
     }
 
-    if (!confirm(`Delete "${service.name}"? This cannot be undone.`)) return;
+    setDeleteTarget(service);
+  };
 
+  // ── Actually perform the delete after modal confirmation ──
+  const confirmDeleteService = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
     try {
-      await SessionService.deleteSession(service.sessionId);
+      if (deleteTarget.type === 'group_session') {
+        await MentorService.deleteGroupSession(deleteTarget.sessionId);
+      } else {
+        await SessionService.deleteSession(deleteTarget.sessionId);
+      }
       await fetchAllSessions();
+      setDeleteTarget(null);
     } catch (err: any) {
       alert(err.message || 'Failed to delete service.');
+    } finally {
+      setIsDeleting(false);
     }
   };
-  
+
+
     // ── Create/Update session via API ──────────────────────
     const handleCreateServiceWithApi = async () => {
       const errors = validateSessionForm(formData);
@@ -606,12 +614,12 @@ export default function ServicesPage({
         </div>
       </div>
 
-      {/* Modal */}
-      {showServiceForm && (
+          {/* Modal */}
+          {showServiceForm && (
         <ServiceModal
           service={{
-            name: 'New Service',
-            description: 'Create a new service offering',
+            name: isEditMode ? (editingSession?.title || 'Edit Service') : 'New Service',
+            description: isEditMode ? 'Update your service offering' : 'Create a new service offering',
             emoji: selectedServiceType?.emoji || '📋',
           }}
 
@@ -627,6 +635,7 @@ export default function ServicesPage({
           isSaving={isSavingSession}
           saveError={saveError}
           fieldErrors={fieldErrors}
+          isEditMode={isEditMode}
         />
       )}
 
@@ -640,6 +649,57 @@ export default function ServicesPage({
         session={selectedSession}
         onStatusChange={handleUpdateSessionStatus}
       />
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+          <div
+            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl"
+            style={{ border: '1px solid #e0d8cf' }}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#fee2e2' }}>
+                  <Trash2 className="w-5 h-5" style={{ color: '#dc2626' }} />
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: '#4a3728' }}>
+                  Delete service?
+                </h3>
+              </div>
+              <button
+                onClick={() => !isDeleting && setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="p-1 hover:bg-[#f3ece4] rounded-lg transition-colors disabled:opacity-50"
+              >
+                <X className="w-4 h-4" style={{ color: '#8a7a6a' }} />
+              </button>
+            </div>
+
+            <p className="text-sm mb-6" style={{ color: '#8a7a6a' }}>
+              Are you sure you want to delete <span className="font-semibold" style={{ color: '#4a3728' }}>"{deleteTarget.name}"</span> permanently? This cannot be undone.
+            </p>
+
+            <div className="flex justify-end gap-3 pt-4" style={{ borderTop: '1px solid #f0ebe4' }}>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="px-4 py-2.5 rounded-xl font-semibold text-sm border transition-colors disabled:opacity-50 hover:bg-[#f3ece4]"
+                style={{ borderColor: '#e0d8cf', color: '#4a3728', backgroundColor: '#fbf7f3' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteService}
+                disabled={isDeleting}
+                className="px-4 py-2.5 rounded-xl text-white font-semibold text-sm transition-opacity disabled:opacity-60 hover:opacity-90"
+                style={{ backgroundColor: '#dc2626' }}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
