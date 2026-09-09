@@ -16,6 +16,8 @@ export default function DashboardPage() {
     activeRange,
     handleRangeChange,
     stats,
+    isLoadingStats,
+    statsError,
     quickActions,
     topPosts,
     isLoadingTopPosts,
@@ -45,7 +47,7 @@ export default function DashboardPage() {
 
       <QuickActions actions={quickActions} />
 
-      <StatsGrid stats={stats} />
+      <StatsGrid stats={stats} isLoading={isLoadingStats} error={statsError} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <FollowerChart

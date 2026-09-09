@@ -6,7 +6,8 @@ import CompanyService from '@/lib/api/company.service';
 import type { PendingItem } from '../components/company/PendingActions';
 import type { TopPost } from '../components/company/TopPosts';
 import type { ActivityItem } from '../components/company/ActivityFeed';
-import { ENGAGEMENT_METRICS, MONTHLY_DATA, QUICK_ACTIONS, STATS, WEEKLY_DATA } from '../types';
+import type { Stat } from '../components/company/StatsGrid';
+import { ENGAGEMENT_METRICS, MONTHLY_DATA, QUICK_ACTIONS, WEEKLY_DATA } from '../types';
 
 function timeAgo(dateInput: Date | string | number | undefined): string {
   if (!dateInput) return 'Recently';
@@ -30,6 +31,36 @@ function timeAgo(dateInput: Date | string | number | undefined): string {
   return `${years}y ago`;
 }
 
+// SVG icon paths for the 4 stat cards
+const STAT_ICONS = {
+  views: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
+  impressions: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
+  followers: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
+  search: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z',
+};
+
+/**
+ * Format a number for display: 28400 → "28.4K", 3282 → "3,282", 0 → "0"
+ */
+function formatStatValue(num: number): string {
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+  if (num >= 10_000) return `${(num / 1_000).toFixed(1)}K`;
+  return num.toLocaleString();
+}
+
+/**
+ * Format a percentage change for display.
+ * Returns null if change is null (no historical data).
+ */
+function formatChange(change: number | null): { text: string; up: boolean } | null {
+  if (change === null || change === undefined) return null;
+  const prefix = change >= 0 ? '+' : '';
+  return {
+    text: `${prefix}${change}%`,
+    up: change >= 0,
+  };
+}
+
 // ── Hook ──────────────────────────────────────────────────────
 
 export function useDashboard(companyIdOverride?: string) {
@@ -42,6 +73,11 @@ export function useDashboard(companyIdOverride?: string) {
   const { userProfileData, loadProfile } = useProfile();
 
   const [activeRange, setActiveRange] = useState<'week' | 'month'>('week');
+
+  // Real stats data states
+  const [stats, setStats] = useState<Stat[]>([]);
+  const [isLoadingStats, setIsLoadingStats] = useState<boolean>(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
   // Real data states
   const [topPosts, setTopPosts] = useState<TopPost[]>([]);
@@ -119,6 +155,100 @@ export function useDashboard(companyIdOverride?: string) {
       isCancelled = true;
     };
   }, [companyIdOverride, params, user, userProfileData?.companyId]);
+
+  // Fetch real Dashboard Card Stats (Profile Views, Post Impressions, Followers, Search Appearances)
+  useEffect(() => {
+    if (!resolvedCompanyId) return;
+
+    let isCancelled = false;
+
+    async function fetchDashboardCardStats() {
+      setIsLoadingStats(true);
+      setStatsError(null);
+
+      try {
+        const res = await CompanyService.getDashboardCardStats(resolvedCompanyId!, 30);
+        if (isCancelled) return;
+
+        const data = res?.data;
+
+        if (!data) {
+          // No data returned — show empty state
+          setStats([
+            { id: 'views', label: 'Profile Views', value: '0', change: '', up: true, icon: STAT_ICONS.views },
+            { id: 'impressions', label: 'Post Impressions', value: '0', change: '', up: true, icon: STAT_ICONS.impressions },
+            { id: 'followers', label: 'Followers', value: '0', change: '', up: true, icon: STAT_ICONS.followers },
+            { id: 'search', label: 'Search Appearances', value: '0', change: '', up: true, icon: STAT_ICONS.search },
+          ]);
+          return;
+        }
+
+        const profileViewsChange = formatChange(data.profileViews?.change);
+        const impressionsChange = formatChange(data.postImpressions?.change);
+        const followersChange = formatChange(data.followers?.change);
+        const searchChange = formatChange(data.searchAppearances?.change);
+
+        const realStats: Stat[] = [
+          {
+            id: 'views',
+            label: 'Profile Views',
+            value: formatStatValue(data.profileViews?.value ?? 0),
+            change: profileViewsChange?.text ?? '',
+            up: profileViewsChange?.up ?? true,
+            icon: STAT_ICONS.views,
+          },
+          {
+            id: 'impressions',
+            label: 'Post Impressions',
+            value: formatStatValue(data.postImpressions?.value ?? 0),
+            change: impressionsChange?.text ?? '',
+            up: impressionsChange?.up ?? true,
+            icon: STAT_ICONS.impressions,
+          },
+          {
+            id: 'followers',
+            label: 'Followers',
+            value: formatStatValue(data.followers?.value ?? 0),
+            change: followersChange?.text ?? '',
+            up: followersChange?.up ?? true,
+            icon: STAT_ICONS.followers,
+          },
+          {
+            id: 'search',
+            label: 'Search Appearances',
+            value: formatStatValue(data.searchAppearances?.value ?? 0),
+            change: searchChange?.text ?? '',
+            up: searchChange?.up ?? true,
+            icon: STAT_ICONS.search,
+          },
+        ];
+
+        setStats(realStats);
+      } catch (err: any) {
+        if (!isCancelled) {
+          console.error('Error fetching dashboard card stats:', err);
+          setStatsError(err.message || 'Failed to load stats');
+          // Show empty values on error — no fake fallbacks
+          setStats([
+            { id: 'views', label: 'Profile Views', value: '—', change: '', up: true, icon: STAT_ICONS.views },
+            { id: 'impressions', label: 'Post Impressions', value: '—', change: '', up: true, icon: STAT_ICONS.impressions },
+            { id: 'followers', label: 'Followers', value: '—', change: '', up: true, icon: STAT_ICONS.followers },
+            { id: 'search', label: 'Search Appearances', value: '—', change: '', up: true, icon: STAT_ICONS.search },
+          ]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingStats(false);
+        }
+      }
+    }
+
+    fetchDashboardCardStats();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [resolvedCompanyId]);
 
   // Fetch real Top Posts
   useEffect(() => {
@@ -311,8 +441,12 @@ export function useDashboard(companyIdOverride?: string) {
     activeRange,
     handleRangeChange,
 
-    // Static / metrics
-    stats: STATS,
+    // Real stats from API (no hardcoded fallbacks)
+    stats,
+    isLoadingStats,
+    statsError,
+
+    // Static quick actions & engagement (not part of this change)
     quickActions: QUICK_ACTIONS,
     engagementMetrics: ENGAGEMENT_METRICS,
 
