@@ -27,6 +27,7 @@ import TrustScorePage from "./TrustScorePage";
 import CommunityPage from "./CommunityPage";
 import MentorService from "@/lib/api/mentorship.service";
 import SessionService from "@/lib/api/session.service";
+import MarketingKitPage from "./MarketingKitPage";
 
 // Define SERVICE_TYPES array
 const SERVICE_TYPES: ServiceType[] = [
@@ -50,6 +51,7 @@ const pageComponents: Record<string, React.FC<any>> = {
   plans: PlansPage,
   trust: TrustScorePage,
   community: CommunityPage,
+  marketing: MarketingKitPage,
 };
 
 export default function MentorDashboard(
