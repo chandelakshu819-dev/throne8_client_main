@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+
+import React, { useState, useEffect, useRef } from "react";
 import {
     X, Save, User, Code2, Globe,
     ChevronDown, Plus, Check, Loader2,
@@ -74,7 +75,26 @@ export default function UpdateProfileModal({
     const [domains, setDomains] = useState<string[]>([]);
     const [skills, setSkills] = useState<string[]>([]);
     const [skillInput, setSkillInput] = useState("");
+
     const [domainOpen, setDomainOpen] = useState(false);
+    const domainDropdownRef = useRef<HTMLDivElement>(null);
+
+    // ✅ FIX: dropdown ab bahar click karne par close ho jayega — pehle
+    // koi outside-click listener nahi tha isliye domain select karne ke
+    // baad bhi list khuli reh jaati thi jab tak dobara trigger button na
+    // dabao.
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (domainDropdownRef.current && !domainDropdownRef.current.contains(event.target as Node)) {
+                setDomainOpen(false);
+            }
+        };
+        if (domainOpen) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [domainOpen]);
+    
     const [linkedinUrl, setLinkedinUrl] = useState("");
     const [githubUrl, setGithubUrl] = useState("");
     const [portfolioUrl, setPortfolioUrl] = useState("");
@@ -134,11 +154,19 @@ export default function UpdateProfileModal({
     // ── Submit ───────────────────────────────────────────────
     const handleSubmit = async () => {
         setError(null);
-
         if (!title.trim()) { setError("Title is required."); setActiveTab("basic"); return; }
         if (!bio.trim() || bio.length < 50) { setError("Bio must be at least 50 characters."); setActiveTab("basic"); return; }
+        if (!currentRole.trim()) { setError("Current role is required."); setActiveTab("basic"); return; }
         if (domains.length === 0) { setError("Select at least 1 domain."); setActiveTab("expertise"); return; }
         if (skills.length === 0) { setError("Add at least 1 skill."); setActiveTab("expertise"); return; }
+        if (!linkedinUrl.trim()) { setError("LinkedIn URL is required."); setActiveTab("social"); return; }
+        if (!linkedinUrl.includes("linkedin.com")) { setError("Please enter a valid LinkedIn URL."); setActiveTab("social"); return; }
+        try {
+            new URL(linkedinUrl);
+        } catch {
+            setError("Please enter a valid LinkedIn URL (must start with https://)."); setActiveTab("social"); return;
+        }
+        if (githubUrl.trim() && !githubUrl.includes("github.com")) { setError("Please enter a valid GitHub URL."); setActiveTab("social"); return; }
 
         setSaving(true);
         try {
@@ -300,8 +328,8 @@ export default function UpdateProfileModal({
                     {/* ── TAB: Expertise ── */}
                     {activeTab === "expertise" && (
                         <div className="space-y-5">
-                            <Field label={`Domains * — ${domains.length}/5 selected`}>
-                                <div className="relative">
+                                                       <Field label={`Domains * — ${domains.length}/5 selected`}>
+                                <div className="relative" ref={domainDropdownRef}>
                                     <button
                                         type="button"
                                         onClick={() => setDomainOpen((p) => !p)}

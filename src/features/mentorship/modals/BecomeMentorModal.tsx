@@ -22,8 +22,21 @@ import { useProfileData } from "@/features/profile/hooks/useProfileData";
 import { useExperienceData } from "@/features/profile/hooks/useExperienceData";
 import { useEducationData } from "@/features/profile/hooks/useEducationData";
 
-interface BecomeMentorModalProps {
-    isOpen: boolean;
+const SKILL_SUGGESTIONS: string[] = [
+    "JavaScript", "TypeScript", "Python", "Java", "C++", "C#", "Go", "Rust",
+    "React", "Next.js", "Vue.js", "Angular", "Node.js", "Express.js", "NestJS",
+    "Redux", "GraphQL", "REST API", "HTML", "CSS", "Tailwind CSS", "SASS",
+    "MongoDB", "PostgreSQL", "MySQL", "Redis", "Firebase", "Docker", "Kubernetes",
+    "AWS", "Azure", "GCP", "CI/CD", "Git", "Data Structures & Algorithms",
+    "System Design", "Machine Learning", "Deep Learning", "Data Science",
+    "TensorFlow", "PyTorch", "SQL", "NoSQL", "Microservices", "Agile", "Scrum",
+    "Product Management", "UI/UX Design", "Figma", "Career Guidance",
+    "Interview Preparation", "Resume Building", "Public Speaking", "Leadership",
+    "Flutter", "React Native", "Swift", "Kotlin", "DevOps", "Cybersecurity",
+    "Blockchain", "Solidity", "Django", "Flask", "Spring Boot", ".NET",
+];
+
+interface BecomeMentorModalProps {    isOpen: boolean;
     onClose: () => void;
     formStep: number;
     profileImage: string;
@@ -58,7 +71,7 @@ export default function BecomeMentorModal({
     const [domainDropdownOpen, setDomainDropdownOpen] = useState(false);
     const [profilePicPreview, setProfilePicPreview] = useState<string>(profileImage);
     const [skillInput, setSkillInput] = useState('');
-
+    const [showSkillSuggestions, setShowSkillSuggestions] = useState(false);
     // ✅ NEW: Profile loading state — jab tak data aa nahi jaata tab tak check nahi karte
     const [isProfileLoading, setIsProfileLoading] = useState(true);
     const [profileLoadError, setProfileLoadError] = useState(false);
@@ -81,6 +94,14 @@ export default function BecomeMentorModal({
 
     const watchedSkills = watch('skills');
     const watchedDomains = watch('domains');
+
+    const filteredSkillSuggestions = skillInput.trim()
+        ? SKILL_SUGGESTIONS.filter(
+            (s) =>
+                s.toLowerCase().includes(skillInput.trim().toLowerCase()) &&
+                !watchedSkills?.includes(s)
+        ).slice(0, 8)
+        : [];
 
     useEffect(() => {
         if (user?.userId) {
@@ -209,6 +230,9 @@ export default function BecomeMentorModal({
             isValid = await trigger(['title', 'linkedinUrl', 'profilePic']);
         } else if (formStep === 2) {
             isValid = await trigger(['bio', 'skills', 'domains', 'experienceTotal', 'currentRole']);
+            if (!isValid) {
+                console.log('❌ Step 2 blocked — failing fields:', errors);
+            }
         }
 
         if (isValid) setFormStep(formStep + 1);
@@ -231,7 +255,7 @@ export default function BecomeMentorModal({
                 domains: formData.domains,
                 skills: formData.skills,
                 experienceTotal: formData.experienceTotal,
-                currentRole: currentRole,
+                currentRole: formData.currentRole,
                 linkedinUrl: formData.linkedinUrl,
                 githubUrl: formData.githubUrl,
                 profilePic: formData.profilePic,
@@ -248,154 +272,8 @@ export default function BecomeMentorModal({
         } finally {
             setIsSubmitting(false);
         }
-    };
-
-    // ✅ NEW: Loading screen — data fetch ho raha hai
-    if (isOpen && isProfileLoading) {
-        return (
-            <div
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6"
-                onClick={handleClose}
-            >
-                <div
-                    className="bg-white rounded-[32px] max-w-md w-full p-10 shadow-2xl text-center relative"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <button
-                        onClick={handleClose}
-                        className="absolute top-5 right-5 w-9 h-9 bg-[#f8f6f4] hover:bg-[#4a3728] text-[#4a3728] hover:text-white rounded-full flex items-center justify-center transition-all"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
-                    <div className="w-12 h-12 border-4 border-[#ece7e2] border-t-[#4a3728] rounded-full animate-spin mx-auto mb-5" />
-                    <p className="text-sm font-bold text-[#4a3728]">Checking your profile...</p>
-                </div>
-            </div>
-        );
     }
 
-        // ✅ NEW: Fetch failed / timed out — retry option do, hang mat hone do
-        if (isOpen && profileLoadError) {
-            return (
-                <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6"
-                    onClick={handleClose}
-                >
-                    <div
-                        className="bg-white rounded-[32px] max-w-md w-full p-10 shadow-2xl text-center relative"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <button
-                            onClick={handleClose}
-                            className="absolute top-5 right-5 w-9 h-9 bg-[#f8f6f4] hover:bg-[#4a3728] text-[#4a3728] hover:text-white rounded-full flex items-center justify-center transition-all"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                        <p className="text-sm font-bold text-red-500 mb-4">
-                            Couldn't load your profile. Please check your connection and try again.
-                        </p>
-                        <button
-                            onClick={() => {
-                                if (!user?.userId) return;
-                                setProfileLoadError(false);
-                                setIsProfileLoading(true);
-                                fetchUserProfile(user.userId);
-                            }}
-                            className="px-6 py-2.5 bg-[#4a3728] text-white rounded-xl text-sm font-bold"
-                        >
-                            Retry
-                        </button>
-                    </div>
-                </div>
-            );
-        }
-        console.log('🔍 [DEBUG] userProfileData:', userProfileData);
-console.log('🔍 [DEBUG] experienceList:', experienceList);
-console.log('🔍 [DEBUG] email:', email, 'currentRole:', currentRole);
-    
-        // ✅ NEW: Profile incomplete screen
-        if (isOpen && !isProfileReady) {
-        return (
-            <div
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6"
-                onClick={handleClose}
-            >
-                <div
-                    className="bg-white rounded-[32px] max-w-md w-full p-10 shadow-2xl text-center relative"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {/* Close */}
-                    <button
-                        onClick={handleClose}
-                        className="absolute top-5 right-5 w-9 h-9 bg-[#f8f6f4] hover:bg-[#4a3728] text-[#4a3728] hover:text-white rounded-full flex items-center justify-center transition-all"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
-
-                    {/* Warning Icon */}
-                    <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-5">
-                        <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                        </svg>
-                    </div>
-
-                    {/* Heading */}
-                    <h3 className="text-xl font-black text-[#4a3728] mb-2">
-                        Profile Incomplete
-                    </h3>
-
-                    {/* Red flash line */}
-                    <p className="text-sm text-red-600 font-semibold mb-3">
-                        ⚠️ Please complete at least 70% of your profile first.
-                    </p>
-
-                    {/* Detail message ~30 words */}
-                    <p className="text-xs text-slate-500 leading-relaxed mb-4">
-                        Mentees choose mentors based on trust and credibility. A complete profile —
-                        with your photo, work experience, and basic details — boosts your booking
-                        chances by <span className="font-bold text-[#4a3728]">3x</span>.
-                        Invest 2 minutes now to stand out.
-                    </p>
-
-                    {/* Missing fields — kya missing hai clearly dikhao */}
-                    <div className="bg-red-50 rounded-2xl p-4 mb-6 text-left space-y-2">
-                        {!profileImage && (
-                            <p className="text-xs text-red-600 font-medium flex items-center gap-2">
-                                <span>✗</span> Profile photo missing
-                            </p>
-                        )}
-                        {!fullName.trim() && (
-                            <p className="text-xs text-red-600 font-medium flex items-center gap-2">
-                                <span>✗</span> Full name missing
-                            </p>
-                        )}
-                        {!email && (
-                            <p className="text-xs text-red-600 font-medium flex items-center gap-2">
-                                <span>✗</span> Email missing
-                            </p>
-                        )}
-                        {!currentRole && (
-                            <p className="text-xs text-red-600 font-medium flex items-center gap-2">
-                                <span>✗</span> Work experience / current role missing
-                            </p>
-                        )}
-                    </div>
-
-                    {/* CTA */}
-                    <button
-                        onClick={() => {
-                            handleClose();
-                            router.push('/profile'); // ✅ apna actual profile route daalo
-                        }}
-                        className="w-full py-3 bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] text-white rounded-2xl font-bold text-sm hover:shadow-xl transition-all"
-                    >
-                        Complete My Profile →
-                    </button>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <>
@@ -620,31 +498,34 @@ console.log('🔍 [DEBUG] email:', email, 'currentRole:', currentRole);
                                 </h3>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Current Role - Auto-filled from profile */}
-                                    <div>
+                                                                       {/* Current Role - Auto-filled from profile, editable fallback */}
+                                                                       <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">
                                             Current Role *
                                         </label>
                                         <input
+                                            {...register('currentRole')}
                                             type="text"
-                                            value={currentRole}
-                                            readOnly
+                                            defaultValue={currentRole}
                                             placeholder="Senior Software Engineer"
-                                            className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium cursor-not-allowed opacity-75"
+                                            className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium"
                                         />
+                                        {errors.currentRole && (
+                                            <p className="text-red-500 text-xs mt-1">{errors.currentRole.message as string}</p>
+                                        )}
                                     </div>
 
-                                    {/* Company - Auto-filled from profile */}
-                                    <div>
+                                                                        {/* Company - Auto-filled from profile, editable fallback */}
+                                                                        <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">
                                             Company *
                                         </label>
                                         <input
                                             type="text"
-                                            value={currentCompany}
-                                            readOnly
+                                            defaultValue={currentCompany}
+                                            key={currentCompany}
                                             placeholder="Google"
-                                            className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium cursor-not-allowed opacity-75"
+                                            className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium"
                                         />
                                     </div>
 
@@ -792,23 +673,56 @@ console.log('🔍 [DEBUG] email:', email, 'currentRole:', currentRole);
                                             </span>
                                         ))}
                                     </div>
-                                    <input
-                                        type="text"
-                                        value={skillInput}
-                                        onChange={(e) => setSkillInput(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                const trimmed = skillInput.trim();
-                                                if (trimmed && !watchedSkills?.includes(trimmed) && (watchedSkills?.length || 0) < 20) {
-                                                    setValue('skills', [...(watchedSkills || []), trimmed], { shouldValidate: true });
-                                                    setSkillInput('');
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={skillInput}
+                                            onChange={(e) => {
+                                                setSkillInput(e.target.value);
+                                                setShowSkillSuggestions(true);
+                                            }}
+                                            onFocus={() => setShowSkillSuggestions(true)}
+                                            onBlur={() => {
+                                                // thoda delay taaki click select se pehle blur na ho jaye
+                                                setTimeout(() => setShowSkillSuggestions(false), 150);
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    const trimmed = skillInput.trim();
+                                                    if (trimmed && !watchedSkills?.includes(trimmed) && (watchedSkills?.length || 0) < 20) {
+                                                        setValue('skills', [...(watchedSkills || []), trimmed], { shouldValidate: true });
+                                                        setSkillInput('');
+                                                        setShowSkillSuggestions(false);
+                                                    }
                                                 }
-                                            }
-                                        }}
-                                        placeholder="Type a skill and press Enter..."
-                                        className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium"
-                                    />
+                                            }}
+                                            placeholder="Type a skill and press Enter..."
+                                            className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium"
+                                        />
+
+{showSkillSuggestions && filteredSkillSuggestions.length > 0 && (
+                                            <div className="absolute z-50 w-full mt-1 bg-white border border-[#ece7e2] rounded-2xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+                                                {filteredSkillSuggestions.map((suggestion) => (
+                                                    <button
+                                                        key={suggestion}
+                                                        type="button"
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault();
+                                                            if ((watchedSkills?.length || 0) < 20 && !watchedSkills?.includes(suggestion)) {
+                                                                setValue('skills', [...(watchedSkills || []), suggestion], { shouldValidate: true });
+                                                            }
+                                                            setSkillInput('');
+                                                            setShowSkillSuggestions(false);
+                                                        }}
+                                                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-600 hover:bg-[#f8f6f4] hover:text-[#4a3728] transition-colors"
+                                                    >
+                                                        {suggestion}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                     {errors.skills && (
                                         <p className="text-red-500 text-xs mt-1">{errors.skills.message}</p>
                                     )}
