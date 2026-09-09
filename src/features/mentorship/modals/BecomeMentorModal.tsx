@@ -2,7 +2,8 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+
+import React, { useState, useEffect, useRef } from "react";
 import { X, Users, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useForm, Controller } from 'react-hook-form';
@@ -69,6 +70,22 @@ export default function BecomeMentorModal({
     const [agreementError, setAgreementError] = useState(false);
     const [isRedirecting, setIsRedirecting] = useState(false);
     const [domainDropdownOpen, setDomainDropdownOpen] = useState(false);
+    const domainDropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!domainDropdownOpen) return;
+
+        const handleClickOutside = (event: MouseEvent) => {
+            if (domainDropdownRef.current && !domainDropdownRef.current.contains(event.target as Node)) {
+                setDomainDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [domainDropdownOpen]);
+    
+    
     const [profilePicPreview, setProfilePicPreview] = useState<string>(profileImage);
     const [skillInput, setSkillInput] = useState('');
     const [showSkillSuggestions, setShowSkillSuggestions] = useState(false);
@@ -347,26 +364,37 @@ export default function BecomeMentorModal({
                                     </label>
 
                                     <div className="relative w-36 h-36 group cursor-pointer">
-                                        <img src={profileImage} alt="Profile" className="w-full h-full rounded-2xl border-4 border-white shadow-xl object-cover transition-all duration-500 group-hover:shadow-2xl group-hover:scale-105" />
-                                        {/* <input
-                                        type="file"
-                                        accept="image/jpeg,image/png,image/webp"
-                                        className="hidden"
-                                        id="profilePicInput"
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) {
-                                                setValue('profilePic', file, { shouldValidate: true });
-                                                setProfilePicPreview(URL.createObjectURL(file));
+                                        <img
+                                            src={profilePicPreview || profileImage}
+                                            alt="Profile"
+                                            className="w-full h-full rounded-2xl border-4 border-white shadow-xl object-cover transition-all duration-500 group-hover:shadow-2xl group-hover:scale-105"
+                                        />
+                                        <input
+                                            type="file"
+                                            accept="image/jpeg,image/png,image/webp"
+                                            className="hidden"
+                                            id="profilePicInput"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    setValue('profilePic', file, { shouldValidate: true });
+                                                    setProfilePicPreview(URL.createObjectURL(file));
+                                                }
+                                            }}
+                                        />
+                                                                                                                            <label
+                                            htmlFor="profilePicInput"
+                                            className={
+                                                profilePicPreview
+                                                    ? "absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/90 rounded-2xl cursor-pointer transition-all duration-300 opacity-0 group-hover:opacity-100"
+                                                    : "absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/90 rounded-2xl cursor-pointer transition-all duration-300"
                                             }
-                                        }}
-                                    />
-                                    <label htmlFor="profilePicInput" className="cursor-pointer">
-                                        <p className="text-sm font-bold text-[#4a3728] mb-1">
-                                            Click to upload
-                                        </p>
-                                        <p className="text-xs text-slate-500">PNG, JPG, WebP — max 5MB</p>
-                                    </label> */}
+                                        >
+                                            <p className="text-xs font-bold text-[#4a3728] text-center px-2">
+                                                {profilePicPreview ? "Change photo" : "Click to upload"}
+                                            </p>
+                                         
+                                        </label>
                                     </div>
                                     {errors.profilePic && (
                                         <p className="text-red-500 text-xs mt-1">{errors.profilePic.message as string}</p>
@@ -552,7 +580,7 @@ export default function BecomeMentorModal({
 
                                     {/* CHANGE: Domains — multi-select checkboxes */}
 
-                                    <div className="relative">
+                                    <div className="relative" ref={domainDropdownRef}>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">
                                             Domains * <span className="text-slate-400 font-normal">(max 5)</span>
                                         </label>
@@ -837,25 +865,7 @@ export default function BecomeMentorModal({
                                     </button>
                                 )}
 
-                                <button
-                                    type="button"
-                                    className="px-6 py-3 bg-white border-2 border-[#4a3728] text-[#4a3728] rounded-2xl font-bold text-sm hover:bg-[#f8f6f4] transition-all flex items-center gap-2">
-                                    <svg
-                                        className="w-4 h-4"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                        />
-                                    </svg>
-                                    Edit
-                                </button>
-                            </div>
+                        </div>
 
                             {formStep < 3 ? (
 
