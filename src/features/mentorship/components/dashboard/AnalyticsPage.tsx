@@ -1,5 +1,6 @@
 // mentorDashboard/components/AnalyticsPage.tsx
-import React from "react"
+"use client"
+import React, { useEffect, useState } from "react"
 import {
   BarChart3,
   ArrowUp,
@@ -13,49 +14,24 @@ import {
   Code2,
   Target,
 } from "lucide-react"
+import MentorService from "@/lib/api/mentorship.service"
 
 interface AnalyticsPageProps {
-  // If you later want to pass real data from parent or context, you can add props here
-  // For now it's static like your original code
+  mentorData?: any // passed down from DashboardLayout — contains mentorId, title, status, etc.
+  [key: string]: any // DashboardLayout spreads many other props onto every page; rest are unused here
 }
 
-const metricCards = [
-  {
-    label: "Profile Views",
-    value: "1,234",
-    change: "+12%",
-    trend: "up" as const,
-    icon: Eye,
-  },
-  {
-    label: "Booking Rate",
-    value: "68%",
-    change: "+5%",
-    trend: "up" as const,
-    icon: CalendarCheck,
-  },
-  {
-    label: "Avg Session Duration",
-    value: "52 min",
-    change: "-2%",
-    trend: "down" as const,
-    icon: Clock,
-  },
-]
+const SERVICE_ICON_MAP: Record<string, { icon: any; color: string }> = {
+  "one-on-one": { icon: Users, color: "#4a3728" },
+  "code-review": { icon: Code2, color: "#8a6a4a" },
+  "group": { icon: Users, color: "#7a5c3e" },
+  "career-guidance": { icon: Target, color: "#5c4632" },
+}
 
-const popularServices = [
-  { name: "1-on-1 Mentoring", bookings: 45, percentage: 90, icon: Users, color: "#4a3728" },
-  { name: "Code Review", bookings: 28, percentage: 56, icon: Code2, color: "#8a6a4a" },
-  { name: "Group Sessions", bookings: 32, percentage: 64, icon: Users, color: "#7a5c3e" },
-  { name: "Career Guidance", bookings: 43, percentage: 86, icon: Target, color: "#5c4632" },
-]
-
-const monthlyEarnings = [
-  { month: "January", amount: "₹12,500", change: "+8%", trend: "up" as const },
-  { month: "December", amount: "₹11,200", change: "+12%", trend: "up" as const },
-  { month: "November", amount: "₹10,000", change: "+5%", trend: "up" as const },
-  { month: "October", amount: "₹9,500", change: "+15%", trend: "up" as const },
-]
+const monthLabel = (ym: string) => {
+  const [y, m] = ym.split("-")
+  return new Date(Number(y), Number(m) - 1).toLocaleString("en-US", { month: "long" })
+}
 
 const TrendPill = ({ change, trend }: { change: string; trend: "up" | "down" }) => (
   <span
@@ -75,18 +51,17 @@ const TrendPill = ({ change, trend }: { change: string; trend: "up" | "down" }) 
 const EarningsTrend = ({
   data,
 }: {
-  data: { month: string; amount: string }[]
+  data: { month: string; amount: number }[]
 }) => {
-  const values = data.map((d) => Number(d.amount.replace(/[₹,]/g, "")))
+  const values = data.map((d) => d.amount)
   const max = Math.max(...values, 1)
   // Reverse so oldest month is on the left, most recent on the right
   const ordered = [...data].reverse()
-  const orderedValues = [...values].reverse()
 
   return (
     <div className="flex items-end justify-between gap-3 h-24 px-1 mb-1">
       {ordered.map((d, idx) => {
-        const heightPct = Math.max((orderedValues[idx] / max) * 100, 8)
+        const heightPct = Math.max((d.amount / max) * 100, 8)
         const isLast = idx === ordered.length - 1
         return (
           <div key={d.month} className="flex-1 flex flex-col items-center gap-2">
@@ -103,7 +78,7 @@ const EarningsTrend = ({
               className="text-[10px] font-semibold uppercase tracking-wide"
               style={{ color: isLast ? "#4a3728" : "#a08070" }}
             >
-              {d.month.slice(0, 3)}
+              {monthLabel(d.month).slice(0, 3)}
             </span>
           </div>
         )
@@ -112,13 +87,101 @@ const EarningsTrend = ({
   )
 }
 
-export default function AnalyticsPage({}: AnalyticsPageProps) {
-  // Quick derived summary for the highlight strip
-  const totalEarnings = monthlyEarnings.reduce(
-    (sum, e) => sum + Number(e.amount.replace(/[₹,]/g, "")),
-    0
-  )
-  const totalBookings = popularServices.reduce((sum, s) => sum + s.bookings, 0)
+export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
+  const mentorId: string | undefined = mentorData?.mentorId
+
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // mentorData hasn't arrived from DashboardLayout's fetch yet — keep showing the spinner,
+    // don't error out. It errors only if mentorData resolved but has no mentorId on it.
+    if (!mentorData) {
+      return
+    }
+    if (!mentorId) {
+      setLoading(false)
+      setError("Mentor profile has no mentorId — check MentorService.getMentorByUserId response shape.")
+      return
+    }
+    let cancelled = false
+
+    setLoading(true)
+    setError(null)
+
+    MentorService.getMentorDashboardStats(mentorId)
+      .then((res) => {
+        if (!cancelled) setData(res.data)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [mentorId, mentorData])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="w-10 h-10 rounded-full border-4 border-[#e0d8cf] border-t-[#4a3728] animate-spin" />
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="p-8 text-center rounded-2xl bg-white" style={{ border: "1px solid #e0d8cf" }}>
+        <p className="font-semibold" style={{ color: "#b91c1c" }}>
+          {error || "No analytics data found."}
+        </p>
+      </div>
+    )
+  }
+
+  const metricCards = [
+    {
+      label: "Profile Views",
+      value: data.profileViews.value.toLocaleString(),
+      change: `${data.profileViews.changePercent >= 0 ? "+" : ""}${data.profileViews.changePercent}%`,
+      trend: data.profileViews.trend as "up" | "down",
+      icon: Eye,
+    },
+    {
+      label: "Booking Rate",
+      value: `${data.bookingRate.value}%`,
+      change: "—",
+      trend: (data.bookingRate.trend as "up" | "down") || "up",
+      icon: CalendarCheck,
+    },
+    {
+      label: "Avg Session Duration",
+      value: `${data.avgSessionDuration.value} min`,
+      change: "—",
+      trend: "up" as const,
+      icon: Clock,
+    },
+  ]
+
+  const totalBookings = data.popularServices.reduce((sum: number, s: any) => sum + s.bookings, 0)
+
+  const popularServices = data.popularServices.map((s: any) => {
+    const meta = SERVICE_ICON_MAP[s.sessionType] || { icon: Users, color: "#4a3728" }
+    return {
+      name: s.sessionType,
+      bookings: s.bookings,
+      percentage: totalBookings ? Math.round((s.bookings / totalBookings) * 100) : 0,
+      icon: meta.icon,
+      color: meta.color,
+    }
+  })
+
+  const totalEarnings = data.monthlyEarnings.reduce((sum: number, e: any) => sum + e.amount, 0)
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -196,37 +259,44 @@ export default function AnalyticsPage({}: AnalyticsPageProps) {
               {totalBookings} total bookings
             </span>
           </div>
-          <div className="space-y-5">
-            {popularServices.map((service, idx) => (
-              <div key={idx}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-6 h-6 rounded-md flex items-center justify-center"
-                      style={{ backgroundColor: `${service.color}1a` }}
-                    >
-                      <service.icon className="w-3.5 h-3.5" style={{ color: service.color }} />
+
+          {popularServices.length === 0 ? (
+            <p className="text-sm text-center py-6" style={{ color: "#a08070" }}>
+              No completed sessions yet.
+            </p>
+          ) : (
+            <div className="space-y-5">
+              {popularServices.map((service: any, idx: number) => (
+                <div key={idx}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-6 h-6 rounded-md flex items-center justify-center"
+                        style={{ backgroundColor: `${service.color}1a` }}
+                      >
+                        <service.icon className="w-3.5 h-3.5" style={{ color: service.color }} />
+                      </div>
+                      <span className="text-sm font-semibold" style={{ color: "#4a3728" }}>
+                        {service.name}
+                      </span>
                     </div>
-                    <span className="text-sm font-semibold" style={{ color: "#4a3728" }}>
-                      {service.name}
+                    <span className="text-sm font-bold" style={{ color: "#7a5c3e" }}>
+                      {service.bookings} bookings
                     </span>
                   </div>
-                  <span className="text-sm font-bold" style={{ color: "#7a5c3e" }}>
-                    {service.bookings} bookings
-                  </span>
+                  <div className="w-full h-2.5 rounded-full" style={{ backgroundColor: "#f0e9e1" }}>
+                    <div
+                      className="h-2.5 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${service.percentage}%`,
+                        backgroundColor: service.color,
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full h-2.5 rounded-full" style={{ backgroundColor: "#f0e9e1" }}>
-                  <div
-                    className="h-2.5 rounded-full transition-all duration-500"
-                    style={{
-                      width: `${service.percentage}%`,
-                      backgroundColor: service.color,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Monthly Earnings */}
@@ -243,30 +313,37 @@ export default function AnalyticsPage({}: AnalyticsPageProps) {
             </div>
           </div>
 
-          {/* Trend visual */}
-          <div className="p-3 rounded-xl mb-4" style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}>
-            <EarningsTrend data={monthlyEarnings} />
-          </div>
-
-          <div className="space-y-3">
-            {monthlyEarnings.map((earning, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between p-4 rounded-xl transition-colors hover:border-[#c9baa9]"
-                style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}
-              >
-                <span className="font-semibold text-sm" style={{ color: "#4a3728" }}>
-                  {earning.month}
-                </span>
-                <div className="text-right">
-                  <p className="font-bold" style={{ color: "#4a3728" }}>
-                    {earning.amount}
-                  </p>
-                  <TrendPill change={earning.change} trend={earning.trend} />
-                </div>
+          {data.monthlyEarnings.length === 0 ? (
+            <p className="text-sm text-center py-6" style={{ color: "#a08070" }}>
+              No earnings recorded yet.
+            </p>
+          ) : (
+            <>
+              {/* Trend visual */}
+              <div className="p-3 rounded-xl mb-4" style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}>
+                <EarningsTrend data={data.monthlyEarnings} />
               </div>
-            ))}
-          </div>
+
+              <div className="space-y-3">
+                {data.monthlyEarnings.map((earning: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-4 rounded-xl transition-colors hover:border-[#c9baa9]"
+                    style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}
+                  >
+                    <span className="font-semibold text-sm" style={{ color: "#4a3728" }}>
+                      {monthLabel(earning.month)}
+                    </span>
+                    <div className="text-right">
+                      <p className="font-bold" style={{ color: "#4a3728" }}>
+                        ₹{earning.amount.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
