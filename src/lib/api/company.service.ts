@@ -773,6 +773,20 @@ class CompanyService {
             throw new Error(error.response?.data?.message || 'Failed to fetch company activities');
         }
     }
+    // Get dashboard card stats (Profile Views, Post Impressions, Followers, Search Appearances)
+    static async getDashboardCardStats(companyId: string, days = 30): Promise<any> {
+        try {
+            const base = config.NEXT_PUBLIC_COMPANY_ANALYTICS_DASHBOARD_V2_ENDPOINT
+                || process.env.NEXT_PUBLIC_COMPANY_ANALYTICS_DASHBOARD_V2_ENDPOINT
+                || '/company/analytics';
+            const { data } = await api.get(`${base}/dashboard-card-stats`, {
+                params: { companyId, days },
+            });
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to fetch dashboard card stats');
+        }
+    }
 }
 
 export default CompanyService;
