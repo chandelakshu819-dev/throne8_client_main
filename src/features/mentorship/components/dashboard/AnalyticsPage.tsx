@@ -44,10 +44,10 @@ const metricCards = [
 ]
 
 const popularServices = [
-  { name: "1-on-1 Mentoring", bookings: 45, percentage: 90, icon: Users },
-  { name: "Code Review", bookings: 28, percentage: 56, icon: Code2 },
-  { name: "Group Sessions", bookings: 32, percentage: 64, icon: Users },
-  { name: "Career Guidance", bookings: 43, percentage: 86, icon: Target },
+  { name: "1-on-1 Mentoring", bookings: 45, percentage: 90, icon: Users, color: "#4a3728" },
+  { name: "Code Review", bookings: 28, percentage: 56, icon: Code2, color: "#8a6a4a" },
+  { name: "Group Sessions", bookings: 32, percentage: 64, icon: Users, color: "#7a5c3e" },
+  { name: "Career Guidance", bookings: 43, percentage: 86, icon: Target, color: "#5c4632" },
 ]
 
 const monthlyEarnings = [
@@ -69,6 +69,48 @@ const TrendPill = ({ change, trend }: { change: string; trend: "up" | "down" }) 
     {change}
   </span>
 )
+
+// ── Mini bar-chart visual for the earnings trend (pure CSS/SVG, no
+// extra chart library dependency needed) ─────────────────────────────
+const EarningsTrend = ({
+  data,
+}: {
+  data: { month: string; amount: string }[]
+}) => {
+  const values = data.map((d) => Number(d.amount.replace(/[₹,]/g, "")))
+  const max = Math.max(...values, 1)
+  // Reverse so oldest month is on the left, most recent on the right
+  const ordered = [...data].reverse()
+  const orderedValues = [...values].reverse()
+
+  return (
+    <div className="flex items-end justify-between gap-3 h-24 px-1 mb-1">
+      {ordered.map((d, idx) => {
+        const heightPct = Math.max((orderedValues[idx] / max) * 100, 8)
+        const isLast = idx === ordered.length - 1
+        return (
+          <div key={d.month} className="flex-1 flex flex-col items-center gap-2">
+            <div className="w-full h-16 flex items-end">
+              <div
+                className="w-full rounded-t-md transition-all duration-500"
+                style={{
+                  height: `${heightPct}%`,
+                  backgroundColor: isLast ? "#4a3728" : "#d9c9b8",
+                }}
+              />
+            </div>
+            <span
+              className="text-[10px] font-semibold uppercase tracking-wide"
+              style={{ color: isLast ? "#4a3728" : "#a08070" }}
+            >
+              {d.month.slice(0, 3)}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function AnalyticsPage({}: AnalyticsPageProps) {
   // Quick derived summary for the highlight strip
@@ -98,13 +140,14 @@ export default function AnalyticsPage({}: AnalyticsPageProps) {
 
         {/* Quick summary chip */}
         <div
-          className="flex items-center gap-2 px-3.5 py-2 rounded-xl"
-          style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}
+          className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl"
+          style={{ backgroundColor: "#4a3728" }}
         >
-          <TrendingUp className="w-4 h-4" style={{ color: "#7a5c3e" }} />
-          <span className="text-sm font-bold" style={{ color: "#4a3728" }}>
-            {totalBookings} bookings · ₹{totalEarnings.toLocaleString()} (last 4 months)
+          <TrendingUp className="w-4 h-4 text-white" />
+          <span className="text-sm font-bold text-white">
+            {totalBookings} bookings · ₹{totalEarnings.toLocaleString()}
           </span>
+          <span className="text-xs text-white/70">last 4 months</span>
         </div>
       </div>
 
@@ -113,8 +156,8 @@ export default function AnalyticsPage({}: AnalyticsPageProps) {
         {metricCards.map((stat, idx) => (
           <div
             key={idx}
-            className="bg-white p-5 rounded-2xl transition-colors hover:border-[#c9baa9]"
-            style={{ border: "1px solid #e0d8cf" }}
+            className="bg-white p-5 rounded-2xl transition-all hover:border-[#c9baa9] hover:-translate-y-0.5"
+            style={{ border: "1px solid #e0d8cf", boxShadow: "0 1px 3px rgba(74,55,40,0.04)" }}
           >
             <div className="flex items-center justify-between mb-4">
               <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#f3ece4" }}>
@@ -138,12 +181,18 @@ export default function AnalyticsPage({}: AnalyticsPageProps) {
       {/* Two-column detailed sections */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Popular Services */}
-        <div className="bg-white p-6 rounded-2xl" style={{ border: "1px solid #e0d8cf" }}>
+        <div
+          className="bg-white p-6 rounded-2xl"
+          style={{ border: "1px solid #e0d8cf", boxShadow: "0 1px 3px rgba(74,55,40,0.04)" }}
+        >
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-base font-bold" style={{ color: "#4a3728" }}>
               Popular Services
             </h3>
-            <span className="text-xs font-semibold" style={{ color: "#a08070" }}>
+            <span
+              className="text-xs font-bold px-2.5 py-1 rounded-full"
+              style={{ backgroundColor: "#f3ece4", color: "#7a5c3e" }}
+            >
               {totalBookings} total bookings
             </span>
           </div>
@@ -152,7 +201,12 @@ export default function AnalyticsPage({}: AnalyticsPageProps) {
               <div key={idx}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <service.icon className="w-3.5 h-3.5" style={{ color: "#a08070" }} />
+                    <div
+                      className="w-6 h-6 rounded-md flex items-center justify-center"
+                      style={{ backgroundColor: `${service.color}1a` }}
+                    >
+                      <service.icon className="w-3.5 h-3.5" style={{ color: service.color }} />
+                    </div>
                     <span className="text-sm font-semibold" style={{ color: "#4a3728" }}>
                       {service.name}
                     </span>
@@ -166,7 +220,7 @@ export default function AnalyticsPage({}: AnalyticsPageProps) {
                     className="h-2.5 rounded-full transition-all duration-500"
                     style={{
                       width: `${service.percentage}%`,
-                      backgroundColor: "#4a3728",
+                      backgroundColor: service.color,
                     }}
                   />
                 </div>
@@ -176,8 +230,11 @@ export default function AnalyticsPage({}: AnalyticsPageProps) {
         </div>
 
         {/* Monthly Earnings */}
-        <div className="bg-white p-6 rounded-2xl" style={{ border: "1px solid #e0d8cf" }}>
-          <div className="flex items-center justify-between mb-5">
+        <div
+          className="bg-white p-6 rounded-2xl"
+          style={{ border: "1px solid #e0d8cf", boxShadow: "0 1px 3px rgba(74,55,40,0.04)" }}
+        >
+          <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-bold" style={{ color: "#4a3728" }}>
               Monthly Earnings
             </h3>
@@ -185,11 +242,17 @@ export default function AnalyticsPage({}: AnalyticsPageProps) {
               <Wallet className="w-4 h-4" style={{ color: "#7a5c3e" }} />
             </div>
           </div>
+
+          {/* Trend visual */}
+          <div className="p-3 rounded-xl mb-4" style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}>
+            <EarningsTrend data={monthlyEarnings} />
+          </div>
+
           <div className="space-y-3">
             {monthlyEarnings.map((earning, idx) => (
               <div
                 key={idx}
-                className="flex items-center justify-between p-4 rounded-xl"
+                className="flex items-center justify-between p-4 rounded-xl transition-colors hover:border-[#c9baa9]"
                 style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}
               >
                 <span className="font-semibold text-sm" style={{ color: "#4a3728" }}>

@@ -1,12 +1,14 @@
 // mentorDashboard/components/NotificationPage.tsx
 import React, { useMemo } from "react"
-import { CalendarClock, Star, CreditCard, Bell, MessageSquare, CheckCheck } from "lucide-react"
+import { CalendarClock, Star, CreditCard, Bell, MessageSquare, CheckCheck, BellRing } from "lucide-react"
 
 const COLORS = {
   ink: "#4a3728",
   accent: "#7a5c3e",
   hairline: "#e0d8cf",
   wash: "#f6ede8",
+  softWash: "#fbf7f3",
+  chip: "#f3ece4",
   paper: "#fffdfb",
   gold: "#c9a87c",
   muted: "#8a7a6a",
@@ -124,25 +126,38 @@ export default function NotificationPage({
   const unreadCount = data.filter((n) => !n.isRead).length
 
   return (
-    <div className="space-y-8 max-w-3xl">
+    <div className="space-y-6 animate-fadeIn max-w-3xl">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold" style={{ color: COLORS.ink }}>
-            Notifications
-          </h2>
-          <p style={{ color: COLORS.muted }} className="text-sm mt-1">
-            {unreadCount > 0
-              ? `${unreadCount} unread update${unreadCount > 1 ? "s" : ""}`
-              : "You're all caught up"}
-          </p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center relative" style={{ backgroundColor: COLORS.ink }}>
+            <Bell className="w-5 h-5 text-white" />
+            {unreadCount > 0 && (
+              <span
+                className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                style={{ backgroundColor: "#b91c1c", border: "2px solid #fff" }}
+              >
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold" style={{ color: COLORS.ink }}>
+              Notifications
+            </h2>
+            <p style={{ color: COLORS.muted }} className="text-sm">
+              {unreadCount > 0
+                ? `${unreadCount} unread update${unreadCount > 1 ? "s" : ""}`
+                : "You're all caught up"}
+            </p>
+          </div>
         </div>
 
         {unreadCount > 0 && (
           <button
             onClick={onMarkAllRead}
-            className="flex items-center gap-1.5 text-sm font-semibold hover:underline shrink-0 mt-1"
-            style={{ color: COLORS.accent }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-colors hover:border-[#c9baa9]"
+            style={{ color: COLORS.accent, backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
           >
             <CheckCheck className="w-4 h-4" />
             Mark all as read
@@ -153,35 +168,43 @@ export default function NotificationPage({
       {/* Empty state */}
       {data.length === 0 && (
         <div
-          className="text-sm py-12 text-center rounded-xl"
-          style={{ color: COLORS.muted, backgroundColor: COLORS.wash, border: `1px solid ${COLORS.hairline}` }}
+          className="flex flex-col items-center justify-center gap-3 py-14 rounded-2xl text-center"
+          style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
         >
-          Nothing here yet. Booking requests, reviews and payment updates will show up as they happen.
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.chip }}>
+            <BellRing className="w-5 h-5" style={{ color: COLORS.accent }} />
+          </div>
+          <p className="text-sm max-w-xs" style={{ color: COLORS.muted }}>
+            Nothing here yet. Booking requests, reviews and payment updates will show up as they happen.
+          </p>
         </div>
       )}
 
       {/* Grouped feed */}
       {groups.map((group) => (
-        <div key={group.label}>
+        <div key={group.label} className="bg-white p-5 rounded-2xl" style={{ border: `1px solid ${COLORS.hairline}` }}>
           <h3
-            className="text-xs font-bold uppercase tracking-wide mb-3"
+            className="text-xs font-bold uppercase tracking-wide mb-3 px-1"
             style={{ color: COLORS.muted }}
           >
             {group.label}
           </h3>
-          <div>
+          <div className="space-y-2">
             {group.items.map((item, idx) => {
               const Icon = TYPE_ICON[item.type ?? "system"] ?? Bell
               return (
                 <button
                   key={item._id ?? idx}
                   onClick={() => item._id && onMarkRead?.(item._id)}
-                  className="w-full flex items-start gap-4 py-4 text-left"
-                  style={{ borderTop: `1px solid ${COLORS.hairline}` }}
+                  className="w-full flex items-start gap-3.5 p-3.5 rounded-xl text-left transition-colors hover:border-[#c9baa9]"
+                  style={{
+                    backgroundColor: item.isRead ? "transparent" : COLORS.softWash,
+                    border: `1px solid ${item.isRead ? "transparent" : COLORS.hairline}`,
+                  }}
                 >
                   <span
-                    className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: COLORS.wash, border: `1px solid ${COLORS.hairline}` }}
+                    className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: COLORS.chip }}
                   >
                     <Icon className="w-4 h-4" style={{ color: COLORS.accent }} />
                   </span>
@@ -200,16 +223,16 @@ export default function NotificationPage({
                       {!item.isRead && (
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ backgroundColor: COLORS.accent }}
+                          style={{ backgroundColor: "#b91c1c" }}
                         />
                       )}
                     </div>
-                    <p className="text-sm mt-0.5" style={{ color: COLORS.muted }}>
+                    <p className="text-sm mt-0.5 line-clamp-2" style={{ color: COLORS.muted }}>
                       {item.message}
                     </p>
                   </div>
 
-                  <span className="text-xs shrink-0 mt-0.5" style={{ color: COLORS.muted }}>
+                  <span className="text-xs shrink-0 mt-0.5 font-medium" style={{ color: COLORS.muted }}>
                     {timeAgo(item.createdAt)}
                   </span>
                 </button>
