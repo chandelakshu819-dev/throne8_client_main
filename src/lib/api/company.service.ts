@@ -271,16 +271,20 @@ class CompanyService {
         }
     }
 
-    // ✅ ADD: Get Posts by Company
+    // ✅ ADD: Get Posts by Company (supports sort: top, engagement, trending, recent)
     static async getPostsByCompany(
         companyId: string,
         page = 1,
-        pageSize = 20
+        pageSize = 20,
+        sort?: string
     ): Promise<any> {
         try {
+            const params: any = { page, pageSize };
+            if (sort) params.sort = sort;
+
             const { data } = await api.get(
-                `${config.NEXT_PUBLIC_COMPANY_POSTS_COMPANY_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_POSTS_COMPANY_ENDPOINT}/${companyId}`,
-                { params: { page, pageSize } }
+                `${config.NEXT_PUBLIC_COMPANY_POSTS_COMPANY_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_POSTS_COMPANY_ENDPOINT || '/company/posts'}/${companyId}`,
+                { params }
             );
             console.log('Fetched posts for company:', data); // Debug log
             return data;
@@ -754,6 +758,19 @@ class CompanyService {
             return data;
         } catch (error: any) {
             throw new Error(error.response?.data?.message || 'Failed to update social links');
+        }
+    }
+
+    // Get real company activities from DB
+    static async getCompanyActivities(companyId: string, filter?: string): Promise<any> {
+        try {
+            const { data } = await api.get(
+                `${config.NEXT_PUBLIC_COMPANY_COMPANIES_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_COMPANIES_ENDPOINT || '/company/companies'}/${companyId}/activity`,
+                { params: filter ? { filter } : undefined }
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to fetch company activities');
         }
     }
 }

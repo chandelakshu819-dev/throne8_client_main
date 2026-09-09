@@ -18,7 +18,11 @@ export default function DashboardPage() {
     stats,
     quickActions,
     topPosts,
+    isLoadingTopPosts,
+    topPostsError,
     activityFeed,
+    isLoadingActivities,
+    activityError,
     engagementMetrics,
     pendingItems,
   } = useDashboard();
@@ -52,9 +56,17 @@ export default function DashboardPage() {
         <PendingActions items={pendingItems} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <TopPosts posts={topPosts} />
-        <ActivityFeed items={activityFeed} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+        <TopPosts
+          posts={topPosts}
+          isLoading={isLoadingTopPosts}
+          error={topPostsError}
+        />
+        <ActivityFeed
+          items={activityFeed}
+          isLoading={isLoadingActivities}
+          error={activityError}
+        />
       </div>
 
       <EngagementMetrics metrics={engagementMetrics} />
