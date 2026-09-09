@@ -252,7 +252,7 @@ class CompanyService {
 
     static async createPost(formData: FormData): Promise<any> {
         try {
-            // ✅ FIX: headers में Content-Type को explicitly delete karo
+            // ✅ FIX: headers mai Content-Type ko explicitly delete karo
             // Axios default 'application/json' set karta hai jo FormData ke sath conflict karta hai
             const { data } = await api.post(
                 `${config.NEXT_PUBLIC_COMPANY_POSTS_CREATE_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_POSTS_CREATE_ENDPOINT}`,
@@ -785,6 +785,192 @@ class CompanyService {
             return data;
         } catch (error: any) {
             throw new Error(error.response?.data?.message || 'Failed to fetch dashboard card stats');
+        }
+    }
+
+    // Get real Action Needed dashboard items (Posting, Applications, Messages, Events, Profile)
+    static async getActionNeeded(companyId: string): Promise<any> {
+        const endpoint = config.NEXT_PUBLIC_COMPANY_COMPANIES_ENDPOINT
+            || process.env.NEXT_PUBLIC_COMPANY_COMPANIES_ENDPOINT
+            || '/company/companies';
+
+        // 1. Try dedicated endpoint first
+        try {
+            const { data } = await api.get(`${endpoint}/${companyId}/action-needed`);
+            if (data?.data?.items || data?.items) {
+                return data;
+            }
+        } catch (err: any) {
+            const status = err.response?.status || err.statusCode;
+            const msg = err.response?.data?.message || err.message || '';
+            // If it's anything other than 404/not found, bubble up the real error
+            if (status && status !== 404 && !msg.toLowerCase().includes('not found')) {
+                throw new Error(msg || 'Failed to fetch action needed items');
+            }
+        }
+
+        // 2. If dedicated route is not yet deployed on server, compose from real existing DB endpoints
+        try {
+            const now = new Date();
+
+            const [postsRes, companyRes, eventsRes, conversationsRes, jobsRes] = await Promise.allSettled([
+                // 1. Real posts
+                api.get(`${endpoint}/${companyId}/posts`, { params: { page: 1, pageSize: 1, sort: 'recent' } }).catch(() => null),
+                // 2. Real company profile
+                api.get(`${endpoint}/${companyId}`).catch(() => null),
+                // 3. Real events
+                api.get(config.NEXT_PUBLIC_COMPANY_EVENTS_GET_ALL_ENDPOINT || '/company/events/get-all-events', { params: { companyId } }).catch(() => null),
+                // 4. Real conversations
+                api.get(config.NEXT_PUBLIC_MESSAGES_CONVERSATIONS_ENDPONT || '/messaging/conversations').catch(() => null),
+                // 5. Real jobs
+                api.get(`/company/jobs/company/${companyId}`).catch(() => null),
+            ]);
+
+            const items: Array<{
+                id: string;
+                label: string;
+                action: string;
+                href: string;
+                urgency: 'high' | 'medium' | 'low';
+            }> = [];
+
+            // 1. Posting item
+            const postData = postsRes.status === 'fulfilled' && postsRes.value ? postsRes.value.data : null;
+            const postList: any[] = postData?.items || postData?.posts || (Array.isArray(postData) ? postData : []);
+            if (postList.length === 0) {
+                items.push({
+                    id: 'p-posting',
+                    label: "You haven't published any posts yet",
+                    action: "Create Post",
+                    href: "/posts",
+                    urgency: "high",
+                });
+            } else {
+                const latestPost = postList[0];
+                const postDate = new Date(latestPost.publishedAt || latestPost.createdAt);
+                if (!isNaN(postDate.getTime())) {
+                    const diffMs = Math.max(0, now.getTime() - postDate.getTime());
+                    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                    if (days >= 1) {
+                        items.push({
+                            id: 'p-posting',
+                            label: days === 1 ? "You haven't posted in 1 day" : `You haven't posted in ${days} days`,
+                            action: "Create Post",
+                            href: "/posts",
+                            urgency: days >= 3 ? "high" : "medium",
+                        });
+                    }
+                }
+            }
+
+            // 2. Job applications item
+            const jobsData = jobsRes.status === 'fulfilled' && jobsRes.value ? jobsRes.value.data : null;
+            const jobsList: any[] = jobsData?.jobs || jobsData?.items || (Array.isArray(jobsData) ? jobsData : []);
+            const pendingAppsCount = jobsList.reduce((acc: number, j: any) => {
+                return acc + (Number(j.applicationsCount || j.applications || 0));
+            }, 0);
+
+            if (pendingAppsCount > 0) {
+                items.push({
+                    id: 'p-applications',
+                    label: `${pendingAppsCount} new job application${pendingAppsCount === 1 ? '' : 's'} waiting`,
+                    action: "Review",
+                    href: "/jobs",
+                    urgency: "high",
+                });
+            } else {
+                items.push({
+                    id: 'p-applications',
+                    label: "0 new job applications waiting",
+                    action: "Review",
+                    href: "/jobs",
+                    urgency: "low",
+                });
+            }
+
+            // 3. Messages item
+            const convData = conversationsRes.status === 'fulfilled' && conversationsRes.value ? conversationsRes.value.data : null;
+            const convList: any[] = convData?.data || (Array.isArray(convData) ? convData : []);
+            const unreadCount = convList.reduce((acc: number, c: any) => acc + (Number(c.unreadCount) || 0), 0);
+            items.push({
+                id: 'p-messages',
+                label: unreadCount > 0 ? `${unreadCount} unread message${unreadCount === 1 ? '' : 's'}` : "0 unread messages",
+                action: "Open Inbox",
+                href: "/inbox",
+                urgency: unreadCount > 0 ? "medium" : "low",
+            });
+
+            // 4. Events item
+            const eventsData = eventsRes.status === 'fulfilled' && eventsRes.value ? eventsRes.value.data : null;
+            const eventsList: any[] = eventsData?.events || eventsData?.items || (Array.isArray(eventsData) ? eventsData : []);
+            const upcomingEvents = eventsList
+                .filter((e: any) => e.startDate && new Date(e.startDate) >= now && e.status !== 'Cancelled')
+                .sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+
+            if (upcomingEvents.length > 0) {
+                const nextEv = upcomingEvents[0];
+                const diffTime = new Date(nextEv.startDate).getTime() - now.getTime();
+                const daysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+                const label = daysLeft === 0
+                    ? `Event "${nextEv.title}" starts today`
+                    : daysLeft === 1
+                    ? `Event "${nextEv.title}" starts tomorrow`
+                    : `Event "${nextEv.title}" starts in ${daysLeft} days`;
+
+                items.push({
+                    id: 'p-events',
+                    label,
+                    action: "Manage",
+                    href: "/events",
+                    urgency: daysLeft <= 2 ? "high" : "medium",
+                });
+            } else {
+                items.push({
+                    id: 'p-events',
+                    label: "No upcoming events",
+                    action: "Manage",
+                    href: "/events",
+                    urgency: "low",
+                });
+            }
+
+            // 5. Profile completion item
+            const compDoc = companyRes.status === 'fulfilled' && companyRes.value ? (companyRes.value.data?.company || companyRes.value.data) : null;
+            if (compDoc) {
+                const profileChecks = [
+                    Boolean(compDoc.companyName && compDoc.companyName.trim()),
+                    Boolean((compDoc.descriptions?.short && compDoc.descriptions.short.trim()) ||
+                        (compDoc.descriptions?.tagline && compDoc.descriptions.tagline.trim()) ||
+                        (compDoc.descriptions?.detailed && compDoc.descriptions.detailed.trim()) ||
+                        (compDoc.description && compDoc.description.trim()) ||
+                        (compDoc.tagline && compDoc.tagline.trim())),
+                    Boolean(compDoc.industry && String(compDoc.industry).trim()),
+                    Boolean((compDoc.companySize || compDoc.size) && String(compDoc.companySize || compDoc.size).trim()),
+                    Boolean((compDoc.headquarters?.city && compDoc.headquarters.city.trim()) ||
+                        (compDoc.headquarters?.country && compDoc.headquarters.country.trim()) ||
+                        (compDoc.headquarters?.address && compDoc.headquarters.address.trim())),
+                    Boolean(compDoc.website && compDoc.website.trim()),
+                    Boolean(compDoc.media?.logo?.url || compDoc.logo),
+                    Boolean(compDoc.socialMedia?.linkedin || compDoc.socialMedia?.twitter || compDoc.socialMedia?.website || compDoc.socialMedia?.facebook || compDoc.socialMedia?.instagram),
+                ];
+                const passedCount = profileChecks.filter(Boolean).length;
+                const completionPercentage = Math.round((passedCount / profileChecks.length) * 100);
+
+                items.push({
+                    id: 'p-profile',
+                    label: `Profile completion: ${completionPercentage}%`,
+                    action: completionPercentage === 100 ? "View" : "Complete",
+                    href: "/edit",
+                    urgency: completionPercentage < 60 ? "high" : "low",
+                });
+            }
+
+            return {
+                status: 'success',
+                data: { items },
+            };
+        } catch (fallbackErr: any) {
+            throw new Error(fallbackErr.message || 'Failed to assemble action needed items from backend');
         }
     }
 }

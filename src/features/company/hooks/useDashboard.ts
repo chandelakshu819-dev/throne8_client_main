@@ -65,9 +65,6 @@ function formatChange(change: number | null): { text: string; up: boolean } | nu
 
 export function useDashboard(companyIdOverride?: string) {
   const user = useAppSelector(s => s.login.user);
-  const unreadMsgs = useAppSelector(s => s.inbox.unreadCount);
-  const jobItems = useAppSelector(s => s.jobs.items);
-  const activityItems = useAppSelector(s => s.activity.items);
 
   const params = useParams();
   const { userProfileData, loadProfile } = useProfile();
@@ -87,6 +84,11 @@ export function useDashboard(companyIdOverride?: string) {
   const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState<boolean>(true);
   const [activityError, setActivityError] = useState<string | null>(null);
+
+  // Real Action Needed states (100% database driven)
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
+  const [isLoadingPendingActions, setIsLoadingPendingActions] = useState<boolean>(true);
+  const [pendingActionsError, setPendingActionsError] = useState<string | null>(null);
 
   // Resolved dynamic companyId
   const [resolvedCompanyId, setResolvedCompanyId] = useState<string | null>(null);
@@ -410,22 +412,45 @@ export function useDashboard(companyIdOverride?: string) {
     [activeRange]
   );
 
-  // Pending actions — counts come from live Redux state
-  const pendingItems = useMemo<PendingItem[]>(() => {
-    const newApplications = jobItems.reduce((a, j) => a + j.applications, 0);
-    const unreadActivity = activityItems.filter(a => !a.read).length;
+  // Fetch real Action Needed items (100% database driven)
+  useEffect(() => {
+    if (!resolvedCompanyId) return;
 
-    return [
-      { id: 'p-1', label: "You haven't posted in 3 days", action: 'Create Post', href: '/posts', urgency: 'high' },
-      { id: 'p-2', label: `${newApplications} new job applications waiting`, action: 'Review', href: '/jobs', urgency: 'high' },
-      { id: 'p-3', label: `${unreadMsgs} unread messages`, action: 'Open Inbox', href: '/inbox', urgency: unreadMsgs > 0 ? 'medium' : 'low' },
-      { id: 'p-4', label: 'Event "AI Summit" starts in 2 days', action: 'Manage', href: '/events', urgency: 'medium' },
-      { id: 'p-5', label: 'Profile completion: 85%', action: 'Complete', href: '/edit', urgency: 'low' },
-      ...(unreadActivity > 0
-        ? [{ id: 'p-6', label: `${unreadActivity} unread activity items`, action: 'View', href: '/activity', urgency: 'low' as const }]
-        : []),
-    ];
-  }, [jobItems, unreadMsgs, activityItems]);
+    let isCancelled = false;
+
+    async function fetchActionNeeded() {
+      setIsLoadingPendingActions(true);
+      setPendingActionsError(null);
+
+      try {
+        const res = await CompanyService.getActionNeeded(resolvedCompanyId!);
+        if (isCancelled) return;
+
+        const rawItems: PendingItem[] = res?.data?.items || res?.items || [];
+        if (Array.isArray(rawItems)) {
+          setPendingItems(rawItems);
+        } else {
+          setPendingItems([]);
+        }
+      } catch (err: any) {
+        if (!isCancelled) {
+          console.error('Error fetching action needed items:', err);
+          setPendingActionsError(err.message || 'Failed to load action needed items');
+          setPendingItems([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingPendingActions(false);
+        }
+      }
+    }
+
+    fetchActionNeeded();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [resolvedCompanyId]);
 
   const handleRangeChange = useCallback((range: 'week' | 'month') => {
     setActiveRange(range);
@@ -459,7 +484,9 @@ export function useDashboard(companyIdOverride?: string) {
     isLoadingActivities,
     activityError,
 
-    // Dynamic — derived from Redux
+    // Real dynamic Action Needed items from database
     pendingItems,
+    isLoadingPendingActions,
+    pendingActionsError,
   };
 }

@@ -27,6 +27,8 @@ export default function DashboardPage() {
     activityError,
     engagementMetrics,
     pendingItems,
+    isLoadingPendingActions,
+    pendingActionsError,
   } = useDashboard();
 
   return (
@@ -55,7 +57,11 @@ export default function DashboardPage() {
           activeRange={activeRange}
           onRangeChange={handleRangeChange}
         />
-        <PendingActions items={pendingItems} />
+        <PendingActions
+          items={pendingItems}
+          isLoading={isLoadingPendingActions}
+          error={pendingActionsError}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
