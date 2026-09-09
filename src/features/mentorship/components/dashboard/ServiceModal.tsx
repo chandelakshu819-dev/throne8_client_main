@@ -3,10 +3,12 @@
 import React, { useMemo, useEffect } from 'react';
 import {
     X, DollarSign, Image as ImageIcon, Upload, FileText,
-    Briefcase, Clock, Users
+    Briefcase, Clock, Users, CreditCard, AlertCircle
 } from 'lucide-react';
 import { Video, MessageSquare, Package } from 'lucide-react';
 
+// NOTE: `emoji` kept only for backward-compat with callers that still pass it in
+// via the `service` prop — it is not rendered anywhere in this file anymore.
 const serviceTypes = [
     {
         name: 'quick_call', label: 'Quick Call', icon: Video,
@@ -75,10 +77,24 @@ interface ServiceModalProps {
     formData: any;
     setFormData: (data: any) => void;
     handleCreateService: () => void;
-    isSaving?: boolean;       // ← NEW
-    saveError?: string | null; // ← NEW
+    isSaving?: boolean;
+    saveError?: string | null;
     fieldErrors?: Record<string, string>;
 }
+
+// Small reusable field label with icon
+const FieldLabel = ({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) => (
+    <label className="flex items-center gap-2 text-sm font-semibold mb-2" style={{ color: '#4a3728' }}>
+        <Icon className="w-4 h-4" style={{ color: '#7a5c3e' }} />
+        {children}
+    </label>
+);
+
+const inputStyle = (hasError?: string) => ({
+    borderColor: hasError ? '#dc2626' : '#e0d8cf',
+    backgroundColor: '#fbf7f3',
+    color: '#4a3728',
+});
 
 export default function ServiceModal({
     service, onClose, formData, setFormData, handleCreateService,
@@ -89,6 +105,7 @@ export default function ServiceModal({
     const currentServiceType = serviceTypes.find(t => t.name === formData?.serviceType);
     const needsDescription = currentServiceType?.needsDescription ?? true;
     const needsParticipants = currentServiceType?.needsParticipants ?? true;
+    const ServiceIcon = currentServiceType?.icon || FileText;
 
     const thumbnailPreview = useMemo(() => {
         if (!formData?.thumbnailImage) return null;
@@ -109,76 +126,77 @@ export default function ServiceModal({
     }, [thumbnailPreview, formData?.thumbnailImage]);
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
             <div
-                className="bg-white rounded-3xl p-8 max-w-4xl w-full shadow-2xl transform animate-fadeIn max-h-[90vh] overflow-y-auto"
-                style={{ border: '2px solid #e0d8cf' }}
+                className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-xl max-h-[90vh] overflow-y-auto"
+                style={{ border: '1px solid #e0d8cf' }}
             >
                 {/* Header */}
-                <div className="flex justify-between items-start mb-8">
-                    <div className="flex items-center gap-4">
-                        <div className="text-6xl">{service.emoji || '📋'}</div>
+                <div className="flex justify-between items-start mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#f3ece4' }}>
+                            <ServiceIcon className="w-5 h-5" style={{ color: '#4a3728' }} />
+                        </div>
                         <div>
-                            <h3 className="text-4xl font-bold mb-2" style={{ color: '#4a3728' }}>
+                            <h3 className="text-xl font-bold" style={{ color: '#4a3728' }}>
                                 {service.name === 'New Service' ? 'Create New Service' : service.name}
                             </h3>
-                            <p className="text-lg" style={{ color: '#8a7a6a' }}>{service.description}</p>
+                            <p className="text-sm" style={{ color: '#8a7a6a' }}>{service.description}</p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
                         disabled={isSaving}
-                        className="p-3 hover:bg-gray-100 rounded-xl transition-all duration-300 hover:rotate-90 disabled:opacity-50"
+                        className="p-2 hover:bg-[#f3ece4] rounded-lg transition-colors disabled:opacity-50"
                     >
-                        <X className="w-7 h-7" style={{ color: '#4a3728' }} />
+                        <X className="w-5 h-5" style={{ color: '#4a3728' }} />
                     </button>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-5">
 
                     {/* Image Upload */}
-                    <div className="p-8 rounded-2xl border-2 border-dashed relative overflow-hidden" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
+                    <div className="rounded-xl border border-dashed relative overflow-hidden" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', minHeight: thumbnailPreview ? '180px' : 'auto' }}>
                         {thumbnailPreview ? (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/5 group">
+                            <div className="relative group" style={{ height: '180px' }}>
                                 <img src={thumbnailPreview} alt="Preview" className="w-full h-full object-cover" />
                                 <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                                    <input 
-                                        type="file" 
-                                        accept="image/jpeg,image/png,image/webp" 
-                                        className="hidden" 
+                                    <input
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp"
+                                        className="hidden"
                                         onChange={(e) => {
                                             const file = e.target.files?.[0];
                                             if (file) setFormData({ ...formData, thumbnailImage: file });
                                         }}
                                         disabled={isSaving}
                                     />
-                                    <div className="text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300 flex items-center gap-2" style={{ backgroundColor: '#4a3728' }}>
-                                        <Upload className="w-5 h-5" />
+                                    <div className="text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2" style={{ backgroundColor: '#4a3728' }}>
+                                        <Upload className="w-4 h-4" />
                                         Change Image
                                     </div>
                                 </label>
                             </div>
                         ) : (
-                            <div className="text-center">
-                                <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
-                                    style={{ border: '2px solid #e0d8cf' }}>
-                                    <ImageIcon className="w-12 h-12" style={{ color: '#7a5c3e' }} />
+                            <div className="text-center py-8 px-6">
+                                <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: '#f3ece4' }}>
+                                    <ImageIcon className="w-6 h-6" style={{ color: '#7a5c3e' }} />
                                 </div>
-                                <h4 className="text-xl font-bold mb-2" style={{ color: '#4a3728' }}>Upload Service Image</h4>
-                                <p className="text-sm mb-4" style={{ color: '#8a7a6a' }}>Add a professional image for your service</p>
-                                <label className="cursor-pointer text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-300 flex items-center gap-2 mx-auto w-fit"
+                                <p className="text-sm font-semibold mb-1" style={{ color: '#4a3728' }}>Upload service image</p>
+                                <p className="text-xs mb-4" style={{ color: '#8a7a6a' }}>Optional — helps your service stand out</p>
+                                <label className="cursor-pointer text-white px-4 py-2 rounded-lg text-sm font-semibold inline-flex items-center gap-2"
                                     style={{ backgroundColor: '#4a3728' }}>
-                                    <input 
-                                        type="file" 
-                                        accept="image/jpeg,image/png,image/webp" 
-                                        className="hidden" 
+                                    <input
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp"
+                                        className="hidden"
                                         onChange={(e) => {
                                             const file = e.target.files?.[0];
                                             if (file) setFormData({ ...formData, thumbnailImage: file });
                                         }}
                                         disabled={isSaving}
                                     />
-                                    <Upload className="w-5 h-5" />
+                                    <Upload className="w-4 h-4" />
                                     Choose Image
                                 </label>
                             </div>
@@ -187,156 +205,108 @@ export default function ServiceModal({
 
                     {/* Service Type Display */}
                     {currentServiceType && (
-                        <div className="p-6 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '2px solid #e0d8cf' }}>
-                            <label className="block text-lg font-bold mb-4" style={{ color: '#4a3728' }}>
-                                <FileText className="w-5 h-5 inline mr-2" />
-                                Service Type
-                            </label>
-                            <div className="flex items-center gap-4 p-4 rounded-xl" style={{ backgroundColor: '#fff', border: '2px solid #e0d8cf' }}>
-                                <div className="text-5xl">{currentServiceType.emoji}</div>
-                                <div className="flex-1">
-                                    <h5 className="font-bold text-xl" style={{ color: '#4a3728' }}>{currentServiceType.label}</h5>
-                                    <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>{currentServiceType.description}</p>
-                                </div>
+                        <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: '#f3ece4' }}>
+                                <currentServiceType.icon className="w-5 h-5" style={{ color: '#4a3728' }} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <h5 className="font-semibold text-sm" style={{ color: '#4a3728' }}>{currentServiceType.label}</h5>
+                                <p className="text-xs mt-0.5" style={{ color: '#8a7a6a' }}>{currentServiceType.description}</p>
                             </div>
                         </div>
                     )}
 
                     {/* Name & Price */}
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                                <Briefcase className="w-5 h-5 inline mr-2" />
-                                Service Name
-                            </label>
+                            <FieldLabel icon={Briefcase}>Service Name</FieldLabel>
                             <input
                                 type="text"
                                 placeholder="e.g., Advanced React Mentoring"
-                                className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                                style={{
-                                    borderColor: fieldErrors?.serviceName ? '#dc2626' : '#e0d8cf',
-                                    backgroundColor: '#fbf7f3',
-                                    color: '#4a3728'
-                                }}
+                                className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                style={inputStyle(fieldErrors?.serviceName)}
                                 value={formData?.serviceName || ''}
                                 onChange={(e) => setFormData({ ...formData, serviceName: e.target.value })}
                                 disabled={isSaving}
                             />
                             {fieldErrors?.serviceName && (
-                                <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
-                                    {fieldErrors.serviceName}
-                                </p>
+                                <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.serviceName}</p>
                             )}
                         </div>
                         <div>
-                            <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                                <DollarSign className="w-5 h-5 inline mr-2" />
-                                Price per Hour
-                            </label>
+                            <FieldLabel icon={DollarSign}>Price per Hour</FieldLabel>
                             <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold" style={{ color: '#7a5c3e' }}>₹</span>
+                                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold" style={{ color: '#7a5c3e' }}>₹</span>
                                 <input
                                     type="number"
                                     placeholder="500"
-                                    className="w-full p-4 pl-10 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                                    style={{
-                                        borderColor: fieldErrors?.price ? '#dc2626' : '#e0d8cf',
-                                        backgroundColor: '#fbf7f3',
-                                        color: '#4a3728'
-                                    }}
+                                    className="w-full pl-7 pr-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                    style={inputStyle(fieldErrors?.price)}
                                     value={formData?.price || ''}
                                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                                     disabled={isSaving}
                                 />
                             </div>
                             {fieldErrors?.price && (
-                                <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
-                                    {fieldErrors.price}
-                                </p>
+                                <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.price}</p>
                             )}
                         </div>
                     </div>
 
                     {/* Scheduled Date & Time */}
                     <div>
-                        <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                            <Clock className="w-5 h-5 inline mr-2" />
-                            Schedule Date & Time
-                        </label>
+                        <FieldLabel icon={Clock}>Schedule Date & Time</FieldLabel>
                         <input
                             type="datetime-local"
                             min={new Date(Date.now() + 10 * 60 * 1000).toISOString().slice(0, 16)}
-                            className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                            style={{
-                                borderColor: fieldErrors?.scheduledAt ? '#dc2626' : '#e0d8cf',
-                                backgroundColor: '#fbf7f3',
-                                color: '#4a3728'
-                            }}
+                            className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                            style={inputStyle(fieldErrors?.scheduledAt)}
                             value={formData?.scheduledAt || ''}
                             onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
                             disabled={isSaving}
                         />
                         {fieldErrors?.scheduledAt && (
-                            <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
-                                {fieldErrors.scheduledAt}
-                            </p>
+                            <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.scheduledAt}</p>
                         )}
                     </div>
 
                     {/* Payment Method */}
                     <div>
-                            <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                                💳 Payment Method
-                            </label>
-                            <select
-                                className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                                style={{
-                                    borderColor: fieldErrors?.paymentMethod ? '#dc2626' : '#e0d8cf',
-                                    backgroundColor: '#fbf7f3',
-                                    color: '#4a3728'
-                                }}
-                                value={formData?.paymentMethod || ''}
-                                onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                                disabled={isSaving}
-                            >
-                                <option value="">Select payment method</option>
-                                <option value="free">🆓 Free (No Charge)</option>
-                                <option value="razorpay">Razorpay</option>
-                                <option value="stripe">Stripe</option>
-                                <option value="cash">Cash</option>
-                                <option value="bank_transfer">Bank Transfer</option>
-                            </select>
-                            {fieldErrors?.paymentMethod && (
-                                <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
-                                    {fieldErrors.paymentMethod}
-                                </p>
-                            )}
-                        </div>
+                        <FieldLabel icon={CreditCard}>Payment Method</FieldLabel>
+                        <select
+                            className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                            style={inputStyle(fieldErrors?.paymentMethod)}
+                            value={formData?.paymentMethod || ''}
+                            onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                            disabled={isSaving}
+                        >
+                            <option value="">Select payment method</option>
+                            <option value="free">Free (No Charge)</option>
+                            <option value="razorpay">Razorpay</option>
+                            <option value="stripe">Stripe</option>
+                            <option value="cash">Cash</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                        </select>
+                        {fieldErrors?.paymentMethod && (
+                            <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.paymentMethod}</p>
+                        )}
+                    </div>
 
                     {/* Description */}
                     {needsDescription && (
                         <div>
-                            <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                                <FileText className="w-5 h-5 inline mr-2" />
-                                Description
-                            </label>
+                            <FieldLabel icon={FileText}>Description</FieldLabel>
                             <textarea
-                                rows={5}
+                                rows={4}
                                 placeholder="Describe your service in detail..."
-                                className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg resize-none"
-                                style={{
-                                    borderColor: fieldErrors?.description ? '#dc2626' : '#e0d8cf',
-                                    backgroundColor: '#fbf7f3',
-                                    color: '#4a3728'
-                                }}
+                                className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm resize-none"
+                                style={inputStyle(fieldErrors?.description)}
                                 value={formData?.description || ''}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                 disabled={isSaving}
                             />
                             {fieldErrors?.description && (
-                                <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
-                                    {fieldErrors.description}
-                                </p>
+                                <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.description}</p>
                             )}
                         </div>
                     )}
@@ -344,43 +314,31 @@ export default function ServiceModal({
                     {/* Topic */}
                     {needsParticipants && (
                         <div>
-                            <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                                <FileText className="w-5 h-5 inline mr-2" />
-                                Topic
-                            </label>
+                            <FieldLabel icon={FileText}>Topic</FieldLabel>
                             <input
                                 type="text"
                                 placeholder="e.g., React System Design"
-                                className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                                style={{
-                                    borderColor: fieldErrors?.topic ? '#dc2626' : '#e0d8cf',
-                                    backgroundColor: '#fbf7f3',
-                                    color: '#4a3728'
-                                }}
+                                className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                style={inputStyle(fieldErrors?.topic)}
                                 value={formData?.topic || ''}
                                 onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
                                 disabled={isSaving}
                             />
                             {fieldErrors?.topic && (
-                                <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
-                                    {fieldErrors.topic}
-                                </p>
+                                <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.topic}</p>
                             )}
                         </div>
                     )}
 
                     {/* Duration & Participants */}
-                    <div className={`grid ${needsParticipants ? 'grid-cols-3' : 'grid-cols-1'} gap-6`}>
+                    <div className={`grid ${needsParticipants ? 'grid-cols-3' : 'grid-cols-1'} gap-4`}>
                         <div>
-                            <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                                <Clock className="w-5 h-5 inline mr-2" />
-                                Duration (min)
-                            </label>
+                            <FieldLabel icon={Clock}>Duration (min)</FieldLabel>
                             <input
                                 type="number"
                                 placeholder="60"
-                                className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                                style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+                                className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                style={inputStyle()}
                                 value={formData?.duration || ''}
                                 onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
                                 disabled={isSaving}
@@ -389,51 +347,33 @@ export default function ServiceModal({
                         {needsParticipants && (
                             <>
                                 <div>
-                                    <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                                        <Users className="w-5 h-5 inline mr-2" />
-                                        Min Participants
-                                    </label>
+                                    <FieldLabel icon={Users}>Min Participants</FieldLabel>
                                     <input
                                         type="number"
                                         placeholder="1"
-                                        className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                                        style={{
-                                            borderColor: fieldErrors?.minParticipants ? '#dc2626' : '#e0d8cf',
-                                            backgroundColor: '#fbf7f3',
-                                            color: '#4a3728'
-                                        }}
+                                        className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                        style={inputStyle(fieldErrors?.minParticipants)}
                                         value={formData?.minParticipants || ''}
                                         onChange={(e) => setFormData({ ...formData, minParticipants: e.target.value })}
                                         disabled={isSaving}
                                     />
                                     {fieldErrors?.minParticipants && (
-                                        <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
-                                            {fieldErrors.minParticipants}
-                                        </p>
+                                        <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.minParticipants}</p>
                                     )}
                                 </div>
                                 <div>
-                                    <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                                        <Users className="w-5 h-5 inline mr-2" />
-                                        Max Participants
-                                    </label>
+                                    <FieldLabel icon={Users}>Max Participants</FieldLabel>
                                     <input
                                         type="number"
                                         placeholder="10"
-                                        className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                                        style={{
-                                            borderColor: fieldErrors?.maxParticipants ? '#dc2626' : '#e0d8cf',
-                                            backgroundColor: '#fbf7f3',
-                                            color: '#4a3728'
-                                        }}
+                                        className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                        style={inputStyle(fieldErrors?.maxParticipants)}
                                         value={formData?.maxParticipants || ''}
                                         onChange={(e) => setFormData({ ...formData, maxParticipants: e.target.value })}
                                         disabled={isSaving}
                                     />
                                     {fieldErrors?.maxParticipants && (
-                                        <p className="text-xs mt-1 font-semibold" style={{ color: '#dc2626' }}>
-                                            {fieldErrors.maxParticipants}
-                                        </p>
+                                        <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.maxParticipants}</p>
                                     )}
                                 </div>
                             </>
@@ -441,13 +381,13 @@ export default function ServiceModal({
                     </div>
 
                     {/* Follow-up Settings */}
-                    <div className="p-6 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '2px solid #e0d8cf' }}>
-                        <h4 className="text-lg font-bold mb-4" style={{ color: '#4a3728' }}>Follow-up Settings</h4>
-                        <div className="grid grid-cols-3 gap-6">
+                    <div className="p-4 rounded-xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
+                        <h4 className="text-sm font-bold mb-3" style={{ color: '#4a3728' }}>Follow-up Settings</h4>
+                        <div className="grid grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-sm font-bold mb-3" style={{ color: '#4a3728' }}>Follow-up Period</label>
+                                <label className="block text-xs font-semibold mb-2" style={{ color: '#4a3728' }}>Follow-up Period</label>
                                 <select
-                                    className="w-full px-4 py-3 rounded-xl border-2 outline-none"
+                                    className="w-full px-3 py-2 rounded-lg border outline-none text-sm"
                                     style={{ borderColor: '#e0d8cf', backgroundColor: '#fff', color: '#4a3728' }}
                                     value={formData?.followUpPeriod || '24'}
                                     onChange={(e) => setFormData({ ...formData, followUpPeriod: e.target.value })}
@@ -457,9 +397,9 @@ export default function ServiceModal({
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-bold mb-3" style={{ color: '#4a3728' }}>Follow-up Allowed</label>
+                                <label className="block text-xs font-semibold mb-2" style={{ color: '#4a3728' }}>Follow-up Allowed</label>
                                 <select
-                                    className="w-full px-4 py-3 rounded-xl border-2 outline-none"
+                                    className="w-full px-3 py-2 rounded-lg border outline-none text-sm"
                                     style={{ borderColor: '#e0d8cf', backgroundColor: '#fff', color: '#4a3728' }}
                                     value={formData?.followUpAllowed || '1'}
                                     onChange={(e) => setFormData({ ...formData, followUpAllowed: e.target.value })}
@@ -469,9 +409,9 @@ export default function ServiceModal({
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-bold mb-3" style={{ color: '#4a3728' }}>Buffer Time</label>
+                                <label className="block text-xs font-semibold mb-2" style={{ color: '#4a3728' }}>Buffer Time</label>
                                 <select
-                                    className="w-full px-4 py-3 rounded-xl border-2 outline-none"
+                                    className="w-full px-3 py-2 rounded-lg border outline-none text-sm"
                                     style={{ borderColor: '#e0d8cf', backgroundColor: '#fff', color: '#4a3728' }}
                                     value={formData?.bufferTime || '5'}
                                     onChange={(e) => setFormData({ ...formData, bufferTime: e.target.value })}
@@ -483,22 +423,23 @@ export default function ServiceModal({
                         </div>
                     </div>
 
-                    {/* ── Error Message ─────────────────────────────── */}
+                    {/* Error Message */}
                     {saveError && (
                         <div
-                            className="p-4 rounded-xl text-sm font-semibold"
+                            className="flex items-center gap-2 p-3 rounded-lg text-sm font-medium"
                             style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5' }}
                         >
-                            ❌ {saveError}
+                            <AlertCircle className="w-4 h-4 shrink-0" />
+                            {saveError}
                         </div>
                     )}
 
-                    {/* ── Buttons ───────────────────────────────────── */}
-                    <div className="flex gap-4 pt-4">
+                    {/* Buttons */}
+                    <div className="flex gap-3 pt-2">
                         <button
                             onClick={onClose}
                             disabled={isSaving}
-                            className="flex-1 py-4 rounded-xl font-bold text-lg border-2 hover:opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 py-3 rounded-xl font-semibold text-sm border transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#f3ece4]"
                             style={{ borderColor: '#e0d8cf', color: '#4a3728', backgroundColor: '#fbf7f3' }}
                         >
                             Cancel
@@ -506,7 +447,7 @@ export default function ServiceModal({
                         <button
                             onClick={handleCreateService}
                             disabled={isSaving}
-                            className="flex-1 py-4 rounded-xl text-white font-bold text-lg hover:shadow-2xl transform hover:scale-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none"
+                            className="flex-1 py-3 rounded-xl text-white font-semibold text-sm transition-opacity disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90"
                             style={{ backgroundColor: '#4a3728' }}
                         >
                             {isSaving ? "Creating..." : "Create Service"}

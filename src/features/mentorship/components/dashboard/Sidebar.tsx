@@ -1,5 +1,5 @@
 // mentorDashboard/components/Sidebar.tsx
-import { Star } from "lucide-react";
+import { Star, ChevronRight } from "lucide-react";
 import { MENU_ITEMS } from "../../constants/constant";
 import type { MenuItem } from "../../types";
 
@@ -14,7 +14,6 @@ export default function Sidebar({
   setActivePage,
   mentorData
 }: SidebarProps) {
-  // Inhe derive karo
   const firstName = mentorData?.user?.firstName ?? "A";
   const lastName = mentorData?.user?.lastName ?? "S";
   const initials = `${firstName[0]}${lastName[0]}`;
@@ -27,42 +26,54 @@ export default function Sidebar({
   const rating = mentorData?.stats?.averageRating || 0;
 
   return (
-    <aside className="w-80 bg-white shadow-2xl flex flex-col">
+    <aside className="w-80 flex flex-col" style={{ backgroundColor: '#fff', borderRight: '1px solid #ece4db' }}>
       {/* Profile Card */}
-      <div className="m-6 p-8 rounded-3xl shadow-2xl relative overflow-hidden hover:scale-105 transition-all duration-300 bg-[#fbf7f3] border-2 border-[#e0d8cf]">
-        <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-30 -mr-16 -mt-16 bg-[#e0d8cf]" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full opacity-30 -ml-12 -mb-12 bg-[#e0d8cf]" />
-        <div className="relative">
-          <div className="w-24 h-24 mx-auto mb-4 rounded-2xl overflow-hidden shadow-xl">
+      <div className="mx-5 mt-6 mb-2 p-6 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
+        <div className="flex flex-col items-center text-center">
+          <div className="w-20 h-20 rounded-2xl overflow-hidden mb-4" style={{ border: '1px solid #e0d8cf' }}>
             {profilePic ? (
               <img src={profilePic} alt={fullName} className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-white bg-[#4a3728]">
+              <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-white" style={{ backgroundColor: '#4a3728' }}>
                 {initials}
               </div>
             )}
           </div>
-          <h2 className="text-2xl font-bold text-center mb-1 text-[#4a3728]">{fullName}</h2>
-          <p className="text-center mb-2 font-semibold text-[#7a5c3e] ">{domain}</p>
-          {/* Rating — 0 ho toh "No ratings yet" dikhao */}
-          <div className="flex items-center justify-center gap-1">
+
+          <h2 className="text-lg font-bold" style={{ color: '#4a3728' }}>{fullName}</h2>
+
+          <span
+            className="mt-2 px-3 py-1 rounded-full text-xs font-semibold"
+            style={{ backgroundColor: '#f3ece4', color: '#7a5c3e' }}
+          >
+            {domain}
+          </span>
+
+          <div className="flex items-center justify-center gap-1 mt-3">
             {rating > 0 ? (
               <>
                 {Array(5).fill(0).map((_, i) => (
-                  <Star key={i} className={`w-5 h-5 ${i < Math.round(rating) ? 'fill-yellow-500 text-yellow-500' : 'text-gray-300'}`} />
+                  <Star
+                    key={i}
+                    className="w-3.5 h-3.5"
+                    style={{
+                      fill: i < Math.round(rating) ? '#c9a87c' : 'none',
+                      color: i < Math.round(rating) ? '#c9a87c' : '#d8cec4',
+                    }}
+                  />
                 ))}
-                <span className="ml-2 font-bold text-[#4a3728]">{rating.toFixed(1)}</span>
+                <span className="ml-1.5 text-sm font-bold" style={{ color: '#4a3728' }}>{rating.toFixed(1)}</span>
               </>
             ) : (
-              <span className="text-sm text-[#8a7a6a]">No ratings yet</span>
+              <span className="text-xs" style={{ color: '#a08070' }}>No ratings yet</span>
             )}
           </div>
         </div>
       </div>
 
       {/* Menu */}
-      <nav className="flex-1 overflow-y-auto px-4 pb-6">
-        <div className="space-y-2">
+      <nav className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="space-y-1">
           {MENU_ITEMS.map((item: MenuItem) => {
             const Icon = item.icon;
             const isActive = activePage === item.id;
@@ -70,14 +81,30 @@ export default function Sidebar({
               <button
                 key={item.id}
                 onClick={() => setActivePage(item.id)}
-                className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-xl transition-all duration-300 font-semibold group ${isActive
-                  ? "bg-[#4a3728] text-white shadow-lg scale-105"
-                  : "bg-[#fbf7f3] text-[#7a5c3e] border-2 border-[#e0d8cf] hover:shadow-md hover:scale-[1.02]"
-                  }`}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-150"
+                style={{
+                  backgroundColor: isActive ? '#4a3728' : 'transparent',
+                  color: isActive ? '#fff' : '#5c4a3a',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) e.currentTarget.style.backgroundColor = '#fbf7f3';
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+                }}
               >
-                <Icon className={`w-5 h-5 transition-transform ${isActive ? "" : "group-hover:scale-110"}`} />
-                <span>{item.label}</span>
-                {isActive && <div className="ml-auto w-2 h-2 bg-white rounded-full animate-pulse" />}
+                <span
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: isActive ? 'rgba(255,255,255,0.15)' : '#f3ece4' }}
+                >
+                  <Icon className="w-4 h-4" style={{ color: isActive ? '#fff' : '#7a5c3e' }} />
+                </span>
+                <span className="flex-1 text-left">{item.label}</span>
+                {isActive ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100" style={{ color: '#c0b0a0' }} />
+                )}
               </button>
             );
           })}
