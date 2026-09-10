@@ -143,6 +143,23 @@ class MentorService {
       throw new Error('Failed to fetch trust score.');
     }
   }
+  static async getMentorDashboardStats(mentorId: string): Promise<any> {
+    try {
+      console.log(`📊 [GET_DASHBOARD_STATS] Fetching for mentor: ${mentorId}`);
+
+      const { data } = await api.get(`/mentorship/analytics/mentor/${mentorId}/dashboard`);
+                                   
+
+      console.log('✅ [GET_DASHBOARD_STATS] Fetched:', data);
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (apiError?.message) throw new Error(apiError.message);
+      }
+      throw new Error('Failed to fetch analytics. Please try again.');
+    }
+  }
 
   /**
    * 👤 GET MY MENTOR PROFILE
