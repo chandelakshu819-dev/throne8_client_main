@@ -230,31 +230,30 @@ class SessionService {
 
     static async updateSession(sessionId: string, payload: Record<string, any>): Promise<ApiResponse> {
         try {
-            const hasFile = payload.thumbnailImage instanceof File;
-
-            let body: any = payload;
-            let headers: Record<string, string> | undefined;
-
-            if (hasFile) {
-                const formData = new FormData();
-                Object.entries(payload).forEach(([key, value]) => {
-                    if (value === undefined || value === null) return;
-                    if (key === 'thumbnailImage') {
-                        formData.append(key, value as File);
-                    } else if (typeof value === 'object') {
-                        formData.append(key, JSON.stringify(value));
-                    } else {
-                        formData.append(key, String(value));
+            // ⚠️ Always send multipart/form-data (even without a new image).
+            // The backend's uploadSingle('thumbnailImage') middleware chain only
+            // reliably parses multipart requests on this route — plain JSON PUT
+            // requests were causing a 500. Sending FormData consistently avoids
+            // that, matching the working behavior of createSession.
+            const formData = new FormData();
+            Object.entries(payload).forEach(([key, value]) => {
+                if (value === undefined || value === null) return;
+                if (key === 'thumbnailImage') {
+                    if (value instanceof File) {
+                        formData.append(key, value);
                     }
-                });
-                body = formData;
-                headers = { 'Content-Type': 'multipart/form-data' };
-            }
+                    // if it's a string (existing URL, unchanged), skip — don't send it back
+                } else if (typeof value === 'object') {
+                    formData.append(key, JSON.stringify(value));
+                } else {
+                    formData.append(key, String(value));
+                }
+            });
 
             const { data } = await api.put<ApiResponse>(
                 `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}`,
-                body,
-                headers ? { headers } : undefined
+                formData,
+                { headers: { 'Content-Type': 'multipart/form-data' } }
             );
             return data;
         } catch (error: any) {
