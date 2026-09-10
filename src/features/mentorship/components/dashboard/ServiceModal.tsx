@@ -80,6 +80,7 @@ interface ServiceModalProps {
     isSaving?: boolean;
     saveError?: string | null;
     fieldErrors?: Record<string, string>;
+    isEditMode?: boolean;
 }
 
 // Small reusable field label with icon
@@ -100,6 +101,7 @@ export default function ServiceModal({
     service, onClose, formData, setFormData, handleCreateService,
     isSaving = false, saveError = null,
     fieldErrors = {},
+    isEditMode = false,
 }: ServiceModalProps) {
 
     const currentServiceType = serviceTypes.find(t => t.name === formData?.serviceType);
@@ -449,7 +451,9 @@ export default function ServiceModal({
                             className="flex-1 py-3 rounded-xl text-white font-semibold text-sm transition-opacity disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90"
                             style={{ backgroundColor: '#4a3728' }}
                         >
-                            {isSaving ? "Creating..." : "Create Service"}
+                            {isSaving
+                                ? (isEditMode ? "Updating..." : "Creating...")
+                                : (isEditMode ? "Update Service" : "Create Service")}
                         </button>
                     </div>
 

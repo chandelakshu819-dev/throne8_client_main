@@ -230,9 +230,31 @@ class SessionService {
 
     static async updateSession(sessionId: string, payload: Record<string, any>): Promise<ApiResponse> {
         try {
+            const hasFile = payload.thumbnailImage instanceof File;
+
+            let body: any = payload;
+            let headers: Record<string, string> | undefined;
+
+            if (hasFile) {
+                const formData = new FormData();
+                Object.entries(payload).forEach(([key, value]) => {
+                    if (value === undefined || value === null) return;
+                    if (key === 'thumbnailImage') {
+                        formData.append(key, value as File);
+                    } else if (typeof value === 'object') {
+                        formData.append(key, JSON.stringify(value));
+                    } else {
+                        formData.append(key, String(value));
+                    }
+                });
+                body = formData;
+                headers = { 'Content-Type': 'multipart/form-data' };
+            }
+
             const { data } = await api.put<ApiResponse>(
                 `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}`,
-                payload
+                body,
+                headers ? { headers } : undefined
             );
             return data;
         } catch (error: any) {

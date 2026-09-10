@@ -142,7 +142,10 @@ export default function ServicesPage({
         minParticipants: raw.minParticipants ?? '',
         maxParticipants: raw.maxParticipants ?? '',
         portfolioUrl: raw.portfolioUrl || '',
+        thumbnailImage: raw.thumbnailImage || raw.image || raw.thumbnailUrl || '',
       });
+
+
       setEditingSession(raw);
       setIsEditMode(true);
       setSaveError(null);
@@ -233,6 +236,9 @@ export default function ServicesPage({
             title: formData.serviceName,
             description: formData.description || "",
           };
+          if (formData.thumbnailImage && typeof formData.thumbnailImage !== 'string') {
+            updatePayload.thumbnailImage = formData.thumbnailImage;
+          }
           await SessionService.updateSession(editingSession.sessionId, updatePayload);
         }
         setIsEditMode(false);
@@ -531,18 +537,18 @@ export default function ServicesPage({
                                     >
                                       <button
                                         onClick={() => handleEditService(service)}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[#f3ece4] transition-colors"
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#f3ece4] transition-colors"
                                         style={{ color: '#4a3728' }}
                                       >
-                                        <Pencil className="w-3.5 h-3.5" />
+                                        <Pencil className="w-3 h-3" />
                                         Edit
                                       </button>
                                       <button
                                         onClick={() => handleDeleteService(service)}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[#fee2e2] transition-colors"
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#fee2e2] transition-colors"
                                         style={{ color: '#dc2626' }}
                                       >
-                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <Trash2 className="w-3 h-3" />
                                         Delete
                                       </button>
                                     </div>
