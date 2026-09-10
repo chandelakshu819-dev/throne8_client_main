@@ -119,7 +119,7 @@ function MentorCard({ mentor, featured }: { mentor: MentorItem; featured: boolea
                     border: `1px solid ${isPaid ? "#d8cec4" : "#a8d5b8"}`,
                 }}
             >
-                {isPaid ? "💎 Paid" : "🎁 Free"}
+                {isPaid ? "Paid" : "Free"}
             </div>
 
             {/* Avatar */}
@@ -344,7 +344,7 @@ export default function FindMentorModal({
                                             color: activeFilter === type ? "#f6ede8" : "#7a5c3e",
                                         }}
                                     >
-                                        {type === "all" ? "All" : type === "free" ? "🎁 Free" : "💎 Paid"}
+                                        {type === "all" ? "All" : type === "free" ? "Free" : "Paid"}
                                     </button>
                                 ))}
                             </div>
