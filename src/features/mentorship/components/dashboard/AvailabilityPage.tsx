@@ -58,6 +58,7 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
   // ── Save / delete state ────────────────────────────────
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);  
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // ── Inline edit state ─────────────────────────────────
@@ -235,19 +236,23 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
     }
   };
 
-  // ── Delete Handler ─────────────────────────────────────
-  const handleDelete = async (availabilityId: string) => {
-    if (!confirm("Delete this availability?")) return;
+   // ── Delete Handler ─────────────────────────────────────
+   const handleDelete = async (availabilityId: string) => {
     setDeletingId(availabilityId);
     try {
       await AvailabilityService.deleteAvailability(availabilityId);
-      setSaveMessage({ type: "success", text: "Deleted successfully." });
       await fetchMonthAvailability();
       await fetchStats();
+      setDeletingId(null);
+      setConfirmDeleteId(null);
+      // 2 second delay ke baad success message dikhega
+      setTimeout(() => {
+        setSaveMessage({ type: "success", text: "Deleted successfully." });
+      }, 2000);
     } catch (error: any) {
       setSaveMessage({ type: "error", text: error.message });
-    } finally {
       setDeletingId(null);
+      setConfirmDeleteId(null);
     }
   };
 
@@ -557,7 +562,7 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                               <Pencil className="w-3.5 h-3.5" style={{ color: '#7a5c3e' }} />
                             </button>
                             <button
-                              onClick={() => handleDelete(record.availabilityId)}
+                              onClick={() => setConfirmDeleteId(record.availabilityId)}
                               disabled={deletingId === record.availabilityId}
                               className="p-2 rounded-lg transition-colors hover:bg-white disabled:opacity-50"
                               style={{ border: '1px solid #e0d8cf' }}
@@ -794,6 +799,65 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
           }
         </button>
       </div>
+
+           {/* Custom Delete Confirm Modal — Image 2 jaisa */}
+           {confirmDeleteId && (
+        <div
+          className="fixed left-0 right-0 bottom-0 z-[300] flex items-center justify-center p-4"
+          style={{ top: "-20px", backgroundColor: "rgba(74,55,40,0.45)", backdropFilter: "blur(4px)" }}
+          onClick={() => setConfirmDeleteId(null)}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl p-6"
+            style={{ backgroundColor: "#fff", boxShadow: "0 24px 60px rgba(74,55,40,0.22)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setConfirmDeleteId(null)}
+              className="absolute top-4 right-4 text-sm"
+              style={{ color: "#8a7a6a" }}
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-start gap-3 mb-2">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: "#fee2e2" }}
+              >
+                <Trash2 className="w-5 h-5" style={{ color: "#dc2626" }} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold" style={{ color: "#4a3728" }}>
+                  Delete availability?
+                </h3>
+              </div>
+            </div>
+
+            <p className="text-sm mb-6" style={{ color: "#8a7a6a" }}>
+              Are you sure you want to delete this availability permanently? This cannot be undone.
+            </p>
+
+            <div className="flex justify-end gap-2.5">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="px-4 py-2 rounded-xl text-sm font-semibold"
+                style={{ backgroundColor: "#fbf7f3", color: "#4a3728", border: "1px solid #e0d8cf" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(confirmDeleteId)}
+                disabled={deletingId === confirmDeleteId}
+                className="px-4 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-60"
+                style={{ backgroundColor: "#dc2626" }}
+              >
+                {deletingId === confirmDeleteId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
