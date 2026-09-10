@@ -26,13 +26,19 @@ const COLORS = {
   faint: "#a08070",
 }
 
+// ✅ FIX: These are the real fields the backend now returns (from
+// sessionRepository.findAll()'s $lookup enrichment) — not "studentName"
+// or "student.firstName/lastName", which were never populated.
 type Session = {
   _id?: string
-  studentName?: string
-  student?: { firstName?: string; lastName?: string }
-  serviceName?: string
-  startTime?: string
+  sessionId?: string
+  menteeName?: string
+  bookedMenteeName?: string
+  menteeProfilePhoto?: string
+  title?: string
+  sessionType?: string
   scheduledAt?: string
+  startTime?: string
   status?: string
 }
 
@@ -195,29 +201,40 @@ export default function DashboardOverviewPage({
         ) : (
           <div className="space-y-3">
             {upcoming.map((s, idx) => {
-              const name =
-                s.studentName ||
-                [s.student?.firstName, s.student?.lastName].filter(Boolean).join(" ") ||
-                "Student"
+              // ✅ FIX: real name comes from backend as menteeName / bookedMenteeName
+              // (built server-side from the mentee's actual firstName + lastName).
+              // "Student" only shows now if the backend genuinely has no user record.
+              const name = s.menteeName || s.bookedMenteeName || "Student"
+              const photo = s.menteeProfilePhoto
+
               return (
                 <div
-                  key={s._id ?? idx}
+                  key={s.sessionId ?? s._id ?? idx}
                   className="flex items-center justify-between gap-4 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9]"
                   style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white"
-                      style={{ backgroundColor: COLORS.ink }}
-                    >
-                      {initialsFrom(name)}
-                    </div>
+                    {photo ? (
+                      <img
+                        src={photo}
+                        alt={name}
+                        className="w-9 h-9 rounded-full object-cover shrink-0"
+                        style={{ border: `1px solid ${COLORS.hairline}` }}
+                      />
+                    ) : (
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white"
+                        style={{ backgroundColor: COLORS.ink }}
+                      >
+                        {initialsFrom(name)}
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <p className="text-sm font-semibold truncate" style={{ color: COLORS.ink }}>
                         {name}
                       </p>
                       <p className="text-xs mt-0.5 truncate" style={{ color: COLORS.muted }}>
-                        {s.serviceName || "Session"}
+                        {s.title || s.sessionType || "Session"}
                       </p>
                     </div>
                   </div>
