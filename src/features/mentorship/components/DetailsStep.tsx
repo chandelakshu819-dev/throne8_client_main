@@ -32,23 +32,11 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
     const { user } = useAuth();
     const { userProfileData, fetchUserProfile } = useProfileData();
 
-
     useEffect(() => {
         if (user) {
             fetchUserProfile();
         }
     }, [user, fetchUserProfile]);
-
-    const fullName = userProfileData
-        ? `${userProfileData.firstName} ${userProfileData.lastName}`.trim()
-        : '';
-    const email = userProfileData?.email || '';
-    const phone = userProfileData?.phoneNumber
-        || '';
-
-    console.log("ðŸ‘¤ User Profile Data in Detail page-:",
-        fullName, email, phone
-    );
 
     const [formData, setFormData] = useState<FormData>({
         name: "",
@@ -68,21 +56,27 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
         color: C.dark, fontSize: "14px", boxSizing: "border-box", outline: "none",
     };
 
+    // Profile data aate hi form ko ek baar prefill karo (agar field abhi khaali hai)
     useEffect(() => {
         if (userProfileData) {
             setFormData((prev) => ({
                 ...prev,
-                name: `${userProfileData.firstName || ""} ${userProfileData.lastName || ""}`.trim(),
-                email: userProfileData.email || "",
-                phone: userProfileData.phoneNumber || "",
+                name: prev.name || `${userProfileData.firstName || ""} ${userProfileData.lastName || ""}`.trim(),
+                email: prev.email || userProfileData.email || "",
+                phone: prev.phone || userProfileData.phoneNumber || "",
             }));
         }
     }, [userProfileData]);
 
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setFormData((prev) => ({ ...prev, [name]: value }));
+    };
+
     return (
         <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px" }}>
             <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: C.mid, display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", fontWeight: 500, marginBottom: "24px" }}>
-                â† Back to Calendar
+                ← Back to Calendar
             </button>
 
             <div style={{ maxWidth: "700px", margin: "0 auto", borderRadius: "24px", padding: "40px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)" }}>
@@ -94,36 +88,24 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
                         <div key={name}>
                             <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: C.dark, marginBottom: "6px" }}>{label}</label>
                             <input
-                                type={type} 
+                                type={type}
                                 name={name}
                                 placeholder={ph}
                                 value={formData[name]}
-                                disabled={["name", "email", "phone"].includes(name)}
-                                style={{
-                                    ...inp,
-                                    background: ["name", "email", "phone"].includes(name)
-                                        ? "#f3f3f3"
-                                        : C.bg,
-                                    cursor: ["name", "email", "phone"].includes(name)
-                                        ? "not-allowed"
-                                        : "text",
-                                    opacity: ["name", "email", "phone"].includes(name)
-                                        ? 0.8
-                                        : 1,
-                                }}
+                                onChange={handleChange}
+                                style={inp}
                             />
                         </div>
                     ))}
                 </div>
 
-                {/* Summary */}
                 <div style={{ borderRadius: "16px", padding: "20px", background: C.bg, border: `1px solid ${C.border}`, marginBottom: "24px" }}>
                     <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "12px" }}>Order Summary</h3>
                     {([
                         ["Service", selectedService?.title ?? ""],
                         ["Date", `${selectedDate} ${MONTHS[month]} ${year}`],
                         ["Time", selectedTime],
-                        ["Total", `â‚¹${selectedService?.price}`],
+                        ["Total", `₹${selectedService?.price}`],
                     ] as [string, string][]).map(([k, v]) => (
                         <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: C.dark, marginBottom: "5px" }}>
                             <span style={{ color: C.mid }}>{k}:</span><span style={{ fontWeight: 500 }}>{v}</span>
@@ -132,7 +114,7 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
                 </div>
 
                 <button onClick={() => onContinue(formData)} disabled={!canProceed} style={{ ...btnPrimary, width: "100%", padding: "16px", borderRadius: "12px", fontSize: "17px", opacity: canProceed ? 1 : 0.5, cursor: canProceed ? "pointer" : "not-allowed" }}>
-                    Proceed to Payment â†’
+                    Proceed to Payment →
                 </button>
             </div>
         </div>
