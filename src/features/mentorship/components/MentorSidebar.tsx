@@ -218,7 +218,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                         {/* Current Role */}
                         <div style={{ borderRadius: "12px", padding: "14px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "10px" }}>
                             <div style={{ fontWeight: "bold", color: C.dark, fontSize: "13px", marginBottom: "2px" }}>{currentRole}</div>
-                            <div style={{ fontSize: "11px", color: C.mid }}>📅 Present</div>
+                            <div style={{ fontSize: "11px", color: C.mid }}>Present</div>
                         </div>
 
                         {/* Previous Roles */}

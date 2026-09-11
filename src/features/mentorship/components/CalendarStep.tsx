@@ -22,6 +22,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
     const [availability, setAvailability] = useState<any[]>([]);
     const [daySlots, setDaySlots] = useState<any[]>([]);
     const [noAvailability, setNoAvailability] = useState(false);
+    const [isDayBlocked, setIsDayBlocked] = useState(false);
     const [selectedAvailabilityId, setSelectedAvailabilityId] = useState<string>("");
 
     const year: number = currentMonth.getFullYear();
@@ -32,17 +33,29 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
 
     useEffect(() => {
         if (!mentorId) return;
-        AvailabilityService.getAllAvailabilityFromDB({ limit: 100 })
+        AvailabilityService.getMentorAvailability(mentorId)
             .then((res) => {
-                const all = res?.data ?? [];
-                const mentorAvail = all.filter((a: any) => a.mentorId === mentorId);
-                setAvailability(mentorAvail);
+                const list = res?.data?.availabilities ?? res?.data ?? [];
+                setAvailability(Array.isArray(list) ? list : []);
             })
             .catch(() => setAvailability([]));
     }, [mentorId]);
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
+
+    // Har month change/availability update pe blocked dates recompute karo
+    const blockedDaysInMonth = React.useMemo(() => {
+        const set = new Set<number>();
+        availability.forEach((a: any) => {
+            if (!a.isDateBlocked) return;
+            const [ay, am, ad] = a.date.substring(0, 10).split("-").map(Number);
+            if (ay === year && am - 1 === month) set.add(ad);
+        });
+        return set;
+    }, [availability, year, month]);
+
+
 
     useEffect(() => {
         if (!selectedDate) return;
@@ -62,12 +75,16 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
             setDaySlots(matched.slots);
             setSelectedAvailabilityId(matched.availabilityId);
             setNoAvailability(false);
+            setIsDayBlocked(!!matched.isDateBlocked);
         } else {
             setDaySlots([]);
             setSelectedAvailabilityId("");
             setNoAvailability(true);
+            setIsDayBlocked(false);
         }
     }, [selectedDate, availability, year, month]);
+
+
 
     useEffect(() => {
         const isCurrentMonth =
@@ -117,31 +134,40 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                                 const cellDate = new Date(year, month, day);
                                 cellDate.setHours(0, 0, 0, 0);
                                 const isPast = cellDate < todayStart;
+                                const isBlocked = blockedDaysInMonth.has(day);
+                                const isDisabledCell = isPast || isBlocked;
                                 return (
                                     <button
                                         key={day}
-                                        disabled={isPast}
-                                        onClick={() => !isPast && setSelectedDate(day)}
+                                        disabled={isDisabledCell}
+                                        title={isBlocked ? "Mentor is unavailable on this date" : undefined}
+                                        onClick={() => !isDisabledCell && setSelectedDate(day)}
                                         style={{
                                             aspectRatio: "1",
                                             borderRadius: "8px",
                                             fontWeight: 500,
-                                            cursor: isPast ? "not-allowed" : "pointer",
-                                            background: isPast
-                                                ? "#f0f0f0"
-                                                : sel
-                                                    ? C.mid
-                                                    : isTd
-                                                        ? C.border
-                                                        : C.bg,
-                                            color: isPast
-                                                ? "#b0b0b0"
-                                                : sel
-                                                    ? "#fff"
-                                                    : C.dark,
-                                            border: isTd && !sel
-                                                ? `2px solid ${C.mid}`
-                                                : `1px solid ${C.border}`,
+                                            cursor: isDisabledCell ? "not-allowed" : "pointer",
+                                            background: isBlocked
+                                                ? "#fee2e2"
+                                                : isPast
+                                                    ? "#f0f0f0"
+                                                    : sel
+                                                        ? C.mid
+                                                        : isTd
+                                                            ? C.border
+                                                            : C.bg,
+                                            color: isBlocked
+                                                ? "#dc2626"
+                                                : isPast
+                                                    ? "#b0b0b0"
+                                                    : sel
+                                                        ? "#fff"
+                                                        : C.dark,
+                                            border: isBlocked
+                                                ? "1px solid #fca5a5"
+                                                : isTd && !sel
+                                                    ? `2px solid ${C.mid}`
+                                                    : `1px solid ${C.border}`,
                                             opacity: isPast ? 0.6 : 1,
                                             transition: "all 0.2s",
                                         }}
@@ -174,13 +200,21 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                             </p>
                         )}
 
-                        {selectedDate && !noAvailability && daySlots.filter(s => !s.isBooked && !s.isBlocked).length === 0 && (
+{selectedDate && !noAvailability && isDayBlocked && (
+                            <p className="text-[#dc2626] font-bold" style={{ textAlign: "center", fontSize: "18px", padding: "16px", background: "#fee2e2", borderRadius: "8px" }}>
+                                Mentor has blocked {MONTHS[month]} {selectedDate}, {year}. Please choose another date.
+                            </p>
+                        )}
+
+                        {selectedDate && !noAvailability && !isDayBlocked && daySlots.filter(s => !s.isBooked && !s.isBlocked).length === 0 && (
                             <p className="text-[#4a3728] font-bold" style={{ textAlign: "center", fontSize: "18px", padding: "16px", background: C.bg, borderRadius: "8px" }}>
                                 All Slots for {MONTHS[month]} {selectedDate}, {year} are Booked or Blocked.
                             </p>
                         )}
 
-                        {selectedDate && !noAvailability && daySlots.length > 0 && (
+                        {selectedDate && !noAvailability && !isDayBlocked && daySlots.length > 0 && (
+
+
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "8px", marginBottom: "24px" }}>
                                 {daySlots.map((slot) => {
                                     const time = `${slot.startTime} - ${slot.endTime}`;
