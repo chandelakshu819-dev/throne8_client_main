@@ -223,8 +223,42 @@ class AvailabilityService {
         }
     }
 
-    // ── DELETE AVAILABILITY ───────────────────────────────────
-    static async deleteAvailability(availabilityId: string): Promise<AvailabilityResponse> {
+        // ── BLOCK DATE (direct, no existing record required) ──────
+        static async blockDateByDate(mentorId: string, date: string, reason?: string, timezone?: string): Promise<AvailabilityResponse> {
+            try {
+                console.log("🚫 [BLOCK_DATE_BY_DATE] Blocking date...", { mentorId, date, reason });
+                const { data } = await api.post<AvailabilityResponse>(
+                    `/mentorship/availability/block-date`,
+                    { mentorId, date, reason, timezone }
+                );
+                console.log("✅ [BLOCK_DATE_BY_DATE] Blocked successfully");
+                return data;
+            } catch (error: any) {
+                console.error("❌ [BLOCK_DATE_BY_DATE] Failed", error?.response?.data || error?.message);
+                if (error?.response?.data?.message) throw new Error(error.response.data.message);
+                throw new Error("Failed to block date.");
+            }
+        }
+    
+        // ── UNBLOCK DATE (direct, by mentorId + date) ──────────────
+        static async unblockDateByDate(mentorId: string, date: string): Promise<AvailabilityResponse> {
+            try {
+                console.log("✅ [UNBLOCK_DATE_BY_DATE] Unblocking date...", { mentorId, date });
+                const { data } = await api.post<AvailabilityResponse>(
+                    `/mentorship/availability/unblock-date`,
+                    { mentorId, date }
+                );
+                console.log("✅ [UNBLOCK_DATE_BY_DATE] Unblocked successfully");
+                return data;
+            } catch (error: any) {
+                console.error("❌ [UNBLOCK_DATE_BY_DATE] Failed", error?.response?.data || error?.message);
+                if (error?.response?.data?.message) throw new Error(error.response.data.message);
+                throw new Error("Failed to unblock date.");
+            }
+        }
+    
+        // ── DELETE AVAILABILITY ───────────────────────────────────
+        static async deleteAvailability(availabilityId: string): Promise<AvailabilityResponse> {
         try {
             console.log("🗑️ [DELETE_AVAILABILITY] Deleting...", { availabilityId });
 

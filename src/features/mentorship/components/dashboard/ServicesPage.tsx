@@ -265,8 +265,9 @@ export default function ServicesPage({
           paymentMethod: "stripe",
           bufferTimeMinutes: Number(formData.bufferTime) || 0,
           followUp: {
-            allowed: formData.followUpAllowed === '1',
-            periodDays: Number(formData.followUpPeriod) || 0,
+            allowed: formData.followUpAllowed !== undefined && Number(formData.followUpAllowed) > 0,
+            // ✅ FIX: convert hours-based dropdown value to days (backend caps at 30 days)
+            periodDays: Math.max(0, Math.round((Number(formData.followUpPeriod) || 0) / 24)),
           },
           thumbnailImage: formData.thumbnailImage,
         };
@@ -284,8 +285,12 @@ export default function ServicesPage({
           ...(formData.serviceType === "career_planning" ? { targetCompany: "General", targetRole: "General" } : {}),
           duration: Number(formData.duration) || 60,
           followUp: {
-            allowed: false,
-            periodDays: Number(formData.followUpPeriod) || 0,
+            // ✅ FIX: dropdown values are in HOURS (24/48/72/96/120), but the
+            // backend's `periodDays` field expects DAYS with a max of 30.
+            // Sending raw hours (e.g. 96 for "4 Days") blew past that limit
+            // and caused "Validation failed" for every option except 24 Hours.
+            allowed: formData.followUpAllowed !== undefined && Number(formData.followUpAllowed) > 0,
+            periodDays: Math.max(0, Math.round((Number(formData.followUpPeriod) || 0) / 24)),
           },
           bufferTimeMinutes: Number(formData.bufferTime) || 0,
           ...(isFree ? {
