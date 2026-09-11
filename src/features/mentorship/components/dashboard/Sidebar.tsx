@@ -7,12 +7,14 @@ interface SidebarProps {
   activePage: string;
   setActivePage: (page: string) => void;
   mentorData: any;
+  unreadNotificationCount?: number;
 }
 
 export default function Sidebar({
   activePage,
   setActivePage,
-  mentorData
+  mentorData,
+  unreadNotificationCount = 0,
 }: SidebarProps) {
   const firstName = mentorData?.user?.firstName ?? "A";
   const lastName = mentorData?.user?.lastName ?? "S";
@@ -77,6 +79,9 @@ export default function Sidebar({
           {MENU_ITEMS.map((item: MenuItem) => {
             const Icon = item.icon;
             const isActive = activePage === item.id;
+            const isNotificationItem = item.id === "notification";
+            const showUnreadDot = isNotificationItem && unreadNotificationCount > 0;
+
             return (
               <button
                 key={item.id}
@@ -94,17 +99,25 @@ export default function Sidebar({
                 }}
               >
                 <span
-                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 relative"
                   style={{ backgroundColor: isActive ? 'rgba(255,255,255,0.15)' : '#f3ece4' }}
                 >
                   <Icon className="w-4 h-4" style={{ color: isActive ? '#fff' : '#7a5c3e' }} />
                 </span>
                 <span className="flex-1 text-left">{item.label}</span>
+
+                {showUnreadDot && !isActive && (
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: "#b91c1c" }}
+                  />
+                )}
+
                 {isActive ? (
                   <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                ) : (
+                ) : !showUnreadDot ? (
                   <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100" style={{ color: '#c0b0a0' }} />
-                )}
+                ) : null}
               </button>
             );
           })}

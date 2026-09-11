@@ -110,6 +110,14 @@ const _config = {
     NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT'),
     NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT'),
     NEXT_PUBLIC_SESSIONS_BOOK_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_BOOK_ENDPOINT'),
+    // ✅ FIX: these two were missing — session.service.ts's getUpcomingSessions()
+    // needed NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT and had no config entry to
+    // read from, causing a TS error ("Property does not exist on type").
+    // The service falls back to `${NEXT_PUBLIC_SESSIONS_ENDPOINT}/upcoming`
+    // (or /past) when the env var itself isn't set, matching backend routes
+    // GET /sessions/upcoming and GET /sessions/past.
+    NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT'),
+    NEXT_PUBLIC_SESSIONS_PAST_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_PAST_ENDPOINT'),
 
     // ============================================================
     // 6. NOTIFICATIONS ENDPOINT
@@ -283,11 +291,6 @@ const _config = {
     NEXT_PUBLIC_VERIFY_EMAIL_COMPANY_EMAIL_RESEND_OTP_ENDPOINT: optionalEnv('NEXT_PUBLIC_VERIFY_EMAIL_COMPANY_EMAIL_RESEND_OTP_ENDPOINT'),
     NEXT_PUBLIC_VERIFY_EMAIL_COMPANY_EMAIL_STATUS_CHECK_ENDPOINT: optionalEnv('NEXT_PUBLIC_VERIFY_EMAIL_COMPANY_EMAIL_STATUS_CHECK_ENDPOINT'),
 
-
-
-
-
-
     // ============================================================
     // 7. CLOUDINARY
     // ============================================================
@@ -343,12 +346,8 @@ const _config = {
     NEXT_PUBLIC_GOOGLE_CLIENT_ID: optionalEnv('NEXT_PUBLIC_GOOGLE_CLIENT_ID'),
     NEXT_PUBLIC_LINKEDIN_CLIENT_ID: optionalEnv('NEXT_PUBLIC_LINKEDIN_CLIENT_ID'),
 
-
-    
-
 } as const;
 
 const config = Object.freeze(_config);
 
 export default config;
-

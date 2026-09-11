@@ -127,7 +127,7 @@ class SessionService {
         }
     }
 
-    // ── GET ALL SESSIONS FROM DB ───────────────────────────────
+    // ── GET ALL SESSIONS FROM DB (admin only — no mentor/user filter) ──
     static async getAllSessionsFromDB(filters: { page?: number; limit?: number } = {}): Promise<ApiResponse> {
         try {
             const { data } = await api.get<ApiResponse>(
@@ -138,6 +138,29 @@ class SessionService {
             return data;
         } catch (error: any) {
             throw new Error(error?.response?.data?.message || "Failed to fetch all sessions.");
+        }
+    }
+
+    // ── GET UPCOMING SESSIONS (mentor/user-scoped, real mentee data) ───
+    // ✅ FIX: was missing entirely — the dashboard was falling back to
+    // getAllSessionsFromDB(), an admin endpoint with no mentor/user filter,
+    // which is why "Upcoming sessions" showed random platform-wide session
+    // templates instead of this mentor's actual bookings with real mentee
+    // names/photos. Backend derives the user from the auth token — no
+    // userId param needed here, just role.
+    static async getUpcomingSessions(params: { role?: "mentor" | "mentee"; limit?: number } = {}): Promise<ApiResponse> {
+        try {
+            const endpoint = config.NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT
+                || `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/upcoming`;
+
+            const { data } = await api.get<ApiResponse>(endpoint, { params });
+            console.log("✅ [GET_UPCOMING_SESSIONS] Fetched:", data);
+            return data;
+        } catch (error: any) {
+            console.error("❌ [GET_UPCOMING_SESSIONS] Failed", error?.response?.data || error?.message);
+            if (error?.response?.status === 401) throw new Error("Please login again.");
+            if (error?.code === "ERR_NETWORK") throw new Error("Unable to connect to server.");
+            throw new Error(error?.response?.data?.message || "Failed to fetch upcoming sessions.");
         }
     }
 
@@ -262,7 +285,8 @@ class SessionService {
         }
     }
 
-    static async cancelSession(sessionId: string, reason: string, bookingId: string): Promise<ApiResponse> {        try {
+    static async cancelSession(sessionId: string, reason: string, bookingId: string): Promise<ApiResponse> {
+        try {
             const { data } = await api.post<ApiResponse>(
                 `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/cancel`,
                 { reason, bookingId }
