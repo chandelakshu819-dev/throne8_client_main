@@ -4,33 +4,32 @@
 // HELPERS
 // ============================================================
 
-function requireEnv(value: string | undefined, fallback: string | undefined, keyName: string): string {
+function requireEnv(
+    value: string | undefined,
+    fallback: string | undefined,
+    keyName: string
+): string {
     if (!value || value.trim() === '') {
         if (fallback) {
-<<<<<<< HEAD
-            console.warn(`[CONFIG] Missing environment variable "${key}". Using fallback: "${fallback}"`);
-=======
-            console.warn(`⚠️  [CONFIG] Missing environment variable "${keyName}". Using fallback: "${fallback}"`);
->>>>>>> 62277b1 (Add profile views and people suggestions)
+            console.warn(
+                `⚠️ [CONFIG] Missing environment variable "${keyName}". Using fallback: "${fallback}"`
+            );
             return fallback;
         }
+
         if (process.env.NODE_ENV === 'development') {
-<<<<<<< HEAD
-            console.warn(`[CONFIG] Env var not loaded yet at import time: "${key}"`);
+            console.warn(
+                `⚠️ [CONFIG] Env var not loaded yet at import time: "${keyName}"`
+            );
             return '';
         }
-        throw new Error(
-            `\n[CONFIG] Missing required environment variable: "${key}"\n` +
-=======
-            console.warn(`⚠️  [CONFIG] Env var not loaded yet at import time: "${keyName}"`);
-            return '';
-        }
+
         throw new Error(
             `\n❌ [CONFIG] Missing required environment variable: "${keyName}"\n` +
->>>>>>> 62277b1 (Add profile views and people suggestions)
             `   Add it to your .env file and restart the server.\n`
         );
     }
+
     return value.trim();
 }
 
@@ -76,73 +75,24 @@ const _config = {
     // ============================================================
     // 3. PROFILE ENDPOINTS
     // ============================================================
-<<<<<<< HEAD
-    NEXT_PUBLIC_PROFILE_PHOTO_ENDPOINT: optionalEnv('NEXT_PUBLIC_PROFILE_PHOTO_ENDPOINT'),
-    NEXT_PUBLIC_COVER_PHOTO_ENDPOINT: optionalEnv('NEXT_PUBLIC_COVER_PHOTO_ENDPOINT'),
-    NEXT_PUBLIC_HEADLINE_ENDPOINT: optionalEnv('NEXT_PUBLIC_HEADLINE_ENDPOINT'),
-    NEXT_PUBLIC_ABOUT_ENDPOINT: optionalEnv('NEXT_PUBLIC_ABOUT_ENDPOINT'),
-    NEXT_PUBLIC_EDUCATION_ENDPOINT: optionalEnv('NEXT_PUBLIC_EDUCATION_ENDPOINT'),
-    NEXT_PUBLIC_EXPERIENCE_ENDPOINT: optionalEnv('NEXT_PUBLIC_EXPERIENCE_ENDPOINT'),
-    NEXT_PUBLIC_SKILLS_ENDPOINT: optionalEnv('NEXT_PUBLIC_SKILLS_ENDPOINT'),
-    NEXT_PUBLIC_CONTACT_ENDPOINT: optionalEnv('NEXT_PUBLIC_CONTACT_ENDPOINT') || '/profile/contact',
-
-=======
-    NEXT_PUBLIC_PROFILE_PHOTO_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_PROFILE_PHOTO_ENDPOINT),
-    NEXT_PUBLIC_COVER_PHOTO_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_COVER_PHOTO_ENDPOINT),
-    NEXT_PUBLIC_HEADLINE_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_HEADLINE_ENDPOINT),
-    NEXT_PUBLIC_ABOUT_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_ABOUT_ENDPOINT),
-    NEXT_PUBLIC_EDUCATION_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_EDUCATION_ENDPOINT),
-    NEXT_PUBLIC_EXPERIENCE_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_EXPERIENCE_ENDPOINT),
-    NEXT_PUBLIC_SKILLS_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SKILLS_ENDPOINT),
-    NEXT_PUBLIC_CONTACT_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_CONTACT_ENDPOINT) || '/profile/contact',
->>>>>>> 62277b1 (Add profile views and people suggestions)
-
+NEXT_PUBLIC_PROFILE_PHOTO_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_PROFILE_PHOTO_ENDPOINT),
+NEXT_PUBLIC_COVER_PHOTO_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_COVER_PHOTO_ENDPOINT),
+NEXT_PUBLIC_HEADLINE_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_HEADLINE_ENDPOINT),
+NEXT_PUBLIC_ABOUT_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_ABOUT_ENDPOINT),
+NEXT_PUBLIC_EDUCATION_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_EDUCATION_ENDPOINT),
+NEXT_PUBLIC_EXPERIENCE_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_EXPERIENCE_ENDPOINT),
+NEXT_PUBLIC_SKILLS_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SKILLS_ENDPOINT),
+NEXT_PUBLIC_CONTACT_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_CONTACT_ENDPOINT) || '/profile/contact',
     // ============================================================
     // 4. ACTIVITY / POSTS ENDPOINTS
     // ============================================================
-<<<<<<< HEAD
-
-    NEXT_PUBLIC_ACTIVITY_ENDPOINT: optionalEnv('NEXT_PUBLIC_ACTIVITY_ENDPOINT'),
-    NEXT_PUBLIC_FEED_ENDPOINT: optionalEnv('NEXT_PUBLIC_FEED_ENDPOINT'),
-    NEXT_PUBLIC_COMMENTS_ENDPOINT: optionalEnv('NEXT_PUBLIC_COMMENTS_ENDPOINT'),
-    NEXT_PUBLIC_REPORTS_ENDPOINT: optionalEnv('NEXT_PUBLIC_REPORTS_ENDPOINT'),
-=======
-    NEXT_PUBLIC_ACTIVITY_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_ACTIVITY_ENDPOINT),
-    NEXT_PUBLIC_FEED_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_FEED_ENDPOINT),
-    NEXT_PUBLIC_COMMENTS_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_COMMENTS_ENDPOINT),
-    NEXT_PUBLIC_REPORTS_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_REPORTS_ENDPOINT),
->>>>>>> 62277b1 (Add profile views and people suggestions)
-
+NEXT_PUBLIC_ACTIVITY_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_ACTIVITY_ENDPOINT),
+NEXT_PUBLIC_FEED_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_FEED_ENDPOINT),
+NEXT_PUBLIC_COMMENTS_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_COMMENTS_ENDPOINT),
+NEXT_PUBLIC_REPORTS_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_REPORTS_ENDPOINT),
     // ============================================================
     // 5. MENTORSHIP ENDPOINTS
     // ============================================================
-<<<<<<< HEAD
-    NEXT_PUBLIC_MENTORSHIP_ENDPOINT: optionalEnv('NEXT_PUBLIC_MENTORSHIP_ENDPOINT'),
-    NEXT_PUBLIC_MENTOR_CREATE_ENDPOINT: optionalEnv('NEXT_PUBLIC_MENTOR_CREATE_ENDPOINT'),
-    NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT: optionalEnv('NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT'),
-    NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT: optionalEnv('NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT'),
-    NEXT_PUBLIC_MENTOR_UPDATE_ENDPOINT: optionalEnv('NEXT_PUBLIC_MENTOR_UPDATE_ENDPOINT'),
-    NEXT_PUBLIC_ALL_MENTORS_ENDPOINT: optionalEnv('NEXT_PUBLIC_ALL_MENTORS_ENDPOINT'),
-
-    NEXT_PUBLIC_AVAILABILITY_CREATE_ENDPOINT: optionalEnv('NEXT_PUBLIC_AVAILABILITY_CREATE_ENDPOINT'),
-    NEXT_PUBLIC_AVAILABILITY_GET_ALL_DB_ENDPOINT: optionalEnv('NEXT_PUBLIC_AVAILABILITY_GET_ALL_DB_ENDPOINT'),
-    NEXT_PUBLIC_AVAILABILITY_BULK_ENDPOINT: optionalEnv('NEXT_PUBLIC_AVAILABILITY_BULK_ENDPOINT'),
-    NEXT_PUBLIC_AVAILABILITY_MENTOR_ENDPOINT: optionalEnv('NEXT_PUBLIC_AVAILABILITY_MENTOR_ENDPOINT'),
-    NEXT_PUBLIC_AVAILABILITY_UPDATE_ENDPOINT: optionalEnv('NEXT_PUBLIC_AVAILABILITY_UPDATE_ENDPOINT'),
-
-    NEXT_PUBLIC_AVAILABILITY_DELETE_ENDPOINT: optionalEnv('NEXT_PUBLIC_AVAILABILITY_DELETE_ENDPOINT'),
-    NEXT_PUBLIC_AVAILABILITY_STATS_ENDPOINT: optionalEnv('NEXT_PUBLIC_AVAILABILITY_STATS_ENDPOINT'),
-
-    NEXT_PUBLIC_SESSIONS_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_ENDPOINT'),
-    NEXT_PUBLIC_SESSIONS_CREATE_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_CREATE_ENDPOINT'),
-    NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT'),
-    NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT'),
-    NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT'),
-    NEXT_PUBLIC_SESSIONS_BOOK_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_BOOK_ENDPOINT'),
-    NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT'),
-    NEXT_PUBLIC_SESSIONS_PAST_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_PAST_ENDPOINT'),
-
-=======
     NEXT_PUBLIC_MENTORSHIP_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_MENTORSHIP_ENDPOINT),
     NEXT_PUBLIC_MENTOR_CREATE_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_MENTOR_CREATE_ENDPOINT),
     NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT),
@@ -157,25 +107,14 @@ const _config = {
     NEXT_PUBLIC_AVAILABILITY_DELETE_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_AVAILABILITY_DELETE_ENDPOINT),
     NEXT_PUBLIC_AVAILABILITY_STATS_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_AVAILABILITY_STATS_ENDPOINT),
 
-
-    
-    
-    // ✅ FIX: these two were missing — session.service.ts's getUpcomingSessions()
-    // needed NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT and had no config entry to
-    // read from, causing a TS error ("Property does not exist on type").
-    // The service falls back to `${NEXT_PUBLIC_SESSIONS_ENDPOINT}/upcoming`
-    // (or /past) when the env var itself isn't set, matching backend routes
-    // GET /sessions/upcoming and GET /sessions/past.
-    
-NEXT_PUBLIC_SESSIONS_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT),
-NEXT_PUBLIC_SESSIONS_CREATE_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_CREATE_ENDPOINT),
-NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT),
-NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT),
-NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT),
-NEXT_PUBLIC_SESSIONS_BOOK_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_BOOK_ENDPOINT),
-NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT),
-NEXT_PUBLIC_SESSIONS_PAST_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_PAST_ENDPOINT),
->>>>>>> 62277b1 (Add profile views and people suggestions)
+    NEXT_PUBLIC_SESSIONS_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT),
+    NEXT_PUBLIC_SESSIONS_CREATE_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_CREATE_ENDPOINT),
+    NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT),
+    NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT),
+    NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT),
+    NEXT_PUBLIC_SESSIONS_BOOK_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_BOOK_ENDPOINT),
+    NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT),
+    NEXT_PUBLIC_SESSIONS_PAST_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_SESSIONS_PAST_ENDPOINT),
     // ============================================================
     // 6. NOTIFICATIONS ENDPOINT
     // ============================================================
@@ -306,17 +245,7 @@ NEXT_PUBLIC_COMPANY_EMPLOYEE_ADVOCACY_ENDPOINT: optionalEnv(process.env.NEXT_PUB
     NEXT_PUBLIC_CONNECTIONS_USER_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_CONNECTIONS_USER_ENDPOINT),
     NEXT_PUBLIC_FOLLOW_COUNTS_ENDPOINT: optionalEnv(process.env.NEXT_PUBLIC_FOLLOW_COUNTS_ENDPOINT),
 
-<<<<<<< HEAD
-    NEXT_PUBLIC_CONNECTIONS_REQUESTS_ENDPOINT: optionalEnv('NEXT_PUBLIC_CONNECTIONS_REQUESTS_ENDPOINT'),
-    NEXT_PUBLIC_FOLLOW_ENDPOINT: optionalEnv('NEXT_PUBLIC_FOLLOW_ENDPOINT'),
-    NEXT_PUBLIC_CONNECTIONS_REQUESTS_USER_ENDPOINT: optionalEnv('NEXT_PUBLIC_CONNECTIONS_REQUESTS_USER_ENDPOINT'),
-    NEXT_PUBLIC_CONNECTIONS_CONNECTION_USER_ENDPOINT: optionalEnv('NEXT_PUBLIC_CONNECTIONS_CONNECTION_USER_ENDPOINT'),
-    NEXT_PUBLIC_CONNECTIONS_USER_ENDPOINT: optionalEnv('NEXT_PUBLIC_CONNECTIONS_USER_ENDPOINT'),
 
-    NEXT_PUBLIC_FOLLOW_COUNTS_ENDPOINT: optionalEnv('NEXT_PUBLIC_FOLLOW_COUNTS_ENDPOINT'),
-
-=======
->>>>>>> 62277b1 (Add profile views and people suggestions)
     // ============================================================
     // 10. MESSAGES ENDPOINTS
     // ============================================================
