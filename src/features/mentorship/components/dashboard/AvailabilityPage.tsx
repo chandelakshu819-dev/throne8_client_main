@@ -16,6 +16,7 @@ interface AvailabilityRecord {
   date: string;
   dayOfWeek: string;
   timezone: string;
+  isDateBlocked?: boolean;
   slots: Array<{
     startTime: string;
     endTime: string;
@@ -23,6 +24,8 @@ interface AvailabilityRecord {
     isBlocked: boolean;
   }>;
 }
+
+
 
 interface StatsData {
   totalSlots: number;
@@ -212,15 +215,15 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
   };
 
   const addBlockedDate = async () => {
-    if (!newBlockDate) return;
-    const record = existingAvailability.find(a => a.date.substring(0, 10) === newBlockDate);
-    if (!record) {
-      setSaveMessage({ type: "error", text: "Is date ke liye koi availability nahi hai. Pehle availability create karo, fir block karo." });
-      return;
-    }
-    setBlockActionId(record.availabilityId);
+    if (!newBlockDate || !mentorData?.mentorId) return;
+    setBlockActionId("pending");
     try {
-      await AvailabilityService.blockDate(record.availabilityId, newBlockLabel.trim() || undefined);
+      await AvailabilityService.blockDateByDate(
+        mentorData.mentorId,
+        newBlockDate,
+        newBlockLabel.trim() || undefined,
+        timezone
+      );
       await fetchMonthAvailability();
       setSaveMessage({ type: "success", text: `Blocked: ${newBlockDate}${newBlockLabel ? ` — ${newBlockLabel}` : ""}` });
       setNewBlockDate(""); setNewBlockLabel(""); setShowBlockDateInput(false);
@@ -261,16 +264,16 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
     const blockedRecordsByDay = useMemo(() => {
       const map = new Map<number, AvailabilityRecord>();
       existingAvailability.forEach(a => {
-        const blockableSlots = a.slots.filter(s => !s.isBooked);
-        const isFullyBlocked = blockableSlots.length > 0 && blockableSlots.every(s => s.isBlocked);
-        if (isFullyBlocked) {
+        if (a.isDateBlocked) {
           const day = parseInt(a.date.substring(8, 10), 10);
           map.set(day, a);
         }
       });
       return map;
     }, [existingAvailability]);
-  
+
+
+    
     const blockedDateList = useMemo(() => {
       return Array.from(blockedRecordsByDay.entries())
         .map(([day, record]) => ({
