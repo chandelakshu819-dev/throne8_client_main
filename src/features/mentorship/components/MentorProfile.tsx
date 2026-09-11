@@ -96,10 +96,10 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     };
 
     return (
-        <div style={{ minHeight: "100vh", background: C.bg }}>
+        <div style={{ minHeight: "100vh", background: C.bg, overflowX: "hidden" }}>
             <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "88px 16px 24px", display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
                 <MentorSidebar mentorData={mentorData} />
-                <div>
+                <div style={{ minWidth: 0 }}>
                     {bookingStep === "calendar" && (
                         <CalendarStep mentorId={mentorData?.mentorId || ""} selectedService={selectedService} onBack={() => setBookingStep(null)} onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }} />
                     )}

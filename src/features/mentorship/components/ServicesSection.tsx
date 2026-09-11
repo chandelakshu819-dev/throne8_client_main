@@ -3,9 +3,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Clock } from "./Icons";
-// import { SERVICES, FILTERS, C, btnPrimary } from "../types/data";
 import { btnPrimary, C } from "../types/data";
-// import type { Service } from "../types/types";
 import SessionService from "@/lib/api/session.service";
 import { Service } from "../types/types";
 
@@ -16,7 +14,6 @@ interface ServicesSectionProps {
   currentUserId: string;
 }
 
-// Session type ko display label me map karo
 const SESSION_TYPE_LABEL: Record<string, string> = {
   quick_call: "1:1 Call",
   mock_interview: "1:1 Call",
@@ -27,7 +24,6 @@ const SESSION_TYPE_LABEL: Record<string, string> = {
   portfolio_review: "1:1 Call",
 };
 
-// Session type ko filter label me map karo
 const SESSION_TYPE_FILTER: Record<string, string> = {
   quick_call: "Quick Call",
   mock_interview: "Mock Interview",
@@ -60,18 +56,13 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       .finally(() => setLoading(false));
   }, [mentorId]);
 
-  // if (loading) return <div style={{ padding: "32px", textAlign: "center" }}>Loading sessions...</div>;
-
-  // Dynamic filters â€” session types se generate karo
   const uniqueTypes = Array.from(new Set(sessions.map((s) => s.sessionType)));
   const dynamicFilters = ["All", ...uniqueTypes.map((t) => SESSION_TYPE_FILTER[t] || t)];
 
-  // Filter logic
   const filtered = activeFilter === "All"
     ? sessions
     : sessions.filter((s) => (SESSION_TYPE_FILTER[s.sessionType] || s.sessionType) === activeFilter);
 
-  // Session ko Service card format me convert karo
   const getServiceFromSession = (session: any): Service => ({
     id: session.sessionId,
     type: SESSION_TYPE_LABEL[session.sessionType] || "1:1 Call",
@@ -83,8 +74,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   });
 
   const getIcon = (sessionType: string): string => {
-    if (sessionType === "group_session") return "ðŸ‘¥";
-    return "ðŸ“ž";
+    if (sessionType === "group_session") return "\u{1F465}"; // 👥
+    return "\u{1F4DE}"; // 📞
   };
 
   return (
@@ -94,7 +85,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       </h2>
       <p style={{ color: C.mid, fontSize: "13px", marginBottom: "20px" }}>Discover our mentorship offerings designed for your success</p>
 
-      {/* Dynamic Filters */}
       <div style={{ display: "flex", gap: "10px", marginBottom: "24px", flexWrap: "wrap" }}>
         {dynamicFilters.map((f) => (
           <button key={f} onClick={() => setActiveFilter(f)} style={{
@@ -109,10 +99,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
         ))}
       </div>
 
-      {/* Session Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
 
-        {/* Loader - jab tak fetch ho raha hai */}
         {loading && (
           <>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -123,14 +111,12 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           </>
         )}
 
-        {/* No sessions - sirf tab dikhao jab fetch complete ho aur result empty ho */}
         {!loading && filtered.length === 0 && (
           <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: C.mid }}>
             No sessions available for this filter.
           </div>
         )}
 
-        {/* Cards - sirf tab dikhao jab fetch complete ho aur data ho */}
         {!loading && filtered.length > 0 && filtered.map((session) => {
           const svc = getServiceFromSession(session);
           const myBooking = session.bookings?.find(
@@ -147,6 +133,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
                 opacity: isPending ? 0.6 : 1,
                 pointerEvents: isBooked ? "none" : "auto",
+                minWidth: 0,
               }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                 <span>{getIcon(session.sessionType)}</span>
@@ -154,27 +141,42 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   {SESSION_TYPE_FILTER[session.sessionType] || session.sessionType}
                 </span>
               </div>
-              <h3 style={{ fontWeight: "bold", color: C.dark, fontSize: "14px", marginBottom: "8px", lineHeight: "1.4" }}>{session.title}</h3>
+              <h3 style={{
+                fontWeight: "bold", color: C.dark, fontSize: "14px",
+                marginBottom: "8px", lineHeight: "1.4",
+                overflowWrap: "anywhere", wordBreak: "break-word",
+              }}>{session.title}</h3>
               {session.description && (
-                <p style={{ fontSize: "12px", color: C.mid, marginBottom: "8px", lineHeight: "1.4" }}>{session.description}</p>
+                <p style={{
+                  fontSize: "12px", color: C.mid, marginBottom: "8px", lineHeight: "1.4",
+                  overflowWrap: "anywhere", wordBreak: "break-word",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}>{session.description}</p>
               )}
               <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
                 <Clock /> {session.duration} Min
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontWeight: "bold", color: session.pricing?.basePrice === 0 ? "#10b981" : C.dark, fontSize: "15px" }}>
-                  {session.pricing?.basePrice === 0 ? "Free" : `â‚¹${session.pricing?.basePrice}`}
+                  {session.pricing?.basePrice === 0 ? "Free" : `\u20B9${session.pricing?.basePrice}`}
                 </span>
                 {isBooked ? (
                   <div style={{ textAlign: "right" }}>
                     {myBooking?.status === "confirmed" ? (
                       <>
-                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>âœ… Session Confirmed</div>
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>
+                          {"\u2705"} Session Confirmed
+                        </div>
                         <div style={{ fontSize: "10px", color: C.mid, marginTop: "2px" }}>Mentor has confirmed your session</div>
                       </>
                     ) : (
                       <>
-                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>âœ… Session Booked</div>
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>
+                          {"\u2705"} Session Booked
+                        </div>
                         <div style={{ fontSize: "10px", color: C.mid, marginTop: "2px" }}>Session Confirmation coming soon by Mentor</div>
                       </>
                     )}
