@@ -318,11 +318,12 @@ class CompanyService {
     static async togglePostLike(postId: string): Promise<any> {
         try {
             const { data } = await api.post(
-                `${config.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT}/${postId}/like`
+                `${config.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_POSTS_ENDPOINT || '/company/posts'}/${postId}/like`
             );
             return data;
         } catch (error: any) {
             console.warn('Failed to toggle post like:', error);
+            throw error;
         }
     }
 
