@@ -1,13 +1,12 @@
 // src/features/mentorship/components/dashboard/DashboardLayout.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
-// Define ServiceType type
 type ServiceType = {
   name: string;
   emoji?: string;
-  icon: React.FC<any>;       // ← add karo
+  icon: React.FC<any>;
   description?: string;
 };
 import { MessageCircle, Wrench, GraduationCap, Dumbbell, CheckSquare } from "lucide-react";
@@ -27,9 +26,9 @@ import TrustScorePage from "./TrustScorePage";
 import CommunityPage from "./CommunityPage";
 import MentorService from "@/lib/api/mentorship.service";
 import SessionService from "@/lib/api/session.service";
+import NotificationService from "@/lib/api/notification.service";
 import MarketingKitPage from "./MarketingKitPage";
 
-// Define SERVICE_TYPES array
 const SERVICE_TYPES: ServiceType[] = [
   { name: "Consultation", emoji: "💬", icon: MessageCircle, description: "One-on-one consultation sessions" },
   { name: "Workshop", emoji: "🛠️", icon: Wrench, description: "Group learning workshops" },
@@ -54,12 +53,19 @@ const pageComponents: Record<string, React.FC<any>> = {
   marketing: MarketingKitPage,
 };
 
+function normalizeNotifications(res: any): any[] {
+  const data = res?.data ?? res;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.notifications)) return data.notifications;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+}
+
 export default function MentorDashboard(
   { userId }: { userId: string }
 ) {
   const [activePage, setActivePage] = useState("dashboard");
 
-  // ── Profile states ────────────────────────────────────────
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -68,6 +74,44 @@ export default function MentorDashboard(
   const [mentorData, setMentorData] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // ── Notification states (mentorship-scoped) ─────────────────
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
+
+  const fetchNotifications = useCallback(() => {
+    setNotificationsLoading(true);
+    NotificationService.getMentorshipNotifications({ limit: 50 })
+      .then((res) => setNotifications(normalizeNotifications(res)))
+      .catch((err) => {
+        console.error("Failed to fetch notifications:", err);
+        setNotifications([]);
+      })
+      .finally(() => setNotificationsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    fetchNotifications();
+  }, [userId, fetchNotifications]);
+
+  const handleMarkNotificationRead = (id: string) => {
+    setNotifications((prev) =>
+      (Array.isArray(prev) ? prev : []).map((n) => (n._id === id ? { ...n, isRead: true } : n))
+    );
+    NotificationService.markMentorshipNotificationRead(id).catch((err) => {
+      console.error("Failed to mark notification as read:", err);
+      fetchNotifications();
+    });
+  };
+
+  const handleMarkAllNotificationsRead = () => {
+    setNotifications((prev) => (Array.isArray(prev) ? prev : []).map((n) => ({ ...n, isRead: true })));
+    NotificationService.markAllMentorshipNotificationsRead().catch((err) => {
+      console.error("Failed to mark all notifications as read:", err);
+      fetchNotifications();
+    });
+  };
 
   useEffect(() => {
     if (!userId) return;
@@ -78,15 +122,14 @@ export default function MentorDashboard(
   }, [userId]);
 
   useEffect(() => {
-    SessionService.getAllSessionsFromDB()
+    if (!userId) return;
+    SessionService.getUpcomingSessions({ role: "mentor", limit: 10 })
       .then((res) => setSessions(res.data || []))
       .catch(console.error);
-  }, []);
+  }, [userId]);
 
-  // ── Services states ───────────────────────────────────────
   const [showServiceForm, setShowServiceForm] = useState(false);
   const [selectedServiceType, setSelectedServiceType] = useState<ServiceType | null>(null);
-  // Define Service type
   type Service = {
     serviceName: string;
     price: string;
@@ -140,18 +183,10 @@ export default function MentorDashboard(
 
   const CurrentPage = pageComponents[activePage] || DashboardOverviewPage;
 
-  console.log("👤 Mentor Data in Dashboard-:", mentorData);
+  const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
   return (
-    // ✅ FIX 1: Navbar is `fixed top-0 h-20` (80px), so it's out of normal
-    // flow and was overlapping this dashboard's content. Wrapping
-    // everything in a flex-col with a shrink-0 h-20 spacer pushes the
-    // Sidebar + main content below the navbar, while the inner flex-1
-    // row still fills the remaining viewport height with its own scroll.
     <div className="flex flex-col h-screen bg-[#f6ede8]">
-      {/* Spacer — reserves space for the fixed Navbar (h-20 = 80px) so
-          Sidebar/main don't render underneath it. Keep this in sync with
-          Navbar's height class. */}
       <div className="h-20 shrink-0" aria-hidden="true" />
 
       <div className="flex flex-1 min-h-0">
@@ -159,20 +194,14 @@ export default function MentorDashboard(
           activePage={activePage}
           setActivePage={setActivePage}
           mentorData={mentorData}
+          unreadNotificationCount={safeNotifications.filter((n) => !n.isRead).length}
         />
 
         <main className="flex-1 overflow-y-auto">
-          {/* ✅ FIX 2: was "p-8 max-w-7xl mx-auto" — max-w-7xl (1280px)
-              plus mx-auto centering left big empty gutters on both sides
-              on wider screens. Widened the cap and trimmed the padding
-              so this matches the fuller-width feel of the /dashboard
-              page. */}
           <div className="px-4 md:px-6 py-8 max-w-[1600px] mx-auto">
             <CurrentPage
-              // Navigation (used by Dashboard overview quick actions)
               setActivePage={setActivePage}
 
-              // Profile props
               mentorData={mentorData}
               profilePhoto={profilePhoto}
               isVerified={isVerified}
@@ -184,7 +213,6 @@ export default function MentorDashboard(
               setAgreedToCode={setAgreedToCode}
               handlePhotoUpload={handlePhotoUpload}
 
-              // Services props
               showServiceForm={showServiceForm}
               setShowServiceForm={setShowServiceForm}
               selectedServiceType={selectedServiceType}
@@ -196,20 +224,15 @@ export default function MentorDashboard(
               serviceTypes={SERVICE_TYPES}
 
               sessions={sessions}
+
+              notifications={safeNotifications}
+              notificationsLoading={notificationsLoading}
+              onMarkRead={handleMarkNotificationRead}
+              onMarkAllRead={handleMarkAllNotificationsRead}
             />
           </div>
         </main>
       </div>
-
-      {/* {showServiceForm && (
-        <ServicePage
-          onClose={() => setShowServiceForm(false)}
-          formData={serviceFormData}
-          setFormData={setServiceFormData}
-          serviceTypes={SERVICE_TYPES}
-          handleCreateService={handleCreateService}
-        />
-      )} */}
 
       <style jsx global>{`
         @keyframes fadeIn {

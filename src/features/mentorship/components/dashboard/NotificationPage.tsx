@@ -27,6 +27,7 @@ type NotificationItem = {
 
 interface NotificationPageProps {
   notifications?: NotificationItem[]
+  notificationsLoading?: boolean
   onMarkAllRead?: () => void
   onMarkRead?: (id: string) => void
 }
@@ -38,43 +39,6 @@ const TYPE_ICON: Record<NotificationType, React.FC<any>> = {
   message: MessageSquare,
   system: Bell,
 }
-
-// Fallback sample data so the page has a sensible look before the real
-// notification feed is wired up to the backend.
-const SAMPLE: NotificationItem[] = [
-  {
-    _id: "1",
-    type: "booking",
-    title: "New session booked",
-    message: "A student booked a Consultation session with you for today, 1:30 PM.",
-    createdAt: new Date().toISOString(),
-    isRead: false,
-  },
-  {
-    _id: "2",
-    type: "review",
-    title: "New review received",
-    message: "You received a 5-star review — \"Excellent mentor, very patient.\"",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-    isRead: false,
-  },
-  {
-    _id: "3",
-    type: "payment",
-    title: "Payment received",
-    message: "Payout for last week's sessions has been processed.",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 30).toISOString(),
-    isRead: true,
-  },
-  {
-    _id: "4",
-    type: "system",
-    title: "Verification reminder",
-    message: "Complete your identity verification to unlock the trust badge.",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6).toISOString(),
-    isRead: true,
-  },
-]
 
 function timeAgo(iso?: string) {
   if (!iso) return ""
@@ -117,13 +81,13 @@ function groupByRecency(items: NotificationItem[]) {
 }
 
 export default function NotificationPage({
-  notifications,
+  notifications = [],
+  notificationsLoading = false,
   onMarkAllRead,
   onMarkRead,
 }: NotificationPageProps) {
-  const data = notifications && notifications.length > 0 ? notifications : SAMPLE
-  const groups = useMemo(() => groupByRecency(data), [data])
-  const unreadCount = data.filter((n) => !n.isRead).length
+  const groups = useMemo(() => groupByRecency(notifications), [notifications])
+  const unreadCount = notifications.filter((n) => !n.isRead).length
 
   return (
     <div className="space-y-6 animate-fadeIn max-w-3xl">
@@ -146,7 +110,9 @@ export default function NotificationPage({
               Notifications
             </h2>
             <p style={{ color: COLORS.muted }} className="text-sm">
-              {unreadCount > 0
+              {notificationsLoading
+                ? "Loading..."
+                : unreadCount > 0
                 ? `${unreadCount} unread update${unreadCount > 1 ? "s" : ""}`
                 : "You're all caught up"}
             </p>
@@ -165,8 +131,18 @@ export default function NotificationPage({
         )}
       </div>
 
+      {/* Loading state */}
+      {notificationsLoading && (
+        <div
+          className="flex items-center justify-center py-14 rounded-2xl"
+          style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
+        >
+          <p className="text-sm" style={{ color: COLORS.muted }}>Fetching notifications...</p>
+        </div>
+      )}
+
       {/* Empty state */}
-      {data.length === 0 && (
+      {!notificationsLoading && notifications.length === 0 && (
         <div
           className="flex flex-col items-center justify-center gap-3 py-14 rounded-2xl text-center"
           style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
@@ -181,7 +157,7 @@ export default function NotificationPage({
       )}
 
       {/* Grouped feed */}
-      {groups.map((group) => (
+      {!notificationsLoading && groups.map((group) => (
         <div key={group.label} className="bg-white p-5 rounded-2xl" style={{ border: `1px solid ${COLORS.hairline}` }}>
           <h3
             className="text-xs font-bold uppercase tracking-wide mb-3 px-1"
