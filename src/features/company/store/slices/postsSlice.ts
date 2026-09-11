@@ -53,10 +53,19 @@ const postsSlice = createSlice({
   initialState,
   reducers: {
     toggleLike(state, action: PayloadAction<string>) {
-      const post = state.items.find(p => p.id === action.payload);
+      const post = state.items.find(p => p.id === action.payload || p.postId === action.payload);
       if (post) {
         post.liked = !post.liked;
-        post.likes += post.liked ? 1 : -1;
+        post.likes = Math.max(0, post.likes + (post.liked ? 1 : -1));
+      }
+    },
+    setPostLike(state, action: PayloadAction<{ id: string; liked: boolean; likesCount?: number }>) {
+      const post = state.items.find(p => p.id === action.payload.id || p.postId === action.payload.id);
+      if (post) {
+        post.liked = action.payload.liked;
+        if (typeof action.payload.likesCount === 'number') {
+          post.likes = Math.max(0, action.payload.likesCount);
+        }
       }
     },
     addPost(state, action: PayloadAction<Post>) {
@@ -109,7 +118,7 @@ const postsSlice = createSlice({
 });
 
 export const {
-  toggleLike, addPost, deletePost, updatePost,
+  toggleLike, setPostLike, addPost, deletePost, updatePost,
   incrementComments, decrementComments, setPostCommentsCount,
   setPosts, setPostsLoading, setPostsError,
 } = postsSlice.actions;

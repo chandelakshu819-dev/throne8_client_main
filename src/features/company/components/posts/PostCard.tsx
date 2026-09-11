@@ -10,7 +10,7 @@ import CompanyService from '@/lib/api/company.service';
 
 import { useAppDispatch } from '@/core/store/store.hooks';
 import {
-  incrementComments, decrementComments, setPostCommentsCount,
+  incrementComments, decrementComments, setPostCommentsCount, setPostLike,
 } from '@/features/company/store/slices/postsSlice';
 import { addActivity } from '@/features/company/store/slices/activitySlice';
 
@@ -116,7 +116,20 @@ const PostCard = memo(function PostCard({
       }));
     }
     if (targetPostId) {
-      await CompanyService.togglePostLike(targetPostId);
+      try {
+        const res = await CompanyService.togglePostLike(targetPostId);
+        const data = res?.data;
+        if (data && typeof data.liked === 'boolean') {
+          dispatch(setPostLike({
+            id: post.id,
+            liked: data.liked,
+            likesCount: data.likesCount,
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to persist post like:', err);
+        onToggleLike(post.id);
+      }
     }
   }, [post.id, post.liked, post.title, post.text, targetPostId, onToggleLike, dispatch]);
 

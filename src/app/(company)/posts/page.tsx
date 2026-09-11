@@ -46,7 +46,7 @@ interface EmployeeOption {
 // Backend post → Redux Post
 function transform(bp: any): Post {
   return {
-    id: bp._id,
+    id: bp._id || bp.id,
     postId: bp.postId,
     title: bp.title || '',
     text: bp.content || '',
@@ -59,13 +59,13 @@ function transform(bp: any): Post {
       ...bp.pollData,
       endsAt: bp.pollData.endsAt?.toString() || '',
     } : undefined,
-    likes: bp.engagementMetrics?.likesCount || 0,
-    comments: bp.engagementMetrics?.commentsCount || 0,
-    reposts: bp.engagementMetrics?.sharesCount || 0,
+    likes: bp.engagementMetrics?.likesCount ?? bp.likes ?? 0,
+    comments: bp.engagementMetrics?.commentsCount ?? bp.comments ?? 0,
+    reposts: bp.engagementMetrics?.sharesCount ?? bp.reposts ?? 0,
     time: bp.createdAt
       ? new Date(bp.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
       : 'Recently',
-    liked: false,
+    liked: Boolean(bp.liked),
     status: (bp.status?.toLowerCase() || 'draft') as Post['status'],
     type: bp.type,
     company: bp.company,
