@@ -183,6 +183,46 @@ class AvailabilityService {
         }
     }
 
+    // ── BLOCK DATE ─────────────────────────────────────────────
+    static async blockDate(availabilityId: string, reason?: string): Promise<AvailabilityResponse> {
+        try {
+            console.log("🚫 [BLOCK_DATE] Blocking...", { availabilityId, reason });
+
+            const { data } = await api.patch<AvailabilityResponse>(
+                `${config.NEXT_PUBLIC_AVAILABILITY_BLOCK_ENDPOINT || process.env.NEXT_PUBLIC_AVAILABILITY_BLOCK_ENDPOINT}/${availabilityId}`,
+                { reason }
+            );
+
+            console.log("✅ [BLOCK_DATE] Blocked successfully");
+            return data;
+        } catch (error: any) {
+            console.error("❌ [BLOCK_DATE] Failed", error?.response?.data || error?.message);
+            if (error?.response?.status === 404) throw new Error("Availability not found.");
+            if (error?.response?.data?.message) throw new Error(error.response.data.message);
+            throw new Error("Failed to block date.");
+        }
+    }
+
+    // ── UNBLOCK DATE ───────────────────────────────────────────
+    static async unblockDate(availabilityId: string): Promise<AvailabilityResponse> {
+        try {
+            console.log("✅ [UNBLOCK_DATE] Unblocking...", { availabilityId });
+
+            const { data } = await api.patch<AvailabilityResponse>(
+                `${config.NEXT_PUBLIC_AVAILABILITY_UNBLOCK_ENDPOINT || process.env.NEXT_PUBLIC_AVAILABILITY_UNBLOCK_ENDPOINT}/${availabilityId}`,
+                {}
+            );
+
+            console.log("✅ [UNBLOCK_DATE] Unblocked successfully");
+            return data;
+        } catch (error: any) {
+            console.error("❌ [UNBLOCK_DATE] Failed", error?.response?.data || error?.message);
+            if (error?.response?.status === 404) throw new Error("Availability not found.");
+            if (error?.response?.data?.message) throw new Error(error.response.data.message);
+            throw new Error("Failed to unblock date.");
+        }
+    }
+
     // ── DELETE AVAILABILITY ───────────────────────────────────
     static async deleteAvailability(availabilityId: string): Promise<AvailabilityResponse> {
         try {

@@ -130,6 +130,48 @@ class MentorService {
   }
 
   /**
+   * 📅 UPDATE MENTOR AVAILABILITY SETTINGS
+   * Uses existing PUT /mentors/:id route — sends only the `availability` block
+   * so weekly ON/OFF days persist in the backend (Mentor.availability.daysAvailable)
+   */
+  static async updateMentorAvailability(
+    mentorId: string,
+    availability: {
+      timezone?: string;
+      daysAvailable?: string[]; // lowercase: 'monday','tuesday', etc.
+      preferredHours?: { start: string; end: string };
+      bufferBetweenSessions?: number;
+    }
+  ): Promise<MentorResponse> {
+    try {
+      console.log('📅 [UPDATE_MENTOR_AVAILABILITY] Saving weekly pattern...', availability);
+
+      const formData = new FormData();
+      formData.append('availability', JSON.stringify(availability));
+
+      const { data } = await api.put<MentorResponse>(
+        `${config.NEXT_PUBLIC_MENTOR_UPDATE_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_UPDATE_ENDPOINT}/${mentorId}`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      console.log('✅ [UPDATE_MENTOR_AVAILABILITY] Saved successfully');
+      return data;
+    } catch (error: any) {
+      console.error('❌ [UPDATE_MENTOR_AVAILABILITY] Failed', error?.response?.data || error?.message);
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (apiError?.message) throw new Error(apiError.message);
+        if (error.response?.status === 404) throw new Error('Mentor not found.');
+        if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
+      }
+      throw new Error('Failed to save weekly availability pattern.');
+    }
+  }
+
+  
+
+  /**
    * 🛡️ GET MENTOR TRUST SCORE
    */
   static async getTrustScore(): Promise<any> {

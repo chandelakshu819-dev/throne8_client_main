@@ -65,22 +65,85 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editSlots, setEditSlots] = useState<Array<{ startTime: string; endTime: string }>>([]);
 
-  // ── Weekly schedule ────────────────────────────────────
-  const [weekSchedule, setWeekSchedule] = useState([
-    { day: "Monday", enabled: true, startTime: "09:00", endTime: "17:00" },
-    { day: "Tuesday", enabled: true, startTime: "09:00", endTime: "17:00" },
-    { day: "Wednesday", enabled: true, startTime: "09:00", endTime: "17:00" },
-    { day: "Thursday", enabled: true, startTime: "09:00", endTime: "17:00" },
-    { day: "Friday", enabled: true, startTime: "09:00", endTime: "17:00" },
-    { day: "Saturday", enabled: false, startTime: "09:00", endTime: "17:00" },
-    { day: "Sunday", enabled: false, startTime: "09:00", endTime: "17:00" },
-  ]);
+      // ── Weekly schedule ────────────────────────────────────
+      const ALL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+      const DEFAULT_WEEK_SCHEDULE = ALL_DAYS.map(day => ({
+        day,
+        enabled: ["Saturday", "Sunday"].indexOf(day) === -1,
+        startTime: "09:00",
+        endTime: "17:00",
+      }));
+   
+      // Backend se availability.daysAvailable aane par usi se schedule banao
+      const buildScheduleFromBackend = () => {
+        const daysAvailable: string[] | undefined = mentorData?.availability?.daysAvailable;
+        if (!daysAvailable || daysAvailable.length === 0) return null;
+        const start = mentorData?.availability?.preferredHours?.start || "09:00";
+        const end = mentorData?.availability?.preferredHours?.end || "17:00";
+        return ALL_DAYS.map(day => ({
+          day,
+          enabled: daysAvailable.includes(day.toLowerCase()),
+          startTime: start,
+          endTime: end,
+        }));
+      };
+   
+     const [weekSchedule, setWeekSchedule] = useState(() => {
+       const fromBackend = buildScheduleFromBackend();
+       if (fromBackend) return fromBackend;
+       if (typeof window === "undefined") return DEFAULT_WEEK_SCHEDULE;
+       try {
+         const saved = localStorage.getItem("mentor_weekSchedule");
+         return saved ? JSON.parse(saved) : DEFAULT_WEEK_SCHEDULE;
+       } catch {
+         return DEFAULT_WEEK_SCHEDULE;
+       }
+     });
+   
+     // Jab mentorData baad me (async) load ho, tab bhi backend se sync kar do
+     useEffect(() => {
+       const fromBackend = buildScheduleFromBackend();
+       if (fromBackend) setWeekSchedule(fromBackend);
+       // eslint-disable-next-line react-hooks/exhaustive-deps
+     }, [mentorData?.availability]);
+   
+     // Jab bhi weekSchedule change ho: localStorage backup + backend me bhi save karo
+     useEffect(() => {
+       try {
+         localStorage.setItem("mentor_weekSchedule", JSON.stringify(weekSchedule));
+       } catch (err) {
+         console.error("Failed to save weekSchedule:", err);
+       }
+   
+       if (!mentorData?.mentorId) return;
+   
+       const timer = setTimeout(() => {
+         const enabledDays = weekSchedule.filter((d: any) => d.enabled).map((d: any) => d.day.toLowerCase());
+         const base = weekSchedule.find((d: any) => d.enabled) || weekSchedule[0];
+   
+         import("@/lib/api/mentorship.service").then(({ default: MentorService }) => {
+           MentorService.updateMentorAvailability(mentorData.mentorId, {
+             timezone,
+             daysAvailable: enabledDays,
+             preferredHours: { start: base.startTime, end: base.endTime },
+             bufferBetweenSessions: bufferTime,
+           }).catch((err: any) => console.error("Failed to persist weekly pattern:", err.message));
+         });
+       }, 800);
+   
+       return () => clearTimeout(timer);
+       // eslint-disable-next-line react-hooks/exhaustive-deps
+     }, [weekSchedule]);
 
-  // ── Blocked dates ──────────────────────────────────────
-  const [blockedDates, setBlockedDates] = useState<{ label: string; date: string }[]>([]);
+
+
+    // ── Blocked dates ──────────────────────────────────────
+  // NOTE: ab ye local array nahi — blocked status seedha `existingAvailability`
+  // (backend se aayi records) se derive hota hai, isliye refresh ke baad bhi sahi rahega.
   const [showBlockDateInput, setShowBlockDateInput] = useState(false);
   const [newBlockDate, setNewBlockDate] = useState("");
   const [newBlockLabel, setNewBlockLabel] = useState("");
+  const [blockActionId, setBlockActionId] = useState<string | null>(null);
 
   // ── Data Fetching ──────────────────────────────────────
   const fetchMonthAvailability = useCallback(async () => {
@@ -148,30 +211,77 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
     setWeekSchedule(prev => prev.map(d => ({ ...d, startTime: mon.startTime, endTime: mon.endTime })));
   };
 
-  const addBlockedDate = () => {
+  const addBlockedDate = async () => {
     if (!newBlockDate) return;
-    setBlockedDates(prev => [...prev, { label: newBlockLabel.trim() || newBlockDate, date: newBlockDate }]);
-    setNewBlockDate(""); setNewBlockLabel(""); setShowBlockDateInput(false);
+    const record = existingAvailability.find(a => a.date.substring(0, 10) === newBlockDate);
+    if (!record) {
+      setSaveMessage({ type: "error", text: "Is date ke liye koi availability nahi hai. Pehle availability create karo, fir block karo." });
+      return;
+    }
+    setBlockActionId(record.availabilityId);
+    try {
+      await AvailabilityService.blockDate(record.availabilityId, newBlockLabel.trim() || undefined);
+      await fetchMonthAvailability();
+      setSaveMessage({ type: "success", text: `Blocked: ${newBlockDate}${newBlockLabel ? ` — ${newBlockLabel}` : ""}` });
+      setNewBlockDate(""); setNewBlockLabel(""); setShowBlockDateInput(false);
+    } catch (err: any) {
+      setSaveMessage({ type: "error", text: err.message });
+    } finally {
+      setBlockActionId(null);
+    }
   };
 
-  const removeBlockedDate = (i: number) => setBlockedDates(prev => prev.filter((_, idx) => idx !== i));
-
-  // NEW: map date -> slot count (used for both the dot and the small number on the calendar)
-  const slotCountByDate = useMemo(() => {
-    const map = new Map<number, number>();
-    existingAvailability.forEach(a => {
-      const day = parseInt(a.date.substring(8, 10), 10);
-      map.set(day, (map.get(day) ?? 0) + a.slots.length);
-    });
-    return map;
-  }, [existingAvailability]);
-
-  const datesWithAvailability = new Set(slotCountByDate.keys());
-
-  const isDateBlocked = (date: number) => {
-    const s = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(date).padStart(2, "0")}`;
-    return blockedDates.some(b => b.date === s);
+  const removeBlockedDate = async (availabilityId: string) => {
+    setBlockActionId(availabilityId);
+    try {
+      await AvailabilityService.unblockDate(availabilityId);
+      await fetchMonthAvailability();
+      setSaveMessage({ type: "success", text: "Date unblocked." });
+    } catch (err: any) {
+      setSaveMessage({ type: "error", text: err.message });
+    } finally {
+      setBlockActionId(null);
+    }
   };
+
+    // NEW: map date -> slot count (used for both the dot and the small number on the calendar)
+    const slotCountByDate = useMemo(() => {
+      const map = new Map<number, number>();
+      existingAvailability.forEach(a => {
+        const day = parseInt(a.date.substring(8, 10), 10);
+        map.set(day, (map.get(day) ?? 0) + a.slots.length);
+      });
+      return map;
+    }, [existingAvailability]);
+  
+    const datesWithAvailability = new Set(slotCountByDate.keys());
+  
+    // Ek availability record "fully blocked" tab mana jaata hai jab uske
+    // saare non-booked slots isBlocked=true hon (aur kam se kam 1 slot ho)
+    const blockedRecordsByDay = useMemo(() => {
+      const map = new Map<number, AvailabilityRecord>();
+      existingAvailability.forEach(a => {
+        const blockableSlots = a.slots.filter(s => !s.isBooked);
+        const isFullyBlocked = blockableSlots.length > 0 && blockableSlots.every(s => s.isBlocked);
+        if (isFullyBlocked) {
+          const day = parseInt(a.date.substring(8, 10), 10);
+          map.set(day, a);
+        }
+      });
+      return map;
+    }, [existingAvailability]);
+  
+    const blockedDateList = useMemo(() => {
+      return Array.from(blockedRecordsByDay.entries())
+        .map(([day, record]) => ({
+          availabilityId: record.availabilityId,
+          date: record.date.substring(0, 10),
+          day,
+        }))
+        .sort((a, b) => a.day - b.day);
+    }, [blockedRecordsByDay]);
+  
+    const isDateBlocked = (date: number) => blockedRecordsByDay.has(date);
 
   // ── Save Handler ───────────────────────────────────────
   const handleSaveAvailability = async () => {
@@ -431,30 +541,44 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                   className="px-3.5 py-2 rounded-lg outline-none text-sm font-semibold flex-1"
                   style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
                 />
-                <button onClick={addBlockedDate} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ backgroundColor: '#4a3728' }}>Add</button>
+
+<button
+                  onClick={addBlockedDate}
+                  disabled={!!blockActionId}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60"
+                  style={{ backgroundColor: '#4a3728' }}
+                >
+                  {blockActionId ? "Blocking..." : "Add"}
+                </button>
+
                 <button onClick={() => setShowBlockDateInput(false)} className="px-3.5 py-2 rounded-lg text-sm font-semibold" style={{ backgroundColor: '#fbf7f3', color: '#7a5c3e', border: '1px solid #e0d8cf' }}>Cancel</button>
               </div>
             )}
           </div>
-
           {/* Weekly Schedule */}
           <div className="bg-white p-6 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold" style={{ color: '#4a3728' }}>Weekly Schedule</h3>
-              {/* NEW: mini week-pattern strip — at-a-glance view of enabled days */}
+              {/* Mini week-pattern strip — ab clickable bhi hai, weekSchedule state se connected */}
               <div className="flex items-center gap-1.5">
-                {weekSchedule.map(d => (
-                  <div
+                {weekSchedule.map((d, idx) => (
+                  <button
                     key={d.day}
+                    type="button"
                     title={`${d.day}${d.enabled ? ` · ${d.startTime}–${d.endTime}` : ' · Off'}`}
-                    className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold"
+                    onClick={() =>
+                      setWeekSchedule(prev =>
+                        prev.map((dd, i) => (i === idx ? { ...dd, enabled: !dd.enabled } : dd))
+                      )
+                    }
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold transition-colors"
                     style={{
                       backgroundColor: d.enabled ? '#4a3728' : '#f3ece4',
                       color: d.enabled ? '#fff' : '#a08070',
                     }}
                   >
                     {d.day[0]}
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -480,6 +604,7 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                       className="px-3 py-1.5 rounded-lg outline-none text-sm"
                       style={{ border: '1px solid #e0d8cf', backgroundColor: '#fff', color: '#4a3728' }}
                     />
+                    {/* Single ON/OFF toggle — ye hi ek button hai, upar wale strip se connected */}
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
                         type="checkbox" checked={item.enabled}
@@ -741,13 +866,18 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
               <Ban className="w-4 h-4" style={{ color: '#7a5c3e' }} /> Blocked Dates
             </h4>
             <div className="space-y-2 mb-3">
-              {blockedDates.length === 0 ? (
+              {blockedDateList.length === 0 ? (
                 <p className="text-sm text-center py-3" style={{ color: '#8a7a6a' }}>No blocked dates yet.</p>
               ) : (
-                blockedDates.map((item, idx) => (
-                  <div key={idx} className="p-2.5 rounded-lg flex items-center justify-between text-sm" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
-                    <span style={{ color: '#8a7a6a' }}>{item.date} — {item.label}</span>
-                    <button onClick={() => removeBlockedDate(idx)}>
+                blockedDateList.map((item) => (
+                  <div key={item.availabilityId} className="p-2.5 rounded-lg flex items-center justify-between text-sm" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
+                    <span style={{ color: '#8a7a6a' }}>{item.date}</span>
+                    <button
+                      onClick={() => removeBlockedDate(item.availabilityId)}
+                      disabled={blockActionId === item.availabilityId}
+                      className="disabled:opacity-50"
+                      title="Unblock this date"
+                    >
                       <Trash2 className="w-3.5 h-3.5" style={{ color: '#dc2626' }} />
                     </button>
                   </div>
