@@ -6,6 +6,8 @@ import { ChevronLeft, ChevronRight } from "./Icons";
 import { TIME_SLOTS, MONTHS, DAYS, C, btnPrimary } from "./mentor/types/data";
 import type { Service, CalendarData } from "./mentor/types/types";
 import AvailabilityService from "@/lib/api/availability.service";
+import SessionService from "@/lib/api/session.service";
+
 
 interface CalendarStepProps {
     selectedService: Service | null;
@@ -24,6 +26,9 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
     const [noAvailability, setNoAvailability] = useState(false);
     const [isDayBlocked, setIsDayBlocked] = useState(false);
     const [selectedAvailabilityId, setSelectedAvailabilityId] = useState<string>("");
+    const [activeSessionCount, setActiveSessionCount] = useState(0);
+
+
 
     const year: number = currentMonth.getFullYear();
     const month: number = currentMonth.getMonth();
@@ -39,6 +44,24 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                 setAvailability(Array.isArray(list) ? list : []);
             })
             .catch(() => setAvailability([]));
+    }, [mentorId]);
+
+    // ✅ NEW: soft warning — count this mentee's existing pending/confirmed
+    // sessions with this specific mentor. Booking is never blocked; this is
+    // purely informational so a mentee doesn't accidentally over-book.
+    useEffect(() => {
+        if (!mentorId) return;
+        SessionService.getUpcomingSessions({ role: "mentee", limit: 50 })
+            .then((res) => {
+                const list = res?.data ?? [];
+                const sessions = Array.isArray(list) ? list : [];
+                const count = sessions.filter((s: any) => {
+                    const status = s.status;
+                    return s.mentorId === mentorId && (status === "pending" || status === "confirmed");
+                }).length;
+                setActiveSessionCount(count);
+            })
+            .catch(() => setActiveSessionCount(0));
     }, [mentorId]);
 
     const todayStart = new Date();
@@ -105,8 +128,28 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
             </button>
 
             <div style={{ maxWidth: "1200px", margin: "0 auto", borderRadius: "24px", padding: "40px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)" }}>
-                <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>Select Date &amp; Time</h2>
-                <p style={{ color: C.mid, fontSize: "13px", marginBottom: "24px" }}>Booking: {selectedService?.title}</p>
+            <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>Select Date &amp; Time</h2>
+                <p style={{ color: C.mid, fontSize: "13px", marginBottom: "16px" }}>Booking: {selectedService?.title}</p>
+
+                {activeSessionCount >= 3 && (
+                    <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        padding: "12px 16px",
+                        borderRadius: "10px",
+                        background: "#fef3c7",
+                        border: "1px solid #fde68a",
+                        color: "#92400e",
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        marginBottom: "20px",
+                    }}>
+                        ℹ️ You already have {activeSessionCount} active sessions with this mentor. You can still book another one.
+                    </div>
+                )}
+
+                
 
                 {/* 2-Column Grid Layout */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "40px", alignItems: "start" }}>

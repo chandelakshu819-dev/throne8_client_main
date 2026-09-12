@@ -129,12 +129,12 @@ export default function ServiceModal({
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-            <div
-                className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-xl max-h-[90vh] overflow-y-auto"
+                       <div
+                className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden"
                 style={{ border: '1px solid #e0d8cf' }}
             >
-                {/* Header */}
-                <div className="flex justify-between items-start mb-6">
+                {/* Header — static, does not scroll */}
+                <div className="flex justify-between items-start p-6 pb-4 shrink-0" style={{ borderBottom: '1px solid #f0ebe4' }}>
                     <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#f3ece4' }}>
                             <ServiceIcon className="w-5 h-5" style={{ color: '#4a3728' }} />
@@ -155,7 +155,10 @@ export default function ServiceModal({
                     </button>
                 </div>
 
-                <div className="space-y-5">
+                {/* Body — only this part scrolls */}
+                <div className="space-y-5 overflow-y-auto p-6 pt-5">
+
+
 
                     {/* Image Upload */}
                     <div className="rounded-xl border border-dashed relative overflow-hidden" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', minHeight: thumbnailPreview ? '180px' : 'auto' }}>
@@ -456,8 +459,7 @@ export default function ServiceModal({
                                 : (isEditMode ? "Update Service" : "Create Service")}
                         </button>
                     </div>
-
-                </div>
+                    </div>
             </div>
         </div>
     );

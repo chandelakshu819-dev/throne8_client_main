@@ -82,7 +82,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
 
   const getIcon = (sessionType: string): string => {
     if (sessionType === "group_session") return "👥";
-    return "📞";
+    return "";
   };
 
   return (
