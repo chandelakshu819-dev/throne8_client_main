@@ -166,7 +166,7 @@ export default function Navigation({
                                 if (isMentor && mentorUserId) {
                                     router.push(`/mentorship/mentorProfile/${mentorUserId}`);
                                 } else {
-                                    router.push('/dashboard');
+                                    router.push(`/mentorship/user-dashboard/${targetUserId}`);
                                 }
                             }}
                             className="bg-[#4a3728] text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-[1.5px] shadow-md hover:bg-[#8b7355] transition-all flex items-center gap-1.5 shrink-0"
