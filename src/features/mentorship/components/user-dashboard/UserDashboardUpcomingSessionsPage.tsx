@@ -114,36 +114,36 @@ export default function UserDashboardUpcomingSessionsPage({ sessions = [] }: Pro
             return (
               <div
                 key={s.sessionId ?? s._id ?? idx}
-                className="flex flex-col md:flex-row gap-5 p-5 rounded-2xl transition-colors hover:border-[#c9baa9] bg-white"
+                className="flex flex-col md:flex-row items-start md:items-center gap-4 p-4 md:p-5 rounded-2xl transition-shadow hover:shadow-sm bg-white"
                 style={{ border: `1px solid ${COLORS.hairline}` }}
               >
-                {/* Mentor Info */}
-                <div className="flex items-start gap-4 md:w-1/3 shrink-0">
+                {/* 1. Mentor Info */}
+                <div className="flex items-center gap-3 w-full md:w-[28%] shrink-0">
                   {photo ? (
                     <img
                       src={photo}
                       alt={name}
-                      className="w-14 h-14 rounded-full object-cover shrink-0"
+                      className="w-12 h-12 rounded-full object-cover shrink-0"
                       style={{ border: `1px solid ${COLORS.hairline}` }}
                     />
                   ) : (
                     <div
-                      className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 text-lg font-bold text-white"
+                      className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-base font-bold text-white"
                       style={{ backgroundColor: COLORS.ink }}
                     >
                       {initialsFrom(name)}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-base font-bold truncate" style={{ color: COLORS.ink }}>
+                    <p className="text-sm font-bold truncate" style={{ color: COLORS.ink }}>
                       {name}
                     </p>
-                    <p className="text-sm truncate mt-0.5" style={{ color: COLORS.muted }}>
+                    <p className="text-xs truncate mt-0.5" style={{ color: COLORS.muted }}>
                       Mentor
                     </p>
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="mt-1.5 flex items-center">
                        <span
-                        className="text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wide"
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
                         style={{ backgroundColor: COLORS.chip, color: COLORS.accent }}
                       >
                         {s.status || "Scheduled"}
@@ -152,60 +152,60 @@ export default function UserDashboardUpcomingSessionsPage({ sessions = [] }: Pro
                   </div>
                 </div>
 
-                {/* Session Details */}
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* 2. Session Details */}
+                <div className="w-full md:flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 md:px-4 md:border-l" style={{ borderColor: COLORS.hairline }}>
                   <div className="space-y-1">
-                    <p className="text-sm font-bold" style={{ color: COLORS.ink }}>
+                    <p className="text-sm font-bold line-clamp-2" style={{ color: COLORS.ink }} title={s.title || "Mentorship Session"}>
                       {s.title || "Mentorship Session"}
                     </p>
-                    <div className="flex items-center gap-1.5 text-sm font-medium" style={{ color: COLORS.muted }}>
-                      <CalendarClock className="w-4 h-4 shrink-0" />
+                    <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
+                      <CalendarClock className="w-3.5 h-3.5 shrink-0" />
                       <span>{formatDateStr(s.startTime || s.scheduledAt)}</span>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-sm font-medium" style={{ color: COLORS.muted }}>
-                      <Clock className="w-4 h-4 shrink-0" />
+                  <div className="space-y-1.5 pt-1 sm:pt-0">
+                    <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
+                      <Clock className="w-3.5 h-3.5 shrink-0" />
                       <span>
                         {formatTimeStr(s.startTime || s.scheduledAt)}
                         {s.duration ? ` (${s.duration} min)` : ""}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-sm font-medium" style={{ color: COLORS.muted }}>
+                    <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
                       {isOnline ? (
-                        <Video className="w-4 h-4 shrink-0" />
+                        <Video className="w-3.5 h-3.5 shrink-0" />
                       ) : (
-                        <MapPin className="w-4 h-4 shrink-0" />
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
                       )}
                       <span>{isOnline ? "Online Meeting" : "In Person"}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex flex-row md:flex-col items-center md:items-stretch justify-center md:justify-start gap-2 shrink-0 border-t md:border-t-0 md:border-l pt-4 md:pt-0 md:pl-5 mt-2 md:mt-0 w-full md:w-auto" style={{ borderColor: COLORS.hairline }}>
+                {/* 3. Actions */}
+                <div className="flex flex-col gap-2 shrink-0 w-full md:w-[150px] md:border-l md:pl-4 pt-4 md:pt-0 border-t md:border-t-0 mt-2 md:mt-0" style={{ borderColor: COLORS.hairline }}>
                    <button
-                    className="flex-1 md:flex-none w-full px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-[#8b7355] shadow-sm text-center"
+                    className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-[#8b7355] shadow-sm text-center"
                     style={{ backgroundColor: COLORS.ink, color: "#fff" }}
                   >
                     Join Session
                   </button>
                   <button
-                    className="flex-1 md:flex-none w-full px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:border-[#c9baa9] text-center"
+                    className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-colors hover:border-[#c9baa9] text-center"
                     style={{ backgroundColor: COLORS.wash, color: COLORS.accent, border: `1px solid ${COLORS.hairline}` }}
                   >
                     View Details
                   </button>
-                  <div className="hidden md:flex gap-2 w-full mt-1">
+                  <div className="flex gap-2 w-full">
                      <button
-                        className="flex-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-gray-50 text-center"
+                        className="flex-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold transition-colors hover:bg-gray-50 text-center uppercase tracking-wide"
                         style={{ color: COLORS.muted, border: `1px solid ${COLORS.hairline}` }}
                       >
                         Reschedule
                       </button>
                       <button
-                        className="flex-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-red-50 text-center text-red-600"
+                        className="flex-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold transition-colors hover:bg-red-50 text-center text-red-600 uppercase tracking-wide"
                         style={{ border: `1px solid #fca5a5` }}
                       >
                         Cancel
