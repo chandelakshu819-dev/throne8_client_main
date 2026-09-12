@@ -29,6 +29,10 @@ import MentorService from "@/lib/api/mentorship.service";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
 import MarketingKitPage from "./MarketingKitPage";
+// ✅ NEW — realtime notification push (booking requests, session started, etc.)
+import { useSocket } from "@/core/realtime/useSocket";
+
+
 
 const SERVICE_TYPES: ServiceType[] = [
   { name: "Consultation", emoji: "💬", icon: MessageCircle, description: "One-on-one consultation sessions" },
@@ -77,25 +81,68 @@ export default function MentorDashboard(
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ── Notification states (mentorship-scoped) ─────────────────
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [notificationsLoading, setNotificationsLoading] = useState(true);
+   // ── Notification states (mentorship-scoped) ─────────────────
+   const [notifications, setNotifications] = useState<any[]>([]);
+   const [notificationsLoading, setNotificationsLoading] = useState(true);
+ 
+   // ✅ NEW — realtime socket hook: pushes 'notification:new' the instant the
+   // backend emits it (booking request, session started/confirmed, etc.)
+   const { latestNotification } = useSocket();
+ 
+   const fetchNotifications = useCallback(() => {
+     setNotificationsLoading(true);
+     NotificationService.getMentorshipNotifications({ limit: 50 })
+       .then((res) => setNotifications(normalizeNotifications(res)))
+       .catch((err) => {
+         console.error("Failed to fetch notifications:", err);
+         setNotifications([]);
+       })
+       .finally(() => setNotificationsLoading(false));
+   }, []);
+ 
+   useEffect(() => {
+     if (!userId) return;
+     fetchNotifications();
+   }, [userId, fetchNotifications]);
+ 
+      // ✅ NEW — prepend the realtime notification to the list the instant it
+   // arrives, instead of waiting for the next full refetch/page-load.
+   // Maps the socket payload's raw `type` (e.g. 'new_booking_request') to the
+   // same "booking"|"review"|"payment"|"message"|"system" bucket the fetched
+   // list uses, so NotificationPage's icon lookup matches either way.
+   useEffect(() => {
+    if (!latestNotification) return;
+    setNotifications((prev) => {
+      const already = (Array.isArray(prev) ? prev : []).some(
+        (n) => n._id === latestNotification.notificationId || n.notificationId === latestNotification.notificationId
+      );
+      if (already) return prev;
 
-  const fetchNotifications = useCallback(() => {
-    setNotificationsLoading(true);
-    NotificationService.getMentorshipNotifications({ limit: 50 })
-      .then((res) => setNotifications(normalizeNotifications(res)))
-      .catch((err) => {
-        console.error("Failed to fetch notifications:", err);
-        setNotifications([]);
-      })
-      .finally(() => setNotificationsLoading(false));
-  }, []);
+      const rawType = latestNotification.type || "";
+      const mappedType =
+        rawType.includes("booking") || rawType.includes("session") || rawType.includes("waitlist") ? "booking" :
+        rawType.includes("review") ? "review" :
+        rawType.includes("payment") || rawType.includes("refund") || rawType.includes("package") || rawType.includes("credit") ? "payment" :
+        rawType.includes("query") ? "message" :
+        "system";
 
-  useEffect(() => {
-    if (!userId) return;
-    fetchNotifications();
-  }, [userId, fetchNotifications]);
+      return [
+        {
+          _id: latestNotification.notificationId,
+          notificationId: latestNotification.notificationId,
+          type: mappedType,
+          title: latestNotification.title,
+          message: latestNotification.message,
+          createdAt: latestNotification.createdAt,
+          isRead: false,
+        },
+        ...(Array.isArray(prev) ? prev : []),
+      ];
+    });
+  }, [latestNotification]);
+  
+
+
 
   const handleMarkNotificationRead = (id: string) => {
     setNotifications((prev) =>

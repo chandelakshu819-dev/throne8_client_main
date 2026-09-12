@@ -35,11 +35,42 @@ class NotificationService {
     // that router uses PUT (not PATCH) and `/read-all` (not `/mark-all-read`).
     // ============================================================
 
+       // ✅ NEW — maps backend's raw shape (id/status.read/exact type enum) into
+    // the shape NotificationPage.tsx + DashboardLayout.tsx actually expect
+    // (_id/isRead/one of "booking"|"review"|"payment"|"message"|"system").
+    // Without this, click-to-mark-read silently no-ops (item._id was always
+    // undefined) and the unread badge never goes down (item.isRead was
+    // always undefined too).
+    private static mapNotificationType(rawType: string): "booking" | "review" | "payment" | "message" | "system" {
+        if (!rawType) return "system";
+        if (rawType.includes("booking") || rawType.includes("session") || rawType.includes("waitlist")) return "booking";
+        if (rawType.includes("review")) return "review";
+        if (rawType.includes("payment") || rawType.includes("refund") || rawType.includes("package") || rawType.includes("credit")) return "payment";
+        if (rawType.includes("query")) return "message";
+        return "system";
+    }
+
+    private static normalizeNotificationDoc(raw: any): any {
+        return {
+            _id: raw.id || raw.notificationId || raw._id,
+            notificationId: raw.notificationId || raw.id || raw._id,
+            type: NotificationService.mapNotificationType(raw.type),
+            title: raw.title,
+            message: raw.message,
+            createdAt: raw.createdAt,
+            isRead: raw.status?.read ?? raw.isRead ?? false,
+        };
+    }
+
     static async getMentorshipNotifications(params?: { page?: number; limit?: number; unreadOnly?: boolean }): Promise<any> {
         try {
             const { data } = await api.get('/mentorship/notifications', { params });
             console.log('📩 [GET_MENTORSHIP_NOTIFICATIONS] Fetched:', data.data);
-            return data;
+
+            const rawList = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+            const normalized = rawList.map(NotificationService.normalizeNotificationDoc);
+
+            return { ...data, data: normalized };
         } catch (error: any) {
             console.error('❌ [GET_MENTORSHIP_NOTIFICATIONS] Failed:', error);
             throw new Error('Failed to fetch mentorship notifications.');
