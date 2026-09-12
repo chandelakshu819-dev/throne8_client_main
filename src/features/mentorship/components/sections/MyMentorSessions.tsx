@@ -1,7 +1,9 @@
-// src/features/mentor/components/sections/MyMentorSessions.tsx
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import SessionService from "@/lib/api/session.service";
+import QueryService, { QueryItem } from "@/lib/api/query.service";
+import WriteReviewModal from "@/features/mentorship/components/WriteReviewModal";
 
 // ─── Color tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -17,6 +19,23 @@ const C = {
     success: "#6b8f6e",
     warn: "#c97c4a",
 } as const;
+
+// ─── Session types (assumed shape — confirm against real API response) ────────
+interface SessionMentorInfo {
+    firstName?: string;
+    lastName?: string;
+    profilePhotoId?: string | null;
+}
+
+interface MenteeSession {
+    sessionId: string;
+    mentorId: string;
+    title: string;
+    scheduledAt: string;
+    duration: number;
+    status: string;
+    mentor?: SessionMentorInfo;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ToastProps {
@@ -35,13 +54,9 @@ interface StatCardProps {
     label: string;
 }
 
-interface ProgressBarProps {
-    value: number;
-    label: string;
-}
-
 interface OneOnOneTabProps {
     onReminder: (sessionName: string, onSave: () => void) => void;
+    toast: (msg: string) => void;
 }
 
 interface QueriesTabProps {
@@ -94,24 +109,22 @@ function ReminderModal({ sessionName, onClose, onSave }: ReminderModalProps) {
                 style={{ background: C.card }}
                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
             >
-                {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <h2
                         className="text-xl font-bold"
                         style={{ color: C.primary, fontFamily: "Georgia, serif" }}
                     >
-                        🔔 Reminder Set Karein
+                        Set Reminder
                     </h2>
                     <button
                         onClick={onClose}
                         className="w-8 h-8 rounded-lg border flex items-center justify-center text-sm transition-colors hover:opacity-70"
                         style={{ borderColor: C.border, color: C.muted }}
                     >
-                        ✕
+                        X
                     </button>
                 </div>
 
-                {/* Session name */}
                 <div className="mb-4">
                     <label
                         className="block text-xs font-semibold mb-1.5"
@@ -127,7 +140,6 @@ function ReminderModal({ sessionName, onClose, onSave }: ReminderModalProps) {
                     />
                 </div>
 
-                {/* Time chips */}
                 <div className="mb-4">
                     <label
                         className="block text-xs font-semibold mb-1.5"
@@ -153,7 +165,6 @@ function ReminderModal({ sessionName, onClose, onSave }: ReminderModalProps) {
                     </div>
                 </div>
 
-                {/* Notif type */}
                 <div className="mb-4">
                     <label
                         className="block text-xs font-semibold mb-1.5"
@@ -173,7 +184,6 @@ function ReminderModal({ sessionName, onClose, onSave }: ReminderModalProps) {
                     </select>
                 </div>
 
-                {/* Notes */}
                 <div className="mb-6">
                     <label
                         className="block text-xs font-semibold mb-1.5"
@@ -190,7 +200,6 @@ function ReminderModal({ sessionName, onClose, onSave }: ReminderModalProps) {
                     />
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-3">
                     <button
                         onClick={onClose}
@@ -204,7 +213,7 @@ function ReminderModal({ sessionName, onClose, onSave }: ReminderModalProps) {
                         className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
                         style={{ background: C.btn }}
                     >
-                        ✓ Save Karein
+                        Save Karein
                     </button>
                 </div>
             </div>
@@ -227,37 +236,6 @@ function StatCard({ num, label }: StatCardProps) {
             </div>
             <div className="text-xs" style={{ color: C.muted }}>
                 {label}
-            </div>
-        </div>
-    );
-}
-
-// ─── Progress Bar ─────────────────────────────────────────────────────────────
-function ProgressBar({ value, label }: ProgressBarProps) {
-    const [width, setWidth] = useState<number>(0);
-
-    useEffect(() => {
-        const timer = setTimeout(() => setWidth(value), 400);
-        return () => clearTimeout(timer);
-    }, [value]);
-
-    return (
-        <div className="mb-4">
-            <div
-                className="flex justify-between text-xs mb-1.5"
-                style={{ color: C.muted }}
-            >
-                <span>{label}</span>
-                <span>{value}%</span>
-            </div>
-            <div className="h-1.5 rounded-full" style={{ background: C.track }}>
-                <div
-                    className="h-full rounded-full transition-all duration-1000"
-                    style={{
-                        width: `${width}%`,
-                        background: `linear-gradient(90deg, ${C.secondary}, ${C.accent})`,
-                    }}
-                />
             </div>
         </div>
     );
@@ -294,289 +272,459 @@ function SectionTitle({
     );
 }
 
-// ─── ONE-ON-ONE TAB ───────────────────────────────────────────────────────────
-interface UpcomingSession {
-    id: string;
-    name: string;
-    date: string;
-    set: boolean;
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function formatSessionDate(iso: string): string {
+    const date = new Date(iso);
+    if (isNaN(date.getTime())) return iso;
+    return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) +
+        ", " +
+        date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 }
 
-interface BookableSession {
-    icon: string;
-    name: string;
-    mentor: string;
-    match: number;
+function mentorDisplayName(mentor?: SessionMentorInfo): string {
+    if (!mentor) return "Mentor";
+    const name = `${mentor.firstName ?? ""} ${mentor.lastName ?? ""}`.trim();
+    return name || "Mentor";
 }
 
-function OneOnOneTab({ onReminder }: OneOnOneTabProps) {
-    const [remindersSet, setRemindersSet] = useState<Record<string, boolean>>({
-        r2: false,
-        r3: false,
-    });
+// ─── ONE-ON-ONE TAB (real data) ────────────────────────────────────────────────
+function OneOnOneTab({ onReminder, toast }: OneOnOneTabProps) {
+    const [upcoming, setUpcoming] = useState<MenteeSession[]>([]);
+    const [completed, setCompleted] = useState<MenteeSession[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [reviewTarget, setReviewTarget] = useState<MenteeSession | null>(null);
+    const [reviewedIds, setReviewedIds] = useState<Record<string, boolean>>({});
+    const [remindersSet, setRemindersSet] = useState<Record<string, boolean>>({});
 
-    const upcoming: UpcomingSession[] = [
-        {
-            id: "r1",
-            name: "Career Roadmap Discussion",
-            date: "Kal, 4:00 PM • 45 min • Rahul Sharma",
-            set: true,
-        },
-        {
-            id: "r2",
-            name: "DSA Mock Interview",
-            date: "5 April, 11:00 AM • 60 min • Priya Gupta",
-            set: false,
-        },
-        {
-            id: "r3",
-            name: "Resume Review",
-            date: "8 April, 3:00 PM • 30 min • Amit Verma",
-            set: false,
-        },
-    ];
+    const loadSessions = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const [upcomingRes, completedRes] = await Promise.all([
+                SessionService.getUpcomingSessions({ role: "mentee", limit: 10 }),
+                SessionService.getAllSessions({ role: "mentee", status: "completed", limit: 10 }),
+            ]);
+            setUpcoming((upcomingRes?.data ?? []) as MenteeSession[]);
+            setCompleted((completedRes?.data ?? []) as MenteeSession[]);
+        } catch (e: any) {
+            setError(e?.message || "Sessions load nahi ho paaye.");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-    const bookable: BookableSession[] = [
-        { icon: "🎯", name: "Career Growth Session", mentor: "Rahul Sharma", match: 92 },
-        { icon: "💻", name: "System Design Prep", mentor: "Priya Gupta", match: 85 },
-    ];
+    useEffect(() => {
+        loadSessions();
+    }, [loadSessions]);
+
+    const handleReviewSuccess = () => {
+        if (reviewTarget) {
+            setReviewedIds((prev) => ({ ...prev, [reviewTarget.sessionId]: true }));
+        }
+        toast("Review submit ho gayi.");
+    };
+
+    if (loading) {
+        return (
+            <div className="py-16 text-center text-sm" style={{ color: C.muted }}>
+                Sessions load ho rahe hain...
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="py-16 text-center text-sm" style={{ color: C.warn }}>
+                {error}
+            </div>
+        );
+    }
 
     return (
         <div>
             {/* Upcoming Timeline */}
             <SectionTitle>Upcoming Sessions</SectionTitle>
-            <div className="flex flex-col gap-0 mb-8">
-                {upcoming.map((s, i) => {
-                    const isSet = s.set || remindersSet[s.id];
-                    return (
-                        <div key={s.id} className="flex gap-4">
-                            <div className="flex flex-col items-center w-10 flex-shrink-0">
-                                <div
-                                    className="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 z-10"
-                                    style={{
-                                        background: C.warn,
-                                        boxShadow: `0 0 0 3px rgba(201,124,74,0.2)`,
-                                    }}
-                                />
-                                {i < upcoming.length - 1 && (
+            {upcoming.length === 0 ? (
+                <p className="text-sm mb-8" style={{ color: C.muted }}>
+                    Koi upcoming session nahi hai.
+                </p>
+            ) : (
+                <div className="flex flex-col gap-0 mb-8">
+                    {upcoming.map((s, i) => {
+                        const isSet = remindersSet[s.sessionId];
+                        return (
+                            <div key={s.sessionId} className="flex gap-4">
+                                <div className="flex flex-col items-center w-10 flex-shrink-0">
                                     <div
-                                        className="flex-1 w-0.5 my-1"
-                                        style={{ background: C.border }}
+                                        className="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 z-10"
+                                        style={{
+                                            background: C.warn,
+                                            boxShadow: `0 0 0 3px rgba(201,124,74,0.2)`,
+                                        }}
                                     />
-                                )}
-                            </div>
-                            <div
-                                className="flex-1 rounded-xl border p-4 mb-4 flex items-center justify-between gap-4 transition-all hover:shadow-md"
-                                style={{ background: C.card, borderColor: C.border }}
-                            >
-                                <div>
-                                    <div
-                                        className="text-sm font-semibold mb-1"
-                                        style={{ color: C.primary }}
-                                    >
-                                        {s.name}
-                                    </div>
-                                    <div className="text-xs" style={{ color: C.muted }}>
-                                        📅 {s.date}
-                                    </div>
+                                    {i < upcoming.length - 1 && (
+                                        <div
+                                            className="flex-1 w-0.5 my-1"
+                                            style={{ background: C.border }}
+                                        />
+                                    )}
                                 </div>
-                                <button
-                                    onClick={() =>
-                                        isSet
-                                            ? undefined
-                                            : onReminder(s.name, () =>
-                                                setRemindersSet((p) => ({ ...p, [s.id]: true }))
-                                            )
-                                    }
-                                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all"
-                                    style={{
-                                        borderColor: isSet ? "rgba(107,143,110,0.3)" : C.border,
-                                        background: isSet ? "rgba(107,143,110,0.08)" : "transparent",
-                                        color: isSet ? C.success : C.secondary,
-                                        cursor: isSet ? "default" : "pointer",
-                                    }}
+                                <div
+                                    className="flex-1 rounded-xl border p-4 mb-4 flex items-center justify-between gap-4 transition-all hover:shadow-md"
+                                    style={{ background: C.card, borderColor: C.border }}
                                 >
-                                    {isSet ? "✅ Reminder Set" : "🔔 Reminder Set Karein"}
-                                </button>
+                                    <div>
+                                        <div
+                                            className="text-sm font-semibold mb-1"
+                                            style={{ color: C.primary }}
+                                        >
+                                            {s.title}
+                                        </div>
+                                        <div className="text-xs" style={{ color: C.muted }}>
+                                            {formatSessionDate(s.scheduledAt)} - {s.duration} min - {mentorDisplayName(s.mentor)}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() =>
+                                            isSet
+                                                ? undefined
+                                                : onReminder(s.title, () =>
+                                                    setRemindersSet((p) => ({ ...p, [s.sessionId]: true }))
+                                                )
+                                        }
+                                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all"
+                                        style={{
+                                            borderColor: isSet ? "rgba(107,143,110,0.3)" : C.border,
+                                            background: isSet ? "rgba(107,143,110,0.08)" : "transparent",
+                                            color: isSet ? C.success : C.secondary,
+                                            cursor: isSet ? "default" : "pointer",
+                                        }}
+                                    >
+                                        {isSet ? "Reminder Set" : "Set Reminder"}
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    );
-                })}
-            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Completed */}
-            <SectionTitle>Completed Session</SectionTitle>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {bookable.map((b) => (
-                    <div
-                        key={b.name}
-                        className="rounded-2xl border p-5 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5"
-                        style={{ background: C.card, borderColor: C.border }}
-                    >
-                        <div className="flex items-start justify-between mb-4">
+            <SectionTitle>Completed Sessions</SectionTitle>
+            {completed.length === 0 ? (
+                <p className="text-sm" style={{ color: C.muted }}>
+                    Abhi tak koi session complete nahi hui.
+                </p>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    {completed.map((s) => {
+                        const alreadyReviewed = reviewedIds[s.sessionId];
+                        return (
                             <div
-                                className="w-11 h-11 rounded-xl flex items-center justify-center text-xl"
-                                style={{ background: "rgba(74,55,40,0.09)" }}
+                                key={s.sessionId}
+                                className="rounded-2xl border p-5 transition-all hover:shadow-lg"
+                                style={{ background: C.card, borderColor: C.border }}
                             >
-                                {b.icon}
+                                <div className="flex items-start justify-between mb-4">
+                                    <div
+                                        className="w-11 h-11 rounded-xl flex items-center justify-center text-sm font-semibold"
+                                        style={{ background: "rgba(74,55,40,0.09)", color: C.secondary }}
+                                    >
+                                        {mentorDisplayName(s.mentor).charAt(0).toUpperCase()}
+                                    </div>
+                                    <span
+                                        className="text-xs font-bold px-2.5 py-1 rounded-full"
+                                        style={{ background: "rgba(74,55,40,0.08)", color: C.secondary }}
+                                    >
+                                        Completed
+                                    </span>
+                                </div>
+                                <div
+                                    className="text-base font-bold mb-1"
+                                    style={{ color: C.primary, fontFamily: "Georgia, serif" }}
+                                >
+                                    {s.title}
+                                </div>
+                                <div className="text-xs mb-4" style={{ color: C.muted }}>
+                                    {mentorDisplayName(s.mentor)} - {formatSessionDate(s.scheduledAt)}
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => !alreadyReviewed && setReviewTarget(s)}
+                                        disabled={alreadyReviewed}
+                                        className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
+                                        style={{
+                                            background: alreadyReviewed ? "rgba(107,143,110,0.12)" : C.btn,
+                                            color: alreadyReviewed ? C.success : "#fff",
+                                            cursor: alreadyReviewed ? "default" : "pointer",
+                                            opacity: alreadyReviewed ? 1 : undefined,
+                                        }}
+                                    >
+                                        {alreadyReviewed ? "Reviewed" : "Write a Review"}
+                                    </button>
+                                </div>
                             </div>
-                            <span
-                                className="text-xs font-bold px-2.5 py-1 rounded-full"
-                                style={{ background: "rgba(74,55,40,0.08)", color: C.secondary }}
-                            >
-                                Completed
-                            </span>
-                        </div>
-                        <div
-                            className="text-base font-bold mb-1"
-                            style={{ color: C.primary, fontFamily: "Georgia, serif" }}
-                        >
-                            {b.name}
-                        </div>
-                        <div className="text-xs mb-4" style={{ color: C.muted }}>
-                            {b.mentor} • Available
-                        </div>
-                        <ProgressBar value={b.match} label="Profile Match" />
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => onReminder(b.name, () => { })}
-                                className="flex-1 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
-                                style={{ background: C.btn }}
-                            >
-                                Review
-                            </button>
-                            <button
-                                className="px-4 py-2 rounded-xl border text-xs font-medium transition-all hover:opacity-80"
-                                style={{ borderColor: C.border, color: C.secondary }}
-                            >
-                                Profile
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {reviewTarget && (
+                <WriteReviewModal
+                    sessionId={reviewTarget.sessionId}
+                    mentorId={reviewTarget.mentorId}
+                    mentorName={mentorDisplayName(reviewTarget.mentor)}
+                    onClose={() => setReviewTarget(null)}
+                    onSuccess={handleReviewSuccess}
+                />
+            )}
         </div>
     );
 }
 
-// ─── QUERIES TAB ──────────────────────────────────────────────────────────────
-interface Query {
-    initials: string;
-    name: string;
-    time: string;
-    text: string;
-    tags: string[];
-    answered: boolean;
-}
-
+// ─── QUERIES TAB (real data) ────────────────────────────────────────────────────
 function QueriesTab({ toast }: QueriesTabProps) {
-    const queries: Query[] = [
-        {
-            initials: "RS",
-            name: "Rahul Sharma",
-            time: "2 ghante pehle",
-            text: "DSA mein Dynamic Programming ke saath main bohot struggle kar raha hoon. Kya aap kuch practice problems suggest kar sakte hain jo beginner level se start ho?",
-            tags: ["DSA", "Dynamic Programming"],
-            answered: false,
-        },
-        {
-            initials: "PG",
-            name: "Priya Gupta",
-            time: "1 din pehle",
-            text: "Mujhe system design interview ki preparation ke liye kahan se start karna chahiye? Koi roadmap denge?",
-            tags: ["System Design", "Interview"],
-            answered: false,
-        },
-        {
-            initials: "AV",
-            name: "Amit Verma",
-            time: "3 din pehle",
-            text: "Resume mein projects section kaise improve karein? Kya STAR method yahan bhi kaam karta hai?",
-            tags: ["Resume"],
-            answered: true,
-        },
-    ];
+    const [queries, setQueries] = useState<QueryItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [followUpOpenId, setFollowUpOpenId] = useState<string | null>(null);
+    const [followUpText, setFollowUpText] = useState("");
+    const [submittingFollowUp, setSubmittingFollowUp] = useState(false);
+
+    const loadQueries = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await QueryService.getAllQueries({ role: "mentee", limit: 20 });
+            setQueries(res.data ?? []);
+        } catch (e: any) {
+            setError(e?.message || "Queries load nahi ho payi.");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadQueries();
+    }, [loadQueries]);
+
+    const handleFollowUpSubmit = async (queryId: string) => {
+        if (followUpText.trim().length === 0) return;
+        setSubmittingFollowUp(true);
+        try {
+            const res = await QueryService.submitFollowUp(queryId, followUpText.trim());
+            setQueries((prev) => prev.map((q) => (q.queryId === queryId ? res.data : q)));
+            setFollowUpOpenId(null);
+            setFollowUpText("");
+            toast("Follow-up bhej diya gaya.");
+        } catch (e: any) {
+            toast(e?.message || "Follow-up submit nahi ho paya.");
+        } finally {
+            setSubmittingFollowUp(false);
+        }
+    };
+
+    const mentorName = (q: QueryItem) => {
+        const name = `${q.mentor?.firstName ?? ""} ${q.mentor?.lastName ?? ""}`.trim();
+        return name || "Mentor";
+    };
+
+    const timeAgo = (dateStr: string) => {
+        const diffMs = Date.now() - new Date(dateStr).getTime();
+        const hrs = Math.floor(diffMs / 3600000);
+        if (hrs < 1) return "abhi";
+        if (hrs < 24) return `${hrs} ghante pehle`;
+        const days = Math.floor(hrs / 24);
+        return `${days} din pehle`;
+    };
+
+    if (loading) {
+        return (
+            <div className="py-16 text-center text-sm" style={{ color: C.muted }}>
+                Queries load ho rahi hain...
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="py-16 text-center text-sm" style={{ color: C.warn }}>
+                {error}
+            </div>
+        );
+    }
 
     return (
         <div>
             <div className="flex items-center justify-between mb-5">
                 <SectionTitle inline>Aapki Queries</SectionTitle>
                 <button
-                    onClick={() => toast("✏️ New query form khul raha hai...")}
+                    onClick={() => toast("Query bhejne ke liye mentor profile se Query service select karo.")}
                     className="px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
                     style={{ background: C.btn }}
                 >
                     + Nayi Query
                 </button>
             </div>
-            <div className="flex flex-col gap-4">
-                {queries.map((q) => (
-                    <div
-                        key={q.name}
-                        className="rounded-2xl border p-5 flex gap-4 transition-all hover:shadow-md"
-                        style={{ background: C.card, borderColor: C.border }}
-                    >
+
+            {queries.length === 0 ? (
+                <p className="text-sm" style={{ color: C.muted }}>
+                    Abhi tak koi query nahi bheji.
+                </p>
+            ) : (
+                <div className="flex flex-col gap-4">
+                    {queries.map((q) => (
                         <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                            style={{
-                                background: `linear-gradient(135deg, ${C.secondary}, ${C.accent})`,
-                            }}
+                            key={q.queryId}
+                            className="rounded-2xl border p-5 flex gap-4 transition-all hover:shadow-md"
+                            style={{ background: C.card, borderColor: C.border }}
                         >
-                            {q.initials}
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex justify-between items-start mb-2">
-                                <span className="text-sm font-semibold" style={{ color: C.primary }}>
-                                    {q.name}
-                                </span>
-                                <span className="text-xs" style={{ color: C.muted }}>
-                                    {q.time}
-                                </span>
-                            </div>
-                            <p
-                                className="text-sm leading-relaxed mb-3"
-                                style={{ color: C.secondary }}
+                            <div
+                                className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                                style={{
+                                    background: `linear-gradient(135deg, ${C.secondary}, ${C.accent})`,
+                                }}
                             >
-                                {q.text}
-                            </p>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                {q.tags.map((t) => (
-                                    <span
-                                        key={t}
-                                        className="text-xs px-2.5 py-0.5 rounded-full font-medium"
-                                        style={{ background: "rgba(74,55,40,0.07)", color: C.secondary }}
-                                    >
-                                        {t}
+                                {mentorName(q).charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-sm font-semibold" style={{ color: C.primary }}>
+                                        {mentorName(q)}
                                     </span>
-                                ))}
-                                {q.answered ? (
-                                    <span
-                                        className="text-xs px-2.5 py-0.5 rounded-full font-medium"
-                                        style={{ background: "rgba(107,143,110,0.12)", color: C.success }}
-                                    >
-                                        ✅ Answered
+                                    <span className="text-xs" style={{ color: C.muted }}>
+                                        {timeAgo(q.createdAt)}
                                     </span>
-                                ) : (
-                                    <button
-                                        onClick={() => toast("💬 Reply box khul raha hai...")}
-                                        className="text-xs px-3 py-1 rounded-lg border font-medium transition-all hover:opacity-80 ml-1"
-                                        style={{ borderColor: C.border, color: C.secondary }}
+                                </div>
+                                <p className="text-sm leading-relaxed mb-2" style={{ color: C.secondary }}>
+                                    {q.question}
+                                </p>
+
+                                {q.answer && (
+                                    <div
+                                        className="rounded-xl p-3 mb-3"
+                                        style={{ background: C.bg, border: `1px solid ${C.border}` }}
                                     >
-                                        Reply
-                                    </button>
+                                        <p className="text-xs font-semibold mb-1" style={{ color: C.success }}>
+                                            Mentor ka jawab
+                                        </p>
+                                        <p className="text-sm" style={{ color: C.primary }}>
+                                            {q.answer}
+                                        </p>
+                                    </div>
                                 )}
+
+                                {q.followUp?.question && (
+                                    <div
+                                        className="rounded-xl p-3 mb-3"
+                                        style={{ background: "rgba(74,55,40,0.04)", border: `1px solid ${C.border}` }}
+                                    >
+                                        <p className="text-xs font-semibold mb-1" style={{ color: C.secondary }}>
+                                            Aapka follow-up
+                                        </p>
+                                        <p className="text-sm mb-2" style={{ color: C.primary }}>
+                                            {q.followUp.question}
+                                        </p>
+                                        {q.followUp.answer && (
+                                            <>
+                                                <p className="text-xs font-semibold mb-1" style={{ color: C.success }}>
+                                                    Mentor ka jawab
+                                                </p>
+                                                <p className="text-sm" style={{ color: C.primary }}>
+                                                    {q.followUp.answer}
+                                                </p>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+
+                                {followUpOpenId === q.queryId && (
+                                    <div className="mb-3">
+                                        <textarea
+                                            value={followUpText}
+                                            onChange={(e) => setFollowUpText(e.target.value)}
+                                            placeholder="Apna follow-up sawaal likho..."
+                                            rows={2}
+                                            className="w-full rounded-xl px-3 py-2 text-sm border outline-none mb-2"
+                                            style={{ background: C.bg, borderColor: C.border, color: C.primary }}
+                                        />
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleFollowUpSubmit(q.queryId)}
+                                                disabled={submittingFollowUp || followUpText.trim().length === 0}
+                                                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+                                                style={{ background: C.btn, opacity: submittingFollowUp ? 0.6 : 1 }}
+                                            >
+                                                {submittingFollowUp ? "Bhej rahe hain..." : "Bhejo"}
+                                            </button>
+                                            <button
+                                                onClick={() => { setFollowUpOpenId(null); setFollowUpText(""); }}
+                                                className="px-3 py-1.5 rounded-lg text-xs font-medium border"
+                                                style={{ borderColor: C.border, color: C.secondary }}
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {q.category && (
+                                        <span
+                                            className="text-xs px-2.5 py-0.5 rounded-full font-medium"
+                                            style={{ background: "rgba(74,55,40,0.07)", color: C.secondary }}
+                                        >
+                                            {q.category}
+                                        </span>
+                                    )}
+
+                                    {q.status === "answered" && (
+                                        <span
+                                            className="text-xs px-2.5 py-0.5 rounded-full font-medium"
+                                            style={{ background: "rgba(107,143,110,0.12)", color: C.success }}
+                                        >
+                                            Answered
+                                        </span>
+                                    )}
+                                    {q.status === "pending" && (
+                                        <span
+                                            className="text-xs px-2.5 py-0.5 rounded-full font-medium"
+                                            style={{ background: "rgba(201,124,74,0.12)", color: C.warn }}
+                                        >
+                                            Pending
+                                        </span>
+                                    )}
+                                    {q.status === "expired" && (
+                                        <span
+                                            className="text-xs px-2.5 py-0.5 rounded-full font-medium"
+                                            style={{ background: "rgba(0,0,0,0.06)", color: C.muted }}
+                                        >
+                                            Expired
+                                        </span>
+                                    )}
+
+                                    {q.status === "answered" && !q.followUp?.askedAt && followUpOpenId !== q.queryId && (
+                                        <button
+                                            onClick={() => { setFollowUpOpenId(q.queryId); setFollowUpText(""); }}
+                                            className="text-xs px-3 py-1 rounded-lg border font-medium transition-all hover:opacity-80 ml-1"
+                                            style={{ borderColor: C.border, color: C.secondary }}
+                                        >
+                                            Follow-up
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
 
-// ─── RESOURCES TAB ────────────────────────────────────────────────────────────
+// ─── RESOURCES TAB (still mock — separate task) ────────────────────────────────
 interface Resource {
-    icon: string;
     type: string;
     name: string;
     meta: string;
@@ -586,54 +734,12 @@ interface Resource {
 
 function ResourcesTab({ toast }: ResourcesTabProps) {
     const resources: Resource[] = [
-        {
-            icon: "📄",
-            type: "PDF",
-            name: "DSA Cheat Sheet — Top 100 Problems",
-            meta: "2.4 MB • Rahul Sharma",
-            btn: "⬇",
-            action: "⬇️ Download ho raha hai...",
-        },
-        {
-            icon: "🎥",
-            type: "VIDEO",
-            name: "System Design Interview — Complete Guide",
-            meta: "45 min • Priya Gupta",
-            btn: "▶",
-            action: "▶️ Video play ho rahi hai...",
-        },
-        {
-            icon: "📊",
-            type: "SHEET",
-            name: "6-Month Study Plan — Software Engineering",
-            meta: "180 KB • Amit Verma",
-            btn: "⬇",
-            action: "⬇️ Download ho raha hai...",
-        },
-        {
-            icon: "🔗",
-            type: "LINK",
-            name: "LeetCode Top 150 Interview Questions List",
-            meta: "External • Rahul Sharma",
-            btn: "↗",
-            action: "🔗 Link khul raha hai...",
-        },
-        {
-            icon: "📝",
-            type: "NOTES",
-            name: "Resume Writing Tips — ATS Friendly Format",
-            meta: "32 KB • Amit Verma",
-            btn: "⬇",
-            action: "⬇️ Download ho raha hai...",
-        },
-        {
-            icon: "🎤",
-            type: "RECORDING",
-            name: "Mock Interview Session Recording — March 22",
-            meta: "28 min • Priya Gupta",
-            btn: "▶",
-            action: "▶️ Recording play ho rahi hai...",
-        },
+        { type: "PDF", name: "DSA Cheat Sheet - Top 100 Problems", meta: "2.4 MB - Rahul Sharma", btn: "Download", action: "Download ho raha hai..." },
+        { type: "VIDEO", name: "System Design Interview - Complete Guide", meta: "45 min - Priya Gupta", btn: "Play", action: "Video play ho rahi hai..." },
+        { type: "SHEET", name: "6-Month Study Plan - Software Engineering", meta: "180 KB - Amit Verma", btn: "Download", action: "Download ho raha hai..." },
+        { type: "LINK", name: "LeetCode Top 150 Interview Questions List", meta: "External - Rahul Sharma", btn: "Open", action: "Link khul raha hai..." },
+        { type: "NOTES", name: "Resume Writing Tips - ATS Friendly Format", meta: "32 KB - Amit Verma", btn: "Download", action: "Download ho raha hai..." },
+        { type: "RECORDING", name: "Mock Interview Session Recording - March 22", meta: "28 min - Priya Gupta", btn: "Play", action: "Recording play ho rahi hai..." },
     ];
 
     return (
@@ -641,7 +747,7 @@ function ResourcesTab({ toast }: ResourcesTabProps) {
             <div className="flex items-center justify-between mb-5">
                 <SectionTitle inline>Shared Resources</SectionTitle>
                 <button
-                    onClick={() => toast("📎 File upload ho raha hai...")}
+                    onClick={() => toast("File upload ho raha hai...")}
                     className="px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
                     style={{ background: C.btn }}
                 >
@@ -655,12 +761,6 @@ function ResourcesTab({ toast }: ResourcesTabProps) {
                         className="rounded-2xl border p-5 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5"
                         style={{ background: C.card, borderColor: C.border }}
                     >
-                        <div
-                            className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4"
-                            style={{ background: "rgba(74,55,40,0.08)" }}
-                        >
-                            {r.icon}
-                        </div>
                         <div
                             className="text-xs font-bold tracking-wider mb-1"
                             style={{ color: C.muted }}
@@ -679,7 +779,7 @@ function ResourcesTab({ toast }: ResourcesTabProps) {
                             </span>
                             <button
                                 onClick={() => toast(r.action)}
-                                className="w-8 h-8 rounded-lg text-white flex items-center justify-center text-sm transition-all hover:scale-105 hover:opacity-90"
+                                className="px-3 py-1.5 rounded-lg text-white flex items-center justify-center text-xs font-medium transition-all hover:opacity-90"
                                 style={{ background: C.primary }}
                             >
                                 {r.btn}
@@ -692,7 +792,7 @@ function ResourcesTab({ toast }: ResourcesTabProps) {
     );
 }
 
-// ─── HISTORY TAB ──────────────────────────────────────────────────────────────
+// ─── HISTORY TAB (still mock — separate task) ──────────────────────────────────
 interface SessionHistory {
     name: string;
     date: string;
@@ -701,14 +801,14 @@ interface SessionHistory {
 
 function HistoryTab() {
     const sessions: SessionHistory[] = [
-        { name: "Career Goals Planning", date: "28 March 2026 • Rahul Sharma • 45 min", stars: 5 },
-        { name: "DSA Mock Interview — Round 1", date: "21 March 2026 • Priya Gupta • 60 min", stars: 4 },
-        { name: "Resume Review & Feedback", date: "15 March 2026 • Amit Verma • 30 min", stars: 5 },
-        { name: "System Design Basics", date: "8 March 2026 • Priya Gupta • 45 min", stars: 4 },
-        { name: "Intro Session — Goals Discussion", date: "1 March 2026 • Rahul Sharma • 30 min", stars: 5 },
-        { name: "LinkedIn Profile Optimization", date: "22 Feb 2026 • Amit Verma • 30 min", stars: 4 },
-        { name: "Behavioral Interview Prep", date: "14 Feb 2026 • Priya Gupta • 45 min", stars: 5 },
-        { name: "OOP Concepts Deep Dive", date: "5 Feb 2026 • Rahul Sharma • 60 min", stars: 4 },
+        { name: "Career Goals Planning", date: "28 March 2026 - Rahul Sharma - 45 min", stars: 5 },
+        { name: "DSA Mock Interview - Round 1", date: "21 March 2026 - Priya Gupta - 60 min", stars: 4 },
+        { name: "Resume Review & Feedback", date: "15 March 2026 - Amit Verma - 30 min", stars: 5 },
+        { name: "System Design Basics", date: "8 March 2026 - Priya Gupta - 45 min", stars: 4 },
+        { name: "Intro Session - Goals Discussion", date: "1 March 2026 - Rahul Sharma - 30 min", stars: 5 },
+        { name: "LinkedIn Profile Optimization", date: "22 Feb 2026 - Amit Verma - 30 min", stars: 4 },
+        { name: "Behavioral Interview Prep", date: "14 Feb 2026 - Priya Gupta - 45 min", stars: 5 },
+        { name: "OOP Concepts Deep Dive", date: "5 Feb 2026 - Rahul Sharma - 60 min", stars: 4 },
     ];
 
     return (
@@ -729,7 +829,7 @@ function HistoryTab() {
                                 fontSize: "1rem",
                             }}
                         >
-                            ✓
+                            OK
                         </div>
                         <div className="flex-1">
                             <div
@@ -739,13 +839,13 @@ function HistoryTab() {
                                 {s.name}
                             </div>
                             <div className="text-xs" style={{ color: C.muted }}>
-                                📅 {s.date}
+                                {s.date}
                             </div>
                         </div>
                         <div className="text-right flex-shrink-0">
                             <div className="text-sm mb-0.5" style={{ color: C.accent }}>
-                                {"★".repeat(s.stars)}
-                                {"☆".repeat(5 - s.stars)}
+                                {"*".repeat(s.stars)}
+                                {"-".repeat(5 - s.stars)}
                             </div>
                             <div className="text-xs" style={{ color: C.success }}>
                                 Completed
@@ -787,17 +887,17 @@ export default function MentorDashboard() {
         setModal({ open: true, session: sessionName, onSave });
     };
 
-    const handleSaveReminder = (time: string): void => {
+    const handleSaveReminder = (): void => {
         modal.onSave?.();
         setModal({ open: false, session: "", onSave: null });
-        showToast("✅ Reminder set ho gaya! Aapko samay par notification milegi.");
+        showToast("Reminder set ho gaya! Aapko samay par notification milegi.");
     };
 
     const tabs: Tab[] = [
-        { id: "one-on-one", label: "👤 1:1 Session" },
-        { id: "queries", label: "❓ Queries" },
-        { id: "resources", label: "📚 Resources" },
-        { id: "history", label: "📋 History" },
+        { id: "one-on-one", label: "1:1 Session" },
+        { id: "queries", label: "Queries" },
+        { id: "resources", label: "Resources" },
+        { id: "history", label: "History" },
     ];
 
     return (
@@ -805,17 +905,16 @@ export default function MentorDashboard() {
             className="min-h-screen"
             style={{ background: C.bg, fontFamily: "'DM Sans', sans-serif" }}
         >
-            {/* ── HEADER ── */}
             <header
                 className="sticky top-0 z-40 flex items-center justify-between px-6 h-16 border-b shadow-sm"
                 style={{ background: C.card, borderColor: C.border }}
             >
                 <div className="flex items-center gap-3">
                     <div
-                        className="w-9 h-9 rounded-xl flex items-center justify-center text-base"
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-base font-bold"
                         style={{ background: C.primary, color: C.bg }}
                     >
-                        🎓
+                        M
                     </div>
                     <span
                         className="text-xl font-bold"
@@ -824,32 +923,9 @@ export default function MentorDashboard() {
                         MentorSpace
                     </span>
                 </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => showToast("🔔 2 upcoming sessions this week!")}
-                        className="relative w-9 h-9 rounded-full border flex items-center justify-center transition-all hover:opacity-80"
-                        style={{ borderColor: C.border, color: C.secondary }}
-                    >
-                        🔔
-                        <span
-                            className="absolute top-1 right-1 w-2 h-2 rounded-full border-2"
-                            style={{ background: C.warn, borderColor: C.card }}
-                        />
-                    </button>
-                    <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold text-white cursor-pointer"
-                        style={{
-                            background: `linear-gradient(135deg, ${C.secondary}, ${C.accent})`,
-                        }}
-                    >
-                        RK
-                    </div>
-                </div>
             </header>
 
-            {/* ── MAIN ── */}
             <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 pb-16">
-                {/* Page Heading */}
                 <div className="mb-6">
                     <h1
                         className="text-3xl font-bold mb-1"
@@ -858,63 +934,10 @@ export default function MentorDashboard() {
                         Mentor Sessions
                     </h1>
                     <p className="text-sm font-light" style={{ color: C.muted }}>
-                        Apne saare mentor sessions ek jagah manage karein — queries, resources, aur history.
+                        Apne saare mentor sessions ek jagah manage karein - queries, resources, aur history.
                     </p>
                 </div>
 
-                {/* Alert Banner */}
-                <div
-                    className="rounded-2xl p-5 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg"
-                    style={{
-                        background: `linear-gradient(135deg, ${C.primary} 0%, ${C.secondary} 100%)`,
-                    }}
-                >
-                    <div className="flex items-center gap-4">
-                        <div
-                            className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-                            style={{ background: "rgba(255,255,255,0.15)" }}
-                        >
-                            ⏰
-                        </div>
-                        <div>
-                            <p className="font-semibold text-white text-sm mb-0.5">
-                                Upcoming: 1:1 Session with Rahul Sir — Kal 4:00 PM
-                            </p>
-                            <p className="text-xs" style={{ color: "rgba(255,255,255,0.75)" }}>
-                                Career Roadmap discussion • 45 min • Google Meet
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                        <button
-                            onClick={() => openReminder("Career Roadmap Discussion", () => { })}
-                            className="px-4 py-2 rounded-xl text-xs font-medium border transition-all hover:opacity-90"
-                            style={{
-                                background: "rgba(255,255,255,0.15)",
-                                borderColor: "rgba(255,255,255,0.3)",
-                                color: "white",
-                            }}
-                        >
-                            🔔 Reminder
-                        </button>
-                        <button
-                            className="px-4 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-90 hover:-translate-y-0.5"
-                            style={{ background: "white", color: C.primary }}
-                        >
-                            Join Meeting →
-                        </button>
-                    </div>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                    <StatCard num="12" label="Total Sessions" />
-                    <StatCard num="8" label="Completed" />
-                    <StatCard num="3" label="Upcoming" />
-                    <StatCard num="24h" label="Total Time" />
-                </div>
-
-                {/* Tab Nav */}
                 <div
                     className="flex flex-wrap gap-1 p-1.5 rounded-xl border mb-6 w-fit"
                     style={{ background: C.card, borderColor: C.border }}
@@ -936,14 +959,12 @@ export default function MentorDashboard() {
                     ))}
                 </div>
 
-                {/* Tab Panels */}
-                {activeTab === "one-on-one" && <OneOnOneTab onReminder={openReminder} />}
+                {activeTab === "one-on-one" && <OneOnOneTab onReminder={openReminder} toast={showToast} />}
                 {activeTab === "queries" && <QueriesTab toast={showToast} />}
                 {activeTab === "resources" && <ResourcesTab toast={showToast} />}
                 {activeTab === "history" && <HistoryTab />}
             </main>
 
-            {/* Reminder Modal */}
             {modal.open && (
                 <ReminderModal
                     sessionName={modal.session}
@@ -952,7 +973,6 @@ export default function MentorDashboard() {
                 />
             )}
 
-            {/* Toast */}
             <Toast msg={toastMsg} visible={toastVisible} />
         </div>
     );

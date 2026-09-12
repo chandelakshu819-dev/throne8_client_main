@@ -1,10 +1,12 @@
-// components/mentor-profile/ServicesSection.tsx
+//src/features/mentorship/components/ServicesSection.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
 import { Clock } from "./Icons";
 import { btnPrimary, C } from "../types/data";
 import SessionService from "@/lib/api/session.service";
+import MentorService from "@/lib/api/mentorship.service";
+import QueryModal from "./QueryModal";
 import { Service } from "../types/types";
 
 interface ServicesSectionProps {
@@ -34,6 +36,17 @@ const SESSION_TYPE_FILTER: Record<string, string> = {
   portfolio_review: "Portfolio Review",
 };
 
+// ✅ FIX: mentor.userId is a raw UUID, not a display name. The backend's
+// enrichMentorWithRelations (mentor.service.ts) attaches a `user` object
+// with firstName/lastName/fullName — same pattern as reviews. Use that.
+const getMentorDisplayName = (mentor: any): string => {
+  const user = mentor?.user;
+  if (!user) return "";
+  if (user.fullName) return user.fullName;
+  const combined = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+  return combined;
+};
+
 const ServicesSection: React.FC<ServicesSectionProps> = ({
   onServiceClick,
   mentorId,
@@ -43,6 +56,13 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   const [activeFilter, setActiveFilter] = useState<string>("All");
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [mentorInfo, setMentorInfo] = useState<{
+    askQueryPrice: number;
+    acceptQueries: boolean;
+    mentorName: string;
+  } | null>(null);
+  const [queryModalOpen, setQueryModalOpen] = useState(false);
 
   useEffect(() => {
     if (!mentorId) return;
@@ -54,6 +74,21 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       })
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
+  }, [mentorId]);
+
+  useEffect(() => {
+    if (!mentorId) return;
+    MentorService.getMyMentorProfile(mentorId)
+      .then((res: any) => {
+        const mentor = res?.data;
+        if (!mentor) return;
+        setMentorInfo({
+          askQueryPrice: mentor.pricing?.askQuery ?? 0,
+          acceptQueries: mentor.preferences?.acceptQueries ?? true,
+          mentorName: getMentorDisplayName(mentor),
+        });
+      })
+      .catch(() => setMentorInfo(null));
   }, [mentorId]);
 
   const uniqueTypes = Array.from(new Set(sessions.map((s) => s.sessionType)));
@@ -74,8 +109,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   });
 
   const getIcon = (sessionType: string): string => {
-    if (sessionType === "group_session") return "\u{1F465}"; // 👥
-    return "\u{1F4DE}"; // 📞
+    if (sessionType === "group_session") return "\u{1F465}";
+    return "\u{1F4DE}";
   };
 
   return (
@@ -111,7 +146,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           </>
         )}
 
-        {!loading && filtered.length === 0 && (
+        {!loading && filtered.length === 0 && mentorInfo?.acceptQueries !== true && (
           <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: C.mid }}>
             No sessions available for this filter.
           </div>
@@ -190,7 +225,55 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
             </div>
           );
         })}
+
+        {mentorInfo?.acceptQueries && (
+          <div
+            style={{
+              borderRadius: "16px", padding: "20px", background: C.bg,
+              border: `1px solid ${C.border}`, position: "relative",
+              boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
+              minWidth: 0,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+              <span>{"\u2753"}</span>
+              <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "12px", background: C.border, color: C.dark }}>
+                Query
+              </span>
+            </div>
+            <h3 style={{
+              fontWeight: "bold", color: C.dark, fontSize: "14px",
+              marginBottom: "8px", lineHeight: "1.4",
+            }}>Ask a Query</h3>
+            <p style={{
+              fontSize: "12px", color: C.mid, marginBottom: "14px", lineHeight: "1.4",
+            }}>
+              Text-based question, mentor jawab dega - no live call needed.
+            </p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontWeight: "bold", color: mentorInfo.askQueryPrice === 0 ? "#10b981" : C.dark, fontSize: "15px" }}>
+                {mentorInfo.askQueryPrice === 0 ? "Free" : `\u20B9${mentorInfo.askQueryPrice}`}
+              </span>
+              <button
+                onClick={() => setQueryModalOpen(true)}
+                style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}
+              >
+                Ask
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {queryModalOpen && mentorInfo && (
+        <QueryModal
+          mentorId={mentorId}
+          mentorName={mentorInfo.mentorName || undefined}
+          price={mentorInfo.askQueryPrice}
+          onClose={() => setQueryModalOpen(false)}
+          onSuccess={() => setQueryModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

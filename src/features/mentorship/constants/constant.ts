@@ -1,13 +1,15 @@
 // mentorDashboard/constant/constants.ts
 import {
   User, Briefcase, Calendar, Clock, CreditCard, Star, LayoutDashboard,
-  Bell, Package, BarChart3, Award, Users, Shield, Video, MessageSquare
+  Bell, Package, BarChart3, Award, Users, Shield, Video, MessageSquare,
+  HelpCircle,
 } from 'lucide-react';
 
 export const MENU_ITEMS = [
   { id: 'profile',      label: 'Profile',      icon: User },
   { id: 'services',     label: 'Services',     icon: Briefcase },
   { id: 'booking',      label: 'Booking',      icon: Calendar },
+  { id: 'queries',      label: 'Queries',      icon: HelpCircle },
   { id: 'availability', label: 'Availability', icon: Clock },
   { id: 'payment',      label: 'Payment',      icon: CreditCard },
   { id: 'review',       label: 'Review',       icon: Star },

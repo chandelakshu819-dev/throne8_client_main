@@ -17,6 +17,7 @@ import NotificationPage from "./NotificationPage";
 import ProfilePage from "./ProfilePage";
 import ServicesPage from "./ServicesPage";
 import BookingsPage from "./BookingsPage";
+import QueriesPage from "./QueriesPage";
 import AvailabilityPage from "./AvailabilityPage";
 import PaymentsPage from "./PaymentsPage";
 import ReviewsPage from "./ReviewsPage";
@@ -43,6 +44,7 @@ const pageComponents: Record<string, React.FC<any>> = {
   notification: NotificationPage,
   services: ServicesPage,
   booking: BookingsPage,
+  queries: QueriesPage,
   availability: AvailabilityPage,
   payment: PaymentsPage,
   review: ReviewsPage,
