@@ -316,7 +316,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
           </div>,
           document.body
         )}
-        
+
   
         {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -474,60 +474,60 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex gap-1.5">
-                          {bookingTab === 'pending' && (
+                        {bookingTab === 'pending' && (
                             <>
                               <button
                                 onClick={() => handleConfirm(booking.sessionId, booking.bookingId)}
                                 disabled={actionLoading === booking.sessionId}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 text-white transition-opacity hover:opacity-90"
-                                style={{ backgroundColor: '#15803d' }}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
+                                style={{ backgroundColor: '#dcfce7', color: '#15803d' }}
                               >
                                 <Check className="w-3.5 h-3.5" /> {actionLoading === booking.sessionId ? '...' : 'Accept'}
                               </button>
                               <button
                                 onClick={() => { setCancelSessionId(booking.sessionId); setCancelBookingId(booking.bookingId); setShowCancelModal(true); }}
                                 disabled={actionLoading === booking.sessionId}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 text-white transition-opacity hover:opacity-90"
-                                style={{ backgroundColor: '#dc2626' }}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
+                                style={{ backgroundColor: '#fee2e2', color: '#dc2626' }}
                               >
                                 <XCircle className="w-3.5 h-3.5" /> Reject
                               </button>
                             </>
                           )}
-                          {bookingTab === 'upcoming' && (
+                                                    {bookingTab === 'upcoming' && (
                             <>
                               <button
                                 onClick={() => handleStart(booking.sessionId)}
                                 disabled={actionLoading === booking.sessionId}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 text-white transition-opacity hover:opacity-90"
-                                style={{ backgroundColor: '#1d4ed8' }}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
+                                style={{ backgroundColor: '#dbeafe', color: '#1d4ed8' }}
                               >
                                 <Play className="w-3.5 h-3.5" /> {actionLoading === booking.sessionId ? '...' : 'Start'}
                               </button>
                               <button
                                 onClick={() => { setRescheduleSessionId(booking.sessionId); setRescheduleBookingId(booking.bookingId); setShowRescheduleModal(true); }}
                                 disabled={actionLoading === booking.sessionId}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 text-white transition-opacity hover:opacity-90"
-                                style={{ backgroundColor: '#b45309' }}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
+                                style={{ backgroundColor: '#fed7aa', color: '#c2410c' }}
                               >
                                 <RotateCw className="w-3.5 h-3.5" /> Reschedule
                               </button>
                               <button
                                 onClick={() => { setCancelSessionId(booking.sessionId); setCancelBookingId(booking.bookingId); setShowCancelModal(true); }}
                                 disabled={actionLoading === booking.sessionId}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 text-white transition-opacity hover:opacity-90"
-                                style={{ backgroundColor: '#dc2626' }}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
+                                style={{ backgroundColor: '#fee2e2', color: '#dc2626' }}
                               >
                                 <XCircle className="w-3.5 h-3.5" /> Cancel
                               </button>
                             </>
                           )}
-                          {bookingTab === 'in_progress' && (
+                                                   {bookingTab === 'in_progress' && (
                             <button
                               onClick={() => handleEnd(booking.sessionId)}
                               disabled={actionLoading === booking.sessionId}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 text-white transition-opacity hover:opacity-90"
-                              style={{ backgroundColor: '#7c3aed' }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
+                              style={{ backgroundColor: '#f3e8ff', color: '#7c3aed' }}
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" /> {actionLoading === booking.sessionId ? '...' : 'End Session'}
                             </button>
