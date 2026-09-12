@@ -110,130 +110,134 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
 
     return (
         <div style={{ position: "sticky", top: "24px" }}>
-            <div style={{ borderRadius: "24px", overflow: "hidden", boxShadow: "0 20px 60px rgba(74,55,40,0.15)", border: `1px solid ${C.border}` }}>
+            <div style={{ borderRadius: "24px", overflow: "hidden", boxShadow: "0 12px 40px rgba(0,0,0,0.08)", border: `1px solid ${C.border}`, background: C.bg }}>
 
                 {/* Banner */}
-                <div style={{ position: "relative", height: "120px", background: bannerBackground }}>
+                <div style={{ position: "relative", height: "140px", background: bannerBackground }}>
+                    {/* Add a subtle gradient overlay to the banner for a premium feel */}
+                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.4))" }}></div>
                     {isOwner && (
                         <>
                             <input type="file" ref={bgInputRef} onChange={handleBgUpload} accept="image/*" style={{ display: "none" }} disabled={isUploadingCover} />
                             <button
                                 onClick={() => bgInputRef.current?.click()}
                                 disabled={isUploadingCover}
-                                style={{ position: "absolute", top: "12px", right: "12px", padding: "8px", borderRadius: "8px", background: "rgba(251,247,243,0.9)", border: `1px solid ${C.border}`, cursor: isUploadingCover ? "not-allowed" : "pointer", opacity: isUploadingCover ? 0.6 : 1 }}
+                                style={{ position: "absolute", top: "16px", right: "16px", padding: "10px", borderRadius: "12px", background: "rgba(255,255,255,0.9)", border: "none", cursor: isUploadingCover ? "not-allowed" : "pointer", opacity: isUploadingCover ? 0.6 : 1, boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, display: "flex", alignItems: "center", justifyContent: "center" }}
                             >
                                 <Camera />
                             </button>
                         </>
                     )}
-                    <div style={{ position: "absolute", bottom: "-48px", left: "50%", transform: "translateX(-50%)" }}>
+                    <div style={{ position: "absolute", bottom: "-50px", left: "50%", transform: "translateX(-50%)", zIndex: 10 }}>
                         <div style={{ position: "relative" }}>
                             {image ? (
-                                <img src={image} alt={name} style={{ width: "96px", height: "96px", borderRadius: "50%", border: `4px solid ${C.bg}`, objectFit: "cover" }} />
+                                <img src={image} alt={name} style={{ width: "100px", height: "100px", borderRadius: "50%", border: `4px solid ${C.bg}`, objectFit: "cover", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
                             ) : (
-                                <div style={{ width: "96px", height: "96px", borderRadius: "50%", border: `4px solid ${C.bg}`, background: C.grad, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: "bold", fontSize: "28px" }}>
+                                <div style={{ width: "100px", height: "100px", borderRadius: "50%", border: `4px solid ${C.bg}`, background: C.grad, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: "bold", fontSize: "32px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
                                     {name.charAt(0).toUpperCase()}
                                 </div>
                             )}
                             {verified && (
-                                <div style={{ position: "absolute", bottom: "2px", right: "2px", width: "24px", height: "24px", borderRadius: "50%", background: "#10b981", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "12px", border: "2px solid #fff" }}>✓</div>
+                                <div style={{ position: "absolute", bottom: "4px", right: "4px", width: "26px", height: "26px", borderRadius: "50%", background: "#10b981", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "14px", border: `3px solid ${C.bg}`, boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}>✓</div>
                             )}
                         </div>
                     </div>
                 </div>
 
                 {/* Body */}
-                <div style={{ background: C.bg, padding: "60px 24px 28px", textAlign: "center" }}>
-                    <h1 style={{ fontSize: "20px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>{name}</h1>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", marginBottom: "10px" }}>
-                        <Star filled style={{ color: "#f59e0b" }} />
-                        <span style={{ fontWeight: "bold", color: C.dark }}>{rating}</span>
+                <div style={{ padding: "64px 28px 32px", textAlign: "center" }}>
+                    <h1 style={{ fontSize: "24px", fontWeight: "800", color: C.dark, marginBottom: "8px", letterSpacing: "-0.5px" }}>{name}</h1>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", marginBottom: "8px" }}>
+                        <Star filled style={{ color: "#f59e0b", width: "18px", height: "18px" }} />
+                        <span style={{ fontWeight: "700", color: C.dark, fontSize: "15px" }}>{rating}</span>
                     </div>
-                    <p style={{ fontSize: "13px", color: C.mid, marginBottom: "4px" }}>{currentRole}</p>
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "20px", background: C.border, fontSize: "12px", color: C.dark, marginBottom: "20px", marginTop: "8px" }}>
-                        <Briefcase /> {experience}
+                    <p style={{ fontSize: "15px", color: C.mid, marginBottom: "16px", fontWeight: "500" }}>{currentRole}</p>
+                    
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "8px 16px", borderRadius: "30px", background: C.surface, border: `1px solid ${C.border}`, fontSize: "13px", color: C.dark, marginBottom: "28px", fontWeight: "600", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+                        <Briefcase style={{ width: "16px", height: "16px", color: C.mid }} /> {experience}
                     </div>
 
                     {/* Stats */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "18px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "28px" }}>
                         {([
                             ["Total Sessions", totalSessions],
                             ["Completion Rate", completionRate],
                             ["Response Time", responseTime],
                             ["Trust Score", trustScoreVal],
                         ] as [string, string | number][]).map(([label, val]) => (
-                            <div key={label} style={{ borderRadius: "12px", padding: "12px", background: C.surface, border: `1px solid ${C.border}` }}>
-                                <div style={{ fontSize: "15px", fontWeight: "bold", color: C.dark }}>{val}</div>
-                                <div style={{ fontSize: "11px", color: C.mid }}>{label}</div>
+                            <div key={label} style={{ borderRadius: "16px", padding: "16px", background: C.surface, border: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: "4px", boxShadow: "0 2px 10px rgba(0,0,0,0.02)" }}>
+                                <div style={{ fontSize: "18px", fontWeight: "800", color: C.dark }}>{val}</div>
+                                <div style={{ fontSize: "12px", color: C.mid, fontWeight: "500" }}>{label}</div>
                             </div>
                         ))}
                     </div>
 
-                                    {/* Socials */}
-                                    <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "20px", flexWrap: "wrap" }}>
+                    {/* Socials */}
+                    <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginBottom: "32px", flexWrap: "wrap" }}>
                         {linkedinUrl !== "#" && (
-                            <a href={linkedinUrl} target="_blank" rel="noopener noreferrer">
-                                <button style={{ padding: "8px 18px", borderRadius: "8px", background: C.border, border: "none", cursor: "pointer", color: C.dark, fontWeight: "bold" }}>in</button>
+                            <a href={linkedinUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                                <button style={{ padding: "10px 20px", borderRadius: "12px", background: C.surface, border: `1px solid ${C.border}`, cursor: "pointer", color: C.dark, fontWeight: "600", fontSize: "13px", transition: "all 0.2s", boxShadow: "0 2px 6px rgba(0,0,0,0.03)" }}>LinkedIn</button>
                             </a>
                         )}
                         {mentorData?.socialProof?.githubUrl && (
-                            <a href={mentorData.socialProof.githubUrl} target="_blank" rel="noopener noreferrer">
-                                <button style={{ padding: "8px 18px", borderRadius: "8px", background: C.border, border: "none", cursor: "pointer", color: C.dark, fontWeight: "bold" }}>GitHub</button>
+                            <a href={mentorData.socialProof.githubUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                                <button style={{ padding: "10px 20px", borderRadius: "12px", background: C.surface, border: `1px solid ${C.border}`, cursor: "pointer", color: C.dark, fontWeight: "600", fontSize: "13px", transition: "all 0.2s", boxShadow: "0 2px 6px rgba(0,0,0,0.03)" }}>GitHub</button>
                             </a>
                         )}
-                        {/* ✅ FIX: Portfolio URL ka button add kiya — pehle missing tha */}
                         {mentorData?.socialProof?.portfolioUrl && (
-                            <a href={mentorData.socialProof.portfolioUrl} target="_blank" rel="noopener noreferrer">
-                                <button style={{ padding: "8px 18px", borderRadius: "8px", background: C.border, border: "none", cursor: "pointer", color: C.dark, fontWeight: "bold" }}>Portfolio</button>
+                            <a href={mentorData.socialProof.portfolioUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                                <button style={{ padding: "10px 20px", borderRadius: "12px", background: C.surface, border: `1px solid ${C.border}`, cursor: "pointer", color: C.dark, fontWeight: "600", fontSize: "13px", transition: "all 0.2s", boxShadow: "0 2px 6px rgba(0,0,0,0.03)" }}>Portfolio</button>
                             </a>
                         )}
                     </div>
 
                     {/* Skills */}
-                    <div style={{ textAlign: "left", marginBottom: "20px" }}>
-                        <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "8px" }}>Skills</h3>
+                    <div style={{ textAlign: "left", marginBottom: "28px" }}>
+                        <h3 style={{ fontWeight: "700", color: C.dark, marginBottom: "12px", fontSize: "16px" }}>Skills</h3>
                         {skills.length > 0 ? (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                                 {skills.map((skill: string) => (
-                                    <span key={skill} style={{ padding: "4px 10px", borderRadius: "20px", background: C.surface, border: `1px solid ${C.border}`, fontSize: "11px", color: C.dark }}>
+                                    <span key={skill} style={{ padding: "6px 14px", borderRadius: "24px", background: C.surface, border: `1px solid ${C.border}`, fontSize: "13px", color: C.dark, fontWeight: "500", boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>
                                         {skill}
                                     </span>
                                 ))}
                             </div>
                         ) : (
-                            <p style={{ fontSize: "12px", color: C.mid }}>No skills added yet.</p>
+                            <p style={{ fontSize: "14px", color: C.mid }}>No skills added yet.</p>
                         )}
                     </div>
 
                     {/* About */}
-                    <div style={{ textAlign: "left", marginBottom: "20px" }}>
-                        <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "8px" }}>About</h3>
-                        <p style={{ fontSize: "13px", color: C.mid, lineHeight: "1.6" }}>{about}</p>
+                    <div style={{ textAlign: "left", marginBottom: "28px" }}>
+                        <h3 style={{ fontWeight: "700", color: C.dark, marginBottom: "12px", fontSize: "16px" }}>About</h3>
+                        <p style={{ fontSize: "14px", color: C.mid, lineHeight: "1.7" }}>{about}</p>
                     </div>
 
                     {/* Work Experience */}
                     <div style={{ textAlign: "left" }}>
-                        <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "12px" }}>Work Experience</h3>
+                        <h3 style={{ fontWeight: "700", color: C.dark, marginBottom: "16px", fontSize: "16px" }}>Work Experience</h3>
 
                         {/* Current Role */}
-                        <div style={{ borderRadius: "12px", padding: "14px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "10px" }}>
-                            <div style={{ fontWeight: "bold", color: C.dark, fontSize: "13px", marginBottom: "2px" }}>{currentRole}</div>
-                            <div style={{ fontSize: "11px", color: C.mid }}>Present</div>
+                        <div style={{ borderRadius: "16px", padding: "18px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+                            <div style={{ fontWeight: "700", color: C.dark, fontSize: "15px", marginBottom: "4px" }}>{currentRole}</div>
+                            <div style={{ fontSize: "13px", color: C.mid, fontWeight: "500" }}>Present</div>
                         </div>
 
                         {/* Previous Roles */}
                         {previousRoles.length > 0 ? (
                             previousRoles.map((w: any, i: number) => (
-                                <div key={i} style={{ borderRadius: "12px", padding: "14px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "10px" }}>
-                                    <div style={{ fontWeight: "bold", color: C.dark, fontSize: "13px", marginBottom: "2px" }}>{w.title || w.position}</div>
-                                    <div style={{ color: C.mid, fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>{w.company}</div>
-                                    {w.location && <div style={{ fontSize: "11px", color: C.mid, marginBottom: "2px" }}>📍 {w.location}</div>}
-                                    {w.duration && <div style={{ fontSize: "11px", color: C.mid, marginBottom: "6px" }}>📅 {w.duration}</div>}
-                                    {w.description && <div style={{ fontSize: "12px", color: C.dark }}>{w.description}</div>}
+                                <div key={i} style={{ borderRadius: "16px", padding: "18px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+                                    <div style={{ fontWeight: "700", color: C.dark, fontSize: "15px", marginBottom: "4px" }}>{w.title || w.position}</div>
+                                    <div style={{ color: C.dark, fontSize: "13px", fontWeight: "600", marginBottom: "8px" }}>{w.company}</div>
+                                    <div style={{ display: "flex", gap: "12px", marginBottom: w.description ? "12px" : "0" }}>
+                                        {w.location && <div style={{ fontSize: "12px", color: C.mid, display: "flex", alignItems: "center", gap: "4px" }}>📍 {w.location}</div>}
+                                        {w.duration && <div style={{ fontSize: "12px", color: C.mid, display: "flex", alignItems: "center", gap: "4px" }}>📅 {w.duration}</div>}
+                                    </div>
+                                    {w.description && <div style={{ fontSize: "13px", color: C.mid, lineHeight: "1.6" }}>{w.description}</div>}
                                 </div>
                             ))
                         ) : (
-                            <p style={{ fontSize: "12px", color: C.mid }}>No previous work experience added yet.</p>
+                            <p style={{ fontSize: "14px", color: C.mid }}>No previous work experience added yet.</p>
                         )}
                     </div>
                 </div>
