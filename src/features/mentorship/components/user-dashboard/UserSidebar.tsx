@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, ChevronRight, CalendarClock } from "lucide-react";
+import { LayoutDashboard, ChevronRight, CalendarClock, Users } from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 
@@ -13,6 +13,7 @@ interface UserSidebarProps {
 const USER_MENU_ITEMS = [
   { id: "dashboard", label: "Overview", icon: LayoutDashboard },
   { id: "upcoming-sessions", label: "Upcoming Sessions", icon: CalendarClock },
+  { id: "my-mentors", label: "My Mentors", icon: Users },
 ];
 
 export default function UserSidebar({
