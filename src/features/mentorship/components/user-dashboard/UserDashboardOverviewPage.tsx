@@ -36,6 +36,10 @@ type Session = {
   startTime?: string;
   status?: string;
   duration?: number;
+  review?: {
+    rating?: number;
+    menteeReview?: string;
+  };
 };
 
 interface UserDashboardOverviewPageProps {
@@ -99,6 +103,27 @@ export default function UserDashboardOverviewPage({
     { label: "My Mentors", value: String(uniqueMentors), icon: Users },
     { label: "Mentorship Hours", value: String(totalHours), icon: Clock3 },
   ];
+
+  const pendingActions = [];
+
+  if (user && (!user.bio || !user.jobTitle || !user.profilePhoto)) {
+    pendingActions.push({
+      title: "Complete your profile",
+      description: "Help mentors understand your goals",
+      icon: BookOpen,
+      onClick: () => router.push('/settings/profile')
+    });
+  }
+
+  const unreviewedSessions = completed.filter(s => !s.review || (!s.review.rating && !s.review.menteeReview));
+  if (unreviewedSessions.length > 0) {
+    pendingActions.push({
+      title: `Review ${unreviewedSessions.length} completed session${unreviewedSessions.length > 1 ? 's' : ''}`,
+      description: "Share your feedback to help others",
+      icon: ShieldCheck,
+      onClick: () => router.push('/mentorship/sessions')
+    });
+  }
 
   return (
     <div className="space-y-8 animate-fadeIn max-w-4xl">
@@ -218,23 +243,41 @@ export default function UserDashboardOverviewPage({
               Pending Actions
             </h3>
 
-            <div className="flex flex-col gap-3">
+            {pendingActions.length === 0 ? (
               <div
-                className="flex items-center justify-between gap-3 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9] cursor-pointer"
+                className="flex flex-col items-center justify-center gap-2 py-8 rounded-xl text-center"
                 style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-[#e0d8cf]">
-                    <BookOpen className="w-4 h-4" style={{ color: COLORS.accent }} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-[#4a3728]">Complete your profile</p>
-                    <p className="text-xs text-[#8a7a6a]">Help mentors understand your goals</p>
-                  </div>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.chip }}>
+                  <CheckCircle className="w-5 h-5" style={{ color: COLORS.accent }} />
                 </div>
-                <ArrowUpRight className="w-4 h-4 shrink-0" style={{ color: COLORS.accent }} />
+                <p className="text-sm font-medium" style={{ color: COLORS.muted }}>
+                  You're all caught up
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {pendingActions.map((action, idx) => (
+                  <div
+                    key={idx}
+                    onClick={action.onClick}
+                    className="flex items-center justify-between gap-3 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9] cursor-pointer"
+                    style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-[#e0d8cf]">
+                        <action.icon className="w-4 h-4" style={{ color: COLORS.accent }} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-[#4a3728]">{action.title}</p>
+                        <p className="text-xs text-[#8a7a6a]">{action.description}</p>
+                      </div>
+                    </div>
+                    <ArrowUpRight className="w-4 h-4 shrink-0" style={{ color: COLORS.accent }} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Quick Actions */}
