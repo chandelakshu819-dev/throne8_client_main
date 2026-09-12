@@ -8,16 +8,16 @@ function requireEnv(key: string, fallback?: string): string {
     const value = process.env[key];
     if (!value || value.trim() === '') {
         if (fallback) {
-            console.warn(`⚠️  [CONFIG] Missing environment variable "${key}". Using fallback: "${fallback}"`);
+            console.warn(`[CONFIG] Missing environment variable "${key}". Using fallback: "${fallback}"`);
             return fallback;
         }
         // In development, warn but don't crash - env vars load after first request
         if (process.env.NODE_ENV === 'development') {
-            console.warn(`⚠️  [CONFIG] Env var not loaded yet at import time: "${key}"`);
+            console.warn(`[CONFIG] Env var not loaded yet at import time: "${key}"`);
             return '';
         }
         throw new Error(
-            `\n❌ [CONFIG] Missing required environment variable: "${key}"\n` +
+            `\n[CONFIG] Missing required environment variable: "${key}"\n` +
             `   Add it to your .env file and restart the server.\n`
         );
     }
@@ -76,12 +76,12 @@ const _config = {
     NEXT_PUBLIC_EXPERIENCE_ENDPOINT: optionalEnv('NEXT_PUBLIC_EXPERIENCE_ENDPOINT'),
     NEXT_PUBLIC_SKILLS_ENDPOINT: optionalEnv('NEXT_PUBLIC_SKILLS_ENDPOINT'),
     NEXT_PUBLIC_CONTACT_ENDPOINT: optionalEnv('NEXT_PUBLIC_CONTACT_ENDPOINT') || '/profile/contact',
-    
+
 
     // ============================================================
     // 4. ACTIVITY / POSTS ENDPOINTS
     // ============================================================
-    
+
     NEXT_PUBLIC_ACTIVITY_ENDPOINT: optionalEnv('NEXT_PUBLIC_ACTIVITY_ENDPOINT'),
     NEXT_PUBLIC_FEED_ENDPOINT: optionalEnv('NEXT_PUBLIC_FEED_ENDPOINT'),
     NEXT_PUBLIC_COMMENTS_ENDPOINT: optionalEnv('NEXT_PUBLIC_COMMENTS_ENDPOINT'),
@@ -94,6 +94,7 @@ const _config = {
     NEXT_PUBLIC_MENTOR_CREATE_ENDPOINT: optionalEnv('NEXT_PUBLIC_MENTOR_CREATE_ENDPOINT'),
     NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT: optionalEnv('NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT'),
     NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT: optionalEnv('NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT'),
+    NEXT_PUBLIC_MENTOR_UPDATE_ENDPOINT: optionalEnv('NEXT_PUBLIC_MENTOR_UPDATE_ENDPOINT'),
     NEXT_PUBLIC_ALL_MENTORS_ENDPOINT: optionalEnv('NEXT_PUBLIC_ALL_MENTORS_ENDPOINT'),
 
     NEXT_PUBLIC_AVAILABILITY_CREATE_ENDPOINT: optionalEnv('NEXT_PUBLIC_AVAILABILITY_CREATE_ENDPOINT'),
@@ -101,6 +102,7 @@ const _config = {
     NEXT_PUBLIC_AVAILABILITY_BULK_ENDPOINT: optionalEnv('NEXT_PUBLIC_AVAILABILITY_BULK_ENDPOINT'),
     NEXT_PUBLIC_AVAILABILITY_MENTOR_ENDPOINT: optionalEnv('NEXT_PUBLIC_AVAILABILITY_MENTOR_ENDPOINT'),
     NEXT_PUBLIC_AVAILABILITY_UPDATE_ENDPOINT: optionalEnv('NEXT_PUBLIC_AVAILABILITY_UPDATE_ENDPOINT'),
+
     NEXT_PUBLIC_AVAILABILITY_DELETE_ENDPOINT: optionalEnv('NEXT_PUBLIC_AVAILABILITY_DELETE_ENDPOINT'),
     NEXT_PUBLIC_AVAILABILITY_STATS_ENDPOINT: optionalEnv('NEXT_PUBLIC_AVAILABILITY_STATS_ENDPOINT'),
 
@@ -110,12 +112,6 @@ const _config = {
     NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT'),
     NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT'),
     NEXT_PUBLIC_SESSIONS_BOOK_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_BOOK_ENDPOINT'),
-    // ✅ FIX: these two were missing — session.service.ts's getUpcomingSessions()
-    // needed NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT and had no config entry to
-    // read from, causing a TS error ("Property does not exist on type").
-    // The service falls back to `${NEXT_PUBLIC_SESSIONS_ENDPOINT}/upcoming`
-    // (or /past) when the env var itself isn't set, matching backend routes
-    // GET /sessions/upcoming and GET /sessions/past.
     NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT'),
     NEXT_PUBLIC_SESSIONS_PAST_ENDPOINT: optionalEnv('NEXT_PUBLIC_SESSIONS_PAST_ENDPOINT'),
 
@@ -251,11 +247,8 @@ const _config = {
     NEXT_PUBLIC_CONNECTIONS_CONNECTION_USER_ENDPOINT: optionalEnv('NEXT_PUBLIC_CONNECTIONS_CONNECTION_USER_ENDPOINT'),
     NEXT_PUBLIC_CONNECTIONS_USER_ENDPOINT: optionalEnv('NEXT_PUBLIC_CONNECTIONS_USER_ENDPOINT'),
 
-
-
-
-       ///////////////////////// changed 
     NEXT_PUBLIC_FOLLOW_COUNTS_ENDPOINT: optionalEnv('NEXT_PUBLIC_FOLLOW_COUNTS_ENDPOINT'),
+
     // ============================================================
     // 10. MESSAGES ENDPOINTS
     // ============================================================
