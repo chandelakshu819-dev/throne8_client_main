@@ -1,5 +1,6 @@
 // mentorDashboard/components/BookingsPage.tsx
 import React, { useEffect, useState, useMemo } from "react"
+import { createPortal } from "react-dom"
 import {
   Calendar,
   Clock,
@@ -64,6 +65,19 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [loadingData, setLoadingData] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // ✅ Custom toast — replaces native alert() popups
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+  };
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   // Search — new: live-filters the visible rows by student name
   const [showSearch, setShowSearch] = useState(false);
@@ -186,93 +200,125 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       hour: "2-digit", minute: "2-digit"
     });
 
-  const handleConfirm = async (sessionId: string, bookingId?: string) => {
-    setActionLoading(sessionId);
-    try {
-      await SessionService.confirmSession(sessionId, bookingId);
-      alert("Booking confirmed successfully");
-      await fetchSessions();
-      setBookingTab('upcoming');
-    } catch (err: any) {
-      alert(err.message || "Failed to confirm booking.");
-    } finally {
-      setActionLoading(null);
-    }
-  };
+    const handleConfirm = async (sessionId: string, bookingId?: string) => {
+      setActionLoading(sessionId);
+      try {
+        await SessionService.confirmSession(sessionId, bookingId);
+        showToast("Booking confirmed successfully", "success");
+        await fetchSessions();
+        setBookingTab('upcoming');
+      } catch (err: any) {
+        showToast(err.message || "Failed to confirm booking.", "error");
+      } finally {
+        setActionLoading(null);
+      }
+    };
 
-  const handleStart = async (sessionId: string) => {
-    setActionLoading(sessionId);
-    try {
-      await SessionService.startSession(sessionId);
-      alert("Session started");
-      await fetchSessions();
-      setBookingTab('in_progress');
-    } catch (err: any) {
-      alert(err.message || "Failed to start session.");
-    } finally {
-      setActionLoading(null);
-    }
-  };
 
-  const handleEnd = async (sessionId: string) => {
-    setActionLoading(sessionId);
-    try {
-      await SessionService.completeSession(sessionId, { wasSuccessful: true });
-      alert("Session completed");
-      await fetchSessions();
-      setBookingTab('completed');
-    } catch (err: any) {
-      alert(err.message || "Failed to complete session.");
-    } finally {
-      setActionLoading(null);
-    }
-  };
 
-  const handleCancelSubmit = async () => {
-    if (!cancelSessionId || !cancelBookingId || !cancelReason) {
-      alert("Please provide a reason.");
-      return;
-    }
-    setActionLoading(cancelSessionId);
-    try {
-      await SessionService.cancelSession(cancelSessionId, cancelReason, cancelBookingId);
-      alert("Session cancelled successfully");
-      setShowCancelModal(false);
-      setCancelReason("");
-      setCancelBookingId(null);
-      await fetchSessions();
-    } catch (err: any) {
-      alert(err.message || "Failed to cancel session.");
-    } finally {
-      setActionLoading(null);
-    }
-  };
+    const handleStart = async (sessionId: string) => {
+      setActionLoading(sessionId);
+      try {
+        await SessionService.startSession(sessionId);
+        showToast("Session started", "success");
+        await fetchSessions();
+        setBookingTab('in_progress');
+      } catch (err: any) {
+        showToast(err.message || "Failed to start session.", "error");
+      } finally {
+        setActionLoading(null);
+      }
+    };
 
-  const handleRescheduleSubmit = async () => {
-    if (!rescheduleSessionId || !rescheduleBookingId || !rescheduleDate || !rescheduleReason) {
-      alert("Please provide both new date and reason.");
-      return;
-    }
-    setActionLoading(rescheduleSessionId);
-    try {
-      await SessionService.rescheduleSession(rescheduleSessionId, new Date(rescheduleDate).toISOString(), rescheduleReason, rescheduleBookingId);
-      alert("Session rescheduled successfully");
-      setShowRescheduleModal(false);
-      setRescheduleDate("");
-      setRescheduleReason("");
-      setRescheduleBookingId(null);
-      await fetchSessions();
-      setBookingTab('upcoming');
-    } catch (err: any) {
-      alert(err.message || "Failed to reschedule session.");
-    } finally {
-      setActionLoading(null);
-    }
-  };
 
-  return (
-    <div className="space-y-6 animate-fadeIn">
-      {/* Header */}
+
+    const handleEnd = async (sessionId: string) => {
+      setActionLoading(sessionId);
+      try {
+        await SessionService.completeSession(sessionId, { wasSuccessful: true });
+        showToast("Session completed", "success");
+        await fetchSessions();
+        setBookingTab('completed');
+      } catch (err: any) {
+        showToast(err.message || "Failed to complete session.", "error");
+      } finally {
+        setActionLoading(null);
+      }
+    };
+
+
+
+    const handleCancelSubmit = async () => {
+      if (!cancelSessionId || !cancelBookingId || !cancelReason) {
+        showToast("Please provide a reason.", "error");
+        return;
+      }
+      setActionLoading(cancelSessionId);
+      try {
+        await SessionService.cancelSession(cancelSessionId, cancelReason, cancelBookingId);
+        showToast("Session cancelled successfully", "success");
+        setShowCancelModal(false);
+        setCancelReason("");
+        setCancelBookingId(null);
+        await fetchSessions();
+      } catch (err: any) {
+        showToast(err.message || "Failed to cancel session.", "error");
+      } finally {
+        setActionLoading(null);
+      }
+    };
+
+
+    const handleRescheduleSubmit = async () => {
+      if (!rescheduleSessionId || !rescheduleBookingId || !rescheduleDate || !rescheduleReason) {
+        showToast("Please provide both new date and reason.", "error");
+        return;
+      }
+      setActionLoading(rescheduleSessionId);
+      try {
+        await SessionService.rescheduleSession(rescheduleSessionId, new Date(rescheduleDate).toISOString(), rescheduleReason, rescheduleBookingId);
+        showToast("Session rescheduled successfully", "success");
+        setShowRescheduleModal(false);
+        setRescheduleDate("");
+        setRescheduleReason("");
+        setRescheduleBookingId(null);
+        await fetchSessions();
+        setBookingTab('upcoming');
+      } catch (err: any) {
+        showToast(err.message || "Failed to reschedule session.", "error");
+      } finally {
+        setActionLoading(null);
+      }
+    };
+
+
+    return (
+      <div className="space-y-6 animate-fadeIn">
+               {/* ✅ Toast — portal so it escapes the animate-fadeIn transform stacking context */}
+               {toast && typeof document !== 'undefined' && createPortal(
+          <div
+            className="fixed top-5 right-5 z-[9999] flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg"
+            style={{
+              backgroundColor: toast.type === 'success' ? '#dcfce7' : '#fee2e2',
+              color: toast.type === 'success' ? '#15803d' : '#dc2626',
+              border: `1px solid ${toast.type === 'success' ? '#86efac' : '#fca5a5'}`,
+            }}
+          >
+            {toast.type === 'success' ? (
+              <CheckCircle2 className="w-4.5 h-4.5 shrink-0" />
+            ) : (
+              <XCircle className="w-4.5 h-4.5 shrink-0" />
+            )}
+            <span className="text-sm font-semibold">{toast.message}</span>
+            <button onClick={() => setToast(null)} className="ml-2 shrink-0">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>,
+          document.body
+        )}
+        
+  
+        {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#4a3728' }}>
@@ -511,9 +557,11 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         </div>
       </div>
 
-      {/* Modals */}
-      {showCancelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+            {/* Modals — rendered via portal so they escape the animate-fadeIn
+          parent's transform-created stacking context and always sit above
+          the fixed Navbar, regardless of where this component is mounted. */}
+      {showCancelModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4" style={{ border: '1px solid #e0d8cf' }}>
             <h3 className="text-lg font-bold mb-4" style={{ color: '#4a3728' }}>Confirm Cancellation</h3>
             <div>
@@ -544,11 +592,13 @@ export default function BookingsPage({ mentorData }: BookingProps) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {showRescheduleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+
+{showRescheduleModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4" style={{ border: '1px solid #e0d8cf' }}>
             <h3 className="text-lg font-bold mb-4" style={{ color: '#4a3728' }}>Reschedule Session</h3>
             <div className="space-y-4">
@@ -591,7 +641,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

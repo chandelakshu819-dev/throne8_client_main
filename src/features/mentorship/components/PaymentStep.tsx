@@ -25,8 +25,16 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
     selectedService, calendarData, formData, mentorId,
     onBack, onConfirm, onBookingSuccess
 }) => {
+
+
     const [paymentMethod, setPaymentMethod] = useState<string>("");
     const [booking, setBooking] = useState(false);
+    // ✅ FIX: React 18 StrictMode (dev) double-invokes effects, and any parent
+    // re-mount of this step would re-fire the BYPASS_PAYMENT auto-booking
+    // effect below. A ref-based guard (survives re-renders, unlike state)
+    // ensures the booking request only ever fires once per mount.
+    const hasBookedRef = React.useRef(false);
+
 
     const paymentMethodMap: Record<string, string> = {
         upi: "razorpay",
@@ -42,6 +50,9 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
     const handleBookSession = async (overrideMethod?: string) => {
         const methodToUse = overrideMethod || paymentMethod;
         if (!methodToUse) return;
+        // ✅ FIX: block any second call (double effect fire, double click, etc.)
+        if (hasBookedRef.current) return;
+        hasBookedRef.current = true;
         setBooking(true);
 
         try {
