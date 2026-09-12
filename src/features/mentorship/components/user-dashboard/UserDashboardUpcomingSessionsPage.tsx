@@ -184,7 +184,7 @@ export default function UserDashboardUpcomingSessionsPage({ sessions = [] }: Pro
                 </div>
 
                 {/* 3. Actions */}
-                <div className="flex flex-col gap-2 shrink-0 w-full md:w-[150px] md:border-l md:pl-4 pt-4 md:pt-0 border-t md:border-t-0 mt-2 md:mt-0" style={{ borderColor: COLORS.hairline }}>
+                <div className="flex flex-col gap-2 shrink-0 w-full md:w-[165px] md:border-l md:pl-4 pt-4 md:pt-0 border-t md:border-t-0 mt-2 md:mt-0" style={{ borderColor: COLORS.hairline }}>
                    <button
                     className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-[#8b7355] shadow-sm text-center"
                     style={{ backgroundColor: COLORS.ink, color: "#fff" }}
@@ -199,13 +199,13 @@ export default function UserDashboardUpcomingSessionsPage({ sessions = [] }: Pro
                   </button>
                   <div className="flex gap-2 w-full">
                      <button
-                        className="flex-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold transition-colors hover:bg-gray-50 text-center uppercase tracking-wide"
+                        className="flex-1 px-1.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors hover:bg-gray-50 text-center uppercase"
                         style={{ color: COLORS.muted, border: `1px solid ${COLORS.hairline}` }}
                       >
                         Reschedule
                       </button>
                       <button
-                        className="flex-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold transition-colors hover:bg-red-50 text-center text-red-600 uppercase tracking-wide"
+                        className="flex-1 px-1.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors hover:bg-red-50 text-center text-red-600 uppercase"
                         style={{ border: `1px solid #fca5a5` }}
                       >
                         Cancel
