@@ -29,6 +29,7 @@ interface CommentsSectionProps {
   emojiList: any;
   currentUserId?: string;
   isLoading?: boolean;
+  initialVisibleCount?: number;
 }
 const CommentsSection = ({
   isDarkMode,
@@ -56,8 +57,9 @@ const CommentsSection = ({
   emojiList,
   currentUserId,
   isLoading = false,
+  initialVisibleCount = 3,
 }: CommentsSectionProps) => {
-  const [visibleCommentsCount, setVisibleCommentsCount] = useState(3);
+  const [visibleCommentsCount, setVisibleCommentsCount] = useState(initialVisibleCount);
   const [sortMode, setSortMode] = useState<'relevant' | 'recent'>('relevant');
   const [showSortMenu, setShowSortMenu] = useState(false);
 

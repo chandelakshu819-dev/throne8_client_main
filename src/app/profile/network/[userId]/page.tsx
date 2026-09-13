@@ -132,7 +132,8 @@ export default function NetworkPage() {
         headlineData
     );
 
-    const hasDateOfBirth = !!(userProfileData as any)?.dateOfBirth;
+    // hasDateOfBirth is now set by the backend via Contact lookup (User.dateOfBirth was removed)
+    const hasDateOfBirth = !!(userProfileData as any)?.hasDateOfBirth;
 
     // ✅ FIX: hardcoded 12% ki jagah real calculation — same formula ProfileProgress.tsx jaisa
     const completionPercentage = calculateProfileCompletion({

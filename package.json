@@ -9,8 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
-"test:watch": "jest --watch",
-    "test:e2e": "playwright test",
+    "test:watch": "jest --watch",
     "format": "prettier --write .",
     "type-check": "tsc --noEmit"
   },
@@ -41,7 +40,6 @@
     "zustand": "^4.5.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.40.0",
     "@testing-library/jest-dom": "^6.1.0",
     "@testing-library/react": "^14.1.0",
     "@types/lodash": "^4.17.23",
