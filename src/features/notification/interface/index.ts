@@ -11,8 +11,10 @@ export interface Notification {
     | "post_commented"
     | "connection_request"
     | "connection_accepted"
-    | "profile_viewed";
+    | "profile_viewed"
+    | "pymk_suggestion";
     entityId: string;
+    entityIds?: string[];            // populated for pymk_suggestion (all suggested userIds)
     entityType: "post" | "connection" | "user";
     message: string;
     isRead: boolean;

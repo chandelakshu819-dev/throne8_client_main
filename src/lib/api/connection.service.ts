@@ -291,6 +291,54 @@ class ConnectionService {
             return { data: { mutuals: [], count: 0 } };
         }
     }
+
+    /**
+     * 🧑‍🤝‍🧑 GET PYMK SUGGESTION CARDS
+     * Calls GET /api/v1/connections/suggestions
+     * Returns full card objects (name, photo, headline, mutuals, location)
+     * ready to render — not just userIds.
+     */
+    static async getSuggestions(limit: number = 20, offset: number = 0) {
+        try {
+            const { data } = await api.get('/connections/suggestions', {
+                params: { limit, offset },
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [GET_SUGGESTIONS] Failed:', error);
+            throw new Error(error.response?.data?.message || 'Failed to fetch suggestions');
+        }
+    }
+
+    /**
+     * ✕ DISMISS A SUGGESTION (persisted — never resurfaces)
+     * Calls DELETE /api/v1/connections/suggestions/:targetUserId
+     */
+    static async dismissSuggestion(targetUserId: string) {
+        try {
+            const { data } = await api.delete(`/connections/suggestions/${targetUserId}`);
+            return data;
+        } catch (error: any) {
+            console.error('❌ [DISMISS_SUGGESTION] Failed:', error);
+            throw new Error(error.response?.data?.message || 'Failed to dismiss suggestion');
+        }
+    }
+    
+    /**
+     * 👀 GET WHO VIEWED MY PROFILE
+     * Calls GET /api/v1/connections/profile-views/viewers
+     */
+    static async getWhoViewedProfile(page: number = 1, limit: number = 20) {
+        try {
+            const { data } = await api.get('/connections/profile-views/viewers', {
+                params: { page, limit },
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [GET_WHO_VIEWED_PROFILE] Failed:', error);
+            throw new Error(error.response?.data?.message || 'Failed to fetch profile viewers');
+        }
+    }
 }
 
 export default ConnectionService;

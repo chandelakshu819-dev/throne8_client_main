@@ -5,7 +5,7 @@ import TokenStorage from "@/lib/store/token.storage";
 import config from "@/config/env.config";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-    Bell, MessageCircle, Users, Edit3, CheckCircle, X, Heart, MessageSquare, Bookmark, Search, Filter, Settings, Moon, Sun, Volume2, VolumeX, Zap, TrendingUp, Award, Calendar, MapPin, Eye, EyeOff, Loader2, Wifi, WifiOff, RefreshCw, Trash2
+    Bell, MessageCircle, Users, Edit3, CheckCircle, X, Heart, MessageSquare, Bookmark, Search, Filter, Settings, Moon, Sun, Volume2, VolumeX, Zap, TrendingUp, Award, Calendar, MapPin, Eye, EyeOff, Loader2, Wifi, WifiOff, RefreshCw, Trash2, Sparkles, UserPlus
 } from "lucide-react";
 
 import NotificationService from "@/lib/api/notification.service";
@@ -391,7 +391,8 @@ const NotificationsPage = () => {
             n.entityType === "connection" ||
             n.type === "connection_request" ||
             n.type === "connection_accepted" ||
-            n.type === "profile_viewed";
+            n.type === "profile_viewed" ||
+            n.type === "pymk_suggestion";   // ✅ fix: PYMK has entityType='user', not 'connection'
         const matchesTab =
             selectedTab === "all" ||
             (selectedTab === "unread" && !n.isRead) ||
@@ -415,6 +416,8 @@ const NotificationsPage = () => {
                 return <CheckCircle className="w-4 h-4 text-green-500" />;
             case "profile_viewed":
                 return <Eye className="w-4 h-4 text-purple-500" />;
+            case "pymk_suggestion":           // ✅ distinct teal sparkle icon
+                return <Sparkles className="w-4 h-4 text-teal-500" />;
             default:
                 return <Bell className="w-4 h-4 text-gray-500" />;
         }
@@ -434,6 +437,8 @@ const NotificationsPage = () => {
                 return "from-green-500 to-emerald-500";
             case "profile_viewed":
                 return "from-purple-500 to-pink-500";
+            case "pymk_suggestion":           // ✅ teal gradient matching icon
+                return "from-teal-500 to-cyan-500";
             default:
                 return "from-gray-500 to-slate-500";
         }
@@ -453,7 +458,15 @@ const NotificationsPage = () => {
             id: "connections",
             label: "Network",
             icon: Users,
-            count: notifications.filter((n) => n.entityType === "connection").length,
+            // ✅ fix: PYMK sets entityType='user', so count by type union instead
+            count: notifications.filter(
+                (n) =>
+                    n.entityType === "connection" ||
+                    n.type === "connection_request" ||
+                    n.type === "connection_accepted" ||
+                    n.type === "profile_viewed" ||
+                    n.type === "pymk_suggestion"
+            ).length,
         },
     ];
 
@@ -952,6 +965,44 @@ const NotificationsPage = () => {
                                                     </button>
                                                 </div>
                                             )}
+
+                                            {/* See all suggestions link for PYMK notifications */}
+                                            {notification.type === "pymk_suggestion" && (
+                                                <div className={`px-4 pb-3`}>
+                                                    <button
+                                                        onClick={() => {
+                                                            markAsRead(notification.notificationId);
+                                                            router.push('/network/suggestions');
+                                                        }}
+                                                        className="text-xs text-teal-600 hover:text-teal-800 hover:underline transition-colors font-medium flex items-center gap-1"
+                                                    >
+                                                        <Sparkles className="w-3 h-3" />
+                                                        See all suggestions →
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            
+{/* See who viewed link for profile view notifications */}
+{notification.type === "profile_viewed" && (
+    <div className={`px-4 pb-3`}>
+        <button
+            onClick={() => {
+                markAsRead(notification.notificationId);
+                router.push('/network/profile-views');
+            }}
+            className="text-xs text-purple-600 hover:text-purple-800 hover:underline transition-colors font-medium flex items-center gap-1"
+        >
+            <Eye className="w-3 h-3" />
+            See who viewed →
+        </button>
+    </div>
+)}
+
+
+
+
+
                                         </div>
                                     ))}
                                 </div>
