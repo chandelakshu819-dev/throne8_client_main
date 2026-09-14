@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Search, User, Loader2, Building2 } from 'lucide-react';
 import AuthService from '@/lib/api/auth.service';
 import AnalyticsService from '@/lib/api/analytics.service';
@@ -58,6 +58,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
 
     const searchRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
+    const pathname = usePathname();
     const trackedCompanyIdsRef = useRef<Set<string>>(new Set());
     const trackedQueryKeysRef = useRef<Set<string>>(new Set()); // 🔧 FIX #2: naya ref add kiya
     const latestStateRef = useRef<{
@@ -85,6 +86,17 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
         fetchAllUsers();
         fetchAllCompanies();
     }, []);
+
+    // 🔧 FIX: Route change hote hi search state reset karo,
+    // taaki dusre page (jaise Payment) pe purana dropdown "automatically" na dikhe
+    useEffect(() => {
+        setSearchQuery('');
+        setShowResults(false);
+        setFilteredUsers([]);
+        setFilteredCompanies([]);
+        finalizeSearchSession();
+        resetSearchSession();
+    }, [pathname]);
 
     useEffect(() => {
         return () => {
@@ -318,6 +330,11 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onFocus={() => searchQuery && setShowResults(true)}
+                    onBlur={() => {
+                        // 🔧 FIX: input focus hatte hi dropdown band karo (chhoti delay
+                        // taaki result button ka onClick pehle process ho jaye)
+                        setTimeout(() => setShowResults(false), 150);
+                    }}
                     placeholder="Search users..."
                     className="bg-transparent text-sm text-[#4a3728] placeholder-[#7a5c3e] focus:outline-none ml-2 w-full"
                 />
@@ -336,7 +353,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                         {filteredUsers.map((user, index) => (
                             <button
                                 key={user.userId}
-                                onClick={() => handleUserClick(user.userId, user.fullName, index + 1)}
+                                onMouseDown={() => handleUserClick(user.userId, user.fullName, index + 1)}
+                                
                                 className="w-full flex items-center gap-3 px-3 py-3 hover:bg-[#e0d8cf] rounded-lg transition-colors duration-200 text-left"
                             >
                                 <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#e0d8cf] flex-shrink-0">
@@ -368,7 +386,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                                 {filteredCompanies.map((company) => (
                                     <button
                                         key={company.companyId}
-                                        onClick={() => handleCompanyClick(company.companyId)}
+                                        onMouseDown={() => handleCompanyClick(company.companyId)}
                                         className="w-full flex items-center gap-3 px-3 py-3 hover:bg-[#e0d8cf] rounded-lg transition-colors duration-200 text-left"
                                     >
                                         <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#e0d8cf] flex-shrink-0 bg-white">

@@ -9,6 +9,8 @@ import { Video, MessageSquare, Package } from 'lucide-react';
 
 // NOTE: `emoji` kept only for backward-compat with callers that still pass it in
 // via the `service` prop — it is not rendered anywhere in this file anymore.
+const MAX_DESCRIPTION_LENGTH = 500;
+
 const serviceTypes = [
     {
         name: 'quick_call', label: 'Quick Call', icon: Video,
@@ -283,16 +285,25 @@ export default function ServiceModal({
                             <FieldLabel icon={FileText}>Description</FieldLabel>
                             <textarea
                                 rows={4}
+                                maxLength={MAX_DESCRIPTION_LENGTH}
                                 placeholder="Describe your service in detail..."
                                 className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm resize-none"
                                 style={inputStyle(fieldErrors?.description)}
                                 value={formData?.description || ''}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                onChange={(e) => setFormData({ ...formData, description: e.target.value.slice(0, MAX_DESCRIPTION_LENGTH) })}
                                 disabled={isSaving}
                             />
-                            {fieldErrors?.description && (
-                                <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.description}</p>
-                            )}
+                            <div className="flex items-center justify-between mt-1">
+                                {fieldErrors?.description ? (
+                                    <p className="text-xs font-medium" style={{ color: '#dc2626' }}>{fieldErrors.description}</p>
+                                ) : <span />}
+                                <p
+                                    className="text-xs font-medium shrink-0 ml-auto"
+                                    style={{ color: (formData?.description?.length || 0) >= MAX_DESCRIPTION_LENGTH ? '#dc2626' : '#8a7a6a' }}
+                                >
+                                    {formData?.description?.length || 0}/{MAX_DESCRIPTION_LENGTH}
+                                </p>
+                            </div>
                         </div>
                     )}
 
