@@ -132,7 +132,7 @@ export default function UserDashboardMyBookingsPage({ sessions = [] }: Props) {
   };
 
   return (
-    <div className="space-y-6 animate-fadeIn max-w-5xl">
+    <div className="space-y-6 animate-fadeIn max-w-5xl pt-2 pb-8">
       <div>
         <h2 className="text-2xl font-bold" style={{ color: COLORS.ink }}>
           My Bookings
@@ -155,7 +155,8 @@ export default function UserDashboardMyBookingsPage({ sessions = [] }: Props) {
             }`}
             style={{
               color: activeTab === tab ? COLORS.ink : COLORS.muted,
-              borderColor: activeTab === tab ? COLORS.hairline : "transparent",
+              borderColor: activeTab === tab ? COLORS.ink : "transparent",
+              borderWidth: activeTab === tab ? "2px" : "1px",
             }}
           >
             {tab}
@@ -196,21 +197,21 @@ export default function UserDashboardMyBookingsPage({ sessions = [] }: Props) {
             return (
               <div
                 key={bookingId}
-                className="flex flex-col lg:flex-row items-start gap-4 p-5 rounded-2xl transition-shadow hover:shadow-sm bg-white"
+                className="flex flex-col lg:flex-row items-start lg:items-start gap-5 lg:gap-0 p-5 rounded-2xl transition-all hover:shadow-md bg-white hover:-translate-y-0.5"
                 style={{ border: `1px solid ${COLORS.hairline}` }}
               >
-                {/* Mentor Info */}
-                <div className="flex items-start gap-3 w-full lg:w-[260px] shrink-0">
+                {/* 1. Mentor Info */}
+                <div className="flex items-center gap-3 w-full lg:w-[28%] shrink-0 lg:pr-4">
                   {photo ? (
                     <img
                       src={photo}
                       alt={name}
-                      className="w-12 h-12 rounded-full object-cover shrink-0 mt-1"
+                      className="w-12 h-12 rounded-full object-cover shrink-0"
                       style={{ border: `1px solid ${COLORS.hairline}` }}
                     />
                   ) : (
                     <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-base font-bold text-white mt-1"
+                      className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-base font-bold text-white"
                       style={{ backgroundColor: COLORS.ink }}
                     >
                       {initialsFrom(name)}
@@ -220,91 +221,97 @@ export default function UserDashboardMyBookingsPage({ sessions = [] }: Props) {
                     <p className="text-sm font-bold truncate" style={{ color: COLORS.ink }}>
                       {name}
                     </p>
-                    <p className="text-xs truncate mt-0.5 mb-2" style={{ color: COLORS.muted }}>
+                    <p className="text-xs truncate mt-0.5 mb-1.5" style={{ color: COLORS.muted }}>
                       Mentor
                     </p>
-                    <div className="space-y-1.5">
-                      <div className="flex flex-col gap-1 text-[10px]">
-                        <span className="text-gray-500 font-medium">BOOKING ID</span>
-                        <span className="font-mono text-gray-700 truncate" title={bookingId}>
-                          {bookingId.length > 18 ? bookingId.substring(0, 15) + '...' : bookingId}
-                        </span>
-                      </div>
+                    <div className="flex flex-col gap-0.5 text-[10px]">
+                      <span className="text-gray-500 font-medium">BOOKING ID</span>
+                      <span className="font-mono text-gray-700 truncate" title={bookingId}>
+                        {bookingId.length > 18 ? bookingId.substring(0, 15) + '...' : bookingId}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Session & Date */}
-                <div className="w-full lg:flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4 lg:px-4 lg:border-l" style={{ borderColor: COLORS.hairline }}>
-                  <div className="space-y-3">
+                {/* 2. Service */}
+                <div className="w-full lg:w-[24%] shrink-0 space-y-4 lg:px-4 lg:border-l" style={{ borderColor: COLORS.hairline }}>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: COLORS.muted }}>Service</p>
                     <p className="text-sm font-bold line-clamp-2" style={{ color: COLORS.ink }} title={s.title || "Mentorship Session"}>
                       {s.title || "Mentorship Session"}
                     </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: COLORS.muted }}>Booking Status</p>
                     <div className="flex items-center gap-2">
-                       <span
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
+                      <span
+                        className="inline-flex text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
                         style={{ backgroundColor: statusStyles.bg, color: statusStyles.text }}
                       >
                         {s.status || "Scheduled"}
                       </span>
                     </div>
                   </div>
+                </div>
 
-                  <div className="space-y-2 pt-1 sm:pt-0">
-                    <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.ink }}>
-                      <CalendarClock className="w-3.5 h-3.5 shrink-0" style={{ color: COLORS.muted }} />
-                      <span>{formatDateStr(s.startTime || s.scheduledAt)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.ink }}>
-                      <Clock className="w-3.5 h-3.5 shrink-0" style={{ color: COLORS.muted }} />
-                      <span>
-                        {formatTimeStr(s.startTime || s.scheduledAt)}
-                        {s.duration ? ` (${s.duration} min)` : ""}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
-                      {isOnline ? (
-                        <Video className="w-3.5 h-3.5 shrink-0" />
-                      ) : (
-                        <MapPin className="w-3.5 h-3.5 shrink-0" />
-                      )}
-                      <span>{isOnline ? "Online Meeting" : "In Person"}</span>
-                    </div>
+                {/* 3. Date & Time */}
+                <div className="w-full lg:w-[24%] shrink-0 space-y-2 lg:px-4 lg:border-l pt-1 lg:pt-0" style={{ borderColor: COLORS.hairline }}>
+                  <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.ink }}>
+                    <CalendarClock className="w-3.5 h-3.5 shrink-0" style={{ color: COLORS.muted }} />
+                    <span>{formatDateStr(s.startTime || s.scheduledAt)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.ink }}>
+                    <Clock className="w-3.5 h-3.5 shrink-0" style={{ color: COLORS.muted }} />
+                    <span>
+                      {formatTimeStr(s.startTime || s.scheduledAt)}
+                      {s.duration ? ` (${s.duration} min)` : ""}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
+                    {isOnline ? (
+                      <Video className="w-3.5 h-3.5 shrink-0" />
+                    ) : (
+                      <MapPin className="w-3.5 h-3.5 shrink-0" />
+                    )}
+                    <span>{isOnline ? "Online Meeting" : "In Person"}</span>
                   </div>
                 </div>
 
-                {/* Amount & Actions */}
-                <div className="flex flex-col gap-4 shrink-0 w-full lg:w-[180px] lg:border-l lg:pl-4 pt-4 lg:pt-0 border-t lg:border-t-0 mt-2 lg:mt-0" style={{ borderColor: COLORS.hairline }}>
+                {/* 4. Amount & Actions */}
+                <div className="flex flex-col gap-4 shrink-0 w-full lg:w-[24%] lg:border-l lg:pl-4 pt-4 lg:pt-0 border-t lg:border-t-0 mt-2 lg:mt-0" style={{ borderColor: COLORS.hairline }}>
                   
                   {/* Amount / Payment info */}
-                  <div className="flex flex-row lg:flex-col justify-between lg:justify-start items-center lg:items-start gap-2">
+                  <div className="flex flex-row lg:flex-col justify-between lg:justify-start items-start gap-4">
                     {amount !== undefined && amount !== null ? (
                       <div>
-                         <p className="text-xs font-medium uppercase tracking-wider" style={{ color: COLORS.muted }}>Amount</p>
-                         <p className="text-base font-bold" style={{ color: COLORS.ink }}>{formatCurrency(amount, currency)}</p>
+                         <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: COLORS.muted }}>Amount</p>
+                         <p className="text-sm font-bold" style={{ color: COLORS.ink }}>{formatCurrency(amount, currency)}</p>
                       </div>
                     ) : (
                        <p className="text-xs italic" style={{ color: COLORS.muted }}>No price info</p>
                     )}
                     
                     {paymentStatus && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-1 mt-1"
-                            style={{ backgroundColor: paymentStyles.bg, color: paymentStyles.text }}>
-                        {paymentStatus}
-                      </span>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: COLORS.muted }}>Payment Status</p>
+                        <span className="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider items-center gap-1"
+                              style={{ backgroundColor: paymentStyles.bg, color: paymentStyles.text }}>
+                          {paymentStatus}
+                        </span>
+                      </div>
                     )}
                   </div>
 
-                  <div className="flex flex-col gap-2 mt-auto">
+                  <div className="flex flex-col gap-2 mt-auto w-full">
                     {invoiceLink && (
                       <a
                         href={invoiceLink}
                         target="_blank"
                         rel="noreferrer"
-                        className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:border-[#c9baa9] text-center"
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors hover:border-[#c9baa9] text-center"
                         style={{ backgroundColor: "transparent", color: COLORS.muted, border: `1px solid ${COLORS.hairline}` }}
                       >
-                        <Receipt className="w-3 h-3" />
+                        <Receipt className="w-3.5 h-3.5" />
                         Invoice
                       </a>
                     )}
