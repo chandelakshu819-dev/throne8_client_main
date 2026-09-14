@@ -16,6 +16,7 @@ const USER_MENU_ITEMS = [
   { id: "my-mentors", label: "My Mentors", icon: Users },
   { id: "my-bookings", label: "My Bookings", icon: Bookmark },
   { id: "session-history", label: "Session History", icon: History },
+  { id: "group-sessions", label: "Group Sessions", icon: Users },
 ];
 
 export default function UserSidebar({
