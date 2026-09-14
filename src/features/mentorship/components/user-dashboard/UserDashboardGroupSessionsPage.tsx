@@ -132,15 +132,15 @@ export default function UserDashboardGroupSessionsPage({}: Props) {
     if (allSessions.length === 0) {
       return (
         <div
-          className="flex flex-col items-center justify-center gap-3 py-16 rounded-2xl text-center"
+          className="flex flex-col items-center justify-center gap-2 py-10 rounded-xl text-center"
           style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
         >
-          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.chip }}>
-            <Users className="w-8 h-8" style={{ color: COLORS.accent }} />
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.chip }}>
+            <Users className="w-6 h-6" style={{ color: COLORS.accent }} />
           </div>
           <div>
-            <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>No upcoming group sessions</h3>
-            <p className="text-sm mt-1" style={{ color: COLORS.muted }}>
+            <h3 className="text-base font-bold" style={{ color: COLORS.ink }}>No upcoming group sessions</h3>
+            <p className="text-sm mt-0.5" style={{ color: COLORS.muted }}>
               There are currently no upcoming group sessions available.
             </p>
           </div>
@@ -268,15 +268,15 @@ export default function UserDashboardGroupSessionsPage({}: Props) {
     if (registeredSessions.length === 0) {
       return (
         <div
-          className="flex flex-col items-center justify-center gap-3 py-16 rounded-2xl text-center"
+          className="flex flex-col items-center justify-center gap-2 py-10 rounded-xl text-center"
           style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
         >
-          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.chip }}>
-            <Bookmark className="w-8 h-8" style={{ color: COLORS.accent }} />
+          <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.chip }}>
+            <Bookmark className="w-6 h-6" style={{ color: COLORS.accent }} />
           </div>
           <div>
-            <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>You have not registered for any group sessions yet</h3>
-            <p className="text-sm mt-1" style={{ color: COLORS.muted }}>
+            <h3 className="text-base font-bold" style={{ color: COLORS.ink }}>You have not registered for any group sessions yet</h3>
+            <p className="text-sm mt-0.5" style={{ color: COLORS.muted }}>
               When you reserve a seat for an upcoming session, it will appear here.
             </p>
           </div>
