@@ -5,7 +5,7 @@ import TokenStorage from "@/lib/store/token.storage";
 import config from "@/config/env.config";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-    Bell, MessageCircle, Users, Edit3, CheckCircle, X, Heart, MessageSquare, Bookmark, Search, Filter, Settings, Moon, Sun, Volume2, VolumeX, Zap, TrendingUp, Award, Calendar, MapPin, Eye, EyeOff, Loader2, Wifi, WifiOff, RefreshCw, Trash2
+    Bell, MessageCircle, Users, Edit3, CheckCircle, X, Heart, MessageSquare, Bookmark, Search, Filter, Settings, Moon, Sun, Volume2, VolumeX, Zap, TrendingUp, Award, Calendar, MapPin, Eye, EyeOff, Loader2, Wifi, WifiOff, RefreshCw, Trash2, Sparkles, UserPlus, Repeat2, Cake
 } from "lucide-react";
 
 import NotificationService from "@/lib/api/notification.service";
@@ -157,12 +157,12 @@ const NotificationsPage = () => {
             try {
                 const json = await NotificationService.getNotifications({ page: pageNum, limit: 20 });
 
-                //////////////////////////////Changed Modified
+
                 if (json.success) {
 
 
                     const data: Notification[] = json.data.notifications || [];
-                    console.log('NOTIFICATIONS DATA:', JSON.stringify(data, null, 2));
+
                     setNotifications((prev) => (append ? [...prev, ...data] : data));
 
 
@@ -391,7 +391,9 @@ const NotificationsPage = () => {
             n.entityType === "connection" ||
             n.type === "connection_request" ||
             n.type === "connection_accepted" ||
-            n.type === "profile_viewed";
+            n.type === "profile_viewed" ||
+            n.type === "pymk_suggestion" ||
+            n.type === "connection_birthday";
         const matchesTab =
             selectedTab === "all" ||
             (selectedTab === "unread" && !n.isRead) ||
@@ -406,15 +408,23 @@ const NotificationsPage = () => {
             case "post_created":
                 return <Edit3 className="w-4 h-4 text-[#4a3728]" />;
             case "post_liked":
+            case "comment_liked":
                 return <Heart className="w-4 h-4 text-red-500" fill="currentColor" />;
             case "post_commented":
+            case "comment_replied":
                 return <MessageSquare className="w-4 h-4 text-blue-500" />;
+            case "post_reposted":
+                return <Repeat2 className="w-4 h-4 text-green-500" />;
             case "connection_request":
                 return <Users className="w-4 h-4 text-orange-500" />;
             case "connection_accepted":
                 return <CheckCircle className="w-4 h-4 text-green-500" />;
             case "profile_viewed":
                 return <Eye className="w-4 h-4 text-purple-500" />;
+            case "pymk_suggestion":           // ✅ distinct teal sparkle icon
+                return <Sparkles className="w-4 h-4 text-teal-500" />;
+            case "connection_birthday":
+                return <Cake className="w-4 h-4 text-pink-500" />;
             default:
                 return <Bell className="w-4 h-4 text-gray-500" />;
         }
@@ -425,15 +435,23 @@ const NotificationsPage = () => {
             case "post_created":
                 return "from-[#4a3728] to-[#7a5c3e]";
             case "post_liked":
+            case "comment_liked":
                 return "from-red-500 to-pink-500";
             case "post_commented":
+            case "comment_replied":
                 return "from-blue-500 to-indigo-500";
+            case "post_reposted":
+                return "from-green-500 to-emerald-500";
             case "connection_request":
                 return "from-orange-500 to-yellow-500";
             case "connection_accepted":
                 return "from-green-500 to-emerald-500";
             case "profile_viewed":
                 return "from-purple-500 to-pink-500";
+            case "pymk_suggestion":           // ✅ teal gradient matching icon
+                return "from-teal-500 to-cyan-500";
+            case "connection_birthday":
+                return "from-pink-500 to-rose-500";
             default:
                 return "from-gray-500 to-slate-500";
         }
@@ -453,7 +471,16 @@ const NotificationsPage = () => {
             id: "connections",
             label: "Network",
             icon: Users,
-            count: notifications.filter((n) => n.entityType === "connection").length,
+            // ✅ fix: PYMK sets entityType='user', so count by type union instead
+            count: notifications.filter(
+                (n) =>
+                    n.entityType === "connection" ||
+                    n.type === "connection_request" ||
+                    n.type === "connection_accepted" ||
+                    n.type === "profile_viewed" ||
+                    n.type === "pymk_suggestion" ||
+                    n.type === "connection_birthday"
+            ).length,
         },
     ];
 
@@ -755,6 +782,7 @@ const NotificationsPage = () => {
                                     <option value="post_created">New Posts</option>
                                     <option value="post_liked">Likes</option>
                                     <option value="post_commented">Comments</option>
+                                    <option value="post_reposted">Reposts</option>
                                     <option value="connection_request">
                                         Connection Requests
                                     </option>
@@ -763,6 +791,9 @@ const NotificationsPage = () => {
                                     </option>
                                     <option value="profile_viewed">
                                         Profile Views
+                                    </option>
+                                    <option value="connection_birthday">
+                                        Birthdays
                                     </option>
                                 </select>
                             </div>
@@ -820,7 +851,14 @@ const NotificationsPage = () => {
                                             <div className="p-4">
                                                 <div className="flex items-start gap-4">
                                                     {/* Avatar */}
-                                                    <div className="relative flex-shrink-0">
+                                                    <div
+                                                        className="relative flex-shrink-0 cursor-pointer"
+                                                        onClick={() => {
+                                                            if (notification.senderId) {
+                                                                router.push(`/profile/${notification.senderId}`);
+                                                            }
+                                                        }}
+                                                    >
                                                         <img
                                                             src={
                                                                 notification.senderPhoto ||
@@ -846,13 +884,18 @@ const NotificationsPage = () => {
                                                                     className={`text-sm ${darkMode ? "text-gray-200" : "text-gray-800"} leading-relaxed`}
                                                                 >
                                                                     <span
+                                                                        onClick={() => {
+                                                                            if (notification.senderId) {
+                                                                                router.push(`/profile/${notification.senderId}`);
+                                                                            }
+                                                                        }}
                                                                         className={`font-semibold ${darkMode ? "text-white" : "text-gray-900"} hover:text-[#4a3728] transition-colors cursor-pointer`}
                                                                     >
                                                                         {notification.senderName}
                                                                     </span>{" "}
-                                                                    {notification.message
-                                                                        .replace(notification.senderName, "")
-                                                                        .trim()}
+                                                                  {notification.message.startsWith(notification.senderName)
+                                                                 ? notification.message.replace(notification.senderName, "").trim()
+                                                                   : notification.message}
                                                                 </p>
 
                                                                 {/* Unread badge */}
@@ -945,13 +988,81 @@ const NotificationsPage = () => {
                                             {notification.entityType === "post" && (
                                                 <div className={`px-4 pb-3`}>
                                                     <button 
-                                                        onClick={() => router.push(`/post/${notification.entityId}`)}
+                                                        onClick={() => {
+                                                            let url = `/post/${notification.entityId}`;
+                                                            // Deep link to specific comment for comment notifications
+                                                            if ((notification.type === "comment_liked" || notification.type === "comment_replied") && notification.entityIds?.length) {
+                                                                const commentId = notification.entityIds[0];
+                                                                url += `?commentId=${commentId}`;
+                                                                if (notification.type === "comment_replied" && notification.entityIds.length > 1) {
+                                                                    url += `&replyId=${notification.entityIds[1]}`;
+                                                                }
+                                                            }
+                                                            markAsRead(notification.notificationId);
+                                                            router.push(url);
+                                                        }}
                                                         className="text-xs text-[#4a3728] hover:underline transition-colors font-medium"
                                                     >
-                                                        View Post →
+                                                        {notification.type === "comment_liked" || notification.type === "comment_replied"
+                                                            ? "View Comment →"
+                                                            : "View Post →"}
                                                     </button>
                                                 </div>
                                             )}
+
+                                            {/* See all suggestions link for PYMK notifications */}
+                                            {notification.type === "pymk_suggestion" && (
+                                                <div className={`px-4 pb-3`}>
+                                                    <button
+                                                        onClick={() => {
+                                                            markAsRead(notification.notificationId);
+                                                            router.push('/network/suggestions');
+                                                        }}
+                                                        className="text-xs text-teal-600 hover:text-teal-800 hover:underline transition-colors font-medium flex items-center gap-1"
+                                                    >
+                                                        <Sparkles className="w-3 h-3" />
+                                                        See all suggestions →
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            
+{/* See who viewed link for profile view notifications */}
+{notification.type === "profile_viewed" && (
+    <div className={`px-4 pb-3`}>
+        <button
+            onClick={() => {
+                markAsRead(notification.notificationId);
+                router.push('/network/profile-views');
+            }}
+            className="text-xs text-purple-600 hover:text-purple-800 hover:underline transition-colors font-medium flex items-center gap-1"
+        >
+            <Eye className="w-3 h-3" />
+            See who viewed →
+        </button>
+    </div>
+)}
+
+{/* View Profile link for birthday notifications */}
+{notification.type === "connection_birthday" && (
+    <div className={`px-4 pb-3`}>
+        <button
+            onClick={() => {
+                markAsRead(notification.notificationId);
+                router.push(`/profile/${notification.senderId}`);
+            }}
+            className="text-xs text-pink-600 hover:text-pink-800 hover:underline transition-colors font-medium flex items-center gap-1"
+        >
+            <Cake className="w-3 h-3" />
+            View Profile →
+        </button>
+    </div>
+)}
+
+
+
+
+
                                         </div>
                                     ))}
                                 </div>

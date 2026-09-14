@@ -59,7 +59,7 @@ const CommentItem = ({
     : '';
 
   return (
-    <div className="py-3 first:pt-0">
+    <div id={`comment-${commentId}`} className="py-3 first:pt-0">
       <div className="flex items-start gap-2.5">
         <img
           src={authorAvatar}
@@ -205,7 +205,7 @@ const CommentItem = ({
               style={{ borderColor: isDarkMode ? '#334155' : '#4a372820' }}
             >
               {comment.replies.map((reply: any) => (
-                <div key={reply.id || reply.commentId} className="flex items-start gap-2">
+                <div id={`comment-${reply.id || reply.commentId}`} key={reply.id || reply.commentId} className="flex items-start gap-2">
                   <img
                     src={reply.user?.avatar || reply.avatar}
                     alt={reply.user?.name || reply.user}

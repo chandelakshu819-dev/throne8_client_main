@@ -44,3 +44,15 @@ body {
 .animate-shake {
   animation: shake 0.5s ease-in-out;
 }
+
+/* ── Comment deep-link highlight (used by /post/[postId]?commentId=...) ── */
+@keyframes highlightPulse {
+  0%   { background-color: rgba(74, 55, 40, 0.18); border-radius: 12px; }
+  60%  { background-color: rgba(74, 55, 40, 0.10); }
+  100% { background-color: transparent; }
+}
+
+.notif-highlight {
+  animation: highlightPulse 2.5s ease-out forwards;
+  border-radius: 12px;
+}

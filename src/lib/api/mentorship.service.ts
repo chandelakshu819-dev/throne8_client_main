@@ -323,11 +323,6 @@ class MentorService {
     }
   }
 
-  /**
-   * Submit a review for a completed mentorship session.
-   * POST /reviews - sessionId + mentorId + rating + comment required.
-   * menteeId backend khud req.user se leta hai, frontend se bhejne ki zaroorat nahi.
-   */
   static async submitReview(payload: {
     sessionId: string;
     mentorId: string;
@@ -350,6 +345,62 @@ class MentorService {
         if (apiError?.message) throw new Error(apiError.message);
       }
       throw new Error('Failed to submit review. Please try again.');
+    }
+  }
+
+  static async toggleSaveMentor(mentorId: string): Promise<{ saved: boolean }> {
+    try {
+      const { data } = await api.patch<{ saved: boolean }>(
+        `/mentorship/mentors/${mentorId}/save`
+      );
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (error.code === 'ERR_NETWORK') {
+          throw new Error('Unable to connect to server. Please check your internet connection.');
+        }
+        if (error.response?.status === 401) {
+          throw new Error('Session expired. Please login again.');
+        }
+        if (error.response?.status === 404) {
+          throw new Error('Mentor not found.');
+        }
+        if (apiError?.message) {
+          throw new Error(apiError.message);
+        }
+      }
+      throw new Error('Failed to save/unsave mentor. Please try again.');
+    }
+  }
+
+  static async reportMentor(mentorId: string, reason: string): Promise<any> {
+    try {
+      const { data } = await api.post(
+        `/mentorship/mentors/${mentorId}/report`,
+        { reason }
+      );
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (error.code === 'ERR_NETWORK') {
+          throw new Error('Unable to connect to server. Please check your internet connection.');
+        }
+        if (error.response?.status === 400) {
+          throw new Error(apiError?.message || 'Report reason is required.');
+        }
+        if (error.response?.status === 401) {
+          throw new Error('Session expired. Please login again.');
+        }
+        if (error.response?.status === 404) {
+          throw new Error('Mentor not found.');
+        }
+        if (apiError?.message) {
+          throw new Error(apiError.message);
+        }
+      }
+      throw new Error('Failed to submit report. Please try again.');
     }
   }
 }
