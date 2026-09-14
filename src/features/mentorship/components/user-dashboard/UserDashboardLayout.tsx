@@ -5,6 +5,7 @@ import UserSidebar from "./UserSidebar";
 import UserDashboardOverviewPage from "./UserDashboardOverviewPage";
 import UserDashboardUpcomingSessionsPage from "./UserDashboardUpcomingSessionsPage";
 import UserDashboardMyMentorsPage from "./UserDashboardMyMentorsPage";
+import UserDashboardMyBookingsPage from "./UserDashboardMyBookingsPage";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -13,6 +14,7 @@ const pageComponents: Record<string, React.FC<any>> = {
   dashboard: UserDashboardOverviewPage,
   "upcoming-sessions": UserDashboardUpcomingSessionsPage,
   "my-mentors": UserDashboardMyMentorsPage,
+  "my-bookings": UserDashboardMyBookingsPage,
 };
 
 function normalizeNotifications(res: any): any[] {
