@@ -11,11 +11,11 @@ export default function UserDashboardWaitlistPage() {
       </div>
 
       <div 
-        className="flex flex-col items-center justify-center p-12 text-center rounded-2xl h-[400px]"
+        className="flex flex-col items-center justify-center py-16 px-6 text-center rounded-2xl"
         style={{ backgroundColor: '#fff', border: '1px solid #e0d8cf' }}
       >
         <div 
-          className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6"
+          className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
           style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}
         >
           <Clock className="w-8 h-8" style={{ color: '#c0b0a0' }} />

@@ -9,6 +9,10 @@ import UserDashboardMyBookingsPage from "./UserDashboardMyBookingsPage";
 import UserDashboardSessionHistoryPage from "./UserDashboardSessionHistoryPage";
 import UserDashboardGroupSessionsPage from "./UserDashboardGroupSessionsPage";
 import UserDashboardWaitlistPage from "./UserDashboardWaitlistPage";
+import UserDashboardReviewsPage from "./UserDashboardReviewsPage";
+import UserDashboardPaymentsPage from "./UserDashboardPaymentsPage";
+import UserDashboardNotificationsPage from "./UserDashboardNotificationsPage";
+import UserDashboardRecommendedMentorsPage from "./UserDashboardRecommendedMentorsPage";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -21,6 +25,10 @@ const pageComponents: Record<string, React.FC<any>> = {
   "session-history": UserDashboardSessionHistoryPage,
   "group-sessions": UserDashboardGroupSessionsPage,
   waitlist: UserDashboardWaitlistPage,
+  reviews: UserDashboardReviewsPage,
+  payments: UserDashboardPaymentsPage,
+  notifications: UserDashboardNotificationsPage,
+  "recommended-mentors": UserDashboardRecommendedMentorsPage,
 };
 
 function normalizeNotifications(res: any): any[] {
@@ -55,6 +63,24 @@ export default function UserDashboardLayout({ userId }: { userId: string }) {
     fetchNotifications();
   }, [userId, fetchNotifications]);
 
+  const handleMarkAllRead = useCallback(async () => {
+    try {
+      await NotificationService.markAllMentorshipNotificationsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    } catch (error) {
+      console.error("Failed to mark all as read:", error);
+    }
+  }, []);
+
+  const handleMarkRead = useCallback(async (id: string) => {
+    try {
+      await NotificationService.markMentorshipNotificationRead(id);
+      setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+    } catch (error) {
+      console.error("Failed to mark as read:", error);
+    }
+  }, []);
+
   useEffect(() => {
     if (!userId) return;
     SessionService.getAllSessions({ role: "mentee", limit: 100 })
@@ -80,6 +106,10 @@ export default function UserDashboardLayout({ userId }: { userId: string }) {
               setActivePage={setActivePage}
               sessions={sessions}
               user={user}
+              notifications={safeNotifications}
+              notificationsLoading={notificationsLoading}
+              onMarkAllRead={handleMarkAllRead}
+              onMarkRead={handleMarkRead}
             />
           </div>
         </main>

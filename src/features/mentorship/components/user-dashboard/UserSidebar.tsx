@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, ChevronRight, CalendarClock, Users, Bookmark, History, Clock } from "lucide-react";
+import { LayoutDashboard, ChevronRight, CalendarClock, Users, Bookmark, History, Clock, Star, Receipt, Bell, Sparkles } from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 
@@ -12,12 +12,16 @@ interface UserSidebarProps {
 
 const USER_MENU_ITEMS = [
   { id: "dashboard", label: "Overview", icon: LayoutDashboard },
+  { id: "recommended-mentors", label: "Recommended Mentors", icon: Sparkles },
   { id: "upcoming-sessions", label: "Upcoming Sessions", icon: CalendarClock },
   { id: "my-mentors", label: "My Mentors", icon: Users },
   { id: "my-bookings", label: "My Bookings", icon: Bookmark },
+  { id: "payments", label: "Payments & Transactions", icon: Receipt },
   { id: "session-history", label: "Session History", icon: History },
   { id: "group-sessions", label: "Group Sessions", icon: Users },
   { id: "waitlist", label: "Waitlist", icon: Clock },
+  { id: "reviews", label: "Reviews & Feedback", icon: Star },
+  { id: "notifications", label: "Notifications", icon: Bell },
 ];
 
 export default function UserSidebar({
@@ -65,7 +69,7 @@ export default function UserSidebar({
           {USER_MENU_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activePage === item.id;
-            const isNotificationItem = item.id === "notification";
+            const isNotificationItem = item.id === "notifications";
             const showUnreadDot = isNotificationItem && unreadNotificationCount > 0;
 
             return (
