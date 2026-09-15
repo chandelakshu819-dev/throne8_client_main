@@ -1,10 +1,14 @@
-import React from "react";
+//src/features/mentorship/components/user-dashboard/UserDashboardUpcomingSessionsPage.tsx
+
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   CalendarClock,
   Clock,
   Video,
   MapPin,
 } from "lucide-react";
+import SessionService from "@/lib/api/session.service";
 
 const COLORS = {
   ink: "#4a3728",
@@ -59,7 +63,12 @@ function initialsFrom(name: string) {
 }
 
 export default function UserDashboardUpcomingSessionsPage({ sessions = [] }: Props) {
+  const router = useRouter();
   const now = Date.now();
+
+  // ⭐ NEW: track which session's "Join Session" button is loading,
+  // taaki sirf usi row pe spinner/disabled state dikhe.
+  const [joiningId, setJoiningId] = useState<string | null>(null);
 
   const upcoming = sessions
     .filter((s) => {
@@ -71,6 +80,21 @@ export default function UserDashboardUpcomingSessionsPage({ sessions = [] }: Pro
         new Date(a.startTime || a.scheduledAt || 0).getTime() -
         new Date(b.startTime || b.scheduledAt || 0).getTime()
     );
+
+  // ⭐ NEW: Join Session click handler — session valid hai confirm karta
+  // hai (getSessionById), phir video call room pe redirect karta hai.
+  const handleJoinSession = async (sessionId?: string) => {
+    if (!sessionId) return;
+    setJoiningId(sessionId);
+    try {
+      await SessionService.getSessionById(sessionId);
+      router.push(`/mentorship/session-room/${sessionId}`);
+    } catch (err: any) {
+      alert(err.message || "Unable to join session. Please try again.");
+    } finally {
+      setJoiningId(null);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fadeIn max-w-5xl">
@@ -110,10 +134,11 @@ export default function UserDashboardUpcomingSessionsPage({ sessions = [] }: Pro
             const name = s.mentorName || "Mentor";
             const photo = s.mentorProfilePhoto;
             const isOnline = !s.sessionType || s.sessionType.toLowerCase() === "virtual" || s.sessionType.toLowerCase() === "online";
-            
+            const sid = s.sessionId ?? s._id;
+
             return (
               <div
-                key={s.sessionId ?? s._id ?? idx}
+                key={sid ?? idx}
                 className="flex flex-col md:flex-row items-start md:items-center gap-4 p-4 md:p-5 rounded-2xl transition-shadow hover:shadow-sm bg-white"
                 style={{ border: `1px solid ${COLORS.hairline}` }}
               >
@@ -186,10 +211,12 @@ export default function UserDashboardUpcomingSessionsPage({ sessions = [] }: Pro
                 {/* 3. Actions */}
                 <div className="flex flex-col gap-2 shrink-0 w-full md:w-[165px] md:border-l md:pl-4 pt-4 md:pt-0 border-t md:border-t-0 mt-2 md:mt-0" style={{ borderColor: COLORS.hairline }}>
                    <button
-                    className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-[#8b7355] shadow-sm text-center"
+                    onClick={() => handleJoinSession(sid)}
+                    disabled={joiningId === sid}
+                    className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-[#8b7355] shadow-sm text-center disabled:opacity-60"
                     style={{ backgroundColor: COLORS.ink, color: "#fff" }}
                   >
-                    Join Session
+                    {joiningId === sid ? "Joining..." : "Join Session"}
                   </button>
                   <button
                     className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-colors hover:border-[#c9baa9] text-center"
