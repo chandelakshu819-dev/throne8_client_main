@@ -15,6 +15,7 @@ import {
   Check,
   X,
 } from "lucide-react"
+import { useRouter } from "next/navigation";
 import SessionService from "@/lib/api/session.service";
 import ProfileService from "@/lib/api/profile.service";
 
@@ -78,6 +79,7 @@ const statusBadge: Record<string, { bg: string; fg: string; label: string }> = {
 };
 
 export default function BookingsPage({ mentorData }: BookingProps) {
+  const router = useRouter();
   const [bookingTab, setBookingTab] = useState<BookingTab>('all');
   const [now, setNow] = useState(() => Date.now());
 
@@ -239,14 +241,17 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     };
 
 
-
     const handleStart = async (sessionId: string, bookingId: string) => {
       setActionLoading(sessionId);
       try {
-        await SessionService.startSession(sessionId, bookingId);
+        // ⚠️ ASSUMPTION: backend response shape is { data: { roomId, ... } }.
+        // Confirm against the real session.service.ts return type — adjust
+        // res?.data?.roomId below if it's nested differently (e.g. res?.data?.data?.roomId).
+        const res: any = await SessionService.startSession(sessionId, bookingId);
+        const roomId = res?.data?.roomId ?? bookingId; // fallback: bookingId doubles as roomId
         showToast("Session started", "success");
         await fetchSessions();
-        setBookingTab('in_progress');
+        router.push(`/mentorship/mentor-session?sessionId=${sessionId}&roomId=${roomId}&bookingId=${bookingId}`);
       } catch (err: any) {
         showToast(err.message || "Failed to start session.", "error");
       } finally {

@@ -283,13 +283,14 @@ export function useLiveRoom({
         setupVAD(socketId, remoteStream);
       };
 
-      // ICE candidate — send to remote peer via signaling
+         // ICE candidate — send to remote peer via signaling.
+      // Server (liveRoomHandler.ts) routes by userId, not socketId.
       pc.onicecandidate = (event) => {
         if (!event.candidate) return;
         const socket = getSocket();
         socket?.emit('webrtc-ice-candidate', {
           roomId,
-          targetSocketId: socketId,
+          targetUserId: peerUserId,
           candidate: event.candidate,
         });
       };
@@ -374,9 +375,14 @@ export function useLiveRoom({
           await pc.setLocalDescription(offer);
 
           const socket = getSocket();
+          // Server routes only by targetUserId (see liveRoomHandler.ts) — the old
+          // targetSocketId field here was silently dropped by the `if (!targetUserId...)`
+          // guard, so reconnect offers never reached the peer. `socketId` in this
+          // function is actually the userId (peerConnections is keyed by userId
+          // throughout this file), so it's safe to reuse directly.
           socket?.emit('webrtc-offer', {
             roomId,
-            targetSocketId: socketId,
+            targetUserId: socketId,
             offer,
           });
         } catch (err) {
@@ -786,18 +792,20 @@ const toggleMic = useCallback(async () => {
     if (!socket) return;
 
     // ── Another user joined → we initiate offer ──
+        // Server's 'user-joined-room' payload is { userId, userName, timestamp } — no socketId.
+    // socketId only shows up when this fn is reused from room-participants-list.
     const handleUserJoined = async ({
-      socketId: remoteSocketId,
       userId: remoteUserId,
       userName: remoteUserName,
+      socketId: remoteSocketId,
     }: {
-      socketId: string;
       userId: string;
       userName?: string;
+      socketId?: string;
     }) => {
-      if (!isMounted.current) return;
+      if (!isMounted.current || !remoteUserId || remoteUserId === userId) return;
 
-      const pc = createPeerConnection(remoteSocketId, remoteUserId, remoteUserName);
+      const pc = createPeerConnection(remoteUserId, remoteUserId, remoteUserName);
 
       try {
         const offer = await pc.createOffer();
@@ -805,7 +813,7 @@ const toggleMic = useCallback(async () => {
 
         socket.emit('webrtc-offer', {
           roomId,
-          targetSocketId: remoteSocketId,
+          targetUserId: remoteUserId,
           offer,
         });
       } catch (err) {
@@ -813,7 +821,7 @@ const toggleMic = useCallback(async () => {
       }
 
       onPeerJoined?.({
-        socketId: remoteSocketId,
+        socketId: remoteSocketId || remoteUserId,
         userId: remoteUserId,
         userName: remoteUserName,
         stream: null,
@@ -826,45 +834,43 @@ const toggleMic = useCallback(async () => {
     };
 
     // ── Receive offer → send answer ──
-    const handleOffer = async ({
-      fromSocketId,
-      userId: remoteUserId,
-      userName: remoteUserName,
-      offer,
-    }: {
-      fromSocketId: string;
-      userId: string;
-      userName?: string;
-      offer: RTCSessionDescriptionInit;
-    }) => {
-      if (!isMounted.current) return;
-
-      const pc = createPeerConnection(fromSocketId, remoteUserId, remoteUserName);
-
-      try {
-        await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-
-        socket.emit('webrtc-answer', {
-          roomId,
-          targetSocketId: fromSocketId,
-          answer,
-        });
-      } catch (err) {
-        console.error('[WebRTC] answer failed', err);
-      }
-    };
+        // Server sends { fromUserId, roomId, offer } only.
+        const handleOffer = async ({
+          fromUserId,
+          offer,
+        }: {
+          fromUserId: string;
+          roomId?: string;
+          offer: RTCSessionDescriptionInit;
+        }) => {
+          if (!isMounted.current || !fromUserId) return;
+    
+          const pc = createPeerConnection(fromUserId, fromUserId, undefined);
+    
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+    
+            socket.emit('webrtc-answer', {
+              roomId,
+              targetUserId: fromUserId,
+              answer,
+            });
+          } catch (err) {
+            console.error('[WebRTC] answer failed', err);
+          }
+        };
 
     // ── Receive answer ──
     const handleAnswer = async ({
-      fromSocketId,
+      fromUserId,
       answer,
     }: {
-      fromSocketId: string;
+      fromUserId: string;
       answer: RTCSessionDescriptionInit;
     }) => {
-      const pc = peerConnections.current.get(fromSocketId);
+      const pc = peerConnections.current.get(fromUserId);
       if (!pc) return;
 
       try {
@@ -878,13 +884,13 @@ const toggleMic = useCallback(async () => {
 
     // ── Receive ICE candidate ──
     const handleIceCandidate = async ({
-      fromSocketId,
+      fromUserId,
       candidate,
     }: {
-      fromSocketId: string;
+      fromUserId: string;
       candidate: RTCIceCandidateInit;
     }) => {
-      const pc = peerConnections.current.get(fromSocketId);
+      const pc = peerConnections.current.get(fromUserId);
       if (!pc) return;
 
       try {
@@ -895,10 +901,12 @@ const toggleMic = useCallback(async () => {
     };
 
     // ── User left room ──
-    const handleUserLeft = ({ socketId: remoteSocketId }: { socketId: string }) => {
-      removePeer(remoteSocketId);
-      onPeerLeft?.(remoteSocketId);
-    };
+       // Server's 'user-left-room' payload is { userId, userName, timestamp }.
+       const handleUserLeft = ({ userId: remoteUserId }: { userId: string }) => {
+        if (!remoteUserId) return;
+        removePeer(remoteUserId);
+        onPeerLeft?.(remoteUserId);
+      };
 
     // ── Remote media toggles ──
     const handleCameraToggle = ({

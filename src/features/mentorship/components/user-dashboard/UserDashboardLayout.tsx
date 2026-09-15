@@ -13,9 +13,12 @@ import UserDashboardReviewsPage from "./UserDashboardReviewsPage";
 import UserDashboardPaymentsPage from "./UserDashboardPaymentsPage";
 import UserDashboardNotificationsPage from "./UserDashboardNotificationsPage";
 import UserDashboardRecommendedMentorsPage from "./UserDashboardRecommendedMentorsPage";
+import { useRouter } from "next/navigation";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { getSocket } from "@/core/realtime/socket.client";
+
 
 const pageComponents: Record<string, React.FC<any>> = {
   dashboard: UserDashboardOverviewPage,
@@ -40,9 +43,22 @@ function normalizeNotifications(res: any): any[] {
 }
 
 export default function UserDashboardLayout({ userId }: { userId: string }) {
+  const router = useRouter();
   const [activePage, setActivePage] = useState("dashboard");
   const [sessions, setSessions] = useState<any[]>([]);
   const { user } = useAuth();
+
+  // ✅ NEW: "your mentor started the session" live banner. Persistent by
+  // design — session:started fires once, real-time, and the mentee could be
+  // on any tab (Payments, Reviews, etc). A silent auto-redirect would yank
+  // them away without warning, so we surface a dismissible Join Now banner
+  // instead and let them join on their own terms.
+  const [liveSession, setLiveSession] = useState<{
+    sessionId: string;
+    bookingId: string;
+    roomId: string;
+    title: string;
+  } | null>(null);
 
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
@@ -88,13 +104,74 @@ export default function UserDashboardLayout({ userId }: { userId: string }) {
       .catch(console.error);
   }, [userId]);
 
+  // ✅ NEW: real-time "mentor started the session" listener.
+  // Backend emits this via emitToUser(menteeId, 'session:started', {...})
+  // from mentorshipSession.service.ts's startSession(). Payload fields
+  // confirmed against that emit call: sessionId, bookingId, roomId, title,
+  // startedAt, scheduledAt, meetingUrl.
+  useEffect(() => {
+    if (!userId) return;
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleSessionStarted = (payload: {
+      sessionId: string;
+      bookingId: string;
+      roomId: string;
+      title: string;
+    }) => {
+      setLiveSession(payload);
+      // Refresh so "Upcoming" flips to reflect in_progress status if the
+      // mentee later visits UserDashboardUpcomingSessionsPage.
+      SessionService.getAllSessions({ role: "mentee", limit: 100 })
+        .then((res) => setSessions(res.data || []))
+        .catch(console.error);
+    };
+
+    socket.on("session:started", handleSessionStarted);
+    return () => {
+      socket.off("session:started", handleSessionStarted);
+    };
+  }, [userId]);
+
+  const handleJoinLiveSession = () => {
+    if (!liveSession) return;
+    router.push(
+      `/mentorship/mentor-session?sessionId=${liveSession.sessionId}&roomId=${liveSession.roomId}&bookingId=${liveSession.bookingId}`
+    );
+    setLiveSession(null);
+  };
+
   const CurrentPage = pageComponents[activePage] || UserDashboardOverviewPage;
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
   return (
     <div className="flex flex-col h-screen bg-[#f6ede8]">
-      <div className="h-20 shrink-0" aria-hidden="true" />
-      <div className="flex flex-1 min-h-0">
+    <div className="h-20 shrink-0" aria-hidden="true" />
+    {liveSession && (
+      <div
+        className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-5 py-3 rounded-2xl shadow-lg"
+        style={{ background: "#4a3728" }}
+      >
+        <span className="text-sm font-semibold text-white">
+          🔴 Your mentor started "{liveSession.title}"
+        </span>
+        <button
+          onClick={handleJoinLiveSession}
+          className="px-4 py-1.5 rounded-lg text-xs font-bold transition-opacity hover:opacity-90"
+          style={{ background: "white", color: "#4a3728" }}
+        >
+          Join Now →
+        </button>
+        <button
+          onClick={() => setLiveSession(null)}
+          className="text-white/70 hover:text-white text-xs"
+        >
+          ✕
+        </button>
+      </div>
+    )}
+    <div className="flex flex-1 min-h-0">
         <UserSidebar
           activePage={activePage}
           setActivePage={setActivePage}
