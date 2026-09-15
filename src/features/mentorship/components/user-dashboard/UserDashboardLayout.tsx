@@ -10,6 +10,7 @@ import UserDashboardSessionHistoryPage from "./UserDashboardSessionHistoryPage";
 import UserDashboardGroupSessionsPage from "./UserDashboardGroupSessionsPage";
 import UserDashboardWaitlistPage from "./UserDashboardWaitlistPage";
 import UserDashboardReviewsPage from "./UserDashboardReviewsPage";
+import UserDashboardPaymentsPage from "./UserDashboardPaymentsPage";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -23,6 +24,7 @@ const pageComponents: Record<string, React.FC<any>> = {
   "group-sessions": UserDashboardGroupSessionsPage,
   waitlist: UserDashboardWaitlistPage,
   reviews: UserDashboardReviewsPage,
+  payments: UserDashboardPaymentsPage,
 };
 
 function normalizeNotifications(res: any): any[] {

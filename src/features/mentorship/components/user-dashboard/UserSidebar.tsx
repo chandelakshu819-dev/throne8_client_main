@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, ChevronRight, CalendarClock, Users, Bookmark, History, Clock, Star } from "lucide-react";
+import { LayoutDashboard, ChevronRight, CalendarClock, Users, Bookmark, History, Clock, Star, Receipt } from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 
@@ -15,6 +15,7 @@ const USER_MENU_ITEMS = [
   { id: "upcoming-sessions", label: "Upcoming Sessions", icon: CalendarClock },
   { id: "my-mentors", label: "My Mentors", icon: Users },
   { id: "my-bookings", label: "My Bookings", icon: Bookmark },
+  { id: "payments", label: "Payments & Transactions", icon: Receipt },
   { id: "session-history", label: "Session History", icon: History },
   { id: "group-sessions", label: "Group Sessions", icon: Users },
   { id: "waitlist", label: "Waitlist", icon: Clock },
