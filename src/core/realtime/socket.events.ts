@@ -25,4 +25,5 @@ export const SOCKET_EVENTS = {
     // bina page refresh kiye.
     MENTORSHIP_SESSION_STARTED: 'mentorship:session:started',
     MENTORSHIP_SESSION_ENDED: 'mentorship:session:ended',
+    MENTORSHIP_PEER_JOINED: 'mentorship:peer-joined',
 } as const;

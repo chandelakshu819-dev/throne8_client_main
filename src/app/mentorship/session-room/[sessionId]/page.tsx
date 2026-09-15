@@ -3,8 +3,23 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useLiveRoom } from '@/core/webrtc/useLiveRoom';
+import { getSocket } from '@/core/realtime/socket.client';
 import SessionService from '@/lib/api/session.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+
+function formatDate(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function formatTime(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
 
 export default function SessionRoomPage() {
   const params = useParams();
@@ -12,20 +27,16 @@ export default function SessionRoomPage() {
   const sessionId = params?.sessionId as string;
 
   const { user } = useAuth();
-  // ADJUST: agar useAuth se field ka naam alag hai (jaise user?.userId,
-  // user?._id) to yahan match karo.
   const currentUserId = (user as any)?.id || (user as any)?.userId || '';
   const currentUserName =
-    `${(user as any)?.firstName || ''} ${(user as any)?.lastName || ''}`.trim() ||
-    'User';
+    `${(user as any)?.firstName || ''} ${(user as any)?.lastName || ''}`.trim() || 'User';
 
   const [sessionData, setSessionData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [peerNotified, setPeerNotified] = useState(false);
   const hasJoinedRef = useRef(false);
 
-  // roomId = sessionId hi use kar rahe hain — alag se model field
-  // add karne ki zaroorat nahi, sessionId already unique hai.
   const {
     localStream,
     peers,
@@ -43,34 +54,53 @@ export default function SessionRoomPage() {
     userName: currentUserName,
   });
 
-  // ── Session details fetch karo (auth check + display info ke liye) ──
   useEffect(() => {
     if (!sessionId) return;
-
     const fetchSession = async () => {
       try {
         setLoading(true);
         const res = await SessionService.getSessionById(sessionId);
-        setSessionData(res.data || res);
+        console.log('[SessionRoom] RAW response:', res); // 👈 ISE CHECK KARO CONSOLE ME
+        const normalized = res?.data ?? res;
+        console.log('[SessionRoom] normalized sessionData:', normalized); // 👈 AUR ISE BHI
+        setSessionData(normalized);
       } catch (err: any) {
+        console.error('[SessionRoom] fetch error:', err);
         setLoadError(err.message || 'Failed to load session.');
       } finally {
         setLoading(false);
       }
     };
-
     fetchSession();
   }, [sessionId]);
 
-  // ── Session load hone ke baad hi room join karo (ek hi baar) ──
   useEffect(() => {
     if (sessionData && currentUserId && !hasJoinedRef.current) {
       hasJoinedRef.current = true;
-      joinRoom(true, true);
+      joinRoom(true, true).then(() => {
+        const socket = getSocket();
+        socket?.emit('mentorship:notify-join', { sessionId });
+        setPeerNotified(true);
+      });
     }
-  }, [sessionData, currentUserId, joinRoom]);
+  }, [sessionData, currentUserId, joinRoom, sessionId]);
 
-  // ── Page se bahar jaate waqt room leave karo ──
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handlePeerJoined = (data: { sessionId: string; joinerRole: string }) => {
+      if (data.sessionId === sessionId) {
+        console.log('[SessionRoom] peer joined:', data);
+      }
+    };
+
+    socket.on('mentorship:peer-joined', handlePeerJoined);
+    return () => {
+      socket.off('mentorship:peer-joined', handlePeerJoined);
+    };
+  }, [sessionId]);
+
   useEffect(() => {
     return () => {
       leaveRoom();
@@ -82,24 +112,19 @@ export default function SessionRoomPage() {
     router.back();
   }, [leaveRoom, router]);
 
-  // ── Loading state ──
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#f6ede8]">
-        <p className="text-[#4a3728]">Session load ho raha hai...</p>
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f6ede8' }}>
+        <p style={{ color: '#4a3728' }}>Session load ho raha hai...</p>
       </div>
     );
   }
 
-  // ── Error state ──
   if (loadError || !sessionData) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-[#f6ede8]">
-        <p className="text-red-600">{loadError || 'Session not found.'}</p>
-        <button
-          onClick={() => router.back()}
-          className="rounded bg-[#4a3728] px-4 py-2 text-white"
-        >
+      <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: '#f6ede8' }}>
+        <p style={{ color: '#dc2626' }}>{loadError || 'Session not found.'}</p>
+        <button onClick={() => router.back()} style={{ borderRadius: 6, backgroundColor: '#4a3728', padding: '8px 16px', color: 'white', border: 'none' }}>
           Go Back
         </button>
       </div>
@@ -107,19 +132,28 @@ export default function SessionRoomPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-[#1a1a1a] text-white">
+    <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', backgroundColor: '#1a1a1a', color: 'white' }}>
       {/* Header */}
-      <div className="flex items-center justify-between bg-[#4a3728] px-6 py-3">
-        <h1 className="text-lg font-semibold">{sessionData.title}</h1>
-        <span className="text-sm opacity-80">
-          {peers.length > 0 ? 'Connected' : 'Waiting for other participant...'}
-        </span>
+      <div style={{ backgroundColor: '#4a3728', padding: '12px 24px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>
+            {sessionData.title || 'Mentorship Session'}
+          </h1>
+          <span style={{ fontSize: 13, opacity: 0.85 }}>
+            {peers.length > 0 ? 'Connected' : peerNotified ? 'Waiting — other person notified' : 'Waiting for other participant...'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 16, marginTop: 4, fontSize: 12, opacity: 0.8 }}>
+          <span>{formatDate(sessionData.scheduledAt || sessionData.startTime)}</span>
+          <span>{formatTime(sessionData.scheduledAt || sessionData.startTime)}</span>
+          {sessionData.duration && <span>{sessionData.duration} min</span>}
+          {sessionData.status && <span style={{ textTransform: 'uppercase', fontWeight: 600 }}>{sessionData.status}</span>}
+        </div>
       </div>
 
       {/* Video grid */}
-      <div className="flex flex-1 items-center justify-center gap-4 p-4">
-        {/* Local video */}
-        <div className="relative aspect-video w-full max-w-md rounded-lg bg-black">
+      <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 16 }}>
+        <div style={{ position: 'relative', aspectRatio: '16/9', width: '100%', maxWidth: 480, borderRadius: 8, backgroundColor: 'black' }}>
           {localStream && (
             <video
               autoPlay
@@ -128,23 +162,24 @@ export default function SessionRoomPage() {
               ref={(el) => {
                 if (el && el.srcObject !== localStream) el.srcObject = localStream;
               }}
-              className="h-full w-full rounded-lg object-cover"
+              style={{ height: '100%', width: '100%', borderRadius: 8, objectFit: 'cover' }}
             />
           )}
-          <span className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-1 text-xs">
+          <span style={{ position: 'absolute', bottom: 8, left: 8, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.5)', padding: '2px 8px', fontSize: 12 }}>
             You
           </span>
         </div>
 
-        {/* Remote peers */}
         {peers.length === 0 && (
-          <div className="flex aspect-video w-full max-w-md items-center justify-center rounded-lg bg-black/40">
-            <p className="text-sm opacity-70">Waiting for the other person to join…</p>
+          <div style={{ display: 'flex', aspectRatio: '16/9', width: '100%', maxWidth: 480, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.4)' }}>
+            <p style={{ fontSize: 13, opacity: 0.7 }}>
+              {peerNotified ? 'Other person has been notified — waiting for them to join…' : 'Waiting for the other person to join…'}
+            </p>
           </div>
         )}
 
         {peers.map((peer) => (
-          <div key={peer.socketId} className="relative aspect-video w-full max-w-md rounded-lg bg-black">
+          <div key={peer.socketId} style={{ position: 'relative', aspectRatio: '16/9', width: '100%', maxWidth: 480, borderRadius: 8, backgroundColor: 'black' }}>
             {peer.stream && (
               <video
                 autoPlay
@@ -152,41 +187,28 @@ export default function SessionRoomPage() {
                 ref={(el) => {
                   if (el && el.srcObject !== peer.stream) el.srcObject = peer.stream;
                 }}
-                className="h-full w-full rounded-lg object-cover"
+                style={{ height: '100%', width: '100%', borderRadius: 8, objectFit: 'cover' }}
               />
             )}
-            <span className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-1 text-xs">
+            <span style={{ position: 'absolute', bottom: 8, left: 8, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.5)', padding: '2px 8px', fontSize: 12 }}>
               {peer.userName || 'Participant'}
             </span>
           </div>
         ))}
       </div>
 
-      {liveRoomError && (
-        <p className="px-6 pb-2 text-center text-sm text-red-400">{liveRoomError}</p>
-      )}
-      {isConnecting && (
-        <p className="px-6 pb-2 text-center text-sm opacity-70">Connecting…</p>
-      )}
+      {liveRoomError && <p style={{ padding: '0 24px 8px', textAlign: 'center', fontSize: 13, color: '#f87171' }}>{liveRoomError}</p>}
+      {isConnecting && <p style={{ padding: '0 24px 8px', textAlign: 'center', fontSize: 13, opacity: 0.7 }}>Connecting…</p>}
 
       {/* Controls */}
-      <div className="flex items-center justify-center gap-4 bg-[#2a2a2a] py-4">
-        <button
-          onClick={toggleMic}
-          className={`rounded-full px-4 py-2 ${isMicOn ? 'bg-[#7a5c3e]' : 'bg-red-600'}`}
-        >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: '#2a2a2a', padding: '16px 0', flexShrink: 0 }}>
+        <button onClick={toggleMic} style={{ borderRadius: 9999, padding: '8px 16px', border: 'none', color: 'white', backgroundColor: isMicOn ? '#7a5c3e' : '#dc2626' }}>
           {isMicOn ? 'Mute' : 'Unmute'}
         </button>
-        <button
-          onClick={toggleCamera}
-          className={`rounded-full px-4 py-2 ${isCameraOn ? 'bg-[#7a5c3e]' : 'bg-red-600'}`}
-        >
+        <button onClick={toggleCamera} style={{ borderRadius: 9999, padding: '8px 16px', border: 'none', color: 'white', backgroundColor: isCameraOn ? '#7a5c3e' : '#dc2626' }}>
           {isCameraOn ? 'Camera Off' : 'Camera On'}
         </button>
-        <button
-          onClick={handleEndCall}
-          className="rounded-full bg-red-700 px-6 py-2 font-semibold"
-        >
+        <button onClick={handleEndCall} style={{ borderRadius: 9999, padding: '8px 24px', border: 'none', fontWeight: 600, color: 'white', backgroundColor: '#b91c1c' }}>
           End Call
         </button>
       </div>
