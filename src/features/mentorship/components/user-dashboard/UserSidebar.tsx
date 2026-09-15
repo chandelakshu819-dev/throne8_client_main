@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, ChevronRight, CalendarClock, Users, Bookmark, History, Clock } from "lucide-react";
+import { LayoutDashboard, ChevronRight, CalendarClock, Users, Bookmark, History, Clock, Star } from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 
@@ -18,6 +18,7 @@ const USER_MENU_ITEMS = [
   { id: "session-history", label: "Session History", icon: History },
   { id: "group-sessions", label: "Group Sessions", icon: Users },
   { id: "waitlist", label: "Waitlist", icon: Clock },
+  { id: "reviews", label: "Reviews & Feedback", icon: Star },
 ];
 
 export default function UserSidebar({
