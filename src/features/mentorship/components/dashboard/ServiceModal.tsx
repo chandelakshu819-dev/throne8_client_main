@@ -55,9 +55,9 @@ const serviceTypes = [
 ];
 
 const followUpPeriodOptions = [
-    { value: '24', label: '24 Hours' }, { value: '48', label: '48 Hours' },
-    { value: '72', label: '3 Days' }, { value: '96', label: '4 Days' },
-    { value: '120', label: '5 Days' },
+    { value: '1', label: '1 Day (24 Hours)' }, { value: '2', label: '2 Days (48 Hours)' },
+    { value: '3', label: '3 Days' }, { value: '4', label: '4 Days' },
+    { value: '5', label: '5 Days' },
 ];
 
 const followUpAllowedOptions = [
@@ -404,7 +404,7 @@ export default function ServiceModal({
                                 <select
                                     className="w-full px-3 py-2 rounded-lg border outline-none text-sm"
                                     style={{ borderColor: '#e0d8cf', backgroundColor: '#fff', color: '#4a3728' }}
-                                    value={formData?.followUpPeriod || '24'}
+                                    value={formData?.followUpPeriod || '1'}
                                     onChange={(e) => setFormData({ ...formData, followUpPeriod: e.target.value })}
                                     disabled={isSaving}
                                 >

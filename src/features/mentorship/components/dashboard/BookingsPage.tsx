@@ -1,5 +1,6 @@
 // mentorDashboard/components/BookingsPage.tsx
 import React, { useEffect, useState, useMemo } from "react"
+import Image from "next/image"
 import { createPortal } from "react-dom"
 import {
   Calendar,
@@ -17,6 +18,8 @@ import {
 } from "lucide-react"
 import SessionService from "@/lib/api/session.service";
 import ProfileService from "@/lib/api/profile.service";
+import EditSessionModal from "@/features/mentorship/modals/EditSessionModal";
+
 
 interface BookingProps {
   mentorData: any;
@@ -31,7 +34,7 @@ type MentorBookingRow = {
   serviceName: string;
   scheduledAt: string;
   slotTime: string;
-  status: 'pending' | 'confirmed' | 'rescheduled' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'rescheduled' | 'in_progress' | 'completed' | 'cancelled' | 'available';
 };
 
 type BookingTab = 'all' | 'pending' | 'upcoming' | 'in_progress' | 'completed';
@@ -118,6 +121,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   const [rescheduleBookingId, setRescheduleBookingId] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleReason, setRescheduleReason] = useState("");
+  const [rescheduleError, setRescheduleError] = useState("");
 
   const fetchSessions = async () => {
     if (!mentorData?.mentorId) return;
@@ -139,7 +143,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
             serviceName: s.title || s.sessionType || "Session",
             scheduledAt: b.scheduledAt || s.scheduledAt,
             slotTime: b.slotTime || s.slotTime,
-            status: b.status,
+            status: b.status || s.status,
           }));
         });
         const sorted = flattened.sort((a, b) => {
@@ -187,18 +191,18 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   }, [allBookings]);
 
   const pendingBookings = allBookings.filter(b => b.status === 'pending');
-  const upcomingBookings = allBookings.filter(b => b.status === 'confirmed' || b.status === 'rescheduled');
+  const upcomingBookings = allBookings.filter(b => ['confirmed', 'rescheduled', 'available'].includes(b.status));
   const inProgressBookings = allBookings.filter(b => b.status === 'in_progress');
   const completedBookings = allBookings.filter(b => b.status === 'completed');
 
   const getCurrentBookings = () => {
     switch (bookingTab) {
-      case 'all': return allBookings.filter(b => b.status !== 'completed');
+      case 'all': return allBookings.filter(b => !['completed', 'cancelled'].includes(b.status));
       case 'pending': return pendingBookings;
       case 'upcoming': return upcomingBookings;
       case 'in_progress': return inProgressBookings;
       case 'completed': return completedBookings;
-      default: return allBookings.filter(b => b.status !== 'completed');
+      default: return allBookings.filter(b => !['completed', 'cancelled'].includes(b.status));
     }
   };
 
@@ -457,8 +461,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
               <p className="text-xs mt-1">{searchQuery ? 'Try a different search' : 'Bookings will appear here when available'}</p>
             </div>
           ) : (
-            <table className="w-full">
-              <thead style={{ backgroundColor: '#fbf7f3' }}>
+            <table className="w-full relative">
+              <thead style={{ backgroundColor: '#fbf7f3' }} className="sticky top-0 z-10 shadow-sm border-b border-[#e0d8cf]">
                 <tr>
                   <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: '#8a7a6a' }}>Student</th>
                   <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: '#8a7a6a' }}>Service</th>
@@ -644,7 +648,10 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   className="w-full rounded-lg p-3 outline-none text-sm"
                   style={{ border: '1px solid #e0d8cf', color: '#4a3728' }}
                   value={rescheduleDate}
-                  onChange={(e) => setRescheduleDate(e.target.value)}
+                  onChange={(e) => {
+                    setRescheduleDate(e.target.value);
+                    if (rescheduleError) setRescheduleError("");
+                  }}
                 />
               </div>
               <div>
@@ -655,15 +662,24 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
                   placeholder="Reason for rescheduling"
                   value={rescheduleReason}
-                  onChange={(e) => setRescheduleReason(e.target.value)}
+                  onChange={(e) => {
+                    setRescheduleReason(e.target.value);
+                    if (rescheduleError) setRescheduleError("");
+                  }}
                 />
               </div>
+              {rescheduleError && (
+                <div className="text-red-500 text-sm font-semibold mt-2 flex items-center gap-1">
+                  ❌ <span>{rescheduleError}</span>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button
                 className="px-4 py-2 rounded-lg text-sm font-semibold"
                 style={{ backgroundColor: '#fbf7f3', color: '#7a5c3e', border: '1px solid #e0d8cf' }}
-                onClick={() => { setShowRescheduleModal(false); setRescheduleSessionId(null); setRescheduleBookingId(null); setRescheduleDate(""); setRescheduleReason(""); }}
+                onClick={() => { setShowRescheduleModal(false); setRescheduleSessionId(null); setRescheduleBookingId(null); setRescheduleDate(""); setRescheduleReason(""); setRescheduleError(""); }}
+                disabled={actionLoading === rescheduleSessionId}
               >
                 Cancel
               </button>
@@ -671,6 +687,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                 className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
                 style={{ backgroundColor: '#4a3728' }}
                 onClick={handleRescheduleSubmit}
+                disabled={actionLoading === rescheduleSessionId}
               >
                 {actionLoading === rescheduleSessionId ? 'Processing...' : 'Confirm Reschedule'}
               </button>

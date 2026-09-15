@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import {
   CreditCard,
   TrendingUp,
@@ -57,6 +58,7 @@ type TransactionRow = {
   menteeId: string;
   menteeName: string;
   menteeProfilePhotoId: string | null;
+  rawDate: Date;
   date: string;
   basePrice: number;
   platformFee: number;
@@ -463,6 +465,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
             menteeId: b.menteeId || b.bookedBy || "",
             menteeName: b.mentee?.fullName || s.bookedMenteeName || "Unknown",
             menteeProfilePhotoId: b.mentee?.profilePic || null,
+            rawDate: b.bookedAt ? new Date(b.bookedAt) : new Date(s.scheduledAt || Date.now()),
             date: b.bookedAt
               ? new Date(b.bookedAt).toLocaleDateString("en-IN", {
                   day: "2-digit", month: "short", year: "numeric",
@@ -520,7 +523,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
   const earnedRows = transactions.filter((t) =>
     ["confirmed", "rescheduled", "in_progress", "completed"].includes(t.bookingStatus)
   );
-  const totalEarnings = earnedRows.reduce((sum, t) => sum + t.total, 0);
+  const totalEarnings = earnedRows.reduce((sum, t) => sum + t.basePrice, 0);
 
   const now = new Date();
   const thisMonthEarnings = earnedRows
@@ -535,6 +538,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
     .reduce((sum, t) => sum + t.total, 0);
 
   const grandTotal = transactions.reduce((sum, t) => sum + t.total, 0);
+
 
   const earningsStats = [
     {
@@ -684,7 +688,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             {photo ? (
-                              <img src={photo} alt={t.menteeName} className="w-8 h-8 rounded-full object-cover"
+                              <Image src={photo} alt={t.menteeName} width={32} height={32} className="w-8 h-8 rounded-full object-cover"
                                 onError={(e) => { e.currentTarget.style.display = "none"; }} />
                             ) : null}
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${photo ? "hidden" : ""}`}

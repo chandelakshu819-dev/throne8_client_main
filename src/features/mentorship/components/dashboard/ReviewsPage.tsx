@@ -13,7 +13,7 @@ const COLORS = {
 }
 
 interface ReviewsPageProps {
-  mentorData?: any // DashboardLayout se aata hai
+  mentorData?: { mentorId?: string }; // DashboardLayout se aata hai
 }
 
 function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
@@ -71,7 +71,7 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
       setReviews(reviewsRes.data)
       setTotalPages(reviewsRes.pagination.totalPages)
       setPage(1)
-    } catch (e) {
+    } catch {
       setError("Reviews load nahi ho paaye. Try again.")
     } finally {
       setLoading(false)
@@ -90,7 +90,7 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
       const res = await ReviewService.getMentorReviews(mentorId, next, 10)
       setReviews((prev) => [...prev, ...res.data])
       setPage(next)
-    } catch (e) {
+    } catch {
       // silent fail on pagination
     } finally {
       setLoadingMore(false)
@@ -328,5 +328,5 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
         </>
       )}
     </div>
-  )
+  );
 }

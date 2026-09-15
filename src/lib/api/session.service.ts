@@ -41,6 +41,38 @@ interface ApiResponse {
     data: any;
 }
 
+// ── Analytics Types ────────────────────────────────────────
+export interface PopularService {
+    _id: string; // e.g., "1_ON_1"
+    count: number;
+    revenue: number;
+}
+export interface AnalyticsData {
+    mentor: { id: string; userId: string; title: string; status: string };
+    sessions: {
+        total: number;
+        completed: number;
+        cancelled: number;
+        completionRate: number;
+        byType: PopularService[];
+    };
+    earnings: {
+        total: number;
+        average: number;
+        currency: string;
+    };
+    reviews: {
+        averageRating: number;
+        totalReviews: number;
+        distribution: Record<string, number>;
+    };
+    period: { startDate?: string; endDate?: string };
+}
+export interface AnalyticsResponse {
+    success: boolean;
+    data: AnalyticsData;
+}
+
 export interface BookSessionInput {
     sessionId: string;    
     mentorId: string;
@@ -107,6 +139,20 @@ class SessionService {
         } catch (error: any) {
             console.error("❌ [GET_MENTOR_SESSIONS] Failed", error?.response?.data);
             throw new Error(error?.response?.data?.message || "Failed to fetch mentor sessions.");
+        }
+    }
+
+    // ── GET MENTOR ANALYTICS ───────────────────────────────
+    static async getMentorAnalytics(mentorId: string): Promise<AnalyticsResponse> {
+        try {
+            console.log("📊 [GET_MENTOR_ANALYTICS] Fetching for:", mentorId);
+            const { data } = await api.get<AnalyticsResponse>(
+                `/mentorship/analytics/mentor/${mentorId}/stats`
+            );
+            return data;
+        } catch (error: any) {
+            console.error("❌ [GET_MENTOR_ANALYTICS] Failed:", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to fetch mentor analytics.");
         }
     }
 
@@ -203,6 +249,8 @@ class SessionService {
             throw new Error(error?.response?.data?.message || "Failed to fetch sessions.");
         }
     }
+
+
 
     static async confirmSession(sessionId: string, bookingId?: string): Promise<ApiResponse> {
         try {

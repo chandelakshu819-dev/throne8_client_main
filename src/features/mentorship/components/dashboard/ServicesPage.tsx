@@ -7,7 +7,7 @@ import {
   MoreVertical, Pencil, Trash2, X, ArrowUpDown,
 } from 'lucide-react';
 import ServiceModal from './ServiceModal';
-import EditSessionModal from '@/features/study-group/modals/EditSessionModal';
+import EditSessionModal from '@/features/mentorship/modals/EditSessionModal';
 import MentorService, { CreateGroupSessionInput } from "@/lib/api/mentorship.service";
 import SessionService, { CreateSessionInput } from "@/lib/api/session.service";
 import { validateSessionForm } from '@/features/profile/validators/session.schema';
@@ -92,6 +92,9 @@ export default function ServicesPage({
   // ── API state ─────────────────────────────────────────
   const [apiSessions, setApiSessions] = useState<any[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [apiGroupSessions, setApiGroupSessions] = useState<any[]>([]);
+  const [groupSessionsLoading, setGroupSessionsLoading] = useState(false);
+  const [groupSessionsError, setGroupSessionsError] = useState<string | null>(null);
   const [isSavingSession, setIsSavingSession] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -100,9 +103,10 @@ export default function ServicesPage({
   const [editingSession, setEditingSession] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  // ── Edit Session Modal state ───────────────────────────
+  // ── Edit Session Modal state ───────────────────────────────────
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<any>(null);
+  const [modalMode, setModalMode] = useState<'view' | 'edit'>('edit');
   // ── Sort state (client-side only, no backend impact) ───
   const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
@@ -115,8 +119,29 @@ export default function ServicesPage({
   useEffect(() => {
     if (mentorData?.mentorId) {
       fetchAllSessions();
+      fetchGroupSessions();
     }
   }, [mentorData?.mentorId]);
+
+  // ── Fetch all group sessions ──────────────────────────
+  const fetchGroupSessions = async () => {
+    setGroupSessionsLoading(true);
+    setGroupSessionsError(null);
+    try {
+      if (!mentorData?.mentorId) return;
+      const res = await MentorService.getAllGroupSessions({ mentorId: mentorData.mentorId });
+      let groups: any[] = [];
+      if (Array.isArray(res)) groups = res;
+      else if (res && Array.isArray(res.data)) groups = res.data;
+      else if (res?.data && Array.isArray(res.data.data)) groups = res.data.data;
+      setApiGroupSessions(groups);
+    } catch (err: any) {
+      console.error("Group Sessions fetch failed:", err.message);
+      setGroupSessionsError(err.message || "Failed to load group sessions.");
+    } finally {
+      setGroupSessionsLoading(false);
+    }
+  };
 
   // ── Fetch all sessions ────────────────────────────────
   const fetchAllSessions = async () => {
@@ -149,7 +174,7 @@ export default function ServicesPage({
     const handleEditService = (service: any) => {
       const raw = apiSessions.find((s: any) => s.sessionId === service.sessionId);
       if (!raw) return;
-  
+
       const type = serviceTypes.find(t => t.name === raw.sessionType) || null;
       setSelectedServiceType(type);
       setFormData({
@@ -181,7 +206,7 @@ export default function ServicesPage({
       setShowServiceForm(true);
       setOpenMenuId(null);
     };
-  
+
          // ── Delete service: validate, then open the styled confirm modal ──
   const handleDeleteService = (service: any) => {
     setOpenMenuId(null);
@@ -337,7 +362,7 @@ export default function ServicesPage({
       }
 
       handleCreateService();
-      await fetchAllSessions();
+      await Promise.all([fetchAllSessions(), fetchGroupSessions()]);
       setShowServiceForm(false);
       setSaveError(null);
       setFieldErrors({});
@@ -404,6 +429,24 @@ export default function ServicesPage({
         return 0;
     }
   });
+
+  const formatGroupDate = (dateString?: string) => {
+    if (!dateString) return "Date not available";
+    try {
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return "Date not available";
+      return new Intl.DateTimeFormat('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }).format(d);
+    } catch {
+      return "Date not available";
+    }
+  };
 
   // ── Render ─────────────────────────────────────────────
   return (
@@ -557,6 +600,123 @@ export default function ServicesPage({
           </div>
         </div>
 
+        {/* Current Group Sessions (Only if group_session selected) */}
+        {selectedServiceType?.name === 'group_session' && (
+          <div className="mt-8 mb-8 animate-fadeIn">
+            <h3 className="text-2xl font-bold" style={{ color: '#4a3728' }}>Current Group Sessions</h3>
+            <p className="text-sm mb-6" style={{ color: '#8a7a6a' }}>Manage your upcoming group learning sessions</p>
+
+            {groupSessionsLoading ? (
+              <div className="flex items-center justify-center p-16 border-2 border-dashed rounded-3xl" style={{ borderColor: '#e0d8cf', backgroundColor: '#fcfaf8', minHeight: '320px' }}>
+                <span className="flex items-center gap-3 text-xl font-semibold animate-pulse" style={{ color: '#7a5c3e' }}>
+                  <RefreshCw className="w-6 h-6 animate-spin" />
+                  Loading group sessions...
+                </span>
+              </div>
+            ) : groupSessionsError ? (
+              <div className="flex flex-col items-center justify-center p-16 border-2 border-dashed rounded-3xl" style={{ borderColor: '#e0d8cf', backgroundColor: '#fcfaf8', minHeight: '320px' }}>
+                <div className="w-16 h-16 mb-4 rounded-full flex items-center justify-center bg-red-100">
+                  <span className="text-3xl">⚠️</span>
+                </div>
+                <p className="text-xl font-bold text-red-600 mb-6">{groupSessionsError}</p>
+                <button
+                  onClick={fetchGroupSessions}
+                  className="px-8 py-3 rounded-2xl text-white font-bold transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
+                  style={{ backgroundColor: '#4a3728' }}
+                >
+                  Retry Fetching
+                </button>
+              </div>
+            ) : apiGroupSessions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 px-4 rounded-3xl" style={{ minHeight: '360px', backgroundColor: '#fcfaf8', border: '2px dashed #e0d8cf' }}>
+                <div className="w-24 h-24 mb-6 rounded-full flex items-center justify-center animate-bounce shadow-xl" style={{ backgroundColor: '#fff', border: '4px solid #fbf7f3' }}>
+                  <span className="text-5xl">👥</span>
+                </div>
+                <h4 className="text-3xl font-extrabold mb-3 text-center" style={{ color: '#4a3728' }}>No group sessions yet</h4>
+                <p className="text-lg text-center max-w-md mb-8" style={{ color: '#8a7a6a' }}>
+                  Create your first group session to start teaching multiple mentees.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {apiGroupSessions.map((group, idx) => {
+                  const sStyle = statusStyle(group.status);
+                  return (
+                    <div
+                      key={group.sessionId || group.id || idx}
+                      className="bg-white p-6 rounded-2xl shadow-lg hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-300 border"
+                      style={{ borderColor: '#e0d8cf' }}
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl"
+                          style={{ backgroundColor: '#fbf7f3', border: '2px solid #e0d8cf' }}>
+                          <Users className="w-6 h-6" style={{ color: '#4a3728' }} />
+                        </div>
+                        {/* Fallback to gray pill for 'open' to match the 1-on-1 default pill styling accurately based on screenshot */}
+                        <span className="text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest shadow-sm" style={{ backgroundColor: sStyle.bg, color: sStyle.color }}>
+                          {group.status || 'open'}
+                        </span>
+                      </div>
+
+                      <h3 className="text-xl font-bold mb-2 line-clamp-1" style={{ color: '#4a3728' }}>
+                        {group.title || "Group Session"}
+                      </h3>
+
+                      <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold mb-3"
+                        style={{ backgroundColor: '#4a3728', color: '#fff' }}>
+                        Group Session
+                      </span>
+
+                      <p className="mb-4 text-sm line-clamp-2 leading-relaxed" style={{ color: '#8a7a6a' }}>
+                        📅 {formatGroupDate(group.scheduledAt)}
+                        <br/>
+                        ⏱ {group.duration || 0} Minutes
+                      </p>
+
+                      <div className="flex items-center gap-2 mb-4">
+                        <Users className="w-4 h-4" style={{ color: '#8a7a6a' }} />
+                        <span className="text-sm" style={{ color: '#8a7a6a' }}>
+                          {group.currentParticipants ?? 0} / {group.maxParticipants ?? 0} Enrolled
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center pt-4" style={{ borderTop: '1px solid #e0d8cf' }}>
+                        <span className="text-2xl font-bold" style={{ color: '#7a5c3e' }}>
+                          {group.pricing?.pricePerPerson === 0 ? 'Free' : `₹${group.pricing?.pricePerPerson ?? 0}`}
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedSession({ ...group, isGroupSession: true });
+                              setModalMode('view');
+                              setIsEditModalOpen(true);
+                            }}
+                            className="px-4 py-2 text-sm rounded-lg font-semibold hover:bg-gray-50 transition-all flex items-center gap-1"
+                            style={{ backgroundColor: '#fcfaf8', color: '#7a5c3e', border: '1px solid #e0d8cf' }}
+                          >
+                            👁 View Details
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedSession({ ...group, isGroupSession: true });
+                              setModalMode('edit');
+                              setIsEditModalOpen(true);
+                            }}
+                            className="px-4 py-2 text-sm rounded-lg text-white font-semibold hover:shadow-md transition-all flex items-center gap-1"
+                            style={{ backgroundColor: '#4a3728' }}
+                          >
+                            ✏ Edit Session
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Current Services — real API data */}
         <div>
           <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
@@ -604,6 +764,7 @@ export default function ServicesPage({
               )}
             </div>
           </div>
+          <p className="text-sm mb-6" style={{ color: '#8a7a6a' }}>Manage your individual mentoring services</p>
 
           {!sessionsLoading && sortedServices.length === 0 ? (
             <div className="text-center py-14 rounded-2xl border" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
@@ -796,12 +957,17 @@ export default function ServicesPage({
       {/* Edit Session Modal */}
       <EditSessionModal
         isOpen={isEditModalOpen}
+        initialMode={modalMode}
         onClose={() => {
           setIsEditModalOpen(false);
           setSelectedSession(null);
         }}
         session={selectedSession}
         onStatusChange={handleUpdateSessionStatus}
+        onRefresh={() => {
+            fetchAllSessions();
+            fetchGroupSessions();
+        }}
       />
 
       {/* Delete Confirmation Modal */}
