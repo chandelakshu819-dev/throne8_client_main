@@ -12,6 +12,7 @@ import UserDashboardWaitlistPage from "./UserDashboardWaitlistPage";
 import UserDashboardReviewsPage from "./UserDashboardReviewsPage";
 import UserDashboardPaymentsPage from "./UserDashboardPaymentsPage";
 import UserDashboardNotificationsPage from "./UserDashboardNotificationsPage";
+import UserDashboardRecommendedMentorsPage from "./UserDashboardRecommendedMentorsPage";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -27,6 +28,7 @@ const pageComponents: Record<string, React.FC<any>> = {
   reviews: UserDashboardReviewsPage,
   payments: UserDashboardPaymentsPage,
   notifications: UserDashboardNotificationsPage,
+  "recommended-mentors": UserDashboardRecommendedMentorsPage,
 };
 
 function normalizeNotifications(res: any): any[] {
