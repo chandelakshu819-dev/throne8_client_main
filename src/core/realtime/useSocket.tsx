@@ -15,6 +15,15 @@ export interface RealtimeNotification {
     createdAt: string;
 }
 
+export interface SessionStartedEvent {
+    sessionId: string;
+    bookingId: string;
+    title: string;
+    startedAt: string;
+    scheduledAt: string;
+    meetingUrl: string | null;
+}
+
 export function useSocket() {
     const [socket, setSocket] = useState<Socket | null>(null);
     const [isConnected, setIsConnected] = useState(false);
@@ -24,6 +33,7 @@ export function useSocket() {
     // of every screen wiring its own 'notification:new' listener.
     const [unreadCount, setUnreadCount] = useState(0);
     const [latestNotification, setLatestNotification] = useState<RealtimeNotification | null>(null);
+    const [sessionStarted, setSessionStarted] = useState<SessionStartedEvent | null>(null);
 
     useEffect(() => {
         if (!TokenStorage.isAuthenticated()) {
@@ -56,21 +66,31 @@ export function useSocket() {
                 setUnreadCount((prev) => prev + 1);
             });
 
-            // ✅ NEW: server pushes the authoritative count after any read/markAllRead
-            socketInstance.on('notification:unread:count', (data: { count: number }) => {
-                setUnreadCount(data.count);
-            });
-
-            return () => {
-                socketInstance.off('connect');
-                socketInstance.off('disconnect');
-                socketInstance.off('notification:new');
-                socketInstance.off('notification:unread:count');
-            };
+                       // ✅ NEW: server pushes the authoritative count after any read/markAllRead
+                       socketInstance.on('notification:unread:count', (data: { count: number }) => {
+                        setUnreadCount(data.count);
+                    });
+        
+                    // ✅ NEW: fired the moment a mentor starts a session this user booked.
+                    // Consuming components (student dashboard / booking row) can watch
+                    // this to flip status without a manual refresh.
+                    socketInstance.on('session:started', (payload: SessionStartedEvent) => {
+                        console.log('🟢 [useSocket] Session started:', payload);
+                        setSessionStarted(payload);
+                    });
+        
+                    return () => {
+                        socketInstance.off('connect');
+                        socketInstance.off('disconnect');
+                        socketInstance.off('notification:new');
+                        socketInstance.off('notification:unread:count');
+                        socketInstance.off('session:started');
+                    };
         } catch (error) {
             console.error('❌ [useSocket] Failed to initialize:', error);
         }
     }, []);
 
-    return { socket, isConnected, unreadCount, latestNotification };
+    
+    return { socket, isConnected, unreadCount, latestNotification, sessionStarted };
 }

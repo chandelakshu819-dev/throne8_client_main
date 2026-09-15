@@ -36,6 +36,24 @@ type MentorBookingRow = {
 
 type BookingTab = 'all' | 'pending' | 'upcoming' | 'in_progress' | 'completed';
 
+// Server ke bookingStatus.ts wale window se match hona chahiye
+const START_JOIN_BEFORE_MS = 5 * 60 * 1000;
+const START_LATE_LIMIT_MS = 15 * 60 * 1000;
+
+function getStartState(scheduledAt: string, now: number) {
+  const start = new Date(scheduledAt).getTime();
+  const opensAt = start - START_JOIN_BEFORE_MS;
+  const closesAt = start + START_LATE_LIMIT_MS;
+
+  if (now < opensAt) {
+    const mins = Math.round((opensAt - now) / 60000);
+    return { enabled: false, label: mins >= 60 ? `Starts in ${Math.round(mins / 60)}h` : `Starts in ${mins}m` };
+  }
+  if (now > closesAt) return { enabled: false, label: 'Missed' };
+  return { enabled: true, label: 'Start' };
+}
+
+
 const tabMeta: Record<BookingTab, { label: string; icon: React.ElementType }> = {
   all: { label: 'All Active', icon: Clock },
   pending: { label: 'Pending', icon: Clock },
@@ -61,6 +79,12 @@ const statusBadge: Record<string, { bg: string; fg: string; label: string }> = {
 
 export default function BookingsPage({ mentorData }: BookingProps) {
   const [bookingTab, setBookingTab] = useState<BookingTab>('all');
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
   const [allBookings, setAllBookings] = useState<MentorBookingRow[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [loadingData, setLoadingData] = useState(true);
@@ -216,10 +240,10 @@ export default function BookingsPage({ mentorData }: BookingProps) {
 
 
 
-    const handleStart = async (sessionId: string) => {
+    const handleStart = async (sessionId: string, bookingId: string) => {
       setActionLoading(sessionId);
       try {
-        await SessionService.startSession(sessionId);
+        await SessionService.startSession(sessionId, bookingId);
         showToast("Session started", "success");
         await fetchSessions();
         setBookingTab('in_progress');
@@ -232,10 +256,10 @@ export default function BookingsPage({ mentorData }: BookingProps) {
 
 
 
-    const handleEnd = async (sessionId: string) => {
+    const handleEnd = async (sessionId: string, bookingId: string) => {
       setActionLoading(sessionId);
       try {
-        await SessionService.completeSession(sessionId, { wasSuccessful: true });
+        await SessionService.completeSession(sessionId, { wasSuccessful: true, bookingId });
         showToast("Session completed", "success");
         await fetchSessions();
         setBookingTab('completed');
@@ -245,6 +269,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         setActionLoading(null);
       }
     };
+
 
 
 
@@ -494,15 +519,24 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                               </button>
                             </>
                           )}
-                                                    {bookingTab === 'upcoming' && (
+                                                                                                {bookingTab === 'upcoming' && (() => {
+                            const startState = getStartState(booking.scheduledAt, now);
+                            const isDisabled = actionLoading === booking.sessionId || !startState.enabled;
+                            return (
                             <>
                               <button
-                                onClick={() => handleStart(booking.sessionId)}
-                                disabled={actionLoading === booking.sessionId}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
-                                style={{ backgroundColor: '#dbeafe', color: '#1d4ed8' }}
+                                onClick={() => handleStart(booking.sessionId, booking.bookingId)}
+                                disabled={isDisabled}
+                                title={!startState.enabled ? startState.label : undefined}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity"
+                                style={{
+                                  backgroundColor: startState.enabled ? '#dbeafe' : '#f0ebe4',
+                                  color: startState.enabled ? '#1d4ed8' : '#a08070',
+                                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                }}
                               >
-                                <Play className="w-3.5 h-3.5" /> {actionLoading === booking.sessionId ? '...' : 'Start'}
+                                <Play className="w-3.5 h-3.5" />
+                                {actionLoading === booking.sessionId ? '...' : startState.label}
                               </button>
                               <button
                                 onClick={() => { setRescheduleSessionId(booking.sessionId); setRescheduleBookingId(booking.bookingId); setShowRescheduleModal(true); }}
@@ -521,10 +555,11 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                                 <XCircle className="w-3.5 h-3.5" /> Cancel
                               </button>
                             </>
-                          )}
+                            );
+                          })()}
                                                    {bookingTab === 'in_progress' && (
                             <button
-                              onClick={() => handleEnd(booking.sessionId)}
+                            onClick={() => handleEnd(booking.sessionId, booking.bookingId)}
                               disabled={actionLoading === booking.sessionId}
                               className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
                               style={{ backgroundColor: '#f3e8ff', color: '#7c3aed' }}

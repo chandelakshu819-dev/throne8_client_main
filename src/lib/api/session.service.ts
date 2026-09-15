@@ -216,10 +216,11 @@ class SessionService {
         }
     }
 
-    static async startSession(sessionId: string): Promise<ApiResponse> {
+    static async startSession(sessionId: string, bookingId?: string): Promise<ApiResponse> {
         try {
             const { data } = await api.post<ApiResponse>(
-                `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/start`
+                `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/start`,
+                { bookingId }
             );
             return data;
         } catch (error: any) {
@@ -227,7 +228,7 @@ class SessionService {
         }
     }
 
-    static async completeSession(sessionId: string, payload: { actualDuration?: number, wasSuccessful?: boolean, followUpRequired?: boolean, followUpNotes?: string }): Promise<ApiResponse> {
+    static async completeSession(sessionId: string, payload: { actualDuration?: number, wasSuccessful?: boolean, followUpRequired?: boolean, followUpNotes?: string, bookingId?: string }): Promise<ApiResponse> {
         try {
             const { data } = await api.post<ApiResponse>(
                 `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/complete`,
