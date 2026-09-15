@@ -16,7 +16,6 @@ import {
   Check,
   X,
 } from "lucide-react"
-import { useRouter } from "next/navigation";
 import SessionService from "@/lib/api/session.service";
 import ProfileService from "@/lib/api/profile.service";
 

@@ -727,10 +727,27 @@ const toggleMic = useCallback(async () => {
     setError(null);
 
     const socket = getSocket();
-    if (!socket?.connected) {
-      setError('Socket not connected. Please refresh the page.');
+    if (!socket) {
+      setError('Socket not available. Please refresh the page.');
       setIsConnecting(false);
       return;
+    }
+    // Socket object mil gaya, lekin abhi tak 'connect' event fire nahi hua
+    // ho sakta (naya banaya gaya socket hai). Thoda wait karo taaki
+    // handshake complete ho jaaye, warna 'connected' abhi bhi false milega.
+    if (!socket.connected) {
+      const connected = await new Promise<boolean>((resolve) => {
+        const timeout = setTimeout(() => resolve(false), 5000);
+        socket.once('connect', () => {
+          clearTimeout(timeout);
+          resolve(true);
+        });
+      });
+      if (!connected) {
+        setError('Socket not connected. Please refresh the page.');
+        setIsConnecting(false);
+        return;
+      }
     }
     const stream = await startLocalStream(withCamera, withMic);
     if (!stream) {

@@ -54,6 +54,28 @@ export const initializeSocket = (): Socket => {
 };
 
 export const getSocket = (): Socket | null => {
+    // ⚠️ FIX: pehle yeh sirf existing `socket` variable return karta tha —
+    // agar koi page pehle se initializeSocket() call nahi kar chuka tha
+    // (jaise mentor seedha /mentor-session pe navigate kare), to socket
+    // hamesha null milta tha → "Socket not connected" error.
+    //
+    // Sirf tab naya initializeSocket() call karo jab socket kabhi bana hi
+    // nahi (socket === null). Agar socket already exist karta hai lekin
+    // temporarily disconnected hai (network blip / reconnection already
+    // in-progress — socket.io khud reconnectionAttempts:5 se handle kar
+    // raha hai), to naya connection mat banao — warna purana reconnecting
+    // socket orphan ho jayega aur do parallel connections ban jayenge.
+    if (!socket) {
+        try {
+            const token = TokenStorage.getAccessToken();
+            if (token) {
+                return initializeSocket();
+            }
+        } catch (err) {
+            console.error('❌ getSocket: auto-init failed', err);
+            return null;
+        }
+    }
     return socket;
 };
 
