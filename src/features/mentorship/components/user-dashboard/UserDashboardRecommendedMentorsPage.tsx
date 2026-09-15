@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
-import { Star, ChevronRight, User, Sparkles } from "lucide-react";
+import { Star, User, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import MentorService from "@/lib/api/mentorship.service";
-import { useProfile } from "@/features/profile/hooks/useProfile";
+import { useSkillsData } from "@/features/profile/hooks/useSkillsData";
 
 const COLORS = {
   ink: "#4a3728",
@@ -18,24 +18,21 @@ const COLORS = {
   muted: "#8a7a6a",
 };
 
-type Session = {
-  _id?: string;
-  title?: string;
-  sessionType?: string;
-};
-
 interface UserDashboardRecommendedMentorsPageProps {
-  sessions?: Session[];
+  sessions?: any[];
   user?: any;
 }
 
-function extractKeywords(str: string): string[] {
-  if (!str) return [];
-  return str
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
-    .split(/\s+/)
-    .filter((w) => w.length > 2);
+function normalizeSkill(str: string): string {
+  if (!str) return "";
+  return str.toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+}
+
+function formatRecommendationReason(matchedSkills: string[]): string {
+  if (matchedSkills.length === 0) return "";
+  if (matchedSkills.length === 1) return `Matches on ${matchedSkills[0]}`;
+  if (matchedSkills.length === 2) return `Matches on ${matchedSkills[0]} and ${matchedSkills[1]}`;
+  return `Matches on ${matchedSkills[0]}, ${matchedSkills[1]}, and ${matchedSkills.length - 2} more`;
 }
 
 export default function UserDashboardRecommendedMentorsPage({
@@ -43,39 +40,20 @@ export default function UserDashboardRecommendedMentorsPage({
   user,
 }: UserDashboardRecommendedMentorsPageProps) {
   const router = useRouter();
-  const { userProfileData } = useProfile();
   
   const [mentors, setMentors] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingMentors, setLoadingMentors] = useState(true);
 
-  // Derive user keywords from real profile and booking data
-  const userKeywords = useMemo(() => {
-    const words = new Set<string>();
+  // Fetch real authenticated user skills
+  const { skillsList, fetchSkillsData, isLoadingSkills } = useSkillsData();
 
-    const addPhrases = (text?: string) => {
-      if (!text) return;
-      extractKeywords(text).forEach((w) => words.add(w));
-    };
-
-    // 1. Role / Career
-    addPhrases(userProfileData?.currentPosition);
-    addPhrases(userProfileData?.onboarding?.workingProfile?.jobTitle);
-    
-    // 2. Education/Interests
-    addPhrases(userProfileData?.onboarding?.studentProfile?.fieldOfStudy);
-
-    // 3. Past Sessions (Previous Bookings)
-    sessions.forEach((s) => {
-      addPhrases(s.title);
-      addPhrases(s.sessionType);
-    });
-
-    return Array.from(words);
-  }, [userProfileData, sessions]);
+  useEffect(() => {
+    fetchSkillsData();
+  }, [fetchSkillsData]);
 
   useEffect(() => {
     const fetchMentors = async () => {
-      setLoading(true);
+      setLoadingMentors(true);
       try {
         const res = await MentorService.getAllMentors({ page: 1, limit: 100 });
         const list = Array.isArray(res.data) ? res.data : res.data?.mentors || [];
@@ -83,7 +61,7 @@ export default function UserDashboardRecommendedMentorsPage({
       } catch (err) {
         console.error("Failed to load mentors", err);
       } finally {
-        setLoading(false);
+        setLoadingMentors(false);
       }
     };
     fetchMentors();
@@ -91,53 +69,43 @@ export default function UserDashboardRecommendedMentorsPage({
 
   const recommendedMentors = useMemo(() => {
     if (!mentors || mentors.length === 0) return [];
-    if (userKeywords.length === 0) {
-      // If user has no data, just fallback to highest rated
-      return mentors
-        .sort((a, b) => (b.stats?.averageRating || 0) - (a.stats?.averageRating || 0))
-        .slice(0, 10)
-        .map(m => ({ ...m, recommendationReason: "Highly rated on Throne8" }));
-    }
+    if (!skillsList || skillsList.length === 0) return [];
+
+    const userSkillsRaw = skillsList.map((s) => s.skillName);
+    const normalizedUserSkills = userSkillsRaw.map(normalizeSkill);
+    const userSkillsCount = normalizedUserSkills.length;
 
     const scored = mentors.map((m) => {
-      let score = 0;
-      const reasons = new Set<string>();
+      const mentorSkillsRaw: string[] = m.skills || [];
+      const normalizedMentorSkills = mentorSkillsRaw.map(normalizeSkill);
 
-      const mentorRoleStr = m.experience?.currentRole || "";
-      const mentorDomains = (m.domains || []).join(" ");
-      const mentorSkills = (m.skills || []).join(" ");
-      
-      const mentorText = `${mentorRoleStr} ${mentorDomains} ${mentorSkills}`.toLowerCase();
-
-      userKeywords.forEach((kw) => {
-        if (mentorText.includes(kw)) {
-          score += 1;
-          
-          if (mentorRoleStr.toLowerCase().includes(kw)) {
-            reasons.add(`Matches your career role`);
-          } else if (mentorDomains.toLowerCase().includes(kw)) {
-            reasons.add(`Matches your interests`);
-          } else if (mentorSkills.toLowerCase().includes(kw)) {
-            reasons.add(`Matches your skills`);
-          } else {
-             reasons.add(`Matches your previous sessions`);
-          }
-        }
+      // Find which of the mentor's skills match the user's skills
+      const matchedSkillsRaw = mentorSkillsRaw.filter((ms, index) => {
+        return normalizedUserSkills.includes(normalizedMentorSkills[index]);
       });
+
+      const matchCount = matchedSkillsRaw.length;
+      const skillMatchScore = userSkillsCount > 0 ? Math.round((matchCount / userSkillsCount) * 100) : 0;
+      
+      const recommendationReason = formatRecommendationReason(matchedSkillsRaw);
 
       return {
         ...m,
-        score,
-        recommendationReason: Array.from(reasons)[0] || "Recommended for you",
+        matchedSkillsRaw,
+        matchCount,
+        skillMatchScore,
+        recommendationReason,
       };
     });
 
-    // Filter to only those with some match, sort by score
+    // Filter to only those with at least one matching skill, sort by score
     return scored
-      .filter((m) => m.score > 0)
-      .sort((a, b) => b.score - a.score)
+      .filter((m) => m.matchCount > 0)
+      .sort((a, b) => b.skillMatchScore - a.skillMatchScore)
       .slice(0, 10);
-  }, [mentors, userKeywords]);
+  }, [mentors, skillsList]);
+
+  const loading = loadingMentors || isLoadingSkills;
 
   const renderContent = () => {
     if (loading) {
@@ -166,19 +134,45 @@ export default function UserDashboardRecommendedMentorsPage({
       );
     }
 
-    if (recommendedMentors.length === 0) {
+    if (!skillsList || skillsList.length === 0) {
       return (
         <div
-          className="flex flex-col items-center justify-center gap-3 py-16 rounded-2xl text-center"
+          className="flex flex-col items-center justify-center gap-3 py-16 rounded-2xl text-center px-4"
           style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
         >
           <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.chip }}>
             <Sparkles className="w-8 h-8" style={{ color: COLORS.accent }} />
           </div>
           <div>
-            <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>No matching mentors available</h3>
-            <p className="text-sm mt-1 max-w-sm" style={{ color: COLORS.muted }}>
-              We couldn't find mentors that strongly match your current profile skills, role, or previous bookings. Check back later or update your profile!
+            <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>Profile Skills Required</h3>
+            <p className="text-sm mt-1 max-w-sm mx-auto" style={{ color: COLORS.muted }}>
+              To provide accurate mentor recommendations, please add your professional skills to your profile.
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/profile')}
+            className="mt-4 px-5 py-2 text-sm font-semibold rounded-xl text-white transition-colors hover:opacity-90"
+            style={{ backgroundColor: COLORS.ink }}
+          >
+            Update Profile
+          </button>
+        </div>
+      );
+    }
+
+    if (recommendedMentors.length === 0) {
+      return (
+        <div
+          className="flex flex-col items-center justify-center gap-3 py-16 rounded-2xl text-center px-4"
+          style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
+        >
+          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.chip }}>
+            <Sparkles className="w-8 h-8" style={{ color: COLORS.accent }} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>No Skill Matches Found</h3>
+            <p className="text-sm mt-1 max-w-md mx-auto" style={{ color: COLORS.muted }}>
+              We currently don't have mentors that share your exact skill set. Check back later as new mentors join the platform!
             </p>
           </div>
         </div>
@@ -191,13 +185,12 @@ export default function UserDashboardRecommendedMentorsPage({
           const name = `${mentor.user?.firstName || ""} ${mentor.user?.lastName || ""}`.trim() || "Mentor";
           const role = mentor.experience?.currentRole || "Mentor";
           const rating = mentor.stats?.averageRating || 0;
-          const reviews = mentor.stats?.totalReviews || 0;
           const pic = mentor.profilePic || "";
           
           return (
             <div
               key={mentor.mentorId}
-              className="group flex flex-col bg-white rounded-2xl overflow-hidden border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg h-full"
+              className="group flex flex-col bg-white rounded-2xl overflow-hidden border transition-all duration-200 ease-in-out hover:-translate-y-1 hover:shadow-md hover:border-[#c9baa9] motion-reduce:transition-none motion-reduce:hover:transform-none h-full"
               style={{ borderColor: COLORS.hairline }}
             >
               <div className="p-5 flex-1 flex flex-col">
@@ -235,23 +228,37 @@ export default function UserDashboardRecommendedMentorsPage({
 
                 {mentor.recommendationReason && (
                    <div className="mt-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg w-fit" style={{ backgroundColor: COLORS.chip }}>
-                      <Sparkles className="w-3.5 h-3.5" style={{ color: COLORS.accent }} />
-                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: COLORS.accent }}>
+                      <Sparkles className="w-3.5 h-3.5 shrink-0" style={{ color: COLORS.accent }} />
+                      <span className="text-[10.5px] font-bold uppercase tracking-wide leading-snug" style={{ color: COLORS.accent }}>
                         {mentor.recommendationReason}
                       </span>
                    </div>
                 )}
+                
+                {mentor.skillMatchScore > 0 && (
+                  <div className="mt-2 text-[12px] font-semibold" style={{ color: COLORS.ink }}>
+                    Match Score: {mentor.skillMatchScore}%
+                  </div>
+                )}
 
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {(mentor.skills || []).slice(0, 3).map((skill: string, i: number) => (
-                    <span
-                      key={i}
-                      className="text-xs font-medium px-2 py-1 rounded-md"
-                      style={{ backgroundColor: COLORS.softWash, color: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}
-                    >
-                      {skill}
-                    </span>
-                  ))}
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {(mentor.skills || []).slice(0, 3).map((skill: string, i: number) => {
+                    // Highlight matching skills
+                    const isMatched = mentor.matchedSkillsRaw?.includes(skill);
+                    return (
+                      <span
+                        key={i}
+                        className={`text-xs font-medium px-2 py-1 rounded-md ${isMatched ? 'font-semibold' : ''}`}
+                        style={{ 
+                          backgroundColor: isMatched ? '#efe3d8' : COLORS.softWash, 
+                          color: isMatched ? '#4a3728' : COLORS.ink, 
+                          border: `1px solid ${isMatched ? '#d4c5b5' : COLORS.hairline}` 
+                        }}
+                      >
+                        {skill}
+                      </span>
+                    )
+                  })}
                   {(mentor.skills || []).length > 3 && (
                     <span className="text-xs font-medium px-2 py-1 rounded-md" style={{ color: COLORS.muted }}>
                       +{(mentor.skills || []).length - 3}
@@ -260,7 +267,7 @@ export default function UserDashboardRecommendedMentorsPage({
                 </div>
               </div>
 
-              <div className="flex gap-2 p-4 border-t mt-auto group-hover:border-[#c9baa9] transition-colors" style={{ borderColor: COLORS.hairline }}>
+              <div className="flex gap-2 p-4 border-t mt-auto transition-colors" style={{ borderColor: COLORS.hairline }}>
                 <button
                   onClick={() => router.push(`/mentorship/mentors/${mentor.mentorId}`)}
                   className="flex-1 py-2 text-xs font-semibold rounded-xl border transition-colors hover:bg-[#fbf7f3]"
@@ -290,7 +297,7 @@ export default function UserDashboardRecommendedMentorsPage({
           Recommended Mentors
         </h2>
         <p style={{ color: COLORS.muted }} className="text-sm mt-1">
-          Mentors hand-picked for you based on your career goals, skills, and past sessions.
+          Mentors strongly matched with your actual professional skills.
         </p>
       </div>
 
@@ -298,3 +305,4 @@ export default function UserDashboardRecommendedMentorsPage({
     </div>
   );
 }
+
