@@ -207,8 +207,7 @@ export default function UserDashboardPaymentsPage({ sessions = [] }: Props) {
             return (
               <div
                 key={t.id}
-                className="flex flex-col md:flex-row items-start md:items-center gap-4 p-5 rounded-2xl transition-all hover:shadow-md bg-white border"
-                style={{ borderColor: COLORS.hairline }}
+                className="flex flex-col md:flex-row items-start md:items-center gap-4 p-5 rounded-2xl transition-all duration-200 ease-out motion-safe:hover:-translate-y-1 hover:shadow-lg cursor-pointer bg-white border border-[#e0d8cf] hover:border-[#c9a87c]"
               >
                 {/* Mentor & Service Info */}
                 <div className="flex flex-1 items-center gap-3 min-w-0">
