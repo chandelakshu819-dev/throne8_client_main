@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   CalendarClock,
   Clock,
@@ -9,6 +9,7 @@ import {
   History
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import WriteReviewModal from "@/features/mentorship/components/WriteReviewModal";
 
 const COLORS = {
   ink: "#4a3728",
@@ -74,6 +75,16 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
   const router = useRouter();
   const now = Date.now();
 
+  // 🔧 FIX: "Give Review" used to call router.push("/mentorship/sessions") —
+  // that route doesn't exist anywhere in the app, so Next.js fell back to
+  // home instead of opening a review form. Now it opens WriteReviewModal
+  // in place, same modal already wired up in MyMentorSessions.tsx.
+  const [reviewTarget, setReviewTarget] = useState<Session | null>(null);
+  // sessions come in as a prop from the parent (fetched once on mount), so a
+  // submitted review won't flip `hasReview` on its own — track it locally
+  // so the button/badge updates immediately without needing a full refetch.
+  const [locallyReviewedIds, setLocallyReviewedIds] = useState<Set<string>>(new Set());
+
   const historySessions = sessions.filter((s) => {
     const status = (s.status || "").toLowerCase();
     const t = new Date(s.startTime || s.scheduledAt || 0).getTime();
@@ -128,8 +139,10 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
             const isOnline = !s.sessionType || s.sessionType.toLowerCase() === "virtual" || s.sessionType.toLowerCase() === "online";
             const sessionId = s.sessionId || s._id || `SH-${idx}`;
             const statusStyles = getStatusBadgeStyles(s.status || "Unknown");
-            
-            const hasReview = s.review && (s.review.rating || s.review.menteeReview);
+
+            const hasReview =
+              (s.review && (s.review.rating || s.review.menteeReview)) ||
+              locallyReviewedIds.has(sessionId);
             const isCompletedStatus = (s.status || "").toLowerCase() === "completed" || (s.status || "").toLowerCase() === "done";
             const canReview = isCompletedStatus && !hasReview;
 
@@ -223,7 +236,7 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
                   <div className="flex flex-col gap-2 mt-auto w-full">
                     {canReview && (
                       <button
-                        onClick={() => router.push("/mentorship/sessions")}
+                        onClick={() => setReviewTarget(s)}
                         className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors hover:border-[#c9baa9] text-center"
                         style={{ backgroundColor: "transparent", color: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}
                       >
@@ -245,6 +258,26 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
             );
           })}
         </div>
+      )}
+
+      {reviewTarget && (
+        <WriteReviewModal
+          sessionId={reviewTarget.sessionId || reviewTarget._id || ""}
+          mentorId={reviewTarget.mentorId || ""}
+          mentorName={reviewTarget.mentorName}
+          onClose={() => setReviewTarget(null)}
+          onSuccess={() => {
+            const sid = reviewTarget.sessionId || reviewTarget._id;
+            if (sid) {
+              setLocallyReviewedIds((prev) => {
+                const next = new Set(prev);
+                next.add(sid);
+                return next;
+              });
+            }
+            setReviewTarget(null);
+          }}
+        />
       )}
     </div>
   );

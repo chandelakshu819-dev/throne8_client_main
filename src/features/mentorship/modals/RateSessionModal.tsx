@@ -29,21 +29,25 @@ const TAG_LABELS: Record<ReviewTag, string> = {
 const MIN_COMMENT = 10;
 const MAX_COMMENT = 1000;
 
-interface WriteReviewModalProps {
+interface RateSessionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
   sessionId: string;
   mentorId: string;
   mentorName?: string;
-  onClose: () => void;
-  onSuccess: () => void;
+  // called after a successful submit — use this to refresh whatever
+  // list of sessions/reviews is showing on the parent page
+  onSubmitted?: () => void;
 }
 
-export default function WriteReviewModal({
+export default function RateSessionModal({
+  isOpen,
+  onClose,
   sessionId,
   mentorId,
   mentorName,
-  onClose,
-  onSuccess,
-}: WriteReviewModalProps) {
+  onSubmitted,
+}: RateSessionModalProps) {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -51,6 +55,18 @@ export default function WriteReviewModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+
+  if (!isOpen) return null;
+
+  const resetAndClose = () => {
+    setRating(0);
+    setHoverRating(0);
+    setComment("");
+    setSelectedTags([]);
+    setError(null);
+    setSubmitted(false);
+    onClose();
+  };
 
   const toggleTag = (tag: ReviewTag) => {
     setSelectedTags((prev) =>
@@ -74,7 +90,7 @@ export default function WriteReviewModal({
         tags: selectedTags,
       });
       setSubmitted(true);
-      onSuccess();
+      onSubmitted?.();
     } catch (err: any) {
       // backend already gives specific messages like "Review already
       // submitted for this session" or "Can only review completed sessions"
@@ -102,7 +118,7 @@ export default function WriteReviewModal({
             )}
           </div>
           <button
-            onClick={onClose}
+            onClick={resetAndClose}
             className="p-1 hover:bg-[#f3ece4] rounded-lg transition-colors"
           >
             <X className="w-4 h-4" style={{ color: COLORS.muted }} />
@@ -115,7 +131,7 @@ export default function WriteReviewModal({
               Your review has been submitted and is now visible on the mentor's profile.
             </p>
             <button
-              onClick={onClose}
+              onClick={resetAndClose}
               className="mt-5 px-5 py-2.5 rounded-xl text-white text-sm font-semibold"
               style={{ backgroundColor: COLORS.ink }}
             >
@@ -197,7 +213,7 @@ export default function WriteReviewModal({
 
             <div className="flex justify-end gap-3 pt-4" style={{ borderTop: `1px solid ${COLORS.hairline}` }}>
               <button
-                onClick={onClose}
+                onClick={resetAndClose}
                 disabled={isSubmitting}
                 className="px-4 py-2.5 rounded-xl font-semibold text-sm border transition-colors disabled:opacity-50 hover:bg-[#f3ece4]"
                 style={{ borderColor: COLORS.hairline, color: COLORS.ink, backgroundColor: COLORS.wash }}
