@@ -1,5 +1,5 @@
 "use client";
-
+//src/app/mentorship/group-session/[id]/page.tsx
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import MentorService from "@/lib/api/mentorship.service";

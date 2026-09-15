@@ -16,12 +16,30 @@ import {
 } from "lucide-react"
 import MentorService from "@/lib/api/mentorship.service"
 
+interface PopularServiceStat {
+  sessionType: string;
+  bookings: number;
+}
+
+interface MonthlyEarningStat {
+  month: string;
+  amount: number;
+}
+
+interface AnalyticsData {
+  profileViews: { value: number; changePercent: number; trend: string };
+  bookingRate: { value: number; trend: string };
+  avgSessionDuration: { value: number };
+  popularServices: PopularServiceStat[];
+  monthlyEarnings: MonthlyEarningStat[];
+}
+
 interface AnalyticsPageProps {
   mentorData?: any // passed down from DashboardLayout — contains mentorId, title, status, etc.
   [key: string]: any // DashboardLayout spreads many other props onto every page; rest are unused here
 }
 
-const SERVICE_ICON_MAP: Record<string, { icon: any; color: string }> = {
+const SERVICE_ICON_MAP: Record<string, { icon: React.ElementType; color: string }> = {
   "one-on-one": { icon: Users, color: "#4a3728" },
   "code-review": { icon: Code2, color: "#8a6a4a" },
   "group": { icon: Users, color: "#7a5c3e" },
@@ -90,7 +108,7 @@ const EarningsTrend = ({
 export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
   const mentorId: string | undefined = mentorData?.mentorId
 
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -168,9 +186,9 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
     },
   ]
 
-  const totalBookings = data.popularServices.reduce((sum: number, s: any) => sum + s.bookings, 0)
+  const totalBookings = data.popularServices.reduce((sum: number, s: PopularServiceStat) => sum + s.bookings, 0)
 
-  const popularServices = data.popularServices.map((s: any) => {
+  const popularServices = data.popularServices.map((s: PopularServiceStat) => {
     const meta = SERVICE_ICON_MAP[s.sessionType] || { icon: Users, color: "#4a3728" }
     return {
       name: s.sessionType,
@@ -181,7 +199,7 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
     }
   })
 
-  const totalEarnings = data.monthlyEarnings.reduce((sum: number, e: any) => sum + e.amount, 0)
+  const totalEarnings = data.monthlyEarnings.reduce((sum: number, e: MonthlyEarningStat) => sum + e.amount, 0)
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -266,7 +284,7 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
             </p>
           ) : (
             <div className="space-y-5">
-              {popularServices.map((service: any, idx: number) => (
+              {popularServices.map((service, idx: number) => (
                 <div key={idx}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -325,7 +343,7 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
               </div>
 
               <div className="space-y-3">
-                {data.monthlyEarnings.map((earning: any, idx: number) => (
+                {data.monthlyEarnings.map((earning: MonthlyEarningStat, idx: number) => (
                   <div
                     key={idx}
                     className="flex items-center justify-between p-4 rounded-xl transition-colors hover:border-[#c9baa9]"

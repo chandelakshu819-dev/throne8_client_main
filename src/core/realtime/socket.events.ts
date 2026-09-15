@@ -17,4 +17,12 @@ export const SOCKET_EVENTS = {
 
     // Feed events
     FEED_NEW_POST: 'feed:new-post',
+
+    // ⭐ NEW: Mentorship session events
+    // Backend `notification.service.ts` already sends a SESSION_STARTED
+    // in-app notification on mentor's "Start" — is naam ka socket event bhi
+    // agar backend emit kare to mentee ki screen turant update ho jayegi
+    // bina page refresh kiye.
+    MENTORSHIP_SESSION_STARTED: 'mentorship:session:started',
+    MENTORSHIP_SESSION_ENDED: 'mentorship:session:ended',
 } as const;

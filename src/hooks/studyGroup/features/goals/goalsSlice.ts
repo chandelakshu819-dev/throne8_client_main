@@ -202,7 +202,7 @@ const goalsSlice = createSlice({
       .addCase(updateGoalProgressThunk.fulfilled, (state, action) => {
         const index = state.items.findIndex(g => g.goalId === action.payload.goalId);
         if (index !== -1) {
-          state.items[index] = { ...action.payload, color: state.items[index].color };
+          state.items[index] = { ...state.items[index], ...action.payload, color: state.items[index].color };
         }
       });
 
@@ -210,7 +210,7 @@ const goalsSlice = createSlice({
       .addCase(markGoalIncompleteThunk.fulfilled, (state, action) => {
         const index = state.items.findIndex(g => g.goalId === action.payload.goalId);
         if (index !== -1) {
-          state.items[index] = { ...action.payload, color: state.items[index].color };
+          state.items[index] = { ...state.items[index], ...action.payload, color: state.items[index].color };
         }
       });
 
@@ -219,7 +219,7 @@ const goalsSlice = createSlice({
       .addCase(markGoalCompleteThunk.fulfilled, (state, action) => {
         const index = state.items.findIndex(g => g.goalId === action.payload.goalId);
         if (index !== -1) {
-          state.items[index] = { ...action.payload, color: state.items[index].color };
+          state.items[index] = { ...state.items[index], ...action.payload, color: state.items[index].color };
         }
       });
 
@@ -250,6 +250,6 @@ export const goalsReducer = goalsSlice.reducer;
 
 // Backward compat — purane components ke liye
 export type Goal = GoalWithUI;
-export type WeeklyGoal = { goalId: string; title: string; color: string; completed: boolean };
+
 
 

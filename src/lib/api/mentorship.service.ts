@@ -403,6 +403,35 @@ class MentorService {
       throw new Error('Failed to submit report. Please try again.');
     }
   }
+
+  // ⭐ NEW: fetch single session by sessionId — Join Session flow me
+  // isi se meeting/roomId details milengi jo video call room me use hongi.
+  static async getSessionById(sessionId: string): Promise<any> {
+    try {
+      const { data } = await api.get(`/sessions/${sessionId}`);
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (error.code === 'ERR_NETWORK') {
+          throw new Error('Unable to connect to server. Please check your internet connection.');
+        }
+        if (error.response?.status === 401) {
+          throw new Error('Session expired. Please login again.');
+        }
+        if (error.response?.status === 403) {
+          throw new Error('You are not authorized to view this session.');
+        }
+        if (error.response?.status === 404) {
+          throw new Error('Session not found.');
+        }
+        if (apiError?.message) {
+          throw new Error(apiError.message);
+        }
+      }
+      throw new Error('Failed to fetch session details. Please try again.');
+    }
+  }
 }
 
 export default MentorService;
