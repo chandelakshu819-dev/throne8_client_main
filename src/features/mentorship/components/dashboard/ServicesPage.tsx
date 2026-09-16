@@ -288,6 +288,14 @@ export default function ServicesPage({
           const updatePayload: Record<string, any> = {
             title: formData.serviceName,
             description: formData.description || "",
+            scheduledAt: new Date(formData.scheduledAt).toISOString(),
+            duration: Number(formData.duration) || 60,
+            pricing: {
+              basePrice: Number(formData.price),
+              platformFee: Math.round(Number(formData.price) * 0.15),
+              totalAmount: Number(formData.price) + Math.round(Number(formData.price) * 0.15),
+              currency: "INR",
+            },
           };
           if (formData.thumbnailImage && typeof formData.thumbnailImage !== 'string') {
             updatePayload.thumbnailImage = formData.thumbnailImage;
