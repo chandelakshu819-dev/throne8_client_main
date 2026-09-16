@@ -37,6 +37,13 @@ export default function SessionRoomPage() {
   const [peerNotified, setPeerNotified] = useState(false);
   const hasJoinedRef = useRef(false);
 
+
+  // ✅ NEW: floating emoji reactions during the live call
+  const [floatingReactions, setFloatingReactions] = useState
+    { id: number; emoji: string; fromSelf: boolean }[]
+  >([]);
+  const reactionIdRef = useRef(0);
+  
   const {
     localStream,
     peers,
@@ -95,9 +102,20 @@ export default function SessionRoomPage() {
       }
     };
 
+    const handleReactionReceived = (data: { sessionId: string; emoji: string; fromUserId: string }) => {
+      if (data.sessionId !== sessionId) return;
+      const id = ++reactionIdRef.current;
+      setFloatingReactions((prev) => [...prev, { id, emoji: data.emoji, fromSelf: false }]);
+      setTimeout(() => {
+        setFloatingReactions((prev) => prev.filter((r) => r.id !== id));
+      }, 2200);
+    };
+
     socket.on('mentorship:peer-joined', handlePeerJoined);
+    socket.on('mentorship:reaction-received', handleReactionReceived);
     return () => {
       socket.off('mentorship:peer-joined', handlePeerJoined);
+      socket.off('mentorship:reaction-received', handleReactionReceived);
     };
   }, [sessionId]);
 
@@ -111,6 +129,22 @@ export default function SessionRoomPage() {
     leaveRoom();
     router.back();
   }, [leaveRoom, router]);
+
+  // ✅ NEW: emit a reaction to the other participant + show it locally
+  const REACTIONS = ['👍', '❤️', '😂', '👏', '🎉'];
+  const sendReaction = useCallback(
+    (emoji: string) => {
+      const socket = getSocket();
+      socket?.emit('mentorship:send-reaction', { sessionId, emoji });
+
+      const id = ++reactionIdRef.current;
+      setFloatingReactions((prev) => [...prev, { id, emoji, fromSelf: true }]);
+      setTimeout(() => {
+        setFloatingReactions((prev) => prev.filter((r) => r.id !== id));
+      }, 2200);
+    },
+    [sessionId]
+  );
 
   if (loading) {
     return (
@@ -151,8 +185,21 @@ export default function SessionRoomPage() {
         </div>
       </div>
 
-      {/* Video grid */}
-      <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 16 }}>
+          {/* Video grid */}
+          <div style={{ position: 'relative', display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 16 }}>
+        {/* Floating reaction overlay */}
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+          {floatingReactions.map((r) => (
+            <span
+              key={r.id}
+              className="floating-reaction"
+              style={{ position: 'absolute', bottom: 90, left: r.fromSelf ? '35%' : '60%', fontSize: 32 }}
+            >
+              {r.emoji}
+            </span>
+          ))}
+        </div>
+
         <div style={{ position: 'relative', aspectRatio: '16/9', width: '100%', maxWidth: 480, borderRadius: 8, backgroundColor: 'black' }}>
           {localStream && (
             <video
@@ -200,6 +247,20 @@ export default function SessionRoomPage() {
       {liveRoomError && <p style={{ padding: '0 24px 8px', textAlign: 'center', fontSize: 13, color: '#f87171' }}>{liveRoomError}</p>}
       {isConnecting && <p style={{ padding: '0 24px 8px', textAlign: 'center', fontSize: 13, opacity: 0.7 }}>Connecting…</p>}
 
+            {/* Reactions bar */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#1a1a1a', padding: '8px 0', flexShrink: 0 }}>
+        {REACTIONS.map((emoji) => (
+          <button
+            key={emoji}
+            onClick={() => sendReaction(emoji)}
+            style={{ fontSize: 20, padding: '4px 10px', borderRadius: 9999, border: 'none', backgroundColor: 'rgba(255,255,255,0.08)', cursor: 'pointer' }}
+            title={`Send ${emoji}`}
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+
       {/* Controls */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: '#2a2a2a', padding: '16px 0', flexShrink: 0 }}>
         <button onClick={toggleMic} style={{ borderRadius: 9999, padding: '8px 16px', border: 'none', color: 'white', backgroundColor: isMicOn ? '#7a5c3e' : '#dc2626' }}>
@@ -212,6 +273,15 @@ export default function SessionRoomPage() {
           End Call
         </button>
       </div>
+
+      <style>{`
+        @keyframes floatUp {
+          0%   { transform: translateY(0) scale(0.6); opacity: 0; }
+          15%  { transform: translateY(-10px) scale(1.1); opacity: 1; }
+          100% { transform: translateY(-160px) scale(1); opacity: 0; }
+        }
+        .floating-reaction { animation: floatUp 2.2s ease-out forwards; }
+      `}</style>
     </div>
   );
 }

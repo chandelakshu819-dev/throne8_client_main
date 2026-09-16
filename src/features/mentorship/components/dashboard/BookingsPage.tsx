@@ -97,6 +97,11 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleReason, setRescheduleReason] = useState("");
 
+  // ✅ NEW: intermediate "Session Details / Start Session" screen state.
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [startModalBooking, setStartModalBooking] = useState<MentorBookingRow | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
+
   const fetchSessions = async () => {
     if (!mentorData?.mentorId) return;
     setLoadingData(true);
@@ -217,17 +222,33 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     };
 
 
-    // ⭐ UPDATED: session start hone ke baad ab seedha video call room me
-    // redirect kar rahe hain — pehle sirf status update hota tha, kahin
-    // navigate nahi hota tha.
-    const handleStart = async (sessionId: string) => {
+      // ⭐ FIXED: "Start" button ab direct API call nahi karta — pehle
+    // intermediate modal khulta hai, API sirf modal ke apne button se.
+    const openStartModal = (booking: MentorBookingRow) => {
+      setStartError(null);
+      setStartModalBooking(booking);
+      setShowStartModal(true);
+    };
+
+    const confirmStartSession = async () => {
+      if (!startModalBooking) return;
+      const { sessionId, bookingId } = startModalBooking;
       setActionLoading(sessionId);
+      setStartError(null);
       try {
-        await SessionService.startSession(sessionId);
+        const res: any = await SessionService.startSession(sessionId, bookingId);
+        // Backend `{...session, roomId}` return karta hai — roomId hamesha
+        // bookingId ke barabar hota hai (fallback safe hai).
         showToast("Session started", "success");
+        setShowStartModal(false);
+        setStartModalBooking(null);
+        // ✅ Actual working video page — session-room/[sessionId].
         router.push(`/mentorship/session-room/${sessionId}`);
       } catch (err: any) {
-        showToast(err.message || "Failed to start session.", "error");
+        const message = err?.response?.data?.message || err.message || "Failed to start session.";
+        setStartError(message);
+        showToast(message, "error");
+      } finally {
         setActionLoading(null);
       }
     };
@@ -498,13 +519,13 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                           )}
                                                     {bookingTab === 'upcoming' && (
                             <>
-                              <button
-                                onClick={() => handleStart(booking.sessionId)}
+                                                            <button
+                                onClick={() => openStartModal(booking)}
                                 disabled={actionLoading === booking.sessionId}
                                 className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
                                 style={{ backgroundColor: '#dbeafe', color: '#1d4ed8' }}
                               >
-                                <Play className="w-3.5 h-3.5" /> {actionLoading === booking.sessionId ? '...' : 'Start'}
+                                <Play className="w-3.5 h-3.5" /> Start
                               </button>
                               <button
                                 onClick={() => { setRescheduleSessionId(booking.sessionId); setRescheduleBookingId(booking.bookingId); setShowRescheduleModal(true); }}
@@ -639,7 +660,67 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                 style={{ backgroundColor: '#4a3728' }}
                 onClick={handleRescheduleSubmit}
               >
-                {actionLoading === rescheduleSessionId ? 'Processing...' : 'Confirm Reschedule'}
+                               {actionLoading === rescheduleSessionId ? 'Processing...' : 'Confirm Reschedule'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ✅ NEW: intermediate "Session Details / Start Session" screen */}
+      {showStartModal && startModalBooking && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4" style={{ border: '1px solid #e0d8cf' }}>
+            <h3 className="text-lg font-bold mb-1" style={{ color: '#4a3728' }}>Session Details</h3>
+            <p className="text-xs mb-4" style={{ color: '#8a7a6a' }}>Review the session before starting the video call.</p>
+
+            <div className="space-y-2.5 rounded-xl p-4 mb-4" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#8a7a6a' }}>Session Title</span>
+                <span style={{ color: '#4a3728' }} className="font-semibold">{startModalBooking.serviceName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#8a7a6a' }}>Mentee</span>
+                <span style={{ color: '#4a3728' }} className="font-semibold">{startModalBooking.menteeName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#8a7a6a' }}>Date</span>
+                <span style={{ color: '#4a3728' }} className="font-semibold">{formatDate(startModalBooking.scheduledAt)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#8a7a6a' }}>Time</span>
+                <span style={{ color: '#4a3728' }} className="font-semibold">{formatTime(startModalBooking)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#8a7a6a' }}>Status</span>
+                <span style={{ color: '#4a3728' }} className="font-semibold capitalize">{startModalBooking.status.replace('_', ' ')}</span>
+              </div>
+            </div>
+
+            {startError && (
+              <div className="text-xs font-semibold rounded-lg px-3 py-2 mb-4" style={{ backgroundColor: '#fee2e2', color: '#dc2626' }}>
+                {startError}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ backgroundColor: '#fbf7f3', color: '#7a5c3e', border: '1px solid #e0d8cf' }}
+                onClick={() => { setShowStartModal(false); setStartModalBooking(null); setStartError(null); }}
+                disabled={actionLoading === startModalBooking.sessionId}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
+                style={{ backgroundColor: '#1d4ed8', opacity: actionLoading === startModalBooking.sessionId ? 0.6 : 1 }}
+                onClick={confirmStartSession}
+                disabled={actionLoading === startModalBooking.sessionId}
+              >
+                <Play className="w-3.5 h-3.5" />
+                {actionLoading === startModalBooking.sessionId ? 'Starting...' : 'Start Session'}
               </button>
             </div>
           </div>
