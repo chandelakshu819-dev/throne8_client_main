@@ -39,11 +39,11 @@ export default function SessionRoomPage() {
 
 
   // ✅ NEW: floating emoji reactions during the live call
-  const [floatingReactions, setFloatingReactions] = useState
+  const [floatingReactions, setFloatingReactions] = useState <
     { id: number; emoji: string; fromSelf: boolean }[]
   >([]);
   const reactionIdRef = useRef(0);
-  
+
   const {
     localStream,
     peers,
