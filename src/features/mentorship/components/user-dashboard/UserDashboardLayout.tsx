@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import UserSidebar from "./UserSidebar";
 import UserDashboardOverviewPage from "./UserDashboardOverviewPage";
+import UserDashboardProgressPage from "./UserDashboardProgressPage";
 import UserDashboardUpcomingSessionsPage from "./UserDashboardUpcomingSessionsPage";
 import UserDashboardMyMentorsPage from "./UserDashboardMyMentorsPage";
 import UserDashboardMyBookingsPage from "./UserDashboardMyBookingsPage";
@@ -22,6 +23,7 @@ import { getSocket } from "@/core/realtime/socket.client";
 
 const pageComponents: Record<string, React.FC<any>> = {
   dashboard: UserDashboardOverviewPage,
+  progress: UserDashboardProgressPage,
   "upcoming-sessions": UserDashboardUpcomingSessionsPage,
   "my-mentors": UserDashboardMyMentorsPage,
   "my-bookings": UserDashboardMyBookingsPage,
