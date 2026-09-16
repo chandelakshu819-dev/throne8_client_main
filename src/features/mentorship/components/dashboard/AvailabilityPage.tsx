@@ -353,15 +353,20 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
    const handleDelete = async (availabilityId: string) => {
     setDeletingId(availabilityId);
     try {
+      // 1. API call — modal button shows "Deleting..." during this
       await AvailabilityService.deleteAvailability(availabilityId);
+
+      // 2. Close the modal first (clean visual step — deleting done, modal gone)
+      setConfirmDeleteId(null);
+      setDeletingId(null);
+
+      // 3. THEN refresh the background list, so the card disappears only
+      // after the modal has already closed — not before/during it.
       await fetchMonthAvailability();
       await fetchStats();
-      setDeletingId(null);
-      setConfirmDeleteId(null);
-      // 2 second delay ke baad success message dikhega
-      setTimeout(() => {
-        setSaveMessage({ type: "success", text: "Deleted successfully." });
-      }, 2000);
+
+      // 4. Show the success toast immediately, no artificial delay
+      setSaveMessage({ type: "success", text: "Deleted successfully." });
     } catch (error: any) {
       setSaveMessage({ type: "error", text: error.message });
       setDeletingId(null);
@@ -377,6 +382,29 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
   const cancelEdit = () => { setEditingId(null); setEditSlots([]); };
 
   const handleUpdate = async (availabilityId: string) => {
+    // Client-side duplicate/overlap guard — mirrors backend's overlap check
+    // so the user gets a clear, specific message here instead of a generic
+    // "Failed to update availability" after hitting the API.
+    const toMinutes = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+    for (let i = 0; i < editSlots.length; i++) {
+      for (let j = i + 1; j < editSlots.length; j++) {
+        const aStart = toMinutes(editSlots[i].startTime);
+        const aEnd = toMinutes(editSlots[i].endTime);
+        const bStart = toMinutes(editSlots[j].startTime);
+        const bEnd = toMinutes(editSlots[j].endTime);
+        if (aStart < bEnd && aEnd > bStart) {
+          setSaveMessage({
+            type: "error",
+            text: `Slots ${i + 1} (${editSlots[i].startTime}-${editSlots[i].endTime}) and ${j + 1} (${editSlots[j].startTime}-${editSlots[j].endTime}) overlap. Please fix before saving.`,
+          });
+          return;
+        }
+      }
+    }
+
     try {
       await AvailabilityService.updateAvailability(availabilityId, { slots: editSlots });
       setSaveMessage({ type: "success", text: "Updated successfully." });
@@ -404,6 +432,23 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
   // ── Render ─────────────────────────────────────────────
   return (
     <div className="space-y-6 animate-fadeIn">
+
+      {/* Toast — fixed at top so it's visible regardless of scroll position.
+          Previously this message rendered inline near the bottom Save button,
+          so actions like Delete (triggered from the middle/top of a long
+          page) required scrolling down to see the result. */}
+           {saveMessage && (
+        <div
+          className="fixed top-5 right-5 z-[500] px-5 py-3.5 rounded-xl text-sm font-semibold shadow-lg max-w-sm"
+          style={{
+            backgroundColor: saveMessage.type === "success" ? '#dcfce7' : '#fee2e2',
+            color: saveMessage.type === "success" ? '#15803d' : '#dc2626',
+            border: `1px solid ${saveMessage.type === "success" ? '#86efac' : '#fca5a5'}`,
+          }}
+        >
+          {saveMessage.text}
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -725,8 +770,19 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                             </button>
                           </div>
                         ))}
-                        <button
-                          onClick={() => setEditSlots(prev => [...prev, { startTime: "09:00", endTime: "09:30" }])}
+                                               <button
+                          onClick={() => setEditSlots(prev => {
+                            // Naya slot last slot ke endTime se shuru hota hai
+                            // (fixed 09:00 se nahi) — isse accidental duplicate
+                            // ya overlapping slot add hone ka chance kam ho jaata hai.
+                            const toHHMM = (mins: number) =>
+                              `${String(Math.floor((mins % 1440) / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+                            const last = prev[prev.length - 1];
+                            if (!last) return [...prev, { startTime: "09:00", endTime: "09:30" }];
+                            const [h, m] = last.endTime.split(":").map(Number);
+                            const start = h * 60 + m;
+                            return [...prev, { startTime: toHHMM(start), endTime: toHHMM(start + 30) }];
+                          })}
                           className="text-xs font-semibold flex items-center gap-1 mt-1 hover:underline"
                           style={{ color: '#7a5c3e' }}
                         >
@@ -898,20 +954,8 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
         </div>
       </div>
 
-      {/* Save Section */}
-      <div>
-        {saveMessage && (
-          <div
-            className="mb-3 p-3.5 rounded-xl text-sm font-semibold"
-            style={{
-              backgroundColor: saveMessage.type === "success" ? '#dcfce7' : '#fee2e2',
-              color: saveMessage.type === "success" ? '#15803d' : '#dc2626',
-              border: `1px solid ${saveMessage.type === "success" ? '#86efac' : '#fca5a5'}`,
-            }}
-          >
-            {saveMessage.text}
-          </div>
-        )}
+            {/* Save Section */}
+            <div>
         <p className="text-sm mb-3 font-medium" style={{ color: '#8a7a6a' }}>
           {selectedDate
             ? `Single day mode — ${selectedDate} ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()} · Click date again to deselect`
