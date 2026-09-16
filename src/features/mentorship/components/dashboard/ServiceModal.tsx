@@ -11,6 +11,13 @@ import { Video, MessageSquare, Package } from 'lucide-react';
 // via the `service` prop — it is not rendered anywhere in this file anymore.
 const MAX_DESCRIPTION_LENGTH = 500;
 
+// Local datetime-local string banata hai (browser's local timezone me),
+// toISOString() (UTC) use karne se IST users ke liye time 5:30 hrs shift ho jaata tha.
+const toLocalDatetimeString = (date: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 const serviceTypes = [
     {
         name: 'quick_call', label: 'Quick Call', icon: Video,
@@ -265,7 +272,8 @@ export default function ServiceModal({
                         <FieldLabel icon={Clock}>Schedule Date & Time</FieldLabel>
                         <input
                             type="datetime-local"
-                            min={new Date(Date.now() + 10 * 60 * 1000).toISOString().slice(0, 16)}
+                            min={toLocalDatetimeString(new Date(Date.now() + 10 * 60 * 1000))}
+
                             className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
                             style={inputStyle(fieldErrors?.scheduledAt)}
                             value={formData?.scheduledAt || ''}

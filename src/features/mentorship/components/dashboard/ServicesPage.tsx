@@ -37,6 +37,14 @@ const serviceTypes = [
   { name: 'group_session', label: 'Group Session', icon: Users, description: 'Group learning sessions', emoji: '👥', accent: '#15803d' },
 ];
 
+
+// Local datetime-local string banata hai (browser's local timezone me),
+// toISOString() (UTC) use karne se IST users ke liye time 5:30 hrs shift ho jaata tha.
+const toLocalDatetimeString = (date: Date) => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 // Fallback icon for unknown/legacy service types
 const FallbackIcon = ClipboardList;
 const FALLBACK_ACCENT = '#7a5c3e';
@@ -184,7 +192,7 @@ export default function ServicesPage({
         description: raw.description || '',
         topic: raw.topic || '',
         price: raw.pricing?.basePrice ?? raw.pricePerPerson ?? '',
-        scheduledAt: raw.scheduledAt ? new Date(raw.scheduledAt).toISOString().slice(0, 16) : '',
+        scheduledAt: raw.scheduledAt ? toLocalDatetimeString(new Date(raw.scheduledAt)) : '',
         duration: raw.duration ?? '',
         followUpPeriod: String(raw.followUp?.periodDays ?? '24'),
         // 🔧 FIX: both branches used to return '1' regardless of the actual
