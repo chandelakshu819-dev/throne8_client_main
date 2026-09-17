@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useProfile } from "@/features/profile/hooks/useProfile";
 import { getSocket } from "@/core/realtime/socket.client";
 
 
@@ -52,6 +53,13 @@ export default function UserDashboardLayout({ userId }: { userId: string }) {
   const [activePage, setActivePage] = useState("dashboard");
   const [sessions, setSessions] = useState<any[]>([]);
   const { user } = useAuth();
+  const { userProfileData, loadProfile } = useProfile();
+
+  useEffect(() => {
+    if (!userProfileData && typeof loadProfile === "function") {
+      loadProfile();
+    }
+  }, [userProfileData, loadProfile]);
 
   // ✅ "your mentor started the session" live banner. Persistent by design —
   // session:started fires once, real-time, and the mentee could be on any
@@ -194,7 +202,7 @@ export default function UserDashboardLayout({ userId }: { userId: string }) {
             <CurrentPage
               setActivePage={setActivePage}
               sessions={sessions}
-              user={user}
+              user={userProfileData ? { ...user, ...userProfileData } : user}
               notifications={safeNotifications}
               notificationsLoading={notificationsLoading}
               onMarkAllRead={handleMarkAllRead}

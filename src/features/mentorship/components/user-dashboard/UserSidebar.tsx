@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { LayoutDashboard, ChevronRight, CalendarClock, Users, Bookmark, History, Clock, Star, Receipt, Bell, Sparkles, TrendingUp, UserCog } from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfile } from "@/features/profile/hooks/useProfile";
+import { formatUserDisplayName, getInitials } from "@/shared/utils/format";
 
 interface UserSidebarProps {
   activePage: string;
@@ -32,12 +34,21 @@ export default function UserSidebar({
   unreadNotificationCount = 0,
 }: UserSidebarProps) {
   const { user } = useAuth();
-  const { profileImageUrl } = useProfile();
+  const { userProfileData, profileImageUrl, loadProfile } = useProfile();
 
-  const firstName = user?.firstName ?? "U";
-  const lastName = user?.lastName ?? "S";
-  const initials = `${firstName[0]}${lastName[0]}`.toUpperCase();
-  const fullName = `${firstName} ${lastName}`;
+  useEffect(() => {
+    if (!userProfileData && typeof loadProfile === "function") {
+      loadProfile();
+    }
+  }, [userProfileData, loadProfile]);
+
+  const firstName = (userProfileData?.firstName || user?.firstName || "").trim();
+  const lastName = (userProfileData?.lastName || user?.lastName || "").trim();
+  const directName = [firstName, lastName].filter(Boolean).join(" ");
+  const fullName = directName || formatUserDisplayName(userProfileData, user);
+  const initials = (firstName || lastName)
+    ? `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase()
+    : getInitials(fullName) || "U";
 
   return (
     <aside className="w-80 flex flex-col" style={{ backgroundColor: '#fff', borderRight: '1px solid #ece4db' }}>

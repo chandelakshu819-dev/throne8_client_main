@@ -71,7 +71,10 @@ export default function UserDashboardOverviewPage({
   setActivePage,
 }: UserDashboardOverviewPageProps) {
   const router = useRouter();
-  const firstName = user?.firstName ?? "there";
+  const firstName =
+    user?.firstName?.trim() ||
+    (user?.name ? user.name.trim().split(" ")[0] : null) ||
+    "there";
 
   const now = Date.now();
 

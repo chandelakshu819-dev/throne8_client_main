@@ -27,14 +27,20 @@ export const useProfile = () => {
 
     // ✅ Enhanced loadProfile with photo fetching
     const loadProfile = async () => {
-        const result = await dispatch(fetchUserProfile()).unwrap();
+        try {
+            const result = await dispatch(fetchUserProfile()).unwrap();
 
-        // Fetch photos if IDs exist
-        if (result.profilePhotoId) {
-            dispatch(fetchProfilePhotoUrl(result.profilePhotoId));
-        }
-        if (result.coverPhotoId) {
-            dispatch(fetchCoverPhotoUrl(result.coverPhotoId));
+            // Fetch photos if IDs exist
+            if (result?.profilePhotoId) {
+                dispatch(fetchProfilePhotoUrl(result.profilePhotoId));
+            }
+            if (result?.coverPhotoId) {
+                dispatch(fetchCoverPhotoUrl(result.coverPhotoId));
+            }
+            return result;
+        } catch (error) {
+            console.error('Failed to load profile:', error);
+            return null;
         }
     };
 

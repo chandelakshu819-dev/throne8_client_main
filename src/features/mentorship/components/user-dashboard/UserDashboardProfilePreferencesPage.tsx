@@ -31,6 +31,7 @@ import {
 import AuthService from "@/lib/api/auth.service";
 import ProfileService from "@/lib/api/profile.service";
 import TokenStorage from "@/lib/store/token.storage";
+import { useProfile } from "@/features/profile/hooks/useProfile";
 
 // Design Tokens matching Throne8 Mentee Beige/Brown Theme
 const THEME = {
@@ -59,6 +60,8 @@ export default function UserDashboardProfilePreferencesPage({
   user: initialAuthUser,
   setActivePage,
 }: UserDashboardProfilePreferencesPageProps) {
+  const { loadProfile } = useProfile();
+
   // ==========================================
   // Core State
   // ==========================================
@@ -199,6 +202,9 @@ export default function UserDashboardProfilePreferencesPage({
         setFeedback({ type: "success", message: "Profile photo updated successfully!" });
         // Refresh profile data to sync photo ID
         fetchAllUserData(true);
+        if (typeof loadProfile === "function") {
+          loadProfile();
+        }
       }
     } catch (err: any) {
       console.error("Failed to upload profile photo:", err);
@@ -991,6 +997,9 @@ export default function UserDashboardProfilePreferencesPage({
             setIsEditProfileOpen(false);
             setFeedback({ type: "success", message: "Profile updated and saved to server!" });
             fetchAllUserData(true);
+            if (typeof loadProfile === "function") {
+              loadProfile();
+            }
           }}
         />
       )}
