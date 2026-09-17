@@ -53,10 +53,10 @@ export default function UserDashboardLayout({ userId }: { userId: string }) {
   const [sessions, setSessions] = useState<any[]>([]);
   const { user } = useAuth();
 
-  // ✅ NEW: "your mentor started the session" live banner. Persistent by
-  // design — session:started fires once, real-time, and the mentee could be
-  // on any tab (Payments, Reviews, etc). A silent auto-redirect would yank
-  // them away without warning, so we surface a dismissible Join Now banner
+  // ✅ "your mentor started the session" live banner. Persistent by design —
+  // session:started fires once, real-time, and the mentee could be on any
+  // tab (Payments, Reviews, etc). A silent auto-redirect would yank them
+  // away without warning, so we surface a dismissible Join Now banner
   // instead and let them join on their own terms.
   const [liveSession, setLiveSession] = useState<{
     sessionId: string;
@@ -102,14 +102,18 @@ export default function UserDashboardLayout({ userId }: { userId: string }) {
     }
   }, []);
 
-  useEffect(() => {
+  const fetchSessions = useCallback(() => {
     if (!userId) return;
     SessionService.getAllSessions({ role: "mentee", limit: 100 })
       .then((res) => setSessions(res.data || []))
       .catch(console.error);
   }, [userId]);
 
-  // ✅ NEW: real-time "mentor started the session" listener.
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
+
+  // ✅ Real-time "mentor started the session" listener.
   // Backend emits this via emitToUser(menteeId, 'session:started', {...})
   // from mentorshipSession.service.ts's startSession(). Payload fields
   // confirmed against that emit call: sessionId, bookingId, roomId, title,
@@ -127,23 +131,26 @@ export default function UserDashboardLayout({ userId }: { userId: string }) {
     }) => {
       setLiveSession(payload);
       // Refresh so "Upcoming" flips to reflect in_progress status if the
-      // mentee later visits UserDashboardUpcomingSessionsPage.
-      SessionService.getAllSessions({ role: "mentee", limit: 100 })
-        .then((res) => setSessions(res.data || []))
-        .catch(console.error);
+      // mentee is currently viewing UserDashboardUpcomingSessionsPage —
+      // Join Session button flips from disabled/grey to enabled/green
+      // without needing a manual page refresh.
+      fetchSessions();
     };
 
     socket.on("session:started", handleSessionStarted);
     return () => {
       socket.off("session:started", handleSessionStarted);
     };
-  }, [userId]);
+  }, [userId, fetchSessions]);
 
+  // ✅ FIXED: was pointing at "/mentorship/mentor-session" — a route that
+  // doesn't exist in the app. The mentor's "Start" button in BookingsPage.tsx
+  // navigates to `/mentorship/session-room/${sessionId}`, so the mentee must
+  // land on the SAME route or the two sides never end up in the same
+  // WebRTC room.
   const handleJoinLiveSession = () => {
     if (!liveSession) return;
-    router.push(
-      `/mentorship/mentor-session?sessionId=${liveSession.sessionId}&roomId=${liveSession.roomId}&bookingId=${liveSession.bookingId}`
-    );
+    router.push(`/mentorship/session-room/${liveSession.sessionId}`);
     setLiveSession(null);
   };
 

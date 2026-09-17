@@ -7,6 +7,7 @@ import {
   Clock,
   Video,
   MapPin,
+  Loader2,
 } from "lucide-react";
 import SessionService from "@/lib/api/session.service";
 
@@ -66,8 +67,6 @@ export default function UserDashboardUpcomingSessionsPage({ sessions = [] }: Pro
   const router = useRouter();
   const now = Date.now();
 
-  // ⭐ NEW: track which session's "Join Session" button is loading,
-  // taaki sirf usi row pe spinner/disabled state dikhe.
   const [joiningId, setJoiningId] = useState<string | null>(null);
 
   const upcoming = sessions
@@ -81,8 +80,6 @@ export default function UserDashboardUpcomingSessionsPage({ sessions = [] }: Pro
         new Date(b.startTime || b.scheduledAt || 0).getTime()
     );
 
-  // ⭐ NEW: Join Session click handler — session valid hai confirm karta
-  // hai (getSessionById), phir video call room pe redirect karta hai.
   const handleJoinSession = async (sessionId?: string) => {
     if (!sessionId) return;
     setJoiningId(sessionId);
@@ -136,6 +133,11 @@ export default function UserDashboardUpcomingSessionsPage({ sessions = [] }: Pro
             const isOnline = !s.sessionType || s.sessionType.toLowerCase() === "virtual" || s.sessionType.toLowerCase() === "online";
             const sid = s.sessionId ?? s._id;
 
+            // 🔑 GATE: sirf mentor start kare (status === 'in_progress') tabhi
+            // Join Session enabled hoga. Confirmed/pending me disabled rahega.
+            const statusLower = (s.status || "").toLowerCase();
+            const canJoin = statusLower === "in_progress";
+
             return (
               <div
                 key={sid ?? idx}
@@ -169,9 +171,12 @@ export default function UserDashboardUpcomingSessionsPage({ sessions = [] }: Pro
                     <div className="mt-1.5 flex items-center">
                        <span
                         className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
-                        style={{ backgroundColor: COLORS.chip, color: COLORS.accent }}
+                        style={{
+                          backgroundColor: canJoin ? "#dbeafe" : COLORS.chip,
+                          color: canJoin ? "#1d4ed8" : COLORS.accent,
+                        }}
                       >
-                        {s.status || "Scheduled"}
+                        {canJoin ? "Live Now" : (s.status || "Scheduled")}
                       </span>
                     </div>
                   </div>
@@ -211,12 +216,23 @@ export default function UserDashboardUpcomingSessionsPage({ sessions = [] }: Pro
                 {/* 3. Actions */}
                 <div className="flex flex-col gap-2 shrink-0 w-full md:w-[165px] md:border-l md:pl-4 pt-4 md:pt-0 border-t md:border-t-0 mt-2 md:mt-0" style={{ borderColor: COLORS.hairline }}>
                    <button
-                    onClick={() => handleJoinSession(sid)}
-                    disabled={joiningId === sid}
-                    className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-[#8b7355] shadow-sm text-center disabled:opacity-60"
-                    style={{ backgroundColor: COLORS.ink, color: "#fff" }}
+                    onClick={() => canJoin && handleJoinSession(sid)}
+                    disabled={!canJoin || joiningId === sid}
+                    className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm text-center disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                    style={{
+                      backgroundColor: canJoin ? COLORS.ink : "#e5e0d8",
+                      color: canJoin ? "#fff" : "#9c9186",
+                    }}
                   >
-                    {joiningId === sid ? "Joining..." : "Join Session"}
+                    {joiningId === sid ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Joining...
+                      </>
+                    ) : canJoin ? (
+                      "Join Session"
+                    ) : (
+                      "Waiting for mentor"
+                    )}
                   </button>
                   <button
                     className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-colors hover:border-[#c9baa9] text-center"
