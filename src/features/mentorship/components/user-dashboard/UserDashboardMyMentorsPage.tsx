@@ -1,5 +1,9 @@
+"use client";
+
 import React from "react";
 import { Users, CalendarClock, History } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { routes } from "@/config/routes";
 
 const COLORS = {
   ink: "#4a3728",
@@ -28,6 +32,12 @@ type Session = {
   mentorJobTitle?: string;
   mentorCompany?: string;
   mentorDesignation?: string;
+  mentor?: {
+    mentorId?: string;
+    _id?: string;
+    name?: string;
+    profilePhoto?: string;
+  };
 };
 
 interface Props {
@@ -48,6 +58,7 @@ function formatDateStr(iso?: string) {
 }
 
 export default function UserDashboardMyMentorsPage({ sessions = [] }: Props) {
+  const router = useRouter();
   const now = Date.now();
 
   const mentorMap = new Map<string, {
@@ -62,14 +73,16 @@ export default function UserDashboardMyMentorsPage({ sessions = [] }: Props) {
   }>();
 
   sessions.forEach((s) => {
-    const key = s.mentorId || s.mentorName;
+    const mentorId = s.mentorId || s.mentor?.mentorId || s.mentor?._id || "";
+    const mentorName = s.mentorName || s.mentor?.name || "";
+    const key = mentorId || mentorName;
     if (!key) return;
 
     if (!mentorMap.has(key)) {
       mentorMap.set(key, {
-        mentorId: s.mentorId || "",
-        mentorName: s.mentorName || "Unknown Mentor",
-        mentorProfilePhoto: s.mentorProfilePhoto,
+        mentorId: mentorId,
+        mentorName: mentorName || "Unknown Mentor",
+        mentorProfilePhoto: s.mentorProfilePhoto || s.mentor?.profilePhoto,
         mentorDesignation: s.mentorJobTitle || s.mentorDesignation || "Mentor",
         totalSessions: 0,
         allSessions: []
@@ -77,6 +90,15 @@ export default function UserDashboardMyMentorsPage({ sessions = [] }: Props) {
     }
 
     const m = mentorMap.get(key)!;
+    if (!m.mentorId && mentorId) {
+      m.mentorId = mentorId;
+    }
+    if ((!m.mentorName || m.mentorName === "Unknown Mentor") && mentorName) {
+      m.mentorName = mentorName;
+    }
+    if (!m.mentorProfilePhoto && (s.mentorProfilePhoto || s.mentor?.profilePhoto)) {
+      m.mentorProfilePhoto = s.mentorProfilePhoto || s.mentor?.profilePhoto;
+    }
     m.allSessions.push(s);
   });
 
@@ -134,87 +156,116 @@ export default function UserDashboardMyMentorsPage({ sessions = [] }: Props) {
             </p>
           </div>
           <button
-            className="mt-4 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-[#8b7355] shadow-md"
+            className="mt-4 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 hover:-translate-y-1 hover:shadow-md motion-reduce:hover:translate-y-0 motion-reduce:transition-none hover:bg-[#8b7355] shadow-md"
             style={{ backgroundColor: COLORS.ink, color: "#fff" }}
-            onClick={() => window.location.href = '/mentorship'}
+            onClick={() => router.push('/mentorship')}
           >
             Find a Mentor
           </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {mentors.map((m, idx) => (
-            <div
-              key={m.mentorId || m.mentorName || idx}
-              className="flex flex-col bg-white rounded-2xl overflow-hidden transition-shadow hover:shadow-sm"
-              style={{ border: `1px solid ${COLORS.hairline}` }}
-            >
-              <div className="p-4 flex items-start gap-4" style={{ backgroundColor: COLORS.softWash }}>
-                {m.mentorProfilePhoto ? (
-                  <img
-                    src={m.mentorProfilePhoto}
-                    alt={m.mentorName}
-                    className="w-12 h-12 rounded-full object-cover shrink-0"
-                    style={{ border: `1px solid ${COLORS.hairline}` }}
-                  />
-                ) : (
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-lg font-bold text-white"
-                    style={{ backgroundColor: COLORS.ink }}
-                  >
-                    {initialsFrom(m.mentorName)}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1 mt-0.5">
-                  <p className="text-base font-bold truncate" style={{ color: COLORS.ink }}>
-                    {m.mentorName}
-                  </p>
-                  <p className="text-xs truncate mt-0.5" style={{ color: COLORS.muted }}>
-                    {m.mentorDesignation}
-                  </p>
-                </div>
-              </div>
-              <div className="p-4 flex-1 flex flex-col justify-between border-t" style={{ borderColor: COLORS.hairline }}>
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span style={{ color: COLORS.muted }}>Total Sessions</span>
-                    <span className="font-semibold" style={{ color: COLORS.ink }}>{m.totalSessions}</span>
-                  </div>
-                  {m.lastSession && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-1.5" style={{ color: COLORS.muted }}>
-                        <History className="w-3.5 h-3.5" /> Last
-                      </span>
-                      <span className="font-medium" style={{ color: COLORS.ink }}>{formatDateStr(m.lastSession)}</span>
-                    </div>
-                  )}
-                  {m.nextSession && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-1.5" style={{ color: COLORS.accent }}>
-                        <CalendarClock className="w-3.5 h-3.5" /> Next
-                      </span>
-                      <span className="font-semibold" style={{ color: COLORS.ink }}>{formatDateStr(m.nextSession)}</span>
-                    </div>
-                  )}
-                </div>
+          {mentors.map((m, idx) => {
+            const hasMentorId = Boolean(m.mentorId && m.mentorId.trim());
 
-                <div className="flex items-center gap-2 mt-auto">
-                  <button
-                    className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-[#8b7355] shadow-sm text-center"
-                    style={{ backgroundColor: COLORS.ink, color: "#fff" }}
-                  >
-                    Book Again
-                  </button>
-                  <button
-                    className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold transition-colors hover:border-[#c9baa9] text-center"
-                    style={{ backgroundColor: COLORS.wash, color: COLORS.accent, border: `1px solid ${COLORS.hairline}` }}
-                  >
-                    View Profile
-                  </button>
+            const handleViewProfile = () => {
+              if (!hasMentorId) return;
+              const profileUrl = routes.mentorCard(m.mentorName, m.mentorId);
+              router.push(profileUrl);
+            };
+
+            const handleBookAgain = () => {
+              if (!hasMentorId) return;
+              const targetSession = m.allSessions.find((s) => s.sessionId || s._id);
+              const serviceId = targetSession?.sessionId || targetSession?._id;
+              const baseCardUrl = routes.mentorCard(m.mentorName, m.mentorId);
+              const bookingUrl = serviceId
+                ? `${baseCardUrl}?serviceId=${encodeURIComponent(serviceId)}&book=true`
+                : `${baseCardUrl}?book=true`;
+              router.push(bookingUrl);
+            };
+
+            return (
+              <div
+                key={m.mentorId || m.mentorName || idx}
+                className="flex flex-col bg-white rounded-2xl overflow-hidden transition-shadow hover:shadow-sm"
+                style={{ border: `1px solid ${COLORS.hairline}` }}
+              >
+                <div className="p-4 flex items-start gap-4" style={{ backgroundColor: COLORS.softWash }}>
+                  {m.mentorProfilePhoto ? (
+                    <img
+                      src={m.mentorProfilePhoto}
+                      alt={m.mentorName}
+                      className="w-12 h-12 rounded-full object-cover shrink-0"
+                      style={{ border: `1px solid ${COLORS.hairline}` }}
+                    />
+                  ) : (
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-lg font-bold text-white"
+                      style={{ backgroundColor: COLORS.ink }}
+                    >
+                      {initialsFrom(m.mentorName)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1 mt-0.5">
+                    <p className="text-base font-bold truncate" style={{ color: COLORS.ink }}>
+                      {m.mentorName}
+                    </p>
+                    <p className="text-xs truncate mt-0.5" style={{ color: COLORS.muted }}>
+                      {m.mentorDesignation}
+                    </p>
+                  </div>
+                </div>
+                <div className="p-4 flex-1 flex flex-col justify-between border-t" style={{ borderColor: COLORS.hairline }}>
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span style={{ color: COLORS.muted }}>Total Sessions</span>
+                      <span className="font-semibold" style={{ color: COLORS.ink }}>{m.totalSessions}</span>
+                    </div>
+                    {m.lastSession && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="flex items-center gap-1.5" style={{ color: COLORS.muted }}>
+                          <History className="w-3.5 h-3.5" /> Last
+                        </span>
+                        <span className="font-medium" style={{ color: COLORS.ink }}>{formatDateStr(m.lastSession)}</span>
+                      </div>
+                    )}
+                    {m.nextSession && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="flex items-center gap-1.5" style={{ color: COLORS.accent }}>
+                          <CalendarClock className="w-3.5 h-3.5" /> Next
+                        </span>
+                        <span className="font-semibold" style={{ color: COLORS.ink }}>{formatDateStr(m.nextSession)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 mt-auto">
+                    <button
+                      type="button"
+                      onClick={handleBookAgain}
+                      disabled={!hasMentorId}
+                      title={hasMentorId ? `Book again with ${m.mentorName}` : "Mentor information unavailable"}
+                      className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold shadow-sm text-center transition-all duration-200 hover:-translate-y-1 hover:shadow-md motion-reduce:hover:translate-y-0 motion-reduce:transition-none hover:bg-[#8b7355] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+                      style={{ backgroundColor: COLORS.ink, color: "#fff" }}
+                    >
+                      Book Again
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleViewProfile}
+                      disabled={!hasMentorId}
+                      title={hasMentorId ? `View profile of ${m.mentorName}` : "Mentor information unavailable"}
+                      className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold text-center transition-all duration-200 hover:-translate-y-1 hover:shadow-md motion-reduce:hover:translate-y-0 motion-reduce:transition-none hover:border-[#c9baa9] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+                      style={{ backgroundColor: COLORS.wash, color: COLORS.accent, border: `1px solid ${COLORS.hairline}` }}
+                    >
+                      View Profile
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
