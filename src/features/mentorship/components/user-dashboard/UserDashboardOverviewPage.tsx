@@ -331,6 +331,7 @@ export default function UserDashboardOverviewPage({
                 Quick Book Mentor
               </button>
               <button
+                onClick={() => setActivePage?.("upcoming-sessions")}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-colors hover:border-[#c9baa9]"
                 style={{ backgroundColor: COLORS.wash, color: COLORS.accent, border: `1px solid ${COLORS.hairline}` }}
               >

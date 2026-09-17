@@ -254,8 +254,8 @@ export default function FindMentorModal({
             style={{ backgroundColor: "rgba(74,55,40,0.45)", backdropFilter: "blur(6px)" }}
             onClick={onClose}
         >
-                        {/* Modal Box — scroll ab isme nahi hoga */}
-                        <div
+            {/* Modal Box — scroll ab isme nahi hoga */}
+            <div
                 className="relative w-full max-w-4xl max-h-[90vh] rounded-3xl overflow-hidden"
                 style={{ backgroundColor: "#f6ede8", boxShadow: "0 24px 60px rgba(74,55,40,0.22)" }}
                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
@@ -272,7 +272,7 @@ export default function FindMentorModal({
                 {/* Naya scrollable wrapper — sirf yeh andar wala content scroll karega */}
                 <div className="px-4 py-8 md:px-8 overflow-y-auto max-h-[90vh]">
 
-                    
+
 
                     {/* ── Search Box ── */}
                     <div
