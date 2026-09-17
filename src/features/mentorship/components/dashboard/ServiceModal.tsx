@@ -90,6 +90,10 @@ interface ServiceModalProps {
     saveError?: string | null;
     fieldErrors?: Record<string, string>;
     isEditMode?: boolean;
+    // ✅ NEW: mentor ki Availability me jo slot-duration set hai (30/45/60 min),
+    // parent (ServicesPage) se pass hoga — isse Duration field ab free number
+    // nahi, balki usi slot duration se connected dropdown banega.
+    availableDurations?: number[];
 }
 
 // Small reusable field label with icon
@@ -111,7 +115,21 @@ export default function ServiceModal({
     isSaving = false, saveError = null,
     fieldErrors = {},
     isEditMode = false,
+    availableDurations = [30, 45, 60],
 }: ServiceModalProps) {
+
+    // ✅ NEW: modal khulte hi (ya jab availableDurations change ho) agar
+    // formData.duration khaali hai ya availableDurations me nahi hai,
+    // to pehla valid option auto-select kar do — taaki service hamesha
+    // mentor ki actual availability slot-duration ke according bane.
+    useEffect(() => {
+        if (!availableDurations?.length) return;
+        const current = Number(formData?.duration);
+        if (!current || !availableDurations.includes(current)) {
+            setFormData({ ...formData, duration: availableDurations[0] });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [availableDurations]);
 
     const currentServiceType = serviceTypes.find(t => t.name === formData?.serviceType);
     const needsDescription = currentServiceType?.needsDescription ?? true;
@@ -353,19 +371,26 @@ export default function ServiceModal({
                         </div>
                     )}
 
-                    {/* Duration & Participants */}
-                    <div className={`grid ${needsParticipants ? 'grid-cols-3' : 'grid-cols-1'} gap-4`}>
+                                    {/* Duration & Participants */}
+                                    <div className={`grid ${needsParticipants ? 'grid-cols-3' : 'grid-cols-1'} gap-4`}>
                         <div>
                             <FieldLabel icon={Clock}>Duration (min)</FieldLabel>
-                            <input
-                                type="number"
-                                placeholder="60"
+                            {/* ✅ FIX: free number input ki jagah dropdown — sirf
+                                wahi durations chunne ko milte hain jo mentor ne
+                                Availability page me slot-duration ke roop me set
+                                kiye hain, taaki service ka duration hamesha
+                                actual bookable slot-length ke according ho. */}
+                            <select
                                 className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
                                 style={inputStyle()}
                                 value={formData?.duration || ''}
-                                onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                                onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })}
                                 disabled={isSaving}
-                            />
+                            >
+                                {availableDurations.map(min => (
+                                    <option key={min} value={min}>{min} min</option>
+                                ))}
+                            </select>
                         </div>
                         {needsParticipants && (
                             <>

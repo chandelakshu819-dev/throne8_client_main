@@ -97,10 +97,18 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleReason, setRescheduleReason] = useState("");
 
-  // ✅ NEW: intermediate "Session Details / Start Session" screen state.
-  const [showStartModal, setShowStartModal] = useState(false);
-  const [startModalBooking, setStartModalBooking] = useState<MentorBookingRow | null>(null);
-  const [startError, setStartError] = useState<string | null>(null);
+    // ✅ NEW: intermediate "Session Details / Start Session" screen state.
+    const [showStartModal, setShowStartModal] = useState(false);
+    const [startModalBooking, setStartModalBooking] = useState<MentorBookingRow | null>(null);
+    const [startError, setStartError] = useState<string | null>(null);
+  
+    // ✅ NEW: View Details modal (for completed bookings' Eye icon)
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [detailsBooking, setDetailsBooking] = useState<MentorBookingRow | null>(null);
+  
+    // ✅ NEW: Download receipt loading state (for completed bookings' Download icon)
+    const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
 
   const fetchSessions = async () => {
     if (!mentorData?.mentorId) return;
@@ -255,8 +263,79 @@ export default function BookingsPage({ mentorData }: BookingProps) {
 
 
 
+    // ✅ NEW: opens the details modal for a completed booking
+    const openDetailsModal = (booking: MentorBookingRow) => {
+      setDetailsBooking(booking);
+      setShowDetailsModal(true);
+    };
+
+        // ✅ FIXED: now fetches REAL receipt data from the backend
+    // (GET /sessions/:id/receipt) instead of using only local row data —
+    // gets accurate pricing, payment status, and completedAt timestamp.
+    const handleDownloadReceipt = async (booking: MentorBookingRow) => {
+      setDownloadingId(booking.bookingId);
+      try {
+        const res: any = await SessionService.getSessionReceipt(booking.sessionId, booking.bookingId);
+        const r = res.data;
+
+        const amount = r.pricing?.totalAmount ?? 0;
+        const currency = r.pricing?.currency || "INR";
+        const paymentStatus = r.payment?.status || "N/A";
+        const completedAt = r.completedAt ? formatDate(r.completedAt) : formatDate(booking.scheduledAt);
+
+        const receiptHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Session Receipt - ${r.menteeName}</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 40px; color: #4a3728; }
+  .header { border-bottom: 2px solid #4a3728; padding-bottom: 16px; margin-bottom: 24px; }
+  .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0ebe4; }
+  .label { color: #8a7a6a; font-size: 13px; }
+  .value { font-weight: 600; }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; background: #f3e8ff; color: #7c3aed; font-size: 12px; font-weight: 600; }
+  .total { margin-top: 16px; padding-top: 16px; border-top: 2px solid #4a3728; font-size: 18px; font-weight: 700; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h2>Session Receipt</h2>
+    <span class="badge">Completed</span>
+  </div>
+  <div class="row"><span class="label">Booking ID</span><span class="value">${r.bookingId}</span></div>
+  <div class="row"><span class="label">Student</span><span class="value">${r.menteeName}</span></div>
+  <div class="row"><span class="label">Mentor</span><span class="value">${r.mentorName}</span></div>
+  <div class="row"><span class="label">Service</span><span class="value">${r.title}</span></div>
+  <div class="row"><span class="label">Date</span><span class="value">${formatDate(r.scheduledAt)}</span></div>
+  <div class="row"><span class="label">Time</span><span class="value">${r.slotTime || formatTime(booking)}</span></div>
+  <div class="row"><span class="label">Duration</span><span class="value">${r.duration} min</span></div>
+  <div class="row"><span class="label">Payment Status</span><span class="value">${paymentStatus}</span></div>
+  <div class="row"><span class="label">Completed On</span><span class="value">${completedAt}</span></div>
+  <div class="total"><span>Total Amount</span><span>${currency} ${amount}</span></div>
+</body>
+</html>`;
+        const blob = new Blob([receiptHtml], { type: "text/html" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `receipt-${r.menteeName.replace(/\s+/g, "_")}-${r.bookingId}.html`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        showToast("Receipt downloaded", "success");
+      } catch (err: any) {
+        showToast(err.message || "Failed to download receipt.", "error");
+      } finally {
+        setDownloadingId(null);
+      }
+    };
+
+
     const handleEnd = async (sessionId: string) => {
-      setActionLoading(sessionId);
+            setActionLoading(sessionId);
       try {
         await SessionService.completeSession(sessionId, { wasSuccessful: true });
         showToast("Session completed", "success");
@@ -299,7 +378,11 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       }
       setActionLoading(rescheduleSessionId);
       try {
-        await SessionService.rescheduleSession(rescheduleSessionId, new Date(rescheduleDate).toISOString(), rescheduleReason, rescheduleBookingId);
+        // datetime-local se aane wale value mein timezone nahi hota — usko explicit
+// IST offset ke saath parse karo, warna browser ka local system timezone use
+// ho jata hai jo IST se different ho sakta hai.
+const scheduledAtISO = new Date(`${rescheduleDate}:00+05:30`).toISOString();
+await SessionService.rescheduleSession(rescheduleSessionId, scheduledAtISO, rescheduleReason, rescheduleBookingId);
         showToast("Session rescheduled successfully", "success");
         setShowRescheduleModal(false);
         setRescheduleDate("");
@@ -555,14 +638,19 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                               <CheckCircle2 className="w-3.5 h-3.5" /> {actionLoading === booking.sessionId ? '...' : 'End Session'}
                             </button>
                           )}
-                          {bookingTab === 'completed' && (
+                                                  {bookingTab === 'completed' && (
                             <>
-                              <button className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4]"
+                              <button
+                                onClick={() => openDetailsModal(booking)}
+                                className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4]"
                                 style={{ border: '1px solid #e0d8cf' }}
                                 title="View Details">
                                 <Eye className="w-3.5 h-3.5" style={{ color: '#7a5c3e' }} />
                               </button>
-                              <button className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4]"
+                              <button
+                                onClick={() => handleDownloadReceipt(booking)}
+                                disabled={downloadingId === booking.bookingId}
+                                className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4] disabled:opacity-50"
                                 style={{ border: '1px solid #e0d8cf' }}
                                 title="Download">
                                 <Download className="w-3.5 h-3.5" style={{ color: '#7a5c3e' }} />
@@ -721,6 +809,60 @@ export default function BookingsPage({ mentorData }: BookingProps) {
               >
                 <Play className="w-3.5 h-3.5" />
                 {actionLoading === startModalBooking.sessionId ? 'Starting...' : 'Start Session'}
+                </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ✅ NEW: View Details modal — for completed bookings' Eye icon */}
+      {showDetailsModal && detailsBooking && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4" style={{ border: '1px solid #e0d8cf' }}>
+            <h3 className="text-lg font-bold mb-1" style={{ color: '#4a3728' }}>Session Details</h3>
+            <p className="text-xs mb-4" style={{ color: '#8a7a6a' }}>Completed session summary.</p>
+
+            <div className="space-y-2.5 rounded-xl p-4 mb-4" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#8a7a6a' }}>Student</span>
+                <span style={{ color: '#4a3728' }} className="font-semibold">{detailsBooking.menteeName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#8a7a6a' }}>Service</span>
+                <span style={{ color: '#4a3728' }} className="font-semibold">{detailsBooking.serviceName}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#8a7a6a' }}>Date</span>
+                <span style={{ color: '#4a3728' }} className="font-semibold">{formatDate(detailsBooking.scheduledAt)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#8a7a6a' }}>Time</span>
+                <span style={{ color: '#4a3728' }} className="font-semibold">{formatTime(detailsBooking)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span style={{ color: '#8a7a6a' }}>Status</span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold" style={{ backgroundColor: '#f3e8ff', color: '#7c3aed' }}>
+                  Completed
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ backgroundColor: '#fbf7f3', color: '#7a5c3e', border: '1px solid #e0d8cf' }}
+                onClick={() => { setShowDetailsModal(false); setDetailsBooking(null); }}
+              >
+                Close
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
+                style={{ backgroundColor: '#4a3728' }}
+                onClick={() => handleDownloadReceipt(detailsBooking)}
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download Receipt
               </button>
             </div>
           </div>

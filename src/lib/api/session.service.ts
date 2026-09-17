@@ -357,6 +357,24 @@ class SessionService {
             throw new Error(error?.response?.data?.message || "Failed to reschedule session.");
         }
     }
+
+    // ── GET SESSION RECEIPT (for completed booking's Download/View) ────
+    // ✅ NEW: fetches real booking data (mentee name, price, payment status,
+    // completedAt) to build the receipt shown/downloaded from BookingsPage.
+    static async getSessionReceipt(sessionId: string, bookingId?: string): Promise<ApiResponse> {
+        try {
+            const { data } = await api.get<ApiResponse>(
+                `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/receipt`,
+                { params: bookingId ? { bookingId } : {} }
+            );
+            return data;
+        } catch (error: any) {
+            console.error("❌ [GET_SESSION_RECEIPT] Failed", error?.response?.data || error?.message);
+            if (error?.response?.status === 404) throw new Error("Session not found.");
+            if (error?.response?.status === 400) throw new Error(error?.response?.data?.message || "Receipt not available.");
+            throw new Error(error?.response?.data?.message || "Failed to fetch receipt.");
+        }
+    }
 }
 
 export default SessionService;

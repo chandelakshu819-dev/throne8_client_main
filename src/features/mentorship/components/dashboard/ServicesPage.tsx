@@ -310,6 +310,19 @@ export default function ServicesPage({
           }
           await SessionService.updateSession(editingSession.sessionId, updatePayload);
         }
+
+        // ✅ NEW: Service ka Duration ab Availability page ke default
+        // slot-duration me bhi sync hoga — agli baar naye slots isi
+        // duration ke banenge. Ye fail ho bhi jaaye to service save
+        // block nahi hona chahiye, isliye alag try/catch me hai.
+        try {
+          await MentorService.updateMentorAvailability(mentorData.mentorId, {
+            slotDuration: Number(formData.duration) || 30,
+          });
+        } catch (syncErr: any) {
+          console.error("Failed to sync slot duration to availability:", syncErr.message);
+        }
+
         setIsEditMode(false);
         setEditingSession(null);
         handleCreateService();
@@ -377,6 +390,16 @@ export default function ServicesPage({
         await SessionService.createSession(sessionInput);
       }
 
+      // ✅ NEW: same sync — service create hote hi Availability ka default
+      // slot-duration bhi is Duration ke according update ho jaata hai.
+      try {
+        await MentorService.updateMentorAvailability(mentorData.mentorId, {
+          slotDuration: Number(formData.duration) || 30,
+        });
+      } catch (syncErr: any) {
+        console.error("Failed to sync slot duration to availability:", syncErr.message);
+      }
+
       handleCreateService();
       await Promise.all([fetchAllSessions(), fetchGroupSessions()]);
       setShowServiceForm(false);
@@ -413,6 +436,11 @@ export default function ServicesPage({
         // thumbnail had actually been uploaded and saved.
         thumbnailImage: s.thumbnailImage || s.image || s.thumbnailUrl || null,
         isApi: true,
+        // ✅ NEW: needed by the "Most recent" sort — without this, every
+        // card's date fell back to 0 and the sort became a no-op, so new
+        // services never actually moved to the top.
+        createdAt: s.createdAt || null,
+        scheduledAt: s.scheduledAt || null,
       };
     }),
     ...completedServices
@@ -440,9 +468,14 @@ export default function ServicesPage({
         return (a.price || 0) - (b.price || 0);
       case 'name':
         return a.name.localeCompare(b.name);
-      case 'recent':
-      default:
-        return 0;
+        case 'recent':
+          default: {
+            // naya session sabse upar — createdAt fallback scheduledAt pe,
+            // dono na ho to order same rakho
+            const aDate = new Date((a as any).createdAt || (a as any).scheduledAt || 0).getTime();
+            const bDate = new Date((b as any).createdAt || (b as any).scheduledAt || 0).getTime();
+            return bDate - aDate;
+          }
     }
   });
 

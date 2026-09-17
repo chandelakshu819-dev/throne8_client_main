@@ -1,5 +1,5 @@
 // mentorDashboard/components/AvailabilityPage.tsx
-import React, { useState, useEffect, useCallback, useMemo } from "react"
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
   Clock, Globe, Calendar, ChevronLeft, ChevronRight,
   Shield, Trash2, Plus, X, BarChart2, RefreshCw, Pencil, Check, Lock, Ban
@@ -44,7 +44,16 @@ const statCardMeta = [
 export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) {
   // ── Core state ─────────────────────────────────────────
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [slotDuration, setSlotDuration] = useState(30);
+  const [slotDuration, setSlotDuration] = useState(() => mentorData?.availability?.slotDuration || 30);
+
+  // ✅ NEW: Service create/update hote hi (ServicesPage.tsx se) backend ka
+  // availability.slotDuration update hota hai — mentorData refresh hone par
+  // yahan bhi sync kar do, taaki agla generateSlots() naye duration ke sath chale.
+  useEffect(() => {
+    if (mentorData?.availability?.slotDuration) {
+      setSlotDuration(mentorData.availability.slotDuration);
+    }
+  }, [mentorData?.availability?.slotDuration]);
   const [bufferTime, setBufferTime] = useState(0);
   const [timezone, setTimezone] = useState("Asia/Kolkata");
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
@@ -221,19 +230,18 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
       await AvailabilityService.blockDateByDate(
         mentorData.mentorId,
         newBlockDate,
-        newBlockLabel.trim() || undefined,
+        undefined,
         timezone
       );
       await fetchMonthAvailability();
-      setSaveMessage({ type: "success", text: `Blocked: ${newBlockDate}${newBlockLabel ? ` — ${newBlockLabel}` : ""}` });
-      setNewBlockDate(""); setNewBlockLabel(""); setShowBlockDateInput(false);
+      setSaveMessage({ type: "success", text: `Blocked: ${newBlockDate}` });
+      setNewBlockDate(""); setShowBlockDateInput(false);
     } catch (err: any) {
       setSaveMessage({ type: "error", text: err.message });
     } finally {
       setBlockActionId(null);
     }
   };
-
   const removeBlockedDate = async (availabilityId: string) => {
     setBlockActionId(availabilityId);
     try {
@@ -286,7 +294,39 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
   
     const isDateBlocked = (date: number) => blockedRecordsByDay.has(date);
 
-  // ── Save Handler ───────────────────────────────────────
+    // ✅ NEW: which weekday name corresponds to the currently selected calendar
+    // date — used to auto-highlight and scroll to that row in Weekly Schedule.
+    const selectedDayName = useMemo(() => {
+      if (selectedDate === null) return null;
+      const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDate);
+      return date.toLocaleDateString("en-US", { weekday: "long" });
+    }, [selectedDate, currentDate]);
+
+      // ✅ NEW: jab calendar se koi date select ho, us weekday row tak
+    // sirf ANDAR WALE box (scheduleListRef) ko scroll karo — page/window
+    // scroll ko bilkul touch nahi karte (scrollIntoView use nahi kiya,
+    // kyunki wo ancestor page ko bhi scroll kar sakta hai).
+    const dayRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+    const scheduleListRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      if (!selectedDayName) return;
+      const container = scheduleListRef.current;
+      const el = dayRowRefs.current[selectedDayName];
+      if (!container || !el) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const offset =
+        elRect.top - containerRect.top + container.scrollTop
+        - (container.clientHeight / 2) + (el.clientHeight / 2);
+
+      container.scrollTo({ top: offset, behavior: "smooth" });
+    }, [selectedDayName]);
+
+  
+  
+     // ── Save Handler ───────────────────────────────────────
   const handleSaveAvailability = async () => {
     if (!mentorData?.mentorId) {
       setSaveMessage({ type: "error", text: "Mentor ID not found. Please refresh." });
@@ -491,31 +531,13 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
         {/* ── Left Section ──────────────────────────────── */}
         <div className="lg:col-span-2 space-y-5">
 
-          {/* Config cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {/* Slot Duration */}
-            <div className="bg-white p-5 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
-              <h3 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: '#4a3728' }}>
-                <Clock className="w-4 h-4" style={{ color: '#7a5c3e' }} /> Slot Duration
-              </h3>
-              <div className="flex gap-2">
-                {[30, 45, 60].map(min => (
-                  <button
-                    key={min}
-                    onClick={() => setSlotDuration(min)}
-                    className="flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors"
-                    style={{
-                      backgroundColor: slotDuration === min ? '#4a3728' : '#fbf7f3',
-                      color: slotDuration === min ? '#fff' : '#7a5c3e',
-                      border: slotDuration === min ? 'none' : '1px solid #e0d8cf',
-                    }}
-                  >
-                    {min}m
-                  </button>
-                ))}
-              </div>
-            </div>
-
+                   {/* Config cards */}
+          {/* ✅ FIX: Slot Duration card hata diya — ab sirf 2 cards hain,
+              isliye grid ko md:grid-cols-3 se md:grid-cols-2 kar diya
+              taaki khaali teesri column na dikhe. slotDuration state
+              ab bhi code me hai (generateSlots/save handlers isko use
+              karte hain) bas fixed default (30) pe rehta hai. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Break */}
             <div className="bg-white p-5 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
               <h3 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: '#4a3728' }}>
@@ -581,15 +603,13 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
               <div className="mt-3 flex items-center gap-2 flex-wrap">
                 <input
                   type="date" value={newBlockDate} onChange={e => setNewBlockDate(e.target.value)}
-                  className="px-3.5 py-2 rounded-lg outline-none text-sm font-semibold"
-                  style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
-                />
-                <input
-                  type="text" placeholder="Label (e.g. Diwali)" value={newBlockLabel} onChange={e => setNewBlockLabel(e.target.value)}
                   className="px-3.5 py-2 rounded-lg outline-none text-sm font-semibold flex-1"
                   style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
                 />
 
+                {/* ✅ FIX: Label/reason input hata diya — ab sirf date
+                    diya jaata hai, addBlockedDate() ko label ki jagah
+                    undefined pass hoga (jo already optional hai). */}
 <button
                   onClick={addBlockedDate}
                   disabled={!!blockActionId}
@@ -607,37 +627,60 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
           <div className="bg-white p-6 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold" style={{ color: '#4a3728' }}>Weekly Schedule</h3>
-              {/* Mini week-pattern strip — ab clickable bhi hai, weekSchedule state se connected */}
+                            {/* Mini week-pattern strip — clickable to toggle enabled/disabled,
+                  AND now shows a ring highlight when its day matches the
+                  currently selected calendar date. */}
               <div className="flex items-center gap-1.5">
-                {weekSchedule.map((d, idx) => (
-                  <button
-                    key={d.day}
-                    type="button"
-                    title={`${d.day}${d.enabled ? ` · ${d.startTime}–${d.endTime}` : ' · Off'}`}
-                    onClick={() =>
-                      setWeekSchedule(prev =>
-                        prev.map((dd, i) => (i === idx ? { ...dd, enabled: !dd.enabled } : dd))
-                      )
-                    }
-                    className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold transition-colors"
-                    style={{
-                      backgroundColor: d.enabled ? '#4a3728' : '#f3ece4',
-                      color: d.enabled ? '#fff' : '#a08070',
-                    }}
-                  >
-                    {d.day[0]}
-                  </button>
-                ))}
+              {weekSchedule.map((d, idx) => {
+                  const isSelectedDay = selectedDayName === d.day;
+                  return (
+                    <button
+                      key={d.day}
+                      type="button"
+                      title={`${d.day}${d.enabled ? ` · ${d.startTime}–${d.endTime}` : ' · Off'}${isSelectedDay ? ` · Selected on calendar (${selectedDate})` : ''}`}
+                      onClick={() =>
+                        setWeekSchedule(prev =>
+                          prev.map((dd, i) => (i === idx ? { ...dd, enabled: !dd.enabled } : dd))
+                        )
+                      }
+                      className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold transition-all"
+                      style={{
+                        // ✅ FIX: selected calendar date ka day ab solid dark
+                        // block dikhega (jaisa enabled days dikhte hain),
+                        // sirf halka ring nahi — chahe wo day enabled ho ya na ho.
+                        backgroundColor: isSelectedDay ? '#4a3728' : d.enabled ? '#4a3728' : '#f3ece4',
+                        color: isSelectedDay ? '#fff' : d.enabled ? '#fff' : '#a08070',
+                        boxShadow: isSelectedDay ? '0 0 0 2px #4a3728, 0 0 0 4px rgba(74,55,40,0.3)' : 'none',
+                      }}
+                    >
+                      {d.day[0]}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            <div className="space-y-2.5">
-              {weekSchedule.map((item, idx) => (
-                <div
+            <div
+              ref={scheduleListRef}
+              className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1"
+            >
+              {weekSchedule.map((item, idx) => {
+                // ✅ FIX: calendar se jo date select hui hai uska weekday —
+                // usi row ko dark-highlight karo taaki "kis din ka schedule
+                // edit ho raha hai" turant clear ho jaye.
+                const isSelectedDay = selectedDayName === item.day;
+                return (
+                  <div
                   key={item.day}
-                  className="flex items-center justify-between p-4 rounded-xl transition-opacity"
-                  style={{ border: '1px solid #e0d8cf', backgroundColor: item.enabled ? '#fbf7f3' : '#fafafa', opacity: item.enabled ? 1 : 0.55 }}
+                  ref={(el) => { dayRowRefs.current[item.day] = el; }}
+                  className="flex items-center justify-between p-4 rounded-xl transition-all"
+                  style={{
+                    border: isSelectedDay ? '2px solid #4a3728' : '1px solid #e0d8cf',
+                    backgroundColor: isSelectedDay ? '#f3ece4' : item.enabled ? '#fbf7f3' : '#fafafa',
+                    opacity: item.enabled ? 1 : 0.55,
+                    boxShadow: isSelectedDay ? '0 0 0 3px rgba(74,55,40,0.12)' : 'none',
+                  }}
                 >
-                  <span className="text-sm font-bold w-24" style={{ color: '#4a3728' }}>{item.day}</span>
+                                          <span className="text-sm font-bold w-24" style={{ color: '#4a3728' }}>{item.day}</span>
                   <div className="flex items-center gap-3 flex-1 justify-end">
                     <input
                       type="time" value={item.startTime} disabled={!item.enabled}
@@ -664,9 +707,10 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                         style={{ backgroundColor: item.enabled ? '#4a3728' : '#d8cec4' }}
                       />
                     </label>
-                  </div>
+                    </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

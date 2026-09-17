@@ -125,6 +125,8 @@ class MentorService {
       daysAvailable?: string[];
       preferredHours?: { start: string; end: string };
       bufferBetweenSessions?: number;
+      // ✅ NEW
+      slotDuration?: number;
     }
   ): Promise<MentorResponse> {
     try {
