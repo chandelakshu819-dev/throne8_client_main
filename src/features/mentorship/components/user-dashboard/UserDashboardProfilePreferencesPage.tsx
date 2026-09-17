@@ -292,7 +292,7 @@ export default function UserDashboardProfilePreferencesPage({
         <button
           onClick={() => fetchAllUserData(true)}
           disabled={refreshing}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 hover:-translate-y-0.5"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
           style={{
             backgroundColor: THEME.cardBg,
             borderColor: THEME.border,
@@ -441,7 +441,7 @@ export default function UserDashboardProfilePreferencesPage({
           {/* Edit Profile Action */}
           <button
             onClick={() => setIsEditProfileOpen(true)}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 shrink-0"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md active:translate-y-0 shrink-0"
             style={{ backgroundColor: THEME.primary }}
           >
             <Edit3 className="w-3.5 h-3.5" />
@@ -486,7 +486,7 @@ export default function UserDashboardProfilePreferencesPage({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* SECTION 2: Preferred Role & Career Direction */}
         <section
-          className="rounded-2xl p-6 border shadow-sm flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5"
+          className="rounded-2xl p-6 border shadow-sm flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
           style={{
             backgroundColor: THEME.cardBg,
             borderColor: THEME.border,
@@ -549,7 +549,7 @@ export default function UserDashboardProfilePreferencesPage({
 
         {/* SECTION 7: Notification Preferences */}
         <section
-          className="rounded-2xl p-6 border shadow-sm flex flex-col justify-between transition-all duration-200 hover:-translate-y-0.5"
+          className="rounded-2xl p-6 border shadow-sm flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
           style={{
             backgroundColor: THEME.cardBg,
             borderColor: THEME.border,
@@ -734,7 +734,7 @@ export default function UserDashboardProfilePreferencesPage({
 
           <button
             onClick={() => setIsAddSkillOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md active:translate-y-0"
             style={{ backgroundColor: THEME.primary }}
           >
             <Plus className="w-3.5 h-3.5" />
@@ -822,7 +822,7 @@ export default function UserDashboardProfilePreferencesPage({
 
           <button
             onClick={() => setIsAddExpOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md active:translate-y-0"
             style={{ backgroundColor: THEME.primary }}
           >
             <Plus className="w-3.5 h-3.5" />
@@ -903,31 +903,14 @@ export default function UserDashboardProfilePreferencesPage({
               </div>
             </div>
 
-            {/* Honest representation of backend data availability */}
             <div
-              className="p-4 rounded-xl border space-y-2 mb-3"
+              className="p-4 rounded-xl border space-y-2 mb-3 text-center"
               style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}
             >
-              <div className="flex items-start gap-2.5">
-                <Info className="w-4 h-4 mt-0.5 shrink-0" style={{ color: THEME.secondary }} />
-                <div className="text-xs leading-relaxed" style={{ color: THEME.primary }}>
-                  <p className="font-semibold mb-1">Backend Configuration Status</p>
-                  <p className="text-xs" style={{ color: THEME.textMuted }}>
-                    A dedicated <code className="text-[11px] bg-[#ece4db] px-1 py-0.5 rounded">careerInterests</code> collection
-                    is currently pending backend route deployment on the server. To avoid presenting fabricated or un-persisted options,
-                    interest targeting currently aligns directly with your active{" "}
-                    <strong>Preferred Role</strong> (<code className="text-[11px]">{currentPosition || "None set"}</code>) and followed companies.
-                  </p>
-                </div>
-              </div>
+              <p className="text-xs font-medium" style={{ color: THEME.textMuted }}>
+                No career interests added yet.
+              </p>
             </div>
-          </div>
-
-          <div className="pt-4 mt-4 border-t flex items-center justify-between text-xs" style={{ borderColor: THEME.borderLight }}>
-            <span style={{ color: THEME.textMuted }}>Status: Authentic Empty State</span>
-            <span className="font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md">
-              Awaiting Dedicated API
-            </span>
           </div>
         </section>
 
@@ -957,30 +940,14 @@ export default function UserDashboardProfilePreferencesPage({
               </div>
             </div>
 
-            {/* Honest representation of backend data availability */}
             <div
-              className="p-4 rounded-xl border space-y-2 mb-3"
+              className="p-4 rounded-xl border space-y-2 mb-3 text-center"
               style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}
             >
-              <div className="flex items-start gap-2.5">
-                <Info className="w-4 h-4 mt-0.5 shrink-0" style={{ color: THEME.secondary }} />
-                <div className="text-xs leading-relaxed" style={{ color: THEME.primary }}>
-                  <p className="font-semibold mb-1">Session Goal Alignment</p>
-                  <p className="text-xs" style={{ color: THEME.textMuted }}>
-                    User mentorship goals are currently generated in real-time by the AI matching engine based on your active role
-                    (<strong>{currentPosition ? `Advance in ${currentPosition}` : "General Career Growth"}</strong>).
-                    Independent user goal models are not yet exposed as a mutable user endpoint in the API.
-                  </p>
-                </div>
-              </div>
+              <p className="text-xs font-medium" style={{ color: THEME.textMuted }}>
+                No goals added yet.
+              </p>
             </div>
-          </div>
-
-          <div className="pt-4 mt-4 border-t flex items-center justify-between text-xs" style={{ borderColor: THEME.borderLight }}>
-            <span style={{ color: THEME.textMuted }}>Status: Heuristic AI Matching</span>
-            <span className="font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md">
-              Awaiting User Goal Model
-            </span>
           </div>
         </section>
       </div>
@@ -1076,7 +1043,7 @@ function SkillCard({ skill, onDelete }: { skill: any; onDelete: () => Promise<vo
 
   return (
     <div
-      className="p-3.5 rounded-xl border flex items-center justify-between gap-2 transition-all duration-200 hover:-translate-y-0.5 shadow-xs"
+      className="p-3.5 rounded-xl border flex items-center justify-between gap-2 transition-all duration-200 hover:-translate-y-1 hover:shadow-md shadow-xs"
       style={{
         backgroundColor: THEME.surfaceMuted,
         borderColor: THEME.borderLight,
@@ -1139,7 +1106,7 @@ function ExperienceRow({ exp, onDelete }: { exp: any; onDelete: () => Promise<vo
 
   return (
     <div
-      className="p-4 rounded-xl border flex flex-col sm:flex-row sm:items-start justify-between gap-3 transition-all duration-200 hover:-translate-y-0.5 shadow-xs"
+      className="p-4 rounded-xl border flex flex-col sm:flex-row sm:items-start justify-between gap-3 transition-all duration-200 hover:-translate-y-1 hover:shadow-md shadow-xs"
       style={{
         backgroundColor: THEME.surfaceMuted,
         borderColor: THEME.borderLight,
