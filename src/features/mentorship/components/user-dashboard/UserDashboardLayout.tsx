@@ -14,6 +14,7 @@ import UserDashboardReviewsPage from "./UserDashboardReviewsPage";
 import UserDashboardPaymentsPage from "./UserDashboardPaymentsPage";
 import UserDashboardNotificationsPage from "./UserDashboardNotificationsPage";
 import UserDashboardRecommendedMentorsPage from "./UserDashboardRecommendedMentorsPage";
+import UserDashboardProfilePreferencesPage from "./UserDashboardProfilePreferencesPage";
 import { useRouter } from "next/navigation";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
@@ -23,6 +24,8 @@ import { getSocket } from "@/core/realtime/socket.client";
 
 const pageComponents: Record<string, React.FC<any>> = {
   dashboard: UserDashboardOverviewPage,
+  "profile-preferences": UserDashboardProfilePreferencesPage,
+  profile: UserDashboardProfilePreferencesPage,
   progress: UserDashboardProgressPage,
   "upcoming-sessions": UserDashboardUpcomingSessionsPage,
   "my-mentors": UserDashboardMyMentorsPage,

@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, ChevronRight, CalendarClock, Users, Bookmark, History, Clock, Star, Receipt, Bell, Sparkles, TrendingUp } from "lucide-react";
+import { LayoutDashboard, ChevronRight, CalendarClock, Users, Bookmark, History, Clock, Star, Receipt, Bell, Sparkles, TrendingUp, UserCog } from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 
@@ -12,6 +12,7 @@ interface UserSidebarProps {
 
 const USER_MENU_ITEMS = [
   { id: "dashboard", label: "Overview", icon: LayoutDashboard },
+  { id: "profile-preferences", label: "Profile & Preferences", icon: UserCog },
   { id: "progress", label: "Mentorship Progress", icon: TrendingUp },
   { id: "recommended-mentors", label: "Recommended Mentors", icon: Sparkles },
   { id: "upcoming-sessions", label: "Upcoming Sessions", icon: CalendarClock },
@@ -41,11 +42,18 @@ export default function UserSidebar({
   return (
     <aside className="w-80 flex flex-col" style={{ backgroundColor: '#fff', borderRight: '1px solid #ece4db' }}>
       {/* Profile Card */}
-      <div className="mx-5 mt-6 mb-2 p-6 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
+      <div
+        onClick={() => setActivePage("profile-preferences")}
+        role="button"
+        tabIndex={0}
+        className="mx-5 mt-6 mb-2 p-6 rounded-2xl cursor-pointer transition-all duration-200 hover:shadow-md group"
+        style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}
+        title="Manage Profile & Preferences"
+      >
         <div className="flex flex-col items-center text-center">
-          <div className="w-20 h-20 rounded-2xl overflow-hidden mb-4" style={{ border: '1px solid #e0d8cf' }}>
+          <div className="w-20 h-20 rounded-2xl overflow-hidden mb-4 relative" style={{ border: '1px solid #e0d8cf' }}>
             {profileImageUrl ? (
-              <img src={profileImageUrl} alt={fullName} className="w-full h-full object-cover" />
+              <img src={profileImageUrl} alt={fullName} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-white" style={{ backgroundColor: '#4a3728' }}>
                 {initials}
@@ -53,14 +61,19 @@ export default function UserSidebar({
             )}
           </div>
 
-          <h2 className="text-lg font-bold" style={{ color: '#4a3728' }}>{fullName}</h2>
+          <h2 className="text-lg font-bold group-hover:text-[#7a5c3e] transition-colors" style={{ color: '#4a3728' }}>{fullName}</h2>
 
-          <span
-            className="mt-2 px-3 py-1 rounded-full text-xs font-semibold"
-            style={{ backgroundColor: '#f3ece4', color: '#7a5c3e' }}
-          >
-            Mentee
-          </span>
+          <div className="flex items-center gap-2 mt-2">
+            <span
+              className="px-3 py-1 rounded-full text-xs font-semibold"
+              style={{ backgroundColor: '#f3ece4', color: '#7a5c3e' }}
+            >
+              Mentee
+            </span>
+            <span className="text-[11px] font-medium text-[#7a5c3e] underline opacity-80 group-hover:opacity-100">
+              Manage →
+            </span>
+          </div>
         </div>
       </div>
 
