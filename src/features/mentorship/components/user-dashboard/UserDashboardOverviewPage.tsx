@@ -147,17 +147,23 @@ export default function UserDashboardOverviewPage({
       title: "Complete your profile",
       description: "Help mentors understand your goals",
       icon: BookOpen,
-      onClick: () => router.push('/settings/profile')
+      onClick: () => setActivePage?.('profile')
     });
   }
 
-  const unreviewedSessions = completed.filter(s => !s.review || (!s.review.rating && !s.review.menteeReview));
+  const unreviewedSessions = sessions.filter(s => {
+    const status = (s.status || "").toLowerCase();
+    const isCompletedStatus = status === "completed" || status === "done";
+    const hasReview = s.review && (s.review.rating || s.review.menteeReview);
+    return isCompletedStatus && !hasReview;
+  });
+
   if (unreviewedSessions.length > 0) {
     pendingActions.push({
       title: `Review ${unreviewedSessions.length} completed session${unreviewedSessions.length > 1 ? 's' : ''}`,
       description: "Share your feedback to help others",
       icon: ShieldCheck,
-      onClick: () => router.push('/mentorship/sessions')
+      onClick: () => setActivePage?.('session-history')
     });
   }
 
@@ -297,7 +303,7 @@ export default function UserDashboardOverviewPage({
                   <div
                     key={idx}
                     onClick={action.onClick}
-                    className="flex items-center justify-between gap-3 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9] cursor-pointer"
+                    className="flex items-center justify-between gap-3 p-3.5 rounded-xl transition-all duration-200 hover:-translate-y-1 hover:shadow-md hover:border-[#c9baa9] cursor-pointer"
                     style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
                   >
                     <div className="flex items-center gap-3">
