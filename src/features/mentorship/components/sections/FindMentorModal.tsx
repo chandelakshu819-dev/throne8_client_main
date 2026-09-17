@@ -182,7 +182,10 @@ function MentorCard({ mentor, featured }: { mentor: MentorItem; featured: boolea
             )}
 
             <button
-                onClick={() => router.push(`/mentorship/mentors/${mentor.id}?book=true`)}
+                onClick={() => {
+                    const slugName = mentor.name ? mentor.name.toLowerCase().replace(/\s+/g, "-") : "mentor";
+                    router.push(`/mentorship/mentor-card/${slugName}/${mentor.id}?book=true`);
+                }}
                 className="w-full py-2 rounded-xl text-xs font-bold tracking-wide transition-all hover:opacity-90 active:scale-95 mt-auto"
                 style={{ backgroundColor: "#4a3728", color: "#f6ede8" }}
             >
