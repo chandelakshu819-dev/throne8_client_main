@@ -256,8 +256,7 @@ class ConnectionService {
             throw new Error(error.response?.data?.message || 'Failed to fetch blocked users');
         }
     }
-
-
+    
 
     static async getBulkMutualConnections(userId: string, targetUserIds: string[], limit: number = 3) {
         try {
@@ -291,6 +290,7 @@ class ConnectionService {
             return { data: { mutuals: [], count: 0 } };
         }
     }
+
 
     /**
      * 🧑‍🤝‍🧑 GET PYMK SUGGESTION CARDS

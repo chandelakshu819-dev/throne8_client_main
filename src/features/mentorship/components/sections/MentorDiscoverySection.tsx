@@ -2,9 +2,17 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+    Crown,
+    Users,
+    Star,
+    Briefcase,
+    Eye,
+    Calendar,
+    ArrowRight
+} from "lucide-react";
 import Sidebar from "../layout/Sidebar";
-import { MentorCard } from "@/features/index";
 import MentorService from "@/lib/api/mentorship.service";
 
 interface MentorDiscoverySectionProps {
@@ -12,11 +20,37 @@ interface MentorDiscoverySectionProps {
     compareList: number[];
 }
 
+interface MentorData {
+    id: string | number;
+    name: string;
+    role: string;
+    company: string;
+    rating: number;
+    sessions: number;
+    price: number;
+    image: string;
+    tags: string[];
+    exp: string;
+    expTotal: number;
+    domains: string[];
+    isSenior: boolean;
+    acceptsBooking: boolean;
+    isDummy?: boolean;
+}
+
 export default function MentorDiscoverySection({ toggleCompare, compareList }: MentorDiscoverySectionProps) {
-    const [allMentors, setAllMentors] = useState<any[]>([]);
-    const [filteredMentors, setFilteredMentors] = useState<any[]>([]);
+    const router = useRouter();
+    const [allMentors, setAllMentors] = useState<MentorData[]>([]);
+    const [filteredMentors, setFilteredMentors] = useState<MentorData[]>([]);
     const [loading, setLoading] = useState(true);
     const [filtering, setFiltering] = useState(false);
+
+    // Show more / pagination states for each section
+    const [showAllSeniorMentors, setShowAllSeniorMentors] = useState(false);
+    const [showAllRegularMentors, setShowAllRegularMentors] = useState(false);
+
+    const SENIOR_LIMIT = 4;
+    const REGULAR_LIMIT = 4;
 
     // Filter states
     const [companySearch, setCompanySearch] = useState("");
@@ -27,26 +61,61 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         MentorService.getAllMentors({ page: 1, limit: 50 })
             .then((res) => {
                 const list = Array.isArray(res.data) ? res.data : [];
-                const mapped = list.map((m: any) => ({
-                    id: m.mentorId,
-                    name: `${m.user?.firstName ?? ""} ${m.user?.lastName ?? ""}`.trim(),
-                    role: m.experience?.currentRole?.split(" at ")[0] ?? "Mentor",
-                    company: m.experience?.currentRole?.split(" at ")[1] ?? "",
-                    rating: m.stats?.averageRating || 0,
-                    sessions: m.stats?.totalSessions || 0,
-                    price: m.pricing?.quickCall || 0,
-                    match: 90,
-                    image: m.profilePic ?? "",
-                    tags: m.skills?.slice(0, 2) ?? [],
-                    exp: `${m.experience?.total ?? 0} Yrs`,
-                    expTotal: m.experience?.total ?? 0,
-                    domains: m.domains ?? [],
-                    isDummy: false,
-                }));
+                const mapped: MentorData[] = list.map((m: any) => {
+                    const rawRole = m.experience?.currentRole ?? "";
+                    const rawTitle = m.title ?? "";
+                    const totalExp = Number(m.experience?.total) || 0;
+
+                    // Parse role and company safely
+                    let role = rawRole;
+                    let company = "";
+                    if (rawRole.includes(" @ ")) {
+                        const parts = rawRole.split(" @ ");
+                        role = parts[0];
+                        company = parts[1] || "";
+                    } else if (rawRole.includes(" at ")) {
+                        const parts = rawRole.split(" at ");
+                        role = parts[0];
+                        company = parts[1] || "";
+                    } else if (rawRole) {
+                        role = rawRole;
+                        company = m.company ?? "";
+                    } else {
+                        role = rawTitle || "Mentor";
+                        company = m.company ?? "";
+                    }
+
+                    // TODO: Replace this heuristic with a proper verification.isVerified or SeniorMentorApplication-based check once that data is joined into the getAllMentors() API response.
+                    const seniorKeywords = ["senior", "lead", "principal", "director", "head", "vp", "founder", "ceo", "cto"];
+                    const textToCheck = `${rawRole} ${rawTitle}`.toLowerCase();
+                    const hasSeniorKeyword = seniorKeywords.some((kw) => textToCheck.includes(kw));
+                    const isSenior = totalExp >= 5 || hasSeniorKeyword;
+
+                    return {
+                        id: m.mentorId,
+                        name: `${m.user?.firstName ?? ""} ${m.user?.lastName ?? ""}`.trim() || m.user?.name || "Mentor",
+                        role: role.trim() || "Mentor",
+                        company: company.trim(),
+                        rating: Number(m.stats?.averageRating) || 4.9,
+                        sessions: Number(m.stats?.totalSessions) || 0,
+                        price: Number(m.pricing?.quickCall) || 0,
+                        image: m.profilePic ?? "",
+                        tags: Array.isArray(m.skills) && m.skills.length > 0 ? m.skills.slice(0, 2) : ["Mentorship", "Career"],
+                        exp: `${totalExp} Yrs`,
+                        expTotal: totalExp,
+                        domains: Array.isArray(m.domains) ? m.domains : [],
+                        isSenior,
+                        acceptsBooking: Boolean(m.pricing?.quickCall || m.availability?.autoAcceptBookings || (m.availability?.daysAvailable && m.availability.daysAvailable.length > 0)),
+                        isDummy: false,
+                    };
+                });
                 setAllMentors(mapped);
                 setFilteredMentors(mapped);
             })
-            .catch(() => { setAllMentors([]); setFilteredMentors([]); })
+            .catch(() => {
+                setAllMentors([]);
+                setFilteredMentors([]);
+            })
             .finally(() => setLoading(false));
     }, []);
 
@@ -68,14 +137,19 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
 
     const handleApplyFilters = () => {
         setFiltering(true);
+        // Reset show-more states when filters are re-applied
+        setShowAllSeniorMentors(false);
+        setShowAllRegularMentors(false);
+
         setTimeout(() => {
             let result = [...allMentors];
 
             // Company search filter
             if (companySearch.trim()) {
+                const searchLower = companySearch.toLowerCase();
                 result = result.filter(m =>
-                    m.company?.toLowerCase().includes(companySearch.toLowerCase()) ||
-                    m.name?.toLowerCase().includes(companySearch.toLowerCase())
+                    m.company?.toLowerCase().includes(searchLower) ||
+                    m.name?.toLowerCase().includes(searchLower)
                 );
             }
 
@@ -99,21 +173,249 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
 
             setFilteredMentors(result);
             setFiltering(false);
-        }, 500); // small delay for loader feel
+        }, 400);
     };
 
     const handleClearFilters = () => {
         setCompanySearch("");
         setSelectedDomains([]);
         setSelectedExps([]);
+        setShowAllSeniorMentors(false);
+        setShowAllRegularMentors(false);
         setFilteredMentors(allMentors);
     };
 
-    const displayMentors = filteredMentors;
-    const isFiltered = companySearch || selectedDomains.length > 0 || selectedExps.length > 0;
+    const isFiltered = Boolean(companySearch || selectedDomains.length > 0 || selectedExps.length > 0);
+
+    // Split into Senior and Regular mentors
+    const seniorMentors = filteredMentors.filter((m) => m.isSenior);
+    const baseRegularMentors = filteredMentors.filter((m) => !m.isSenior);
+
+    // 3 frontend-only dummy mentors to bring total count to 5 (2 real + 3 dummy)
+    const DUMMY_REGULAR_MENTORS: MentorData[] = [
+        {
+            id: "dummy-1",
+            name: "New Mentor",
+            role: "Profile in Onboarding",
+            company: "",
+            rating: 0,
+            sessions: 0,
+            price: 0,
+            image: "",
+            tags: ["Mentorship"],
+            exp: "0 Yrs",
+            expTotal: 0,
+            domains: [],
+            isSenior: false,
+            acceptsBooking: false,
+            isDummy: true,
+        },
+        {
+            id: "dummy-2",
+            name: "New Mentor",
+            role: "Profile in Onboarding",
+            company: "",
+            rating: 0,
+            sessions: 0,
+            price: 0,
+            image: "",
+            tags: ["Mentorship"],
+            exp: "0 Yrs",
+            expTotal: 0,
+            domains: [],
+            isSenior: false,
+            acceptsBooking: false,
+            isDummy: true,
+        },
+        {
+            id: "dummy-3",
+            name: "New Mentor",
+            role: "Profile in Onboarding",
+            company: "",
+            rating: 0,
+            sessions: 0,
+            price: 0,
+            image: "",
+            tags: ["Mentorship"],
+            exp: "0 Yrs",
+            expTotal: 0,
+            domains: [],
+            isSenior: false,
+            acceptsBooking: false,
+            isDummy: true,
+        },
+    ];
+
+    // Append dummy mentors exclusively to regularMentors
+    const regularMentors = [...baseRegularMentors, ...DUMMY_REGULAR_MENTORS];
+
+    // Sliced lists for initial view
+    const visibleSeniorMentors = showAllSeniorMentors 
+        ? seniorMentors 
+        : seniorMentors.slice(0, SENIOR_LIMIT);
+
+    const visibleRegularMentors = showAllRegularMentors 
+        ? regularMentors 
+        : regularMentors.slice(0, REGULAR_LIMIT);
+
+    // Format experience label with proper singular/plural grammar
+    const getExperienceLabel = (totalYears: number) => {
+        if (!totalYears || totalYears <= 0) return "0-1 Yrs Experience";
+        if (totalYears === 1) return "1 Yr Experience";
+        return `${totalYears}+ Yrs Experience`;
+    };
+
+    const handleNavigate = (mentor: MentorData) => {
+        if (mentor.isDummy) return;
+        const slugName = (mentor.name || "mentor").toLowerCase().replace(/\s+/g, "-");
+        router.push(`/mentorship/mentor-card/${slugName}/${mentor.id}`);
+    };
+
+    // Render individual mentor card
+    const renderCard = (mentor: MentorData, isSeniorCard: boolean) => (
+        <div
+            key={mentor.id}
+            className={`rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 relative group ${
+                mentor.isDummy 
+                    ? "bg-[#fcfaf7] border border-dashed border-[#dcd1c7] opacity-75 shadow-none cursor-default select-none" 
+                    : "bg-white border border-[#e8ded5] hover:border-[#cfbeaf] shadow-sm hover:shadow-md"
+            }`}
+        >
+            <div>
+                {/* Card Top Row: Badge (Senior) + Online indicator */}
+                <div className="flex items-center justify-between min-h-[26px] mb-2.5">
+                    {isSeniorCard ? (
+                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#faeedd] text-[#8b5e3c] border border-[#ecd5bf] text-[10px] font-bold uppercase tracking-wider">
+                            <Crown className="w-3 h-3 text-[#b47a3e]" />
+                            <span>SENIOR MENTOR</span>
+                        </div>
+                    ) : (
+                        <div />
+                    )}
+
+                    {mentor.isDummy ? (
+                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-stone-400 ml-auto">
+                            <span className="w-2 h-2 rounded-full bg-stone-300" />
+                            <span>Joining Soon</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 ml-auto">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Online</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Avatar */}
+                <div className="flex justify-center mb-2.5">
+                    <div className={`w-16 h-16 rounded-full overflow-hidden border-2 shadow-sm ring-1 ring-[#e4d8ce] flex items-center justify-center ${mentor.isDummy ? "border-dashed border-[#d5c6ba] bg-[#f3ece3]" : "border-white bg-[#f5ede5]"}`}>
+                        {mentor.image ? (
+                            <img
+                                src={mentor.image}
+                                alt={mentor.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-[#4a3728] text-lg font-bold">
+                                {mentor.isDummy ? <Users className="w-6 h-6 text-[#b5a799]" /> : (mentor.name?.[0] ?? "M")}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Name */}
+                <h4 className={`font-bold text-sm text-center truncate px-1 ${mentor.isDummy ? "text-[#8b7355]" : "text-[#2d2015]"}`}>
+                    {mentor.name}
+                </h4>
+
+                {/* Role & Company */}
+                <p className="text-[11px] text-[#8b7355] text-center font-medium truncate mb-2 px-1">
+                    {mentor.role}{mentor.company ? ` @ ${mentor.company}` : ""}
+                </p>
+
+                {/* Rating & Sessions */}
+                <div className="flex items-center justify-center gap-1.5 text-xs mb-2.5">
+                    {mentor.isDummy ? (
+                        <div className="flex items-center justify-center gap-1.5 text-[#b5a799]">
+                            <Star className="w-3.5 h-3.5 text-[#d9cbbe]" />
+                            <span className="font-medium text-[#a39282]">Joining Soon</span>
+                        </div>
+                    ) : (
+                        <>
+                            <Star className="w-3.5 h-3.5 fill-[#d99b26] text-[#d99b26]" />
+                            <span className="font-bold text-[#2d2015]">{mentor.rating ? Number(mentor.rating).toFixed(1) : "4.9"}</span>
+                            <span className="text-[#c4b5a5]">·</span>
+                            <span className="text-[11px] text-[#8b7355]">{mentor.sessions || 0} sessions</span>
+                        </>
+                    )}
+                </div>
+
+                {/* Expertise Tags */}
+                <div className="flex items-center justify-center gap-1.5 flex-wrap mb-2.5 min-h-[24px]">
+                    {mentor.tags.map((tag: string, idx: number) => (
+                        <span
+                            key={idx}
+                            className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full ${
+                                mentor.isDummy
+                                    ? "bg-[#f5ede5] text-[#a39282] border border-dashed border-[#e4d6c8]"
+                                    : "bg-[#f6efe8] text-[#6b5643] border border-[#ebdcd0]"
+                            }`}
+                        >
+                            {tag}
+                        </span>
+                    ))}
+                </div>
+
+                {/* Experience */}
+                <div className="flex items-center justify-center gap-1.5 text-[11px] text-[#786352] font-medium mb-4">
+                    <Briefcase className="w-3.5 h-3.5 text-[#a67c52]" />
+                    <span>{getExperienceLabel(mentor.expTotal)}</span>
+                </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div>
+                {mentor.isDummy ? (
+                    <button
+                        disabled
+                        className="w-full py-2 px-3 bg-[#f2eae1] text-[#a39282] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed border border-[#e5dcd3]"
+                    >
+                        <span>Not Available Yet</span>
+                    </button>
+                ) : mentor.acceptsBooking ? (
+                    <button
+                        onClick={() => handleNavigate(mentor)}
+                        className="w-full py-2 px-3 bg-[#3a2a1e] hover:bg-[#251910] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                    >
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>Book Session</span>
+                        <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+                    </button>
+                ) : (
+                    <button
+                        onClick={() => handleNavigate(mentor)}
+                        className="w-full py-2 px-3 border border-[#cfc2b6] hover:border-[#8b7355] hover:bg-[#faf6f1] text-[#3a2a1e] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View Profile</span>
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+
+    // Skeleton loader grid
+    const renderSkeletonGrid = (count: number = 4) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {Array(count).fill(0).map((_, i) => (
+                <div key={i} className="h-[300px] rounded-2xl bg-[#eee5dd] animate-pulse" />
+            ))}
+        </div>
+    );
 
     return (
-        <section className="py-24 px-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-12 items-start">
+        <section className="py-12 px-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-10">
+            {/* LEFT COLUMN: Sidebar (Untouched) */}
             <Sidebar
                 companySearch={companySearch}
                 setCompanySearch={setCompanySearch}
@@ -125,15 +427,23 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                 onClear={handleClearFilters}
             />
 
-            <div>
+            {/* RIGHT COLUMN: Senior Mentors + Mentors */}
+            <div className="flex flex-col gap-10">
                 {(loading || filtering) ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                        {Array(6).fill(0).map((_, i) => (
-                            <div key={i} className="w-full h-[320px] rounded-[32px] bg-[#e0d8cf] animate-pulse" />
-                        ))}
+                    <div className="flex flex-col gap-10">
+                        <div>
+                            <div className="h-8 w-48 bg-[#eee5dd] rounded-lg animate-pulse mb-2" />
+                            <div className="h-4 w-72 bg-[#eee5dd] rounded-lg animate-pulse mb-6" />
+                            {renderSkeletonGrid(4)}
+                        </div>
+                        <div>
+                            <div className="h-8 w-40 bg-[#eee5dd] rounded-lg animate-pulse mb-2" />
+                            <div className="h-4 w-64 bg-[#eee5dd] rounded-lg animate-pulse mb-6" />
+                            {renderSkeletonGrid(4)}
+                        </div>
                     </div>
-                ) : displayMentors.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-24 text-center">
+                ) : filteredMentors.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-24 text-center bg-white border border-[#e8ded5] rounded-3xl p-8">
                         <p className="text-2xl font-black text-[#8b7355]">
                             {isFiltered ? "No Mentors Found" : "No Mentors Yet"}
                         </p>
@@ -143,28 +453,90 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                         {isFiltered && (
                             <button
                                 onClick={handleClearFilters}
-                                className="mt-4 px-6 py-2 bg-[#4a3728] text-white rounded-2xl text-sm font-bold"
+                                className="mt-4 px-6 py-2 bg-[#4a3728] text-white rounded-2xl text-sm font-bold shadow-sm hover:bg-[#38291e] transition-colors"
                             >
                                 Clear Filters
                             </button>
                         )}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                        {displayMentors.map((mentor, i) => (
-                            <MentorCard key={i} mentor={mentor} />
-                        ))}
-                    </div>
-                )}
+                    <>
+                        {/* SECTION 1 — Professional Mentors (Senior) */}
+                        {seniorMentors.length > 0 && (
+                            <section>
+                                <div className="flex items-center gap-3 mb-5">
+                                    <div className="w-10 h-10 rounded-full border border-[#4a3728]/20 bg-[#faf6f1] flex items-center justify-center text-[#4a3728] shadow-sm flex-shrink-0">
+                                        <Crown className="w-5 h-5 text-[#8b5e3c]" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-[#2d2015] tracking-tight">
+                                            Professional Mentor
+                                        </h2>
+                                        <p className="text-xs text-[#8b7355] mt-0.5">
+                                            Learn from experienced industry professionals.
+                                        </p>
+                                    </div>
+                                </div>
 
-                {!loading && !filtering && displayMentors.length > 0 && (
-                    <div className="reveal-on-scroll mt-8">
-                        <button className="group relative w-full py-4 bg-[#FAF9F6] text-[#4a3728] text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-2 hover:gap-3 overflow-hidden">
-                            <span className="absolute inset-0 bg-[#ece7e2] transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-out"></span>
-                            <span className="relative z-10">Show all</span>
-                            <ArrowRight className="relative z-10 w-4 h-4 group-hover:translate-x-1 transition-all duration-300" />
-                        </button>
-                    </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                    {visibleSeniorMentors.map((mentor) => renderCard(mentor, true))}
+                                </div>
+
+                                {seniorMentors.length > SENIOR_LIMIT && (
+                                    <div className="mt-6">
+                                        <button
+                                            onClick={() => setShowAllSeniorMentors((prev) => !prev)}
+                                            className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden"
+                                        >
+                                            <span className="absolute inset-0 bg-[#f4ede6] scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out" />
+                                            <span className="relative z-10 tracking-wide">
+                                                {showAllSeniorMentors ? "Show less" : `Show more (${seniorMentors.length - SENIOR_LIMIT} more)`}
+                                            </span>
+                                            <ArrowRight className={`relative z-10 w-4 h-4 text-[#8b7355] transition-transform duration-300 ${showAllSeniorMentors ? "-rotate-90" : "group-hover:translate-x-1.5 group-hover:text-[#4a3728]"}`} />
+                                        </button>
+                                    </div>
+                                )}
+                            </section>
+                        )}
+
+                        {/* SECTION 2 — OUR Mentor (Regular) */}
+                        {regularMentors.length > 0 && (
+                            <section>
+                                <div className="flex items-center gap-3 mb-5">
+                                    <div className="w-10 h-10 rounded-full border border-[#4a3728]/20 bg-[#faf6f1] flex items-center justify-center text-[#4a3728] shadow-sm flex-shrink-0">
+                                        <Users className="w-5 h-5 text-[#4a3728]" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-[#2d2015] tracking-tight">
+                                            OUR Mentor
+                                        </h2>
+                                        <p className="text-xs text-[#8b7355] mt-0.5">
+                                            Connect with skilled professionals and peers.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                    {visibleRegularMentors.map((mentor) => renderCard(mentor, false))}
+                                </div>
+
+                                {regularMentors.length > REGULAR_LIMIT && (
+                                    <div className="mt-6">
+                                        <button
+                                            onClick={() => setShowAllRegularMentors((prev) => !prev)}
+                                            className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden"
+                                        >
+                                            <span className="absolute inset-0 bg-[#f4ede6] scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out" />
+                                            <span className="relative z-10 tracking-wide">
+                                                {showAllRegularMentors ? "Show less" : `Show more (${regularMentors.length - REGULAR_LIMIT} more)`}
+                                            </span>
+                                            <ArrowRight className={`relative z-10 w-4 h-4 text-[#8b7355] transition-transform duration-300 ${showAllRegularMentors ? "-rotate-90" : "group-hover:translate-x-1.5 group-hover:text-[#4a3728]"}`} />
+                                        </button>
+                                    </div>
+                                )}
+                            </section>
+                        )}
+                    </>
                 )}
             </div>
         </section>

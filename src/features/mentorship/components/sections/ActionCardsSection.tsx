@@ -2,7 +2,7 @@
 
 // features/mentorship/components/sections/ActionCardsSection.tsx
 import React, { useEffect, useState } from "react";
-import { Search, Users, Star, ArrowRight, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { Search, Users, Star, ArrowRight, Clock, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import SeniorMentorApplicationService, {
     ApplicationStatus,
@@ -13,7 +13,6 @@ interface ActionCardsSectionProps {
     onBecomeMentorClick: () => void;
     onFindMentorClick: () => void;
     isMentor?: boolean;
-    /** Pass the authenticated userId so the card can fetch the user's existing application */
     userId?: string;
 }
 
@@ -26,7 +25,6 @@ function resolveCardContent(
     description: string;
     cta: string;
     statusIcon: React.ReactNode | null;
-    statusColor: string;
 } {
     if (isLoading) {
         return {
@@ -34,7 +32,6 @@ function resolveCardContent(
             description: "Checking your application status…",
             cta: "Loading…",
             statusIcon: null,
-            statusColor: "text-[#4a3728]",
         };
     }
 
@@ -45,7 +42,6 @@ function resolveCardContent(
                 "Share your industry experience, guide aspiring professionals, and help shape the next generation of talent.",
             cta: "Apply Now",
             statusIcon: null,
-            statusColor: "text-[#4a3728]",
         };
     }
 
@@ -55,19 +51,15 @@ function resolveCardContent(
                 title: "Senior Mentor Application",
                 description: "Your application has been submitted and is awaiting review.",
                 cta: "View Application",
-                statusIcon: <Clock className="w-3.5 h-3.5 text-amber-500" />,
-                statusColor: "text-amber-600",
+                statusIcon: <Clock className="w-3.5 h-3.5 text-amber-300 group-hover:text-amber-300" />,
             };
-
         case ApplicationStatus.UNDER_REVIEW:
             return {
                 title: "Senior Mentor Application",
                 description: "Great news — your application is currently under review by our team.",
                 cta: "View Status",
-                statusIcon: <Clock className="w-3.5 h-3.5 text-blue-500" />,
-                statusColor: "text-blue-600",
+                statusIcon: <Clock className="w-3.5 h-3.5 text-blue-300" />,
             };
-
         case ApplicationStatus.REJECTED:
             return {
                 title: "Senior Mentor Application",
@@ -76,19 +68,15 @@ function resolveCardContent(
                         ? `Your application needs attention: ${application.rejectionReason}`
                         : "Your previous application needs attention. Please update and resubmit.",
                 cta: "Update Application",
-                statusIcon: <AlertCircle className="w-3.5 h-3.5 text-red-400" />,
-                statusColor: "text-red-500",
+                statusIcon: <AlertCircle className="w-3.5 h-3.5 text-red-400 group-hover:text-red-300" />,
             };
-
         case ApplicationStatus.VERIFIED:
             return {
                 title: "Senior Mentor",
                 description: "Congratulations! Your application has been verified. Welcome to the Senior Mentor community.",
                 cta: "View Profile",
-                statusIcon: <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />,
-                statusColor: "text-emerald-600",
+                statusIcon: <CheckCircle className="w-3.5 h-3.5 text-emerald-500 group-hover:text-emerald-300" />,
             };
-
         default:
             return {
                 title: "Become Senior Mentor",
@@ -96,11 +84,109 @@ function resolveCardContent(
                     "Share your industry experience, guide aspiring professionals, and help shape the next generation of talent.",
                 cta: "Apply Now",
                 statusIcon: null,
-                statusColor: "text-[#4a3728]",
             };
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Reusable ActionCard — light by default, smoothly transitions to dark on hover
+// ─────────────────────────────────────────────────────────────────────────────
+interface ActionCardProps {
+    onClick: () => void;
+    icon: React.ReactNode;
+    title: React.ReactNode;
+    description: React.ReactNode;
+    cta: React.ReactNode;
+    disabled?: boolean;
+}
+
+function ActionCard({ onClick, icon, title, description, cta, disabled }: ActionCardProps) {
+    return (
+        <div
+            onClick={onClick}
+            className={`group relative bg-white rounded-[32px] p-7 border border-[#e8ddd4] shadow-md hover:shadow-2xl transition-all duration-500 overflow-hidden hover:-translate-y-2 ${disabled ? "cursor-wait opacity-80" : "cursor-pointer"
+                }`}
+        >
+            {/*
+             * DARK GRADIENT OVERLAY — sits at z-0, fades in on hover.
+             * CSS cannot transition background-image (gradients), so we use
+             * an absolutely-positioned layer that transitions via opacity.
+             * All content sits at z-10, above this layer.
+             */}
+            <div className="absolute inset-0 bg-gradient-to-br from-[#4a3728] via-[#5c4535] to-[#3a2a1e] rounded-[32px] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+            {/* Dot-grid texture — only visible when dark overlay is on */}
+            <div
+                className="absolute inset-0 rounded-[32px] opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                style={{
+                    backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)",
+                    backgroundSize: "20px 20px",
+                }}
+            />
+
+            {/* Shimmer orb top-right — only on hover */}
+            <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" />
+
+            {/* ── All content above the overlays ── */}
+            <div className="relative z-10">
+
+                {/* Icon badge */}
+                <div className="mb-5">
+                    <div className="relative w-fit">
+                        {/*
+                         * Icon background:
+                         *   Default:  solid dark-brown (matches page theme)
+                         *   Hover:    frosted glass white/15 (readable on dark overlay)
+                         * We layer two divs — one for each state — and cross-fade them.
+                         */}
+                        <div className="relative w-16 h-16">
+                            {/* Default icon bg */}
+                            <div className="absolute inset-0 rounded-2xl bg-[#4a3728] shadow-lg opacity-100 group-hover:opacity-0 transition-opacity duration-500" />
+                            {/* Hover icon bg */}
+                            <div className="absolute inset-0 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/20 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                            {/* Icon itself — cross-fades colour */}
+                            <div className="absolute inset-0 flex items-center justify-center group-hover:scale-105 group-hover:rotate-3 transition-transform duration-500">
+                                {icon}
+                            </div>
+                        </div>
+
+                        {/* Decorative ring */}
+                        <div className="absolute -inset-1.5 rounded-2xl border-2 border-[#e8ddd4] group-hover:border-white/20 transition-colors duration-500" />
+
+                        {/* Gold sparkle badge — hidden by default, appears on hover */}
+                        <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[#c4963a] rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100">
+                            <Sparkles className="w-3 h-3 text-white" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Title */}
+                <div className="flex items-center gap-1.5 mb-1.5">
+                    <h3 className="text-lg font-black text-[#4a3728] group-hover:text-white transition-colors duration-300">
+                        {title}
+                    </h3>
+                </div>
+
+                {/* Description */}
+                <div className="text-xs text-[#8b7355] group-hover:text-white/70 font-medium mb-5 leading-relaxed transition-colors duration-300">
+                    {description}
+                </div>
+
+                {/* CTA pill button */}
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-black uppercase tracking-wide transition-all duration-300
+                    bg-[#f5ede3] border border-[#e8ddd4] text-[#4a3728]
+                    group-hover:bg-white/10 group-hover:border-white/25 group-hover:text-white">
+                    {cta}
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-300" />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main section
+// ─────────────────────────────────────────────────────────────────────────────
 export default function ActionCardsSection({
     onBecomeMentorClick,
     onFindMentorClick,
@@ -115,7 +201,7 @@ export default function ActionCardsSection({
     const [seniorError, setSeniorError] = useState(false);
 
     useEffect(() => {
-        if (!userId) return; // Not logged in — skip fetch
+        if (!userId) return;
 
         setSeniorLoading(true);
         setSeniorError(false);
@@ -123,7 +209,6 @@ export default function ActionCardsSection({
         SeniorMentorApplicationService.getMyApplication()
             .then((app) => setSeniorApplication(app))
             .catch(() => {
-                // Graceful fallback — do not crash the page
                 console.warn("⚠️ [ActionCards] Could not fetch senior mentor application status.");
                 setSeniorError(true);
                 setSeniorApplication(null);
@@ -136,7 +221,6 @@ export default function ActionCardsSection({
         if (seniorLoading) return;
 
         if (!seniorApplication) {
-            // No application yet → go to the apply page
             router.push("/mentorship/senior-mentor-application");
             return;
         }
@@ -145,11 +229,9 @@ export default function ActionCardsSection({
             case ApplicationStatus.PENDING:
             case ApplicationStatus.UNDER_REVIEW:
             case ApplicationStatus.REJECTED:
-                // View / update existing application
                 router.push("/mentorship/senior-mentor-application");
                 break;
             case ApplicationStatus.VERIFIED:
-                // Go to their mentor profile — use the existing user-based route
                 router.push(`/mentorship/${seniorApplication.userId}`);
                 break;
             default:
@@ -157,124 +239,63 @@ export default function ActionCardsSection({
         }
     };
 
-    const { title, description, cta, statusIcon, statusColor } =
+    const { title, description, cta, statusIcon } =
         resolveCardContent(seniorLoading ? null : seniorApplication, seniorLoading);
 
-    // ── Grid columns: 3 when isMentor is false (all 3 cards show), else 2 ───
     const gridCols = isMentor
         ? "grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto"
         : "grid-cols-1 md:grid-cols-3";
 
     return (
         <>
-            <section className="px-6 pb-16 max-w-5xl mx-auto">
-                <div className={`grid gap-8 ${gridCols}`}>
+            <section className="px-6 -mt-2 sm:-mt-4 pb-16 max-w-5xl mx-auto">
+                <div className={`grid gap-6 ${gridCols}`}>
 
-                    {/* ── Find Mentor Card ────────────────────────────────────── */}
-                    <div
+                    {/* ── Find Mentor ─────────────────────────────────────── */}
+                    <ActionCard
                         onClick={onFindMentorClick}
-                        className="group relative bg-white rounded-[32px] p-6 border border-[#ece7e2] shadow-lg hover:shadow-2xl transition-all duration-700 cursor-pointer overflow-hidden hover:-translate-y-2 animate-float-slow"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-br from-[#4a3728]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-[#4a3728]/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-all duration-700 group-hover:scale-150" />
-                        <div className="relative z-10">
-                            <div className="w-12 h-12 bg-[#4a3728] rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-md">
-                                <Search className="w-6 h-6 text-white" />
-                            </div>
-                            <h3 className="text-xl font-black mb-2 group-hover:text-[#8b7355] transition-colors">
-                                Find Mentor
-                            </h3>
-                            <p className="text-xs text-slate-500 font-medium mb-3 leading-relaxed">
-                                Connect with 500+ industry experts from top tech companies. Get
-                                personalized 1:1 guidance.
-                            </p>
-                            <div className="flex items-center gap-2 text-[#8b7355] font-bold text-xs group-hover:gap-4 transition-all">
-                                Explore Mentors{" "}
-                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                            </div>
-                        </div>
-                    </div>
+                        icon={<Search className="w-7 h-7 text-white group-hover:text-[#c4963a] transition-colors duration-300" />}
+                        title="Find Mentor"
+                        description="Connect with 500+ industry experts from top tech companies. Get personalized 1:1 guidance."
+                        cta="Explore Mentors"
+                    />
 
-                    {/* ── Become Mentor Card (hidden when already a mentor) ───── */}
+                    {/* ── Become Mentor (hidden when already a mentor) ─────── */}
                     {!isMentor && (
-                        <div
-                            className="group relative bg-white rounded-[32px] p-6 border border-[#ece7e2] shadow-lg hover:shadow-2xl transition-all duration-700 cursor-pointer overflow-hidden hover:-translate-y-2 animate-float-slow-delayed"
+                        <ActionCard
                             onClick={onBecomeMentorClick}
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-[#8b7355]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-[#8b7355]/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-all duration-700 group-hover:scale-150" />
-                            <div className="relative z-10">
-                                <div className="w-12 h-12 bg-[#8b7355] rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-md">
-                                    <Users className="w-6 h-6 text-white" />
-                                </div>
-                                <h3 className="text-xl font-black mb-2 group-hover:text-[#4a3728] transition-colors">
-                                    Become Mentor
-                                </h3>
-                                <p className="text-xs text-slate-500 font-medium mb-3 leading-relaxed">
-                                    Share your expertise with aspiring professionals. Build your personal
-                                    brand and earn.
-                                </p>
-                                <div className="flex items-center gap-2 text-[#4a3728] font-bold text-xs group-hover:gap-4 transition-all">
-                                    Apply Now{" "}
-                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                </div>
-                            </div>
-                        </div>
+                            icon={<Users className="w-7 h-7 text-white group-hover:text-[#c4963a] transition-colors duration-300" />}
+                            title="Become Mentor"
+                            description="Share your expertise with aspiring professionals. Build your personal brand and earn."
+                            cta="Apply Now"
+                        />
                     )}
 
-                    {/* ── Become Senior Mentor Card ───────────────────────────── */}
-                    <div
+                    {/* ── Become Senior Mentor ─────────────────────────────── */}
+                    <ActionCard
                         onClick={handleSeniorMentorClick}
-                        aria-label={`${title} — ${cta}`}
-                        className={`group relative bg-white rounded-[32px] p-6 border border-[#ece7e2] shadow-lg hover:shadow-2xl transition-all duration-700 overflow-hidden hover:-translate-y-2 animate-float-slow ${
-                            seniorLoading ? "cursor-wait opacity-80" : "cursor-pointer"
-                        }`}
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-br from-[#4a3728]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-[#4a3728]/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-all duration-700 group-hover:scale-150" />
-                        <div className="relative z-10">
-
-                            {/* Icon */}
-                            <div className="w-12 h-12 bg-[#4a3728] rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-md">
-                                <Star className="w-6 h-6 text-white" />
-                            </div>
-
-                            {/* Title + status badge */}
-                            <div className="flex items-center gap-1.5 mb-2">
-                                <h3 className="text-xl font-black group-hover:text-[#8b7355] transition-colors">
-                                    {title}
-                                </h3>
+                        disabled={seniorLoading}
+                        icon={<Star className="w-7 h-7 text-white group-hover:text-[#c4963a] transition-colors duration-300" />}
+                        title={
+                            <span className="flex items-center gap-1.5">
+                                {title}
                                 {statusIcon}
-                            </div>
-
-                            {/* Description — skeleton while loading */}
-                            {seniorLoading ? (
-                                <div className="space-y-1.5 mb-3">
-                                    <div className="h-2.5 bg-slate-100 rounded animate-pulse w-full" />
-                                    <div className="h-2.5 bg-slate-100 rounded animate-pulse w-4/5" />
+                            </span>
+                        }
+                        description={
+                            seniorLoading ? (
+                                <div className="space-y-1.5">
+                                    <div className="h-2.5 bg-[#e8ddd4] group-hover:bg-white/15 rounded animate-pulse w-full transition-colors duration-300" />
+                                    <div className="h-2.5 bg-[#e8ddd4] group-hover:bg-white/15 rounded animate-pulse w-4/5 transition-colors duration-300" />
                                 </div>
                             ) : (
-                                <p className="text-xs text-slate-500 font-medium mb-3 leading-relaxed">
-                                    {/* Show API error fallback gracefully */}
-                                    {seniorError
-                                        ? "Share your industry experience and guide the next generation of professionals."
-                                        : description}
-                                </p>
-                            )}
-
-                            {/* CTA */}
-                            <div className={`flex items-center gap-2 font-bold text-xs group-hover:gap-4 transition-all ${statusColor}`}>
-                                {seniorLoading ? (
-                                    <span className="text-slate-400">Loading…</span>
-                                ) : (
-                                    <>
-                                        {cta}{" "}
-                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                                seniorError
+                                    ? "Share your industry experience and guide the next generation of professionals."
+                                    : description
+                            )
+                        }
+                        cta={seniorLoading ? "Loading…" : cta}
+                    />
 
                 </div>
             </section>

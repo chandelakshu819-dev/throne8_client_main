@@ -41,7 +41,7 @@ export default function Sidebar({
     };
 
     return (
-        <aside className="hidden lg:block sticky top-28 space-y-6 max-h-[calc(100vh-120px)] overflow-visible">
+        <aside className="hidden lg:block sticky top-28 space-y-6 self-start">
             <div className="bg-white border border-[#ece7e2] rounded-[32px] p-6 shadow-sm">
                 <h4 className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[3px] text-[#8b7355] mb-8">
                     <Filter className="w-4 h-4" /> Refine Search
