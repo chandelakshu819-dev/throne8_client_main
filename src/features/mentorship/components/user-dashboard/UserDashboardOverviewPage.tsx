@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   CalendarClock,
   ShieldCheck,
@@ -11,6 +11,8 @@ import {
   BookOpen
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import MentorService from "@/lib/api/mentorship.service";
+import FindMentorModal from "@/features/mentorship/components/sections/FindMentorModal";
 
 const COLORS = {
   ink: "#4a3728",
@@ -71,6 +73,37 @@ export default function UserDashboardOverviewPage({
   setActivePage,
 }: UserDashboardOverviewPageProps) {
   const router = useRouter();
+  const [isFindMentorOpen, setIsFindMentorOpen] = useState(false);
+  const [findMentorMentors, setFindMentorMentors] = useState<any[]>([]);
+  const [findMentorLoading, setFindMentorLoading] = useState(false);
+
+  const handleOpenFindMentor = async () => {
+    setIsFindMentorOpen(true);
+    if (findMentorMentors.length === 0) {
+      setFindMentorLoading(true);
+      try {
+        const res = await MentorService.getAllMentors({ page: 1, limit: 100 });
+        const list = Array.isArray(res.data) ? res.data : (res.data?.mentors || []);
+        const mapped = list.map((m: any) => ({
+            id: m.mentorId,
+            name: `${m.user?.firstName ?? ""} ${m.user?.lastName ?? ""}`.trim(),
+            role: m.experience?.currentRole?.split(" at ")[0] ?? "Mentor",
+            company: m.experience?.currentRole?.split(" at ")[1] ?? "",
+            rating: m.stats?.averageRating || 0,
+            sessions: m.stats?.totalSessions || 0,
+            price: m.pricing?.quickCall || 0,
+            tags: m.skills?.slice(0, 2) ?? [],
+            image: m.profilePic ?? "",
+        }));
+        setFindMentorMentors(mapped);
+      } catch (err) {
+        console.error("Failed to fetch mentors", err);
+      } finally {
+        setFindMentorLoading(false);
+      }
+    }
+  };
+
   const firstName =
     user?.firstName?.trim() ||
     (user?.name ? user.name.trim().split(" ")[0] : null) ||
@@ -290,7 +323,7 @@ export default function UserDashboardOverviewPage({
             </h3>
             <div className="flex flex-col gap-3">
               <button
-                onClick={() => router.push('/mentorship')}
+                onClick={handleOpenFindMentor}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all hover:bg-[#8b7355] shadow-md"
                 style={{ backgroundColor: COLORS.ink, color: "#fff" }}
               >
@@ -308,6 +341,13 @@ export default function UserDashboardOverviewPage({
           </div>
         </div>
       </div>
+
+      <FindMentorModal
+        isOpen={isFindMentorOpen}
+        onClose={() => setIsFindMentorOpen(false)}
+        mentors={findMentorMentors}
+        loading={findMentorLoading}
+      />
     </div>
   );
 }
