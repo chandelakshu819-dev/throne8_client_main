@@ -508,50 +508,132 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
 
   const dayAbbrev = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-  // ✅ FIX: native <input type="time"> ka clock icon browser/CSS ke hisaab
-  // se sirf hover/focus par dikhta hai — kisi global CSS ne isko chhupa
-  // rakha hai jo override nahi ho raha. Isliye apna khud ka Clock icon
-  // overlay karte hain jo HAMESHA visible rahega (native icon hide kar
-  // diya). Icon ya input par click karne se native time-picker khulega.
+    // ✅ FIX (Option B — permanent): native <input type="time"> browser/OS
+  // locale follow karta hai — agar system 24-hour clock pe set hai (jaisa
+  // ki Windows me commonly hota hai), to time picker me koi AM/PM selector
+  // hi nahi dikhta. Mentor "1:10 PM" ke liye "01:10" type kar deta tha jo
+  // silently 1:10 AM save ho jaata tha — locale se bilkul independent nahi
+  // tha. Ab apna khud ka 12-hour picker hai: hour (1-12) + minute + explicit
+  // AM/PM toggle. Output hamesha same 24hr "HH:MM" string hai jo backend/
+  // generateSlots() already expect karta hai — is component ke bahar kuch
+  // badalne ki zaroorat nahi.
+  const to24Hour = (hour12: number, minute: number, period: "AM" | "PM"): string => {
+    let h = hour12 % 12;
+    if (period === "PM") h += 12;
+    return `${String(h).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  };
+
+  const from24Hour = (value: string): { hour12: number; minute: number; period: "AM" | "PM" } => {
+    const [hStr, mStr] = (value || "00:00").split(":");
+    const h24 = parseInt(hStr, 10) || 0;
+    const minute = parseInt(mStr, 10) || 0;
+    const period: "AM" | "PM" = h24 >= 12 ? "PM" : "AM";
+    let hour12 = h24 % 12;
+    if (hour12 === 0) hour12 = 12;
+    return { hour12, minute, period };
+  };
+
   const TimeInput = ({
     value,
     onChange,
     disabled = false,
   }: { value: string; onChange: (v: string) => void; disabled?: boolean }) => {
-    const inputRef = useRef<HTMLInputElement>(null);
-    const openPicker = () => {
-      if (disabled) return;
-      const input = inputRef.current;
-      if (input && typeof (input as any).showPicker === "function") {
-        try { (input as any).showPicker(); } catch { input.focus(); }
-      } else {
-        input?.focus();
-      }
-    };
+    const { hour12, minute, period } = from24Hour(value);
+    const [open, setOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    // Close on outside click
+    useEffect(() => {
+      if (!open) return;
+      const handleClick = (e: MouseEvent) => {
+        if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+          setOpen(false);
+        }
+      };
+      document.addEventListener("mousedown", handleClick);
+      return () => document.removeEventListener("mousedown", handleClick);
+    }, [open]);
+
+    const updateHour = (h: number) => onChange(to24Hour(h, minute, period));
+    const updateMinute = (m: number) => onChange(to24Hour(hour12, m, period));
+    const updatePeriod = (p: "AM" | "PM") => onChange(to24Hour(hour12, minute, p));
+
+    const displayLabel = `${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${period}`;
+
     return (
-      <div className="relative inline-flex items-center" onClick={openPicker}>
-        <input
-          ref={inputRef}
-          type="time"
-          value={value}
+      <div className="relative inline-block" ref={wrapperRef}>
+        <button
+          type="button"
           disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
-          className="px-3 py-1.5 pr-8 rounded-lg outline-none text-sm [&::-webkit-calendar-picker-indicator]:opacity-0"
+          onClick={() => !disabled && setOpen((v) => !v)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg outline-none text-sm font-semibold"
           style={{
             border: '1px solid #e0d8cf',
             backgroundColor: disabled ? '#f5f1ec' : '#fff',
             color: '#4a3728',
             cursor: disabled ? 'not-allowed' : 'pointer',
           }}
-        />
-        <Clock
-          className="w-3.5 h-3.5 absolute right-2.5 pointer-events-none"
-          style={{ color: disabled ? '#c9beb2' : '#7a5c3e' }}
-        />
+        >
+          {displayLabel}
+          <Clock className="w-3.5 h-3.5" style={{ color: disabled ? '#c9beb2' : '#7a5c3e' }} />
+        </button>
+
+        {open && !disabled && (
+          <div
+            className="absolute z-50 mt-1 flex items-center gap-1.5 p-3 rounded-xl shadow-lg"
+            style={{ backgroundColor: '#fff', border: '1px solid #e0d8cf', minWidth: '220px' }}
+          >
+            {/* Hour dropdown */}
+            <select
+              value={hour12}
+              onChange={(e) => updateHour(Number(e.target.value))}
+              className="px-2 py-1.5 rounded-lg outline-none text-sm font-semibold"
+              style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
+              ))}
+            </select>
+
+            <span className="text-sm font-bold" style={{ color: '#8a7a6a' }}>:</span>
+
+            {/* Minute dropdown — 5-min steps, matches typical slot granularity */}
+            <select
+              value={minute}
+              onChange={(e) => updateMinute(Number(e.target.value))}
+              className="px-2 py-1.5 rounded-lg outline-none text-sm font-semibold"
+              style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+            >
+              {Array.from({ length: 60 }, (_, i) => i).map((m) => (
+                <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
+              ))}
+            </select>
+
+            {/* Explicit AM/PM toggle — this is the actual fix */}
+            <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid #e0d8cf' }}>
+              {(["AM", "PM"] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => updatePeriod(p)}
+                  className="px-2.5 py-1.5 text-xs font-bold transition-colors"
+                  style={{
+                    backgroundColor: period === p ? '#4a3728' : '#fbf7f3',
+                    color: period === p ? '#fff' : '#7a5c3e',
+                  }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
 
+
+  
   // ── Render ─────────────────────────────────────────────
   return (
     <div className="space-y-6 animate-fadeIn">
