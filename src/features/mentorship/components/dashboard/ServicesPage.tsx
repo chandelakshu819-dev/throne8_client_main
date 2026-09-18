@@ -311,14 +311,20 @@ export default function ServicesPage({
           await SessionService.updateSession(editingSession.sessionId, updatePayload);
         }
 
-        // ✅ NEW: Service ka Duration ab Availability page ke default
+               // ✅ NEW: Service ka Duration ab Availability page ke default
         // slot-duration me bhi sync hoga — agli baar naye slots isi
         // duration ke banenge. Ye fail ho bhi jaaye to service save
         // block nahi hona chahiye, isliye alag try/catch me hai.
         try {
+          const newDuration = Number(formData.duration) || 30;
           await MentorService.updateMentorAvailability(mentorData.mentorId, {
-            slotDuration: Number(formData.duration) || 30,
+            slotDuration: newDuration,
           });
+          // ✅ FIX: mentorData prop parent me refresh nahi hota, isliye
+          // AvailabilityPage ko turant naya duration batao — localStorage
+          // (remount ke liye) + custom event (same-mount live update ke liye).
+          try { localStorage.setItem("mentor_slotDuration", String(newDuration)); } catch {}
+          window.dispatchEvent(new CustomEvent("mentorSlotDurationUpdated", { detail: newDuration }));
         } catch (syncErr: any) {
           console.error("Failed to sync slot duration to availability:", syncErr.message);
         }
@@ -390,12 +396,15 @@ export default function ServicesPage({
         await SessionService.createSession(sessionInput);
       }
 
-      // ✅ NEW: same sync — service create hote hi Availability ka default
+         // ✅ NEW: same sync — service create hote hi Availability ka default
       // slot-duration bhi is Duration ke according update ho jaata hai.
       try {
+        const newDuration = Number(formData.duration) || 30;
         await MentorService.updateMentorAvailability(mentorData.mentorId, {
-          slotDuration: Number(formData.duration) || 30,
+          slotDuration: newDuration,
         });
+        try { localStorage.setItem("mentor_slotDuration", String(newDuration)); } catch {}
+        window.dispatchEvent(new CustomEvent("mentorSlotDurationUpdated", { detail: newDuration }));
       } catch (syncErr: any) {
         console.error("Failed to sync slot duration to availability:", syncErr.message);
       }

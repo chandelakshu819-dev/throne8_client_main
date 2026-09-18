@@ -44,7 +44,16 @@ const statCardMeta = [
 export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) {
   // ── Core state ─────────────────────────────────────────
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [slotDuration, setSlotDuration] = useState(() => mentorData?.availability?.slotDuration || 30);
+  const [slotDuration, setSlotDuration] = useState(() => {
+    // ✅ FIX: component remount hone par bhi (tab switch etc.) mentorData
+    // prop se pehle localStorage me abhi saved sync-value check karo,
+    // taaki latest service-Duration hi initial value ho, na ki stale 30.
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("mentor_slotDuration");
+      if (saved) return Number(saved);
+    }
+    return mentorData?.availability?.slotDuration || 30;
+  });
 
   // ✅ NEW: Service create/update hote hi (ServicesPage.tsx se) backend ka
   // availability.slotDuration update hota hai — mentorData refresh hone par
@@ -54,6 +63,21 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
       setSlotDuration(mentorData.availability.slotDuration);
     }
   }, [mentorData?.availability?.slotDuration]);
+
+  // ✅ FIX: Parent (jo mentorData hold karta hai) backend-sync ke baad
+  // mentorData ko refetch nahi karta, isliye upar wala useEffect kabhi
+  // fire nahi hota. ServicesPage se aane wale custom event ko sunkar
+  // slotDuration ko turant, live update karo — bina page refresh ke.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (typeof detail === "number" && detail > 0) {
+        setSlotDuration(detail);
+      }
+    };
+    window.addEventListener("mentorSlotDurationUpdated", handler);
+    return () => window.removeEventListener("mentorSlotDurationUpdated", handler);
+  }, []);
   const [bufferTime, setBufferTime] = useState(0);
   const [timezone, setTimezone] = useState("Asia/Kolkata");
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
@@ -309,6 +333,21 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
     const dayRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const scheduleListRef = useRef<HTMLDivElement>(null);
 
+     // ✅ FIX: Calendar se date select karte hi, us date ka weekday Weekly
+    // Schedule me sirf highlight nahi — turant "active" (enabled: true)
+    // bhi ho jana chahiye. Pehle highlight to hota tha lekin toggle OFF
+    // rehta tha, isliye time inputs disabled the aur Save karne par
+    // "day is not enabled" error aata tha. Ab date select karte hi
+    // uska din auto-enable ho jayega — mentor seedha time set kar sakega.
+    useEffect(() => {
+      if (!selectedDayName) return;
+      setWeekSchedule(prev =>
+        prev.some(d => d.day === selectedDayName && !d.enabled)
+          ? prev.map(d => d.day === selectedDayName ? { ...d, enabled: true } : d)
+          : prev
+      );
+    }, [selectedDayName]);
+
     useEffect(() => {
       if (!selectedDayName) return;
       const container = scheduleListRef.current;
@@ -468,6 +507,50 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
   const isCurrentMonth = currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear();
 
   const dayAbbrev = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  // ✅ FIX: native <input type="time"> ka clock icon browser/CSS ke hisaab
+  // se sirf hover/focus par dikhta hai — kisi global CSS ne isko chhupa
+  // rakha hai jo override nahi ho raha. Isliye apna khud ka Clock icon
+  // overlay karte hain jo HAMESHA visible rahega (native icon hide kar
+  // diya). Icon ya input par click karne se native time-picker khulega.
+  const TimeInput = ({
+    value,
+    onChange,
+    disabled = false,
+  }: { value: string; onChange: (v: string) => void; disabled?: boolean }) => {
+    const inputRef = useRef<HTMLInputElement>(null);
+    const openPicker = () => {
+      if (disabled) return;
+      const input = inputRef.current;
+      if (input && typeof (input as any).showPicker === "function") {
+        try { (input as any).showPicker(); } catch { input.focus(); }
+      } else {
+        input?.focus();
+      }
+    };
+    return (
+      <div className="relative inline-flex items-center" onClick={openPicker}>
+        <input
+          ref={inputRef}
+          type="time"
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+          className="px-3 py-1.5 pr-8 rounded-lg outline-none text-sm [&::-webkit-calendar-picker-indicator]:opacity-0"
+          style={{
+            border: '1px solid #e0d8cf',
+            backgroundColor: disabled ? '#f5f1ec' : '#fff',
+            color: '#4a3728',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+          }}
+        />
+        <Clock
+          className="w-3.5 h-3.5 absolute right-2.5 pointer-events-none"
+          style={{ color: disabled ? '#c9beb2' : '#7a5c3e' }}
+        />
+      </div>
+    );
+  };
 
   // ── Render ─────────────────────────────────────────────
   return (
@@ -682,18 +765,16 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                 >
                                           <span className="text-sm font-bold w-24" style={{ color: '#4a3728' }}>{item.day}</span>
                   <div className="flex items-center gap-3 flex-1 justify-end">
-                    <input
-                      type="time" value={item.startTime} disabled={!item.enabled}
-                      onChange={e => setWeekSchedule(prev => prev.map((d, i) => i === idx ? { ...d, startTime: e.target.value } : d))}
-                      className="px-3 py-1.5 rounded-lg outline-none text-sm"
-                      style={{ border: '1px solid #e0d8cf', backgroundColor: '#fff', color: '#4a3728' }}
+                  <TimeInput
+                      value={item.startTime}
+                      disabled={!item.enabled}
+                      onChange={(v) => setWeekSchedule(prev => prev.map((d, i) => i === idx ? { ...d, startTime: v } : d))}
                     />
                     <span style={{ color: '#8a7a6a' }} className="text-xs font-semibold">to</span>
-                    <input
-                      type="time" value={item.endTime} disabled={!item.enabled}
-                      onChange={e => setWeekSchedule(prev => prev.map((d, i) => i === idx ? { ...d, endTime: e.target.value } : d))}
-                      className="px-3 py-1.5 rounded-lg outline-none text-sm"
-                      style={{ border: '1px solid #e0d8cf', backgroundColor: '#fff', color: '#4a3728' }}
+                    <TimeInput
+                      value={item.endTime}
+                      disabled={!item.enabled}
+                      onChange={(v) => setWeekSchedule(prev => prev.map((d, i) => i === idx ? { ...d, endTime: v } : d))}
                     />
                     {/* Single ON/OFF toggle — ye hi ek button hai, upar wale strip se connected */}
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -796,18 +877,14 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                       <div className="space-y-2">
                         {editSlots.map((slot, si) => (
                           <div key={si} className="flex items-center gap-2.5">
-                            <input
-                              type="time" value={slot.startTime}
-                              onChange={e => setEditSlots(prev => prev.map((s, i) => i === si ? { ...s, startTime: e.target.value } : s))}
-                              className="px-3 py-1.5 rounded-lg text-sm outline-none"
-                              style={{ border: '1px solid #e0d8cf', backgroundColor: '#fff' }}
+                                                     <TimeInput
+                              value={slot.startTime}
+                              onChange={(v) => setEditSlots(prev => prev.map((s, i) => i === si ? { ...s, startTime: v } : s))}
                             />
                             <span className="text-sm" style={{ color: '#8a7a6a' }}>→</span>
-                            <input
-                              type="time" value={slot.endTime}
-                              onChange={e => setEditSlots(prev => prev.map((s, i) => i === si ? { ...s, endTime: e.target.value } : s))}
-                              className="px-3 py-1.5 rounded-lg text-sm outline-none"
-                              style={{ border: '1px solid #e0d8cf', backgroundColor: '#fff' }}
+                            <TimeInput
+                              value={slot.endTime}
+                              onChange={(v) => setEditSlots(prev => prev.map((s, i) => i === si ? { ...s, endTime: v } : s))}
                             />
                             <button onClick={() => setEditSlots(prev => prev.filter((_, i) => i !== si))}>
                               <X className="w-3.5 h-3.5" style={{ color: '#dc2626' }} />
