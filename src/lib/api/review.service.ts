@@ -3,6 +3,7 @@ import api from "./api.intance";
 export interface MentorReview {
   id: string;
   reviewId: string;
+  sessionId: string;
   mentorId: string;
   menteeId: string;
   rating: number;
@@ -12,6 +13,11 @@ export interface MentorReview {
   tags: string[];
   mentorResponse?: { comment: string; respondedAt: string };
   createdAt: string;
+  mentee?: {
+    firstName?: string;
+    lastName?: string;
+    profilePhotoId?: string | null;
+  };
 }
 
 export interface ReviewStats {
@@ -25,7 +31,7 @@ interface PaginatedResponse<T> {
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
-// 🔧 NEW: matches backend's allowed tags list exactly
+// matches backend's allowed tags list exactly
 // (see MentorshipReviewSchema.tags.enum in the backend model)
 export const REVIEW_TAGS = [
   "helpful",
@@ -42,8 +48,6 @@ export const REVIEW_TAGS = [
 
 export type ReviewTag = (typeof REVIEW_TAGS)[number];
 
-// 🔧 NEW: input shape for submitting a review — mirrors backend's
-// submitReviewValidation (sessionId, mentorId, rating 1-5, comment 10-1000 chars)
 export interface SubmitReviewInput {
   sessionId: string;
   mentorId: string;
@@ -67,11 +71,18 @@ const ReviewService = {
 
   markHelpful: (reviewId: string) => api.post(`/mentorship/reviews/${reviewId}/helpful`),
 
-  // 🔧 NEW: this was missing — no frontend wrapper existed for the
-  // backend's POST /api/v1/mentorship/reviews route, so mentees had no way
-  // to actually submit a review even though the backend was fully built.
   submitReview: (input: SubmitReviewInput) =>
     api.post<{ data: MentorReview }>(`/mentorship/reviews`, input).then((res) => res.data.data),
+
+  // NEW: fetches all reviews the logged-in mentee has submitted, so we can
+  // cross-reference against `sessions` by sessionId and know which sessions
+  // already have a review vs are still pending — SessionMentor documents
+  // never carry the review themselves (see backend submitReview()), so this
+  // is the only reliable source of truth for "given vs pending".
+  getMyReviews: () =>
+    api
+      .get<{ data: MentorReview[] }>(`/mentorship/reviews/mentee/me`)
+      .then((res) => res.data.data),
 };
 
 export default ReviewService;

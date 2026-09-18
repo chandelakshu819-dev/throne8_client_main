@@ -6,9 +6,6 @@ import { Clock } from "./Icons";
 import { SERVICES, FILTERS, C, btnPrimary } from "../../types/data";
 import type { Service } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
-import MentorService from "@/lib/api/mentorship.service";
-
-
 
 interface ServicesSectionProps {
   onServiceClick: (service: Service) => void;
@@ -39,6 +36,20 @@ const SESSION_TYPE_FILTER: Record<string, string> = {
   portfolio_review: "Portfolio Review",
 };
 
+const formatGroupDate = (dateString?: string) => {
+  if (!dateString) return "Date not available";
+  try {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return "Date not available";
+    return new Intl.DateTimeFormat('en-IN', {
+      day: 'numeric', month: 'short', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true,
+    }).format(d);
+  } catch {
+    return "Date not available";
+  }
+};
+
 const ServicesSection: React.FC<ServicesSectionProps> = ({
   onServiceClick,
   mentorId,
@@ -47,30 +58,59 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
 }) => {
   const [activeFilter, setActiveFilter] = useState<string>("All");
   const [sessions, setSessions] = useState<any[]>([]);
+  // ✅ NEW: group sessions kept separate — different shape (pricing.pricePerPerson,
+  // participants[], fixed scheduledAt) and a different booking action (join, not
+  // the calendar/slot-picker flow that 1:1 sessions use).
+  const [groupSessions, setGroupSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joinedIds, setJoinedIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!mentorId) return;
-    SessionService.getAllSessionsFromDB({ limit: 50 })
-      .then((res) => {
-        const allSessions = res?.data ?? [];
-        const mentorSessions = allSessions.filter((s: any) => s.mentorId === mentorId);
-        setSessions(mentorSessions);
-      })
-      .catch(() => setSessions([]))
-      .finally(() => setLoading(false));
+    setLoading(true);
+
+    Promise.allSettled([
+      SessionService.getAllSessionsFromDB({ limit: 50 }),
+      MentorService.getAllGroupSessions({ mentorId }),
+    ]).then(([sessionsRes, groupRes]) => {
+      if (sessionsRes.status === "fulfilled") {
+        const allSessions = sessionsRes.value?.data ?? [];
+        setSessions(allSessions.filter((s: any) => s.mentorId === mentorId));
+      } else {
+        setSessions([]);
+      }
+
+      if (groupRes.status === "fulfilled") {
+        const res: any = groupRes.value;
+        let groups: any[] = [];
+        if (Array.isArray(res)) groups = res;
+        else if (res && Array.isArray(res.data)) groups = res.data;
+        else if (res?.data && Array.isArray(res.data.data)) groups = res.data.data;
+        // ✅ only sessions still open for joining
+        setGroupSessions(groups.filter((g: any) => g.status === 'open' || g.status === undefined));
+      } else {
+        setGroupSessions([]);
+      }
+    }).finally(() => setLoading(false));
   }, [mentorId]);
 
-  // if (loading) return <div style={{ padding: "32px", textAlign: "center" }}>Loading sessions...</div>;
-
-  // Dynamic filters — session types se generate karo
+  // Dynamic filters — session types se generate karo (group sessions included)
   const uniqueTypes = Array.from(new Set(sessions.map((s) => s.sessionType)));
   const dynamicFilters = ["All", ...uniqueTypes.map((t) => SESSION_TYPE_FILTER[t] || t)];
+  if (groupSessions.length > 0 && !dynamicFilters.includes("Group Session")) {
+    dynamicFilters.push("Group Session");
+  }
 
   // Filter logic
   const filtered = activeFilter === "All"
     ? sessions
-    : sessions.filter((s) => (SESSION_TYPE_FILTER[s.sessionType] || s.sessionType) === activeFilter);
+    : activeFilter === "Group Session"
+      ? []
+      : sessions.filter((s) => (SESSION_TYPE_FILTER[s.sessionType] || s.sessionType) === activeFilter);
+
+  const showGroupSessions = activeFilter === "All" || activeFilter === "Group Session";
 
   // Session ko Service card format me convert karo
   const getServiceFromSession = (session: any): Service => ({
@@ -87,6 +127,21 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     if (sessionType === "group_session") return "👥";
     return "";
   };
+
+  const handleJoinGroupSession = async (groupId: string) => {
+    setJoinError(null);
+    setJoiningId(groupId);
+    try {
+      await MentorService.joinGroupSession(groupId);
+      setJoinedIds((prev) => [...prev, groupId]);
+    } catch (err: any) {
+      setJoinError(err.message || "Failed to join session.");
+    } finally {
+      setJoiningId(null);
+    }
+  };
+
+  const hasAnyResults = filtered.length > 0 || (showGroupSessions && groupSessions.length > 0);
 
   return (
     <div style={{ borderRadius: "24px", padding: "32px", marginBottom: "24px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 8px 32px rgba(74,55,40,0.08)" }}>
@@ -110,6 +165,12 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
         ))}
       </div>
 
+      {joinError && (
+        <div style={{ marginBottom: "16px", padding: "10px 14px", borderRadius: "10px", background: "#fee2e2", color: "#dc2626", fontSize: "13px", fontWeight: 600 }}>
+          {joinError}
+        </div>
+      )}
+
       {/* Session Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
 
@@ -125,14 +186,14 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
         )}
 
         {/* No sessions - sirf tab dikhao jab fetch complete ho aur result empty ho */}
-        {!loading && filtered.length === 0 && (
+        {!loading && !hasAnyResults && (
           <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: C.mid }}>
             No sessions available for this filter.
           </div>
         )}
 
-        {/* Cards - sirf tab dikhao jab fetch complete ho aur data ho */}
-        {!loading && filtered.length > 0 && filtered.map((session) => {
+        {/* Regular session Cards */}
+        {!loading && filtered.map((session) => {
           const svc = getServiceFromSession(session);
           const myBooking = session.bookings?.find(
             (b: any) => b.menteeId === currentUserId
@@ -211,6 +272,63 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                       Waitlist
                     </button>
                   </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* ✅ NEW: Group session cards — separate rendering because they carry
+            different fields (fixed scheduledAt, pricePerPerson, participant
+            count) and a different action (join, not the slot-picker flow). */}
+        {!loading && showGroupSessions && groupSessions.map((group) => {
+          const seatsLeft = (group.maxParticipants ?? 0) - (group.currentParticipants ?? 0);
+          const alreadyJoined = joinedIds.includes(group.sessionId) ||
+            group.participants?.some((p: any) => p.menteeId === currentUserId);
+          const isJoining = joiningId === group.sessionId;
+          const pricePerPerson = group.pricing?.pricePerPerson ?? group.pricePerPerson ?? 0;
+
+          return (
+            <div key={group.sessionId}
+              style={{
+                borderRadius: "16px", padding: "20px", background: C.bg,
+                border: `1px solid ${C.border}`, position: "relative",
+                boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
+              }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <span>👥</span>
+                <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "12px", background: C.border, color: C.dark }}>
+                  Group Session
+                </span>
+              </div>
+              <h3 style={{ fontWeight: "bold", color: C.dark, fontSize: "14px", marginBottom: "8px", lineHeight: "1.4" }}>
+                {group.title}
+              </h3>
+              {group.description && (
+                <p style={{ fontSize: "12px", color: C.mid, marginBottom: "8px", lineHeight: "1.4" }}>{group.description}</p>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: C.mid, marginBottom: "4px" }}>
+                <Clock /> {formatGroupDate(group.scheduledAt)} · {group.duration} Min
+              </div>
+              <div style={{ fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
+                {seatsLeft > 0 ? `${seatsLeft} seats available` : "Session full"} · {group.currentParticipants ?? 0}/{group.maxParticipants ?? 0} enrolled
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontWeight: "bold", color: pricePerPerson === 0 ? "#10b981" : C.dark, fontSize: "15px" }}>
+                  {pricePerPerson === 0 ? "Free" : `₹${pricePerPerson}/person`}
+                </span>
+                {alreadyJoined ? (
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>✅ Seat Reserved</div>
+                ) : seatsLeft <= 0 ? (
+                  <span style={{ fontSize: "12px", fontWeight: 700, color: C.mid }}>Full</span>
+                ) : (
+                  <button
+                    onClick={() => handleJoinGroupSession(group.sessionId)}
+                    disabled={isJoining}
+                    style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px", opacity: isJoining ? 0.6 : 1 }}
+                  >
+                    {isJoining ? "Reserving..." : "Reserve Seat"}
+                  </button>
                 )}
               </div>
             </div>

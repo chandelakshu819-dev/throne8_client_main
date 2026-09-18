@@ -100,8 +100,6 @@ const DEFAULT_HIGHLIGHTS = [
   "Practical, actionable takeaways",
 ];
 
-// Session-type ke hisaab se generic preparation tips — jab tak koi
-// specific `notes` field session pe set nahi hai, ye fallback dikhta hai.
 const PREP_INSTRUCTIONS: Record<string, string[]> = {
   quick_call: ["Keep your specific question ready", "Join 2–3 minutes early to test your mic/camera"],
   mock_interview: ["Keep your resume handy for reference", "Find a quiet space with stable internet"],
@@ -123,6 +121,24 @@ const getMentorDisplayName = (mentor: any): string => {
 const getTypeIcon = (sessionType: string) => {
   if (sessionType === "group_session") return Users;
   return Phone;
+};
+
+const formatGroupDate = (dateString?: string) => {
+  if (!dateString) return "Date not available";
+  try {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return "Date not available";
+    return new Intl.DateTimeFormat("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(d);
+  } catch {
+    return "Date not available";
+  }
 };
 
 // ── Progress tracker step order ──────────────────────────────────
@@ -174,6 +190,15 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // ✅ NEW: group sessions ke liye alag state — inki shape (fixed scheduledAt,
+  // pricing.pricePerPerson, participants[]) normal sessions se alag hai, isliye
+  // inhe `sessions` array mein mix nahi kiya.
+  const [groupSessions, setGroupSessions] = useState<any[]>([]);
+  const [groupLoading, setGroupLoading] = useState(true);
+  const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joinedIds, setJoinedIds] = useState<string[]>([]);
+
   const [mentorFull, setMentorFull] = useState<any | null>(null);
   const [mentorInfo, setMentorInfo] = useState<{
     askQueryPrice: number;
@@ -196,6 +221,22 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       })
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
+  }, [mentorId]);
+
+  // ✅ NEW: mentor ke group sessions fetch karo
+  useEffect(() => {
+    if (!mentorId) return;
+    setGroupLoading(true);
+    MentorService.getAllGroupSessions({ mentorId })
+      .then((res: any) => {
+        let groups: any[] = [];
+        if (Array.isArray(res)) groups = res;
+        else if (res && Array.isArray(res.data)) groups = res.data;
+        else if (res?.data && Array.isArray(res.data.data)) groups = res.data.data;
+        setGroupSessions(groups.filter((g: any) => g.status === "open" || g.status === undefined));
+      })
+      .catch(() => setGroupSessions([]))
+      .finally(() => setGroupLoading(false));
   }, [mentorId]);
 
   useEffect(() => {
@@ -223,11 +264,20 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
 
   const uniqueTypes = Array.from(new Set(sessions.map((s) => s.sessionType)));
   const dynamicFilters = ["All", ...uniqueTypes.map((t) => SESSION_TYPE_FILTER[t] || t)];
+  // ✅ NEW: agar group sessions hain to filter pill add karo
+  if (groupSessions.length > 0 && !dynamicFilters.includes("Group Session")) {
+    dynamicFilters.push("Group Session");
+  }
 
   const filtered =
     activeFilter === "All"
       ? sessions
+      : activeFilter === "Group Session"
+      ? []
       : sessions.filter((s) => (SESSION_TYPE_FILTER[s.sessionType] || s.sessionType) === activeFilter);
+
+  // ✅ NEW: group sessions kab dikhaye
+  const showGroupSessions = activeFilter === "All" || activeFilter === "Group Session";
 
   const getServiceFromSession = (session: any): Service => ({
     id: session.sessionId,
@@ -259,15 +309,10 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   const handleReschedule = async (session: any) => {
     const myBooking = getMyBooking(session);
     if (!myBooking?.bookingId) {
-      // ⚠️ CONFIRM: assuming booking object has `bookingId` field
-      // (same pattern as session.sessionId). Agar aapke booking object
-      // me field ka naam alag hai (e.g. `_id`), to sirf yahi field name badlo.
       alert("Booking not found.");
       return;
     }
 
-    // TODO: apna actual reschedule flow yaha lagao (date-picker modal etc.)
-    // placeholder: sirf ek prompt se demo ke liye
     const input = window.prompt("Naya date/time enter karo (YYYY-MM-DD HH:mm):");
     if (!input) return;
     const newDate = new Date(input);
@@ -295,7 +340,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   const handleCancel = async (session: any) => {
     const myBooking = getMyBooking(session);
     if (!myBooking?.bookingId) {
-      // ⚠️ CONFIRM: same assumption as handleReschedule above
       alert("Booking not found.");
       return;
     }
@@ -312,6 +356,26 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       setActionBusy(false);
     }
   };
+
+  // ✅ NEW: group session join karne ka handler
+  const handleJoinGroupSession = async (groupId: string) => {
+    setJoinError(null);
+    setJoiningId(groupId);
+    try {
+      await MentorService.joinGroupSession(groupId);
+      setJoinedIds((prev) => [...prev, groupId]);
+    } catch (err: any) {
+      setJoinError(err.message || "Failed to join session.");
+    } finally {
+      setJoiningId(null);
+    }
+  };
+
+  const isLoadingAny = loading || groupLoading;
+  const hasAnyResults =
+    filtered.length > 0 ||
+    (showGroupSessions && groupSessions.length > 0) ||
+    mentorInfo?.acceptQueries === true;
 
   return (
     <div
@@ -355,8 +419,24 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
         ))}
       </div>
 
+      {joinError && (
+        <div
+          style={{
+            marginBottom: "16px",
+            padding: "10px 14px",
+            borderRadius: "10px",
+            background: "#fee2e2",
+            color: "#dc2626",
+            fontSize: "13px",
+            fontWeight: 600,
+          }}
+        >
+          {joinError}
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-        {loading && (
+        {isLoadingAny && (
           <>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             <div
@@ -385,13 +465,13 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           </>
         )}
 
-        {!loading && filtered.length === 0 && mentorInfo?.acceptQueries !== true && (
+        {!isLoadingAny && !hasAnyResults && (
           <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: C.mid }}>
             No sessions available for this filter.
           </div>
         )}
 
-        {!loading &&
+        {!isLoadingAny &&
           filtered.length > 0 &&
           filtered.map((session) => {
             const myBooking = getMyBooking(session);
@@ -425,7 +505,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   e.currentTarget.style.boxShadow = "0 2px 8px rgba(74,55,40,0.06)";
                 }}
               >
-                {/* Thumbnail image agar mentor ne set ki ho */}
                 {session.thumbnailImage && (
                   <div style={{ width: "100%", height: "110px", overflow: "hidden" }}>
                     <img
@@ -613,6 +692,148 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
             );
           })}
 
+        {/* ✅ NEW: Group session cards — alag rendering kyunki inka action
+            (Reserve Seat → join API) normal `onServiceClick` calendar flow se
+            different hai, aur inka scheduledAt fixed hota hai. */}
+        {!isLoadingAny &&
+          showGroupSessions &&
+          groupSessions.map((group) => {
+            const seatsLeft = (group.maxParticipants ?? 0) - (group.currentParticipants ?? 0);
+            const alreadyJoined =
+              joinedIds.includes(group.sessionId) ||
+              group.participants?.some((p: any) => p.menteeId === currentUserId);
+            const isJoining = joiningId === group.sessionId;
+            const pricePerPerson = group.pricing?.pricePerPerson ?? group.pricePerPerson ?? 0;
+
+            return (
+              <div
+                key={group.sessionId}
+                style={{
+                  borderRadius: "16px",
+                  overflow: "hidden",
+                  background: C.bg,
+                  border: `1px solid ${C.border}`,
+                  position: "relative",
+                  boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
+                  minWidth: 0,
+                }}
+              >
+                {group.thumbnailImage && (
+                  <div style={{ width: "100%", height: "110px", overflow: "hidden" }}>
+                    <img
+                      src={group.thumbnailImage}
+                      alt={group.title}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                  </div>
+                )}
+                <div style={{ padding: "20px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                    <div
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "8px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: C.border,
+                        color: C.dark,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Users size={14} />
+                    </div>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        padding: "3px 10px",
+                        borderRadius: "12px",
+                        background: C.border,
+                        color: C.dark,
+                      }}
+                    >
+                      Group Session
+                    </span>
+                  </div>
+
+                  <h3
+                    style={{
+                      fontWeight: "bold",
+                      color: C.dark,
+                      fontSize: "14px",
+                      marginBottom: "8px",
+                      lineHeight: "1.4",
+                      overflowWrap: "anywhere",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {group.title}
+                  </h3>
+
+                  {group.description && (
+                    <p
+                      style={{
+                        fontSize: "12px",
+                        color: C.mid,
+                        marginBottom: "8px",
+                        lineHeight: "1.4",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {group.description}
+                    </p>
+                  )}
+
+                  <div style={{ fontSize: "12px", color: C.mid, marginBottom: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <ClockIcon size={13} /> {formatGroupDate(group.scheduledAt)} · {group.duration} Min
+                  </div>
+                  <div style={{ fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
+                    {seatsLeft > 0 ? `${seatsLeft} seats available` : "Session full"} · {group.currentParticipants ?? 0}/{group.maxParticipants ?? 0} enrolled
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span
+                      style={{
+                        fontWeight: "bold",
+                        color: pricePerPerson === 0 ? "#10b981" : C.dark,
+                        fontSize: "15px",
+                      }}
+                    >
+                      {pricePerPerson === 0 ? "Free" : `₹${pricePerPerson}/person`}
+                    </span>
+
+                    {alreadyJoined ? (
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981", display: "flex", alignItems: "center", gap: "4px" }}>
+                        <CheckCircle2 size={13} /> Seat Reserved
+                      </div>
+                    ) : seatsLeft <= 0 ? (
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: C.mid }}>Full</span>
+                    ) : (
+                      <button
+                        onClick={() => handleJoinGroupSession(group.sessionId)}
+                        disabled={isJoining}
+                        style={{
+                          ...btnPrimary,
+                          padding: "8px 18px",
+                          borderRadius: "10px",
+                          fontSize: "13px",
+                          opacity: isJoining ? 0.6 : 1,
+                        }}
+                      >
+                        {isJoining ? "Reserving..." : "Reserve Seat"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
         {mentorInfo?.acceptQueries && (
           <div
             style={{
@@ -692,7 +913,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
         const isBooked = !!myBooking;
         const TypeIcon = getTypeIcon(detailSession.sessionType);
 
-        // ---------- UNBOOKED: pitch modal (jaisa pehle tha) ----------
         if (!isBooked) {
           const highlights = SESSION_HIGHLIGHTS[detailSession.sessionType] || DEFAULT_HIGHLIGHTS;
           const bookingsCount = detailSession.bookings?.length || 0;
@@ -768,7 +988,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           );
         }
 
-        // ---------- BOOKED: full structured modal ----------
         const scheduledDate = myBooking?.scheduledAt ? new Date(myBooking.scheduledAt) : (detailSession.scheduledAt ? new Date(detailSession.scheduledAt) : null);
         const statusIdx = isCancelled ? -1 : stepIndex(myBooking.status);
         const prepTips = detailSession.notes
@@ -781,7 +1000,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
 
         return (
           <ModalShell onBackdropClick={closeDetail} maxWidth="520px">
-            {/* 1. Service Image + Name + Mentor */}
             <div style={{ padding: "24px 24px 0 24px", position: "relative" }}>
               <CloseButton onClick={closeDetail} />
               <HeaderBlock session={detailSession} TypeIcon={TypeIcon} />
@@ -792,7 +1010,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
             </div>
 
             <div style={{ padding: "0 24px" }}>
-              {/* 2. Confirmed Badge */}
               <div
                 style={{
                   display: "inline-flex",
@@ -811,7 +1028,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 {statusLabel}
               </div>
 
-              {/* 3. Booking Progress Tracker */}
               {!isCancelled && (
                 <div style={{ marginBottom: "22px" }}>
                   <div style={{ display: "flex", alignItems: "center" }}>
@@ -846,7 +1062,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 </div>
               )}
 
-              {/* 4. Date / Time / Countdown */}
               {scheduledDate && (
                 <div
                   style={{
@@ -873,7 +1088,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 </div>
               )}
 
-              {/* 5. Join Session */}
               {(isConfirmed || isInProgress) && (
                 <button
                   onClick={() => {
@@ -900,7 +1114,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 </button>
               )}
 
-              {/* 6. What You Booked */}
               <SectionBlock icon={<ClipboardList size={15} />} title="What You Booked">
                 <p style={{ fontSize: "13px", color: C.dark, marginBottom: "8px" }}>
                   {SESSION_TYPE_FILTER[detailSession.sessionType] || detailSession.sessionType} — {detailSession.duration} min
@@ -910,7 +1123,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 )}
               </SectionBlock>
 
-              {/* 7. Mentor Details */}
               <SectionBlock icon={<UserIcon size={15} />} title="Mentor Details">
                 <p style={{ fontSize: "13px", color: C.dark, fontWeight: 600, marginBottom: "2px" }}>
                   {mentorInfo?.mentorName || "Mentor"}
@@ -921,7 +1133,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 )}
               </SectionBlock>
 
-              {/* 8. Preparation Instructions */}
               <SectionBlock icon={<Sparkles size={15} />} title="Preparation Instructions">
                 <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
                   {prepTips.map((tip: string, i: number) => (
@@ -933,7 +1144,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 </ul>
               </SectionBlock>
 
-              {/* 9. Booking & Payment Details */}
               <SectionBlock icon={<Wallet size={15} />} title="Booking & Payment Details">
                 <Row label="Base Price" value={`₹${myBooking.pricing?.basePrice ?? detailSession.pricing?.basePrice ?? 0}`} />
                 <Row label="Platform Fee" value={`₹${myBooking.pricing?.platformFee ?? detailSession.pricing?.platformFee ?? 0}`} />
@@ -942,7 +1152,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 {myBooking.payment?.method && <Row label="Payment Method" value={myBooking.payment.method} />}
               </SectionBlock>
 
-              {/* 10. Communication / Reschedule / Cancel */}
               {!isCancelled && !isCompleted && (
                 <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
                   <ActionChip icon={<MessageCircle size={13} />} label="Message" onClick={handleMessageMentor} />
@@ -951,7 +1160,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 </div>
               )}
 
-              {/* 11. Timeline */}
               <SectionBlock icon={<History size={15} />} title="Timeline">
                 <TimelineList session={detailSession} booking={myBooking} />
               </SectionBlock>
@@ -980,8 +1188,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
 export default ServicesSection;
 
 // ============================================================
-// Small presentational helpers (isi file me, alag file nahi banayi
-// taaki import paths na tootein)
+// Small presentational helpers
 // ============================================================
 
 function ModalShell({ children, onBackdropClick, maxWidth = "460px" }: { children: React.ReactNode; onBackdropClick: () => void; maxWidth?: string }) {
