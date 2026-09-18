@@ -11,7 +11,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import WriteReviewModal from "@/features/mentorship/components/WriteReviewModal";
+import UserDashboardReviewModal from "./UserDashboardReviewModal";
 import { routes } from "@/config/routes";
 
 const COLORS = {
@@ -289,7 +289,7 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
       )}
 
       {reviewTarget && (
-        <WriteReviewModal
+        <UserDashboardReviewModal
           sessionId={reviewTarget.sessionId || reviewTarget._id || ""}
           mentorId={reviewTarget.mentorId || ""}
           mentorName={reviewTarget.mentorName}
