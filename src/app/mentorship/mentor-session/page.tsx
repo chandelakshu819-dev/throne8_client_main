@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useLiveRoom, RemotePeer } from "@/core/webrtc/useLiveRoom";
 import SessionService from "@/lib/api/session.service";
+import { getSocket } from "@/core/realtime/socket.client";
 import { useAuth } from "@/features/auth/hooks/useAuth"; // ⚠️ adjust import/shape if different
 import {
     ToastProps, ReminderModalProps, StatCardProps, ProgressBarProps,
@@ -692,6 +693,17 @@ export default function MentorDashboard() {
         showToast("✅ Reminder set ho gaya! Aapko samay par notification milegi.");
     };
 
+    // ✅ NEW: mentor/mentee jab is room me join kare, to doosre party ko
+    // real-time "peer joined" signal + persistent notification bheja jaye.
+    // Backend socket handler (`mentorshipHandler.ts`) already isko sunn
+    // raha hai — bas frontend se emit karna baaki tha.
+    useEffect(() => {
+        if (!sessionId || !user?.userId) return;
+        const socket = getSocket();
+        socket?.emit('mentorship:notify-join', { sessionId });
+    }, [sessionId, user?.userId]);
+
+    
     const handleEndSession = async (): Promise<void> => {
         if (!sessionId) {
             showToast("⚠️ Session ID missing in URL — cannot end session.");

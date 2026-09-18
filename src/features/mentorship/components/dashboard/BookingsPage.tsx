@@ -246,12 +246,21 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       try {
         const res: any = await SessionService.startSession(sessionId, bookingId);
         // Backend `{...session, roomId}` return karta hai — roomId hamesha
-        // bookingId ke barabar hota hai (fallback safe hai).
+        // bookingId ke barabar hota hai (fallback safe hai agar backend
+        // response shape change ho jaye).
+        const roomId = res?.data?.roomId || bookingId;
+
         showToast("Session started", "success");
         setShowStartModal(false);
         setStartModalBooking(null);
-        // ✅ Actual working video page — session-room/[sessionId].
-        router.push(`/mentorship/session-room/${sessionId}`);
+
+        // ✅ FIX: Sahi route /mentorship/mentor-session hai (query params
+        // leta hai) — /mentorship/session-room/:id wala route app me
+        // exist hi nahi karta tha, isliye 404 aa raha tha. roomId ab
+        // properly pass ho raha hai taaki useLiveRoom join kar sake.
+        router.push(
+          `/mentorship/mentor-session?sessionId=${encodeURIComponent(sessionId)}&roomId=${encodeURIComponent(roomId)}&bookingId=${encodeURIComponent(bookingId)}`
+        );
       } catch (err: any) {
         const message = err?.response?.data?.message || err.message || "Failed to start session.";
         setStartError(message);
@@ -260,7 +269,6 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         setActionLoading(null);
       }
     };
-
 
 
     // ✅ NEW: opens the details modal for a completed booking
