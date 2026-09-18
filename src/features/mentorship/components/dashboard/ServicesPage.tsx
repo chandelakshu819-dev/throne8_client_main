@@ -853,6 +853,7 @@ export default function ServicesPage({
                       <button
                         onClick={() => {
                           setSelectedSession(service);
+                          setModalMode('view');
                           setIsEditModalOpen(true);
                         }}
                         className="editCurrentSessions px-4 py-2 rounded-lg text-white text-sm font-semibold transition-colors hover:opacity-90 whitespace-nowrap"

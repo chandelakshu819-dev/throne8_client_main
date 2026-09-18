@@ -567,15 +567,45 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                         )}
                       </div>
                     ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onServiceClick(getServiceFromSession(session));
-                        }}
-                        style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}
-                      >
-                        Book
-                      </button>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onServiceClick(getServiceFromSession(session));
+                          }}
+                          style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}
+                        >
+                          Book
+                        </button>
+                        {/* NEW: Waitlist option — e.stopPropagation() is required
+                            here too since the whole card has its own onClick
+                            that opens the detail modal. */}
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const fallbackDate = session.scheduledAt || new Date().toISOString();
+                              await MentorService.joinWaitlist({
+                                mentorId,
+                                preferredDates: [fallbackDate],
+                                preferredTimeSlots: ["any"],
+                                sessionType: session.sessionType,
+                                timezone: "Asia/Kolkata",
+                              });
+                              alert("You've been added to the waitlist. We'll notify you when a slot opens up.");
+                            } catch (err: any) {
+                              alert(err.message || "Failed to join waitlist.");
+                            }
+                          }}
+                          style={{
+                            padding: "8px 18px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                            background: "transparent", color: C.dark, border: `1.5px solid ${C.dark}`,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Waitlist
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

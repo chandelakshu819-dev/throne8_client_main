@@ -406,7 +406,7 @@ class MentorService {
     }
   }
 
-  // ⭐ NEW: fetch single session by sessionId — Join Session flow me
+   // ⭐ NEW: fetch single session by sessionId — Join Session flow me
   // isi se meeting/roomId details milengi jo video call room me use hongi.
   static async getSessionById(sessionId: string): Promise<any> {
     try {
@@ -432,6 +432,50 @@ class MentorService {
         }
       }
       throw new Error('Failed to fetch session details. Please try again.');
+    }
+  }
+
+  // ⭐ NEW: student joins waitlist for a mentor whose slot/session is full.
+  // Backend: joinWaitlist() → Mentor.waitlistCounter atomically +1 (position
+  // assign) → creates Waitlist doc (status: ACTIVE, expiresAt: +7 days).
+  // Route: POST /waitlist/join (see waitlist.routes.ts). Validator requires
+  // mentorId, preferredDates[] (ISO8601, min 1), preferredTimeSlots[] (min 1),
+  // sessionType, timezone — all as top-level JSON body fields, no FormData.
+  static async joinWaitlist(input: {
+    mentorId: string;
+    preferredDates: string[];
+    preferredTimeSlots: string[];
+    sessionType: string;
+    timezone: string;
+    notes?: string;
+  }): Promise<any> {
+    try {
+      const { data } = await api.post(`/waitlist/join`, input);
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (error.code === 'ERR_NETWORK') {
+          throw new Error('Unable to connect to server. Please check your internet connection.');
+        }
+        if (error.response?.status === 400) {
+          throw new Error(
+            apiError?.errors?.map((e: any) => e.msg).join(', ') ||
+            apiError?.message ||
+            'You are already on the waitlist, or required details are missing.'
+          );
+        }
+        if (error.response?.status === 401) {
+          throw new Error('Session expired. Please login again.');
+        }
+        if (error.response?.status === 404) {
+          throw new Error('Mentor not found.');
+        }
+        if (apiError?.message) {
+          throw new Error(apiError.message);
+        }
+      }
+      throw new Error('Failed to join waitlist. Please try again.');
     }
   }
 }

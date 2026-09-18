@@ -6,6 +6,9 @@ import { Clock } from "./Icons";
 import { SERVICES, FILTERS, C, btnPrimary } from "../../types/data";
 import type { Service } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
+import MentorService from "@/lib/api/mentorship.service";
+
+
 
 interface ServicesSectionProps {
   onServiceClick: (service: Service) => void;
@@ -178,9 +181,36 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                     )}
                   </div>
                 ) : (
-                  <button onClick={() => onServiceClick(svc)} style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}>
-                    Book
-                  </button>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button onClick={() => onServiceClick(svc)} style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}>
+                      Book
+                    </button>
+                    {/* NEW: Waitlist option shown alongside Book. */}
+                    <button
+                      onClick={async () => {
+                        try {
+                          const fallbackDate = session.scheduledAt || new Date().toISOString();
+                          await MentorService.joinWaitlist({
+                            mentorId,
+                            preferredDates: [fallbackDate],
+                            preferredTimeSlots: ["any"],
+                            sessionType: session.sessionType,
+                            timezone: "Asia/Kolkata",
+                          });
+                          alert("You've been added to the waitlist. We'll notify you when a slot opens up.");
+                        } catch (err: any) {
+                          alert(err.message || "Failed to join waitlist.");
+                        }
+                      }}
+                      style={{
+                        padding: "8px 18px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                        background: "transparent", color: C.dark, border: `1.5px solid ${C.dark}`,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Waitlist
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
