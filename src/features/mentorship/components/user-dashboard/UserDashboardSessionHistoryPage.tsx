@@ -7,10 +7,12 @@ import {
   MapPin,
   Star,
   RotateCcw, 
-  History
+  History,
+  MessageSquare
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import WriteReviewModal from "@/features/mentorship/components/WriteReviewModal";
+import { routes } from "@/config/routes";
 
 const COLORS = {
   ink: "#4a3728",
@@ -32,6 +34,7 @@ const COLORS = {
 type Session = {
   _id?: string;
   sessionId?: string;
+  serviceId?: string;
   mentorId?: string;
   mentorName?: string;
   mentorProfilePhoto?: string;
@@ -76,15 +79,9 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
   const router = useRouter();
   const now = Date.now();
 
-  // 🔧 FIX: "Give Review" used to call router.push("/mentorship/sessions") —
-  // that route doesn't exist anywhere in the app, so Next.js fell back to
-  // home instead of opening a review form. Now it opens WriteReviewModal
-  // in place, same modal already wired up in MyMentorSessions.tsx.
   const [reviewTarget, setReviewTarget] = useState<Session | null>(null);
-  // sessions come in as a prop from the parent (fetched once on mount), so a
-  // submitted review won't flip `hasReview` on its own — track it locally
-  // so the button/badge updates immediately without needing a full refetch.
   const [locallyReviewedIds, setLocallyReviewedIds] = useState<Set<string>>(new Set());
+  const [viewReviewSession, setViewReviewSession] = useState<Session | null>(null);
 
   const historySessions = sessions.filter((s) => {
     const status = (s.status || "").toLowerCase();
@@ -103,6 +100,19 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
     if (s === "completed" || s === "done") return { bg: COLORS.successWash, text: COLORS.success };
     if (s === "cancelled" || s === "refunded") return { bg: COLORS.dangerWash, text: COLORS.danger };
     return { bg: COLORS.chip, text: COLORS.accent };
+  };
+
+  const handleBookAgain = (s: Session) => {
+    if (!s.mentorId) {
+      router.push("/mentorship");
+      return;
+    }
+    const serviceIdentifier = s.serviceId || s.sessionId || s._id;
+    const baseCardUrl = routes.mentorCard(s.mentorName || "mentor", s.mentorId);
+    const bookingUrl = serviceIdentifier
+      ? `${baseCardUrl}?serviceId=${encodeURIComponent(serviceIdentifier)}&book=true`
+      : `${baseCardUrl}?book=true`;
+    router.push(bookingUrl);
   };
 
   return (
@@ -150,7 +160,7 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
             return (
               <div
                 key={sessionId}
-                className="flex flex-col lg:flex-row items-start lg:items-start gap-5 lg:gap-0 p-5 rounded-2xl transition-all hover:shadow-md bg-white hover:-translate-y-0.5"
+                className="flex flex-col lg:flex-row items-start lg:items-start gap-5 lg:gap-0 p-5 rounded-2xl transition-all hover:shadow-md bg-white hover:-translate-y-0.5 motion-reduce:transition-none motion-reduce:hover:translate-y-0"
                 style={{ border: `1px solid ${COLORS.hairline}` }}
               >
                 {/* 1. Mentor Info */}
@@ -228,9 +238,26 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
                     <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: COLORS.muted }}>Review Status</p>
                     <div className="flex items-center gap-1.5">
                       <Star className="w-3.5 h-3.5" style={{ color: hasReview ? COLORS.gold : COLORS.faint, fill: hasReview ? COLORS.gold : "none" }} />
-                      <span className="text-xs font-medium" style={{ color: hasReview ? COLORS.ink : COLORS.muted }}>
-                        {hasReview ? "Reviewed" : "Not reviewed"}
-                      </span>
+                      {hasReview ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs font-medium" style={{ color: COLORS.ink }}>
+                            {s.review?.rating ? `${s.review.rating}/5` : "Reviewed"}
+                          </span>
+                          {s.review?.menteeReview && (
+                            <button
+                              onClick={() => setViewReviewSession(s)}
+                              className="text-[10px] ml-1 font-semibold underline hover:text-[#7a5c3e] transition-colors"
+                              style={{ color: COLORS.muted }}
+                            >
+                              View
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs font-medium" style={{ color: COLORS.muted }}>
+                          Not reviewed
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -246,8 +273,8 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
                       </button>
                     )}
                     <button
-                      onClick={() => s.mentorId ? router.push(`/mentorship/mentors/${s.mentorId}`) : router.push("/mentorship")}
-                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-[#8b7355] shadow-sm text-center"
+                      onClick={() => handleBookAgain(s)}
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 hover:-translate-y-1 hover:shadow-md motion-reduce:hover:translate-y-0 motion-reduce:transition-none hover:bg-[#8b7355] shadow-sm text-center"
                       style={{ backgroundColor: COLORS.ink, color: "#fff" }}
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -279,6 +306,49 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
             setReviewTarget(null);
           }}
         />
+      )}
+
+      {viewReviewSession && viewReviewSession.review && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-xl" style={{ border: `1px solid ${COLORS.hairline}` }}>
+            <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: COLORS.hairline, backgroundColor: COLORS.softWash }}>
+              <h3 className="font-bold text-lg" style={{ color: COLORS.ink }}>Your Review</h3>
+              <button onClick={() => setViewReviewSession(null)} className="text-sm font-bold" style={{ color: COLORS.muted }}>✕</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold" style={{ color: COLORS.muted }}>Rating:</p>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className="w-4 h-4"
+                      style={{
+                        color: (viewReviewSession.review?.rating || 0) >= star ? COLORS.gold : COLORS.hairline,
+                        fill: (viewReviewSession.review?.rating || 0) >= star ? COLORS.gold : "none"
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-semibold mb-1.5" style={{ color: COLORS.muted }}>Feedback:</p>
+                <div className="p-3 rounded-xl text-sm" style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}`, color: COLORS.ink }}>
+                  {viewReviewSession.review?.menteeReview || "No written feedback provided."}
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t flex justify-end" style={{ borderColor: COLORS.hairline }}>
+              <button
+                onClick={() => setViewReviewSession(null)}
+                className="px-4 py-2 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f6ede8]"
+                style={{ color: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
