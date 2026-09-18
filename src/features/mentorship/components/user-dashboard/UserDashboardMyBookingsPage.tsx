@@ -7,8 +7,10 @@ import {
   MapPin,
   Bookmark,
   Receipt,
-  FileText
+  FileText,
+  X
 } from "lucide-react";
+import { createPortal } from "react-dom";
 
 const COLORS = {
   ink: "#4a3728",
@@ -87,6 +89,8 @@ type TabType = "upcoming" | "completed" | "cancelled" | "pending";
 
 export default function UserDashboardMyBookingsPage({ sessions = [] }: Props) {
   const [activeTab, setActiveTab] = useState<TabType>("upcoming");
+  const [selectedBooking, setSelectedBooking] = useState<Session | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const now = Date.now();
 
   const filteredSessions = sessions.filter((s) => {
@@ -317,7 +321,11 @@ export default function UserDashboardMyBookingsPage({ sessions = [] }: Props) {
                       </a>
                     )}
                     <button
-                      className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-[#8b7355] shadow-sm text-center"
+                      onClick={() => {
+                        setSelectedBooking(s);
+                        setShowDetailsModal(true);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 hover:-translate-y-1 hover:shadow-md hover:bg-[#8b7355] shadow-sm text-center"
                       style={{ backgroundColor: COLORS.ink, color: "#fff" }}
                     >
                       View Details
@@ -328,6 +336,123 @@ export default function UserDashboardMyBookingsPage({ sessions = [] }: Props) {
             );
           })}
         </div>
+      )}
+
+      {/* View Details Modal */}
+      {showDetailsModal && selectedBooking && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4 relative max-h-[90vh] overflow-y-auto hide-scrollbar" style={{ border: `1px solid ${COLORS.hairline}` }}>
+            <button
+              onClick={() => {
+                setShowDetailsModal(false);
+                setSelectedBooking(null);
+              }}
+              className="absolute top-4 right-4 p-1.5 rounded-full transition-colors hover:bg-gray-100"
+              style={{ color: COLORS.muted }}
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <h3 className="text-xl font-bold mb-1" style={{ color: COLORS.ink }}>Booking Details</h3>
+            <p className="text-sm mb-5" style={{ color: COLORS.muted }}>Review all information about this session.</p>
+
+            <div className="space-y-4">
+              {/* Service & Mentor */}
+              <div className="rounded-xl p-4" style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: COLORS.muted }}>Service</p>
+                <p className="text-sm font-bold mb-3" style={{ color: COLORS.ink }}>{selectedBooking.title || "Mentorship Session"}</p>
+                
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: COLORS.muted }}>Mentor</p>
+                <div className="flex items-center gap-2">
+                  {selectedBooking.mentorProfilePhoto ? (
+                    <img src={selectedBooking.mentorProfilePhoto} alt="Mentor" className="w-6 h-6 rounded-full object-cover" style={{ border: `1px solid ${COLORS.hairline}` }} />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style={{ backgroundColor: COLORS.ink }}>
+                      {initialsFrom(selectedBooking.mentorName || "Mentor")}
+                    </div>
+                  )}
+                  <span className="text-sm font-semibold" style={{ color: COLORS.ink }}>{selectedBooking.mentorName || "Mentor"}</span>
+                </div>
+              </div>
+
+              {/* Date, Time, Duration, Location */}
+              <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}>
+                <div className="flex justify-between items-center text-sm">
+                  <span style={{ color: COLORS.muted }} className="font-semibold">Date</span>
+                  <span style={{ color: COLORS.ink }} className="font-bold">{formatDateStr(selectedBooking.startTime || selectedBooking.scheduledAt)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span style={{ color: COLORS.muted }} className="font-semibold">Time</span>
+                  <span style={{ color: COLORS.ink }} className="font-bold">{formatTimeStr(selectedBooking.startTime || selectedBooking.scheduledAt)}</span>
+                </div>
+                {selectedBooking.duration && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span style={{ color: COLORS.muted }} className="font-semibold">Duration</span>
+                    <span style={{ color: COLORS.ink }} className="font-bold">{selectedBooking.duration} min</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center text-sm">
+                  <span style={{ color: COLORS.muted }} className="font-semibold">Location</span>
+                  <span style={{ color: COLORS.ink }} className="font-bold capitalize">
+                    {(!selectedBooking.sessionType || selectedBooking.sessionType.toLowerCase() === "virtual" || selectedBooking.sessionType.toLowerCase() === "online") ? "Online Video" : "In Person"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Status & IDs */}
+              <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}>
+                <div className="flex justify-between items-center text-sm">
+                  <span style={{ color: COLORS.muted }} className="font-semibold">Booking ID</span>
+                  <span className="font-mono text-xs font-semibold" style={{ color: COLORS.ink }}>
+                    {selectedBooking.sessionId || selectedBooking._id || "Not Available"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span style={{ color: COLORS.muted }} className="font-semibold">Booking Status</span>
+                  <span className="inline-flex text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
+                    style={{ backgroundColor: getStatusBadgeStyles(selectedBooking.status || "Unknown").bg, color: getStatusBadgeStyles(selectedBooking.status || "Unknown").text }}
+                  >
+                    {selectedBooking.status || "Scheduled"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Pricing & Payment */}
+              <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}>
+                <div className="flex justify-between items-center text-sm">
+                  <span style={{ color: COLORS.muted }} className="font-semibold">Amount</span>
+                  <span style={{ color: COLORS.ink }} className="font-bold">
+                    {selectedBooking.pricing?.totalAmount !== undefined 
+                      ? formatCurrency(selectedBooking.pricing.totalAmount, selectedBooking.pricing.currency || "INR")
+                      : "Not available"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span style={{ color: COLORS.muted }} className="font-semibold">Payment Status</span>
+                  <span className="inline-flex text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
+                    style={{ backgroundColor: getPaymentBadgeStyles(selectedBooking.payment?.status).bg, color: getPaymentBadgeStyles(selectedBooking.payment?.status).text }}
+                  >
+                    {selectedBooking.payment?.status || "Unknown"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setSelectedBooking(null);
+                }}
+                className="px-5 py-2 rounded-xl text-sm font-bold transition-all hover:bg-gray-100"
+                style={{ color: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
