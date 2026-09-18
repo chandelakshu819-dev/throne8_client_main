@@ -13,7 +13,7 @@ const COLORS = {
   muted: "#8a7a6a",
 }
 
-type NotificationType = "booking" | "review" | "payment" | "message" | "system"
+type NotificationType = string
 
 type NotificationItem = {
   _id?: string
@@ -22,6 +22,8 @@ type NotificationItem = {
   message?: string
   createdAt?: string
   isRead?: boolean
+  data?: any
+  metadata?: any
 }
 
 interface UserDashboardNotificationsPageProps {
@@ -111,6 +113,8 @@ export default function UserDashboardNotificationsPage({
             <p style={{ color: COLORS.muted }} className="text-sm mt-0.5">
               {notificationsLoading
                 ? "Loading your notifications..."
+                : notifications.length === 0
+                ? "No notifications yet"
                 : unreadCount > 0
                 ? `You have ${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}`
                 : "You're all caught up"}
@@ -118,7 +122,7 @@ export default function UserDashboardNotificationsPage({
           </div>
         </div>
 
-        {unreadCount > 0 && (
+        {unreadCount > 0 && onMarkAllRead && (
           <button
             onClick={onMarkAllRead}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-[#eadecc]"
@@ -173,7 +177,7 @@ export default function UserDashboardNotificationsPage({
           <div className="space-y-3">
             {group.items.map((item, idx) => {
               const Icon = TYPE_ICON[item.type ?? "system"] ?? Bell
-              
+
               const isInteractive = !item.isRead && item._id;
 
               return (
@@ -184,9 +188,9 @@ export default function UserDashboardNotificationsPage({
                       onMarkRead?.(item._id!);
                     }
                   }}
-                  className={`w-full flex items-start gap-4 p-4 rounded-2xl text-left transition-all duration-200 motion-reduce:transition-none ${
-                    isInteractive 
-                      ? 'hover:-translate-y-1 hover:shadow-md hover:border-[#c9baa9] cursor-pointer' 
+                  className={`w-full flex items-start gap-4 p-4 rounded-2xl text-left transition-all duration-200 motion-reduce:transition-none hover:-translate-y-1 hover:shadow-md ${
+                    isInteractive
+                      ? 'hover:border-[#c9baa9] cursor-pointer'
                       : 'cursor-default'
                   }`}
                   style={{
@@ -219,9 +223,24 @@ export default function UserDashboardNotificationsPage({
                         />
                       )}
                     </div>
-                    <p className="text-sm" style={{ color: item.isRead ? COLORS.muted : "#5c4a3a" }}>
+                    <p className="text-sm break-words whitespace-pre-wrap" style={{ color: item.isRead ? COLORS.muted : "#5c4a3a" }}>
                       {item.message}
                     </p>
+
+                    {(() => {
+                      const isPayment = item.type?.includes("payment");
+                      const name = item.data?.mentorName || item.metadata?.mentorName || item.data?.menteeName || item.metadata?.menteeName || item.data?.user?.name || item.metadata?.user?.name;
+                      const label = (item.data?.mentorName || item.metadata?.mentorName) ? "Mentor" : "User";
+
+                      if (!isPayment && name) {
+                        return (
+                          <div className="mt-2 inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-[#fbf7f3] border" style={{ color: COLORS.accent, borderColor: COLORS.gold }}>
+                            {label}: {name}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
 
                   <span className="text-xs shrink-0 mt-1 font-semibold" style={{ color: COLORS.muted }}>
