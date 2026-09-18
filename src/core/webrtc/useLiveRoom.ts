@@ -808,7 +808,7 @@ const toggleMic = useCallback(async () => {
     const socket = getSocket();
     if (!socket) return;
 
-    // ── Another user joined → we initiate offer ──
+       // ── Another user joined → we initiate offer ──
         // Server's 'user-joined-room' payload is { userId, userName, timestamp } — no socketId.
     // socketId only shows up when this fn is reused from room-participants-list.
     const handleUserJoined = async ({
@@ -849,6 +849,36 @@ const toggleMic = useCallback(async () => {
         connectionState: 'new',
       });
     };
+
+    // ── NEW: existing peer just gets NOTIFIED a new user joined.
+    // Does NOT create an offer — this prevents "offer glare", where both the
+    // newcomer (via room-participants-list) and the existing peer (via this
+    // event) would otherwise send simultaneous offers to each other, each
+    // tearing down the other's in-flight PeerConnection. Only the newcomer
+    // initiates; the existing peer just waits and answers when the offer
+    // arrives (handleOffer already does this correctly).
+    const handlePeerAnnounced = ({
+      userId: remoteUserId,
+      userName: remoteUserName,
+    }: {
+      userId: string;
+      userName?: string;
+    }) => {
+      if (!isMounted.current || !remoteUserId || remoteUserId === userId) return;
+
+      onPeerJoined?.({
+        socketId: remoteUserId,
+        userId: remoteUserId,
+        userName: remoteUserName,
+        stream: null,
+        cameraOn: true,
+        micOn: true,
+        isSpeaking: false,
+        quality: 'good',
+        connectionState: 'new',
+      });
+    };
+
 
     // ── Receive offer → send answer ──
         // Server sends { fromUserId, roomId, offer } only.
@@ -983,7 +1013,7 @@ const toggleMic = useCallback(async () => {
       }
     };
 
-    socket.on('user-joined-room', handleUserJoined);
+    socket.on('user-joined-room', handlePeerAnnounced);
     socket.on('webrtc-offer-received', handleOffer);
     socket.on('webrtc-answer-received', handleAnswer);
     socket.on('webrtc-ice-candidate-received', handleIceCandidate);
@@ -993,7 +1023,7 @@ const toggleMic = useCallback(async () => {
     socket.on('room-participants-list', handleRoomParticipants);
 
     return () => {
-      socket.off('user-joined-room', handleUserJoined);
+      socket.off('user-joined-room', handlePeerAnnounced);
       socket.off('webrtc-offer-received', handleOffer);
       socket.off('webrtc-answer-received', handleAnswer);
       socket.off('webrtc-ice-candidate-received', handleIceCandidate);
