@@ -13,7 +13,7 @@ import {
     Send,
     Users,
     CheckCircle2,
-    TrendingUp
+    TrendingUp,
 } from "lucide-react";
 import MentorService from "@/lib/api/mentorship.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -89,18 +89,7 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
                     ""
                 ).toLowerCase();
 
-                const seniorKeywords = [
-                    "senior",
-                    "lead",
-                    "principal",
-                    "director",
-                    "head",
-                    "vp",
-                    "founder",
-                    "ceo",
-                    "cto",
-                ];
-
+              
                 const hasSeniorTitle = seniorKeywords.some((keyword) =>
                     rawRole.includes(keyword)
                 );
@@ -309,14 +298,7 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
 
                 {/* ── RIGHT SIDE ────────────────────────────────────────────────── */}
                 <div className="lg:col-span-6 xl:col-span-6 relative flex flex-col items-center lg:items-end w-full pt-2 lg:pt-0 lg:-translate-x-[70px]">
-                    {/* Floating Pill: DOMAIN: Tech & AI */}
-                    <div className="w-full max-w-[420px] flex justify-start mb-2.5">
-                        <div className="bg-[#f0e8de] border border-[#e5d9ce] rounded-full px-3.5 py-1 flex items-center gap-2 text-xs font-bold text-[#231815]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#8c6b4a]" />
-                            <span className="text-[#8c6b4a] font-semibold text-[11px] uppercase tracking-wider">DOMAIN:</span>
-                            <span className="font-bold">Tech &amp; AI</span>
-                        </div>
-                    </div>
+                  
 
                     {/* Outer Collage Wrapper */}
                     <div className="relative w-full max-w-[420px]">
@@ -326,35 +308,39 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
                         {/* Dynamic Mentor Card */}
 <div
     onClick={handleViewMentorProfile}
-    className="
-        group
-        relative
-        overflow-hidden
-        bg-gradient-to-br
-        from-[#4a3020]
-        via-[#5a3b27]
-        to-[#382419]
-        border
-        border-[#7d5b3d]
-        rounded-[24px]
-        sm:rounded-[28px]
-        p-4
-        sm:p-5
-        shadow-[0_12px_30px_rgba(55,35,22,0.18)]
-        hover:-translate-y-1
-        hover:border-[#c4963a]
-        hover:shadow-[0_18px_40px_rgba(55,35,22,0.28)]
-        transition-all
-        duration-500
-        cursor-pointer
-    "
+    style={{
+    boxShadow:
+        "0 22px 45px rgba(45, 27, 17, 0.42), 0 10px 22px rgba(45, 27, 17, 0.28)",
+}}
+   className="
+    group
+    relative
+    overflow-hidden
+    bg-gradient-to-br
+    from-[#4a3020]
+    via-[#563824]
+    to-[#3b2619]
+    border
+    border-[#7d5b3d]
+    rounded-[22px]
+    sm:rounded-[24px]
+    p-4
+    sm:p-5
+    shadow-[0_20px_45px_rgba(45,27,17,0.35),0_8px_18px_rgba(45,27,17,0.20)]
+    hover:-translate-y-1
+    hover:border-[#c4963a]
+    hover:shadow-[0_26px_55px_rgba(45,27,17,0.42)]
+    transition-all
+    duration-500
+    cursor-pointer
+"
 >
     {/* Decorative background */}
     <div
         className="
-            absolute
-            -right-20
-            -top-20
+             absolute
+        -bottom-20
+        right-[-40px]
             w-48
             h-48
             rounded-full
@@ -378,8 +364,20 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
         "
     />
 
-    <div className="relative z-10">
-
+   {/* Premium Gold Accent Bar */}
+<div
+    className="
+        absolute
+        left-0
+        top-0
+        bottom-0
+        w-[6px]
+        bg-gradient-to-b
+        from-[#e0b84c]
+        via-[#c4963a]
+        to-[#9f722d]
+    "
+/>
         {/* Crown badge + decorative crown */}
         <div className="flex items-start justify-between mb-3">
 
@@ -408,15 +406,7 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
                 </span>
             </div>
 
-            <Crown
-                className="
-                    w-8
-                    h-8
-                    text-[#e7c98e]
-                    rotate-12
-                    opacity-90
-                "
-            />
+           
 
         </div>
 
@@ -512,15 +502,17 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
                 </h3>
 
 
-                <p
-                    className="
-                        text-xs
-                        font-medium
-                        text-[#e2cdb2]
-                        truncate
-                        mt-1
-                    "
-                >
+                     <p
+    className="
+       text-[14px]
+sm:text-[15px]
+font-bold
+text-[#f8e8d2]
+        truncate
+        mt-1
+        tracking-[0.01em]
+    "
+>
                     {loading && !mentor ? (
                         <span className="inline-block w-24 h-3 bg-[#6a4a35] rounded animate-pulse mt-1" />
                     ) : (
@@ -539,10 +531,10 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
                         flex
                         items-center
                         gap-1.5
-                        text-xs
-                        font-medium
+                        text-[13px]
+                        font-semibold
                         text-[#e2cdb2]
-                        mt-1.5
+                        mt-2
                     "
                 >
 
@@ -550,17 +542,18 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
                         className="
                             flex
                             items-center
-                            gap-0.5
+                            gap-1
+                             text-[15px]
                             text-[#f1d49a]
-                            font-bold
+                            font-extrabold
                         "
                     >
                         <Star
                             className="
-                                w-3.5
-                                h-3.5
-                                fill-[#c4963a]
-                                text-[#c4963a]
+                                w-4
+                                h-4
+                                fill-[#D4AF37]
+            text-[#D4AF37]
                             "
                         />
 
@@ -662,7 +655,7 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
                     </div>
                 </div>
 
-            </div>
+            
         </section>
     );
 }
