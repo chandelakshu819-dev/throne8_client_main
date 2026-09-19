@@ -22,6 +22,69 @@ function formatPrice(price: any): string {
     return `₹${num.toLocaleString("en-IN")}`;
 }
 
+const DEFAULT_1TO1_SERVICES = [
+    {
+        sessionId: "606399ca-4e90-48c8-8e9c-0b2158663fbe",
+        mentorId: "016b0f23-3546-43b4-8743-d67061caf5f3",
+        title: "The flow you should follow",
+        description: "The flow you should follow, in a way Booking List Sorting Fix. Master your system design and career trajectory.",
+        duration: 60,
+        pricing: { basePrice: 700 },
+        category: "CAREER PLANNING",
+        sessionType: "career_planning",
+        thumbnailImage: "https://res.cloudinary.com/dft8cyjtt/image/upload/v1787473128/session-thumbnails/session_b3571692-eaf2-43fe-9182-383f93f19061_1787473126932.jpg",
+        skills: ["Career Planning", "System Design"],
+        rating: 5.0,
+        sessionCount: 84,
+        host: {
+            name: "Abhishek Meena",
+            role: "Software Engineer",
+            image: "https://res.cloudinary.com/dft8cyjtt/image/upload/v1787299188/mentor-profiles/mentor_b3571692-eaf2-43fe-9182-383f93f19061_1787299188031.jpg",
+            isOnline: true,
+        },
+    },
+    {
+        sessionId: "fd480e19-2641-455b-ac84-be459d754501",
+        mentorId: "d9822212-a284-4a13-95ea-2aaca2867738",
+        title: "Technical Interview & Live Coding",
+        description: "Real interview-style practice with live feedback, systems architecture, and actionable improvement checklist.",
+        duration: 60,
+        pricing: { basePrice: 999 },
+        category: "MOCK INTERVIEW",
+        sessionType: "mock_interview",
+        thumbnailImage: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=600",
+        skills: ["Mock Interview", "React"],
+        rating: 4.9,
+        sessionCount: 62,
+        host: {
+            name: "Sarah Jenkins",
+            role: "Staff Engineer & Tech Lead",
+            image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400",
+            isOnline: true,
+        },
+    },
+    {
+        sessionId: "5d991275-cc7b-47be-a51f-09820f010718",
+        mentorId: "3c140ebf-ae87-4acf-89b0-397e5946c151",
+        title: "Technical Query & Architecture Advisory",
+        description: "Direct, focused 1-on-1 advisory solving your specific technical queries and architecture roadblocks.",
+        duration: 38,
+        pricing: { basePrice: 835 },
+        category: "QUERY SOLVING",
+        sessionType: "ask_query",
+        thumbnailImage: "https://res.cloudinary.com/ddwiwu2ko/image/upload/v1788949310/session-thumbnails/session_8ca13970-2a2e-4051-bed4-8e4f301096ef_1788949310028.jpg",
+        skills: ["Query Solving", "Architecture"],
+        rating: 5.0,
+        sessionCount: 45,
+        host: {
+            name: "Steve Byres",
+            role: "Senior Engineer",
+            image: "https://res.cloudinary.com/ddwiwu2ko/image/upload/v1788940783/mentor-profiles/mentor_8ca13970-2a2e-4051-bed4-8e4f301096ef_1788940782999.jpg",
+            isOnline: false,
+        },
+    },
+];
+
 export default function MentorshipServicesSection({
     mentorId,
     mentorName,
@@ -29,9 +92,9 @@ export default function MentorshipServicesSection({
     mentorRole,
 }: MentorshipServicesSectionProps) {
     const router = useRouter();
-    const [services, setServices] = useState<any[]>([]);
+    const [services, setServices] = useState<any[]>(DEFAULT_1TO1_SERVICES);
     const [mentorMap, setMentorMap] = useState<Map<string, any>>(new Map());
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
 
     // Infinite Carousel State
     const [currentIndex, setCurrentIndex] = useState(3);
@@ -206,20 +269,7 @@ export default function MentorshipServicesSection({
         router.push(`/mentorship/service/${serviceId}`);
     };
 
-    if (loading) {
-        return (
-            <section className="py-12 px-4 md:px-6">
-                <div className="max-w-[1240px] mx-auto text-center">
-                    <div className="inline-block w-7 h-7 border-2 border-[#8b7355] border-t-transparent rounded-full animate-spin mb-2.5" />
-                    <p className="text-xs font-medium text-[#8b7355]">Loading 1-to-1 services...</p>
-                </div>
-            </section>
-        );
-    }
-
-    if (services.length === 0) {
-        return null;
-    }
+    const effectiveServices = services.length > 0 ? services : DEFAULT_1TO1_SERVICES;
 
     // Infinite Loop clones
     const getClones = (arr: any[], count: number) => {
@@ -232,11 +282,11 @@ export default function MentorshipServicesSection({
     };
 
     const visibleCardsCount = Math.round(100 / cardWidthPercent);
-    const shouldCarousel = services.length > visibleCardsCount;
+    const shouldCarousel = effectiveServices.length > visibleCardsCount;
 
-    const preClones = shouldCarousel ? getClones([...services].reverse(), 3).reverse() : [];
-    const postClones = shouldCarousel ? getClones(services, 3) : [];
-    const displayItems = shouldCarousel ? [...preClones, ...services, ...postClones] : services;
+    const preClones = shouldCarousel ? getClones([...effectiveServices].reverse(), 3).reverse() : [];
+    const postClones = shouldCarousel ? getClones(effectiveServices, 3) : [];
+    const displayItems = shouldCarousel ? [...preClones, ...effectiveServices, ...postClones] : effectiveServices;
 
     return (
         <section className="pt-6 pb-12 px-4 md:px-6">
@@ -297,12 +347,15 @@ export default function MentorshipServicesSection({
                             const uniqueKey = `carousel-item-${serviceId}-${index}`;
 
                             // Host profile resolution
-                            const hostData = mentorMap.get(service.mentorId);
-                            const hostName = hostData
+                            const hostData = mentorMap.get(service.mentorId) || (service as any).host;
+                            const hostName = hostData?.name
+                                ? hostData.name
+                                : hostData?.user
                                 ? `${hostData.user?.firstName || ""} ${hostData.user?.lastName || ""}`.trim()
                                 : mentorName || "Industry Mentor";
 
                             const hostRole =
+                                hostData?.role ||
                                 hostData?.experience?.currentRole ||
                                 hostData?.headline ||
                                 hostData?.currentRole ||
@@ -310,16 +363,21 @@ export default function MentorshipServicesSection({
                                 "Senior Professional";
 
                             const hostPic =
+                                hostData?.image ||
                                 hostData?.profilePic ||
                                 hostData?.user?.profilePic ||
                                 mentorImage ||
                                 "";
 
                             const hostUserId =
+                                hostData?.mentorId ||
                                 hostData?.userId ||
+                                hostData?._id ||
+                                hostData?.user?.userId ||
                                 hostData?.user?.id ||
                                 hostData?.user?._id ||
-                                service.mentorId;
+                                service.mentorId ||
+                                service.userId;
 
                             const isOnline =
                                 hostData?.isOnline ??
@@ -367,7 +425,8 @@ export default function MentorshipServicesSection({
                             const rawRating =
                                 hostData?.stats?.averageRating ??
                                 hostData?.rating ??
-                                service.rating;
+                                service.rating ??
+                                5.0;
                             const rawSessions =
                                 hostData?.stats?.totalSessions ??
                                 hostData?.totalSessions ??
@@ -391,8 +450,8 @@ export default function MentorshipServicesSection({
                                         handleServiceClick(serviceId);
                                     }}
                                 >
-                                    {/* ── 3. CARD CONTAINER (20-22px radius, natural flex height) ── */}
-                                    <div className="group flex flex-col bg-white rounded-[20px] sm:rounded-[22px] overflow-hidden border border-[#ece7e2] shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 h-full pointer-events-auto cursor-pointer">
+                                    {/* ── 3. CARD CONTAINER (20-22px radius, natural flex height, rich hover transition) ── */}
+                                    <div className="group flex flex-col bg-white hover:bg-[#FDFBF7] rounded-[20px] sm:rounded-[22px] overflow-hidden border border-[#ece7e2] hover:border-[#8b7355]/40 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-xl transition-all duration-300 hover:-translate-y-1 h-full pointer-events-auto cursor-pointer">
                                         {/* ── 2. COMPACT THUMBNAIL (130-138px height) ── */}
                                         <div className="relative w-full h-[130px] sm:h-[138px] bg-[#f4ece1] overflow-hidden flex-shrink-0">
                                             {thumbnail ? (
@@ -520,7 +579,12 @@ export default function MentorshipServicesSection({
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         if (Math.abs(dragDistance.current) > 10) return;
-                                                        router.push(`/mentorship/${hostUserId}`);
+                                                        const targetId = hostUserId && hostUserId !== "undefined" ? hostUserId : "";
+                                                        if (targetId) {
+                                                            router.push(`/mentorship/${targetId}`);
+                                                        } else {
+                                                            router.push('/mentorship');
+                                                        }
                                                     }}
                                                     className="flex-1 py-1.5 sm:py-2 px-2.5 rounded-full border border-[#dcd4cb] hover:border-[#8b7355] bg-white hover:bg-[#FAF9F6] text-[#4a3728] font-bold text-xs text-center transition-all duration-200 shadow-xs"
                                                 >

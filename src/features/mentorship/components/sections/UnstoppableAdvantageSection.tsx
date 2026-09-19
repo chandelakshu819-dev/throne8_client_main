@@ -2,96 +2,109 @@
 
 import React from "react";
 import { ShieldCheck, Zap, Star, Globe } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+const ITEMS: {
+    icon: LucideIcon;
+    title: string;
+    description: string;
+    number: string;
+}[] = [
+    {
+        icon: ShieldCheck,
+        title: "Verified Experts",
+        description: "Industry-vetted professionals",
+        number: "01",
+    },
+    {
+        icon: Zap,
+        title: "Instant Booking",
+        description: "Book sessions in seconds",
+        number: "02",
+    },
+    {
+        icon: Star,
+        title: "Best Value",
+        description: "Premium quality, fair pricing",
+        number: "03",
+    },
+    {
+        icon: Globe,
+        title: "Global Reach",
+        description: "Connect across time zones",
+        number: "04",
+    },
+];
 
 export default function UnstoppableAdvantageSection() {
     return (
-        <section className="py-20 px-6 bg-[#FAF9F6] relative overflow-hidden">
-            <div className="absolute top-10 right-20 w-64 h-64 bg-[#4a3728]/5 rounded-full blur-3xl" />
-            <div className="absolute bottom-10 left-20 w-80 h-80 bg-[#8b7355]/5 rounded-full blur-3xl" />
+        <section className="relative overflow-hidden bg-[#f7f1e6] px-6 py-20">
+            {/* Decorative arcs */}
+            <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full border border-[#e6d6bd]/60" />
+            <div className="pointer-events-none absolute -right-32 top-10 h-80 w-80 rounded-full bg-[#eddcc0]/50 blur-2xl" />
+            <div className="pointer-events-none absolute bottom-0 right-0 h-64 w-64 rounded-full bg-[#8b7355]/5 blur-3xl" />
 
-            <div className="max-w-7xl mx-auto relative z-10">
-                <div className="text-center mb-14 reveal-on-scroll">
-                    <h2 className="text-4xl md:text-5xl font-black tracking-tighter text-[#4a3728] mb-3">
-                        The <span className="text-[#8b7355]">Unstoppable</span> Advantage
+            <div className="relative z-10 mx-auto max-w-5xl">
+                {/* Header */}
+                <div className="reveal-on-scroll mb-14 text-center">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[#8b7355]">
+                        The Unstoppable Advantage
+                    </p>
+                    <h2 className="mt-3 font-serif text-4xl font-bold tracking-tight text-[#2a1a10] sm:text-5xl">
+                        The Unstoppable Advantage
                     </h2>
-                    <p className="text-slate-500 text-base font-medium max-w-2xl mx-auto">
-                        Why thousands choose us for their career growth
+                    <p className="mx-auto mt-3 max-w-xl text-base font-medium text-slate-500">
+                        Why thousands choose us for their career growth.
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                    {/* Card 1 */}
-                    <div className="reveal-on-scroll group perspective-1000">
-                        <div className="relative bg-white rounded-[24px] p-6 border-2 border-[#ece7e2] shadow-xl hover:shadow-[0_15px_45px_rgba(74,55,40,0.12)] transition-all duration-700 transform-gpu hover:-translate-y-3 hover:rotate-y-3">
-                            <div className="absolute inset-0 bg-gradient-to-br from-[#4a3728]/10 to-transparent rounded-[24px] translate-x-1.5 translate-y-1.5 -z-10 group-hover:translate-x-3 group-hover:translate-y-3 transition-all duration-700" />
-                            <div className="absolute -top-4 -right-4 w-16 h-16 bg-[#8b7355]/20 rounded-full blur-xl group-hover:scale-150 transition-all duration-700" />
-                            <div className="w-12 h-12 bg-gradient-to-br from-[#4a3728] to-[#634a36] rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-md relative z-10 mx-auto">
-                                <ShieldCheck className="w-6 h-6 text-white" />
-                            </div>
-                            <p className="text-sm font-black text-[#4a3728] text-center mb-1 group-hover:text-[#8b7355] transition-colors uppercase tracking-wider">
-                                Verified Experts
-                            </p>
-                            <p className="text-[10px] text-slate-500 text-center font-medium leading-relaxed">
-                                Industry-vetted professionals
-                            </p>
-                            <div className="w-8 h-0.5 bg-gradient-to-r from-[#4a3728] to-[#8b7355] mt-4 rounded-full group-hover:w-full transition-all duration-700 mx-auto" />
-                        </div>
-                    </div>
+                {/* Timeline */}
+                <div className="reveal-on-scroll flex items-start justify-between">
+                    {ITEMS.map((item, i) => (
+                        <React.Fragment key={item.title}>
+                            <div className="flex w-full max-w-[160px] flex-col items-center text-center">
+                                <div
+                                    className="
+                                        flex h-24 w-24 items-center justify-center rounded-full
+                                        bg-gradient-to-br from-[#3a2718] to-[#6b4e37]
+                                        shadow-[0_10px_28px_rgba(74,55,40,0.25)]
+                                        ring-4 ring-white/60
+                                    "
+                                >
+                                    <item.icon className="h-8 w-8 text-white" strokeWidth={1.6} />
+                                </div>
 
-                    {/* Card 2 */}
-                    <div className="reveal-on-scroll group perspective-1000" style={{ animationDelay: "75ms" }}>
-                        <div className="relative bg-white rounded-[24px] p-6 border-2 border-[#ece7e2] shadow-xl hover:shadow-[0_15px_45px_rgba(74,55,40,0.12)] transition-all duration-700 transform-gpu hover:-translate-y-3 hover:rotate-y-3">
-                            <div className="absolute inset-0 bg-gradient-to-br from-[#8b7355]/10 to-transparent rounded-[24px] translate-x-1.5 translate-y-1.5 -z-10 group-hover:translate-x-3 group-hover:translate-y-3 transition-all duration-700" />
-                            <div className="absolute -top-4 -right-4 w-16 h-16 bg-[#4a3728]/20 rounded-full blur-xl group-hover:scale-150 transition-all duration-700" />
-                            <div className="w-12 h-12 bg-gradient-to-br from-[#8b7355] to-[#a08368] rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-md relative z-10 mx-auto">
-                                <Zap className="w-6 h-6 text-white" />
-                            </div>
-                            <p className="text-sm font-black text-[#4a3728] text-center mb-1 group-hover:text-[#8b7355] transition-colors uppercase tracking-wider">
-                                Instant Booking
-                            </p>
-                            <p className="text-[10px] text-slate-500 text-center font-medium leading-relaxed">
-                                Book sessions in seconds
-                            </p>
-                            <div className="w-8 h-0.5 bg-gradient-to-r from-[#8b7355] to-[#4a3728] mt-4 rounded-full group-hover:w-full transition-all duration-700 mx-auto" />
-                        </div>
-                    </div>
+                                <p className="mt-4 text-sm font-black uppercase tracking-wider text-[#2a1a10]">
+                                    {item.title}
+                                </p>
+                                <p className="mt-1 text-[13px] leading-snug text-slate-500">
+                                    {item.description}
+                                </p>
 
-                    {/* Card 3 */}
-                    <div className="reveal-on-scroll group perspective-1000" style={{ animationDelay: "150ms" }}>
-                        <div className="relative bg-white rounded-[24px] p-6 border-2 border-[#ece7e2] shadow-xl hover:shadow-[0_15px_45px_rgba(74,55,40,0.12)] transition-all duration-700 transform-gpu hover:-translate-y-3 hover:rotate-y-3">
-                            <div className="absolute inset-0 bg-gradient-to-br from-[#4a3728]/10 to-transparent rounded-[24px] translate-x-1.5 translate-y-1.5 -z-10 group-hover:translate-x-3 group-hover:translate-y-3 transition-all duration-700" />
-                            <div className="absolute -top-4 -right-4 w-16 h-16 bg-[#8b7355]/20 rounded-full blur-xl group-hover:scale-150 transition-all duration-700" />
-                            <div className="w-12 h-12 bg-gradient-to-br from-[#4a3728] to-[#634a36] rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-md relative z-10 mx-auto">
-                                <Star className="w-6 h-6 text-white" />
+                                <div className="mt-4 flex flex-col items-center gap-1.5">
+                                    <span className="text-sm font-bold text-[#8b7355]">
+                                        {item.number}
+                                    </span>
+                                    <span className="h-0.5 w-6 rounded-full bg-[#8b7355]" />
+                                </div>
                             </div>
-                            <p className="text-sm font-black text-[#4a3728] text-center mb-1 group-hover:text-[#8b7355] transition-colors uppercase tracking-wider">
-                                Best Value
-                            </p>
-                            <p className="text-[10px] text-slate-500 text-center font-medium leading-relaxed">
-                                Premium quality, fair pricing
-                            </p>
-                            <div className="w-8 h-0.5 bg-gradient-to-r from-[#4a3728] to-[#8b7355] mt-4 rounded-full group-hover:w-full transition-all duration-700 mx-auto" />
-                        </div>
-                    </div>
 
-                    {/* Card 4 */}
-                    <div className="reveal-on-scroll group perspective-1000" style={{ animationDelay: "225ms" }}>
-                        <div className="relative bg-white rounded-[24px] p-6 border-2 border-[#ece7e2] shadow-xl hover:shadow-[0_15px_45px_rgba(74,55,40,0.12)] transition-all duration-700 transform-gpu hover:-translate-y-3 hover:rotate-y-3">
-                            <div className="absolute inset-0 bg-gradient-to-br from-[#8b7355]/10 to-transparent rounded-[24px] translate-x-1.5 translate-y-1.5 -z-10 group-hover:translate-x-3 group-hover:translate-y-3 transition-all duration-700" />
-                            <div className="absolute -top-4 -right-4 w-16 h-16 bg-[#4a3728]/20 rounded-full blur-xl group-hover:scale-150 transition-all duration-700" />
-                            <div className="w-12 h-12 bg-gradient-to-br from-[#8b7355] to-[#a08368] rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-md relative z-10 mx-auto">
-                                <Globe className="w-6 h-6 text-white" />
-                            </div>
-                            <p className="text-sm font-black text-[#4a3728] text-center mb-1 group-hover:text-[#8b7355] transition-colors uppercase tracking-wider">
-                                Global Reach
-                            </p>
-                            <p className="text-[10px] text-slate-500 text-center font-medium leading-relaxed">
-                                Connect across time zones
-                            </p>
-                            <div className="w-8 h-0.5 bg-gradient-to-r from-[#8b7355] to-[#4a3728] mt-4 rounded-full group-hover:w-full transition-all duration-700 mx-auto" />
-                        </div>
-                    </div>
+                            {/* Connector between items (not after the last one) */}
+                            {i < ITEMS.length - 1 && (
+                                <div className="mt-12 hidden flex-1 items-center justify-center sm:flex">
+                                    <div className="h-px w-full border-t border-dashed border-[#c9b493]" />
+                                    <span className="mx-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#8b7355]" />
+                                    <div className="h-px w-full border-t border-dashed border-[#c9b493]" />
+                                </div>
+                            )}
+                        </React.Fragment>
+                    ))}
                 </div>
+
+                {/* Tagline */}
+                <p className="reveal-on-scroll mt-14 text-center text-[11px] font-semibold uppercase tracking-[0.3em] text-[#a08368]">
+                    Same People. Bigger Possibilities.
+                </p>
             </div>
         </section>
     );

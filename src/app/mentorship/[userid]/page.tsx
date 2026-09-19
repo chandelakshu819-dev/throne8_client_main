@@ -39,7 +39,7 @@ export default function ThroneUltraPremium() {
     const [showMentorForm, setShowMentorForm] = useState(false);
     const [formStep, setFormStep] = useState(1);
     const [isMentor, setIsMentor] = useState(false);
-    const [selectedDate, setSelectedDate] = useState(0);
+    
     const params = useParams();
     const rawUserId = (params?.userid || (params as any)?.userId) as string;
     const userId = rawUserId && rawUserId !== "undefined" ? rawUserId : "";
@@ -134,7 +134,7 @@ export default function ThroneUltraPremium() {
     };
 
     return (
-        <div className="min-h-screen bg-[#FAF9F6] text-[#4a3728] font-sans selection:bg-[#4a3728] selection:text-white">
+     <div className="min-h-screen bg-[#f7f1e6] text-[#4a3728] font-sans selection:bg-[#4a3728] selection:text-white">
             <GlobalStyles />
 
             {/* Navigation */}
@@ -218,8 +218,7 @@ export default function ThroneUltraPremium() {
                 mentorRole={pageMentorData?.experience?.currentRole?.split(" at ")[0]}
             />
 
-            {/* Slot Picker */}
-            <SlotPickerSection selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
+           
 
             {/* Our Impact */}
             <OurImpactSection />

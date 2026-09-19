@@ -21,7 +21,7 @@ interface TopMentorsMarqueeProps {
 
 export default function TopMentorsMarquee({ mentors }: TopMentorsMarqueeProps) {
   return (
-    <section className="py-14 bg-white overflow-hidden border-y border-[#f0edea]">
+    <section className="py-14 bg-[#f7f1e6] overflow-hidden border-y border-[#f0edea]">
       <div className="text-center mb-10 px-6">
         <h2 className="text-4xl md:text-5xl font-black tracking-tighter mb-3">
           <span className="text-[#8b7355]">TOP</span> MENTORS

@@ -74,7 +74,11 @@ export default function Navigation({
                 router.push(`/notifications/${targetUserId}`);
                 break;
             case 'Mentorship':
-                router.push(`/mentorship/${targetUserId}`);
+                if (targetUserId && targetUserId !== 'undefined') {
+                    router.push(`/mentorship/${targetUserId}`);
+                } else {
+                    router.push('/mentorship');
+                }
                 break;
             default:
                 break;

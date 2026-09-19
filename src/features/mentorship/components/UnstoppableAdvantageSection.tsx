@@ -5,7 +5,7 @@ import { ShieldCheck, Zap, Star, Globe } from "lucide-react";
 
 export default function UnstoppableAdvantageSection() {
     return (
-        <section className="py-20 px-6 bg-[#FAF9F6] relative overflow-hidden">
+        <section className="py-20 px-6 bg-[#f7f1e6] relative overflow-hidden">
             <div className="absolute top-10 right-20 w-64 h-64 bg-[#4a3728]/5 rounded-full blur-3xl" />
             <div className="absolute bottom-10 left-20 w-80 h-80 bg-[#8b7355]/5 rounded-full blur-3xl" />
 
