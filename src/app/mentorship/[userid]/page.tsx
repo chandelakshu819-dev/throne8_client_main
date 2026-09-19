@@ -33,14 +33,15 @@ import FindMentorModal from "@/features/mentorship/components/sections/FindMento
 export default function ThroneUltraPremium() {
     const router = useRouter();
     const [compareList, setCompareList] = useState<number[]>([]);
+    const [selectedDate, setSelectedDate] = useState(0);
     const [activeTimezone, setActiveTimezone] = useState("IST (UTC+5:30)");
     const [openFaq, setOpenFaq] = useState<number | null>(null);
     const [showMentorForm, setShowMentorForm] = useState(false);
     const [formStep, setFormStep] = useState(1);
     const [isMentor, setIsMentor] = useState(false);
     const params = useParams();
-    const { user: currentUser } = useAuth();
-    const userId = params.userid as string;
+    const rawUserId = (params?.userid || (params as any)?.userId) as string;
+    const userId = rawUserId && rawUserId !== "undefined" ? rawUserId : "";
     const [findMentorOpen, setFindMentorOpen] = useState(false);
     const [findMentorMentors, setFindMentorMentors] = useState<any[]>([]);
     const [findMentorLoading, setFindMentorLoading] = useState(false);
@@ -70,7 +71,7 @@ export default function ThroneUltraPremium() {
     }, [user]);
 
     useEffect(() => {
-        if (userId) {
+        if (userId && userId !== "undefined") {
             MentorService.getAllMentors()
                 .then((res) => {
                     const found = res?.data?.find((m: any) => m.mentorId === userId || m.userId === userId || m.user?.username === userId || m.user?.slug === userId) ?? null;
@@ -144,7 +145,7 @@ export default function ThroneUltraPremium() {
             />
 
             {/* Hero Section */}
-            <HeroSection />
+            <HeroSection mentorData={pageMentorData} />
 
             {/* Action Cards - Find Mentor & Become Mentor */}
             <ActionCardsSection
@@ -181,7 +182,9 @@ export default function ThroneUltraPremium() {
             /> */}
 
             {/* Top Mentors Marquee */}
-            <MentorMarqueeSection />
+            <div id="top-mentors">
+    <MentorMarqueeSection />
+</div>
 
             {/* Main Discovery Section with Sidebar */}
             <MentorDiscoverySection
@@ -191,6 +194,12 @@ export default function ThroneUltraPremium() {
 
             {/* Company Logos */}
             <CompanyLogosSection />
+
+            {/* Slot Picker */}
+            <SlotPickerSection
+                selectedDate={selectedDate}
+                setSelectedDate={setSelectedDate}
+            />
 
             {/* 1-to-1 Mentorship Services */}
             <MentorshipServicesSection 
