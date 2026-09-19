@@ -8,6 +8,7 @@ interface SidebarProps {
   setActivePage: (page: string) => void;
   mentorData: any;
   unreadNotificationCount?: number;
+  onSwitchRole?: () => void;
 }
 
 export default function Sidebar({
@@ -15,6 +16,7 @@ export default function Sidebar({
   setActivePage,
   mentorData,
   unreadNotificationCount = 0,
+  onSwitchRole,
 }: SidebarProps) {
   const firstName = mentorData?.user?.firstName ?? "A";
   const lastName = mentorData?.user?.lastName ?? "S";
@@ -70,6 +72,19 @@ export default function Sidebar({
               <span className="text-xs" style={{ color: '#a08070' }}>No ratings yet</span>
             )}
           </div>
+
+          {onSwitchRole && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSwitchRole();
+              }}
+              className="mt-3 text-[11px] font-semibold underline"
+              style={{ color: '#4a3728' }}
+            >
+              Switch to Mentee view →
+            </button>
+          )}
         </div>
       </div>
 

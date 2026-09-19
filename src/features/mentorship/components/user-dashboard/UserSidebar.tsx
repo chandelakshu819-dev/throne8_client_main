@@ -10,6 +10,8 @@ interface UserSidebarProps {
   activePage: string;
   setActivePage: (page: string) => void;
   unreadNotificationCount?: number;
+  isMentor?: boolean;
+  onSwitchRole?: () => void;
 }
 
 const USER_MENU_ITEMS = [
@@ -32,6 +34,8 @@ export default function UserSidebar({
   activePage,
   setActivePage,
   unreadNotificationCount = 0,
+  isMentor = false,
+  onSwitchRole,
 }: UserSidebarProps) {
   const { user } = useAuth();
   const { userProfileData, profileImageUrl, loadProfile } = useProfile();
@@ -85,6 +89,19 @@ export default function UserSidebar({
               Manage →
             </span>
           </div>
+
+          {isMentor && onSwitchRole && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSwitchRole();
+              }}
+              className="mt-3 text-[11px] font-semibold underline"
+              style={{ color: '#4a3728' }}
+            >
+              Switch to Mentor view →
+            </button>
+          )}
         </div>
       </div>
 

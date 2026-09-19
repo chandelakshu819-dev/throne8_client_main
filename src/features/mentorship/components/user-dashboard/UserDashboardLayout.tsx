@@ -1,5 +1,5 @@
 "use client";
-
+//src/features/mentorship/components/user-dashboard/UserDashboardLayout.tsx
 import { useEffect, useState, useCallback } from "react";
 import UserSidebar from "./UserSidebar";
 import UserDashboardOverviewPage from "./UserDashboardOverviewPage";
@@ -48,7 +48,7 @@ function normalizeNotifications(res: any): any[] {
   return [];
 }
 
-export default function UserDashboardLayout({ userId }: { userId: string }) {
+export default function UserDashboardLayout({ userId, isMentor, onSwitchRole }: { userId: string; isMentor?: boolean; onSwitchRole?: () => void }) {
   const router = useRouter();
   const [activePage, setActivePage] = useState("dashboard");
   const [sessions, setSessions] = useState<any[]>([]);
@@ -196,6 +196,8 @@ export default function UserDashboardLayout({ userId }: { userId: string }) {
           activePage={activePage}
           setActivePage={setActivePage}
           unreadNotificationCount={safeNotifications.filter((n) => !n.isRead).length}
+          isMentor={isMentor}
+          onSwitchRole={onSwitchRole}
         />
         <main className="flex-1 overflow-y-auto">
           <div className="px-4 md:px-6 py-8 max-w-[1600px] mx-auto">

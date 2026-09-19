@@ -68,7 +68,7 @@ function normalizeNotifications(res: any): any[] {
 }
 
 export default function MentorDashboard(
-  { userId }: { userId: string }
+  { userId, onSwitchRole }: { userId: string; onSwitchRole?: () => void }
 ) {
   const [activePage, setActivePage] = useState("dashboard");
 
@@ -244,6 +244,7 @@ export default function MentorDashboard(
           setActivePage={setActivePage}
           mentorData={mentorData}
           unreadNotificationCount={safeNotifications.filter((n) => !n.isRead).length}
+          onSwitchRole={onSwitchRole}
         />
 
         <main className="flex-1 overflow-y-auto">
