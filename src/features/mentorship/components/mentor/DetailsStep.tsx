@@ -34,10 +34,10 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
 
 
     useEffect(() => {
-        if (user) {
-            fetchUserProfile();
+        if (user?.userId) {
+            fetchUserProfile(user.userId);
         }
-    }, [user, fetchUserProfile]);
+    }, [user?.userId, fetchUserProfile]);
 
     const fullName = userProfileData
         ? `${userProfileData.firstName} ${userProfileData.lastName}`.trim()
@@ -60,24 +60,33 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
     const { selectedDate, selectedTime, currentMonth } = calendarData;
     const month: number = currentMonth.getMonth();
     const year: number = currentMonth.getFullYear();
-    const canProceed: boolean = !!(formData.name && formData.email && formData.phone);
-
+    const canProceed: boolean = !!(
+        formData.name.trim() &&
+        formData.email.trim() &&
+        formData.phone.trim()
+    );
     const inp: React.CSSProperties = {
         width: "100%", padding: "12px 16px", borderRadius: "12px",
         border: `1px solid ${C.border}`, background: C.bg,
         color: C.dark, fontSize: "14px", boxSizing: "border-box", outline: "none",
     };
-
     useEffect(() => {
-        if (userProfileData) {
-            setFormData((prev) => ({
-                ...prev,
-                name: `${userProfileData.firstName || ""} ${userProfileData.lastName || ""}`.trim(),
-                email: userProfileData.email || "",
-                phone: userProfileData.phoneNumber || "",
-            }));
-        }
-    }, [userProfileData]);
+        if (!userProfileData && !user) return;
+
+        const profileName = `${userProfileData?.firstName || ""} ${userProfileData?.lastName || ""}`.trim();
+
+        setFormData((prev) => ({
+            ...prev,
+            name: prev.name || profileName,
+            email: prev.email || userProfileData?.email || user?.email || "",
+            phone: prev.phone || userProfileData?.phoneNumber || "",
+        }));
+    }, [userProfileData, user]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setFormData((prev) => ({ ...prev, [name]: value }));
+    };
 
     return (
         <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px" }}>
@@ -97,20 +106,9 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
                                 type={type} 
                                 name={name}
                                 placeholder={ph}
-                                value={formData[name]}
-                                disabled={["name", "email", "phone"].includes(name)}
-                                style={{
-                                    ...inp,
-                                    background: ["name", "email", "phone"].includes(name)
-                                        ? "#f3f3f3"
-                                        : C.bg,
-                                    cursor: ["name", "email", "phone"].includes(name)
-                                        ? "not-allowed"
-                                        : "text",
-                                    opacity: ["name", "email", "phone"].includes(name)
-                                        ? 0.8
-                                        : 1,
-                                }}
+                                value={formData[name] ?? ""}
+                                onChange={handleChange}
+                                style={inp}
                             />
                         </div>
                     ))}

@@ -94,11 +94,22 @@ export interface UseLiveRoomOptions {
 // useLiveRoom.ts – ICE_SERVERS array
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
   {
-    urls: 'turn:your-turn-server.com:3478',
-    username: 'dynamic-user',
-    credential: 'dynamic-password'
-  }
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
 ];
 
 /**
@@ -302,6 +313,15 @@ export function useLiveRoom({
           console.warn('[ICE error]', event);
         }
       };
+
+            // Extra safety net — Safari doesn't always fire onconnectionstatechange reliably
+            pc.oniceconnectionstatechange = () => {
+              if (pc.iceConnectionState === 'failed') {
+                scheduleReconnect(socketId, peerUserId, peerUserName);
+              }
+            };
+      
+          
 
       // Connection state machine
       pc.onconnectionstatechange = () => {
