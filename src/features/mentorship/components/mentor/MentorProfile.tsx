@@ -80,6 +80,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                         mentorId={mentorData?.mentorId || ""}
                         bookedSessionIds={bookedSessionIds}
                         currentUserId={user?.userId || ""}
+                        mentorName={`${mentorData?.user?.firstName ?? ""} ${mentorData?.user?.lastName ?? ""}`.trim()}
                     />
 
                     <ReviewsSection />

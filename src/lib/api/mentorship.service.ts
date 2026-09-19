@@ -457,6 +457,8 @@ class MentorService {
   // sessionType, timezone — all as top-level JSON body fields, no FormData.
   static async joinWaitlist(input: {
     mentorId: string;
+    serviceId?: string;
+    serviceTitle?: string;
     preferredDates: string[];
     preferredTimeSlots: string[];
     sessionType: string;
@@ -473,7 +475,63 @@ class MentorService {
         if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
         if (apiError?.message) throw new Error(apiError.message);
       }
-      throw new Error('Failed to join group session.');
+      throw new Error('Failed to join waitlist. Please try again.');
+    }
+  }
+
+  private static waitlistError(error: any, fallback: string): Error {
+    if (axios.isAxiosError(error)) {
+      if (error.code === 'ERR_NETWORK') {
+        return new Error('Unable to connect to server. Please check your internet connection.');
+      }
+      if (error.response?.status === 401) return new Error('Session expired. Please login again.');
+      const msg = error.response?.data?.message;
+      if (msg) return new Error(msg);
+    }
+    return new Error(fallback);
+  }
+
+  // User: all my waitlist entries (with mentorName + queuePosition)
+  static async getMyWaitlists(): Promise<any> {
+    try {
+      const { data } = await api.get(`/mentorship/waitlist/my-waitlists`);
+      return data;
+    } catch (error: any) {
+      throw MentorService.waitlistError(error, 'Failed to fetch your waitlist.');
+    }
+  }
+
+  // User leaves, or mentor removes someone (backend decides by who is calling)
+  static async leaveWaitlist(waitlistId: string, reason?: string): Promise<any> {
+    try {
+      const { data } = await api.delete(`/mentorship/waitlist/${waitlistId}`, {
+        data: { reason: reason || 'User requested' },
+      });
+      return data;
+    } catch (error: any) {
+      throw MentorService.waitlistError(error, 'Failed to update waitlist.');
+    }
+  }
+
+  // Mentor: full waitlist (all statuses unless `status` is passed)
+  static async getMentorWaitlist(mentorId: string, status?: string): Promise<any> {
+    try {
+      const { data } = await api.get(`/mentorship/waitlist/mentor/${mentorId}`, {
+        params: status ? { status } : undefined,
+      });
+      return data;
+    } catch (error: any) {
+      throw MentorService.waitlistError(error, 'Failed to fetch waitlist.');
+    }
+  }
+
+  // Mentor: approve one entry
+  static async approveWaitlistEntry(waitlistId: string): Promise<any> {
+    try {
+      const { data } = await api.post(`/mentorship/waitlist/${waitlistId}/approve`);
+      return data;
+    } catch (error: any) {
+      throw MentorService.waitlistError(error, 'Failed to approve waitlist entry.');
     }
   }
 }

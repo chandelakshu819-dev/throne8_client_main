@@ -6,12 +6,15 @@ import { Clock } from "./Icons";
 import { SERVICES, FILTERS, C, btnPrimary } from "../../types/data";
 import type { Service } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
+import MentorService from "@/lib/api/mentorship.service";
+import WaitlistModal from "./WaitlistModal";
 
 interface ServicesSectionProps {
   onServiceClick: (service: Service) => void;
   mentorId: string;
   bookedSessionIds: string[];
   currentUserId: string;
+  mentorName?: string;
 }
 
 // Session type ko display label me map karo
@@ -54,7 +57,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   onServiceClick,
   mentorId,
   bookedSessionIds,
-  currentUserId
+  currentUserId,
+  mentorName = "",
 }) => {
   const [activeFilter, setActiveFilter] = useState<string>("All");
   const [sessions, setSessions] = useState<any[]>([]);
@@ -66,6 +70,69 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
+
+
+
+
+  // ── Waitlist ──
+  // key = session.sessionId (the service card), value = the user's active waitlist entry
+  const [waitlistEntries, setWaitlistEntries] = useState<Record<string, any>>({});
+  const [waitlistTarget, setWaitlistTarget] = useState<any | null>(null);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  useEffect(() => {
+    if (!mentorId || !currentUserId) return;
+    MentorService.getMyWaitlists()
+      .then((res) => {
+        const map: Record<string, any> = {};
+        (res?.data ?? []).forEach((w: any) => {
+          if (w.mentorId === mentorId && w.serviceId && (w.status === "active" || w.status === "notified")) {
+            map[w.serviceId] = w;
+          }
+        });
+        setWaitlistEntries(map);
+      })
+      .catch(() => setWaitlistEntries({}));
+  }, [mentorId, currentUserId]);
+
+  const handleJoinWaitlist = async (session: any, note: string) => {
+    const res = await MentorService.joinWaitlist({
+      mentorId,
+      serviceId: session.sessionId,
+      serviceTitle: session.title,
+      preferredDates: [session.scheduledAt || new Date().toISOString()],
+      preferredTimeSlots: ["any"],
+      sessionType: session.sessionType,
+      timezone: "Asia/Kolkata",
+      notes: note || undefined,
+    });
+    setWaitlistEntries((prev) => ({ ...prev, [session.sessionId]: res.data }));
+    setWaitlistTarget(null);
+    showToast("You're on the waitlist. We'll notify you when a slot opens.");
+  };
+
+  const handleLeaveWaitlist = async (serviceId: string, entry: any) => {
+    setLeavingId(entry.waitlistId);
+    try {
+      await MentorService.leaveWaitlist(entry.waitlistId);
+      setWaitlistEntries((prev) => {
+        const next = { ...prev };
+        delete next[serviceId];
+        return next;
+      });
+      showToast("You've left the waitlist.");
+    } catch (err: any) {
+      showToast(err.message || "Failed to leave waitlist.", "error");
+    } finally {
+      setLeavingId(null);
+    }
+  };
 
   useEffect(() => {
     if (!mentorId) return;
@@ -201,6 +268,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           const isPending = myBooking?.status === 'pending';
           const isConfirmed = myBooking?.status === 'confirmed';
           const isBooked = isPending || isConfirmed;
+          const wl = waitlistEntries[session.sessionId];
           return (
             <div key={session.sessionId}
               style={{
@@ -242,36 +310,52 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                     )}
                   </div>
                 ) : (
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button onClick={() => onServiceClick(svc)} style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}>
-                      Book
-                    </button>
-                    {/* NEW: Waitlist option shown alongside Book. */}
-                    <button
-                      onClick={async () => {
-                        try {
-                          const fallbackDate = session.scheduledAt || new Date().toISOString();
-                          await MentorService.joinWaitlist({
-                            mentorId,
-                            preferredDates: [fallbackDate],
-                            preferredTimeSlots: ["any"],
-                            sessionType: session.sessionType,
-                            timezone: "Asia/Kolkata",
-                          });
-                          alert("You've been added to the waitlist. We'll notify you when a slot opens up.");
-                        } catch (err: any) {
-                          alert(err.message || "Failed to join waitlist.");
-                        }
-                      }}
-                      style={{
-                        padding: "8px 18px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
-                        background: "transparent", color: C.dark, border: `1.5px solid ${C.dark}`,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Waitlist
-                    </button>
-                  </div>
+                  wl ? (
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: wl.status === "notified" ? "#10b981" : C.dark }}>
+                        {wl.status === "notified"
+                          ? "🎉 Slot available — book now"
+                          : `⏳ On waitlist · #${wl.queuePosition ?? "-"}`}
+                      </div>
+                      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "8px" }}>
+                        {wl.status === "notified" && (
+                          <button
+                            onClick={() => onServiceClick(svc)}
+                            style={{ ...btnPrimary, padding: "6px 14px", borderRadius: "10px", fontSize: "12px" }}
+                          >
+                            Book now
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleLeaveWaitlist(session.sessionId, wl)}
+                          disabled={leavingId === wl.waitlistId}
+                          style={{
+                            padding: "6px 14px", borderRadius: "10px", fontSize: "12px", fontWeight: 600,
+                            background: "transparent", color: "#dc2626", border: "1.5px solid #fca5a5",
+                            cursor: "pointer", opacity: leavingId === wl.waitlistId ? 0.6 : 1,
+                          }}
+                        >
+                          {leavingId === wl.waitlistId ? "Leaving..." : "Leave waitlist"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button onClick={() => onServiceClick(svc)} style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}>
+                        Book
+                      </button>
+                      <button
+                        onClick={() => setWaitlistTarget(session)}
+                        style={{
+                          padding: "8px 18px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                          background: "transparent", color: C.dark, border: `1.5px solid ${C.dark}`,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Waitlist
+                      </button>
+                    </div>
+                  )
                 )}
               </div>
             </div>
@@ -334,9 +418,37 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
             </div>
           );
         })}
-      </div>
-    </div>
-  );
+          </div>
+
+{waitlistTarget && (
+  <WaitlistModal
+    service={{
+      title: waitlistTarget.title,
+      sessionType: waitlistTarget.sessionType,
+      duration: waitlistTarget.duration,
+      price: waitlistTarget.pricing?.basePrice,
+    }}
+    mentorName={mentorName}
+    onClose={() => setWaitlistTarget(null)}
+    onConfirm={(note) => handleJoinWaitlist(waitlistTarget, note)}
+  />
+)}
+
+{toast && (
+  <div
+    style={{
+      position: "fixed", top: 20, right: 20, zIndex: 9999, padding: "12px 16px", borderRadius: 12,
+      fontSize: 13, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+      background: toast.type === "success" ? "#dcfce7" : "#fee2e2",
+      color: toast.type === "success" ? "#15803d" : "#dc2626",
+      border: `1px solid ${toast.type === "success" ? "#86efac" : "#fca5a5"}`,
+    }}
+  >
+    {toast.msg}
+  </div>
+)}
+</div>
+);
 };
 
 export default ServicesSection;

@@ -4,6 +4,10 @@ import { useState, useEffect, useCallback } from "react";
 import SessionService from "@/lib/api/session.service";
 import QueryService, { QueryItem } from "@/lib/api/query.service";
 import WriteReviewModal from "@/features/mentorship/components/WriteReviewModal";
+import MentorService from "@/lib/api/mentorship.service";
+import { useRouter } from "next/navigation";
+
+
 
 // ─── Color tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -858,8 +862,149 @@ function HistoryTab() {
     );
 }
 
+// ─── WAITLIST TAB ─────────────────────────────────────────────────────────────
+interface WaitlistItem {
+    waitlistId: string;
+    mentorId: string;
+    mentorName: string;
+    serviceTitle?: string;
+    sessionType: string;
+    status: "active" | "notified" | "booked" | "expired" | "cancelled";
+    queuePosition: number | null;
+    createdAt: string;
+    bookingWindowExpiresAt?: string;
+}
+
+const WAITLIST_BADGE: Record<WaitlistItem["status"], { label: string; bg: string; fg: string }> = {
+    active: { label: "Waiting", bg: "rgba(201,124,74,0.12)", fg: C.warn },
+    notified: { label: "Approved", bg: "rgba(107,143,110,0.12)", fg: C.success },
+    booked: { label: "Booked", bg: "rgba(74,55,40,0.08)", fg: C.secondary },
+    expired: { label: "Removed", bg: "rgba(0,0,0,0.06)", fg: C.muted },
+    cancelled: { label: "Removed", bg: "rgba(0,0,0,0.06)", fg: C.muted },
+};
+
+function WaitlistTab({ toast }: { toast: (msg: string) => void }) {
+    const router = useRouter();
+    const [items, setItems] = useState<WaitlistItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [leavingId, setLeavingId] = useState<string | null>(null);
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await MentorService.getMyWaitlists();
+            setItems((res?.data ?? []) as WaitlistItem[]);
+        } catch (e: any) {
+            setError(e?.message || "Could not load your waitlist.");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        load();
+    }, [load]);
+
+    const handleLeave = async (id: string) => {
+        setLeavingId(id);
+        try {
+            await MentorService.leaveWaitlist(id);
+            toast("You've left the waitlist.");
+            await load();
+        } catch (e: any) {
+            toast(e?.message || "Could not leave the waitlist.");
+        } finally {
+            setLeavingId(null);
+        }
+    };
+
+    const goBook = (w: WaitlistItem) => {
+        const slug = encodeURIComponent((w.mentorName || "mentor").toLowerCase().replace(/\s+/g, "-"));
+        router.push(`/mentorship/mentor-card/${slug}/${w.mentorId}`);
+    };
+
+    if (loading) {
+        return <div className="py-16 text-center text-sm" style={{ color: C.muted }}>Loading your waitlist...</div>;
+    }
+    if (error) {
+        return <div className="py-16 text-center text-sm" style={{ color: C.warn }}>{error}</div>;
+    }
+
+    return (
+        <div>
+            <SectionTitle>My Waitlist</SectionTitle>
+            {items.length === 0 ? (
+                <p className="text-sm" style={{ color: C.muted }}>
+                    You're not on any waitlist. Use the Waitlist button on a mentor's service when no slot is free.
+                </p>
+            ) : (
+                <div className="flex flex-col gap-4">
+                    {items.map((w) => {
+                        const badge = WAITLIST_BADGE[w.status];
+                        const canLeave = w.status === "active" || w.status === "notified";
+                        return (
+                            <div
+                                key={w.waitlistId}
+                                className="rounded-2xl border p-5 flex flex-wrap items-center justify-between gap-4"
+                                style={{ background: C.card, borderColor: C.border }}
+                            >
+                                <div>
+                                    <div className="text-sm font-bold mb-1" style={{ color: C.primary }}>
+                                        {w.serviceTitle || w.sessionType.replace(/_/g, " ")}
+                                    </div>
+                                    <div className="text-xs" style={{ color: C.muted }}>
+                                        {w.mentorName} - Requested {formatSessionDate(w.createdAt)}
+                                        {w.status === "active" && w.queuePosition ? ` - Position #${w.queuePosition}` : ""}
+                                    </div>
+                                    {w.status === "notified" && w.bookingWindowExpiresAt && (
+                                        <div className="text-xs mt-1 font-medium" style={{ color: C.success }}>
+                                            Book before {formatSessionDate(w.bookingWindowExpiresAt)}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span
+                                        className="text-xs font-bold px-2.5 py-1 rounded-full"
+                                        style={{ background: badge.bg, color: badge.fg }}
+                                    >
+                                        {badge.label}
+                                    </span>
+                                    {w.status === "notified" && (
+                                        <button
+                                            onClick={() => goBook(w)}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+                                            style={{ background: C.btn }}
+                                        >
+                                            Book now
+                                        </button>
+                                    )}
+                                    {canLeave && (
+                                        <button
+                                            onClick={() => handleLeave(w.waitlistId)}
+                                            disabled={leavingId === w.waitlistId}
+                                            className="px-3 py-1.5 rounded-lg text-xs font-medium border"
+                                            style={{ borderColor: C.border, color: C.secondary, opacity: leavingId === w.waitlistId ? 0.6 : 1 }}
+                                        >
+                                            {leavingId === w.waitlistId ? "Leaving..." : "Leave waitlist"}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
+
 // ─── Tab Definition ───────────────────────────────────────────────────────────
-type TabId = "one-on-one" | "queries" | "resources" | "history";
+type TabId = "one-on-one" | "queries" | "waitlist" | "resources" | "history";
+
+
 
 interface Tab {
     id: TabId;
@@ -896,6 +1041,7 @@ export default function MentorDashboard() {
     const tabs: Tab[] = [
         { id: "one-on-one", label: "1:1 Session" },
         { id: "queries", label: "Queries" },
+        { id: "waitlist", label: "Waitlist" },
         { id: "resources", label: "Resources" },
         { id: "history", label: "History" },
     ];
@@ -961,6 +1107,7 @@ export default function MentorDashboard() {
 
                 {activeTab === "one-on-one" && <OneOnOneTab onReminder={openReminder} toast={showToast} />}
                 {activeTab === "queries" && <QueriesTab toast={showToast} />}
+                {activeTab === "waitlist" && <WaitlistTab toast={showToast} />}
                 {activeTab === "resources" && <ResourcesTab toast={showToast} />}
                 {activeTab === "history" && <HistoryTab />}
             </main>
