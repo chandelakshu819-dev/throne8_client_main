@@ -16,6 +16,7 @@ interface ProfileNavbarProps {
     userName: string;
     currentUserId?: string;
     companyId?: string;
+    userRole?: string;
     onOpenLeftPanel?: () => void;
 }
 
@@ -33,7 +34,7 @@ const ROUTE_PREFIX: Record<string, string> = {
     'Mentorship': '/mentorship',
 };
 
-const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, currentUserId, companyId, onOpenLeftPanel }) => {
+const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, currentUserId, companyId, userRole, onOpenLeftPanel }) => {
     const router = useRouter();
     const pathname = usePathname();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -107,7 +108,11 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                 router.push(`/notifications/${currentUserId}`);
                 break;
             case 'Mentorship':
-                router.push(`/mentorship/${currentUserId}`);
+                if (userRole === 'admin') {
+                    router.push('/mentorship/admin');
+                } else {
+                    router.push(`/mentorship/${currentUserId}`);
+                }
                 break;
             default:
                 break;

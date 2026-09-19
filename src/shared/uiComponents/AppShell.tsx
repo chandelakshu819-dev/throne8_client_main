@@ -27,6 +27,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         profileImage={profileData.profileImage}
         userName={fullName}
         currentUserId={user?.userId}
+        userRole={user?.role}
       />
       {/* pt-16 taaki content fixed navbar ke peeche na chhupe (navbar height = h-16) */}
       <div className="pt-16">{children}</div>
