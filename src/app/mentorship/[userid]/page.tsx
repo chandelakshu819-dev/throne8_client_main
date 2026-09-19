@@ -218,8 +218,6 @@ export default function ThroneUltraPremium() {
                 mentorRole={pageMentorData?.experience?.currentRole?.split(" at ")[0]}
             />
 
-           
-
             {/* Our Impact */}
             <OurImpactSection />
 
