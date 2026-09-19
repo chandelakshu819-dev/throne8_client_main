@@ -56,6 +56,7 @@ export default function NavbarProvider({ children }: { children: React.ReactNode
                     profileImage={profileData.profileImage}
                     userName={fullName}
                     currentUserId={user?.userId || user?.id}
+                    userRole={user?.role}
                 />
             )}
             {children}

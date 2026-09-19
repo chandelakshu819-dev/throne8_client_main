@@ -31,6 +31,7 @@ export default function GlobalNavbar() {
             profileImage={profileData.profileImage}
             userName={fullName}
             currentUserId={user?.userId}
+            userRole={user?.role}
         />
     );
 }

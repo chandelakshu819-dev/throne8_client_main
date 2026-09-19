@@ -13,6 +13,7 @@ export enum ApplicationStatus {
 export interface SeniorMentorApplication {
   applicationId: string;
   userId: string;
+  mentorRole: 'senior_mentor' | 'alumni';
   fullName: string;
   college: string;
   degree: string;
@@ -86,6 +87,21 @@ class SeniorMentorApplicationService {
       return data?.data;
     } catch (error: any) {
       console.error('❌ [SENIOR_MENTOR_APP] Application failed:', error?.response?.data?.message || error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * GET /api/v1/mentorship/senior-mentor-applications/:id/profile
+   * Returns a Senior Mentor Application by ID (owner only) to display as Profile.
+   */
+  static async getApplicationProfileById(userId: string): Promise<SeniorMentorApplication | null> {
+    try {
+      console.log(`🎓 [SENIOR_MENTOR_APP] Fetching profile by userId: ${userId}`);
+      const { data } = await api.get(`/mentorship/senior-mentor-applications/user/${userId}/profile`);
+      return data?.data ?? null;
+    } catch (error: any) {
+      console.error(`❌ [SENIOR_MENTOR_APP] Failed to fetch profile ${userId}:`, error?.message);
       throw error;
     }
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { LayoutDashboard, ChevronRight, CalendarClock, Users, Bookmark, History, Clock, Star, Receipt, Bell, Sparkles, TrendingUp, UserCog } from "lucide-react";
+import { LayoutDashboard, ChevronRight, CalendarClock, Users, Bookmark, History, Clock, Star, Receipt, Bell, Sparkles, TrendingUp, UserCog, HelpCircle } from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 import { formatUserDisplayName, getInitials } from "@/shared/utils/format";
@@ -18,6 +18,7 @@ const USER_MENU_ITEMS = [
   { id: "dashboard", label: "Overview", icon: LayoutDashboard },
   { id: "profile-preferences", label: "Profile & Preferences", icon: UserCog },
   { id: "progress", label: "Mentorship Progress", icon: TrendingUp },
+  { id: "queries", label: "My Queries", icon: HelpCircle },
   { id: "recommended-mentors", label: "Recommended Mentors", icon: Sparkles },
   { id: "upcoming-sessions", label: "Upcoming Sessions", icon: CalendarClock },
   { id: "my-mentors", label: "My Mentors", icon: Users },

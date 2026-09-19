@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import UserSidebar from "./UserSidebar";
 import UserDashboardOverviewPage from "./UserDashboardOverviewPage";
 import UserDashboardProgressPage from "./UserDashboardProgressPage";
+import UserDashboardQueriesPage from "./UserDashboardQueriesPage";
 import UserDashboardUpcomingSessionsPage from "./UserDashboardUpcomingSessionsPage";
 import UserDashboardMyMentorsPage from "./UserDashboardMyMentorsPage";
 import UserDashboardMyBookingsPage from "./UserDashboardMyBookingsPage";
@@ -28,6 +29,7 @@ const pageComponents: Record<string, React.FC<any>> = {
   "profile-preferences": UserDashboardProfilePreferencesPage,
   profile: UserDashboardProfilePreferencesPage,
   progress: UserDashboardProgressPage,
+  queries: UserDashboardQueriesPage,
   "upcoming-sessions": UserDashboardUpcomingSessionsPage,
   "my-mentors": UserDashboardMyMentorsPage,
   "my-bookings": UserDashboardMyBookingsPage,
