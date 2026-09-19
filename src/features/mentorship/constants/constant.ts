@@ -9,6 +9,7 @@ export const MENU_ITEMS = [
   { id: 'profile',      label: 'Profile',      icon: User },
   { id: 'services',     label: 'Services',     icon: Briefcase },
   { id: 'booking',      label: 'Booking',      icon: Calendar },
+  { id: 'waitlist',     label: 'Waitlist',     icon: Users },
   { id: 'queries',      label: 'Queries',      icon: HelpCircle },
   { id: 'availability', label: 'Availability', icon: Clock },
   { id: 'payment',      label: 'Payment',      icon: CreditCard },
