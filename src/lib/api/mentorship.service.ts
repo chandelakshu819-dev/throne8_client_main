@@ -435,9 +435,36 @@ class MentorService {
     }
   }
 
-    static async joinGroupSession(id: string, transactionId?: string): Promise<any> {
+  static async joinGroupSession(id: string, transactionId?: string): Promise<any> {
     try {
       const { data } = await api.post(`/mentorship/group-sessions/${id}/join`, { transactionId });
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (apiError?.message) throw new Error(apiError.message);
+      }
+      throw new Error('Failed to join group session.');
+    }
+  }
+
+  // ⭐ NEW: student joins waitlist for a mentor whose slot/session is full.
+  // Backend: joinWaitlist() → Mentor.waitlistCounter atomically +1 (position
+  // assign) → creates Waitlist doc (status: ACTIVE, expiresAt: +7 days).
+  // Route: POST /mentorship/waitlist/join (see waitlist.routes.ts, mounted
+  // under Mentorship/routers/index.ts). Validator requires
+  // mentorId, preferredDates[] (ISO8601, min 1), preferredTimeSlots[] (min 1),
+  // sessionType, timezone — all as top-level JSON body fields, no FormData.
+  static async joinWaitlist(input: {
+    mentorId: string;
+    preferredDates: string[];
+    preferredTimeSlots: string[];
+    sessionType: string;
+    timezone: string;
+    notes?: string;
+  }): Promise<any> {
+    try {
+      const { data } = await api.post(`/mentorship/waitlist/join`, input);
       return data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {

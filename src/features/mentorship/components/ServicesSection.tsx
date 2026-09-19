@@ -659,13 +659,22 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                         {/* NEW: Waitlist option — e.stopPropagation() is required
                             here too since the whole card has its own onClick
                             that opens the detail modal. */}
-                        <button
+                                                <button
                           onClick={async (e) => {
                             e.stopPropagation();
+                            // ⚠️ FIX: backend's Mentor.findOne({ userId: input.mentorId })
+                            // expects the mentor's userId, not the Mentor document's own
+                            // mentorId (which is what the `mentorId` prop holds here).
+                            // mentorFull.userId is the correct value — same field already
+                            // used by handleMessageMentor() above.
+                            if (!mentorFull?.userId) {
+                              alert("Mentor details are still loading. Please try again in a moment.");
+                              return;
+                            }
                             try {
                               const fallbackDate = session.scheduledAt || new Date().toISOString();
                               await MentorService.joinWaitlist({
-                                mentorId,
+                                mentorId: mentorFull.userId,
                                 preferredDates: [fallbackDate],
                                 preferredTimeSlots: ["any"],
                                 sessionType: session.sessionType,
