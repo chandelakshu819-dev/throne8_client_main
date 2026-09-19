@@ -151,6 +151,29 @@ class MentorService {
     }
   }
 
+  static async updateProfilePhoto(mentorId: string, file: File): Promise<MentorResponse> {
+    try {
+      const formData = new FormData();
+      formData.append('profilePic', file);
+
+      const { data } = await api.put<MentorResponse>(
+        `${config.NEXT_PUBLIC_MENTOR_UPDATE_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_UPDATE_ENDPOINT}/${mentorId}`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (apiError?.message) throw new Error(apiError.message);
+        if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
+      }
+      throw new Error('Failed to update profile photo. Please try again.');
+    }
+  }
+
+
   static async getTrustScore(): Promise<any> {
     try {
       const { data } = await api.get('/mentorship/mentors/me/trust-score');

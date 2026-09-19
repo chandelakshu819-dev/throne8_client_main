@@ -1,5 +1,5 @@
 // app/mentorship/mentor-card/[mentorname]/[mentorid]/page.tsx
-import MentorProfile from '@/features/mentorship/components/MentorProfile';
+import MentorProfile from '@/features/mentorship/components/mentor/MentorProfile';
 import { Metadata } from 'next';
 import React from 'react'
 

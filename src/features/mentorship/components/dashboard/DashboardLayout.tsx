@@ -200,11 +200,24 @@ export default function MentorDashboard(
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !mentorData?.mentorId) return;
 
+    // Instant preview — sirf UI feedback ke liye, source of truth nahi
     const reader = new FileReader();
     reader.onloadend = () => setProfilePhoto(reader.result as string);
     reader.readAsDataURL(file);
+
+    // ✅ Actual backend update — isi se Sidebar + MentorSidebar sync honge
+    MentorService.updateProfilePhoto(mentorData.mentorId, file)
+      .then((res: any) => {
+        const updated = res?.data ?? res;
+        setMentorData((prev: any) => ({ ...prev, profilePic: updated?.profilePic }));
+        setProfilePhoto(null); // local preview clear — ab mentorData.profilePic hi source hai
+      })
+      .catch((err) => {
+        console.error("Failed to update profile photo:", err);
+        setProfilePhoto(null); // fail hone par preview bhi hata do
+      });
   };
 
   const handleCreateService = () => {

@@ -27,6 +27,7 @@ import { btnPrimary, C } from "../types/data";
 import SessionService from "@/lib/api/session.service";
 import MentorService from "@/lib/api/mentorship.service";
 import QueryModal from "./QueryModal";
+import WaitlistModal from "../modal/WaitlistModal";
 import { Service } from "../types/types";
 
 interface ServicesSectionProps {
@@ -210,6 +211,68 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   const [detailSession, setDetailSession] = useState<any | null>(null);
   const [, forceTick] = useState(0); // countdown ko live update karne ke liye
   const [actionBusy, setActionBusy] = useState(false);
+
+  // ── Waitlist ──
+  // key = session.sessionId (service card), value = user ki active waitlist entry
+  const [waitlistEntries, setWaitlistEntries] = useState<Record<string, any>>({});
+  const [waitlistTarget, setWaitlistTarget] = useState<any | null>(null);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  useEffect(() => {
+    if (!mentorId || !currentUserId) return;
+    MentorService.getMyWaitlists()
+      .then((res) => {
+        const map: Record<string, any> = {};
+        (res?.data ?? []).forEach((w: any) => {
+          if (w.serviceId && (w.status === "active" || w.status === "notified")) {
+            map[w.serviceId] = w;
+          }
+        });
+        setWaitlistEntries(map);
+      })
+      .catch(() => setWaitlistEntries({}));
+  }, [mentorId, currentUserId]);
+
+  const handleJoinWaitlist = async (session: any, note: string) => {
+    const res = await MentorService.joinWaitlist({
+      mentorId,
+      serviceId: session.sessionId,
+      serviceTitle: session.title,
+      preferredDates: [session.scheduledAt || new Date().toISOString()],
+      preferredTimeSlots: ["any"],
+      sessionType: session.sessionType,
+      timezone: "Asia/Kolkata",
+      notes: note || undefined,
+    });
+    setWaitlistEntries((prev) => ({ ...prev, [session.sessionId]: res.data }));
+    setWaitlistTarget(null);
+    showToast("You're on the waitlist. We'll notify you when a slot opens.");
+  };
+
+  const handleLeaveWaitlist = async (serviceId: string, entry: any) => {
+    setLeavingId(entry.waitlistId);
+    try {
+      await MentorService.leaveWaitlist(entry.waitlistId);
+      setWaitlistEntries((prev) => {
+        const next = { ...prev };
+        delete next[serviceId];
+        return next;
+      });
+      showToast("You've left the waitlist.");
+    } catch (err: any) {
+      showToast(err.message || "Failed to leave waitlist.", "error");
+    } finally {
+      setLeavingId(null);
+    }
+  };
+
+
 
   useEffect(() => {
     if (!mentorId) return;
@@ -656,43 +719,54 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                         >
                           Book
                         </button>
-                        {/* NEW: Waitlist option — e.stopPropagation() is required
-                            here too since the whole card has its own onClick
-                            that opens the detail modal. */}
-                                                <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            // ⚠️ FIX: backend's Mentor.findOne({ userId: input.mentorId })
-                            // expects the mentor's userId, not the Mentor document's own
-                            // mentorId (which is what the `mentorId` prop holds here).
-                            // mentorFull.userId is the correct value — same field already
-                            // used by handleMessageMentor() above.
-                            if (!mentorFull?.userId) {
-                              alert("Mentor details are still loading. Please try again in a moment.");
-                              return;
-                            }
-                            try {
-                              const fallbackDate = session.scheduledAt || new Date().toISOString();
-                              await MentorService.joinWaitlist({
-                                mentorId: mentorFull.userId,
-                                preferredDates: [fallbackDate],
-                                preferredTimeSlots: ["any"],
-                                sessionType: session.sessionType,
-                                timezone: "Asia/Kolkata",
-                              });
-                              alert("You've been added to the waitlist. We'll notify you when a slot opens up.");
-                            } catch (err: any) {
-                              alert(err.message || "Failed to join waitlist.");
-                            }
-                          }}
-                          style={{
-                            padding: "8px 18px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
-                            background: "transparent", color: C.dark, border: `1.5px solid ${C.dark}`,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Waitlist
-                        </button>
+                                                {/* Waitlist: user waitlist par hai to status + Leave, warna Join modal khulta hai.
+                            e.stopPropagation() zaroori hai kyunki poore card ka onClick detail modal kholta hai. */}
+                        {(() => {
+                          const wl = waitlistEntries[session.sessionId];
+                          if (wl) {
+                            const approved = wl.status === "notified";
+                            const leaving = leavingId === wl.waitlistId;
+                            return (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleLeaveWaitlist(session.sessionId, wl);
+                                }}
+                                disabled={leaving}
+                                title="Leave waitlist"
+                                style={{
+                                  padding: "8px 14px", borderRadius: "10px", fontSize: "12px", fontWeight: 600,
+                                  background: approved ? "#ecfdf5" : "transparent",
+                                  color: approved ? "#10b981" : "#dc2626",
+                                  border: `1.5px solid ${approved ? "#86efac" : "#fca5a5"}`,
+                                  cursor: leaving ? "not-allowed" : "pointer",
+                                  opacity: leaving ? 0.6 : 1,
+                                }}
+                              >
+                                {leaving
+                                  ? "Leaving..."
+                                  : approved
+                                  ? "🎉 Approved · Leave"
+                                  : `⏳ #${wl.queuePosition ?? "-"} · Leave`}
+                              </button>
+                            );
+                          }
+                          return (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setWaitlistTarget(session);
+                              }}
+                              style={{
+                                padding: "8px 18px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                                background: "transparent", color: C.dark, border: `1.5px solid ${C.dark}`,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Waitlist
+                            </button>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
@@ -1180,6 +1254,35 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           </ModalShell>
         );
       })()}
+
+
+{waitlistTarget && (
+        <WaitlistModal
+          service={{
+            title: waitlistTarget.title,
+            sessionType: waitlistTarget.sessionType,
+            duration: waitlistTarget.duration,
+            price: waitlistTarget.pricing?.basePrice,
+          }}
+          mentorName={mentorInfo?.mentorName}
+          onClose={() => setWaitlistTarget(null)}
+          onConfirm={(note) => handleJoinWaitlist(waitlistTarget, note)}
+        />
+      )}
+
+      {toast && (
+        <div
+          style={{
+            position: "fixed", top: 20, right: 20, zIndex: 9999, padding: "12px 16px", borderRadius: 12,
+            fontSize: 13, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+            background: toast.type === "success" ? "#dcfce7" : "#fee2e2",
+            color: toast.type === "success" ? "#15803d" : "#dc2626",
+            border: `1px solid ${toast.type === "success" ? "#86efac" : "#fca5a5"}`,
+          }}
+        >
+          {toast.msg}
+        </div>
+      )}
 
       {queryModalOpen && mentorInfo && (
         <QueryModal

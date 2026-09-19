@@ -7,7 +7,7 @@ import { SERVICES, FILTERS, C, btnPrimary } from "../../types/data";
 import type { Service } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
 import MentorService from "@/lib/api/mentorship.service";
-import WaitlistModal from "./WaitlistModal";
+import WaitlistModal from "../modal/WaitlistModal";
 
 interface ServicesSectionProps {
   onServiceClick: (service: Service) => void;
