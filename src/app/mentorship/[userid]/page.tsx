@@ -39,7 +39,6 @@ export default function ThroneUltraPremium() {
     const [showMentorForm, setShowMentorForm] = useState(false);
     const [formStep, setFormStep] = useState(1);
     const [isMentor, setIsMentor] = useState(false);
-    const [selectedDate, setSelectedDate] = useState(0);
     const params = useParams();
     const rawUserId = (params?.userid || (params as any)?.userId) as string;
     const userId = rawUserId && rawUserId !== "undefined" ? rawUserId : "";
