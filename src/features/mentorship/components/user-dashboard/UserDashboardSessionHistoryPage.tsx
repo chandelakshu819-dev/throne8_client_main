@@ -1,5 +1,5 @@
-//src/features/mentorship/components/user-dashboard/UserDashboardSessionHistoryPage.tsx
-import React, { useState } from "react";
+"use client";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   CalendarClock,
   Clock,
@@ -8,11 +8,16 @@ import {
   Star,
   RotateCcw, 
   History,
-  MessageSquare
+  MessageSquare,
+  AlertCircle,
+  Loader2,
+  RefreshCw
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import UserDashboardReviewModal from "./UserDashboardReviewModal";
 import { routes } from "@/config/routes";
+import SessionService from "@/lib/api/session.service";
+import ReviewService, { MentorReview } from "@/lib/api/review.service";
 
 const COLORS = {
   ink: "#4a3728",
@@ -45,14 +50,10 @@ type Session = {
   startTime?: string;
   status?: string;
   duration?: number;
-  review?: {
-    rating?: number;
-    menteeReview?: string;
-  };
 };
 
 interface Props {
-  sessions?: Session[];
+  sessions?: any[]; // Ignored, we fetch fresh data
 }
 
 function formatDateStr(iso?: string) {
@@ -75,30 +76,71 @@ function initialsFrom(name: string) {
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props) {
+export default function UserDashboardSessionHistoryPage(_props: Props) {
   const router = useRouter();
-  const now = Date.now();
+  
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [reviewsMap, setReviewsMap] = useState<Record<string, MentorReview>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [reviewTarget, setReviewTarget] = useState<Session | null>(null);
-  const [locallyReviewedIds, setLocallyReviewedIds] = useState<Set<string>>(new Set());
-  const [viewReviewSession, setViewReviewSession] = useState<Session | null>(null);
+  const [viewReview, setViewReview] = useState<MentorReview | null>(null);
 
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const [sessionsRes, reviewsData] = await Promise.all([
+        SessionService.getAllSessions({ role: "mentee", limit: 100 }),
+        ReviewService.getMyReviews()
+      ]);
+      
+      const allSessions = sessionsRes?.data || [];
+      setSessions(allSessions);
+      
+      const rMap: Record<string, MentorReview> = {};
+      (reviewsData || []).forEach((r: MentorReview) => {
+        if (r.sessionId) rMap[r.sessionId] = r;
+      });
+      setReviewsMap(rMap);
+    } catch (err: any) {
+      console.error("Failed to fetch session history data:", err);
+      setError(err.message || "Failed to load session history.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleRefresh = () => {
+    fetchData();
+  };
+
+  const now = Date.now();
+  
+  // Filter history sessions
   const historySessions = sessions.filter((s) => {
-    const status = (s.status || "").toLowerCase();
+    const status = (s.status || "").toUpperCase();
     const t = new Date(s.startTime || s.scheduledAt || 0).getTime();
     const isPast = t < now && t > 0;
-
-    return status === "completed" || status === "done" || (isPast && status !== "cancelled");
+    
+    return ["COMPLETED", "DONE", "CANCELLED", "REJECTED"].includes(status) || (isPast && !["PENDING", "CONFIRMED"].includes(status));
   }).sort((a, b) => {
     const ta = new Date(a.startTime || a.scheduledAt || 0).getTime();
     const tb = new Date(b.startTime || b.scheduledAt || 0).getTime();
-    return tb - ta; // Descending for history
+    return tb - ta; 
   });
 
   const getStatusBadgeStyles = (status: string) => {
-    const s = status.toLowerCase();
-    if (s === "completed" || s === "done") return { bg: COLORS.successWash, text: COLORS.success };
-    if (s === "cancelled" || s === "refunded") return { bg: COLORS.dangerWash, text: COLORS.danger };
+    const s = status.toUpperCase();
+    if (["COMPLETED", "DONE"].includes(s)) return { bg: COLORS.successWash, text: COLORS.success };
+    if (["CANCELLED", "REFUNDED", "REJECTED"].includes(s)) return { bg: COLORS.dangerWash, text: COLORS.danger };
+    if (["IN_PROGRESS"].includes(s)) return { bg: "#fff7ed", text: "#ea580c" };
     return { bg: COLORS.chip, text: COLORS.accent };
   };
 
@@ -117,16 +159,61 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
 
   return (
     <div className="space-y-6 animate-fadeIn max-w-5xl pt-2 pb-8">
-      <div>
-        <h2 className="text-2xl font-bold" style={{ color: COLORS.ink }}>
-          Session History
-        </h2>
-        <p style={{ color: COLORS.muted }} className="text-sm mt-1">
-          Review your past mentorship sessions and feedback.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold" style={{ color: COLORS.ink }}>
+            Session History
+          </h2>
+          <p style={{ color: COLORS.muted }} className="text-sm mt-1">
+            Review your past mentorship sessions and feedback.
+          </p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:bg-[#f6ede8] disabled:opacity-50"
+          style={{ color: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
       </div>
 
-      {historySessions.length === 0 ? (
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="animate-pulse flex flex-col lg:flex-row gap-5 p-5 rounded-2xl bg-white" style={{ border: `1px solid ${COLORS.hairline}` }}>
+              <div className="w-12 h-12 rounded-full bg-gray-200 shrink-0" />
+              <div className="flex-1 space-y-3 py-1">
+                <div className="h-4 bg-gray-200 rounded w-1/3" />
+                <div className="h-3 bg-gray-200 rounded w-1/4" />
+              </div>
+              <div className="flex-1 space-y-3 py-1">
+                <div className="h-4 bg-gray-200 rounded w-1/2" />
+                <div className="h-3 bg-gray-200 rounded w-1/3" />
+              </div>
+              <div className="flex-1 space-y-3 py-1">
+                <div className="h-8 bg-gray-200 rounded w-full" />
+                <div className="h-8 bg-gray-200 rounded w-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center gap-3 py-16 rounded-2xl text-center" style={{ backgroundColor: COLORS.dangerWash, border: `1px solid #fca5a5` }}>
+          <AlertCircle className="w-8 h-8 text-red-500" />
+          <div>
+            <h3 className="text-lg font-bold text-red-700">Failed to load history</h3>
+            <p className="text-sm mt-1 text-red-600">{error}</p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            className="mt-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      ) : historySessions.length === 0 ? (
         <div
           className="flex flex-col items-center justify-center gap-3 py-16 rounded-2xl text-center"
           style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
@@ -135,7 +222,7 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
             <History className="w-8 h-8" style={{ color: COLORS.accent }} />
           </div>
           <div>
-            <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>No session history yet</h3>
+            <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>No mentorship sessions yet.</h3>
             <p className="text-sm mt-1" style={{ color: COLORS.muted }}>
               You don't have any completed sessions at the moment.
             </p>
@@ -149,12 +236,11 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
             const jobTitle = s.mentorJobTitle || "Mentor";
             const isOnline = !s.sessionType || s.sessionType.toLowerCase() === "virtual" || s.sessionType.toLowerCase() === "online";
             const sessionId = s.sessionId || s._id || `SH-${idx}`;
-            const statusStyles = getStatusBadgeStyles(s.status || "Unknown");
+            const statusStyles = getStatusBadgeStyles(s.status || "UNKNOWN");
 
-            const hasReview =
-              (s.review && (s.review.rating || s.review.menteeReview)) ||
-              locallyReviewedIds.has(sessionId);
-            const isCompletedStatus = (s.status || "").toLowerCase() === "completed" || (s.status || "").toLowerCase() === "done";
+            const actualReview = reviewsMap[sessionId];
+            const hasReview = !!actualReview;
+            const isCompletedStatus = ["COMPLETED", "DONE"].includes((s.status || "").toUpperCase());
             const canReview = isCompletedStatus && !hasReview;
 
             return (
@@ -204,7 +290,7 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
                       className="inline-flex text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
                       style={{ backgroundColor: statusStyles.bg, color: statusStyles.text }}
                     >
-                      {s.status || "Unknown"}
+                      {s.status || "UNKNOWN"}
                     </span>
                   </div>
                 </div>
@@ -241,11 +327,11 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
                       {hasReview ? (
                         <div className="flex items-center gap-1">
                           <span className="text-xs font-medium" style={{ color: COLORS.ink }}>
-                            {s.review?.rating ? `${s.review.rating}/5` : "Reviewed"}
+                            {actualReview.rating ? `${actualReview.rating}/5` : "Reviewed"}
                           </span>
-                          {s.review?.menteeReview && (
+                          {actualReview.comment && (
                             <button
-                              onClick={() => setViewReviewSession(s)}
+                              onClick={() => setViewReview(actualReview)}
                               className="text-[10px] ml-1 font-semibold underline hover:text-[#7a5c3e] transition-colors"
                               style={{ color: COLORS.muted }}
                             >
@@ -255,7 +341,7 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
                         </div>
                       ) : (
                         <span className="text-xs font-medium" style={{ color: COLORS.muted }}>
-                          Not reviewed
+                          {isCompletedStatus ? "Not reviewed" : "Not eligible"}
                         </span>
                       )}
                     </div>
@@ -295,25 +381,18 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
           mentorName={reviewTarget.mentorName}
           onClose={() => setReviewTarget(null)}
           onSuccess={() => {
-            const sid = reviewTarget.sessionId || reviewTarget._id;
-            if (sid) {
-              setLocallyReviewedIds((prev) => {
-                const next = new Set(prev);
-                next.add(sid);
-                return next;
-              });
-            }
             setReviewTarget(null);
+            fetchData(); // Refresh to get the new review and update UI
           }}
         />
       )}
 
-      {viewReviewSession && viewReviewSession.review && (
+      {viewReview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-xl" style={{ border: `1px solid ${COLORS.hairline}` }}>
             <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: COLORS.hairline, backgroundColor: COLORS.softWash }}>
               <h3 className="font-bold text-lg" style={{ color: COLORS.ink }}>Your Review</h3>
-              <button onClick={() => setViewReviewSession(null)} className="text-sm font-bold" style={{ color: COLORS.muted }}>✕</button>
+              <button onClick={() => setViewReview(null)} className="text-sm font-bold" style={{ color: COLORS.muted }}>✕</button>
             </div>
             <div className="p-5 space-y-4">
               <div className="flex items-center gap-2">
@@ -324,8 +403,8 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
                       key={star}
                       className="w-4 h-4"
                       style={{
-                        color: (viewReviewSession.review?.rating || 0) >= star ? COLORS.gold : COLORS.hairline,
-                        fill: (viewReviewSession.review?.rating || 0) >= star ? COLORS.gold : "none"
+                        color: (viewReview.rating || 0) >= star ? COLORS.gold : COLORS.hairline,
+                        fill: (viewReview.rating || 0) >= star ? COLORS.gold : "none"
                       }}
                     />
                   ))}
@@ -334,13 +413,13 @@ export default function UserDashboardSessionHistoryPage({ sessions = [] }: Props
               <div>
                 <p className="text-sm font-semibold mb-1.5" style={{ color: COLORS.muted }}>Feedback:</p>
                 <div className="p-3 rounded-xl text-sm" style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}`, color: COLORS.ink }}>
-                  {viewReviewSession.review?.menteeReview || "No written feedback provided."}
+                  {viewReview.comment || "No written feedback provided."}
                 </div>
               </div>
             </div>
             <div className="p-4 border-t flex justify-end" style={{ borderColor: COLORS.hairline }}>
               <button
-                onClick={() => setViewReviewSession(null)}
+                onClick={() => setViewReview(null)}
                 className="px-4 py-2 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f6ede8]"
                 style={{ color: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}
               >
