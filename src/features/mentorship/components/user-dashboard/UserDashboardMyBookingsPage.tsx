@@ -95,7 +95,8 @@ export default function UserDashboardMyBookingsPage({ sessions = [] }: Props) {
 
   const filteredSessions = sessions.filter((s) => {
     const status = (s.status || "").toLowerCase();
-    const t = new Date(s.startTime || s.scheduledAt || 0).getTime();
+    const actualTime = s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt || 0;
+    const t = new Date(actualTime).getTime();
     const isPast = t < now && t > 0;
 
     switch (activeTab) {
@@ -111,8 +112,10 @@ export default function UserDashboardMyBookingsPage({ sessions = [] }: Props) {
         return false;
     }
   }).sort((a, b) => {
-    const ta = new Date(a.startTime || a.scheduledAt || 0).getTime();
-    const tb = new Date(b.startTime || b.scheduledAt || 0).getTime();
+    const timeA = a.bookings?.[0]?.scheduledAt || a.startTime || a.scheduledAt || 0;
+    const timeB = b.bookings?.[0]?.scheduledAt || b.startTime || b.scheduledAt || 0;
+    const ta = new Date(timeA).getTime();
+    const tb = new Date(timeB).getTime();
     if (activeTab === "completed" || activeTab === "cancelled") {
       return tb - ta; // Descending for past
     }
@@ -263,12 +266,12 @@ export default function UserDashboardMyBookingsPage({ sessions = [] }: Props) {
                 <div className="w-full lg:w-[24%] shrink-0 space-y-2 lg:px-4 lg:border-l pt-1 lg:pt-0" style={{ borderColor: COLORS.hairline }}>
                   <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.ink }}>
                     <CalendarClock className="w-3.5 h-3.5 shrink-0" style={{ color: COLORS.muted }} />
-                    <span>{formatDateStr(s.startTime || s.scheduledAt)}</span>
+                    <span>{formatDateStr(s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt)}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.ink }}>
                     <Clock className="w-3.5 h-3.5 shrink-0" style={{ color: COLORS.muted }} />
                     <span>
-                      {formatTimeStr(s.startTime || s.scheduledAt)}
+                      {formatTimeStr(s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt)}
                       {s.duration ? ` (${s.duration} min)` : ""}
                     </span>
                   </div>
@@ -379,11 +382,11 @@ export default function UserDashboardMyBookingsPage({ sessions = [] }: Props) {
               <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}>
                 <div className="flex justify-between items-center text-sm">
                   <span style={{ color: COLORS.muted }} className="font-semibold">Date</span>
-                  <span style={{ color: COLORS.ink }} className="font-bold">{formatDateStr(selectedBooking.startTime || selectedBooking.scheduledAt)}</span>
+                  <span style={{ color: COLORS.ink }} className="font-bold">{formatDateStr(selectedBooking.bookings?.[0]?.scheduledAt || selectedBooking.startTime || selectedBooking.scheduledAt)}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span style={{ color: COLORS.muted }} className="font-semibold">Time</span>
-                  <span style={{ color: COLORS.ink }} className="font-bold">{formatTimeStr(selectedBooking.startTime || selectedBooking.scheduledAt)}</span>
+                  <span style={{ color: COLORS.ink }} className="font-bold">{formatTimeStr(selectedBooking.bookings?.[0]?.scheduledAt || selectedBooking.startTime || selectedBooking.scheduledAt)}</span>
                 </div>
                 {selectedBooking.duration && (
                   <div className="flex justify-between items-center text-sm">

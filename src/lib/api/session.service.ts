@@ -210,6 +210,23 @@ class SessionService {
         }
     }
 
+    // ── GET PAST SESSIONS (mentor/user-scoped, real mentee data) ───
+    static async getPastSessions(params: { role?: "mentor" | "mentee"; limit?: number; page?: number } = {}): Promise<ApiResponse> {
+        try {
+            const endpoint = config.NEXT_PUBLIC_SESSIONS_PAST_ENDPOINT
+                || `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/past`;
+
+            const { data } = await api.get<ApiResponse>(endpoint, { params });
+            console.log("✅ [GET_PAST_SESSIONS] Fetched:", data);
+            return data;
+        } catch (error: any) {
+            console.error("❌ [GET_PAST_SESSIONS] Failed", error?.response?.data || error?.message);
+            if (error?.response?.status === 401) throw new Error("Please login again.");
+            if (error?.code === "ERR_NETWORK") throw new Error("Unable to connect to server.");
+            throw new Error(error?.response?.data?.message || "Failed to fetch past sessions.");
+        }
+    }
+
     // ── GET SESSION BY ID ──────────────────────────────────
     static async getSessionById(sessionId: string): Promise<ApiResponse> {
         try {
@@ -235,10 +252,10 @@ class SessionService {
         try {
             console.log("📋 [GET_ALL_SESSIONS] Fetching with filters:", filters);
 
-            const { data } = await api.get<ApiResponse>(
-                `${config.NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT}`,
-                { params: filters }
-            );
+            const endpoint = config.NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT 
+                || `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/get-all`;
+            
+            const { data } = await api.get<ApiResponse>(endpoint, { params: filters });
 
             // console.log("✅ [GET_ALL_SESSIONS] Fetched:", data, "sessions");
             return data;

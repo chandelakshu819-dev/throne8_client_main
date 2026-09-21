@@ -127,20 +127,22 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage }: Pro
     try {
       setLoading(true);
       setError(null);
-      const res = await SessionService.getUpcomingSessions({ role: "mentee", limit: 50 });
-
+      const res = await SessionService.getAllSessions({ role: "mentee", limit: 100 });
       const fetchedSessions = (res.data || []) as Session[];
 
       const currentNow = Date.now();
       const validUpcoming = fetchedSessions
         .filter((s) => {
-          const t = new Date(s.startTime || s.scheduledAt || 0).getTime();
+          const actualTime = s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt || 0;
+          const t = new Date(actualTime).getTime();
           return t >= currentNow && s.status !== "cancelled" && s.status !== "completed" && s.status !== "refunded" && s.status !== "no_show";
         })
         .sort(
-          (a, b) =>
-            new Date(a.startTime || a.scheduledAt || 0).getTime() -
-            new Date(b.startTime || b.scheduledAt || 0).getTime()
+          (a, b) => {
+            const timeA = a.bookings?.[0]?.scheduledAt || a.startTime || a.scheduledAt || 0;
+            const timeB = b.bookings?.[0]?.scheduledAt || b.startTime || b.scheduledAt || 0;
+            return new Date(timeA).getTime() - new Date(timeB).getTime();
+          }
         );
 
       setUpcoming(validUpcoming);
@@ -388,7 +390,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage }: Pro
                     </p>
                     <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
                       <CalendarClock className="w-3.5 h-3.5 shrink-0" />
-                      <span>{formatDateStr(s.startTime || s.scheduledAt)}</span>
+                      <span>{formatDateStr(s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt)}</span>
                     </div>
                   </div>
 
@@ -396,7 +398,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage }: Pro
                     <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
                       <Clock className="w-3.5 h-3.5 shrink-0" />
                       <span>
-                        {formatTimeStr(s.startTime || s.scheduledAt)}
+                        {formatTimeStr(s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt)}
                         {s.duration ? ` (${s.duration} min)` : ""}
                       </span>
                     </div>
