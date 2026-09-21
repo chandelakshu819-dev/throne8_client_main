@@ -1,4 +1,4 @@
-// mentorDashboard/components/AnalyticsPage.tsx
+// File: src/features/mentorship/components/dashboard/AnalyticsPage.tsx
 "use client"
 import React, { useEffect, useState } from "react"
 import {
@@ -13,30 +13,56 @@ import {
   Users,
   Code2,
   Target,
+  XCircle,
+  Percent,
 } from "lucide-react"
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+} from "recharts"
 import MentorService from "@/lib/api/mentorship.service"
 
 interface PopularServiceStat {
-  sessionType: string;
-  bookings: number;
+  sessionType: string
+  bookings: number
+  revenue?: number
 }
 
 interface MonthlyEarningStat {
-  month: string;
-  amount: number;
+  month: string
+  amount: number
+}
+
+interface RatingTrendStat {
+  month: string
+  avgRating: number
+  count: number
 }
 
 interface AnalyticsData {
-  profileViews: { value: number; changePercent: number; trend: string };
-  bookingRate: { value: number; trend: string };
-  avgSessionDuration: { value: number };
-  popularServices: PopularServiceStat[];
-  monthlyEarnings: MonthlyEarningStat[];
+  profileViews: { value: number; changePercent: number; trend: string }
+  bookingRate: { value: number; trend: string }
+  avgSessionDuration: { value: number }
+  cancellationRate?: { value: number; cancelled: number; noShow: number; total: number }
+  conversion?: { views: number; bookings: number; rate: number }
+  popularServices: PopularServiceStat[]
+  monthlyEarnings: MonthlyEarningStat[]
+  ratingTrend?: RatingTrendStat[]
 }
 
 interface AnalyticsPageProps {
-  mentorData?: any // passed down from DashboardLayout — contains mentorId, title, status, etc.
-  [key: string]: any // DashboardLayout spreads many other props onto every page; rest are unused here
+  mentorData?: any
+  [key: string]: any
 }
 
 const SERVICE_ICON_MAP: Record<string, { icon: React.ElementType; color: string }> = {
@@ -45,6 +71,8 @@ const SERVICE_ICON_MAP: Record<string, { icon: React.ElementType; color: string 
   "group": { icon: Users, color: "#7a5c3e" },
   "career-guidance": { icon: Target, color: "#5c4632" },
 }
+
+const FALLBACK_COLORS = ["#4a3728", "#8a6a4a", "#7a5c3e", "#5c4632", "#a08070"]
 
 const monthLabel = (ym: string) => {
   const [y, m] = ym.split("-")
@@ -64,44 +92,70 @@ const TrendPill = ({ change, trend }: { change: string; trend: "up" | "down" }) 
   </span>
 )
 
-// ── Mini bar-chart visual for the earnings trend (pure CSS/SVG, no
-// extra chart library dependency needed) ─────────────────────────────
-const EarningsTrend = ({
-  data,
-}: {
-  data: { month: string; amount: number }[]
-}) => {
-  const values = data.map((d) => d.amount)
-  const max = Math.max(...values, 1)
-  // Reverse so oldest month is on the left, most recent on the right
-  const ordered = [...data].reverse()
+// ── Real bar chart for the earnings trend (recharts) ─────────────────
+const EarningsTrend = ({ data }: { data: MonthlyEarningStat[] }) => {
+  const chartData = [...data].reverse().map((d) => ({
+    month: monthLabel(d.month).slice(0, 3),
+    amount: d.amount,
+  }))
 
   return (
-    <div className="flex items-end justify-between gap-3 h-24 px-1 mb-1">
-      {ordered.map((d, idx) => {
-        const heightPct = Math.max((d.amount / max) * 100, 8)
-        const isLast = idx === ordered.length - 1
-        return (
-          <div key={d.month} className="flex-1 flex flex-col items-center gap-2">
-            <div className="w-full h-16 flex items-end">
-              <div
-                className="w-full rounded-t-md transition-all duration-500"
-                style={{
-                  height: `${heightPct}%`,
-                  backgroundColor: isLast ? "#4a3728" : "#d9c9b8",
-                }}
-              />
-            </div>
-            <span
-              className="text-[10px] font-semibold uppercase tracking-wide"
-              style={{ color: isLast ? "#4a3728" : "#a08070" }}
-            >
-              {monthLabel(d.month).slice(0, 3)}
-            </span>
-          </div>
-        )
-      })}
-    </div>
+    <ResponsiveContainer width="100%" height={180}>
+      <BarChart data={chartData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e0d8cf" vertical={false} />
+        <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#a08070" }} axisLine={false} tickLine={false} />
+        <YAxis tick={{ fontSize: 11, fill: "#a08070" }} axisLine={false} tickLine={false} />
+        <Tooltip
+          formatter={(value: number) => [`₹${value.toLocaleString()}`, "Earnings"]}
+          contentStyle={{ borderRadius: 8, border: "1px solid #e0d8cf", fontSize: 12 }}
+        />
+        <Bar dataKey="amount" radius={[6, 6, 0, 0]} fill="#4a3728" />
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
+// ── Donut chart for service popularity ───────────────────────────────
+const ServicesDonut = ({
+  data,
+}: {
+  data: { name: string; bookings: number; color: string }[]
+}) => (
+  <ResponsiveContainer width="100%" height={180}>
+    <PieChart>
+      <Pie data={data} dataKey="bookings" nameKey="name" innerRadius={45} outerRadius={70} paddingAngle={3}>
+        {data.map((entry, idx) => (
+          <Cell key={idx} fill={entry.color} />
+        ))}
+      </Pie>
+      <Tooltip
+        formatter={(value: number, name: string) => [`${value} bookings`, name]}
+        contentStyle={{ borderRadius: 8, border: "1px solid #e0d8cf", fontSize: 12 }}
+      />
+    </PieChart>
+  </ResponsiveContainer>
+)
+
+// ── Line chart for rating trend over months ──────────────────────────
+const RatingTrendChart = ({ data }: { data: RatingTrendStat[] }) => {
+  const chartData = data.map((d) => ({
+    month: monthLabel(d.month).slice(0, 3),
+    rating: d.avgRating,
+  }))
+
+  return (
+    <ResponsiveContainer width="100%" height={140}>
+      <LineChart data={chartData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e0d8cf" vertical={false} />
+        <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#a08070" }} axisLine={false} tickLine={false} />
+        <YAxis domain={[0, 5]} tick={{ fontSize: 11, fill: "#a08070" }} axisLine={false} tickLine={false} />
+        <Tooltip
+          formatter={(value: number) => [`${value} ★`, "Avg rating"]}
+          contentStyle={{ borderRadius: 8, border: "1px solid #e0d8cf", fontSize: 12 }}
+        />
+        <Line type="monotone" dataKey="rating" stroke="#4a3728" strokeWidth={2} dot={{ r: 3, fill: "#4a3728" }} />
+      </LineChart>
+    </ResponsiveContainer>
   )
 }
 
@@ -113,8 +167,6 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // mentorData hasn't arrived from DashboardLayout's fetch yet — keep showing the spinner,
-    // don't error out. It errors only if mentorData resolved but has no mentorId on it.
     if (!mentorData) {
       return
     }
@@ -184,15 +236,42 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
       trend: "up" as const,
       icon: Clock,
     },
+    // ✅ NEW cards — only render if backend sent the data
+    ...(data.cancellationRate
+      ? [
+          {
+            label: "Cancellation Rate",
+            value: `${data.cancellationRate.value}%`,
+            change: "—",
+            trend: (data.cancellationRate.value <= 10 ? "up" : "down") as "up" | "down",
+            icon: XCircle,
+          },
+        ]
+      : []),
+    ...(data.conversion
+      ? [
+          {
+            label: "View → Booking Rate",
+            value: `${data.conversion.rate}%`,
+            change: "—",
+            trend: "up" as const,
+            icon: Percent,
+          },
+        ]
+      : []),
   ]
 
   const totalBookings = data.popularServices.reduce((sum: number, s: PopularServiceStat) => sum + s.bookings, 0)
 
-  const popularServices = data.popularServices.map((s: PopularServiceStat) => {
-    const meta = SERVICE_ICON_MAP[s.sessionType] || { icon: Users, color: "#4a3728" }
+  const popularServices = data.popularServices.map((s: PopularServiceStat, idx: number) => {
+    const meta = SERVICE_ICON_MAP[s.sessionType] || {
+      icon: Users,
+      color: FALLBACK_COLORS[idx % FALLBACK_COLORS.length],
+    }
     return {
       name: s.sessionType,
       bookings: s.bookings,
+      revenue: s.revenue || 0,
       percentage: totalBookings ? Math.round((s.bookings / totalBookings) * 100) : 0,
       icon: meta.icon,
       color: meta.color,
@@ -200,6 +279,7 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
   })
 
   const totalEarnings = data.monthlyEarnings.reduce((sum: number, e: MonthlyEarningStat) => sum + e.amount, 0)
+  const totalServiceRevenue = popularServices.reduce((sum, s) => sum + s.revenue, 0)
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -219,11 +299,7 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
           </div>
         </div>
 
-        {/* Quick summary chip */}
-        <div
-          className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl"
-          style={{ backgroundColor: "#4a3728" }}
-        >
+        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl" style={{ backgroundColor: "#4a3728" }}>
           <TrendingUp className="w-4 h-4 text-white" />
           <span className="text-sm font-bold text-white">
             {totalBookings} bookings · ₹{totalEarnings.toLocaleString()}
@@ -283,37 +359,51 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
               No completed sessions yet.
             </p>
           ) : (
-            <div className="space-y-5">
-              {popularServices.map((service, idx: number) => (
-                <div key={idx}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-6 h-6 rounded-md flex items-center justify-center"
-                        style={{ backgroundColor: `${service.color}1a` }}
-                      >
-                        <service.icon className="w-3.5 h-3.5" style={{ color: service.color }} />
+            <>
+              <ServicesDonut data={popularServices} />
+
+              <div className="space-y-5 mt-4">
+                {popularServices.map((service, idx: number) => (
+                  <div key={idx}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-6 h-6 rounded-md flex items-center justify-center"
+                          style={{ backgroundColor: `${service.color}1a` }}
+                        >
+                          <service.icon className="w-3.5 h-3.5" style={{ color: service.color }} />
+                        </div>
+                        <span className="text-sm font-semibold" style={{ color: "#4a3728" }}>
+                          {service.name}
+                        </span>
                       </div>
-                      <span className="text-sm font-semibold" style={{ color: "#4a3728" }}>
-                        {service.name}
-                      </span>
+                      <div className="text-right">
+                        <span className="text-sm font-bold block" style={{ color: "#7a5c3e" }}>
+                          {service.bookings} bookings
+                        </span>
+                        {service.revenue > 0 && (
+                          <span className="text-xs" style={{ color: "#a08070" }}>
+                            ₹{service.revenue.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-sm font-bold" style={{ color: "#7a5c3e" }}>
-                      {service.bookings} bookings
-                    </span>
+                    <div className="w-full h-2.5 rounded-full" style={{ backgroundColor: "#f0e9e1" }}>
+                      <div
+                        className="h-2.5 rounded-full transition-all duration-500"
+                        style={{ width: `${service.percentage}%`, backgroundColor: service.color }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-2.5 rounded-full" style={{ backgroundColor: "#f0e9e1" }}>
-                    <div
-                      className="h-2.5 rounded-full transition-all duration-500"
-                      style={{
-                        width: `${service.percentage}%`,
-                        backgroundColor: service.color,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+
+              {totalServiceRevenue > 0 && (
+                <p className="text-xs mt-4 text-right" style={{ color: "#a08070" }}>
+                  Total revenue from services: <strong style={{ color: "#4a3728" }}>₹{totalServiceRevenue.toLocaleString()}</strong>
+                </p>
+              )}
+            </>
           )}
         </div>
 
@@ -337,7 +427,6 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
             </p>
           ) : (
             <>
-              {/* Trend visual */}
               <div className="p-3 rounded-xl mb-4" style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}>
                 <EarningsTrend data={data.monthlyEarnings} />
               </div>
@@ -364,6 +453,19 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
           )}
         </div>
       </div>
+
+      {/* ✅ NEW: Rating trend — only renders if backend sends ratingTrend */}
+      {data.ratingTrend && data.ratingTrend.length > 0 && (
+        <div
+          className="bg-white p-6 rounded-2xl"
+          style={{ border: "1px solid #e0d8cf", boxShadow: "0 1px 3px rgba(74,55,40,0.04)" }}
+        >
+          <h3 className="text-base font-bold mb-4" style={{ color: "#4a3728" }}>
+            Rating Trend
+          </h3>
+          <RatingTrendChart data={data.ratingTrend} />
+        </div>
+      )}
     </div>
   )
 }
