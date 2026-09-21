@@ -92,13 +92,23 @@ export default function UserDashboardSessionHistoryPage(_props: Props) {
       setLoading(true);
       setError(null);
       
-      const [sessionsRes, reviewsData] = await Promise.all([
-        SessionService.getAllSessions({ role: "mentee", limit: 1000 }),
+      const [upcomingRes, pastRes, reviewsData] = await Promise.all([
+        SessionService.getUpcomingSessions({ role: "mentee", limit: 1000 }),
+        SessionService.getPastSessions({ role: "mentee", limit: 1000 }),
         ReviewService.getMyReviews()
       ]);
       
-      const allSessions = sessionsRes?.data || [];
-      setSessions(allSessions);
+      const upcomingSessions = upcomingRes?.data || [];
+      const pastSessions = pastRes?.data || [];
+      
+      // Combine and filter duplicates
+      const allSessionsMap = new Map<string, Session>();
+      [...upcomingSessions, ...pastSessions].forEach(s => {
+        const id = s.sessionId || s._id;
+        if (id) allSessionsMap.set(id, s);
+      });
+      
+      setSessions(Array.from(allSessionsMap.values()));
       
       const rMap: Record<string, MentorReview> = {};
       (reviewsData || []).forEach((r: MentorReview) => {
