@@ -252,10 +252,10 @@ class SessionService {
         try {
             console.log("📋 [GET_ALL_SESSIONS] Fetching with filters:", filters);
 
-            const { data } = await api.get<ApiResponse>(
-                `${config.NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT}`,
-                { params: filters }
-            );
+            const endpoint = config.NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT 
+                || `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/get-all`;
+            
+            const { data } = await api.get<ApiResponse>(endpoint, { params: filters });
 
             // console.log("✅ [GET_ALL_SESSIONS] Fetched:", data, "sessions");
             return data;

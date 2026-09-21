@@ -50,6 +50,7 @@ type Session = {
   startTime?: string;
   status?: string;
   duration?: number;
+  bookings?: any[];
 };
 
 interface Props {
@@ -92,18 +93,16 @@ export default function UserDashboardSessionHistoryPage(_props: Props) {
       setLoading(true);
       setError(null);
       
-      const [upcomingRes, pastRes, reviewsData] = await Promise.all([
-        SessionService.getUpcomingSessions({ role: "mentee", limit: 1000 }),
-        SessionService.getPastSessions({ role: "mentee", limit: 1000 }),
+      const [allRes, reviewsData] = await Promise.all([
+        SessionService.getAllSessions({ role: "mentee", limit: 1000 }),
         ReviewService.getMyReviews()
       ]);
       
-      const upcomingSessions = upcomingRes?.data || [];
-      const pastSessions = pastRes?.data || [];
+      const allSessions = allRes?.data || [];
       
       // Combine and filter duplicates
       const allSessionsMap = new Map<string, Session>();
-      [...upcomingSessions, ...pastSessions].forEach(s => {
+      allSessions.forEach((s: any) => {
         const id = s.sessionId || s._id;
         if (id) allSessionsMap.set(id, s);
       });
@@ -131,10 +130,17 @@ export default function UserDashboardSessionHistoryPage(_props: Props) {
     fetchData();
   };
   
-  // Sort real sessions by actual scheduled/session date and time. Newest first.
-  const historySessions = [...sessions].sort((a, b) => {
-    const ta = new Date(a.startTime || a.scheduledAt || 0).getTime();
-    const tb = new Date(b.startTime || b.scheduledAt || 0).getTime();
+  const historySessions = [...sessions].filter(s => {
+    // Only show completed/cancelled/rescheduled/no_show/refunded in history, or past sessions
+    const status = (s.status || "").toLowerCase();
+    const timeA = s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt || 0;
+    const isPast = new Date(timeA).getTime() < Date.now();
+    return ["completed", "cancelled", "rescheduled", "no_show", "refunded"].includes(status) || isPast;
+  }).sort((a, b) => {
+    const timeA = a.bookings?.[0]?.scheduledAt || a.startTime || a.scheduledAt || 0;
+    const timeB = b.bookings?.[0]?.scheduledAt || b.startTime || b.scheduledAt || 0;
+    const ta = new Date(timeA).getTime();
+    const tb = new Date(timeB).getTime();
     return tb - ta; 
   });
 
@@ -301,12 +307,12 @@ export default function UserDashboardSessionHistoryPage(_props: Props) {
                 <div className="w-full lg:w-[24%] shrink-0 space-y-2 lg:px-4 lg:border-l pt-1 lg:pt-0" style={{ borderColor: COLORS.hairline }}>
                   <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.ink }}>
                     <CalendarClock className="w-3.5 h-3.5 shrink-0" style={{ color: COLORS.muted }} />
-                    <span>{formatDateStr(s.startTime || s.scheduledAt)}</span>
+                    <span>{formatDateStr(s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt)}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.ink }}>
                     <Clock className="w-3.5 h-3.5 shrink-0" style={{ color: COLORS.muted }} />
                     <span>
-                      {formatTimeStr(s.startTime || s.scheduledAt)}
+                      {formatTimeStr(s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt)}
                       {s.duration ? ` (${s.duration} min)` : ""}
                     </span>
                   </div>
