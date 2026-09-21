@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Star, MessageSquare, RefreshCw, AlertCircle, CheckCircle2, Clock, Calendar, ArrowRight } from "lucide-react";
+import { Star, MessageSquare, RefreshCw, AlertCircle, CheckCircle2, Clock, Calendar, ArrowRight, Trash2 } from "lucide-react";
 import UserDashboardReviewModal from "./UserDashboardReviewModal";
 import ReviewService, { MentorReview, ReviewTag, REVIEW_TAGS } from "@/lib/api/review.service";
 import SessionService from "@/lib/api/session.service";
@@ -81,6 +81,8 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
   const [error, setError] = useState<string | null>(null);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [reviewModalSession, setReviewModalSession] = useState<Session | null>(null);
+  const [deleteReviewId, setDeleteReviewId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Sync internal sessions if prop updates
   useEffect(() => {
@@ -96,21 +98,16 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
 
     try {
       const reviewPromises = ReviewService.getMyReviews();
-      let sessionsPromise: Promise<any> | null = null;
-
-      // If propSessions is empty, fetch mentee sessions to populate pending list
-      if (!propSessions || propSessions.length === 0) {
-        sessionsPromise = SessionService.getAllSessions({ role: "mentee", limit: 100 })
-          .then((res: any) => res?.data || [])
-          .catch((err) => {
-            console.error("Failed to load sessions in ReviewsPage:", err);
-            return [];
-          });
-      }
+      const sessionsPromise = SessionService.getAllSessions({ role: "mentee", limit: 100 })
+        .then((res: any) => res?.data || [])
+        .catch((err) => {
+          console.error("Failed to load sessions in ReviewsPage:", err);
+          return [];
+        });
 
       const [reviewsResult, sessionsResult] = await Promise.all([
         reviewPromises,
-        sessionsPromise || Promise.resolve(null),
+        sessionsPromise,
       ]);
 
       setReviews(Array.isArray(reviewsResult) ? reviewsResult : []);
@@ -139,21 +136,13 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
     return map;
   }, [sessions]);
 
-  // Set of session IDs that have already been reviewed
   const reviewedSessionIds = useMemo(() => {
     const set = new Set<string>();
     reviews.forEach((r) => {
       if (r.sessionId) set.add(r.sessionId);
     });
-    // Also include any sessions that already carry a review object
-    sessions.forEach((s) => {
-      if (s.review && (s.review.rating || s.review.menteeReview)) {
-        if (s.sessionId) set.add(s.sessionId);
-        if (s._id) set.add(s._id);
-      }
-    });
     return set;
-  }, [reviews, sessions]);
+  }, [reviews]);
 
   // "Pending Reviews": completed sessions without a submitted review
   const pendingSessions = useMemo(() => {
@@ -195,6 +184,23 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
     // Switch to Reviews Given tab so user sees their submission
     setActiveTab("given");
   }, [reviewModalSession, fetchData]);
+
+  const handleDelete = async (reviewId: string) => {
+    setIsDeleting(true);
+    setError(null);
+    try {
+      await ReviewService.deleteReview(reviewId);
+      setSuccessBanner("Review deleted successfully.");
+      setTimeout(() => setSuccessBanner(null), 6000);
+      setDeleteReviewId(null);
+      fetchData();
+    } catch (err: any) {
+      console.error("Error deleting review:", err);
+      setError(err?.response?.data?.message || err?.message || "Failed to delete review.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fadeIn max-w-5xl pt-2 pb-8">
@@ -350,8 +356,8 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
           ) : (
             givenReviews.map((r, idx) => {
               const matchedSession = sessionMap.get(r.sessionId);
-              const mentorName = matchedSession?.mentorName || "Mentor";
-              const photo = matchedSession?.mentorProfilePhoto;
+              const mentorName = r.mentor?.firstName && r.mentor?.lastName ? `${r.mentor.firstName} ${r.mentor.lastName}` : matchedSession?.mentorName || "Mentor";
+              const photo = r.mentor?.profilePhotoId || matchedSession?.mentorProfilePhoto;
               const sessionTitle = matchedSession?.title || "Mentorship Session";
               const sessionDate = formatDateStr(matchedSession?.startTime || matchedSession?.scheduledAt || r.createdAt);
               const reviewId = r.reviewId || r._id || r.id || `rev-${idx}`;
@@ -403,9 +409,18 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
                       </div>
                     </div>
 
-                    <span className="text-xs text-right shrink-0" style={{ color: COLORS.muted }}>
-                      {formatDateStr(r.createdAt)}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-right shrink-0" style={{ color: COLORS.muted }}>
+                        {formatDateStr(r.createdAt)}
+                      </span>
+                      <button
+                        onClick={() => setDeleteReviewId(reviewId)}
+                        className="p-1.5 rounded-lg transition-colors hover:bg-red-50 text-red-500 hover:text-red-600"
+                        title="Delete Review"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Rating & Review Content */}
@@ -604,6 +619,42 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
           onClose={() => setReviewModalSession(null)}
           onSuccess={handleReviewSuccess}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteReviewId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm animate-fadeIn">
+          <div
+            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl"
+            style={{ border: `1px solid ${COLORS.hairline}` }}
+          >
+            <h3 className="text-lg font-bold mb-2" style={{ color: COLORS.ink }}>
+              Delete Review?
+            </h3>
+            <p className="text-sm mb-6" style={{ color: COLORS.muted }}>
+              Are you sure you want to delete this review? This action cannot be undone, but you will be able to submit a new review for this session.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteReviewId(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl font-semibold text-sm border transition-colors disabled:opacity-50 hover:bg-[#f3ece4]"
+                style={{ borderColor: COLORS.hairline, color: COLORS.ink, backgroundColor: COLORS.wash }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(deleteReviewId)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl text-white font-semibold text-sm transition-opacity disabled:opacity-50 hover:opacity-90 flex items-center gap-2"
+                style={{ backgroundColor: COLORS.danger }}
+              >
+                {isDeleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

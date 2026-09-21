@@ -50,7 +50,6 @@ export default function UserDashboardReviewModal({
   const [selectedTags, setSelectedTags] = useState<ReviewTag[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
 
   const toggleTag = (tag: ReviewTag) => {
     setSelectedTags((prev) =>
@@ -73,8 +72,8 @@ export default function UserDashboardReviewModal({
         comment: comment.trim(),
         tags: selectedTags,
       });
-      setSubmitted(true);
       onSuccess();
+      onClose();
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || "Failed to submit review. Please try again.");
     } finally {
@@ -91,9 +90,9 @@ export default function UserDashboardReviewModal({
         <div className="flex items-start justify-between mb-5">
           <div>
             <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>
-              {submitted ? "Thanks for the feedback!" : "Rate this session"}
+              Rate this session
             </h3>
-            {!submitted && mentorName && (
+            {mentorName && (
               <p className="text-sm mt-0.5" style={{ color: COLORS.muted }}>
                 How was your session with {mentorName}?
               </p>
@@ -107,21 +106,7 @@ export default function UserDashboardReviewModal({
           </button>
         </div>
 
-        {submitted ? (
-          <div className="text-center py-4">
-            <p className="text-sm" style={{ color: COLORS.muted }}>
-              Your review has been submitted and is now visible on the mentor's profile.
-            </p>
-            <button
-              onClick={onClose}
-              className="mt-5 px-5 py-2.5 rounded-xl text-white text-sm font-semibold"
-              style={{ backgroundColor: COLORS.ink }}
-            >
-              Done
-            </button>
-          </div>
-        ) : (
-          <>
+        <>
             {/* Star rating */}
             <div className="flex justify-center gap-1.5 mb-5">
               {[1, 2, 3, 4, 5].map((star) => (
@@ -213,7 +198,6 @@ export default function UserDashboardReviewModal({
               </button>
             </div>
           </>
-        )}
       </div>
     </div>
   );

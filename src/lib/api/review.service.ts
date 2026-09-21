@@ -20,6 +20,11 @@ export interface MentorReview {
     lastName?: string;
     profilePhotoId?: string | null;
   };
+  mentor?: {
+    firstName?: string;
+    lastName?: string;
+    profilePhotoId?: string | null;
+  };
 }
 
 export interface ReviewStats {
@@ -90,6 +95,9 @@ const ReviewService = {
         if (Array.isArray(raw?.reviews)) return raw.reviews as MentorReview[];
         return [] as MentorReview[];
       }),
+
+  deleteReview: (reviewId: string) =>
+    api.delete<{ message: string; success: boolean }>(`/mentorship/reviews/${reviewId}`).then((res) => res.data),
 };
 
 export default ReviewService;
