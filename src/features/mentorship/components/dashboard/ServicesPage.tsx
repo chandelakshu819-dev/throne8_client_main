@@ -279,8 +279,7 @@ export default function ServicesPage({
     setSaveError(null);
 
     try {
-      const scheduledAtISO = new Date(formData.scheduledAt).toISOString();
-
+      const scheduledAtISO = new Date(formData.scheduledAt || Date.now() + 10 * 60 * 1000).toISOString();
       if (isEditMode && editingSession) {
         if (formData.serviceType === "group_session") {
           // updateGroupSessionValidator sirf ye fields accept karta hai
@@ -440,6 +439,10 @@ export default function ServicesPage({
         sessionId: s.sessionId,
         status: s.status,
         bookings,
+        // ✅ NEW: duration API se nahi aa rahi thi cards tak, isliye
+        // "X min" card par kabhi dikhta hi nahi tha (sirf edit modal me
+        // formData.duration alag se set hota tha).
+        duration: s.duration ?? 0,
         // 🔧 FIX: this was never being read from the API response, so the
         // card always fell back to the icon placeholder even when a
         // thumbnail had actually been uploaded and saved.
@@ -464,6 +467,7 @@ export default function ServicesPage({
         status: "local",
         bookings: [],
         thumbnailImage: s.thumbnailImage || s.image || null,
+        duration: (s as any).duration ?? 0,
         isApi: false,
       })),
   ];
@@ -839,12 +843,27 @@ export default function ServicesPage({
                       {service.description || `Professional ${service.name.toLowerCase()} session`}
                     </p>
 
-                    <div className="flex items-center gap-1.5 mb-4">
-                      <Users className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
-                      <span className="text-xs" style={{ color: '#8a7a6a' }}>
-                        {service.sessions} sessions completed
-                      </span>
+                    <div className="flex flex-col gap-1.5 mb-4">
+                     
+                      {/* ✅ NEW: duration ab card par bhi dikhega, pehle
+                          sirf edit modal me hi dikhta tha kyunki card
+                          data me duration field hi missing thi (Fix 1) */}
+                      {(service as any).duration > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
+                          <span className="text-xs" style={{ color: '#8a7a6a' }}>
+                            {(service as any).duration} Minutes
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
+                        <span className="text-xs" style={{ color: '#8a7a6a' }}>
+                          {service.sessions} sessions completed
+                        </span>
+                      </div>
                     </div>
+                    
 
                     <div className="flex justify-between items-center gap-3 pt-4" style={{ borderTop: '1px solid #f0ebe4' }}>
                       <span className="text-lg font-bold whitespace-nowrap" style={{ color: '#7a5c3e' }}>

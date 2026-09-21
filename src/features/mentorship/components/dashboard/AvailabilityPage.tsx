@@ -103,12 +103,26 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
 
       // ── Weekly schedule ────────────────────────────────────
       const ALL_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+      // ✅ NEW: ab har din ek single time-range ki jagah timeRanges[] rakhta
+      // hai, taaki "+" button se ek din me multiple slot-blocks (subah +
+      // shaam) add kiye ja sakein.
       const DEFAULT_WEEK_SCHEDULE = ALL_DAYS.map(day => ({
         day,
         enabled: ["Saturday", "Sunday"].indexOf(day) === -1,
-        startTime: "09:00",
-        endTime: "17:00",
+        timeRanges: [{ startTime: "09:00", endTime: "17:00" }],
       }));
+
+      // ✅ FIX: purane localStorage data me sirf startTime/endTime hota
+      // tha (naya format timeRanges[] use karta hai) — isse purana saved
+      // data load karte waqt crash na ho, auto-migrate karo.
+      const normalizeWeekSchedule = (data: any[]) =>
+        (data || []).map((d: any) => ({
+          day: d.day,
+          enabled: d.enabled,
+          timeRanges: Array.isArray(d.timeRanges) && d.timeRanges.length > 0
+            ? d.timeRanges
+            : [{ startTime: d.startTime || "09:00", endTime: d.endTime || "17:00" }],
+        }));
    
       // Backend se availability.daysAvailable aane par usi se schedule banao
       const buildScheduleFromBackend = () => {
@@ -119,22 +133,21 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
         return ALL_DAYS.map(day => ({
           day,
           enabled: daysAvailable.includes(day.toLowerCase()),
-          startTime: start,
-          endTime: end,
+          timeRanges: [{ startTime: start, endTime: end }],
         }));
       };
    
-     const [weekSchedule, setWeekSchedule] = useState(() => {
-       const fromBackend = buildScheduleFromBackend();
-       if (fromBackend) return fromBackend;
-       if (typeof window === "undefined") return DEFAULT_WEEK_SCHEDULE;
-       try {
-         const saved = localStorage.getItem("mentor_weekSchedule");
-         return saved ? JSON.parse(saved) : DEFAULT_WEEK_SCHEDULE;
-       } catch {
-         return DEFAULT_WEEK_SCHEDULE;
-       }
-     });
+      const [weekSchedule, setWeekSchedule] = useState(() => {
+        const fromBackend = buildScheduleFromBackend();
+        if (fromBackend) return fromBackend;
+        if (typeof window === "undefined") return DEFAULT_WEEK_SCHEDULE;
+        try {
+          const saved = localStorage.getItem("mentor_weekSchedule");
+          return saved ? normalizeWeekSchedule(JSON.parse(saved)) : DEFAULT_WEEK_SCHEDULE;
+        } catch {
+          return DEFAULT_WEEK_SCHEDULE;
+        }
+      });
    
      // Jab mentorData baad me (async) load ho, tab bhi backend se sync kar do
      useEffect(() => {
@@ -152,20 +165,20 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
        }
    
        if (!mentorData?.mentorId) return;
-   
        const timer = setTimeout(() => {
-         const enabledDays = weekSchedule.filter((d: any) => d.enabled).map((d: any) => d.day.toLowerCase());
-         const base = weekSchedule.find((d: any) => d.enabled) || weekSchedule[0];
-   
-         import("@/lib/api/mentorship.service").then(({ default: MentorService }) => {
-           MentorService.updateMentorAvailability(mentorData.mentorId, {
-             timezone,
-             daysAvailable: enabledDays,
-             preferredHours: { start: base.startTime, end: base.endTime },
-             bufferBetweenSessions: bufferTime,
-           }).catch((err: any) => console.error("Failed to persist weekly pattern:", err.message));
-         });
-       }, 800);
+        const enabledDays = weekSchedule.filter((d: any) => d.enabled).map((d: any) => d.day.toLowerCase());
+        const base = weekSchedule.find((d: any) => d.enabled) || weekSchedule[0];
+        const baseRange = base?.timeRanges?.[0] || { startTime: "09:00", endTime: "17:00" };
+  
+        import("@/lib/api/mentorship.service").then(({ default: MentorService }) => {
+          MentorService.updateMentorAvailability(mentorData.mentorId, {
+            timezone,
+            daysAvailable: enabledDays,
+            preferredHours: { start: baseRange.startTime, end: baseRange.endTime },
+            bufferBetweenSessions: bufferTime,
+          }).catch((err: any) => console.error("Failed to persist weekly pattern:", err.message));
+        });
+      }, 800);
    
        return () => clearTimeout(timer);
        // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,7 +257,12 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
   const copyMondayToAll = () => {
     const mon = weekSchedule.find(d => d.day === "Monday");
     if (!mon) return;
-    setWeekSchedule(prev => prev.map(d => ({ ...d, startTime: mon.startTime, endTime: mon.endTime })));
+    // ✅ FIX: ab poore timeRanges[] (multiple blocks bhi) copy hote hain,
+    // sirf ek startTime/endTime nahi — deep clone taaki reference shared na ho.
+    setWeekSchedule(prev => prev.map(d => ({
+      ...d,
+      timeRanges: mon.timeRanges.map((r: any) => ({ ...r })),
+    })));
   };
 
   const addBlockedDate = async () => {
@@ -382,7 +400,11 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
           setSaveMessage({ type: "error", text: `${dayName} is not enabled in your schedule.` });
           return;
         }
-        const slots = generateSlots(daySched.startTime, daySched.endTime, slotDuration, bufferTime);
+        // ✅ FIX: ab din ke saare timeRanges (subah + shaam wagerah) se
+        // slots generate karke ek hi list me jode jaate hain.
+        const slots = (daySched.timeRanges || []).flatMap((r: any) =>
+          generateSlots(r.startTime, r.endTime, slotDuration, bufferTime)
+        );
         if (slots.length === 0) {
           setSaveMessage({ type: "error", text: "No slots generated. Check time range and duration." });
           return;
@@ -392,31 +414,107 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
         const m = String(currentDate.getMonth() + 1).padStart(2, "0");
         const dd = String(selectedDate).padStart(2, "0");
 
-        await AvailabilityService.createAvailability({
-          mentorId: mentorData.mentorId,
-          date: `${y}-${m}-${dd}`,
-          slots, timezone, isRecurring: false,
-        });
-        setSaveMessage({ type: "success", text: `Created for ${date.toDateString()} (${slots.length} slots)` });
+        // ✅ FIX: pehle ye hamesha createAvailability() call karta tha —
+        // agar us date ke liye availability PEHLE SE DB me thi (jaisa
+        // Tuesday 22 September ke saath ho raha tha, jisme purane 18
+        // slots the), to backend ConflictError deta tha aur Weekly
+        // Schedule me set kiya gaya naya time kabhi save hi nahi hota
+        // tha — Saved Availability list purana data hi dikhati rehti thi.
+        // Ab pehle check karte hain ki us date ka record existingAvailability
+        // me already hai ya nahi:
+        //   - hai → updateAvailability(availabilityId, { slots }) — replace
+        //   - nahi → createAvailability(...) — naya banao
+        const existingRecord = existingAvailability.find(
+          (rec) => rec.date.substring(0, 10) === `${y}-${m}-${dd}`
+        );
+
+        if (existingRecord) {
+          await AvailabilityService.updateAvailability(existingRecord.availabilityId, { slots });
+          setSaveMessage({ type: "success", text: `Updated for ${date.toDateString()} (${slots.length} slots)` });
+        } else {
+          await AvailabilityService.createAvailability({
+            mentorId: mentorData.mentorId,
+            date: `${y}-${m}-${dd}`,
+            slots, timezone, isRecurring: false,
+          });
+          setSaveMessage({ type: "success", text: `Created for ${date.toDateString()} (${slots.length} slots)` });
+        }
       } else {
-        const enabledDays = weekSchedule.filter(d => d.enabled).map(d => d.day.toLowerCase());
-        if (enabledDays.length === 0) {
+        const enabledDaySchedules = weekSchedule.filter(d => d.enabled);
+        if (enabledDaySchedules.length === 0) {
           setSaveMessage({ type: "error", text: "Enable at least one day." });
           return;
         }
         const y = currentDate.getFullYear();
         const m = String(currentDate.getMonth() + 1).padStart(2, "0");
         const lastDay = new Date(y, currentDate.getMonth() + 1, 0).getDate();
-        const startDate = `${y}-${m}-01`;
-        const endDate = `${y}-${m}-${String(lastDay).padStart(2, "0")}`;
-        const base = weekSchedule.find(d => d.enabled)!;
-        const result = await AvailabilityService.bulkCreateAvailability({
-          mentorId: mentorData.mentorId,
-          dateRange: { startDate, endDate },
-          slotConfig: { startTime: base.startTime, endTime: base.endTime, slotDuration, bufferBetween: bufferTime },
-          daysOfWeek: enabledDays, timezone,
+
+                // ✅ FIX: purana bulkCreateAvailability API sirf 1 time-range/day
+        // support karta tha, isliye ek din ke multiple ranges (subah +
+        // shaam) "Save Full Month" me kabhi save hi nahi hote the — sirf
+        // pehla range jaata tha. Ab poore mahine ki har date ke liye us
+        // din ke SAARE ranges se slots generate karke alag-alag
+        // create/update call hoti hai (single-day mode ki tarah).
+        //
+        // ✅ FIX #2: agar us date ke liye availability PEHLE SE DB me hai
+        // (jaise purane 09:00-17:00 wale records), to backend ka
+        // createAvailability() ConflictError deta hai aur silently fail ho
+        // jaata tha — Weekly Schedule me jo naya time set kiya wo kabhi
+        // save hi nahi hota tha. Ab pehle check karte hain ki us date ka
+        // record already existingAvailability me hai ya nahi:
+        //   - hai → updateAvailability(availabilityId, { slots }) — replace
+        //   - nahi → createAvailability(...) — naya banao
+        const dayNameToSchedule = new Map(enabledDaySchedules.map((d: any) => [d.day, d]));
+
+        // date (day-of-month) -> existing record, taaki O(1) me pata chale
+        // ki us din ka data already DB me hai ya nahi
+        const existingRecordByDay = new Map<number, AvailabilityRecord>();
+        existingAvailability.forEach((rec) => {
+          const day = parseInt(rec.date.substring(8, 10), 10);
+          existingRecordByDay.set(day, rec);
         });
-        setSaveMessage({ type: "success", text: `Bulk: ${result.data?.created ?? 0} created, ${result.data?.failed ?? 0} failed` });
+
+        const tasks: Promise<any>[] = [];
+        let datesQueued = 0;
+
+        for (let day = 1; day <= lastDay; day++) {
+          const dateObj = new Date(y, currentDate.getMonth(), day);
+          const weekday = dateObj.toLocaleDateString("en-US", { weekday: "long" });
+          const sched: any = dayNameToSchedule.get(weekday);
+          if (!sched) continue;
+
+          const slots = (sched.timeRanges || []).flatMap((r: any) =>
+            generateSlots(r.startTime, r.endTime, slotDuration, bufferTime)
+          );
+          if (slots.length === 0) continue;
+
+          datesQueued++;
+          const existingRecord = existingRecordByDay.get(day);
+
+          if (existingRecord) {
+            // Date already saved — replace its slots instead of creating.
+            tasks.push(
+              AvailabilityService.updateAvailability(existingRecord.availabilityId, { slots })
+                .catch((err: any) => ({ __failed: true, message: err.message }))
+            );
+          } else {
+            const dd = String(day).padStart(2, "0");
+            tasks.push(
+              AvailabilityService.createAvailability({
+                mentorId: mentorData.mentorId,
+                date: `${y}-${m}-${dd}`,
+                slots, timezone, isRecurring: false,
+              }).catch((err: any) => ({ __failed: true, message: err.message }))
+            );
+          }
+        }
+
+        const results = await Promise.all(tasks);
+        const failed = results.filter((r: any) => r?.__failed).length;
+        setSaveMessage({
+          type: failed > 0 ? "error" : "success",
+          text: `Bulk: ${datesQueued - failed} saved, ${failed} failed`,
+        });
       }
       await fetchMonthAvailability();
       await fetchStats();
@@ -802,7 +900,7 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                     <button
                       key={d.day}
                       type="button"
-                      title={`${d.day}${d.enabled ? ` · ${d.startTime}–${d.endTime}` : ' · Off'}${isSelectedDay ? ` · Selected on calendar (${selectedDate})` : ''}`}
+                      title={`${d.day}${d.enabled ? ` · ${d.timeRanges?.[0]?.startTime}–${d.timeRanges?.[0]?.endTime}${d.timeRanges?.length > 1 ? ` +${d.timeRanges.length - 1} more` : ''}` : ' · Off'}${isSelectedDay ? ` · Selected on calendar (${selectedDate})` : ''}`}
                       onClick={() =>
                         setWeekSchedule(prev =>
                           prev.map((dd, i) => (i === idx ? { ...dd, enabled: !dd.enabled } : dd))
@@ -824,9 +922,12 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                 })}
               </div>
             </div>
+                        {/* ✅ FIX: max-h + overflow-y-auto hata diya — ab list static
+                hai, page ke saath hi naturally expand hoti hai, koi
+                internal scrollbar nahi. */}
             <div
               ref={scheduleListRef}
-              className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1"
+              className="space-y-2.5 pr-1"
             >
               {weekSchedule.map((item, idx) => {
                 // ✅ FIX: calendar se jo date select hui hai uska weekday —
@@ -837,7 +938,7 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                   <div
                   key={item.day}
                   ref={(el) => { dayRowRefs.current[item.day] = el; }}
-                  className="flex items-center justify-between p-4 rounded-xl transition-all"
+                  className="p-4 rounded-xl transition-all"
                   style={{
                     border: isSelectedDay ? '2px solid #4a3728' : '1px solid #e0d8cf',
                     backgroundColor: isSelectedDay ? '#f3ece4' : item.enabled ? '#fbf7f3' : '#fafafa',
@@ -845,19 +946,8 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                     boxShadow: isSelectedDay ? '0 0 0 3px rgba(74,55,40,0.12)' : 'none',
                   }}
                 >
-                                          <span className="text-sm font-bold w-24" style={{ color: '#4a3728' }}>{item.day}</span>
-                  <div className="flex items-center gap-3 flex-1 justify-end">
-                  <TimeInput
-                      value={item.startTime}
-                      disabled={!item.enabled}
-                      onChange={(v) => setWeekSchedule(prev => prev.map((d, i) => i === idx ? { ...d, startTime: v } : d))}
-                    />
-                    <span style={{ color: '#8a7a6a' }} className="text-xs font-semibold">to</span>
-                    <TimeInput
-                      value={item.endTime}
-                      disabled={!item.enabled}
-                      onChange={(v) => setWeekSchedule(prev => prev.map((d, i) => i === idx ? { ...d, endTime: v } : d))}
-                    />
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold w-24" style={{ color: '#4a3728' }}>{item.day}</span>
                     {/* Single ON/OFF toggle — ye hi ek button hai, upar wale strip se connected */}
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -870,154 +960,82 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                         style={{ backgroundColor: item.enabled ? '#4a3728' : '#d8cec4' }}
                       />
                     </label>
-                    </div>
+                  </div>
+
+                  {/* ✅ NEW: ab har din multiple time-ranges rakh sakta hai —
+                      "+" se naya range (e.g. subah + shaam) add karo,
+                      "x" se extra range hatao (pehla range hamesha rahega,
+                      wo delete nahi hota). */}
+                  <div className="flex flex-col gap-2 mt-3">
+                    {item.timeRanges.map((range: any, rIdx: number) => (
+                      <div key={rIdx} className="flex items-center gap-2 justify-end">
+                        <TimeInput
+                          value={range.startTime}
+                          disabled={!item.enabled}
+                          onChange={(v) => setWeekSchedule(prev => prev.map((d, i) =>
+                            i === idx
+                              ? { ...d, timeRanges: d.timeRanges.map((r: any, ri: number) => ri === rIdx ? { ...r, startTime: v } : r) }
+                              : d
+                          ))}
+                        />
+                        <span style={{ color: '#8a7a6a' }} className="text-xs font-semibold">to</span>
+                        <TimeInput
+                          value={range.endTime}
+                          disabled={!item.enabled}
+                          onChange={(v) => setWeekSchedule(prev => prev.map((d, i) =>
+                            i === idx
+                              ? { ...d, timeRanges: d.timeRanges.map((r: any, ri: number) => ri === rIdx ? { ...r, endTime: v } : r) }
+                              : d
+                          ))}
+                        />
+
+                        {/* Remove — sirf tab dikhega jab is din 1 se zyada range ho */}
+                        {item.timeRanges.length > 1 && (
+                          <button
+                            type="button"
+                            disabled={!item.enabled}
+                            onClick={() => setWeekSchedule(prev => prev.map((d, i) =>
+                              i === idx
+                                ? { ...d, timeRanges: d.timeRanges.filter((_: any, ri: number) => ri !== rIdx) }
+                                : d
+                            ))}
+                            className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-[#fee2e2] disabled:opacity-40 transition-colors"
+                            title="Remove this time range"
+                          >
+                            <X className="w-3.5 h-3.5" style={{ color: '#dc2626' }} />
+                          </button>
+                        )}
+
+                        {/* Add — sirf last range ke saath dikhta hai, naya
+                            time-block is din ke liye jodta hai */}
+                        {rIdx === item.timeRanges.length - 1 && (
+                          <button
+                            type="button"
+                            disabled={!item.enabled}
+                            onClick={() => setWeekSchedule(prev => prev.map((d, i) => {
+                              if (i !== idx) return d;
+                              const lastRange = d.timeRanges[d.timeRanges.length - 1];
+                              const start = lastRange?.endTime || "09:00";
+                              return { ...d, timeRanges: [...d.timeRanges, { startTime: start, endTime: start }] };
+                            }))}
+                            className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-[#f3ece4] disabled:opacity-40 transition-colors"
+                            style={{ border: '1px solid #e0d8cf' }}
+                            title="Add another time range for this day"
+                          >
+                            <Plus className="w-3.5 h-3.5" style={{ color: '#7a5c3e' }} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 );
               })}
             </div>
           </div>
-
-          {/* Existing Availability List */}
-          <div className="bg-white p-6 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold" style={{ color: '#4a3728' }}>
-                Saved Availability — {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-              </h3>
-              {isLoadingData && (
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: '#fbf7f3', color: '#7a5c3e' }}>
-                  Loading...
-                </span>
-              )}
-            </div>
-
-            {existingAvailability.length === 0 && !isLoadingData ? (
-              <p className="text-center py-8 text-sm" style={{ color: '#8a7a6a' }}>
-                No availability set for this month yet.
-              </p>
-            ) : (
-              <div className="space-y-2.5">
-                {existingAvailability.map(record => (
-                  <div key={record.availabilityId} className="p-4 rounded-xl" style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3' }}>
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <p className="text-sm font-bold" style={{ color: '#4a3728' }}>
-                          {(() => {
-                            const dateStr = record.date.substring(0, 10);
-                            const [year, month, day] = dateStr.split("-").map(Number);
-                            return new Date(year, month - 1, day).toLocaleDateString("en-IN", {
-                              weekday: "long", day: "numeric", month: "long"
-                            });
-                          })()}
-                        </p>
-                        <p className="text-xs mt-0.5" style={{ color: '#8a7a6a' }}>
-                          {record.slots.length} slots · {record.timezone}
-                        </p>
-                      </div>
-                      <div className="flex gap-1.5">
-                        {editingId === record.availabilityId ? (
-                          <>
-                            <button
-                              onClick={() => handleUpdate(record.availabilityId)}
-                              className="px-3 py-1.5 rounded-lg text-white text-xs font-semibold flex items-center gap-1"
-                              style={{ backgroundColor: '#15803d' }}
-                            >
-                              <Check className="w-3.5 h-3.5" /> Save
-                            </button>
-                            <button
-                              onClick={cancelEdit}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1"
-                              style={{ backgroundColor: '#fff', color: '#7a5c3e', border: '1px solid #e0d8cf' }}
-                            >
-                              <X className="w-3.5 h-3.5" /> Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => startEdit(record)}
-                              className="p-2 rounded-lg transition-colors hover:bg-white"
-                              style={{ border: '1px solid #e0d8cf' }}
-                              title="Edit slots"
-                            >
-                              <Pencil className="w-3.5 h-3.5" style={{ color: '#7a5c3e' }} />
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteId(record.availabilityId)}
-                              disabled={deletingId === record.availabilityId}
-                              className="p-2 rounded-lg transition-colors hover:bg-white disabled:opacity-50"
-                              style={{ border: '1px solid #e0d8cf' }}
-                              title="Delete"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" style={{ color: '#dc2626' }} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {editingId === record.availabilityId ? (
-                      <div className="space-y-2">
-                        {editSlots.map((slot, si) => (
-                          <div key={si} className="flex items-center gap-2.5">
-                                                     <TimeInput
-                              value={slot.startTime}
-                              onChange={(v) => setEditSlots(prev => prev.map((s, i) => i === si ? { ...s, startTime: v } : s))}
-                            />
-                            <span className="text-sm" style={{ color: '#8a7a6a' }}>→</span>
-                            <TimeInput
-                              value={slot.endTime}
-                              onChange={(v) => setEditSlots(prev => prev.map((s, i) => i === si ? { ...s, endTime: v } : s))}
-                            />
-                            <button onClick={() => setEditSlots(prev => prev.filter((_, i) => i !== si))}>
-                              <X className="w-3.5 h-3.5" style={{ color: '#dc2626' }} />
-                            </button>
-                          </div>
-                        ))}
-                                               <button
-                          onClick={() => setEditSlots(prev => {
-                            // Naya slot last slot ke endTime se shuru hota hai
-                            // (fixed 09:00 se nahi) — isse accidental duplicate
-                            // ya overlapping slot add hone ka chance kam ho jaata hai.
-                            const toHHMM = (mins: number) =>
-                              `${String(Math.floor((mins % 1440) / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
-                            const last = prev[prev.length - 1];
-                            if (!last) return [...prev, { startTime: "09:00", endTime: "09:30" }];
-                            const [h, m] = last.endTime.split(":").map(Number);
-                            const start = h * 60 + m;
-                            return [...prev, { startTime: toHHMM(start), endTime: toHHMM(start + 30) }];
-                          })}
-                          className="text-xs font-semibold flex items-center gap-1 mt-1 hover:underline"
-                          style={{ color: '#7a5c3e' }}
-                        >
-                          <Plus className="w-3 h-3" /> Add Slot
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {record.slots.map((slot, si) => (
-                          <span
-                            key={si}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold"
-                            style={{
-                              backgroundColor: slot.isBooked ? '#fef3c7' : slot.isBlocked ? '#fee2e2' : '#dbeafe',
-                              color: slot.isBooked ? '#b45309' : slot.isBlocked ? '#dc2626' : '#1d4ed8',
-                            }}
-                          >
-                            {slot.startTime}–{slot.endTime}
-                            {slot.isBooked && <Lock className="w-3 h-3" />}
-                            {slot.isBlocked && <Ban className="w-3 h-3" />}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
-        </div>
 
-        {/* ── Right Section ──────────────────────────────── */}
+{/* ── Right Section ──────────────────────────────── */}
         <div className="lg:col-span-1 space-y-5">
 
           {/* Calendar */}

@@ -285,24 +285,7 @@ export default function ServiceModal({
                         </div>
                     </div>
 
-                    {/* Scheduled Date & Time */}
-                    <div>
-                        <FieldLabel icon={Clock}>Schedule Date & Time</FieldLabel>
-                        <input
-                            type="datetime-local"
-                            min={toLocalDatetimeString(new Date(Date.now() + 10 * 60 * 1000))}
-
-                            className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
-                            style={inputStyle(fieldErrors?.scheduledAt)}
-                            value={formData?.scheduledAt || ''}
-                            onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
-                            disabled={isSaving}
-                        />
-                        {fieldErrors?.scheduledAt && (
-                            <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.scheduledAt}</p>
-                        )}
-                    </div>
-
+    
                 
 
                     {/* Description */}

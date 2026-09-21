@@ -181,7 +181,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                         )}
 
                         {selectedDate && !noAvailability && daySlots.length > 0 && (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "8px", marginBottom: "24px" }}>
+                       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px", marginBottom: "24px" }}>
                                 {daySlots.map((slot) => {
                                     const time = `${slot.startTime} - ${slot.endTime}`;
                                     const isDisabled = slot.isBooked || slot.isBlocked;
@@ -214,8 +214,8 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                                                 transition: "all 0.2s",
                                             }}
                                         >
-                                            {time}
-                                        </button>
+                                                                                     {slot.startTime}
+                                                                                     </button>
                                     );
                                 })}
                             </div>
