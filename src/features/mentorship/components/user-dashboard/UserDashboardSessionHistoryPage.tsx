@@ -93,7 +93,7 @@ export default function UserDashboardSessionHistoryPage(_props: Props) {
       setError(null);
       
       const [sessionsRes, reviewsData] = await Promise.all([
-        SessionService.getAllSessions({ role: "mentee", limit: 100 }),
+        SessionService.getAllSessions({ role: "mentee", limit: 1000 }),
         ReviewService.getMyReviews()
       ]);
       
@@ -120,17 +120,9 @@ export default function UserDashboardSessionHistoryPage(_props: Props) {
   const handleRefresh = () => {
     fetchData();
   };
-
-  const now = Date.now();
   
-  // Filter history sessions
-  const historySessions = sessions.filter((s) => {
-    const status = (s.status || "").toUpperCase();
-    const t = new Date(s.startTime || s.scheduledAt || 0).getTime();
-    const isPast = t < now && t > 0;
-    
-    return ["COMPLETED", "DONE", "CANCELLED", "REJECTED"].includes(status) || (isPast && !["PENDING", "CONFIRMED"].includes(status));
-  }).sort((a, b) => {
+  // Sort real sessions by actual scheduled/session date and time. Newest first.
+  const historySessions = [...sessions].sort((a, b) => {
     const ta = new Date(a.startTime || a.scheduledAt || 0).getTime();
     const tb = new Date(b.startTime || b.scheduledAt || 0).getTime();
     return tb - ta; 
