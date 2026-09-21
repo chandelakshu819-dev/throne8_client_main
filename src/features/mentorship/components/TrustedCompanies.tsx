@@ -43,7 +43,7 @@ export default function TrustedCompanies({
   };
 
   return (
-    <section className="py-16 sm:py-20 md:py-24 bg-[#FAF9F6] overflow-hidden border-y border-[#ece7e2]">
+    <section className="py-16 sm:py-20 md:py-24 bg-[#f7f1e6] overflow-hidden border-y border-[#ece7e2]">
       {/* Header matching reference hierarchy */}
       <div className="text-center mb-10 sm:mb-14 px-4">
         <span className="text-[11px] sm:text-xs font-bold uppercase tracking-[4px] sm:tracking-[5px] text-[#8B7355] block mb-2.5">

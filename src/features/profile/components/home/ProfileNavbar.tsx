@@ -107,11 +107,13 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
             case 'Notifications':
                 router.push(`/notifications/${currentUserId}`);
                 break;
-            case 'Mentorship':
+           case 'Mentorship':
                 if (userRole === 'admin') {
                     router.push('/mentorship/admin');
-                } else {
+                } else if (currentUserId && currentUserId !== 'undefined') {
                     router.push(`/mentorship/${currentUserId}`);
+                } else {
+                    router.push('/mentorship');
                 }
                 break;
             default:

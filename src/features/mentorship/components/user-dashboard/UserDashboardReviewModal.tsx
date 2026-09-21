@@ -76,9 +76,7 @@ export default function UserDashboardReviewModal({
       setSubmitted(true);
       onSuccess();
     } catch (err: any) {
-      // backend already gives specific messages like "Review already
-      // submitted for this session" or "Can only review completed sessions"
-      setError(err?.response?.data?.message || err?.message || "Review submit nahi ho paya. Try again.");
+      setError(err?.response?.data?.message || err?.message || "Failed to submit review. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

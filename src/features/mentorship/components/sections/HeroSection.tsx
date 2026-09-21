@@ -422,7 +422,7 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
                     h-14
                     sm:w-16
                     sm:h-16
-                    rounded-2xl
+                    rounded-full
                     overflow-hidden
                     border-2
                     border-[#c4963a]
