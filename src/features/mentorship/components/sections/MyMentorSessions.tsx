@@ -6,6 +6,9 @@ import QueryService, { QueryItem } from "@/lib/api/query.service";
 import WriteReviewModal from "@/features/mentorship/components/WriteReviewModal";
 import MentorService from "@/lib/api/mentorship.service";
 import { useRouter } from "next/navigation";
+import { useSocket } from "@/core/realtime/useSocket";
+import { useRingtone } from "@/shared/hooks/useRingtone";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 
 
 
@@ -301,6 +304,20 @@ function OneOnOneTab({ onReminder, toast }: OneOnOneTabProps) {
     const [reviewedIds, setReviewedIds] = useState<Record<string, boolean>>({});
     const [remindersSet, setRemindersSet] = useState<Record<string, boolean>>({});
 
+    // ✅ NEW: live session + realtime
+    const router = useRouter();
+    const { user } = useAuth();
+    const { sessionStarted, sessionEnded, sessionReminder } = useSocket();
+    const { start: startRing, stop: stopRing } = useRingtone({ volume: 0.7 });
+    const [liveSession, setLiveSession] = useState<{
+        sessionId: string;
+        bookingId: string;
+        roomId: string;
+        title: string;
+    } | null>(null);
+
+
+
     const loadSessions = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -321,6 +338,66 @@ function OneOnOneTab({ onReminder, toast }: OneOnOneTabProps) {
     useEffect(() => {
         loadSessions();
     }, [loadSessions]);
+
+    // ✅ Page open hone par: agar session pehle se live hai (socket event miss ho gaya) to bhi banner dikhao
+    useEffect(() => {
+        if (!user?.userId) return;
+        SessionService.getAllSessions({ role: "mentee", status: "in_progress", limit: 5 })
+            .then((res) => {
+                const list = (res?.data ?? []) as any[];
+                for (const s of list) {
+                    const b = (s.bookings ?? []).find(
+                        (x: any) => x.menteeId === user.userId && x.status === "in_progress"
+                    );
+                    if (b) {
+                        setLiveSession({
+                            sessionId: s.sessionId,
+                            bookingId: String(b._id),
+                            roomId: String(b._id),
+                            title: s.title,
+                        });
+                        break;
+                    }
+                }
+            })
+            .catch(() => { /* non-critical */ });
+    }, [user?.userId]);
+
+    // ✅ Mentor ne session start kiya → banner + ring
+    useEffect(() => {
+        if (!sessionStarted) return;
+        setLiveSession({
+            sessionId: sessionStarted.sessionId,
+            bookingId: sessionStarted.bookingId,
+            roomId: sessionStarted.roomId || sessionStarted.bookingId,
+            title: sessionStarted.title,
+        });
+        startRing('incoming');
+        const t = setTimeout(stopRing, 30000);
+        loadSessions();
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessionStarted]);
+
+    // ✅ Session end → banner hatao, ring band, list refresh (bina page refresh ke)
+    useEffect(() => {
+        if (!sessionEnded) return;
+        stopRing();
+        setLiveSession((prev) => (prev && prev.sessionId === sessionEnded.sessionId ? null : prev));
+        loadSessions();
+        toast("Session complete ho gaya. Review dena mat bhoolna!");
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessionEnded]);
+
+    // ✅ Reminder (15 / 5 min pehle)
+    useEffect(() => {
+        if (!sessionReminder) return;
+        toast(`"${sessionReminder.title ?? "Session"}" ${sessionReminder.minutesLeft} min mein start hone wala hai.`);
+        loadSessions();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessionReminder]);
+
+
 
     const handleReviewSuccess = () => {
         if (reviewTarget) {
@@ -347,6 +424,42 @@ function OneOnOneTab({ onReminder, toast }: OneOnOneTabProps) {
 
     return (
         <div>
+                        {/* Live session banner */}
+                        {liveSession && (
+                <div
+                    className="rounded-2xl border p-5 mb-6 flex flex-wrap items-center justify-between gap-4"
+                    style={{ background: "rgba(107,143,110,0.10)", borderColor: "rgba(107,143,110,0.35)" }}
+                >
+                    <div className="flex items-center gap-3">
+                        <span className="relative flex h-3 w-3">
+                            <span
+                                className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                                style={{ background: C.success }}
+                            />
+                            <span className="relative inline-flex rounded-full h-3 w-3" style={{ background: C.success }} />
+                        </span>
+                        <div>
+                            <div className="text-sm font-bold" style={{ color: C.primary }}>Session live hai</div>
+                            <div className="text-xs" style={{ color: C.muted }}>
+                                {liveSession.title} - mentor aapka wait kar rahe hain
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => {
+                            stopRing();
+                            router.push(
+                                `/mentorship/mentor-session?sessionId=${encodeURIComponent(liveSession.sessionId)}&roomId=${encodeURIComponent(liveSession.roomId)}&bookingId=${encodeURIComponent(liveSession.bookingId)}`
+                            );
+                        }}
+                        className="px-5 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+                        style={{ background: C.success }}
+                    >
+                        Join Now
+                    </button>
+                </div>
+            )}
+
             {/* Upcoming Timeline */}
             <SectionTitle>Upcoming Sessions</SectionTitle>
             {upcoming.length === 0 ? (

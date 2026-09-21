@@ -37,6 +37,13 @@ import { getSocket } from '@/core/realtime/socket.client';
 export type ConnectionQuality = 'excellent' | 'good' | 'poor' | 'disconnected';
 export type RoomMode = 'p2p' | 'sfu';
 
+export interface RoomEndedInfo {
+  sessionId?: string;
+  bookingId?: string;
+  endedAt?: string;
+  endedBy?: string;
+}
+
 export interface RemotePeer {
   socketId: string;
   userId: string;
@@ -224,6 +231,7 @@ export function useLiveRoom({
   const [isConnecting, setIsConnecting] = useState(false);
   const [roomMode, setRoomMode] = useState<RoomMode>('p2p');
   const [error, setError] = useState<string | null>(null);
+  const [roomEnded, setRoomEnded] = useState<RoomEndedInfo | null>(null);
 
   // ── Peer state helpers ────────────────────────────────────
   const updatePeer = useCallback(
@@ -734,8 +742,12 @@ const toggleMic = useCallback(async () => {
 
 // REPLACE WITH:
   const joinRoom = useCallback(async (withCamera = true, withMic = true) => {
+
     console.log('[LiveRoom] joinRoom called', { roomId, userId, userName });
+    setRoomEnded(null); // naye join pe purana "ended" state reset
     
+    
+
     // Guard: roomId empty hone par join mat karo
     if (!roomId) {
       console.error('[LiveRoom] roomId is empty, cannot join');
@@ -1033,7 +1045,20 @@ const toggleMic = useCallback(async () => {
       }
     };
 
-    socket.on('user-joined-room', handlePeerAnnounced);
+        // ── Mentor ne session end kiya → sabko room se nikalo ──
+        const handleSessionEnded = (payload: RoomEndedInfo) => {
+          if (!isMounted.current) return;
+          // Sirf apni room/session ka event process karo
+          const ids = [payload?.sessionId, payload?.bookingId].filter(Boolean);
+          if (ids.length > 0 && !ids.includes(roomId)) return;
+    
+          leaveRoom();
+          setRoomEnded(payload ?? {});
+        };
+    
+        socket.on('user-joined-room', handlePeerAnnounced);
+        socket.on('session:ended', handleSessionEnded);
+        socket.on('live-room-ended', handleSessionEnded);
     socket.on('webrtc-offer-received', handleOffer);
     socket.on('webrtc-answer-received', handleAnswer);
     socket.on('webrtc-ice-candidate-received', handleIceCandidate);
@@ -1044,6 +1069,8 @@ const toggleMic = useCallback(async () => {
 
     return () => {
       socket.off('user-joined-room', handlePeerAnnounced);
+      socket.off('session:ended', handleSessionEnded);
+      socket.off('live-room-ended', handleSessionEnded);
       socket.off('webrtc-offer-received', handleOffer);
       socket.off('webrtc-answer-received', handleAnswer);
       socket.off('webrtc-ice-candidate-received', handleIceCandidate);
@@ -1054,6 +1081,8 @@ const toggleMic = useCallback(async () => {
     };
   }, [
     roomId,
+    userId,
+    leaveRoom,
     createPeerConnection,
     removePeer,
     onPeerJoined,
@@ -1095,6 +1124,7 @@ const toggleMic = useCallback(async () => {
     isConnecting,
     roomMode,
     error,
+    roomEnded,
     activeSpeakers,
 
     // Actions

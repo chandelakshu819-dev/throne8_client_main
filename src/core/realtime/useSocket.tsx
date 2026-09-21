@@ -22,6 +22,24 @@ export interface SessionStartedEvent {
     startedAt: string;
     scheduledAt: string;
     meetingUrl: string | null;
+    roomId?: string;
+}
+
+export interface SessionEndedEvent {
+    sessionId: string;
+    bookingId?: string;
+    endedAt: string;
+    endedBy?: string;
+    status?: string; // e.g. 'COMPLETED'
+}
+
+export interface SessionReminderEvent {
+    sessionId: string;
+    bookingId?: string;
+    title?: string;
+    mentorName?: string;
+    scheduledAt: string;
+    minutesLeft: number;
 }
 
 export function useSocket() {
@@ -34,6 +52,10 @@ export function useSocket() {
     const [unreadCount, setUnreadCount] = useState(0);
     const [latestNotification, setLatestNotification] = useState<RealtimeNotification | null>(null);
     const [sessionStarted, setSessionStarted] = useState<SessionStartedEvent | null>(null);
+    const [sessionEnded, setSessionEnded] = useState<SessionEndedEvent | null>(null);
+    const [sessionReminder, setSessionReminder] = useState<SessionReminderEvent | null>(null);
+
+
 
     useEffect(() => {
         if (!TokenStorage.isAuthenticated()) {
@@ -45,52 +67,95 @@ export function useSocket() {
             const socketInstance = initializeSocket();
             setSocket(socketInstance);
 
-            socketInstance.on('connect', () => {
+            // ── Named handlers so cleanup only removes THIS hook's own
+            // listener, not every listener registered on the shared/singleton
+            // socket by other components also calling useSocket(). Calling
+            // `.off('eventName')` with no function reference wipes out ALL
+            // listeners for that event across the whole app — this was
+            // silently killing other mounted components' listeners whenever
+            // any single instance of this hook unmounted (e.g. on navigation).
+            const handleConnect = () => {
                 setIsConnected(true);
                 console.log('✅ [useSocket] Connected');
-                // Ask the server for the current unread count right away —
-                // backend's notificationHandler already answers this event.
                 socketInstance.emit('notification:get:unread:count');
-            });
+            };
 
-            socketInstance.on('disconnect', () => {
+            const handleDisconnect = () => {
                 setIsConnected(false);
                 console.log('❌ [useSocket] Disconnected');
-            });
+            };
 
-            // ✅ NEW: fired by Mentorship + global notification services alike
-            // (booking requests, session started/confirmed, posts, follows, etc.)
-            socketInstance.on('notification:new', (payload: RealtimeNotification) => {
+            const handleNotificationNew = (payload: RealtimeNotification) => {
                 console.log('🔔 [useSocket] New notification:', payload);
                 setLatestNotification(payload);
                 setUnreadCount((prev) => prev + 1);
-            });
+            };
 
-                       // ✅ NEW: server pushes the authoritative count after any read/markAllRead
-                       socketInstance.on('notification:unread:count', (data: { count: number }) => {
-                        setUnreadCount(data.count);
-                    });
-        
-                    // ✅ NEW: fired the moment a mentor starts a session this user booked.
-                    // Consuming components (student dashboard / booking row) can watch
-                    // this to flip status without a manual refresh.
-                    socketInstance.on('session:started', (payload: SessionStartedEvent) => {
-                        console.log('🟢 [useSocket] Session started:', payload);
-                        setSessionStarted(payload);
-                    });
-        
-                    return () => {
-                        socketInstance.off('connect');
-                        socketInstance.off('disconnect');
-                        socketInstance.off('notification:new');
-                        socketInstance.off('notification:unread:count');
-                        socketInstance.off('session:started');
-                    };
+            const handleUnreadCount = (data: { count: number }) => {
+                setUnreadCount(data.count);
+            };
+
+            const handleSessionStarted = (payload: SessionStartedEvent) => {
+                console.log('🟢 [useSocket] Session started:', payload);
+                setSessionEnded(null);
+                setSessionStarted(payload);
+            };
+
+            const handleSessionEnded = (payload: SessionEndedEvent) => {
+                console.log('🔴 [useSocket] Session ended:', payload);
+                setSessionEnded(payload);
+                // Same session ka "live" state clear karo
+                setSessionStarted((prev) =>
+                    prev && prev.sessionId !== payload.sessionId ? prev : null
+                );
+            };
+
+            const handleSessionReminder = (payload: SessionReminderEvent) => {
+                console.log('⏰ [useSocket] Session reminder:', payload);
+                setSessionReminder(payload);
+            };
+
+            socketInstance.on('connect', handleConnect);
+            socketInstance.on('disconnect', handleDisconnect);
+            socketInstance.on('notification:new', handleNotificationNew);
+            socketInstance.on('notification:unread:count', handleUnreadCount);
+            socketInstance.on('session:started', handleSessionStarted);
+            socketInstance.on('session:ended', handleSessionEnded);
+            socketInstance.on('session:reminder', handleSessionReminder);
+
+
+
+            // If the socket is ALREADY connected by the time this effect runs
+            // (e.g. another component initialized it earlier), 'connect' will
+            // never fire again for us — sync isConnected immediately instead
+            // of waiting on an event that already happened.
+            if (socketInstance.connected) {
+                handleConnect();
+            }
+
+            return () => {
+                socketInstance.off('connect', handleConnect);
+                socketInstance.off('disconnect', handleDisconnect);
+                socketInstance.off('notification:new', handleNotificationNew);
+                socketInstance.off('notification:unread:count', handleUnreadCount);
+                socketInstance.off('session:started', handleSessionStarted);
+                socketInstance.off('session:ended', handleSessionEnded);
+                socketInstance.off('session:reminder', handleSessionReminder);
+            };
         } catch (error) {
             console.error('❌ [useSocket] Failed to initialize:', error);
         }
     }, []);
 
+
+    return {
+        socket,
+        isConnected,
+        unreadCount,
+        latestNotification,
+        sessionStarted,
+        sessionEnded,
+        sessionReminder,
+    };
     
-    return { socket, isConnected, unreadCount, latestNotification, sessionStarted };
 }

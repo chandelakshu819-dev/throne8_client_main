@@ -6,8 +6,15 @@ import config from '@/config/env.config';
 let socket: Socket | null = null;
 
 export const initializeSocket = (): Socket => {
-    if (socket?.connected) {
-        console.log('✅ Socket already connected');
+        // Socket pehle se hai (connected ya connecting) → wahi return karo.
+    // Naya banaya to purana orphan ho jata hai aur listeners alag instance
+    // par lag jate hain (isi se events miss hote hain).
+    if (socket) {
+        if (socket.disconnected && !socket.active) {
+            const freshToken = TokenStorage.getAccessToken();
+            if (freshToken) socket.auth = { token: freshToken };
+            socket.connect();
+        }
         return socket;
     }
 

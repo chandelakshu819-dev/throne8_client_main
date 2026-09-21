@@ -4,7 +4,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useLiveRoom, RemotePeer } from "@/core/webrtc/useLiveRoom";
+import { useLiveRoom, RemotePeer, RoomEndedInfo } from "@/core/webrtc/useLiveRoom";
+import { useRingtone } from "@/shared/hooks/useRingtone";
 import SessionService from "@/lib/api/session.service";
 import { getSocket } from "@/core/realtime/socket.client";
 import { useAuth } from "@/features/auth/hooks/useAuth"; // ⚠️ adjust import/shape if different
@@ -271,12 +272,18 @@ function VideoCallSection({
     userName,
     onEndSession,
     ending,
+    isMentor,
+    onRoomEnded,
+    onLeave,
 }: {
     roomId: string;
     userId: string;
     userName?: string;
     onEndSession: () => void;
     ending: boolean;
+    isMentor: boolean;
+    onRoomEnded: (info: RoomEndedInfo) => void;
+    onLeave: () => void;
 }) {
     const {
         localStream,
@@ -285,11 +292,23 @@ function VideoCallSection({
         isMicOn,
         isConnecting,
         error,
+        roomEnded,
         joinRoom,
         leaveRoom,
         toggleCamera,
         toggleMic,
     } = useLiveRoom({ roomId, userId, userName });
+
+    const [confirmEnd, setConfirmEnd] = useState(false);
+    const [elapsed, setElapsed] = useState(0);
+
+    // Call timer
+    useEffect(() => {
+        const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+        return () => clearInterval(t);
+    }, []);
+    const timerLabel = `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(elapsed % 60).padStart(2, "0")}`;
+
 
     const joinedRef = useRef(false);
 
@@ -307,6 +326,30 @@ function VideoCallSection({
     // 1:1 mentorship session — at most one remote peer expected
     const remotePeer: RemotePeer | undefined = peers[0];
 
+    // Session end (socket se aaya) → parent ko batao, ended screen dikhegi
+    useEffect(() => {
+        if (roomEnded) onRoomEnded(roomEnded);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [roomEnded]);
+
+    // Ringback tone: jab tak doosra participant join nahi karta (max 45s)
+    const { start: startRing, stop: stopRing } = useRingtone({ volume: 0.5 });
+    const waitingForPeer = !!localStream && !remotePeer && !isConnecting && !roomEnded && !error;
+    useEffect(() => {
+        if (!waitingForPeer) {
+            stopRing();
+            return;
+        }
+        startRing('outgoing');
+        const t = setTimeout(stopRing, 45000);
+        return () => {
+            clearTimeout(t);
+            stopRing();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [waitingForPeer]);
+
+
     return (
         <div className="rounded-2xl p-4 mb-6 shadow-lg" style={{ background: C.card, border: `1px solid ${C.border}` }}>
             {error && (
@@ -318,7 +361,27 @@ function VideoCallSection({
                 </div>
             )}
 
+<div className="flex items-center justify-between mb-3 px-1">
+                <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                        <span
+                            className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                            style={{ background: remotePeer ? C.success : C.warn }}
+                        />
+                        <span
+                            className="relative inline-flex rounded-full h-2.5 w-2.5"
+                            style={{ background: remotePeer ? C.success : C.warn }}
+                        />
+                    </span>
+                    <span className="text-xs font-semibold" style={{ color: C.primary }}>
+                        {remotePeer ? "LIVE" : "Waiting"}
+                    </span>
+                </div>
+                <span className="text-xs font-mono" style={{ color: C.muted }}>{timerLabel}</span>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+
                 <VideoTile stream={localStream} label={`${userName || "You"} (You)`} muted isLocal />
                 {remotePeer ? (
                     <VideoTile stream={remotePeer.stream} label={remotePeer.userName || "Participant"} />
@@ -354,22 +417,98 @@ function VideoCallSection({
                 >
                     {isCameraOn ? "📹" : "📵"}
                 </button>
-                <button
-                    onClick={onEndSession}
-                    disabled={ending}
-                    className="px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-all"
-                    style={{ background: "#b04a3a", opacity: ending ? 0.6 : 1 }}
-                >
-                    {ending ? "Ending..." : "🔴 End Session"}
-                </button>
+                {isMentor ? (
+                    confirmEnd ? (
+                        <div
+                            className="flex items-center gap-2 rounded-full px-3 py-1.5"
+                            style={{ background: "rgba(176,74,58,0.10)" }}
+                        >
+                            <span className="text-xs font-medium" style={{ color: "#b04a3a" }}>
+                                Sabke liye session end karein?
+                            </span>
+                            <button
+                                onClick={() => { setConfirmEnd(false); onEndSession(); }}
+                                disabled={ending}
+                                className="px-3 py-1.5 rounded-full text-xs font-semibold text-white"
+                                style={{ background: "#b04a3a" }}
+                            >
+                                Haan, End
+                            </button>
+                            <button
+                                onClick={() => setConfirmEnd(false)}
+                                className="px-3 py-1.5 rounded-full text-xs font-medium border"
+                                style={{ borderColor: C.border, color: C.secondary }}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => setConfirmEnd(true)}
+                            disabled={ending}
+                            className="px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-all"
+                            style={{ background: "#b04a3a", opacity: ending ? 0.6 : 1 }}
+                        >
+                            {ending ? "Ending..." : "🔴 End Session"}
+                        </button>
+                    )
+                ) : (
+                    <button
+                        onClick={() => { leaveRoom(); onLeave(); }}
+                        className="px-5 py-2.5 rounded-full text-sm font-semibold text-white transition-all"
+                        style={{ background: "#b04a3a" }}
+                    >
+                        Leave Call
+                    </button>
+                )}
             </div>
         </div>
     );
 }
 
 // ─── ONE-ON-ONE TAB (unchanged — still mock data) ─────────────────────────────
+// ─── SESSION ENDED CARD ───────────────────────────────────────────────────────
+function SessionEndedCard({
+    isMentor,
+    endedByMe,
+    onBack,
+}: {
+    isMentor: boolean;
+    endedByMe: boolean;
+    onBack: () => void;
+}) {
+    return (
+        <div
+            className="rounded-2xl p-8 mb-6 text-center shadow-lg"
+            style={{ background: C.card, border: `1px solid ${C.border}` }}
+        >
+            <div
+                className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center text-3xl"
+                style={{ background: "rgba(107,143,110,0.12)", color: C.success }}
+            >
+                ✓
+            </div>
+            <h2 className="text-2xl font-bold mb-2" style={{ color: C.primary, fontFamily: "Georgia, serif" }}>
+                Session Ended
+            </h2>
+            <p className="text-sm mb-6" style={{ color: C.muted }}>
+                {endedByMe
+                    ? "Aapne session complete kar diya hai."
+                    : "Mentor ne session complete kar diya hai. Review dena mat bhoolna!"}
+            </p>
+            <button
+                onClick={onBack}
+                className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+                style={{ background: C.btn }}
+            >
+                {isMentor ? "Back to Bookings" : "Back to My Sessions"}
+            </button>
+        </div>
+    );
+}
+
 function OneOnOneTab({ onReminder }: OneOnOneTabProps) {
-    const [remindersSet, setRemindersSet] = useState<Record<string, boolean>>({ r2: false, r3: false });
+        const [remindersSet, setRemindersSet] = useState<Record<string, boolean>>({ r2: false, r3: false });
 
     const upcoming: UpcomingSession[] = [
         { id: "r1", name: "Career Roadmap Discussion", date: "Kal, 4:00 PM • 45 min • Rahul Sharma", set: true },
@@ -670,12 +809,17 @@ export default function MentorDashboard() {
     const sessionId = searchParams.get("sessionId") || searchParams.get("id") || "";
     const roomId = searchParams.get("roomId") || "";
     const bookingId = searchParams.get("bookingId") || roomId;
+    // Mentor "Start Session" se aata hai ?role=mentor ke saath. (Server phir bhi enforce karta hai.)
+    const isMentor = searchParams.get("role") === "mentor";
+
 
     const [activeTab, setActiveTab] = useState<TabId>("one-on-one");
     const [modal, setModal] = useState<ModalState>({ open: false, session: "", onSave: null });
     const [toastMsg, setToastMsg] = useState<string>("");
     const [toastVisible, setToastVisible] = useState<boolean>(false);
     const [endingSession, setEndingSession] = useState<boolean>(false);
+    const [sessionEndedInfo, setSessionEndedInfo] = useState<RoomEndedInfo | null>(null);
+
 
     const showToast = (msg: string): void => {
         setToastMsg(msg);
@@ -704,16 +848,28 @@ export default function MentorDashboard() {
     }, [sessionId, user?.userId]);
 
     
+    const goBack = (): void => {
+        if (typeof window !== "undefined" && window.history.length > 1) router.back();
+        else router.push("/mentorship"); // ⚠️ fallback route apne hisaab se badlo
+    };
+
     const handleEndSession = async (): Promise<void> => {
-        if (!sessionId) {
+                if (!sessionId) {
             showToast("⚠️ Session ID missing in URL — cannot end session.");
             return;
         }
         setEndingSession(true);
         try {
-            await SessionService.completeSession(sessionId, { bookingId });
+            await SessionService.completeSession(sessionId, { bookingId, wasSuccessful: true });
             showToast("✅ Session completed!");
-            router.push("/mentorship"); // ⚠️ adjust to wherever mentor should land post-session
+            // Turant push nahi — ended screen dikhao, mentor "Back" khud dabayega
+            setSessionEndedInfo({
+                sessionId,
+                bookingId,
+                endedBy: user?.userId,
+                endedAt: new Date().toISOString(),
+            });
+
         } catch (err: any) {
             showToast(`❌ ${err.message || "Failed to end session."}`);
         } finally {
@@ -774,7 +930,13 @@ export default function MentorDashboard() {
                 </div>
 
                 {/* Live video call — replaces the old static "Join Meeting" banner */}
-                {authLoading ? (
+                {sessionEndedInfo ? (
+                    <SessionEndedCard
+                        isMentor={isMentor}
+                        endedByMe={sessionEndedInfo.endedBy === user?.userId}
+                        onBack={goBack}
+                    />
+                ) : authLoading ? (
                     <div className="rounded-2xl p-5 mb-6 text-sm" style={{ background: C.card, color: C.muted }}>
                         Loading session...
                     </div>
@@ -788,6 +950,9 @@ export default function MentorDashboard() {
                         // what extra fields actually exist, then swap this.
                         userName={(user as any).fullName || user.email}
                         onEndSession={handleEndSession}
+                        isMentor={isMentor}
+                        onRoomEnded={(info) => setSessionEndedInfo(info)}
+                        onLeave={goBack}
                         ending={endingSession}
                     />
                 ) : (

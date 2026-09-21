@@ -18,6 +18,8 @@ import {
 } from "lucide-react"
 import SessionService from "@/lib/api/session.service";
 import ProfileService from "@/lib/api/profile.service";
+import { useSocket } from "@/core/realtime/useSocket";
+
 
 interface BookingProps {
   mentorData: any;
@@ -151,6 +153,16 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     fetchSessions();
   }, [mentorData?.mentorId]);
 
+  // ✅ NEW: session kahin se bhi end ho (doosra tab/device) → list auto-refresh
+  const { sessionEnded } = useSocket();
+  useEffect(() => {
+    if (!sessionEnded) return;
+    fetchSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionEnded]);
+
+
+
   useEffect(() => {
     const mappings = allBookings
       .filter(b => b.menteeId && b.menteeProfilePhoto && !photoUrls[b.menteeId])
@@ -259,7 +271,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         // exist hi nahi karta tha, isliye 404 aa raha tha. roomId ab
         // properly pass ho raha hai taaki useLiveRoom join kar sake.
         router.push(
-          `/mentorship/mentor-session?sessionId=${encodeURIComponent(sessionId)}&roomId=${encodeURIComponent(roomId)}&bookingId=${encodeURIComponent(bookingId)}`
+          `/mentorship/mentor-session?sessionId=${encodeURIComponent(sessionId)}&roomId=${encodeURIComponent(roomId)}&bookingId=${encodeURIComponent(bookingId)}&role=mentor`
         );
       } catch (err: any) {
         const message = err?.response?.data?.message || err.message || "Failed to start session.";
@@ -342,10 +354,10 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     };
 
 
-    const handleEnd = async (sessionId: string) => {
+    const handleEnd = async (sessionId: string, bookingId?: string) => {
             setActionLoading(sessionId);
       try {
-        await SessionService.completeSession(sessionId, { wasSuccessful: true });
+        await SessionService.completeSession(sessionId, { wasSuccessful: true, bookingId });
         showToast("Session completed", "success");
         await fetchSessions();
         setBookingTab('completed');
@@ -638,7 +650,7 @@ await SessionService.rescheduleSession(rescheduleSessionId, scheduledAtISO, resc
                           )}
                                                    {bookingTab === 'in_progress' && (
                             <button
-                              onClick={() => handleEnd(booking.sessionId)}
+                            onClick={() => handleEnd(booking.sessionId, booking.bookingId)}
                               disabled={actionLoading === booking.sessionId}
                               className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
                               style={{ backgroundColor: '#f3e8ff', color: '#7c3aed' }}
