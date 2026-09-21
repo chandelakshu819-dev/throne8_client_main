@@ -1,5 +1,5 @@
 "use client";
-
+//ser/features/mentorship/components/sections/GroupSessionsSection.tsx
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { ArrowRight, Clock, Users, Calendar } from "lucide-react";
 import MentorService from "@/lib/api/mentorship.service";
@@ -12,62 +12,12 @@ interface GroupSessionsSectionProps {
     mentorRole?: string;
 }
 
-const DEFAULT_GROUP_SESSIONS = [
-    {
-        _id: "6a8ab06501c4c09c134479af",
-        sessionId: "b2960493-db2f-44d7-88cf-156bcb16c539",
-        mentorId: "016b0f23-3546-43b4-8743-d67061caf5f3",
-        title: "Live Engineering Leadership & System Design",
-        description: "Interactive live cohort diving into scalable backend architecture, microservices, and system reliability.",
-        thumbnailImage: "https://res.cloudinary.com/dft8cyjtt/image/upload/v1787474019/group-session-thumbnails/group_session_b3571692-eaf2-43fe-9182-383f93f19061_1787474018652.jpg",
-        topic: "Architecture Design",
-        duration: 60,
-        maxParticipants: 10,
-        pricing: { pricePerPerson: 600 },
-        host: {
-            name: "Abhishek Meena",
-            image: "https://res.cloudinary.com/dft8cyjtt/image/upload/v1787299188/mentor-profiles/mentor_b3571692-eaf2-43fe-9182-383f93f19061_1787299188031.jpg"
-        }
-    },
-    {
-        _id: "6a8d796f39edcab27cbfc769",
-        sessionId: "95fff271-c939-44c1-9913-d257e48d00bf",
-        mentorId: "ae865993-66eb-4cdb-9313-a488720257df",
-        title: "Production Web Applications & Cloud Architecture",
-        description: "Hands-on walkthrough of production web services, CI/CD pipelines, and high availability systems.",
-        thumbnailImage: "https://res.cloudinary.com/dft8cyjtt/image/upload/v1787656558/group-session-thumbnails/group_session_938a4778-e61a-4cc3-8c7c-d5df84a0a86a_1787656557573.png",
-        topic: "Cloud Architecture",
-        duration: 60,
-        maxParticipants: 5,
-        pricing: { pricePerPerson: 600 },
-        host: {
-            name: "Sarah Jenkins",
-            image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=400"
-        }
-    },
-    {
-        _id: "6aa133b08f8c14c8b6c09468",
-        sessionId: "6a208f24-d0a8-4dc7-ad20-f3758e7deb99",
-        mentorId: "3c140ebf-ae87-4acf-89b0-397e5946c151",
-        title: "React System Design & Frontend Masterclass",
-        description: "Interactive session focusing on complex state management, clean architecture, and frontend scalability.",
-        thumbnailImage: "https://res.cloudinary.com/ddwiwu2ko/image/upload/v1788949424/group-session-thumbnails/group_session_8ca13970-2a2e-4051-bed4-8e4f301096ef_1788949423418.jpg",
-        topic: "React System Design",
-        duration: 48,
-        maxParticipants: 4,
-        pricing: { pricePerPerson: 692 },
-        host: {
-            name: "Steve Byres",
-            image: "https://res.cloudinary.com/ddwiwu2ko/image/upload/v1788940783/mentor-profiles/mentor_8ca13970-2a2e-4051-bed4-8e4f301096ef_1788940782999.jpg"
-        }
-    }
-];
-
 export default function GroupSessionsSection({ mentorId, mentorName, mentorImage, mentorRole }: GroupSessionsSectionProps) {
     const router = useRouter();
-    const [sessions, setSessions] = useState<any[]>(DEFAULT_GROUP_SESSIONS);
+    const [sessions, setSessions] = useState<any[]>([]);
     const [mentorMap, setMentorMap] = useState<Map<string, any>>(new Map());
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     // Infinite Carousel State
     const [currentIndex, setCurrentIndex] = useState(3);
@@ -82,8 +32,11 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
 
     useEffect(() => {
         const fetchData = async () => {
+            setLoading(true);
+            setError(null);
             try {
-                const sessionRes = await MentorService.getAllGroupSessions();
+                const params = mentorId ? { mentorId } : undefined;
+                const sessionRes = await MentorService.getAllGroupSessions(params as any);
                 const globalSessions = Array.isArray(sessionRes?.data)
                     ? sessionRes.data
                     : Array.isArray(sessionRes?.data?.sessions)
@@ -94,9 +47,7 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
                     ? sessionRes
                     : [];
 
-                if (globalSessions.length > 0) {
-                    setSessions(globalSessions);
-                }
+                setSessions(globalSessions);
 
                 const uniqueMentorIds = Array.from(new Set(globalSessions.map((s: any) => s.mentorId))).filter(Boolean) as string[];
                 const map = new Map<string, any>();
@@ -126,15 +77,17 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
                 }
 
                 setMentorMap(map);
-            } catch (error) {
-                console.error("Failed to load group sessions marketplace", error);
+            } catch (err: any) {
+                console.error("Failed to load group sessions marketplace", err);
+                setError(err?.message || "Failed to load group sessions");
+                setSessions([]);
             } finally {
                 setLoading(false);
             }
         };
 
         fetchData();
-    }, []);
+    }, [mentorId]);
 
     // Layout configuration
     useEffect(() => {
@@ -221,14 +174,12 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
         }
     };
 
-    const effectiveSessions = sessions.length > 0 ? sessions : DEFAULT_GROUP_SESSIONS;
-
     // Auto Play
     useEffect(() => {
-        if (isHovered || effectiveSessions.length <= 1) return;
+        if (isHovered || sessions.length <= 1) return;
         const interval = setInterval(nextSlide, 5000);
         return () => clearInterval(interval);
-    }, [isHovered, nextSlide, effectiveSessions.length]);
+    }, [isHovered, nextSlide, sessions.length]);
 
     const handleSessionClick = (sessionId: string) => {
         router.push(`/mentorship/group-session/${sessionId}`);
@@ -245,17 +196,16 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
     };
 
     const visibleCardsCount = Math.round(100 / cardWidthPercent);
-    const shouldCarousel = effectiveSessions.length > visibleCardsCount;
+    const shouldCarousel = sessions.length > visibleCardsCount;
 
-    const preClones = shouldCarousel ? getClones([...effectiveSessions].reverse(), 3).reverse() : [];
-    const postClones = shouldCarousel ? getClones(effectiveSessions, 3) : [];
-    const displayItems = shouldCarousel ? [...preClones, ...effectiveSessions, ...postClones] : effectiveSessions;
+    const preClones = shouldCarousel ? getClones([...sessions].reverse(), 3).reverse() : [];
+    const postClones = shouldCarousel ? getClones(sessions, 3) : [];
+    const displayItems = shouldCarousel ? [...preClones, ...sessions, ...postClones] : sessions;
 
     return (
-        /* Same wrapper as MentorshipServicesSection: pt-6 pb-12, max-w-[1240px], no outer panel */
         <section className="pt-6 pb-12 px-4 md:px-6">
             <div className="max-w-[1240px] mx-auto">
-                {/* ── SECTION HEADER (same sizes as the 1-to-1 header) ───────────── */}
+                {/* ── SECTION HEADER ───────────── */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-3.5">
                     <div>
                         <div className="inline-flex items-center gap-1.5 px-3 py-0.5 bg-[#f4ece1] rounded-full text-[#4a3728] text-[11px] font-bold uppercase tracking-wider mb-2">
@@ -280,7 +230,32 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
                     </button>
                 </div>
 
+                {/* Loading state */}
+                {loading && (
+                    <div className="flex items-center justify-center py-16 text-[#8e847c] text-sm font-medium">
+                        Loading group sessions...
+                    </div>
+                )}
+
+                {/* Error state */}
+                {!loading && error && (
+                    <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
+                        <p className="text-red-500 text-sm font-semibold">{error}</p>
+                        <p className="text-[#8e847c] text-xs">Please try again later.</p>
+                    </div>
+                )}
+
+                {/* Empty state */}
+                {!loading && !error && sessions.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-16 text-center gap-2 border border-dashed border-[#e2d5c8] rounded-[20px]">
+                        <Users className="w-6 h-6 text-[#8b7355]" />
+                        <p className="text-[#4a3728] text-sm font-bold">No group sessions available right now</p>
+                        <p className="text-[#8e847c] text-xs">Check back later for upcoming live cohorts.</p>
+                    </div>
+                )}
+
                 {/* ── CAROUSEL / 3-COLUMN CARDS WINDOW ─────────────────── */}
+                {!loading && !error && sessions.length > 0 && (
                 <div
                     className={`relative w-full overflow-hidden -mx-2.5 px-2.5 pt-1 pb-4 ${
                         shouldCarousel ? (isDragging ? "cursor-grabbing" : "cursor-grab") : ""
@@ -311,7 +286,6 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
                             const sessionId = session.sessionId || session._id || session.id;
                             const uniqueKey = `carousel-group-session-${sessionId}-${index}`;
 
-                            // Host resolution (same approach as the 1-to-1 section)
                             const hostData = mentorMap.get(session.mentorId) || (session as any).host;
                             const hostName = hostData?.name
                                 ? hostData.name
@@ -339,7 +313,6 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
                                 hostData?.isAvailable ??
                                 (hostData?.status === "active");
 
-                            // Tags (topic + skills), same idea as the 1-to-1 card
                             const tags: string[] = [];
                             const addTag = (t?: string) => {
                                 if (t && !tags.some((x) => x.toLowerCase() === t.toLowerCase())) tags.push(t);
@@ -369,9 +342,7 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
                                         handleSessionClick(sessionId);
                                     }}
                                 >
-                                    {/* ── CARD CONTAINER (same radius, shadow, hover as the 1-to-1 card) ── */}
                                     <div className="group flex flex-col bg-white hover:bg-[#FDFBF7] rounded-[20px] sm:rounded-[22px] overflow-hidden border border-[#ece7e2] hover:border-[#8b7355]/40 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-xl transition-all duration-300 hover:-translate-y-1 h-full pointer-events-auto cursor-pointer">
-                                        {/* ── THUMBNAIL (130 / 138px) ── */}
                                         <div className="relative w-full h-[130px] sm:h-[138px] bg-[#f4ece1] overflow-hidden flex-shrink-0">
                                             {session.thumbnailImage || session.thumbnail ? (
                                                 <img
@@ -386,14 +357,12 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
                                                 </div>
                                             )}
 
-                                            {/* Topic Badge */}
                                             <div className="absolute top-2.5 left-2.5 bg-[#4a3728]/75 backdrop-blur-md px-2.5 py-0.5 rounded-full shadow-xs z-10">
                                                 <span className="text-[9px] sm:text-[10px] font-bold text-white uppercase tracking-wider">
                                                     {session.topic || session.category || "Session"}
                                                 </span>
                                             </div>
 
-                                            {/* Seats Badge */}
                                             {session.maxParticipants && (
                                                 <div className="absolute top-2.5 right-2.5 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full shadow-xs z-10 flex items-center gap-1">
                                                     <Users className="w-2.5 h-2.5 text-white/90" />
@@ -404,9 +373,7 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
                                             )}
                                         </div>
 
-                                        {/* ── CARD BODY (p-3.5 / p-4) ── */}
                                         <div className="flex flex-col p-3.5 sm:p-4 flex-grow">
-                                            {/* Mentor info */}
                                             <div className="flex items-center gap-2.5 mb-2.5">
                                                 <div className="relative flex-shrink-0">
                                                     {hostPic ? (
@@ -439,7 +406,6 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
                                                 </div>
                                             </div>
 
-                                            {/* Tags */}
                                             {displayTags.length > 0 && (
                                                 <div className="flex items-center gap-1.5 flex-wrap mb-2">
                                                     {displayTags.map((tag, tagIdx) => (
@@ -453,17 +419,14 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
                                                 </div>
                                             )}
 
-                                            {/* Title */}
                                             <h3 className="text-sm sm:text-[15px] font-bold text-[#2d2116] leading-snug mb-1.5 group-hover:text-[#4a3728] transition-colors line-clamp-2">
                                                 {session.title}
                                             </h3>
 
-                                            {/* Description */}
                                             <p className="text-[11px] sm:text-xs text-[#8e847c] line-clamp-2 leading-relaxed mb-3">
                                                 {session.description || "Interactive group session led by an expert mentor."}
                                             </p>
 
-                                            {/* Metadata row (date | duration) */}
                                             <div className="mt-auto pt-2.5 mb-3 flex items-center gap-2 text-[11px] sm:text-xs text-[#5a4a3e] border-t border-[#f2ede8]">
                                                 <div className="flex items-center gap-1 font-semibold text-[#5a4a3e]">
                                                     <Calendar className="w-3 h-3 text-[#8b7355]" />
@@ -482,7 +445,6 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
                                                 </div>
                                             </div>
 
-                                            {/* Footer: price + reserve (same height as the 1-to-1 button row) */}
                                             <div className="flex items-center justify-between gap-2">
                                                 <div className="flex items-baseline gap-1 min-w-0">
                                                     <span className="text-sm font-black text-[#2d2116]">{priceDisplay}</span>
@@ -509,6 +471,7 @@ export default function GroupSessionsSection({ mentorId, mentorName, mentorImage
                         })}
                     </div>
                 </div>
+                )}
             </div>
         </section>
     );

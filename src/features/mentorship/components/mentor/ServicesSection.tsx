@@ -1,8 +1,21 @@
 //src/features/mentorship/components/mentor/ServicesSection.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Clock } from "./Icons";
+import {
+  X,
+  Calendar,
+  Users,
+  IndianRupee,
+  CheckCircle2,
+  Video,
+  Ban,
+  ClipboardList,
+  History,
+  Sparkles,
+  User as UserIcon,
+} from "lucide-react";
 import { SERVICES, FILTERS, C, btnPrimary } from "../../types/data";
 import type { Service } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
@@ -39,6 +52,22 @@ const SESSION_TYPE_FILTER: Record<string, string> = {
   portfolio_review: "Portfolio Review",
 };
 
+const GROUP_SESSION_HIGHLIGHTS = [
+  "Learn alongside peers with similar goals",
+  "More perspectives, more questions answered",
+  "Usually more relaxed and discussion-driven",
+];
+
+const GROUP_STATUS_LABEL: Record<string, string> = {
+  draft: "Draft",
+  open: "Open",
+  full: "Full",
+  in_progress: "In Progress",
+  completed: "Completed",
+  cancelled: "Cancelled",
+  rescheduled: "Rescheduled",
+};
+
 const formatGroupDate = (dateString?: string) => {
   if (!dateString) return "Date not available";
   try {
@@ -53,6 +82,18 @@ const formatGroupDate = (dateString?: string) => {
   }
 };
 
+function formatCountdown(target: Date): string {
+  const diffMs = target.getTime() - Date.now();
+  if (diffMs <= 0) return "Starting soon";
+  const totalMinutes = Math.floor(diffMs / 60000);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return `in ${days}d ${hours}h`;
+  if (hours > 0) return `in ${hours}h ${minutes}m`;
+  return `in ${minutes}m`;
+}
+
 const ServicesSection: React.FC<ServicesSectionProps> = ({
   onServiceClick,
   mentorId,
@@ -62,20 +103,19 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
 }) => {
   const [activeFilter, setActiveFilter] = useState<string>("All");
   const [sessions, setSessions] = useState<any[]>([]);
-  // ✅ NEW: group sessions kept separate — different shape (pricing.pricePerPerson,
-  // participants[], fixed scheduledAt) and a different booking action (join, not
-  // the calendar/slot-picker flow that 1:1 sessions use).
   const [groupSessions, setGroupSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
 
-
-
+  // ✅ NEW: detail modal state for a clicked group session card
+  const [detailGroup, setDetailGroup] = useState<any | null>(null);
+  const [groupActionBusy, setGroupActionBusy] = useState(false);
+  const [groupActionError, setGroupActionError] = useState<string | null>(null);
+  const [, forceTick] = useState(0);
 
   // ── Waitlist ──
-  // key = session.sessionId (the service card), value = the user's active waitlist entry
   const [waitlistEntries, setWaitlistEntries] = useState<Record<string, any>>({});
   const [waitlistTarget, setWaitlistTarget] = useState<any | null>(null);
   const [leavingId, setLeavingId] = useState<string | null>(null);
@@ -134,38 +174,61 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     }
   };
 
+  // ✅ Extracted so join/leave actions can refresh group sessions from the
+  // server instead of hand-patching local state (keeps currentParticipants,
+  // status, and participants[] accurate).
+  const fetchGroupSessions = useCallback(() => {
+    if (!mentorId) return Promise.resolve();
+    return MentorService.getAllGroupSessions({ mentorId })
+      .then((res: any) => {
+        let groups: any[] = [];
+        if (Array.isArray(res)) groups = res;
+        else if (res && Array.isArray(res.data)) groups = res.data;
+        else if (res?.data && Array.isArray(res.data.data)) groups = res.data.data;
+        setGroupSessions(groups);
+        return groups;
+      })
+      .catch(() => {
+        setGroupSessions([]);
+        return [];
+      });
+  }, [mentorId]);
+
   useEffect(() => {
     if (!mentorId) return;
     setLoading(true);
 
     Promise.allSettled([
       SessionService.getAllSessionsFromDB({ limit: 50 }),
-      MentorService.getAllGroupSessions({ mentorId }),
-    ]).then(([sessionsRes, groupRes]) => {
+      fetchGroupSessions(),
+    ]).then(([sessionsRes]) => {
       if (sessionsRes.status === "fulfilled") {
-        const allSessions = sessionsRes.value?.data ?? [];
+        const allSessions = (sessionsRes as any).value?.data ?? [];
         setSessions(allSessions.filter((s: any) => s.mentorId === mentorId));
       } else {
         setSessions([]);
       }
-
-      if (groupRes.status === "fulfilled") {
-        const res: any = groupRes.value;
-        let groups: any[] = [];
-        if (Array.isArray(res)) groups = res;
-        else if (res && Array.isArray(res.data)) groups = res.data;
-        else if (res?.data && Array.isArray(res.data.data)) groups = res.data.data;
-        // ✅ only sessions still open for joining
-        setGroupSessions(groups.filter((g: any) => g.status === 'open' || g.status === undefined));
-      } else {
-        setGroupSessions([]);
-      }
     }).finally(() => setLoading(false));
-  }, [mentorId]);
+  }, [mentorId, fetchGroupSessions]);
+
+  // Keep the open detail modal's data in sync with the latest fetched list
+  useEffect(() => {
+    if (!detailGroup) return;
+    const fresh = groupSessions.find((g) => g.sessionId === detailGroup.sessionId);
+    if (fresh) setDetailGroup(fresh);
+  }, [groupSessions]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Countdown ko har 60s me refresh karo jab detail modal khula ho
+  useEffect(() => {
+    if (!detailGroup) return;
+    const interval = setInterval(() => forceTick((t) => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, [detailGroup]);
 
   // Dynamic filters — session types se generate karo (group sessions included)
   const uniqueTypes = Array.from(new Set(sessions.map((s) => s.sessionType)));
   const dynamicFilters = ["All", ...uniqueTypes.map((t) => SESSION_TYPE_FILTER[t] || t)];
+  const openGroupSessionsCount = groupSessions.filter((g) => g.status === 'open' || g.status === undefined).length;
   if (groupSessions.length > 0 && !dynamicFilters.includes("Group Session")) {
     dynamicFilters.push("Group Session");
   }
@@ -178,8 +241,11 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       : sessions.filter((s) => (SESSION_TYPE_FILTER[s.sessionType] || s.sessionType) === activeFilter);
 
   const showGroupSessions = activeFilter === "All" || activeFilter === "Group Session";
+  // On "All" only show open/joinable ones as cards; "Group Session" filter shows everything (open, full, in_progress, completed...)
+  const visibleGroupSessions = activeFilter === "Group Session"
+    ? groupSessions
+    : groupSessions.filter((g) => g.status === 'open' || g.status === undefined);
 
-  // Session ko Service card format me convert karo
   const getServiceFromSession = (session: any): Service => ({
     id: session.sessionId,
     type: SESSION_TYPE_LABEL[session.sessionType] || "1:1 Call",
@@ -201,6 +267,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     try {
       await MentorService.joinGroupSession(groupId);
       setJoinedIds((prev) => [...prev, groupId]);
+      await fetchGroupSessions();
     } catch (err: any) {
       setJoinError(err.message || "Failed to join session.");
     } finally {
@@ -208,7 +275,45 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     }
   };
 
-  const hasAnyResults = filtered.length > 0 || (showGroupSessions && groupSessions.length > 0);
+  const closeGroupDetail = () => {
+    setDetailGroup(null);
+    setGroupActionError(null);
+  };
+
+  const handleJoinFromModal = async () => {
+    if (!detailGroup) return;
+    setGroupActionBusy(true);
+    setGroupActionError(null);
+    try {
+      await MentorService.joinGroupSession(detailGroup.sessionId);
+      setJoinedIds((prev) => [...prev, detailGroup.sessionId]);
+      await fetchGroupSessions();
+    } catch (err: any) {
+      setGroupActionError(err.message || "Failed to join session.");
+    } finally {
+      setGroupActionBusy(false);
+    }
+  };
+
+  const handleLeaveFromModal = async () => {
+    if (!detailGroup) return;
+    if (!window.confirm("Kya aap sach me is group session se leave karna chahte hain?")) return;
+    setGroupActionBusy(true);
+    setGroupActionError(null);
+    try {
+      await MentorService.leaveGroupSession(detailGroup.sessionId);
+      setJoinedIds((prev) => prev.filter((id) => id !== detailGroup.sessionId));
+      showToast("You've left the group session.");
+      await fetchGroupSessions();
+      closeGroupDetail();
+    } catch (err: any) {
+      setGroupActionError(err.message || "Failed to leave session.");
+    } finally {
+      setGroupActionBusy(false);
+    }
+  };
+
+  const hasAnyResults = filtered.length > 0 || (showGroupSessions && visibleGroupSessions.length > 0);
 
   return (
     <div style={{ borderRadius: "24px", padding: "32px", marginBottom: "24px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 8px 32px rgba(74,55,40,0.08)" }}>
@@ -241,7 +346,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       {/* Session Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
 
-        {/* Loader - jab tak fetch ho raha hai */}
         {loading && (
           <>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -252,7 +356,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           </>
         )}
 
-        {/* No sessions - sirf tab dikhao jab fetch complete ho aur result empty ho */}
         {!loading && !hasAnyResults && (
           <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: C.mid }}>
             No sessions available for this filter.
@@ -362,10 +465,9 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           );
         })}
 
-        {/* ✅ NEW: Group session cards — separate rendering because they carry
-            different fields (fixed scheduledAt, pricePerPerson, participant
-            count) and a different action (join, not the slot-picker flow). */}
-        {!loading && showGroupSessions && groupSessions.map((group) => {
+        {/* ✅ Group session cards — now clickable, opens the detail modal below,
+            same as 1:1 sessions do via onServiceClick + detail views. */}
+        {!loading && showGroupSessions && visibleGroupSessions.map((group) => {
           const seatsLeft = (group.maxParticipants ?? 0) - (group.currentParticipants ?? 0);
           const alreadyJoined = joinedIds.includes(group.sessionId) ||
             group.participants?.some((p: any) => p.menteeId === currentUserId);
@@ -374,16 +476,33 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
 
           return (
             <div key={group.sessionId}
+              onClick={() => setDetailGroup(group)}
               style={{
                 borderRadius: "16px", padding: "20px", background: C.bg,
                 border: `1px solid ${C.border}`, position: "relative",
                 boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
-              }}>
+                cursor: "pointer",
+                transition: "transform 0.15s ease, box-shadow 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 8px 20px rgba(74,55,40,0.12)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(74,55,40,0.06)";
+              }}
+            >
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                 <span>👥</span>
                 <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "12px", background: C.border, color: C.dark }}>
                   Group Session
                 </span>
+                {group.status && group.status !== 'open' && (
+                  <span style={{ fontSize: "10px", fontWeight: 700, padding: "3px 10px", borderRadius: "12px", background: "#f3e8ff", color: "#7c3aed" }}>
+                    {GROUP_STATUS_LABEL[group.status] || group.status}
+                  </span>
+                )}
               </div>
               <h3 style={{ fontWeight: "bold", color: C.dark, fontSize: "14px", marginBottom: "8px", lineHeight: "1.4" }}>
                 {group.title}
@@ -407,7 +526,10 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   <span style={{ fontSize: "12px", fontWeight: 700, color: C.mid }}>Full</span>
                 ) : (
                   <button
-                    onClick={() => handleJoinGroupSession(group.sessionId)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleJoinGroupSession(group.sessionId);
+                    }}
                     disabled={isJoining}
                     style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px", opacity: isJoining ? 0.6 : 1 }}
                   >
@@ -419,6 +541,265 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           );
         })}
           </div>
+
+      {/* ================= Group Session Detail Modal ================= */}
+      {detailGroup && (() => {
+        const myParticipant = detailGroup.participants?.find((p: any) => p.menteeId === currentUserId);
+        const isJoined = !!myParticipant || joinedIds.includes(detailGroup.sessionId);
+        const seatsLeft = (detailGroup.maxParticipants ?? 0) - (detailGroup.currentParticipants ?? 0);
+        const pricePerPerson = detailGroup.pricing?.pricePerPerson ?? detailGroup.pricePerPerson ?? 0;
+        const scheduledDate = detailGroup.scheduledAt ? new Date(detailGroup.scheduledAt) : null;
+        const status = detailGroup.status || 'open';
+        const isCancelled = status === 'cancelled';
+        const isCompleted = status === 'completed';
+        const isInProgress = status === 'in_progress';
+
+        const statusColor = isCancelled ? "#ef4444" : isCompleted ? "#10b981" : isInProgress ? "#1d4ed8" : "#b45309";
+        const statusBg = isCancelled ? "#fef2f2" : isCompleted ? "#ecfdf5" : isInProgress ? "#dbeafe" : "#fef3c7";
+
+        return (
+          <div
+            onClick={closeGroupDetail}
+            style={{
+              position: "fixed", inset: 0, background: "rgba(30,20,10,0.45)",
+              backdropFilter: "blur(2px)", display: "flex", alignItems: "center",
+              justifyContent: "center", zIndex: 1000, padding: "16px",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: C.surface, borderRadius: "20px", maxWidth: "480px", width: "100%",
+                maxHeight: "88vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+                border: `1px solid ${C.border}`,
+              }}
+            >
+              <div style={{ padding: "24px 24px 0 24px", position: "relative" }}>
+                <button
+                  onClick={closeGroupDetail}
+                  style={{
+                    position: "absolute", top: "20px", right: "20px", width: "30px", height: "30px",
+                    borderRadius: "50%", border: "none", background: C.border, color: C.dark,
+                    display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+                  }}
+                  aria-label="Close"
+                >
+                  <X size={16} />
+                </button>
+
+                {detailGroup.thumbnailImage ? (
+                  <div style={{ width: "100%", height: "140px", borderRadius: "14px", overflow: "hidden", marginBottom: "16px" }}>
+                    <img src={detailGroup.thumbnailImage} alt={detailGroup.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+                    <div style={{
+                      width: "40px", height: "40px", borderRadius: "12px", display: "flex",
+                      alignItems: "center", justifyContent: "center", background: C.grad, color: "#fff", flexShrink: 0,
+                    }}>
+                      <Users size={19} />
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
+                  <span style={{
+                    fontSize: "12px", fontWeight: 600, padding: "4px 12px", borderRadius: "12px",
+                    background: C.border, color: C.dark,
+                  }}>
+                    Group Session
+                  </span>
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px",
+                    borderRadius: "12px", background: statusBg, color: statusColor, fontSize: "12px", fontWeight: 700,
+                  }}>
+                    {isCancelled ? <Ban size={12} /> : <CheckCircle2 size={12} />}
+                    {GROUP_STATUS_LABEL[status] || status}
+                  </span>
+                </div>
+
+                <h2 style={{ fontSize: "19px", fontWeight: 700, color: C.dark, marginBottom: "6px", lineHeight: "1.35" }}>
+                  {detailGroup.title}
+                </h2>
+
+                {mentorName && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", color: C.mid, fontSize: "13px" }}>
+                    <UserIcon size={14} />
+                    <span>hosted by <strong style={{ color: C.dark }}>{mentorName}</strong></span>
+                  </div>
+                )}
+
+                {detailGroup.description && (
+                  <p style={{ fontSize: "13.5px", color: C.mid, lineHeight: "1.6", marginBottom: "18px" }}>
+                    {detailGroup.description}
+                  </p>
+                )}
+              </div>
+
+              <div style={{ padding: "0 24px" }}>
+                {scheduledDate && (
+                  <div style={{
+                    background: C.bg, borderRadius: "14px", padding: "14px 16px", border: `1px solid ${C.border}`,
+                    marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <Calendar size={16} color={C.dark} />
+                      <div>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>{formatGroupDate(detailGroup.scheduledAt)}</div>
+                        <div style={{ fontSize: "11px", color: C.mid }}>{detailGroup.duration} min · {detailGroup.timezone}</div>
+                      </div>
+                    </div>
+                    {!isCancelled && !isCompleted && (
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: "#b45309" }}>{formatCountdown(scheduledDate)}</span>
+                    )}
+                  </div>
+                )}
+
+                {isJoined && myParticipant && (
+                  <div style={{
+                    background: C.bg, borderRadius: "14px", padding: "14px 16px", border: `1px solid ${C.border}`,
+                    marginBottom: "14px",
+                  }}>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: C.dark, marginBottom: "6px" }}>Your Registration</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", padding: "3px 0" }}>
+                      <span style={{ color: C.mid }}>Status</span>
+                      <span style={{ color: C.dark, fontWeight: 600, textTransform: "capitalize" }}>{myParticipant.attendanceStatus}</span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", padding: "3px 0" }}>
+                      <span style={{ color: C.mid }}>Payment</span>
+                      <span style={{ color: C.dark, fontWeight: 600, textTransform: "capitalize" }}>{myParticipant.paymentStatus}</span>
+                    </div>
+                  </div>
+                )}
+
+                {isInProgress && isJoined && (
+                  <button
+                    onClick={() => {
+                      if (detailGroup.meeting?.meetingUrl) window.open(detailGroup.meeting.meetingUrl, "_blank");
+                    }}
+                    disabled={!detailGroup.meeting?.meetingUrl}
+                    style={{
+                      width: "100%", ...btnPrimary, padding: "12px", borderRadius: "12px", fontSize: "14px",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "18px",
+                      opacity: detailGroup.meeting?.meetingUrl ? 1 : 0.5,
+                      cursor: detailGroup.meeting?.meetingUrl ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    <Video size={16} />
+                    {detailGroup.meeting?.meetingUrl ? "Join Session" : "Meeting link not shared yet"}
+                  </button>
+                )}
+
+                {!isJoined && !isCancelled && !isCompleted && (
+                  <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}`, marginBottom: "18px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
+                      <Sparkles size={15} color={C.dark} />
+                      <span style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>What you'll get</span>
+                    </div>
+                    <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                      {GROUP_SESSION_HIGHLIGHTS.map((h, i) => (
+                        <li key={i} style={{
+                          display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", color: C.dark,
+                          marginBottom: i === GROUP_SESSION_HIGHLIGHTS.length - 1 ? 0 : "8px", lineHeight: "1.5",
+                        }}>
+                          <CheckCircle2 size={14} color="#10b981" style={{ marginTop: "2px", flexShrink: 0 }} />
+                          <span>{h}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+                  <div style={{ flex: 1, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
+                    <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px", color: C.mid }}><Clock /></div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>{detailGroup.duration} min</div>
+                    <div style={{ fontSize: "10px", color: C.mid }}>Duration</div>
+                  </div>
+                  <div style={{ flex: 1, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
+                    <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px", color: C.mid }}><IndianRupee size={15} /></div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: pricePerPerson === 0 ? "#10b981" : C.dark }}>
+                      {pricePerPerson === 0 ? "Free" : `₹${pricePerPerson}`}
+                    </div>
+                    <div style={{ fontSize: "10px", color: C.mid }}>Per person</div>
+                  </div>
+                  <div style={{ flex: 1, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
+                    <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px", color: C.mid }}><Users size={15} /></div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>
+                      {detailGroup.currentParticipants ?? 0}/{detailGroup.maxParticipants ?? 0}
+                    </div>
+                    <div style={{ fontSize: "10px", color: C.mid }}>Enrolled</div>
+                  </div>
+                </div>
+
+                {detailGroup.agenda && (
+                  <div style={{ marginBottom: "16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                      <ClipboardList size={15} color={C.dark} />
+                      <span style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>Agenda</span>
+                    </div>
+                    <div style={{ background: C.bg, borderRadius: "12px", padding: "12px 14px", border: `1px solid ${C.border}`, fontSize: "12.5px", color: C.dark, lineHeight: "1.5" }}>
+                      {detailGroup.agenda}
+                    </div>
+                  </div>
+                )}
+
+                {myParticipant?.registeredAt && (
+                  <div style={{ marginBottom: "16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                      <History size={15} color={C.dark} />
+                      <span style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>Timeline</span>
+                    </div>
+                    <div style={{ background: C.bg, borderRadius: "12px", padding: "12px 14px", border: `1px solid ${C.border}`, fontSize: "12.5px", color: C.dark }}>
+                      Registered on {new Date(myParticipant.registeredAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  </div>
+                )}
+
+                {groupActionError && (
+                  <div style={{ marginBottom: "16px", padding: "10px 14px", borderRadius: "10px", background: "#fee2e2", color: "#dc2626", fontSize: "13px", fontWeight: 600 }}>
+                    {groupActionError}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ padding: "16px 24px 24px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: "10px" }}>
+                <button onClick={closeGroupDetail} style={{ flex: 1, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 600, background: C.border, color: C.dark, border: "none", cursor: "pointer" }}>
+                  Close
+                </button>
+
+                {!isCancelled && !isCompleted && (
+                  isJoined ? (
+                    <button
+                      onClick={handleLeaveFromModal}
+                      disabled={groupActionBusy}
+                      style={{
+                        flex: 2, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 700,
+                        background: "#fef2f2", color: "#dc2626", border: "1.5px solid #fca5a5",
+                        cursor: groupActionBusy ? "not-allowed" : "pointer", opacity: groupActionBusy ? 0.6 : 1,
+                      }}
+                    >
+                      {groupActionBusy ? "Leaving..." : "Leave Session"}
+                    </button>
+                  ) : seatsLeft > 0 ? (
+                    <button
+                      onClick={handleJoinFromModal}
+                      disabled={groupActionBusy}
+                      style={{ flex: 2, ...btnPrimary, padding: "12px", borderRadius: "12px", fontSize: "13.5px", opacity: groupActionBusy ? 0.6 : 1 }}
+                    >
+                      {groupActionBusy ? "Reserving..." : "Reserve Seat"}
+                    </button>
+                  ) : (
+                    <button disabled style={{ flex: 2, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 700, background: C.border, color: C.mid, border: "none", cursor: "not-allowed" }}>
+                      Session Full
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
 {waitlistTarget && (
   <WaitlistModal

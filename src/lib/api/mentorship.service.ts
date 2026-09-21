@@ -125,7 +125,6 @@ class MentorService {
       daysAvailable?: string[];
       preferredHours?: { start: string; end: string };
       bufferBetweenSessions?: number;
-      // ✅ NEW
       slotDuration?: number;
     }
   ): Promise<MentorResponse> {
@@ -429,7 +428,7 @@ class MentorService {
     }
   }
 
-   // ⭐ NEW: fetch single session by sessionId — Join Session flow me
+   // ⭐ fetch single session by sessionId — Join Session flow me
   // isi se meeting/roomId details milengi jo video call room me use hongi.
   static async getSessionById(sessionId: string): Promise<any> {
     try {
@@ -471,13 +470,24 @@ class MentorService {
     }
   }
 
+  // ⭐ NEW: leave a group session the mentee has already joined.
+  // Backend route already existed (POST /group-sessions/:id/leave) but there
+  // was no frontend caller for it — the mentee-side "Leave Session" action
+  // in the group session detail modal needs this.
+  static async leaveGroupSession(id: string): Promise<any> {
+    try {
+      const { data } = await api.post(`/mentorship/group-sessions/${id}/leave`);
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (apiError?.message) throw new Error(apiError.message);
+      }
+      throw new Error('Failed to leave group session.');
+    }
+  }
+
   // ⭐ NEW: student joins waitlist for a mentor whose slot/session is full.
-  // Backend: joinWaitlist() → Mentor.waitlistCounter atomically +1 (position
-  // assign) → creates Waitlist doc (status: ACTIVE, expiresAt: +7 days).
-  // Route: POST /mentorship/waitlist/join (see waitlist.routes.ts, mounted
-  // under Mentorship/routers/index.ts). Validator requires
-  // mentorId, preferredDates[] (ISO8601, min 1), preferredTimeSlots[] (min 1),
-  // sessionType, timezone — all as top-level JSON body fields, no FormData.
   static async joinWaitlist(input: {
     mentorId: string;
     serviceId?: string;
@@ -514,7 +524,6 @@ class MentorService {
     return new Error(fallback);
   }
 
-  // User: all my waitlist entries (with mentorName + queuePosition)
   static async getMyWaitlists(): Promise<any> {
     try {
       const { data } = await api.get(`/mentorship/waitlist/my-waitlists`);
@@ -524,7 +533,6 @@ class MentorService {
     }
   }
 
-  // User leaves, or mentor removes someone (backend decides by who is calling)
   static async leaveWaitlist(waitlistId: string, reason?: string): Promise<any> {
     try {
       const { data } = await api.delete(`/mentorship/waitlist/${waitlistId}`, {
@@ -536,7 +544,6 @@ class MentorService {
     }
   }
 
-  // Mentor: full waitlist (all statuses unless `status` is passed)
   static async getMentorWaitlist(mentorId: string, status?: string): Promise<any> {
     try {
       const { data } = await api.get(`/mentorship/waitlist/mentor/${mentorId}`, {
@@ -548,7 +555,6 @@ class MentorService {
     }
   }
 
-  // Mentor: approve one entry
   static async approveWaitlistEntry(waitlistId: string): Promise<any> {
     try {
       const { data } = await api.post(`/mentorship/waitlist/${waitlistId}/approve`);
