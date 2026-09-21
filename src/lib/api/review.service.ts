@@ -1,18 +1,20 @@
 import api from "./api.intance";
 
 export interface MentorReview {
-  id: string;
-  reviewId: string;
+  id?: string;
+  _id?: string;
+  reviewId?: string;
   sessionId: string;
   mentorId: string;
-  menteeId: string;
+  menteeId?: string;
   rating: number;
   comment: string;
-  helpfulCount: number;
-  isVerified: boolean;
-  tags: string[];
+  helpfulCount?: number;
+  isVerified?: boolean;
+  tags?: string[];
   mentorResponse?: { comment: string; respondedAt: string };
-  createdAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   mentee?: {
     firstName?: string;
     lastName?: string;
@@ -81,8 +83,13 @@ const ReviewService = {
   // is the only reliable source of truth for "given vs pending".
   getMyReviews: () =>
     api
-      .get<{ data: MentorReview[] }>(`/mentorship/reviews/mentee/me`)
-      .then((res) => res.data.data),
+      .get<any>(`/mentorship/reviews/mentee/me`)
+      .then((res) => {
+        const raw = res?.data?.data ?? res?.data;
+        if (Array.isArray(raw)) return raw as MentorReview[];
+        if (Array.isArray(raw?.reviews)) return raw.reviews as MentorReview[];
+        return [] as MentorReview[];
+      }),
 };
 
 export default ReviewService;
