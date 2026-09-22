@@ -7,10 +7,13 @@ import type { BookingStep, Service, CalendarData, FormData as BookingFormData } 
 import MentorSidebar from "./MentorSidebar";
 import ServicesSection from "./ServicesSection";
 import ReviewsSection from "./ReviewsSection";
+
 import CalendarStep from "./CalendarStep";
+import QueryStep from "./QueryStep";
 import DetailsStep from "./DetailsStep";
 import PaymentStep from "./PaymentStep";
 import ConfirmationStep from "./ConfirmationStep";
+
 import MentorService from "@/lib/api/mentorship.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 
@@ -40,7 +43,15 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
 
     const handleServiceClick = (service: Service): void => {
         setSelectedService(service);
-        setBookingStep(service.type === "Resource" || service.price === "Free" ? "confirmation" : "calendar");
+        // ✅ FIX: "Ask a Query" (type "Query") ab calendar flow me nahi
+        // jaayegi — seedha query/message-writing step khulega.
+        setBookingStep(
+            service.type === "Query"
+                ? "query"
+                : service.type === "Resource" || service.price === "Free"
+                    ? "confirmation"
+                    : "calendar"
+        );
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
@@ -50,6 +61,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
+    if (bookingStep === "query") return <QueryStep mentorId={mentorData?.mentorId || ""} selectedService={selectedService} onBack={resetBooking} onSubmitted={resetBooking} />;
     if (bookingStep === "calendar") return <CalendarStep mentorId={mentorData?.mentorId || ""} selectedService={selectedService} onBack={() => setBookingStep(null)} onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }} />;
     if (bookingStep === "details") return <DetailsStep selectedService={selectedService} calendarData={calendarData!} onBack={() => setBookingStep("calendar")} onContinue={(d: BookingFormData) => { setFormData(d); setBookingStep("payment"); }} />;
     if (bookingStep === "payment") return (

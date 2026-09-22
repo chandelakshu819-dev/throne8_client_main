@@ -60,7 +60,8 @@ export interface CalendarData {
     slotTime: string;
 }
 
-export type BookingStep = null | "calendar" | "details" | "payment" | "confirmation";
+export type BookingStep = null | "calendar" | "query" | "details" | "payment" | "confirmation";
+
 
 export interface FormData {
     name: string;

@@ -39,6 +39,7 @@ const SESSION_TYPE_LABEL: Record<string, string> = {
   group_session: "Group",
   deep_dive: "1:1 Call",
   portfolio_review: "1:1 Call",
+  ask_query: "Query", // ✅ FIX: missing tha, isliye ask_query bhi "1:1 Call" ban kar calendar flow me chala jaata tha
 };
 
 // Session type ko filter label me map karo
@@ -362,15 +363,18 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           </div>
         )}
 
-        {/* Regular session Cards */}
-        {!loading && filtered.map((session) => {
+               {/* Regular session Cards */}
+               {!loading && filtered.map((session) => {
           const svc = getServiceFromSession(session);
-          const myBooking = session.bookings?.find(
+          // ✅ FIX: pehle koi bhi (chahe kitni bhi purani) booking milte hi
+          // poori card disable (pointerEvents:none) ho jaati thi — mentee
+          // dobara kabhi is service ka naya slot book nahi kar pata tha.
+          // Ab sirf latest booking ka status info ke liye dikhega, Book
+          // button hamesha clickable rahega.
+          const myBookings = session.bookings?.filter(
             (b: any) => b.menteeId === currentUserId
-          );
-          const isPending = myBooking?.status === 'pending';
-          const isConfirmed = myBooking?.status === 'confirmed';
-          const isBooked = isPending || isConfirmed;
+          ) ?? [];
+          const latestBooking = myBookings[myBookings.length - 1];
           const wl = waitlistEntries[session.sessionId];
           return (
             <div key={session.sessionId}
@@ -378,8 +382,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 borderRadius: "16px", padding: "20px", background: C.bg,
                 border: `1px solid ${C.border}`, position: "relative",
                 boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
-                opacity: isPending ? 0.6 : 1,
-                pointerEvents: isBooked ? "none" : "auto",
               }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                 <span>{getIcon(session.sessionType)}</span>
@@ -398,22 +400,14 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 <span style={{ fontWeight: "bold", color: session.pricing?.basePrice === 0 ? "#10b981" : C.dark, fontSize: "15px" }}>
                   {session.pricing?.basePrice === 0 ? "Free" : `₹${session.pricing?.basePrice}`}
                 </span>
-                {isBooked ? (
-                  <div style={{ textAlign: "right" }}>
-                    {myBooking?.status === "confirmed" ? (
-                      <>
-                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>✅ Session Confirmed</div>
-                        <div style={{ fontSize: "10px", color: C.mid, marginTop: "2px" }}>Mentor has confirmed your session</div>
-                      </>
-                    ) : (
-                      <>
-                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>✅ Session Booked</div>
-                        <div style={{ fontSize: "10px", color: C.mid, marginTop: "2px" }}>Session Confirmation coming soon by Mentor</div>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  wl ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
+                  {/* ✅ FIX: status ab sirf info ke taur par dikhta hai — Book button ko block nahi karta */}
+                  {latestBooking && (latestBooking.status === "confirmed" || latestBooking.status === "pending") && (
+                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#10b981", textAlign: "right" }}>
+                      {latestBooking.status === "confirmed" ? "✅ You have a confirmed session" : "✅ You have a session pending confirmation"}
+                    </div>
+                  )}
+                  {wl ? (
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: "12px", fontWeight: 700, color: wl.status === "notified" ? "#10b981" : C.dark }}>
                         {wl.status === "notified"
@@ -445,7 +439,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   ) : (
                     <div style={{ display: "flex", gap: "8px" }}>
                       <button onClick={() => onServiceClick(svc)} style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}>
-                        Book
+                        {latestBooking ? "Book Another Slot" : "Book"}
                       </button>
                       <button
                         onClick={() => setWaitlistTarget(session)}
@@ -458,8 +452,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                         Waitlist
                       </button>
                     </div>
-                  )
-                )}
+                  )}
+                </div>
               </div>
             </div>
           );

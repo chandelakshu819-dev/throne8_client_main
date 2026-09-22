@@ -887,43 +887,7 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
               taaki khaali teesri column na dikhe. slotDuration state
               ab bhi code me hai (generateSlots/save handlers isko use
               karte hain) bas fixed default (30) pe rehta hai. */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Break */}
-            <div className="bg-white p-5 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
-              <h3 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: '#4a3728' }}>
-                <Clock className="w-4 h-4" style={{ color: '#7a5c3e' }} /> Break Between Sessions
-              </h3>
-              <select
-                value={bufferTime}
-                onChange={e => setBufferTime(parseInt(e.target.value))}
-                className="w-full px-3.5 py-2.5 rounded-lg text-sm font-semibold outline-none"
-                style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#7a5c3e' }}
-              >
-                <option value={0}>No Break</option>
-                <option value={15}>15 minutes</option>
-                <option value={30}>30 minutes</option>
-                <option value={45}>45 minutes</option>
-              </select>
-            </div>
-
-            {/* Timezone */}
-            <div className="bg-white p-5 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
-              <h3 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: '#4a3728' }}>
-                <Globe className="w-4 h-4" style={{ color: '#7a5c3e' }} /> Timezone
-              </h3>
-              <select
-                value={timezone}
-                onChange={e => setTimezone(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-lg text-sm font-semibold outline-none"
-                style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#7a5c3e' }}
-              >
-                <option value="Asia/Kolkata">IST (GMT+5:30)</option>
-                <option value="America/New_York">EST (GMT-5:00)</option>
-                <option value="America/Los_Angeles">PST (GMT-8:00)</option>
-                <option value="Europe/Paris">CET (GMT+1:00)</option>
-              </select>
-            </div>
-          </div>
+        
 
           {/* Weekly Schedule */}
           <div className="bg-white p-6 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>

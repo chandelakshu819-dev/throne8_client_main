@@ -37,6 +37,30 @@ const serviceTypes = [
   { name: 'group_session', label: 'Group Session', icon: Users, description: 'Group learning sessions', emoji: '👥', accent: '#15803d' },
 ];
 
+// ✅ FIX: har service type select karne par ek FRESH blank form banega —
+// pehle `{ ...formData, serviceType: type.name }` sirf serviceType field
+// change karta tha, baaki saari purani values (naam, description, price,
+// Free checkbox, duration, etc.) doosre service type ke form me bhi carry
+// ho jaati thi. Ab poora object reset hoga, sirf naya serviceType set hoga.
+const getDefaultFormData = (serviceType: string = '') => ({
+  serviceType,
+  serviceName: '',
+  description: '',
+  topic: '',
+  price: '',
+  isFree: false,
+  scheduledAt: '',
+  duration: '',
+  followUpPeriod: '1',
+  followUpAllowed: '1',
+  bufferTime: '5',
+  minParticipants: '',
+  maxParticipants: '',
+  portfolioUrl: '',
+  thumbnailImage: '',
+  responseTime: '',
+});
+
 
 // Local datetime-local string banata hai (browser's local timezone me),
 // toISOString() (UTC) use karne se IST users ke liye time 5:30 hrs shift ho jaata tha.
@@ -421,6 +445,8 @@ export default function ServicesPage({
       setShowServiceForm(false);
       setSaveError(null);
       setFieldErrors({});
+      setSelectedServiceType(null);
+      setFormData(getDefaultFormData());
     } catch (err: any) {
       setSaveError(err.message);
     } finally {
@@ -580,12 +606,12 @@ export default function ServicesPage({
                 const isActive = selectedServiceType?.name === type.name;
                 return (
                   <button
-                    key={idx}
-                    onClick={() => {
-                      setSelectedServiceType(type);
-                      setFormData({ ...formData, serviceType: type.name });
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150"
+                  key={idx}
+                  onClick={() => {
+                    setSelectedServiceType(type);
+                    setFormData(getDefaultFormData(type.name));
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150"
                     style={{
                       backgroundColor: isActive ? '#4a3728' : 'transparent',
                       color: isActive ? '#fff' : '#5c4a3a',
@@ -650,12 +676,12 @@ export default function ServicesPage({
                       const Icon = type.icon;
                       return (
                         <button
-                          key={type.name}
-                          onClick={() => {
-                            setSelectedServiceType(type);
-                            setFormData({ ...formData, serviceType: type.name });
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border transition-colors hover:bg-[#f3ece4]"
+                        key={type.name}
+                        onClick={() => {
+                          setSelectedServiceType(type);
+                          setFormData(getDefaultFormData(type.name));
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border transition-colors hover:bg-[#f3ece4]"
                           style={{ borderColor: '#e0d8cf', color: '#5c4a3a', backgroundColor: '#fff' }}
                         >
                           <Icon className="w-3.5 h-3.5" style={{ color: type.accent }} />
@@ -1116,6 +1142,8 @@ export default function ServicesPage({
             setSaveError(null);
             setIsEditMode(false);
             setEditingSession(null);
+            setSelectedServiceType(null);
+            setFormData(getDefaultFormData());
           }}
           formData={formData}
           setFormData={setFormData}

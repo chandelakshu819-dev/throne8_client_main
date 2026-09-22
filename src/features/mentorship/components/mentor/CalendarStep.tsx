@@ -95,14 +95,29 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
 
     useEffect(() => {
         if (!mentorId) return;
-        AvailabilityService.getAllAvailabilityFromDB({ limit: 100 })
-            .then((res) => {
-                const all = res?.data ?? [];
-                const mentorAvail = all.filter((a: any) => a.mentorId === mentorId);
-                setAvailability(mentorAvail);
+
+        // ✅ FIX: pehle admin-only getAllAvailabilityFromDB({limit:100}) use ho raha
+        // tha — sab mentors ke pehle 100 records (date ascending) fetch karke
+        // client-side filter karta tha. Agar DB mein (sab mentors milakar) 100 se
+        // zyada records hote, to is mentor ka aage wala date (e.g. 24 Sept) un
+        // pehle 100 mein hi nahi aata — mentee ko "No Availability Set" dikhta
+        // tha jabki mentor ke apne dashboard par wahi date "Available" dikhta tha.
+        // Ab wahi mentorId-scoped, date-range-filtered endpoint use kar rahe hain
+        // jo mentor ka apna Availability page use karta hai — aur currentMonth
+        // change hone par bhi refetch hota hai (pehle sirf mentorId change par
+        // hota tha, month navigate karne par stale data dikhta rehta tha).
+        const y = currentMonth.getFullYear();
+        const m = String(currentMonth.getMonth() + 1).padStart(2, "0");
+        const lastDay = new Date(y, currentMonth.getMonth() + 1, 0).getDate();
+        const startDate = `${y}-${m}-01`;
+        const endDate = `${y}-${m}-${String(lastDay).padStart(2, "0")}`;
+
+        AvailabilityService.getMentorAvailability(mentorId, { startDate, endDate })
+            .then((res: any) => {
+                setAvailability(res?.data?.availabilities ?? []);
             })
             .catch(() => setAvailability([]));
-    }, [mentorId]);
+    }, [mentorId, currentMonth]);
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
