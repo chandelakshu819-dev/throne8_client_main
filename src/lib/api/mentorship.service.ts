@@ -290,6 +290,22 @@ class MentorService {
     }
   }
 
+  // ⭐ NEW: mentor starts a group session once minParticipants is met and
+  // it's near the scheduled time. Backend route already existed
+  // (POST /group-sessions/:id/start) but had no frontend caller.
+  static async startGroupSession(id: string): Promise<any> {
+    try {
+      const { data } = await api.post(`/mentorship/group-sessions/${id}/start`);
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (apiError?.message) throw new Error(apiError.message);
+      }
+      throw new Error('Failed to start group session.');
+    }
+  }
+
   static async cancelGroupSession(id: string, reason: string): Promise<any> {
     try {
       const { data } = await api.post(`/mentorship/group-sessions/${id}/cancel`, { reason });
