@@ -79,6 +79,14 @@ const bufferTimeOptions = [
     { value: '10', label: '10 Min' }, { value: '15', label: '15 Min' },
 ];
 
+// ✅ NEW: "Ask a Query" service ke liye response time — mentee ko clarity
+// milti hai ki mentor kitne din me uski text-query ka jawab dega.
+const responseTimeOptions = [
+    { value: '1', label: '1 Day' },
+    { value: '2', label: '2 Days' },
+    { value: '3', label: '3 Days' },
+];
+
 // ── Props ──────────────────────────────────────────────────
 interface ServiceModalProps {
     service: { name: string; description: string; emoji: string };
@@ -115,9 +123,8 @@ export default function ServiceModal({
     isSaving = false, saveError = null,
     fieldErrors = {},
     isEditMode = false,
-    availableDurations = [30, 45, 60],
+    availableDurations = [15, 30, 45, 60],
 }: ServiceModalProps) {
-
     // ✅ NEW: modal khulte hi (ya jab availableDurations change ho) agar
     // formData.duration khaali hai ya availableDurations me nahi hai,
     // to pehla valid option auto-select kar do — taaki service hamesha
@@ -130,6 +137,16 @@ export default function ServiceModal({
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [availableDurations]);
+
+    // ✅ NEW: "Ask a Query" select hote hi response time default 1 Day
+    // set kar do agar pehle se koi valid value nahi hai.
+    useEffect(() => {
+        if (formData?.serviceType !== 'ask_query') return;
+        if (!formData?.responseTime) {
+            setFormData({ ...formData, responseTime: '1' });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [formData?.serviceType]);
 
     const currentServiceType = serviceTypes.find(t => t.name === formData?.serviceType);
     const needsDescription = currentServiceType?.needsDescription ?? true;
@@ -266,17 +283,31 @@ export default function ServiceModal({
                             )}
                         </div>
                         <div>
-                            <FieldLabel icon={DollarSign}>Price per Hour</FieldLabel>
+                            <div className="flex items-center justify-between mb-2">
+                                <FieldLabel icon={DollarSign}>Price per Hour</FieldLabel>
+                                <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer" style={{ color: '#7a5c3e' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={!!formData?.isFree}
+                                        onChange={(e) => {
+                                            const checked = e.target.checked;
+                                            setFormData({ ...formData, isFree: checked, price: checked ? 0 : '' });
+                                        }}
+                                        disabled={isSaving}
+                                    />
+                                    Free
+                                </label>
+                            </div>
                             <div className="relative">
                                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold" style={{ color: '#7a5c3e' }}>₹</span>
                                 <input
                                     type="number"
                                     placeholder="500"
-                                    className="w-full pl-7 pr-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                    className="w-full pl-7 pr-3.5 py-2.5 rounded-lg border outline-none text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                                     style={inputStyle(fieldErrors?.price)}
-                                    value={formData?.price || ''}
+                                    value={formData?.isFree ? 0 : (formData?.price || '')}
                                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                    disabled={isSaving}
+                                    disabled={isSaving || formData?.isFree}
                                 />
                             </div>
                             {fieldErrors?.price && (
@@ -316,8 +347,8 @@ export default function ServiceModal({
                         </div>
                     )}
 
-                                     {/* Portfolio URL */}
-                                     {formData?.serviceType === 'portfolio_review' && (
+                                                                        {/* Portfolio URL */}
+                                                                        {formData?.serviceType === 'portfolio_review' && (
                         <div>
                             <FieldLabel icon={Package}>Portfolio URL</FieldLabel>
                             <input
@@ -332,6 +363,37 @@ export default function ServiceModal({
                             {fieldErrors?.portfolioUrl && (
                                 <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.portfolioUrl}</p>
                             )}
+                        </div>
+                    )}
+
+                    {/* ✅ NEW: Response Time — sirf "Ask a Query" service ke liye.
+                        Mentee ko saaf pata chalega ki mentor kitne din me uski
+                        text-query ka jawab dega. */}
+                    {formData?.serviceType === 'ask_query' && (
+                        <div>
+                            <FieldLabel icon={Clock}>Response Time</FieldLabel>
+                            <div className="flex flex-wrap gap-2">
+                                {responseTimeOptions.map(opt => {
+                                    const isActive = String(formData?.responseTime) === opt.value;
+                                    return (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, responseTime: opt.value })}
+                                            disabled={isSaving}
+                                            className="px-4 py-2 rounded-lg text-sm font-semibold border transition-colors disabled:opacity-50"
+                                            style={{
+                                                borderColor: isActive ? '#4a3728' : '#e0d8cf',
+                                                backgroundColor: isActive ? '#4a3728' : '#fbf7f3',
+                                                color: isActive ? '#fff' : '#4a3728',
+                                            }}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                         
                         </div>
                     )}
 
@@ -356,24 +418,29 @@ export default function ServiceModal({
 
                                     {/* Duration & Participants */}
                                     <div className={`grid ${needsParticipants ? 'grid-cols-3' : 'grid-cols-1'} gap-4`}>
-                        <div>
+                                    <div>
                             <FieldLabel icon={Clock}>Duration (min)</FieldLabel>
-                            {/* ✅ FIX: free number input ki jagah dropdown — sirf
-                                wahi durations chunne ko milte hain jo mentor ne
-                                Availability page me slot-duration ke roop me set
-                                kiye hain, taaki service ka duration hamesha
-                                actual bookable slot-length ke according ho. */}
-                            <select
-                                className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
-                                style={inputStyle()}
-                                value={formData?.duration || ''}
-                                onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })}
-                                disabled={isSaving}
-                            >
-                                {availableDurations.map(min => (
-                                    <option key={min} value={min}>{min} min</option>
-                                ))}
-                            </select>
+                            <div className="flex flex-wrap gap-2">
+                                {availableDurations.map(min => {
+                                    const isActive = Number(formData?.duration) === min;
+                                    return (
+                                        <button
+                                            key={min}
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, duration: min })}
+                                            disabled={isSaving}
+                                            className="px-4 py-2 rounded-lg text-sm font-semibold border transition-colors disabled:opacity-50"
+                                            style={{
+                                                borderColor: isActive ? '#4a3728' : '#e0d8cf',
+                                                backgroundColor: isActive ? '#4a3728' : '#fbf7f3',
+                                                color: isActive ? '#fff' : '#4a3728',
+                                            }}
+                                        >
+                                            {min} min
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                         {needsParticipants && (
                             <>

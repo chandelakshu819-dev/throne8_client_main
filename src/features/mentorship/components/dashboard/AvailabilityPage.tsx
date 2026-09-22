@@ -123,8 +123,19 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
             : [{ startTime: d.startTime || "09:00", endTime: d.endTime || "17:00" }],
         }));
    
-      // Backend se availability.daysAvailable aane par usi se schedule banao
+           // ✅ FIX: ab backend ka poora `weeklySchedule` (per-day, multi-range)
+      // priority se use hota hai — pehle sirf simple daysAvailable[] +
+      // ek single preferredHours use hota tha, jisme multi-day custom
+      // time ya ek din ke multiple ranges store hi nahi ho sakte the.
+      // Purane mentors ke liye (jinke paas abhi weeklySchedule nahi hai)
+      // simple format se fallback banaya jaata hai, taaki backward-compat
+      // bana rahe.
       const buildScheduleFromBackend = () => {
+        const backendSchedule = mentorData?.availability?.weeklySchedule;
+        if (Array.isArray(backendSchedule) && backendSchedule.length > 0) {
+          return normalizeWeekSchedule(backendSchedule);
+        }
+
         const daysAvailable: string[] | undefined = mentorData?.availability?.daysAvailable;
         if (!daysAvailable || daysAvailable.length === 0) return null;
         const start = mentorData?.availability?.preferredHours?.start || "09:00";
@@ -175,6 +186,10 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
             daysAvailable: enabledDays,
             preferredHours: { start: baseRange.startTime, end: baseRange.endTime },
             bufferBetweenSessions: bufferTime,
+            // ✅ NEW: poora per-day/multi-range data backend me save ho
+            // raha hai ab — daysAvailable/preferredHours sirf legacy/
+            // backward-compat ke liye bhej rahe hain, asli data ye hai.
+            weeklySchedule: weekSchedule,
           }).catch((err: any) => console.error("Failed to persist weekly pattern:", err.message));
         });
       }, 800);
@@ -332,8 +347,24 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
         }))
         .sort((a, b) => a.day - b.day);
     }, [blockedRecordsByDay]);
-  
+   
     const isDateBlocked = (date: number) => blockedRecordsByDay.has(date);
+
+    // ✅ NEW: jo date calendar se select hui hai, uska existing availability
+    // record (agar DB me pehle se hai) yahan nikal lete hain — isi se pata
+    // chalega ki button "naya banayega" ya "purane ko edit karega".
+    const existingRecordForSelectedDate = useMemo(() => {
+      if (selectedDate === null) return null;
+      const y = currentDate.getFullYear();
+      const m = String(currentDate.getMonth() + 1).padStart(2, "0");
+      const dd = String(selectedDate).padStart(2, "0");
+      return (
+        existingAvailability.find(
+          (rec) => rec.date.substring(0, 10) === `${y}-${m}-${dd}`
+        ) || null
+      );
+    }, [selectedDate, currentDate, existingAvailability]);
+
 
     // ✅ NEW: which weekday name corresponds to the currently selected calendar
     // date — used to auto-highlight and scroll to that row in Weekly Schedule.
@@ -945,9 +976,14 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                 className="px-3.5 py-1.5 rounded-lg text-white text-xs font-bold flex items-center gap-1.5 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90"
                 style={{ backgroundColor: '#4a3728' }}
               >
-                <Check className="w-3.5 h-3.5" />
-                {isSaving ? "Saving..." : selectedDate ? "Save Day" : "Save Month"}
+                                    <Check className="w-3.5 h-3.5" />
+                {isSaving
+                  ? "Saving..."
+                  : selectedDate
+                  ? `${existingRecordForSelectedDate ? "Update" : "Save"} ${selectedDate} ${monthNames[currentDate.getMonth()].slice(0, 3)}`
+                  : "Save Month"}
               </button>
+
               </div>
             </div>
                         {/* ✅ FIX: max-h + overflow-y-auto hata diya — ab list static
@@ -1116,9 +1152,23 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
               </div>
             </div>
 
-            {/* Mode badge */}
-            <div className="mb-3 px-3 py-2 rounded-lg text-xs font-semibold text-center" style={{ backgroundColor: '#fbf7f3', color: '#7a5c3e', border: '1px solid #e0d8cf' }}>
-              {selectedDate ? `Single day: ${selectedDate} ${monthNames[currentDate.getMonth()]}` : `Bulk: Full month`}
+                       {/* Mode badge — ✅ FIX: ab sirf date nahi, balki ye bhi dikhata
+                hai ki is date par pehle se availability hai (Edit) ya nahi
+                (New) — taaki mentor ko clear pata chale ki Save dabane par
+                naya record banega ya purana overwrite hoga. */}
+            <div
+              className="mb-3 px-3 py-2 rounded-lg text-xs font-semibold text-center"
+              style={{
+                backgroundColor: selectedDate && existingRecordForSelectedDate ? '#fef3c7' : '#fbf7f3',
+                color: selectedDate && existingRecordForSelectedDate ? '#b45309' : '#7a5c3e',
+                border: `1px solid ${selectedDate && existingRecordForSelectedDate ? '#fcd34d' : '#e0d8cf'}`,
+              }}
+            >
+              {selectedDate
+                ? existingRecordForSelectedDate
+                  ? `Editing existing availability: ${selectedDate} ${monthNames[currentDate.getMonth()]}`
+                  : `New availability: ${selectedDate} ${monthNames[currentDate.getMonth()]}`
+                : `Bulk: Full month`}
             </div>
 
             {/* Day headers */}

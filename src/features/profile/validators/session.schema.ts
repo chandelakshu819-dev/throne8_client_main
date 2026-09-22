@@ -107,21 +107,18 @@ export const validateSessionForm = (data: any): Record<string, string> => {
       errors.price = "Price cannot be negative";
     }
   } else {
-    if (data.paymentMethod !== "free") {
+    const isFreeService = !!data.isFree || data.paymentMethod === "free";
+    if (!isFreeService) {
       if (!data.price || Number(data.price) <= 0) {
         errors.price = "Price must be greater than 0";
       }
     }
   }
 
-  if (!data.scheduledAt) {
-    errors.scheduledAt = "Please select a scheduled date and time";
-  } else {
-    const date = new Date(data.scheduledAt);
-    if (date.getTime() <= Date.now() + 5 * 60 * 1000) {
-      errors.scheduledAt = "Scheduled time must be at least 5 minutes in the future";
-    }
-  }
+    // NOTE: scheduledAt validation removed — ServiceModal has no date/time
+  // input field, services are always-available offerings, not fixed
+  // time-slot bookings. A default future timestamp is set automatically
+  // at submit time (see ServicesPage.tsx).
   if (!data.serviceType) {
     errors.serviceType = "Please select a service type";
   }

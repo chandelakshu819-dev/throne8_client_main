@@ -126,6 +126,14 @@ class MentorService {
       preferredHours?: { start: string; end: string };
       bufferBetweenSessions?: number;
       slotDuration?: number;
+      // ✅ NEW: poora per-day/multi-range weekly schedule — is se ab
+      // backend me full-fidelity data save hota hai, na ki sirf simple
+      // single-range summary.
+      weeklySchedule?: Array<{
+        day: string;
+        enabled: boolean;
+        timeRanges: Array<{ startTime: string; endTime: string }>;
+      }>;
     }
   ): Promise<MentorResponse> {
     try {

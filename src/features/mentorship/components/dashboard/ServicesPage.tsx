@@ -359,14 +359,22 @@ export default function ServicesPage({
           thumbnailImage: formData.thumbnailImage,
         };
         await MentorService.createGroupSession(groupSessionInput);
+
       } else {
-        const isFree = false;
+        const isFree = !!formData.isFree || Number(formData.price) === 0;
+        // ✅ NEW: "Ask a Query" me response time ko description ke saath
+        // jod diya, kyunki is service type ka apna alag description field
+        // nahi hai (needsDescription: false) — mentee ko yahi se pata
+        // chalega ki mentor kitne din me jawab dega.
+        const responseTimeSuffix = formData.serviceType === 'ask_query' && formData.responseTime
+          ? `Response time: ${formData.responseTime} ${Number(formData.responseTime) > 1 ? 'Days' : 'Day'}`
+          : "";
         const sessionInput: CreateSessionInput = {
           sessionType: formData.serviceType,
           scheduledAt: scheduledAtISO,
           timezone: "Asia/Kolkata",
           title: formData.serviceName,
-          description: formData.description || "",
+          description: [formData.description, responseTimeSuffix].filter(Boolean).join(" • ") || "",
           paymentMethod: "stripe",
           ...(formData.serviceType === "mock_interview" ? { interviewType: "technical" } : {}),
           ...(formData.serviceType === "career_planning" ? { targetCompany: "General", targetRole: "General" } : {}),
