@@ -1,34 +1,24 @@
-//src/features/mentorship/components/ServicesSection.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Clock as ClockIcon,
-  Phone,
-  Users,
-  HelpCircle,
-  X,
-  CheckCircle2,
-  Sparkles,
-  IndianRupee,
   Calendar,
-  Video,
+  Clock,
+  CheckCircle2,
+  Users,
+  ArrowRight,
+  Star,
   MessageCircle,
-  RefreshCcw,
-  Ban,
-  Circle,
-  ClipboardList,
-  Wallet,
-  History,
-  User as UserIcon,
+  Video,
+  XCircle,
 } from "lucide-react";
-import { btnPrimary, C, formatSlotRange } from "../types/data";
+
 import SessionService from "@/lib/api/session.service";
 import MentorService from "@/lib/api/mentorship.service";
 import QueryModal from "./QueryModal";
-import WaitlistModal from "../modal/WaitlistModal";
-import { Service } from "../types/types";
+import WaitlistModal from "./WaitlistModal";
+import { Service } from "@/features/mentorship/types/mentorship.types";
 
 interface ServicesSectionProps {
   onServiceClick: (service: Service) => void;
@@ -37,1500 +27,2039 @@ interface ServicesSectionProps {
   currentUserId: string;
 }
 
-const SESSION_TYPE_LABEL: Record<string, string> = {
-  quick_call: "1:1 Call",
-  mock_interview: "1:1 Call",
-  resume_review: "1:1 Call",
-  career_planning: "1:1 Call",
-  group_session: "Group",
-  deep_dive: "1:1 Call",
-  portfolio_review: "1:1 Call",
+const SESSION_LABELS: Record<string, string> = {
+  "1-on-1": "1-on-1 Session",
+  one_on_one: "1-on-1 Session",
+  individual: "1-on-1 Session",
+  group: "Group Session",
 };
 
-const SESSION_TYPE_FILTER: Record<string, string> = {
-  quick_call: "Quick Call",
-  mock_interview: "Mock Interview",
-  resume_review: "Resume Review",
-  career_planning: "Career Planning",
-  group_session: "Group Session",
-  deep_dive: "Deep Dive",
-  portfolio_review: "Portfolio Review",
-};
-
-const SESSION_HIGHLIGHTS: Record<string, string[]> = {
-  quick_call: [
-    "Fast, focused conversation — no fluff",
-    "Get direct answers to your specific questions",
-    "Great for a quick gut-check before a decision",
-  ],
-  mock_interview: [
-    "Real interview-style practice with live feedback",
-    "Identify blind spots before the actual interview",
-    "Walk away with a clear improvement checklist",
-  ],
-  resume_review: [
-    "Line-by-line feedback from someone who's hired before",
-    "Learn what recruiters actually skim for",
-    "Leave with a stronger, ATS-friendly resume",
-  ],
-  career_planning: [
-    "Map out a realistic path for your next 1–2 years",
-    "Get an outsider's honest perspective on your options",
-    "Leave with concrete next steps, not just advice",
-  ],
-  group_session: [
-    "Learn alongside peers with similar goals",
-    "More perspectives, more questions answered",
-    "Usually more relaxed and discussion-driven",
-  ],
-  deep_dive: [
-    "Go deep on one topic instead of skimming many",
-    "Ideal if you already know the basics",
-    "Comes with follow-up notes/resources when relevant",
-  ],
-  portfolio_review: [
-    "Honest, detailed feedback on your work",
-    "Understand what stands out and what doesn't",
-    "Practical suggestions you can act on immediately",
-  ],
-};
-
-const DEFAULT_HIGHLIGHTS = [
-  "Personalized 1:1 attention",
-  "Direct access to someone who's been there",
-  "Practical, actionable takeaways",
+const SESSION_FILTERS = [
+  "All",
+  "1-on-1 Session",
+  "Group Session",
 ];
 
-const PREP_INSTRUCTIONS: Record<string, string[]> = {
-  quick_call: ["Keep your specific question ready", "Join 2–3 minutes early to test your mic/camera"],
-  mock_interview: ["Keep your resume handy for reference", "Find a quiet space with stable internet"],
-  resume_review: ["Have your latest resume ready to share on screen", "Note down 2–3 areas you're unsure about"],
-  career_planning: ["Think about your top 2–3 career goals beforehand", "List any specific decisions you're stuck on"],
-  group_session: ["Join on time — group sessions start promptly", "Prepare 1 question to ask the group"],
-  deep_dive: ["Review the basics beforehand so time isn't spent on fundamentals", "Note specific sub-topics you want covered"],
-  portfolio_review: ["Share your portfolio link/file in advance if possible", "Shortlist 2–3 pieces you want the most feedback on"],
+const HIGHLIGHTS = [
+  "Personalized guidance",
+  "Real-world industry insights",
+  "Actionable feedback",
+  "Career-focused mentorship",
+];
+
+const PREP_POINTS = [
+  "Keep your questions ready",
+  "Share relevant context beforehand",
+  "Be open to feedback",
+  "Take notes during the session",
+];
+
+const btnPrimary: React.CSSProperties = {
+  border: "none",
+  background: "#111827",
+  color: "#ffffff",
+  fontWeight: 600,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
 };
 
-const getMentorDisplayName = (mentor: any): string => {
-  const user = mentor?.user;
-  if (!user) return "";
-  if (user.fullName) return user.fullName;
-  const combined = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
-  return combined;
+const btnSecondary: React.CSSProperties = {
+  border: "1px solid #e5e7eb",
+  background: "#ffffff",
+  color: "#111827",
+  fontWeight: 600,
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
 };
 
-const getTypeIcon = (sessionType: string) => {
-  if (sessionType === "group_session") return Users;
-  return Phone;
+const getGroupId = (group: any): string => {
+  return String(
+    group?.sessionId ||
+      group?._id ||
+      group?.id ||
+      ""
+  );
 };
 
-const formatGroupDate = (dateString?: string) => {
-  if (!dateString) return "Date not available";
-  try {
-    const d = new Date(dateString);
-    if (isNaN(d.getTime())) return "Date not available";
-    return new Intl.DateTimeFormat("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).format(d);
-  } catch {
-    return "Date not available";
+const getRequestStatus = (
+  request: any
+): "none" | "pending" | "accepted" | "rejected" => {
+  const status =
+    request?.status ||
+    request?.request?.status ||
+    request?.data?.status ||
+    request?.data?.request?.status;
+
+  if (
+    status === "pending" ||
+    status === "accepted" ||
+    status === "rejected"
+  ) {
+    return status;
   }
+
+  return "none";
 };
 
-// ── Progress tracker step order ──────────────────────────────────
-const STEP_ORDER = ["pending", "confirmed", "in_progress", "completed"] as const;
-const STEP_LABEL: Record<string, string> = {
-  pending: "Pending",
-  confirmed: "Confirmed",
-  in_progress: "In Progress",
-  completed: "Completed",
+const getSessionStartTime = (group: any): number | null => {
+  const value =
+    group?.scheduledAt ||
+    group?.startTime ||
+    group?.scheduledFor ||
+    group?.startDate;
+
+  if (!value) return null;
+
+  const time = new Date(value).getTime();
+
+  if (Number.isNaN(time)) return null;
+
+  return time;
 };
 
-function stepIndex(status: string) {
-  if (status === "rescheduled") return STEP_ORDER.indexOf("confirmed");
-  const idx = STEP_ORDER.indexOf(status as any);
-  return idx === -1 ? 0 : idx;
-}
+const isGroupSessionJoinable = (group: any): boolean => {
+  const status = String(
+    group?.status || ""
+  ).toLowerCase();
 
-// ── Countdown helper ──────────────────────────────────────────────
-function formatCountdown(target: Date): string {
-  const diffMs = target.getTime() - Date.now();
-  if (diffMs <= 0) return "Starting soon";
-  const totalMinutes = Math.floor(diffMs / 60000);
-  const days = Math.floor(totalMinutes / (60 * 24));
-  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-  const minutes = totalMinutes % 60;
-  if (days > 0) return `in ${days}d ${hours}h`;
-  if (hours > 0) return `in ${hours}h ${minutes}m`;
-  return `in ${minutes}m`;
-}
+  if (
+    status === "started" ||
+    status === "live" ||
+    status === "in_progress"
+  ) {
+    return true;
+  }
 
-function formatDateTime(d: Date): string {
-  return d.toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+  if (
+    group?.isStarted === true ||
+    group?.isLive === true
+  ) {
+    return true;
+  }
 
-const ServicesSection: React.FC<ServicesSectionProps> = ({
+  /*
+   * If backend does not expose started/live status,
+   * don't show Join Session before the scheduled time.
+   *
+   * A small 15-minute window is allowed before start.
+   */
+  const startTime = getSessionStartTime(group);
+
+  if (!startTime) {
+    return false;
+  }
+
+  const now = Date.now();
+  const fifteenMinutes = 15 * 60 * 1000;
+
+  return (
+    now >= startTime - fifteenMinutes
+  );
+};
+
+const getGroupMeetingUrl = (group: any): string | null => {
+  return (
+    group?.meetingUrl ||
+    group?.meeting?.meetingUrl ||
+    group?.roomUrl ||
+    group?.room?.url ||
+    null
+  );
+};
+
+export default function ServicesSection({
   onServiceClick,
   mentorId,
   bookedSessionIds,
   currentUserId,
-}) => {
+}: ServicesSectionProps) {
   const router = useRouter();
-  const [activeFilter, setActiveFilter] = useState<string>("All");
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // ✅ NEW: group sessions ke liye alag state — inki shape (fixed scheduledAt,
-  // pricing.pricePerPerson, participants[]) normal sessions se alag hai, isliye
-  // inhe `sessions` array mein mix nahi kiya.
-  const [groupSessions, setGroupSessions] = useState<any[]>([]);
-  const [groupLoading, setGroupLoading] = useState(true);
-  const [joiningId, setJoiningId] = useState<string | null>(null);
-  const [joinError, setJoinError] = useState<string | null>(null);
-  const [joinedIds, setJoinedIds] = useState<string[]>([]);
+  const [activeFilter, setActiveFilter] =
+    useState<string>("All");
 
-  const [mentorFull, setMentorFull] = useState<any | null>(null);
-  const [mentorInfo, setMentorInfo] = useState<{
-    askQueryPrice: number;
-    acceptQueries: boolean;
-    mentorName: string;
-  } | null>(null);
-  const [queryModalOpen, setQueryModalOpen] = useState(false);
+  const [sessions, setSessions] =
+    useState<any[]>([]);
 
-  const [detailSession, setDetailSession] = useState<any | null>(null);
-  const [, forceTick] = useState(0); // countdown ko live update karne ke liye
-  const [actionBusy, setActionBusy] = useState(false);
+  const [loading, setLoading] =
+    useState(true);
 
-  // ── Waitlist ──
-  // key = session.sessionId (service card), value = user ki active waitlist entry
-  const [waitlistEntries, setWaitlistEntries] = useState<Record<string, any>>({});
-  const [waitlistTarget, setWaitlistTarget] = useState<any | null>(null);
-  const [leavingId, setLeavingId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const [groupSessions, setGroupSessions] =
+    useState<any[]>([]);
 
-  const showToast = (msg: string, type: "success" | "error" = "success") => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
-  };
+  const [groupLoading, setGroupLoading] =
+    useState(true);
 
+  const [joiningId, setJoiningId] =
+    useState<string | null>(null);
+
+  const [joinError, setJoinError] =
+    useState<string | null>(null);
+
+  /*
+   * Group join request status:
+   *
+   * none
+   * pending
+   * accepted
+   * rejected
+   */
+  const [groupRequestStatus, setGroupRequestStatus] =
+    useState<
+      Record<
+        string,
+        "none" | "pending" | "accepted" | "rejected"
+      >
+    >({});
+
+  const [queryModalOpen, setQueryModalOpen] =
+    useState(false);
+
+  const [waitlistModalOpen, setWaitlistModalOpen] =
+    useState(false);
+
+  const [selectedService, setSelectedService] =
+    useState<any>(null);
+
+  const [selectedGroup, setSelectedGroup] =
+    useState<any>(null);
+
+  const [mentor, setMentor] =
+    useState<any>(null);
+
+  /*
+   * Fetch normal sessions
+   */
   useEffect(() => {
-    if (!mentorId || !currentUserId) return;
-    MentorService.getMyWaitlists()
-      .then((res) => {
-        const map: Record<string, any> = {};
-        (res?.data ?? []).forEach((w: any) => {
-          if (w.serviceId && (w.status === "active" || w.status === "notified")) {
-            map[w.serviceId] = w;
+    let mounted = true;
+
+    const fetchSessions = async () => {
+      setLoading(true);
+
+      try {
+        const response =
+          await SessionService.getAllSessionsFromDB({
+            limit: 50,
+          });
+
+        if (!mounted) return;
+
+        const list = Array.isArray(response)
+          ? response
+          : response?.data ||
+            response?.sessions ||
+            response?.results ||
+            [];
+
+        const mentorSessions = list.filter(
+          (session: any) => {
+            const sessionMentorId =
+              session?.mentorId ||
+              session?.mentor?._id ||
+              session?.mentor?.id;
+
+            return (
+              String(sessionMentorId || "") ===
+              String(mentorId)
+            );
           }
-        });
-        setWaitlistEntries(map);
-      })
-      .catch(() => setWaitlistEntries({}));
+        );
+
+        setSessions(mentorSessions);
+      } catch (error) {
+        if (mounted) {
+          setSessions([]);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchSessions();
+
+    return () => {
+      mounted = false;
+    };
+  }, [mentorId]);
+
+  /*
+   * Fetch group sessions
+   */
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchGroupSessions = async () => {
+      setGroupLoading(true);
+      setJoinError(null);
+
+      try {
+        const response =
+          await MentorService.getAllGroupSessions({
+            mentorId,
+            limit: 50,
+          });
+
+        if (!mounted) return;
+
+        const list = Array.isArray(response)
+          ? response
+          : response?.data ||
+            response?.sessions ||
+            response?.results ||
+            [];
+
+        const normalizedGroups =
+          list.filter((group: any) => {
+            const status = String(
+              group?.status || ""
+            ).toLowerCase();
+
+            return (
+              status === "open" ||
+              status === "" ||
+              group?.status === undefined
+            );
+          });
+
+        setGroupSessions(normalizedGroups);
+
+        /*
+         * Fetch current user's request status
+         * for every group session.
+         */
+        const requestStatuses: Record<
+          string,
+          "none" | "pending" | "accepted" | "rejected"
+        > = {};
+
+        await Promise.all(
+          normalizedGroups.map(
+            async (group: any) => {
+              const groupId =
+                getGroupId(group);
+
+              if (!groupId) return;
+
+              /*
+               * First check participant data.
+               * Accepted users may already be present
+               * in participants.
+               */
+              const participant =
+                Array.isArray(
+                  group?.participants
+                )
+                  ? group.participants.find(
+                      (participant: any) =>
+                        String(
+                          participant?.menteeId ||
+                            participant?.userId ||
+                            participant?.user?._id ||
+                            participant?.user?.id ||
+                            participant?.id ||
+                            ""
+                        ) ===
+                        String(currentUserId)
+                    )
+                  : null;
+
+              if (participant) {
+                requestStatuses[groupId] =
+                  "accepted";
+
+                return;
+              }
+
+              try {
+                const request =
+                  await MentorService.getMyGroupJoinRequest(
+                    groupId
+                  );
+
+                if (!request) {
+                  requestStatuses[groupId] =
+                    "none";
+
+                  return;
+                }
+
+                requestStatuses[groupId] =
+                  getRequestStatus(request);
+              } catch {
+                requestStatuses[groupId] =
+                  "none";
+              }
+            }
+          )
+        );
+
+        if (mounted) {
+          setGroupRequestStatus(
+            requestStatuses
+          );
+        }
+      } catch (error: any) {
+        if (mounted) {
+          setGroupSessions([]);
+          setJoinError(
+            error?.message ||
+              "Failed to load group sessions."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setGroupLoading(false);
+        }
+      }
+    };
+
+    fetchGroupSessions();
+
+    return () => {
+      mounted = false;
+    };
   }, [mentorId, currentUserId]);
 
-  const handleJoinWaitlist = async (session: any, note: string) => {
-    const res = await MentorService.joinWaitlist({
-      mentorId,
-      serviceId: session.sessionId,
-      serviceTitle: session.title,
-      preferredDates: [session.scheduledAt || new Date().toISOString()],
-      preferredTimeSlots: ["any"],
-      sessionType: session.sessionType,
-      timezone: "Asia/Kolkata",
-      notes: note || undefined,
-    });
-    setWaitlistEntries((prev) => ({ ...prev, [session.sessionId]: res.data }));
-    setWaitlistTarget(null);
-    showToast("You're on the waitlist. We'll notify you when a slot opens.");
-  };
+  /*
+   * Fetch mentor profile
+   */
+  useEffect(() => {
+    let mounted = true;
 
-  const handleLeaveWaitlist = async (serviceId: string, entry: any) => {
-    setLeavingId(entry.waitlistId);
-    try {
-      await MentorService.leaveWaitlist(entry.waitlistId);
-      setWaitlistEntries((prev) => {
-        const next = { ...prev };
-        delete next[serviceId];
-        return next;
-      });
-      showToast("You've left the waitlist.");
-    } catch (err: any) {
-      showToast(err.message || "Failed to leave waitlist.", "error");
-    } finally {
-      setLeavingId(null);
+    const fetchMentor = async () => {
+      try {
+        const response =
+          await MentorService.getMyMentorProfile(
+            mentorId
+          );
+
+        if (mounted) {
+          setMentor(response);
+        }
+      } catch {
+        if (mounted) {
+          setMentor(null);
+        }
+      }
+    };
+
+    if (mentorId) {
+      fetchMentor();
     }
-  };
 
-
-
-  useEffect(() => {
-    if (!mentorId) return;
-    SessionService.getAllSessionsFromDB({ limit: 50 })
-      .then((res) => {
-        const allSessions = res?.data ?? [];
-        const mentorSessions = allSessions.filter((s: any) => s.mentorId === mentorId);
-        setSessions(mentorSessions);
-      })
-      .catch(() => setSessions([]))
-      .finally(() => setLoading(false));
+    return () => {
+      mounted = false;
+    };
   }, [mentorId]);
 
-  // ✅ NEW: mentor ke group sessions fetch karo
-  useEffect(() => {
-    if (!mentorId) return;
-    setGroupLoading(true);
-    MentorService.getAllGroupSessions({ mentorId })
-      .then((res: any) => {
-        let groups: any[] = [];
-        if (Array.isArray(res)) groups = res;
-        else if (res && Array.isArray(res.data)) groups = res.data;
-        else if (res?.data && Array.isArray(res.data.data)) groups = res.data.data;
-        setGroupSessions(groups.filter((g: any) => g.status === "open" || g.status === undefined));
-      })
-      .catch(() => setGroupSessions([]))
-      .finally(() => setGroupLoading(false));
-  }, [mentorId]);
+  /*
+   * Join Group Request
+   *
+   * IMPORTANT:
+   * This sends a request to mentor.
+   * It does NOT directly join the group.
+   */
+  const handleJoinGroupSession = async (
+    groupId: string
+  ) => {
+    if (!groupId) return;
 
-  useEffect(() => {
-    if (!mentorId) return;
-    MentorService.getMyMentorProfile(mentorId)
-      .then((res: any) => {
-        const mentor = res?.data;
-        if (!mentor) return;
-        setMentorFull(mentor);
-        setMentorInfo({
-          askQueryPrice: mentor.pricing?.askQuery ?? 0,
-          acceptQueries: mentor.preferences?.acceptQueries ?? true,
-          mentorName: getMentorDisplayName(mentor),
-        });
-      })
-      .catch(() => setMentorInfo(null));
-  }, [mentorId]);
+    const currentStatus =
+      groupRequestStatus[groupId];
 
-  // Countdown ko har 60s me refresh karo jab detail modal khula ho
-  useEffect(() => {
-    if (!detailSession) return;
-    const interval = setInterval(() => forceTick((t) => t + 1), 60000);
-    return () => clearInterval(interval);
-  }, [detailSession]);
-
-  const uniqueTypes = Array.from(new Set(sessions.map((s) => s.sessionType)));
-  const dynamicFilters = ["All", ...uniqueTypes.map((t) => SESSION_TYPE_FILTER[t] || t)];
-  // ✅ NEW: agar group sessions hain to filter pill add karo
-  if (groupSessions.length > 0 && !dynamicFilters.includes("Group Session")) {
-    dynamicFilters.push("Group Session");
-  }
-
-  const filtered =
-    activeFilter === "All"
-      ? sessions
-      : activeFilter === "Group Session"
-        ? []
-        : sessions.filter((s) => (SESSION_TYPE_FILTER[s.sessionType] || s.sessionType) === activeFilter);
-
-  // ✅ NEW: group sessions kab dikhaye
-  const showGroupSessions = activeFilter === "All" || activeFilter === "Group Session";
-
-  const getServiceFromSession = (session: any): Service => ({
-    id: session.sessionId,
-    type: SESSION_TYPE_LABEL[session.sessionType] || "1:1 Call",
-    title: session.title,
-    duration: `${session.duration} Min`,
-    originalPrice: null,
-    price: session.pricing?.basePrice === 0 ? "Free" : session.pricing?.basePrice,
-    popular: false,
-  });
-
-  const getMyBooking = (session: any) =>
-    session.bookings?.find((b: any) => b.menteeId === currentUserId);
-
-  const closeDetail = () => setDetailSession(null);
-
-  const handleBookFromModal = () => {
-    if (!detailSession) return;
-    const svc = getServiceFromSession(detailSession);
-    onServiceClick(svc);
-    closeDetail();
-  };
-
-  const handleMessageMentor = () => {
-    if (!mentorFull?.userId) return;
-    router.push(`/message/${mentorFull.userId}`);
-  };
-
-  const handleReschedule = async (session: any) => {
-    const myBooking = getMyBooking(session);
-    if (!myBooking?.bookingId) {
-      alert("Booking not found.");
+    /*
+     * Don't send duplicate requests.
+     */
+    if (currentStatus === "pending") {
       return;
     }
 
-    const input = window.prompt("Naya date/time enter karo (YYYY-MM-DD HH:mm):");
-    if (!input) return;
-    const newDate = new Date(input);
-    if (isNaN(newDate.getTime())) {
-      alert("Invalid date format");
-      return;
-    }
-    setActionBusy(true);
-    try {
-      await SessionService.rescheduleSession(
-        session.sessionId,
-        newDate.toISOString(),
-        "Mentee requested reschedule",
-        myBooking.bookingId
-      );
-      alert("Reschedule request sent.");
-      closeDetail();
-    } catch (err: any) {
-      alert(err?.message || "Failed to reschedule.");
-    } finally {
-      setActionBusy(false);
-    }
-  };
-
-  const handleCancel = async (session: any) => {
-    const myBooking = getMyBooking(session);
-    if (!myBooking?.bookingId) {
-      alert("Booking not found.");
+    if (currentStatus === "accepted") {
       return;
     }
 
-    if (!window.confirm("Kya aap sach me is session ko cancel karna chahte hain?")) return;
-    setActionBusy(true);
-    try {
-      await SessionService.cancelSession(session.sessionId, "Cancelled by mentee", myBooking.bookingId);
-      alert("Session cancelled.");
-      closeDetail();
-    } catch (err: any) {
-      alert(err?.message || "Failed to cancel.");
-    } finally {
-      setActionBusy(false);
-    }
-  };
-
-  // ✅ NEW: group session join karne ka handler
-  const handleJoinGroupSession = async (groupId: string) => {
     setJoinError(null);
     setJoiningId(groupId);
+
     try {
-      await MentorService.joinGroupSession(groupId);
-      setJoinedIds((prev) => [...prev, groupId]);
-    } catch (err: any) {
-      setJoinError(err.message || "Failed to join session.");
+      await MentorService.requestToJoinGroupSession(
+        groupId
+      );
+
+      /*
+       * Immediately show Request Pending.
+       */
+      setGroupRequestStatus((prev) => ({
+        ...prev,
+        [groupId]: "pending",
+      }));
+    } catch (error: any) {
+      setJoinError(
+        error?.message ||
+          "Failed to send join request."
+      );
     } finally {
       setJoiningId(null);
     }
   };
 
-  const isLoadingAny = loading || groupLoading;
-  const hasAnyResults =
-    filtered.length > 0 ||
-    (showGroupSessions && groupSessions.length > 0) ||
-    mentorInfo?.acceptQueries === true;
+  /*
+   * Open group session room
+   */
+  const handleJoinSession = (
+    group: any
+  ) => {
+    const groupId =
+      getGroupId(group);
 
-  return (
-    <div
-      style={{
-        borderRadius: "24px",
-        padding: "32px",
-        marginBottom: "24px",
-        background: C.surface,
-        border: `1px solid ${C.border}`,
-        boxShadow: "0 8px 32px rgba(74,55,40,0.08)",
-      }}
-    >
-      <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>
-        Available Services
-      </h2>
-      <p style={{ color: C.mid, fontSize: "13px", marginBottom: "20px" }}>
-        Discover our mentorship offerings designed for your success
-      </p>
+    if (!groupId) return;
 
-      <div style={{ display: "flex", gap: "10px", marginBottom: "24px", flexWrap: "wrap" }}>
-        {dynamicFilters.map((f) => (
-          <button
-            key={f}
-            onClick={() => setActiveFilter(f)}
-            style={{
-              padding: "10px 20px",
-              borderRadius: "20px",
-              fontWeight: 500,
-              fontSize: "14px",
-              cursor: "pointer",
-              background: activeFilter === f ? C.grad : C.border,
-              color: activeFilter === f ? "#fff" : C.dark,
-              border: activeFilter === f ? "none" : `1px solid ${C.muted}`,
-              boxShadow: activeFilter === f ? "0 8px 20px rgba(74,55,40,0.3)" : "none",
-              transform: activeFilter === f ? "scale(1.05)" : "scale(1)",
-              transition: "all 0.3s",
-            }}
-          >
-            {f}
-          </button>
-        ))}
-      </div>
+    /*
+     * If backend provides a direct meeting URL,
+     * use it.
+     */
+    const meetingUrl =
+      getGroupMeetingUrl(group);
 
-      {joinError && (
-        <div
-          style={{
-            marginBottom: "16px",
-            padding: "10px 14px",
-            borderRadius: "10px",
-            background: "#fee2e2",
-            color: "#dc2626",
-            fontSize: "13px",
-            fontWeight: 600,
-          }}
-        >
-          {joinError}
-        </div>
-      )}
+    if (meetingUrl) {
+      window.open(
+        meetingUrl,
+        "_blank",
+        "noopener,noreferrer"
+      );
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-        {isLoadingAny && (
-          <>
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <div
-              style={{
-                gridColumn: "1 / -1",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "60px",
-                gap: "12px",
-              }}
-            >
-              <div
-                style={{
-                  width: "36px",
-                  height: "36px",
-                  border: `3px solid ${C.border}`,
-                  borderTop: `3px solid ${C.dark}`,
-                  borderRadius: "50%",
-                  animation: "spin 0.8s linear infinite",
-                }}
-              />
-              <span style={{ fontSize: "13px", color: C.mid }}>Fetching sessions...</span>
-            </div>
-          </>
-        )}
+      return;
+    }
 
-        {!isLoadingAny && !hasAnyResults && (
-          <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: C.mid }}>
-            No sessions available for this filter.
-          </div>
-        )}
+    /*
+     * Otherwise use Throne8 session room.
+     */
+    router.push(
+      `/mentorship/session-room/${groupId}`
+    );
+  };
 
-        {!isLoadingAny &&
-          filtered.length > 0 &&
-          filtered.map((session) => {
-            const myBooking = getMyBooking(session);
-            const isPending = myBooking?.status === "pending";
-            const isConfirmed = myBooking?.status === "confirmed";
-            const isBooked = isPending || isConfirmed;
-            const TypeIcon = getTypeIcon(session.sessionType);
+  /*
+   * Normal session click
+   */
+  const handleNormalSessionClick = (
+    session: any
+  ) => {
+    onServiceClick(session as Service);
+  };
 
-            return (
-              <div
-                key={session.sessionId}
-                onClick={() => setDetailSession(session)}
-                style={{
-                  borderRadius: "16px",
-                  overflow: "hidden",
-                  background: C.bg,
-                  border: `1px solid ${C.border}`,
-                  position: "relative",
-                  boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
-                  opacity: isPending ? 0.6 : 1,
-                  minWidth: 0,
-                  cursor: "pointer",
-                  transition: "transform 0.15s ease, box-shadow 0.15s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                  e.currentTarget.style.boxShadow = "0 8px 20px rgba(74,55,40,0.12)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "0 2px 8px rgba(74,55,40,0.06)";
-                }}
-              >
-                {session.thumbnailImage && (
-                  <div style={{ width: "100%", height: "110px", overflow: "hidden" }}>
-                    <img
-                      src={session.thumbnailImage}
-                      alt={session.title}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    />
-                  </div>
-                )}
+  /*
+   * Waitlist
+   */
+  const handleWaitlist = (
+    service: any
+  ) => {
+    setSelectedService(service);
+    setWaitlistModalOpen(true);
+  };
 
-                <div style={{ padding: "20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                    <div
-                      style={{
-                        width: "28px",
-                        height: "28px",
-                        borderRadius: "8px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: C.border,
-                        color: C.dark,
-                        flexShrink: 0,
-                      }}
-                    >
-                      <TypeIcon size={14} />
-                    </div>
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        padding: "3px 10px",
-                        borderRadius: "12px",
-                        background: C.border,
-                        color: C.dark,
-                      }}
-                    >
-                      {SESSION_TYPE_FILTER[session.sessionType] || session.sessionType}
-                    </span>
-                  </div>
+  /*
+   * Filter normal sessions
+   */
+  const filteredSessions = useMemo(() => {
+    if (activeFilter === "All") {
+      return sessions;
+    }
 
-                  <h3
-                    style={{
-                      fontWeight: "bold",
-                      color: C.dark,
-                      fontSize: "14px",
-                      marginBottom: "8px",
-                      lineHeight: "1.4",
-                      overflowWrap: "anywhere",
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {session.title}
-                  </h3>
+    return sessions.filter(
+      (session: any) => {
+        const rawType =
+          session?.sessionType ||
+          session?.type ||
+          session?.serviceType ||
+          "";
 
-                  {session.description && (
-                    <p
-                      style={{
-                        fontSize: "12px",
-                        color: C.mid,
-                        marginBottom: "8px",
-                        lineHeight: "1.4",
-                        overflowWrap: "anywhere",
-                        wordBreak: "break-word",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {session.description}
-                    </p>
-                  )}
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      fontSize: "12px",
-                      color: C.mid,
-                      marginBottom: "14px",
-                    }}
-                  >
-                    <ClockIcon size={13} /> {session.duration} Min
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span
-                      style={{
-                        fontWeight: "bold",
-                        color: session.pricing?.basePrice === 0 ? "#10b981" : C.dark,
-                        fontSize: "15px",
-                      }}
-                    >
-                      {session.pricing?.basePrice === 0 ? "Free" : `₹${session.pricing?.basePrice}`}
-                    </span>
-
-                    {isBooked ? (
-                      <div style={{ textAlign: "right" }}>
-                        {myBooking?.status === "confirmed" ? (
-                          <>
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#10b981",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                justifyContent: "flex-end",
-                              }}
-                            >
-                              <CheckCircle2 size={13} /> Session Confirmed
-                            </div>
-                            <div style={{ fontSize: "10px", color: C.mid, marginTop: "2px" }}>
-                              Mentor has confirmed your session
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#10b981",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                justifyContent: "flex-end",
-                              }}
-                            >
-                              <CheckCircle2 size={13} /> Session Booked
-                            </div>
-                            <div style={{ fontSize: "10px", color: C.mid, marginTop: "2px" }}>
-                              Session Confirmation coming soon by Mentor
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onServiceClick(getServiceFromSession(session));
-                          }}
-                          style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}
-                        >
-                          Book
-                        </button>
-                        {/* Waitlist: user waitlist par hai to status + Leave, warna Join modal khulta hai.
-                            e.stopPropagation() zaroori hai kyunki poore card ka onClick detail modal kholta hai. */}
-                        {(() => {
-                          const wl = waitlistEntries[session.sessionId];
-                          if (wl) {
-                            const approved = wl.status === "notified";
-                            const leaving = leavingId === wl.waitlistId;
-                            return (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleLeaveWaitlist(session.sessionId, wl);
-                                }}
-                                disabled={leaving}
-                                title="Leave waitlist"
-                                style={{
-                                  padding: "8px 14px", borderRadius: "10px", fontSize: "12px", fontWeight: 600,
-                                  background: approved ? "#ecfdf5" : "transparent",
-                                  color: approved ? "#10b981" : "#dc2626",
-                                  border: `1.5px solid ${approved ? "#86efac" : "#fca5a5"}`,
-                                  cursor: leaving ? "not-allowed" : "pointer",
-                                  opacity: leaving ? 0.6 : 1,
-                                }}
-                              >
-                                {leaving
-                                  ? "Leaving..."
-                                  : approved
-                                    ? "🎉 Approved · Leave"
-                                    : `⏳ #${wl.queuePosition ?? "-"} · Leave`}
-                              </button>
-                            );
-                          }
-                          return (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setWaitlistTarget(session);
-                              }}
-                              style={{
-                                padding: "8px 18px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
-                                background: "transparent", color: C.dark, border: `1.5px solid ${C.dark}`,
-                                cursor: "pointer",
-                              }}
-                            >
-                              Waitlist
-                            </button>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-        {/* ✅ NEW: Group session cards — alag rendering kyunki inka action
-            (Reserve Seat → join API) normal `onServiceClick` calendar flow se
-            different hai, aur inka scheduledAt fixed hota hai. */}
-        {!isLoadingAny &&
-          showGroupSessions &&
-          groupSessions.map((group) => {
-            const seatsLeft = (group.maxParticipants ?? 0) - (group.currentParticipants ?? 0);
-            const alreadyJoined =
-              joinedIds.includes(group.sessionId) ||
-              group.participants?.some((p: any) => p.menteeId === currentUserId);
-            const isJoining = joiningId === group.sessionId;
-            const pricePerPerson = group.pricing?.pricePerPerson ?? group.pricePerPerson ?? 0;
-
-            return (
-              <div
-                key={group.sessionId}
-                style={{
-                  borderRadius: "16px",
-                  overflow: "hidden",
-                  background: C.bg,
-                  border: `1px solid ${C.border}`,
-                  position: "relative",
-                  boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
-                  minWidth: 0,
-                }}
-              >
-                {group.thumbnailImage && (
-                  <div style={{ width: "100%", height: "110px", overflow: "hidden" }}>
-                    <img
-                      src={group.thumbnailImage}
-                      alt={group.title}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    />
-                  </div>
-                )}
-                <div style={{ padding: "20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                    <div
-                      style={{
-                        width: "28px",
-                        height: "28px",
-                        borderRadius: "8px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: C.border,
-                        color: C.dark,
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Users size={14} />
-                    </div>
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        padding: "3px 10px",
-                        borderRadius: "12px",
-                        background: C.border,
-                        color: C.dark,
-                      }}
-                    >
-                      Group Session
-                    </span>
-                  </div>
-
-                  <h3
-                    style={{
-                      fontWeight: "bold",
-                      color: C.dark,
-                      fontSize: "14px",
-                      marginBottom: "8px",
-                      lineHeight: "1.4",
-                      overflowWrap: "anywhere",
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {group.title}
-                  </h3>
-
-                  {group.description && (
-                    <p
-                      style={{
-                        fontSize: "12px",
-                        color: C.mid,
-                        marginBottom: "8px",
-                        lineHeight: "1.4",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {group.description}
-                    </p>
-                  )}
-
-                  <div style={{ fontSize: "12px", color: C.mid, marginBottom: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
-                    <ClockIcon size={13} /> {formatGroupDate(group.scheduledAt)} · {group.duration} Min
-                  </div>
-                  <div style={{ fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
-                    {seatsLeft > 0 ? `${seatsLeft} seats available` : "Session full"} · {group.currentParticipants ?? 0}/{group.maxParticipants ?? 0} enrolled
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span
-                      style={{
-                        fontWeight: "bold",
-                        color: pricePerPerson === 0 ? "#10b981" : C.dark,
-                        fontSize: "15px",
-                      }}
-                    >
-                      {pricePerPerson === 0 ? "Free" : `₹${pricePerPerson}/person`}
-                    </span>
-
-                    {alreadyJoined ? (
-                      <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981", display: "flex", alignItems: "center", gap: "4px" }}>
-                        <CheckCircle2 size={13} /> Seat Reserved
-                      </div>
-                    ) : seatsLeft <= 0 ? (
-                      <span style={{ fontSize: "12px", fontWeight: 700, color: C.mid }}>Full</span>
-                    ) : (
-                      <button
-                        onClick={() => handleJoinGroupSession(group.sessionId)}
-                        disabled={isJoining}
-                        style={{
-                          ...btnPrimary,
-                          padding: "8px 18px",
-                          borderRadius: "10px",
-                          fontSize: "13px",
-                          opacity: isJoining ? 0.6 : 1,
-                        }}
-                      >
-                        {isJoining ? "Reserving..." : "Reserve Seat"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-        {mentorInfo?.acceptQueries && (
-          <div
-            style={{
-              borderRadius: "16px",
-              padding: "20px",
-              background: C.bg,
-              border: `1px solid ${C.border}`,
-              position: "relative",
-              boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
-              minWidth: 0,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-              <div
-                style={{
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "8px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: C.border,
-                  color: C.dark,
-                  flexShrink: 0,
-                }}
-              >
-                <HelpCircle size={14} />
-              </div>
-              <span
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  padding: "3px 10px",
-                  borderRadius: "12px",
-                  background: C.border,
-                  color: C.dark,
-                }}
-              >
-                Query
-              </span>
-            </div>
-            <h3 style={{ fontWeight: "bold", color: C.dark, fontSize: "14px", marginBottom: "8px", lineHeight: "1.4" }}>
-              Ask a Query
-            </h3>
-            <p style={{ fontSize: "12px", color: C.mid, marginBottom: "14px", lineHeight: "1.4" }}>
-              Text-based question, mentor jawab dega - no live call needed.
-            </p>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span
-                style={{
-                  fontWeight: "bold",
-                  color: mentorInfo.askQueryPrice === 0 ? "#10b981" : C.dark,
-                  fontSize: "15px",
-                }}
-              >
-                {mentorInfo.askQueryPrice === 0 ? "Free" : `₹${mentorInfo.askQueryPrice}`}
-              </span>
-              <button
-                onClick={() => setQueryModalOpen(true)}
-                style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}
-              >
-                Ask
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ================= Detail Modal ================= */}
-      {detailSession && (() => {
-        const myBooking = getMyBooking(detailSession);
-        const isConfirmed = myBooking?.status === "confirmed";
-        const isPending = myBooking?.status === "pending";
-        const isCancelled = myBooking?.status === "cancelled";
-        const isCompleted = myBooking?.status === "completed";
-        const isInProgress = myBooking?.status === "in_progress";
-        const isBooked = !!myBooking;
-        const TypeIcon = getTypeIcon(detailSession.sessionType);
-
-        if (!isBooked) {
-          const highlights = SESSION_HIGHLIGHTS[detailSession.sessionType] || DEFAULT_HIGHLIGHTS;
-          const bookingsCount = detailSession.bookings?.length || 0;
-
-          return (
-            <ModalShell onBackdropClick={closeDetail}>
-              <div style={{ padding: "24px 24px 0 24px", position: "relative" }}>
-                <CloseButton onClick={closeDetail} />
-                <HeaderBlock session={detailSession} TypeIcon={TypeIcon} />
-                {detailSession.description && (
-                  <p style={{ fontSize: "13.5px", color: C.mid, lineHeight: "1.6", marginBottom: "18px" }}>
-                    {detailSession.description}
-                  </p>
-                )}
-              </div>
-
-              <div style={{ padding: "0 24px" }}>
-                <div
-                  style={{
-                    background: C.bg,
-                    borderRadius: "14px",
-                    padding: "16px",
-                    border: `1px solid ${C.border}`,
-                    marginBottom: "18px",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
-                    <Sparkles size={15} color={C.dark} />
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>What you'll get</span>
-                  </div>
-                  <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
-                    {highlights.map((h, i) => (
-                      <li
-                        key={i}
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: "8px",
-                          fontSize: "13px",
-                          color: C.dark,
-                          marginBottom: i === highlights.length - 1 ? 0 : "8px",
-                          lineHeight: "1.5",
-                        }}
-                      >
-                        <CheckCircle2 size={14} color="#10b981" style={{ marginTop: "2px", flexShrink: 0 }} />
-                        <span>{h}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-                  <FactBox icon={<ClockIcon size={15} />} value={`${detailSession.duration} min`} label="Duration" />
-                  <FactBox
-                    icon={<IndianRupee size={15} />}
-                    value={detailSession.pricing?.basePrice === 0 ? "Free" : `₹${detailSession.pricing?.basePrice}`}
-                    label="Price"
-                    valueColor={detailSession.pricing?.basePrice === 0 ? "#10b981" : C.dark}
-                  />
-                  {bookingsCount > 0 && (
-                    <FactBox icon={<Users size={15} />} value={String(bookingsCount)} label="Already booked" />
-                  )}
-                </div>
-              </div>
-
-              <div style={{ padding: "16px 24px 24px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: "10px" }}>
-                <button onClick={closeDetail} style={secondaryBtnStyle}>Close</button>
-                <button onClick={handleBookFromModal} style={{ flex: 2, ...btnPrimary, padding: "12px", borderRadius: "12px", fontSize: "13.5px" }}>
-                  Book This Session
-                </button>
-              </div>
-            </ModalShell>
-          );
-        }
-
-        const scheduledDate = myBooking?.scheduledAt ? new Date(myBooking.scheduledAt) : (detailSession.scheduledAt ? new Date(detailSession.scheduledAt) : null);
-        const statusIdx = isCancelled ? -1 : stepIndex(myBooking.status);
-        const prepTips = detailSession.notes
-          ? detailSession.notes.split("\n").filter(Boolean)
-          : PREP_INSTRUCTIONS[detailSession.sessionType] || ["Join a few minutes early", "Keep your questions ready"];
-
-        const statusColor = isCancelled ? "#ef4444" : isCompleted ? "#10b981" : isConfirmed || isInProgress ? "#10b981" : "#b45309";
-        const statusBg = isCancelled ? "#fef2f2" : isCompleted || isConfirmed || isInProgress ? "#ecfdf5" : "#fef3c7";
-        const statusLabel = isCancelled ? "Cancelled" : isCompleted ? "Completed" : isInProgress ? "In Progress" : isConfirmed ? "Confirmed" : "Pending Confirmation";
+        const normalized =
+          SESSION_LABELS[rawType] ||
+          rawType;
 
         return (
-          <ModalShell onBackdropClick={closeDetail} maxWidth="520px">
-            <div style={{ padding: "24px 24px 0 24px", position: "relative" }}>
-              <CloseButton onClick={closeDetail} />
-              <HeaderBlock session={detailSession} TypeIcon={TypeIcon} />
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", color: C.mid, fontSize: "13px" }}>
-                <UserIcon size={14} />
-                <span>with <strong style={{ color: C.dark }}>{mentorInfo?.mentorName || "your mentor"}</strong></span>
-              </div>
-            </div>
-
-            <div style={{ padding: "0 24px" }}>
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "6px 14px",
-                  borderRadius: "20px",
-                  background: statusBg,
-                  color: statusColor,
-                  fontSize: "12.5px",
-                  fontWeight: 700,
-                  marginBottom: "20px",
-                }}
-              >
-                {isCancelled ? <Ban size={14} /> : <CheckCircle2 size={14} />}
-                {statusLabel}
-              </div>
-
-              {!isCancelled && (
-                <div style={{ marginBottom: "22px" }}>
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    {STEP_ORDER.map((step, i) => (
-                      <React.Fragment key={step}>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: i === STEP_ORDER.length - 1 ? "0 0 auto" : 1 }}>
-                          <div
-                            style={{
-                              width: "22px",
-                              height: "22px",
-                              borderRadius: "50%",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              background: i <= statusIdx ? "#10b981" : C.border,
-                              color: i <= statusIdx ? "#fff" : C.mid,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {i < statusIdx ? <CheckCircle2 size={13} /> : <Circle size={8} fill="currentColor" />}
-                          </div>
-                          <span style={{ fontSize: "10px", color: i <= statusIdx ? C.dark : C.mid, marginTop: "6px", fontWeight: i === statusIdx ? 700 : 500, whiteSpace: "nowrap" }}>
-                            {STEP_LABEL[step]}
-                          </span>
-                        </div>
-                        {i < STEP_ORDER.length - 1 && (
-                          <div style={{ flex: 1, height: "2px", background: i < statusIdx ? "#10b981" : C.border, marginBottom: "16px" }} />
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {scheduledDate && (
-                <div
-                  style={{
-                    background: C.bg,
-                    borderRadius: "14px",
-                    padding: "14px 16px",
-                    border: `1px solid ${C.border}`,
-                    marginBottom: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <Calendar size={16} color={C.dark} />
-                    <div>
-                      <div style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>{formatDateTime(scheduledDate)}</div>
-                      {myBooking?.slotTime && <div style={{ fontSize: "11px", color: C.mid }}>{formatSlotRange(myBooking.slotTime)}</div>}
-                    </div>
-                  </div>
-                  {!isCancelled && !isCompleted && (
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: "#b45309" }}>{formatCountdown(scheduledDate)}</span>
-                  )}
-                </div>
-              )}
-
-              {(isConfirmed || isInProgress) && (
-                <button
-                  onClick={() => {
-                    if (detailSession.meeting?.meetingUrl) window.open(detailSession.meeting.meetingUrl, "_blank");
-                  }}
-                  disabled={!detailSession.meeting?.meetingUrl}
-                  style={{
-                    width: "100%",
-                    ...btnPrimary,
-                    padding: "12px",
-                    borderRadius: "12px",
-                    fontSize: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    marginBottom: "18px",
-                    opacity: detailSession.meeting?.meetingUrl ? 1 : 0.5,
-                    cursor: detailSession.meeting?.meetingUrl ? "pointer" : "not-allowed",
-                  }}
-                >
-                  <Video size={16} />
-                  {detailSession.meeting?.meetingUrl ? "Join Session" : "Meeting link not shared yet"}
-                </button>
-              )}
-
-              <SectionBlock icon={<ClipboardList size={15} />} title="What You Booked">
-                <p style={{ fontSize: "13px", color: C.dark, marginBottom: "8px" }}>
-                  {SESSION_TYPE_FILTER[detailSession.sessionType] || detailSession.sessionType} — {detailSession.duration} min
-                </p>
-                {detailSession.description && (
-                  <p style={{ fontSize: "12.5px", color: C.mid, lineHeight: "1.5" }}>{detailSession.description}</p>
-                )}
-              </SectionBlock>
-
-              <SectionBlock icon={<UserIcon size={15} />} title="Mentor Details">
-                <p style={{ fontSize: "13px", color: C.dark, fontWeight: 600, marginBottom: "2px" }}>
-                  {mentorInfo?.mentorName || "Mentor"}
-                </p>
-                {mentorFull?.title && <p style={{ fontSize: "12px", color: C.mid, marginBottom: "2px" }}>{mentorFull.title}</p>}
-                {typeof mentorFull?.experience === "number" && (
-                  <p style={{ fontSize: "12px", color: C.mid }}>{mentorFull.experience} years of experience</p>
-                )}
-              </SectionBlock>
-
-              <SectionBlock icon={<Sparkles size={15} />} title="Preparation Instructions">
-                <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
-                  {prepTips.map((tip: string, i: number) => (
-                    <li key={i} style={{ display: "flex", gap: "8px", fontSize: "12.5px", color: C.dark, marginBottom: i === prepTips.length - 1 ? 0 : "6px" }}>
-                      <CheckCircle2 size={13} color="#10b981" style={{ marginTop: "2px", flexShrink: 0 }} />
-                      <span>{tip}</span>
-                    </li>
-                  ))}
-                </ul>
-              </SectionBlock>
-
-              <SectionBlock icon={<Wallet size={15} />} title="Booking & Payment Details">
-                <Row label="Base Price" value={`₹${myBooking.pricing?.basePrice ?? detailSession.pricing?.basePrice ?? 0}`} />
-                <Row label="Platform Fee" value={`₹${myBooking.pricing?.platformFee ?? detailSession.pricing?.platformFee ?? 0}`} />
-                <Row label="Total Paid" value={`₹${myBooking.pricing?.totalAmount ?? detailSession.pricing?.totalAmount ?? 0}`} bold />
-                <Row label="Payment Status" value={myBooking.payment?.status || "—"} />
-                {myBooking.payment?.method && <Row label="Payment Method" value={myBooking.payment.method} />}
-              </SectionBlock>
-
-              {!isCancelled && !isCompleted && (
-                <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
-                  <ActionChip icon={<MessageCircle size={13} />} label="Message" onClick={handleMessageMentor} />
-                  <ActionChip icon={<RefreshCcw size={13} />} label="Reschedule" onClick={() => handleReschedule(detailSession)} disabled={actionBusy} />
-                  <ActionChip icon={<Ban size={13} />} label="Cancel" onClick={() => handleCancel(detailSession)} disabled={actionBusy} danger />
-                </div>
-              )}
-
-              <SectionBlock icon={<History size={15} />} title="Timeline">
-                <TimelineList session={detailSession} booking={myBooking} />
-              </SectionBlock>
-            </div>
-
-            <div style={{ padding: "16px 24px 24px 24px" }}>
-              <button onClick={closeDetail} style={{ ...secondaryBtnStyle, width: "100%" }}>Close</button>
-            </div>
-          </ModalShell>
+          normalized === activeFilter
         );
-      })()}
+      }
+    );
+  }, [sessions, activeFilter]);
 
+  const isBooked = (
+    session: any
+  ) => {
+    const sessionId =
+      session?.sessionId ||
+      session?._id ||
+      session?.id;
 
-      {waitlistTarget && (
-        <WaitlistModal
-          service={{
-            title: waitlistTarget.title,
-            sessionType: waitlistTarget.sessionType,
-            duration: waitlistTarget.duration,
-            price: waitlistTarget.pricing?.basePrice,
-          }}
-          mentorName={mentorInfo?.mentorName}
-          onClose={() => setWaitlistTarget(null)}
-          onConfirm={(note) => handleJoinWaitlist(waitlistTarget, note)}
-        />
-      )}
+    return bookedSessionIds.includes(
+      String(sessionId)
+    );
+  };
 
-      {toast && (
-        <div
-          style={{
-            position: "fixed", top: 20, right: 20, zIndex: 9999, padding: "12px 16px", borderRadius: 12,
-            fontSize: 13, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-            background: toast.type === "success" ? "#dcfce7" : "#fee2e2",
-            color: toast.type === "success" ? "#15803d" : "#dc2626",
-            border: `1px solid ${toast.type === "success" ? "#86efac" : "#fca5a5"}`,
-          }}
-        >
-          {toast.msg}
-        </div>
-      )}
-
-      {queryModalOpen && mentorInfo && (
-        <QueryModal
-          mentorId={mentorId}
-          mentorName={mentorInfo.mentorName || undefined}
-          price={mentorInfo.askQueryPrice}
-          onClose={() => setQueryModalOpen(false)}
-          onSuccess={() => setQueryModalOpen(false)}
-        />
-      )}
-    </div>
-  );
-};
-
-export default ServicesSection;
-
-// ============================================================
-// Small presentational helpers
-// ============================================================
-
-function ModalShell({ children, onBackdropClick, maxWidth = "460px" }: { children: React.ReactNode; onBackdropClick: () => void; maxWidth?: string }) {
   return (
-    <div
-      onClick={onBackdropClick}
+    <section
       style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(30,20,10,0.45)",
-        backdropFilter: "blur(2px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        padding: "16px",
+        width: "100%",
+        padding: "0 0 60px",
       }}
     >
+      {/* =====================================================
+          HEADER
+      ====================================================== */}
+
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
-          background: C.surface,
-          borderRadius: "20px",
-          maxWidth,
-          width: "100%",
-          maxHeight: "88vh",
-          overflowY: "auto",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
-          border: `1px solid ${C.border}`,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          gap: "20px",
+          marginBottom: "24px",
+          flexWrap: "wrap",
         }}
       >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function CloseButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        position: "absolute",
-        top: "20px",
-        right: "20px",
-        width: "30px",
-        height: "30px",
-        borderRadius: "50%",
-        border: "none",
-        background: C.border,
-        color: C.dark,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: "pointer",
-      }}
-      aria-label="Close"
-    >
-      <X size={16} />
-    </button>
-  );
-}
-
-function HeaderBlock({ session, TypeIcon }: { session: any; TypeIcon: any }) {
-  return (
-    <>
-      {session.thumbnailImage ? (
-        <div style={{ width: "100%", height: "140px", borderRadius: "14px", overflow: "hidden", marginBottom: "16px" }}>
-          <img src={session.thumbnailImage} alt={session.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        </div>
-      ) : (
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+        <div>
           <div
             style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "12px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: C.grad,
-              color: "#fff",
-              flexShrink: 0,
+              fontSize: "12px",
+              fontWeight: 700,
+              color: "#6b7280",
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              marginBottom: "8px",
             }}
           >
-            <TypeIcon size={19} />
+            Mentorship Services
           </div>
+
+          <h2
+            style={{
+              margin: 0,
+              fontSize: "28px",
+              lineHeight: 1.2,
+              fontWeight: 750,
+              color: "#111827",
+            }}
+          >
+            Learn directly from
+            industry experience
+          </h2>
+
+          <p
+            style={{
+              margin: "8px 0 0",
+              maxWidth: "650px",
+              fontSize: "14px",
+              lineHeight: 1.6,
+              color: "#6b7280",
+            }}
+          >
+            Choose a mentorship format that
+            fits your goals and get practical,
+            actionable guidance.
+          </p>
         </div>
-      )}
-      <span
+
+        <button
+          onClick={() =>
+            setQueryModalOpen(true)
+          }
+          style={{
+            ...btnSecondary,
+            padding: "10px 16px",
+            borderRadius: "10px",
+            fontSize: "13px",
+          }}
+        >
+          <MessageCircle size={15} />
+          Ask a Query
+        </button>
+      </div>
+
+      {/* =====================================================
+          FILTERS
+      ====================================================== */}
+
+      <div
         style={{
-          fontSize: "12px",
-          fontWeight: 600,
-          padding: "4px 12px",
-          borderRadius: "12px",
-          background: C.border,
-          color: C.dark,
-          display: "inline-block",
-          marginBottom: "10px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          flexWrap: "wrap",
+          marginBottom: "28px",
         }}
       >
-        {SESSION_TYPE_FILTER[session.sessionType] || session.sessionType}
-      </span>
-      <h2 style={{ fontSize: "19px", fontWeight: 700, color: C.dark, marginBottom: "6px", lineHeight: "1.35" }}>
-        {session.title}
-      </h2>
-    </>
-  );
-}
+        {SESSION_FILTERS.map(
+          (filter) => {
+            const active =
+              activeFilter === filter;
 
-function FactBox({ icon, value, label, valueColor }: { icon: React.ReactNode; value: string; label: string; valueColor?: string }) {
-  return (
-    <div style={{ flex: 1, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px", color: C.mid }}>{icon}</div>
-      <div style={{ fontSize: "13px", fontWeight: 700, color: valueColor || C.dark }}>{value}</div>
-      <div style={{ fontSize: "10px", color: C.mid }}>{label}</div>
-    </div>
-  );
-}
-
-function SectionBlock({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
-  return (
-    <div style={{ marginBottom: "16px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
-        <span style={{ color: C.dark }}>{icon}</span>
-        <span style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>{title}</span>
+            return (
+              <button
+                key={filter}
+                onClick={() =>
+                  setActiveFilter(filter)
+                }
+                style={{
+                  border: active
+                    ? "1px solid #111827"
+                    : "1px solid #e5e7eb",
+                  background: active
+                    ? "#111827"
+                    : "#ffffff",
+                  color: active
+                    ? "#ffffff"
+                    : "#4b5563",
+                  padding:
+                    "8px 14px",
+                  borderRadius: "999px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {filter}
+              </button>
+            );
+          }
+        )}
       </div>
-      <div style={{ background: C.bg, borderRadius: "12px", padding: "12px 14px", border: `1px solid ${C.border}` }}>
-        {children}
-      </div>
-    </div>
-  );
-}
 
-function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", padding: "3px 0" }}>
-      <span style={{ color: C.mid }}>{label}</span>
-      <span style={{ color: C.dark, fontWeight: bold ? 700 : 500 }}>{value}</span>
-    </div>
-  );
-}
+      {/* =====================================================
+          GROUP SESSIONS
+      ====================================================== */}
 
-function ActionChip({
-  icon,
-  label,
-  onClick,
-  danger,
-  disabled,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  danger?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "6px",
-        padding: "8px 14px",
-        borderRadius: "10px",
-        fontSize: "12.5px",
-        fontWeight: 600,
-        background: danger ? "#fef2f2" : C.border,
-        color: danger ? "#ef4444" : C.dark,
-        border: "none",
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.6 : 1,
-      }}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
+      {(activeFilter === "All" ||
+        activeFilter ===
+          "Group Session") && (
+        <div
+          style={{
+            marginBottom: "42px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent:
+                "space-between",
+              alignItems: "center",
+              marginBottom: "16px",
+            }}
+          >
+            <div>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: "20px",
+                  fontWeight: 700,
+                  color: "#111827",
+                }}
+              >
+                Group Sessions
+              </h3>
 
-function TimelineList({ session, booking }: { session: any; booking: any }) {
-  const events: { label: string; date: Date | null; color: string }[] = [];
-
-  if (booking?.bookedAt) events.push({ label: "Session booked", date: new Date(booking.bookedAt), color: "#8a7a6a" });
-  if (booking?.status !== "pending" && booking?.scheduledAt) {
-    events.push({ label: "Confirmed for", date: new Date(booking.scheduledAt), color: "#10b981" });
-  }
-  if (session.reschedule?.lastRescheduledAt) {
-    events.push({ label: "Rescheduled", date: new Date(session.reschedule.lastRescheduledAt), color: "#b45309" });
-  }
-  if (session.cancellation?.cancelledAt) {
-    events.push({ label: `Cancelled${session.cancellation.reason ? ` — ${session.cancellation.reason}` : ""}`, date: new Date(session.cancellation.cancelledAt), color: "#ef4444" });
-  }
-  if (session.completion?.completedAt) {
-    events.push({ label: "Session completed", date: new Date(session.completion.completedAt), color: "#10b981" });
-  }
-
-  events.sort((a, b) => (a.date && b.date ? a.date.getTime() - b.date.getTime() : 0));
-
-  if (events.length === 0) {
-    return <p style={{ fontSize: "12px", color: C.mid, margin: 0 }}>No timeline events yet.</p>;
-  }
-
-  return (
-    <div>
-      {events.map((ev, i) => (
-        <div key={i} style={{ display: "flex", gap: "10px", marginBottom: i === events.length - 1 ? 0 : "10px" }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: ev.color, marginTop: "4px" }} />
-            {i < events.length - 1 && <div style={{ width: "2px", flex: 1, background: C.border, marginTop: "2px" }} />}
+              <p
+                style={{
+                  margin:
+                    "5px 0 0",
+                  fontSize: "13px",
+                  color: "#6b7280",
+                }}
+              >
+                Learn and interact with
+                multiple mentees in a
+                focused session.
+              </p>
+            </div>
           </div>
-          <div style={{ paddingBottom: "2px" }}>
-            <div style={{ fontSize: "12.5px", fontWeight: 600, color: C.dark }}>{ev.label}</div>
-            {ev.date && <div style={{ fontSize: "11px", color: C.mid }}>{formatDateTime(ev.date)}</div>}
-          </div>
+
+          {joinError && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "11px 14px",
+                marginBottom: "14px",
+                borderRadius: "10px",
+                background: "#fef2f2",
+                border:
+                  "1px solid #fecaca",
+                color: "#b91c1c",
+                fontSize: "13px",
+              }}
+            >
+              <XCircle size={15} />
+              {joinError}
+            </div>
+          )}
+
+          {groupLoading ? (
+            <div
+              style={{
+                padding: "40px 20px",
+                border:
+                  "1px solid #e5e7eb",
+                borderRadius: "16px",
+                textAlign: "center",
+                color: "#6b7280",
+                fontSize: "14px",
+              }}
+            >
+              Loading group sessions...
+            </div>
+          ) : groupSessions.length ===
+            0 ? (
+            <div
+              style={{
+                padding: "40px 20px",
+                border:
+                  "1px solid #e5e7eb",
+                borderRadius: "16px",
+                textAlign: "center",
+                color: "#6b7280",
+                fontSize: "14px",
+              }}
+            >
+              No group sessions available
+              right now.
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fill, minmax(300px, 1fr))",
+                gap: "18px",
+              }}
+            >
+              {groupSessions.map(
+                (group: any) => {
+                  const groupId =
+                    getGroupId(group);
+
+                  const seatsLeft =
+                    Math.max(
+                      0,
+                      (group?.maxParticipants ??
+                        0) -
+                        (group?.currentParticipants ??
+                          group?.participants
+                            ?.length ??
+                          0)
+                    );
+
+                  const requestStatus =
+                    groupRequestStatus[
+                      groupId
+                    ] || "none";
+
+                  const isJoining =
+                    joiningId === groupId;
+
+                  const isPending =
+                    requestStatus ===
+                    "pending";
+
+                  const isAccepted =
+                    requestStatus ===
+                    "accepted";
+
+                  const isRejected =
+                    requestStatus ===
+                    "rejected";
+
+                  const sessionJoinable =
+                    isGroupSessionJoinable(
+                      group
+                    );
+
+                  const pricePerPerson =
+                    group?.pricing
+                      ?.pricePerPerson ??
+                    group?.pricePerPerson ??
+                    0;
+
+                  const scheduledAt =
+                    group?.scheduledAt ||
+                    group?.startTime ||
+                    group?.scheduledFor;
+
+                  return (
+                    <div
+                      key={groupId}
+                      style={{
+                        border:
+                          "1px solid #e5e7eb",
+                        borderRadius: "16px",
+                        background:
+                          "#ffffff",
+                        overflow: "hidden",
+                        boxShadow:
+                          "0 4px 16px rgba(0,0,0,0.04)",
+                      }}
+                    >
+                      {/* IMAGE */}
+
+                      {group?.thumbnailImage ||
+                      group?.thumbnail ||
+                      group?.image ? (
+                        <img
+                          src={
+                            group?.thumbnailImage ||
+                            group?.thumbnail ||
+                            group?.image
+                          }
+                          alt={
+                            group?.title ||
+                            "Group Session"
+                          }
+                          style={{
+                            width: "100%",
+                            height: "170px",
+                            objectFit:
+                              "cover",
+                            display:
+                              "block",
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: "100%",
+                            height: "170px",
+                            background:
+                              "#f3f4f6",
+                            display:
+                              "flex",
+                            alignItems:
+                              "center",
+                            justifyContent:
+                              "center",
+                            color: "#9ca3af",
+                          }}
+                        >
+                          <Users
+                            size={42}
+                          />
+                        </div>
+                      )}
+
+                      <div
+                        style={{
+                          padding:
+                            "18px",
+                        }}
+                      >
+                        {/* TITLE */}
+
+                        <div
+                          style={{
+                            display:
+                              "flex",
+                            alignItems:
+                              "flex-start",
+                            justifyContent:
+                              "space-between",
+                            gap: "10px",
+                            marginBottom:
+                              "8px",
+                          }}
+                        >
+                          <h4
+                            style={{
+                              margin: 0,
+                              fontSize:
+                                "17px",
+                              lineHeight:
+                                1.35,
+                              fontWeight:
+                                700,
+                              color:
+                                "#111827",
+                            }}
+                          >
+                            {group?.title ||
+                              "Group Session"}
+                          </h4>
+
+                          <div
+                            style={{
+                              flexShrink: 0,
+                              fontSize:
+                                "11px",
+                              fontWeight:
+                                700,
+                              padding:
+                                "5px 8px",
+                              borderRadius:
+                                "999px",
+                              background:
+                                "#f3f4f6",
+                              color:
+                                "#374151",
+                            }}
+                          >
+                            Group
+                          </div>
+                        </div>
+
+                        {/* DESCRIPTION */}
+
+                        <p
+                          style={{
+                            margin:
+                              "0 0 14px",
+                            fontSize:
+                              "13px",
+                            lineHeight:
+                              1.55,
+                            color:
+                              "#6b7280",
+                            display:
+                              "-webkit-box",
+                            WebkitLineClamp:
+                              3,
+                            WebkitBoxOrient:
+                              "vertical",
+                            overflow:
+                              "hidden",
+                          }}
+                        >
+                          {group?.description ||
+                            group?.topic ||
+                            "Interactive group mentorship session."}
+                        </p>
+
+                        {/* META */}
+
+                        <div
+                          style={{
+                            display:
+                              "grid",
+                            gridTemplateColumns:
+                              "1fr 1fr",
+                            gap: "9px",
+                            marginBottom:
+                              "16px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              alignItems:
+                                "center",
+                              gap: "7px",
+                              fontSize:
+                                "12px",
+                              color:
+                                "#6b7280",
+                            }}
+                          >
+                            <Calendar
+                              size={
+                                14
+                              }
+                            />
+
+                            <span>
+                              {scheduledAt
+                                ? new Date(
+                                    scheduledAt
+                                  ).toLocaleDateString(
+                                    "en-IN",
+                                    {
+                                      day: "2-digit",
+                                      month:
+                                        "short",
+                                      year:
+                                        "numeric",
+                                    }
+                                  )
+                                : "Date TBD"}
+                            </span>
+                          </div>
+
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              alignItems:
+                                "center",
+                              gap: "7px",
+                              fontSize:
+                                "12px",
+                              color:
+                                "#6b7280",
+                            }}
+                          >
+                            <Clock
+                              size={
+                                14
+                              }
+                            />
+
+                            <span>
+                              {scheduledAt
+                                ? new Date(
+                                    scheduledAt
+                                  ).toLocaleTimeString(
+                                    "en-IN",
+                                    {
+                                      hour:
+                                        "2-digit",
+                                      minute:
+                                        "2-digit",
+                                    }
+                                  )
+                                : "Time TBD"}
+                            </span>
+                          </div>
+
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              alignItems:
+                                "center",
+                              gap: "7px",
+                              fontSize:
+                                "12px",
+                              color:
+                                "#6b7280",
+                            }}
+                          >
+                            <Users
+                              size={
+                                14
+                              }
+                            />
+
+                            <span>
+                              {seatsLeft}{" "}
+                              seat
+                              {seatsLeft ===
+                              1
+                                ? ""
+                                : "s"}{" "}
+                              left
+                            </span>
+                          </div>
+
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              alignItems:
+                                "center",
+                              gap: "7px",
+                              fontSize:
+                                "12px",
+                              color:
+                                "#6b7280",
+                            }}
+                          >
+                            <Clock
+                              size={
+                                14
+                              }
+                            />
+
+                            <span>
+                              {group?.duration
+                                ? `${group.duration} min`
+                                : "Duration TBD"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* PRICE */}
+
+                        <div
+                          style={{
+                            display:
+                              "flex",
+                            alignItems:
+                              "center",
+                            justifyContent:
+                              "space-between",
+                            marginBottom:
+                              "15px",
+                            paddingBottom:
+                              "15px",
+                            borderBottom:
+                              "1px solid #f3f4f6",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize:
+                                "12px",
+                              color:
+                                "#6b7280",
+                            }}
+                          >
+                            Price per person
+                          </span>
+
+                          <span
+                            style={{
+                              fontSize:
+                                "17px",
+                              fontWeight:
+                                750,
+                              color:
+                                "#111827",
+                            }}
+                          >
+                            {pricePerPerson >
+                            0
+                              ? `₹${pricePerPerson}`
+                              : "Free"}
+                          </span>
+                        </div>
+
+                        {/* STATUS */}
+
+                        {isPending && (
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              alignItems:
+                                "center",
+                              gap: "8px",
+                              padding:
+                                "9px 11px",
+                              marginBottom:
+                                "12px",
+                              borderRadius:
+                                "10px",
+                              background:
+                                "#fffbeb",
+                              border:
+                                "1px solid #fde68a",
+                              color:
+                                "#92400e",
+                              fontSize:
+                                "12px",
+                              fontWeight:
+                                600,
+                            }}
+                          >
+                            <Clock
+                              size={
+                                14
+                              }
+                            />
+                            Your join request
+                            is pending mentor
+                            approval.
+                          </div>
+                        )}
+
+                        {isAccepted &&
+                          !sessionJoinable && (
+                            <div
+                              style={{
+                                display:
+                                  "flex",
+                                alignItems:
+                                  "center",
+                                gap: "8px",
+                                padding:
+                                  "9px 11px",
+                                marginBottom:
+                                  "12px",
+                                borderRadius:
+                                  "10px",
+                                background:
+                                  "#ecfdf5",
+                                border:
+                                  "1px solid #a7f3d0",
+                                color:
+                                  "#047857",
+                                fontSize:
+                                  "12px",
+                                fontWeight:
+                                  600,
+                              }}
+                            >
+                              <CheckCircle2
+                                size={
+                                  14
+                                }
+                              />
+                              You have joined
+                              this group
+                              session.
+                            </div>
+                          )}
+
+                        {isRejected && (
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              alignItems:
+                                "center",
+                              gap: "8px",
+                              padding:
+                                "9px 11px",
+                              marginBottom:
+                                "12px",
+                              borderRadius:
+                                "10px",
+                              background:
+                                "#fef2f2",
+                              border:
+                                "1px solid #fecaca",
+                              color:
+                                "#b91c1c",
+                              fontSize:
+                                "12px",
+                              fontWeight:
+                                600,
+                            }}
+                          >
+                            <XCircle
+                              size={
+                                14
+                              }
+                            />
+                            Your previous
+                            request was
+                            rejected. You can
+                            request again.
+                          </div>
+                        )}
+
+                        {/* BUTTON */}
+
+                        {isPending ? (
+                          <button
+                            disabled
+                            style={{
+                              width: "100%",
+                              ...btnPrimary,
+                              padding:
+                                "10px 16px",
+                              borderRadius:
+                                "10px",
+                              fontSize:
+                                "13px",
+                              opacity:
+                                0.55,
+                              cursor:
+                                "not-allowed",
+                            }}
+                          >
+                            <Clock
+                              size={
+                                15
+                              }
+                            />
+                            Request Pending
+                          </button>
+                        ) : isAccepted ? (
+                          sessionJoinable ? (
+                            <button
+                              onClick={() =>
+                                handleJoinSession(
+                                  group
+                                )
+                              }
+                              style={{
+                                width:
+                                  "100%",
+                                ...btnPrimary,
+                                padding:
+                                  "10px 16px",
+                                borderRadius:
+                                  "10px",
+                                fontSize:
+                                  "13px",
+                              }}
+                            >
+                              <Video
+                                size={
+                                  15
+                                }
+                              />
+                              Join Session
+                              <ArrowRight
+                                size={
+                                  14
+                                }
+                              />
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              style={{
+                                width:
+                                  "100%",
+                                ...btnSecondary,
+                                padding:
+                                  "10px 16px",
+                                borderRadius:
+                                  "10px",
+                                fontSize:
+                                  "13px",
+                                cursor:
+                                  "default",
+                                opacity:
+                                  0.75,
+                              }}
+                            >
+                              <CheckCircle2
+                                size={
+                                  15
+                                }
+                              />
+                              Joined
+                            </button>
+                          )
+                        ) : seatsLeft <=
+                          0 ? (
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              alignItems:
+                                "center",
+                              justifyContent:
+                                "space-between",
+                              gap: "10px",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize:
+                                  "12px",
+                                color:
+                                  "#6b7280",
+                                fontWeight:
+                                  600,
+                              }}
+                            >
+                              This session
+                              is full.
+                            </span>
+
+                            <button
+                              onClick={() =>
+                                handleWaitlist(
+                                  group
+                                )
+                              }
+                              style={{
+                                ...btnSecondary,
+                                padding:
+                                  "8px 12px",
+                                borderRadius:
+                                  "9px",
+                                fontSize:
+                                  "12px",
+                              }}
+                            >
+                              Join Waitlist
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() =>
+                              handleJoinGroupSession(
+                                groupId
+                              )
+                            }
+                            disabled={
+                              isJoining
+                            }
+                            style={{
+                              width:
+                                "100%",
+                              ...btnPrimary,
+                              padding:
+                                "10px 16px",
+                              borderRadius:
+                                "10px",
+                              fontSize:
+                                "13px",
+                              opacity:
+                                isJoining
+                                  ? 0.6
+                                  : 1,
+                              cursor:
+                                isJoining
+                                  ? "not-allowed"
+                                  : "pointer",
+                            }}
+                          >
+                            {isJoining ? (
+                              <>
+                                <Clock
+                                  size={
+                                    15
+                                  }
+                                />
+                                Sending
+                                Request...
+                              </>
+                            ) : (
+                              <>
+                                <Users
+                                  size={
+                                    15
+                                  }
+                                />
+                                Join Group
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+              )}
+            </div>
+          )}
         </div>
-      ))}
-    </div>
+      )}
+
+      {/* =====================================================
+          NORMAL SESSIONS
+      ====================================================== */}
+
+      {(activeFilter === "All" ||
+        activeFilter ===
+          "1-on-1 Session") && (
+        <div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent:
+                "space-between",
+              alignItems: "center",
+              marginBottom: "16px",
+            }}
+          >
+            <div>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: "20px",
+                  fontWeight: 700,
+                  color: "#111827",
+                }}
+              >
+                1-on-1 Sessions
+              </h3>
+
+              <p
+                style={{
+                  margin:
+                    "5px 0 0",
+                  fontSize: "13px",
+                  color: "#6b7280",
+                }}
+              >
+                Focused one-to-one
+                mentorship based on your
+                goals.
+              </p>
+            </div>
+          </div>
+
+          {loading ? (
+            <div
+              style={{
+                padding: "40px 20px",
+                border:
+                  "1px solid #e5e7eb",
+                borderRadius: "16px",
+                textAlign: "center",
+                color: "#6b7280",
+                fontSize: "14px",
+              }}
+            >
+              Loading sessions...
+            </div>
+          ) : filteredSessions.length ===
+            0 ? (
+            <div
+              style={{
+                padding: "40px 20px",
+                border:
+                  "1px solid #e5e7eb",
+                borderRadius: "16px",
+                textAlign: "center",
+                color: "#6b7280",
+                fontSize: "14px",
+              }}
+            >
+              No 1-on-1 sessions available
+              right now.
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fill, minmax(300px, 1fr))",
+                gap: "18px",
+              }}
+            >
+              {filteredSessions.map(
+                (session: any) => {
+                  const sessionId =
+                    session?.sessionId ||
+                    session?._id ||
+                    session?.id;
+
+                  const booked =
+                    isBooked(session);
+
+                  const title =
+                    session?.title ||
+                    session?.serviceTitle ||
+                    session?.name ||
+                    "Mentorship Session";
+
+                  const description =
+                    session?.description ||
+                    session?.shortDescription ||
+                    "Personalized one-on-one mentorship session.";
+
+                  const duration =
+                    session?.duration ||
+                    session?.durationMinutes;
+
+                  const price =
+                    session?.price ||
+                    session?.pricing
+                      ?.amount ||
+                    session?.pricePerSession ||
+                    0;
+
+                  return (
+                    <div
+                      key={String(
+                        sessionId
+                      )}
+                      style={{
+                        border:
+                          "1px solid #e5e7eb",
+                        borderRadius: "16px",
+                        background:
+                          "#ffffff",
+                        padding: "18px",
+                        boxShadow:
+                          "0 4px 16px rgba(0,0,0,0.04)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display:
+                            "flex",
+                          alignItems:
+                            "flex-start",
+                          justifyContent:
+                            "space-between",
+                          gap: "12px",
+                          marginBottom:
+                            "10px",
+                        }}
+                      >
+                        <h4
+                          style={{
+                            margin: 0,
+                            fontSize:
+                              "17px",
+                            lineHeight:
+                              1.35,
+                            fontWeight:
+                              700,
+                            color:
+                              "#111827",
+                          }}
+                        >
+                          {title}
+                        </h4>
+
+                        <div
+                          style={{
+                            flexShrink: 0,
+                            fontSize:
+                              "11px",
+                            fontWeight:
+                              700,
+                            padding:
+                              "5px 8px",
+                            borderRadius:
+                              "999px",
+                            background:
+                              "#f3f4f6",
+                            color:
+                              "#374151",
+                          }}
+                        >
+                          1-on-1
+                        </div>
+                      </div>
+
+                      <p
+                        style={{
+                          margin:
+                            "0 0 16px",
+                          fontSize:
+                            "13px",
+                          lineHeight:
+                            1.55,
+                          color:
+                            "#6b7280",
+                          display:
+                            "-webkit-box",
+                          WebkitLineClamp:
+                            3,
+                          WebkitBoxOrient:
+                            "vertical",
+                          overflow:
+                            "hidden",
+                        }}
+                      >
+                        {description}
+                      </p>
+
+                      <div
+                        style={{
+                          display:
+                            "flex",
+                          flexDirection:
+                            "column",
+                          gap: "9px",
+                          marginBottom:
+                            "17px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display:
+                              "flex",
+                            alignItems:
+                              "center",
+                            gap: "8px",
+                            fontSize:
+                              "12px",
+                            color:
+                              "#6b7280",
+                          }}
+                        >
+                          <Clock
+                            size={14}
+                          />
+                          {duration
+                            ? `${duration} minutes`
+                            : "Flexible duration"}
+                        </div>
+
+                        <div
+                          style={{
+                            display:
+                              "flex",
+                            alignItems:
+                              "center",
+                            gap: "8px",
+                            fontSize:
+                              "12px",
+                            color:
+                              "#6b7280",
+                          }}
+                        >
+                          <Star
+                            size={14}
+                          />
+                          Personalized
+                          mentorship
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          display:
+                            "flex",
+                          alignItems:
+                            "center",
+                          justifyContent:
+                            "space-between",
+                          marginBottom:
+                            "15px",
+                          paddingBottom:
+                            "15px",
+                          borderBottom:
+                            "1px solid #f3f4f6",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize:
+                              "12px",
+                            color:
+                              "#6b7280",
+                          }}
+                        >
+                          Session price
+                        </span>
+
+                        <span
+                          style={{
+                            fontSize:
+                              "17px",
+                            fontWeight:
+                              750,
+                            color:
+                              "#111827",
+                          }}
+                        >
+                          {price > 0
+                            ? `₹${price}`
+                            : "Free"}
+                        </span>
+                      </div>
+
+                      {booked ? (
+                        <div
+                          style={{
+                            display:
+                              "flex",
+                            alignItems:
+                              "center",
+                            justifyContent:
+                              "center",
+                            gap: "7px",
+                            width:
+                              "100%",
+                            padding:
+                              "10px 16px",
+                            borderRadius:
+                              "10px",
+                            background:
+                              "#ecfdf5",
+                            border:
+                              "1px solid #a7f3d0",
+                            color:
+                              "#047857",
+                            fontSize:
+                              "13px",
+                            fontWeight:
+                              650,
+                          }}
+                        >
+                          <CheckCircle2
+                            size={
+                              15
+                            }
+                          />
+                          Already Booked
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() =>
+                            handleNormalSessionClick(
+                              session
+                            )
+                          }
+                          style={{
+                            width:
+                              "100%",
+                            ...btnPrimary,
+                            padding:
+                              "10px 16px",
+                            borderRadius:
+                              "10px",
+                            fontSize:
+                              "13px",
+                          }}
+                        >
+                          Book Session
+                          <ArrowRight
+                            size={
+                              14
+                            }
+                          />
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =====================================================
+          HIGHLIGHTS
+      ====================================================== */}
+
+      <div
+        style={{
+          marginTop: "42px",
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: "12px",
+        }}
+      >
+        {HIGHLIGHTS.map(
+          (highlight) => (
+            <div
+              key={highlight}
+              style={{
+                padding:
+                  "14px 16px",
+                border:
+                  "1px solid #e5e7eb",
+                borderRadius:
+                  "12px",
+                background:
+                  "#ffffff",
+                fontSize:
+                  "13px",
+                fontWeight:
+                  600,
+                color:
+                  "#374151",
+              }}
+            >
+              <CheckCircle2
+                size={15}
+                style={{
+                  verticalAlign:
+                    "middle",
+                  marginRight:
+                    "7px",
+                }}
+              />
+              {highlight}
+            </div>
+          )
+        )}
+      </div>
+
+      {/* =====================================================
+          PREPARATION
+      ====================================================== */}
+
+      <div
+        style={{
+          marginTop: "28px",
+          padding: "20px",
+          borderRadius: "16px",
+          background: "#f9fafb",
+          border:
+            "1px solid #e5e7eb",
+        }}
+      >
+        <h3
+          style={{
+            margin:
+              "0 0 12px",
+            fontSize:
+              "16px",
+            fontWeight:
+              700,
+            color:
+              "#111827",
+          }}
+        >
+          How to prepare
+        </h3>
+
+        <div
+          style={{
+            display:
+              "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "10px",
+          }}
+        >
+          {PREP_POINTS.map(
+            (point) => (
+              <div
+                key={point}
+                style={{
+                  display:
+                    "flex",
+                  alignItems:
+                    "center",
+                  gap: "8px",
+                  fontSize:
+                    "13px",
+                  color:
+                    "#6b7280",
+                }}
+              >
+                <CheckCircle2
+                  size={14}
+                />
+                {point}
+              </div>
+            )
+          )}
+        </div>
+      </div>
+
+      {/* =====================================================
+          QUERY MODAL
+      ====================================================== */}
+
+      {queryModalOpen && (
+        <QueryModal
+          mentorId={mentorId}
+          mentor={mentor}
+          onClose={() =>
+            setQueryModalOpen(false)
+          }
+        />
+      )}
+
+      {/* =====================================================
+          WAITLIST MODAL
+      ====================================================== */}
+
+      {waitlistModalOpen &&
+        selectedService && (
+          <WaitlistModal
+            mentorId={mentorId}
+            serviceId={
+              selectedService?.sessionId ||
+              selectedService?._id ||
+              selectedService?.id
+            }
+            serviceTitle={
+              selectedService?.title ||
+              selectedService?.serviceTitle ||
+              "Group Session"
+            }
+            onClose={() => {
+              setWaitlistModalOpen(false);
+              setSelectedService(null);
+            }}
+          />
+        )}
+    </section>
   );
 }
-
-const secondaryBtnStyle: React.CSSProperties = {
-  flex: 1,
-  padding: "12px",
-  borderRadius: "12px",
-  fontSize: "13.5px",
-  fontWeight: 600,
-  background: C.border,
-  color: C.dark,
-  border: "none",
-  cursor: "pointer",
-};
