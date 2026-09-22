@@ -11,9 +11,10 @@ import CalendarStep from "./CalendarStep";
 import DetailsStep from "./DetailsStep";
 import PaymentStep from "./PaymentStep";
 import ConfirmationStep from "./ConfirmationStep";
+import { ArrowLeft } from "./Icons";
 import MentorService from "@/lib/api/mentorship.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import SessionService from "@/lib/api/session.service";
 
 interface MentorProfileProps {
@@ -95,48 +96,74 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
+    const router = useRouter();
+
     return (
         <div style={{ minHeight: "100vh", background: C.bg, overflowX: "hidden" }}>
-            <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "88px 16px 24px", display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
-                <MentorSidebar mentorData={mentorData} />
-                <div style={{ minWidth: 0 }}>
-                    {bookingStep === "calendar" && (
-                        <CalendarStep mentorId={mentorData?.mentorId || ""} selectedService={selectedService} onBack={() => setBookingStep(null)} onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }} />
-                    )}
-                    {bookingStep === "details" && (
-                        <DetailsStep selectedService={selectedService} calendarData={calendarData!} onBack={() => setBookingStep("calendar")} onContinue={(d: BookingFormData) => { setFormData(d); setBookingStep("payment"); }} />
-                    )}
-                    {bookingStep === "payment" && (
-                        <PaymentStep
-                            selectedService={selectedService}
-                            calendarData={calendarData!}
-                            formData={formData!}
-                            mentorId={mentorData?.mentorId || ""}
-                            onBack={() => setBookingStep("details")}
-                            onConfirm={() => setBookingStep("confirmation")}
-                            onBookingSuccess={() => {
-                                if (selectedService?.id) {
-                                    setBookedSessionIds(prev => [...prev, String(selectedService.id)]);
-                                }
-                                resetBooking();
-                            }}
-                        />
-                    )}
-                    {bookingStep === "confirmation" && (
-                        <ConfirmationStep selectedService={selectedService} calendarData={calendarData} formData={formData} onReset={resetBooking} />
-                    )}
+            <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "120px 16px 24px" }}>
+                
+                <div style={{ marginBottom: "24px" }}>
+                    <button
+                        onClick={() => router.back()}
+                        style={{
+                            background: "transparent",
+                            border: `1px solid ${C.border}`,
+                            cursor: "pointer",
+                            color: C.dark,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            padding: "8px 16px",
+                            borderRadius: "8px",
+                        }}
+                    >
+                        <ArrowLeft /> Back
+                    </button>
+                </div>
 
-                    {!bookingStep && (
-                        <>
-                            <ServicesSection
-                                onServiceClick={handleServiceClick}
+                <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
+                    <MentorSidebar mentorData={mentorData} />
+                    <div style={{ minWidth: 0 }}>
+                        {bookingStep === "calendar" && (
+                            <CalendarStep mentorId={mentorData?.mentorId || ""} selectedService={selectedService} onBack={() => setBookingStep(null)} onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }} />
+                        )}
+                        {bookingStep === "details" && (
+                            <DetailsStep selectedService={selectedService} calendarData={calendarData!} onBack={() => setBookingStep("calendar")} onContinue={(d: BookingFormData) => { setFormData(d); setBookingStep("payment"); }} />
+                        )}
+                        {bookingStep === "payment" && (
+                            <PaymentStep
+                                selectedService={selectedService}
+                                calendarData={calendarData!}
+                                formData={formData!}
                                 mentorId={mentorData?.mentorId || ""}
-                                bookedSessionIds={bookedSessionIds}
-                                currentUserId={user?.userId || ""}
+                                onBack={() => setBookingStep("details")}
+                                onConfirm={() => setBookingStep("confirmation")}
+                                onBookingSuccess={() => {
+                                    if (selectedService?.id) {
+                                        setBookedSessionIds(prev => [...prev, String(selectedService.id)]);
+                                    }
+                                    resetBooking();
+                                }}
                             />
-                            <ReviewsSection mentorId={mentorData?.mentorId || ""} />
-                        </>
-                    )}
+                        )}
+                        {bookingStep === "confirmation" && (
+                            <ConfirmationStep selectedService={selectedService} calendarData={calendarData} formData={formData} onReset={resetBooking} />
+                        )}
+
+                        {!bookingStep && (
+                            <>
+                                <ServicesSection
+                                    onServiceClick={handleServiceClick}
+                                    mentorId={mentorData?.mentorId || ""}
+                                    bookedSessionIds={bookedSessionIds}
+                                    currentUserId={user?.userId || ""}
+                                />
+                                <ReviewsSection mentorId={mentorData?.mentorId || ""} />
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

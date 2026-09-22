@@ -16,6 +16,8 @@ import ConfirmationStep from "./ConfirmationStep";
 
 import MentorService from "@/lib/api/mentorship.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useRouter } from "next/navigation";
+import { ArrowLeft } from "./Icons";
 
 interface MentorProfileProps {
     mentorId: string;
@@ -25,6 +27,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     mentorId
 }) => {
     const { user } = useAuth();
+    const router = useRouter();
     const [bookingStep, setBookingStep] = useState<BookingStep>(null);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
@@ -84,18 +87,40 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
 
     return (
         <div style={{ minHeight: "100vh", background: C.bg }}>
-            <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "24px 16px", display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
-                <MentorSidebar mentorData={mentorData} />
-                <div>
-                    <ServicesSection
-                        onServiceClick={handleServiceClick}
-                        mentorId={mentorData?.mentorId || ""}
-                        bookedSessionIds={bookedSessionIds}
-                        currentUserId={user?.userId || ""}
-                        mentorName={`${mentorData?.user?.firstName ?? ""} ${mentorData?.user?.lastName ?? ""}`.trim()}
-                    />
+            <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "100px 16px 24px" }}>
+                <div style={{ marginBottom: "24px" }}>
+                    <button
+                        onClick={() => router.back()}
+                        style={{
+                            background: "transparent",
+                            border: `1px solid ${C.border}`,
+                            cursor: "pointer",
+                            color: C.dark,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            padding: "8px 16px",
+                            borderRadius: "8px",
+                        }}
+                    >
+                        <ArrowLeft /> Back
+                    </button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
+                    <MentorSidebar mentorData={mentorData} />
+                    <div>
+                        <ServicesSection
+                            onServiceClick={handleServiceClick}
+                            mentorId={mentorData?.mentorId || ""}
+                            bookedSessionIds={bookedSessionIds}
+                            currentUserId={user?.userId || ""}
+                            mentorName={`${mentorData?.user?.firstName ?? ""} ${mentorData?.user?.lastName ?? ""}`.trim()}
+                        />
 
-                    <ReviewsSection />
+                        <ReviewsSection />
+                    </div>
                 </div>
             </div>
         </div>
