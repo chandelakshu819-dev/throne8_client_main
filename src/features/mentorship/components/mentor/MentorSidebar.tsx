@@ -14,7 +14,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData }) => {
 
     if (!mentorData) {
         return (
-            <div style={{ position: "sticky", top: "24px" }}>
+            <div style={{ position: "sticky", top: "100px" }}>
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                 <div style={{ borderRadius: "24px", padding: "60px 24px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", background: C.bg, border: `1px solid ${C.border}` }}>
                     <div style={{ width: "36px", height: "36px", border: `3px solid ${C.border}`, borderTop: `3px solid ${C.dark}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
@@ -48,7 +48,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData }) => {
     };
 
     return (
-        <div style={{ position: "sticky", top: "24px" }}>
+        <div style={{ position: "sticky", top: "100px" }}>
             <div style={{ borderRadius: "24px", overflow: "hidden", boxShadow: "0 20px 60px rgba(74,55,40,0.15)", border: `1px solid ${C.border}` }}>
 
                 {/* Banner */}

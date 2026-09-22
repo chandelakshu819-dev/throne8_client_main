@@ -2,7 +2,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight } from "./Icons";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight, ArrowLeft } from "./Icons";
 import { TIME_SLOTS, MONTHS, DAYS, C, btnPrimary, formatTimeAMPM, formatSlotRange } from "./mentor/types/data";
 import type { Service, CalendarData } from "./mentor/types/types";
 import AvailabilityService from "@/lib/api/availability.service";
@@ -17,6 +18,7 @@ interface CalendarStepProps {
 }
 
 const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, onContinue, mentorId }) => {
+    const router = useRouter();
     const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
     const [selectedDate, setSelectedDate] = useState<number | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -123,12 +125,28 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
 
     return (
         <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px" }}>
-            <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: C.mid, display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", fontWeight: 500, marginBottom: "24px" }}>
-                ← Back to Profile
-            </button>
-
             <div style={{ maxWidth: "1200px", margin: "0 auto", borderRadius: "24px", padding: "40px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)" }}>
-            <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>Select Date &amp; Time</h2>
+                <div style={{ marginBottom: "16px" }}>
+                    <button
+                        onClick={onBack}
+                        style={{
+                            background: "transparent",
+                            border: `1px solid ${C.border}`,
+                            cursor: "pointer",
+                            color: C.dark,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            padding: "8px 16px",
+                            borderRadius: "8px",
+                        }}
+                    >
+                        <ArrowLeft /> Back
+                    </button>
+                </div>
+                <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>Select Date &amp; Time</h2>
                 <p style={{ color: C.mid, fontSize: "13px", marginBottom: "16px" }}>Booking: {selectedService?.title}</p>
 
                 {activeSessionCount >= 3 && (
