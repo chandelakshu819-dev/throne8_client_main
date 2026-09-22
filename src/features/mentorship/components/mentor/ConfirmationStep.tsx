@@ -18,7 +18,7 @@ const ConfirmationStep: React.FC<ConfirmationStepProps> = ({ selectedService, ca
 
     const rows: [string, string][] = [
         [isRes ? "Resource:" : "Service:", selectedService?.title ?? ""],
-        ...(calendarData?.selectedDate ? ([["Date:", `${calendarData.selectedDate} ${month !== undefined ? MONTHS[month] : ""} ${year}`], ["Time:", calendarData.selectedTime]] as [string, string][]) : []),
+        ...(calendarData?.selectedDate ? ([["Date:", `${calendarData.selectedDate} ${month !== undefined ? MONTHS[month] : ""} ${year}`], ["Time:", calendarData.selectedTime.split(" - ")[0]]] as [string, string][]) : []),
         ...(formData?.email ? ([["Email:", formData.email]] as [string, string][]) : []),
     ];
 

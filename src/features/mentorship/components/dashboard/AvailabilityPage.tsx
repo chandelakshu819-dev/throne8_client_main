@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
   Clock, Globe, Calendar, ChevronLeft, ChevronRight,
-  Shield, Trash2, Plus, X, BarChart2, RefreshCw, Pencil, Check, Lock, Ban
+  Trash2, Plus, X, BarChart2, RefreshCw, Pencil, Check, Lock, Ban
 } from "lucide-react"
 import AvailabilityService from "@/lib/api/availability.service";
 
@@ -82,8 +82,7 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
   const [timezone, setTimezone] = useState("Asia/Kolkata");
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
   const [freeTrialEnabled, setFreeTrialEnabled] = useState(false);
-  const [autoBlockBooked, setAutoBlockBooked] = useState(true);
-  const [autoClosePast, setAutoClosePast] = useState(true);
+
 
   // ── API data state ─────────────────────────────────────
   const [existingAvailability, setExistingAvailability] = useState<AvailabilityRecord[]>([]);
@@ -638,6 +637,12 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
   }: { value: string; onChange: (v: string) => void; disabled?: boolean }) => {
     const { hour12, minute, period } = from24Hour(value);
     const [open, setOpen] = useState(false);
+    // ✅ FIX: native <select> ka OS/browser dropdown yahan bohot lamba
+    // render ho raha tha aur layout todta tha (screenshot me dikha) —
+    // ab apna chhota, scrollable, controlled list use karenge, isliye
+    // in dono ka open/close state alag se track karna hoga.
+    const [hourListOpen, setHourListOpen] = useState(false);
+    const [minuteListOpen, setMinuteListOpen] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     // Close on outside click
@@ -650,6 +655,14 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
       };
       document.addEventListener("mousedown", handleClick);
       return () => document.removeEventListener("mousedown", handleClick);
+    }, [open]);
+
+    // Whole time-popup band hote hi hour/minute ki chhoti lists bhi band kar do
+    useEffect(() => {
+      if (!open) {
+        setHourListOpen(false);
+        setMinuteListOpen(false);
+      }
     }, [open]);
 
     const updateHour = (h: number) => onChange(to24Hour(h, minute, period));
@@ -681,32 +694,75 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
             className="absolute z-50 mt-1 flex items-center gap-1.5 p-3 rounded-xl shadow-lg"
             style={{ backgroundColor: '#fff', border: '1px solid #e0d8cf', minWidth: '220px' }}
           >
-            {/* Hour dropdown */}
-            <select
-              value={hour12}
-              onChange={(e) => updateHour(Number(e.target.value))}
-              className="px-2 py-1.5 rounded-lg outline-none text-sm font-semibold"
-              style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
-            >
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
-                <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
-              ))}
-            </select>
+                      {/* Hour picker — custom scrollable list instead of native <select>
+                (native select rendered a huge unstyled OS dropdown that broke
+                the layout). Fixed-height panel with its own scrollbar. */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => { setHourListOpen(v => !v); setMinuteListOpen(false); }}
+                className="px-2 py-1.5 rounded-lg outline-none text-sm font-semibold w-12 text-center"
+                style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+              >
+                {String(hour12).padStart(2, "0")}
+              </button>
+              {hourListOpen && (
+                <div
+                  className="absolute z-50 mt-1 rounded-lg shadow-lg overflow-y-auto"
+                  style={{ border: '1px solid #e0d8cf', backgroundColor: '#fff', maxHeight: '160px', width: '56px' }}
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => { updateHour(h); setHourListOpen(false); }}
+                      className="block w-full text-center px-2 py-1.5 text-sm font-semibold"
+                      style={{
+                        backgroundColor: h === hour12 ? '#4a3728' : 'transparent',
+                        color: h === hour12 ? '#fff' : '#4a3728',
+                      }}
+                    >
+                      {String(h).padStart(2, "0")}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <span className="text-sm font-bold" style={{ color: '#8a7a6a' }}>:</span>
 
-            {/* Minute dropdown — 5-min steps, matches typical slot granularity */}
-            <select
-              value={minute}
-              onChange={(e) => updateMinute(Number(e.target.value))}
-              className="px-2 py-1.5 rounded-lg outline-none text-sm font-semibold"
-              style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
-            >
-              {Array.from({ length: 60 }, (_, i) => i).map((m) => (
-                <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
-              ))}
-            </select>
-
+            {/* Minute picker — same custom scrollable list, 1-min steps */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => { setMinuteListOpen(v => !v); setHourListOpen(false); }}
+                className="px-2 py-1.5 rounded-lg outline-none text-sm font-semibold w-12 text-center"
+                style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+              >
+                {String(minute).padStart(2, "0")}
+              </button>
+              {minuteListOpen && (
+                <div
+                  className="absolute z-50 mt-1 rounded-lg shadow-lg overflow-y-auto"
+                  style={{ border: '1px solid #e0d8cf', backgroundColor: '#fff', maxHeight: '160px', width: '56px' }}
+                >
+                  {Array.from({ length: 60 }, (_, i) => i).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => { updateMinute(m); setMinuteListOpen(false); }}
+                      className="block w-full text-center px-2 py-1.5 text-sm font-semibold"
+                      style={{
+                        backgroundColor: m === minute ? '#4a3728' : 'transparent',
+                        color: m === minute ? '#fff' : '#4a3728',
+                      }}
+                    >
+                      {String(m).padStart(2, "0")}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {/* Explicit AM/PM toggle — this is the actual fix */}
             <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid #e0d8cf' }}>
               {(["AM", "PM"] as const).map((p) => (
@@ -838,54 +894,6 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
             </div>
           </div>
 
-          {/* Action bar */}
-          <div className="bg-white p-5 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex gap-3 flex-wrap">
-                <button
-                  onClick={copyMondayToAll}
-                  className="px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 text-white transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: '#4a3728' }}
-                >
-                  <Calendar className="w-4 h-4" /> Copy Monday → All Days
-                </button>
-                <button
-                  onClick={() => setShowBlockDateInput(v => !v)}
-                  className="px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-colors hover:bg-[#f3ece4]"
-                  style={{ backgroundColor: '#fbf7f3', color: '#7a5c3e', border: '1px solid #e0d8cf' }}
-                >
-                  <Ban className="w-4 h-4" /> Block Specific Dates
-                </button>
-              </div>
-              <label className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl cursor-pointer" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
-                <input type="checkbox" checked={freeTrialEnabled} onChange={e => setFreeTrialEnabled(e.target.checked)} className="w-4 h-4 rounded" style={{ accentColor: '#4a3728' }} />
-                <span className="text-sm font-semibold" style={{ color: '#4a3728' }}>Free Trial Slot Toggle</span>
-              </label>
-            </div>
-            {showBlockDateInput && (
-              <div className="mt-3 flex items-center gap-2 flex-wrap">
-                <input
-                  type="date" value={newBlockDate} onChange={e => setNewBlockDate(e.target.value)}
-                  className="px-3.5 py-2 rounded-lg outline-none text-sm font-semibold flex-1"
-                  style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
-                />
-
-                {/* ✅ FIX: Label/reason input hata diya — ab sirf date
-                    diya jaata hai, addBlockedDate() ko label ki jagah
-                    undefined pass hoga (jo already optional hai). */}
-<button
-                  onClick={addBlockedDate}
-                  disabled={!!blockActionId}
-                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60"
-                  style={{ backgroundColor: '#4a3728' }}
-                >
-                  {blockActionId ? "Blocking..." : "Add"}
-                </button>
-
-                <button onClick={() => setShowBlockDateInput(false)} className="px-3.5 py-2 rounded-lg text-sm font-semibold" style={{ backgroundColor: '#fbf7f3', color: '#7a5c3e', border: '1px solid #e0d8cf' }}>Cancel</button>
-              </div>
-            )}
-          </div>
           {/* Weekly Schedule */}
           <div className="bg-white p-6 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
             <div className="flex items-center justify-between mb-4">
@@ -893,6 +901,8 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                             {/* Mini week-pattern strip — clickable to toggle enabled/disabled,
                   AND now shows a ring highlight when its day matches the
                   currently selected calendar date. */}
+
+                            <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
               {weekSchedule.map((d, idx) => {
                   const isSelectedDay = selectedDayName === d.day;
@@ -916,10 +926,28 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                         boxShadow: isSelectedDay ? '0 0 0 2px #4a3728, 0 0 0 4px rgba(74,55,40,0.3)' : 'none',
                       }}
                     >
-                      {d.day[0]}
+                                          {d.day[0]}
                     </button>
                   );
                 })}
+              </div>
+
+              {/* Save button — ab strip ke bilkul side mein */}
+              <button
+                type="button"
+                onClick={handleSaveAvailability}
+                disabled={isSaving}
+                title={
+                  selectedDate
+                    ? `Save availability for ${selectedDate} ${monthNames[currentDate.getMonth()]}`
+                    : `Save full month (${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()})`
+                }
+                className="px-3.5 py-1.5 rounded-lg text-white text-xs font-bold flex items-center gap-1.5 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90"
+                style={{ backgroundColor: '#4a3728' }}
+              >
+                <Check className="w-3.5 h-3.5" />
+                {isSaving ? "Saving..." : selectedDate ? "Save Day" : "Save Month"}
+              </button>
               </div>
             </div>
                         {/* ✅ FIX: max-h + overflow-y-auto hata diya — ab list static
@@ -942,24 +970,17 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                   style={{
                     border: isSelectedDay ? '2px solid #4a3728' : '1px solid #e0d8cf',
                     backgroundColor: isSelectedDay ? '#f3ece4' : item.enabled ? '#fbf7f3' : '#fafafa',
-                    opacity: item.enabled ? 1 : 0.55,
                     boxShadow: isSelectedDay ? '0 0 0 3px rgba(74,55,40,0.12)' : 'none',
                   }}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold w-24" style={{ color: '#4a3728' }}>{item.day}</span>
-                    {/* Single ON/OFF toggle — ye hi ek button hai, upar wale strip se connected */}
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox" checked={item.enabled}
-                        onChange={e => setWeekSchedule(prev => prev.map((d, i) => i === idx ? { ...d, enabled: e.target.checked } : d))}
-                        className="sr-only peer"
-                      />
-                      <div
-                        className="w-10 h-5.5 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4.5 after:w-4.5 after:transition-all"
-                        style={{ backgroundColor: item.enabled ? '#4a3728' : '#d8cec4' }}
-                      />
-                    </label>
+                    <span
+                      className="text-[11px] font-semibold"
+                      style={{ color: item.enabled ? '#15803d' : '#a08070' }}
+                    >
+                      {item.enabled ? 'Available' : 'Not available'}
+                    </span>
                   </div>
 
                   {/* ✅ NEW: ab har din multiple time-ranges rakh sakta hai —
@@ -989,26 +1010,10 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                           ))}
                         />
 
-                        {/* Remove — sirf tab dikhega jab is din 1 se zyada range ho */}
-                        {item.timeRanges.length > 1 && (
-                          <button
-                            type="button"
-                            disabled={!item.enabled}
-                            onClick={() => setWeekSchedule(prev => prev.map((d, i) =>
-                              i === idx
-                                ? { ...d, timeRanges: d.timeRanges.filter((_: any, ri: number) => ri !== rIdx) }
-                                : d
-                            ))}
-                            className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-[#fee2e2] disabled:opacity-40 transition-colors"
-                            title="Remove this time range"
-                          >
-                            <X className="w-3.5 h-3.5" style={{ color: '#dc2626' }} />
-                          </button>
-                        )}
-
-                        {/* Add — sirf last range ke saath dikhta hai, naya
-                            time-block is din ke liye jodta hai */}
-                        {rIdx === item.timeRanges.length - 1 && (
+                                               {/* Action cell: pehli row par "+", baaki rows par "x".
+                                                Har row mein ye cell same jagah par rehta hai, isliye
+                            saari rows seedhi line mein aati hain. */}
+                        {rIdx === 0 ? (
                           <button
                             type="button"
                             disabled={!item.enabled}
@@ -1018,12 +1023,68 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                               const start = lastRange?.endTime || "09:00";
                               return { ...d, timeRanges: [...d.timeRanges, { startTime: start, endTime: start }] };
                             }))}
-                            className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-[#f3ece4] disabled:opacity-40 transition-colors"
+                            className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 hover:bg-[#f3ece4] disabled:opacity-40 transition-colors"
                             style={{ border: '1px solid #e0d8cf' }}
                             title="Add another time range for this day"
                           >
                             <Plus className="w-3.5 h-3.5" style={{ color: '#7a5c3e' }} />
                           </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={!item.enabled}
+                            onClick={() => setWeekSchedule(prev => prev.map((d, i) =>
+                              i === idx
+                                ? { ...d, timeRanges: d.timeRanges.filter((_: any, ri: number) => ri !== rIdx) }
+                                : d
+                            ))}
+                            className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 hover:bg-[#fee2e2] disabled:opacity-40 transition-colors"
+                            title="Delete this time range"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" style={{ color: '#dc2626' }} />
+                            </button>
+                        )}
+
+                        {/* Toggle cell: pehli row par ON/OFF switch, baaki rows par khaali jagah.
+                            Inline styles hain, isliye Tailwind classes par depend nahi karta. */}
+                        {rIdx === 0 ? (
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={item.enabled}
+                            title={item.enabled ? 'Available — click to turn off' : 'Not available — click to turn on'}
+                            onClick={() => setWeekSchedule(prev => prev.map((d, i) =>
+                              i === idx ? { ...d, enabled: !d.enabled } : d
+                            ))}
+                            style={{
+                              position: 'relative',
+                              width: 40,
+                              height: 22,
+                              borderRadius: 9999,
+                              border: 'none',
+                              padding: 0,
+                              flexShrink: 0,
+                              cursor: 'pointer',
+                              backgroundColor: item.enabled ? '#4a3728' : '#d8cec4',
+                              transition: 'background-color 0.2s',
+                            }}
+                          >
+                            <span
+                              style={{
+                                position: 'absolute',
+                                top: 2,
+                                left: item.enabled ? 20 : 2,
+                                width: 18,
+                                  height: 18,
+                                borderRadius: '50%',
+                                backgroundColor: '#fff',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                                transition: 'left 0.2s',
+                              }}
+                            />
+                          </button>
+                        ) : (
+                          <div style={{ width: 40, flexShrink: 0 }} />
                         )}
                       </div>
                     ))}
@@ -1122,24 +1183,7 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
             </div>
           </div>
 
-          {/* Auto Block Settings */}
-          <div className="bg-white p-5 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
-            <h4 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: '#4a3728' }}>
-              <Shield className="w-4 h-4" style={{ color: '#7a5c3e' }} /> Auto Block Settings
-            </h4>
-            <div className="space-y-2">
-              {[
-                { label: 'Auto Block Booked Slots', value: autoBlockBooked, set: setAutoBlockBooked },
-                { label: 'Auto Close Past Slots', value: autoClosePast, set: setAutoClosePast },
-              ].map(item => (
-                <label key={item.label} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
-                  <input type="checkbox" checked={item.value} onChange={e => item.set(e.target.checked)} className="w-4 h-4 rounded" style={{ accentColor: '#4a3728' }} />
-                  <p className="text-sm font-semibold" style={{ color: '#4a3728' }}>{item.label}</p>
-                </label>
-              ))}
-            </div>
-          </div>
-
+        
           {/* Blocked Dates */}
           <div className="bg-white p-5 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
             <h4 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: '#4a3728' }}>
@@ -1164,39 +1208,47 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                 ))
               )}
             </div>
-            <button
-              onClick={() => setShowBlockDateInput(true)}
-              className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#4a3728' }}
-            >
-              <Plus className="w-4 h-4" /> Add Blocked Date
-            </button>
+            {!showBlockDateInput ? (
+              <button
+                onClick={() => setShowBlockDateInput(true)}
+                className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: '#4a3728' }}
+              >
+                <Plus className="w-4 h-4" /> Add Blocked Date
+              </button>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <input
+                  type="date"
+                  value={newBlockDate}
+                  onChange={e => setNewBlockDate(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-lg outline-none text-sm font-semibold"
+                  style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={addBlockedDate}
+                    disabled={!!blockActionId || !newBlockDate}
+                    className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60"
+                    style={{ backgroundColor: '#4a3728' }}
+                  >
+                    {blockActionId ? "Blocking..." : "Confirm Block"}
+                  </button>
+                  <button
+                    onClick={() => { setShowBlockDateInput(false); setNewBlockDate(""); }}
+                    className="px-3.5 py-2 rounded-lg text-sm font-semibold"
+                    style={{ backgroundColor: '#fbf7f3', color: '#7a5c3e', border: '1px solid #e0d8cf' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-            {/* Save Section */}
-            <div>
-        <p className="text-sm mb-3 font-medium" style={{ color: '#8a7a6a' }}>
-          {selectedDate
-            ? `Single day mode — ${selectedDate} ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()} · Click date again to deselect`
-            : `Bulk mode — Full month: ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()} · Click a date to switch to single day`
-          }
-        </p>
-        <button
-          onClick={handleSaveAvailability}
-          disabled={isSaving}
-          className="w-full py-3.5 rounded-xl text-white text-sm font-bold transition-opacity disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90"
-          style={{ backgroundColor: '#4a3728' }}
-        >
-          {isSaving
-            ? "Saving..."
-            : selectedDate
-              ? `Save Availability for ${selectedDate} ${monthNames[currentDate.getMonth()]}`
-              : `Save Full Month (${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()})`
-          }
-        </button>
-      </div>
+        
 
            {/* Custom Delete Confirm Modal — Image 2 jaisa */}
            {confirmDeleteId && (

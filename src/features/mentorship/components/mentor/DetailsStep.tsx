@@ -120,7 +120,7 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
                     {([
                         ["Service", selectedService?.title ?? ""],
                         ["Date", `${selectedDate} ${MONTHS[month]} ${year}`],
-                        ["Time", selectedTime],
+                        ["Time", selectedTime.split(" - ")[0]],
                         ["Total", `₹${selectedService?.price}`],
                     ] as [string, string][]).map(([k, v]) => (
                         <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: C.dark, marginBottom: "5px" }}>
