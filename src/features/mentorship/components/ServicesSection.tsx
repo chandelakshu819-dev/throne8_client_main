@@ -336,8 +336,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     activeFilter === "All"
       ? sessions
       : activeFilter === "Group Session"
-      ? []
-      : sessions.filter((s) => (SESSION_TYPE_FILTER[s.sessionType] || s.sessionType) === activeFilter);
+        ? []
+        : sessions.filter((s) => (SESSION_TYPE_FILTER[s.sessionType] || s.sessionType) === activeFilter);
 
   // ✅ NEW: group sessions kab dikhaye
   const showGroupSessions = activeFilter === "All" || activeFilter === "Group Session";
@@ -719,7 +719,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                         >
                           Book
                         </button>
-                                                {/* Waitlist: user waitlist par hai to status + Leave, warna Join modal khulta hai.
+                        {/* Waitlist: user waitlist par hai to status + Leave, warna Join modal khulta hai.
                             e.stopPropagation() zaroori hai kyunki poore card ka onClick detail modal kholta hai. */}
                         {(() => {
                           const wl = waitlistEntries[session.sessionId];
@@ -746,8 +746,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                                 {leaving
                                   ? "Leaving..."
                                   : approved
-                                  ? "🎉 Approved · Leave"
-                                  : `⏳ #${wl.queuePosition ?? "-"} · Leave`}
+                                    ? "🎉 Approved · Leave"
+                                    : `⏳ #${wl.queuePosition ?? "-"} · Leave`}
                               </button>
                             );
                           }
@@ -1256,7 +1256,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       })()}
 
 
-{waitlistTarget && (
+      {waitlistTarget && (
         <WaitlistModal
           service={{
             title: waitlistTarget.title,

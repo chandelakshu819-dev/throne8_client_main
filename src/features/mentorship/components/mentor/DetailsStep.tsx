@@ -103,7 +103,7 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
                         <div key={name}>
                             <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: C.dark, marginBottom: "6px" }}>{label}</label>
                             <input
-                                type={type} 
+                                type={type}
                                 name={name}
                                 placeholder={ph}
                                 value={formData[name] ?? ""}
