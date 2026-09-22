@@ -74,7 +74,7 @@ export interface AnalyticsResponse {
 }
 
 export interface BookSessionInput {
-    sessionId: string;    
+    sessionId: string;
     mentorId: string;
     availabilityId: string;
     slotTime: string;
@@ -90,6 +90,14 @@ export interface BookSessionInput {
 }
 
 class SessionService {
+
+    // ── GROUP SESSIONS base endpoint ────────────────────────
+    // Falls back to a sane default path if not defined in env config,
+    // same pattern as every other *_ENDPOINT fallback in this file.
+    private static readonly GROUP_SESSIONS_ENDPOINT =
+        (config as any).NEXT_PUBLIC_GROUP_SESSIONS_ENDPOINT
+        || (process.env as any).NEXT_PUBLIC_GROUP_SESSIONS_ENDPOINT
+        || '/mentorship/group-sessions';
 
     static async createSession(input: CreateSessionInput): Promise<ApiResponse> {
         try {
@@ -252,9 +260,9 @@ class SessionService {
         try {
             console.log("📋 [GET_ALL_SESSIONS] Fetching with filters:", filters);
 
-            const endpoint = config.NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT 
+            const endpoint = config.NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT
                 || `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/get-all`;
-            
+
             const { data } = await api.get<ApiResponse>(endpoint, { params: filters });
 
             // console.log("✅ [GET_ALL_SESSIONS] Fetched:", data, "sessions");
@@ -390,6 +398,73 @@ class SessionService {
             if (error?.response?.status === 404) throw new Error("Session not found.");
             if (error?.response?.status === 400) throw new Error(error?.response?.data?.message || "Receipt not available.");
             throw new Error(error?.response?.data?.message || "Failed to fetch receipt.");
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // GROUP SESSIONS — mentor Booking dashboard integration
+    // ══════════════════════════════════════════════════════════════════
+
+    // ── GET all group-session participants for the logged-in mentor ────
+    // ✅ NEW: powers the "group sessions inside Booking dashboard" merge.
+    // Backend already shapes each row like a 1:1 booking row
+    // (bookingId, sessionId, menteeId, menteeName, menteeProfilePhoto,
+    // serviceName, scheduledAt, status, isGroupSession: true) so
+    // BookingsPage.tsx can flatten/merge it directly with 1:1 bookings.
+    static async getMentorGroupSessionParticipants(): Promise<ApiResponse> {
+        try {
+            const { data } = await api.get<ApiResponse>(
+                `${SessionService.GROUP_SESSIONS_ENDPOINT}/mentor/participants`
+            );
+            console.log("✅ [GET_MENTOR_GROUP_PARTICIPANTS] Fetched:", data);
+            return data;
+        } catch (error: any) {
+            console.error("❌ [GET_MENTOR_GROUP_PARTICIPANTS] Failed", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to fetch group session bookings.");
+        }
+    }
+
+    // ── START a group session (mentor only) ─────────────────
+    static async startGroupSession(sessionId: string): Promise<ApiResponse> {
+        try {
+            const { data } = await api.post<ApiResponse>(
+                `${SessionService.GROUP_SESSIONS_ENDPOINT}/${sessionId}/start`
+            );
+            return data;
+        } catch (error: any) {
+            console.error("❌ [START_GROUP_SESSION] Failed", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to start group session.");
+        }
+    }
+
+    // ── COMPLETE a group session (mentor only) ──────────────
+    static async completeGroupSession(
+        sessionId: string,
+        payload: { actualDuration?: number; attendees?: string[]; wasSuccessful?: boolean } = {}
+    ): Promise<ApiResponse> {
+        try {
+            const { data } = await api.post<ApiResponse>(
+                `${SessionService.GROUP_SESSIONS_ENDPOINT}/${sessionId}/complete`,
+                payload
+            );
+            return data;
+        } catch (error: any) {
+            console.error("❌ [COMPLETE_GROUP_SESSION] Failed", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to complete group session.");
+        }
+    }
+
+    // ── CANCEL a group session (mentor only) ────────────────
+    static async cancelGroupSession(sessionId: string, reason: string): Promise<ApiResponse> {
+        try {
+            const { data } = await api.post<ApiResponse>(
+                `${SessionService.GROUP_SESSIONS_ENDPOINT}/${sessionId}/cancel`,
+                { reason }
+            );
+            return data;
+        } catch (error: any) {
+            console.error("❌ [CANCEL_GROUP_SESSION] Failed", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to cancel group session.");
         }
     }
 }
