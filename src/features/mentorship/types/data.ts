@@ -79,3 +79,22 @@ export const btnPrimary: React.CSSProperties = {
     cursor: "pointer",
     fontWeight: "bold",
 };
+
+export const formatTimeAMPM = (time24?: string) => {
+    if (!time24) return "";
+    const [h, m] = time24.split(":");
+    if (!h || !m) return time24;
+    let hours = parseInt(h, 10);
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    return `${hours}:${m} ${ampm}`;
+};
+
+export const formatSlotRange = (range24?: string) => {
+    if (!range24) return "";
+    if (range24.includes(" - ")) {
+        const [start, end] = range24.split(" - ");
+        return `${formatTimeAMPM(start)} - ${formatTimeAMPM(end)}`;
+    }
+    return formatTimeAMPM(range24);
+};

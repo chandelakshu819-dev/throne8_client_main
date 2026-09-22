@@ -222,9 +222,9 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     });
 
   const formatTime = (booking: MentorBookingRow) =>
-    booking.slotTime ??
+    (booking.slotTime ? formatSlotRange(booking.slotTime) : undefined) ??
     new Date(booking.scheduledAt).toLocaleTimeString("en-IN", {
-      hour: "2-digit", minute: "2-digit"
+      hour: "2-digit", minute: "2-digit", hour12: true
     });
 
     const handleConfirm = async (sessionId: string, bookingId?: string) => {
@@ -329,7 +329,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   <div class="row"><span class="label">Mentor</span><span class="value">${r.mentorName}</span></div>
   <div class="row"><span class="label">Service</span><span class="value">${r.title}</span></div>
   <div class="row"><span class="label">Date</span><span class="value">${formatDate(r.scheduledAt)}</span></div>
-  <div class="row"><span class="label">Time</span><span class="value">${r.slotTime || formatTime(booking)}</span></div>
+  <div class="row"><span class="label">Time</span><span class="value">${r.slotTime ? formatSlotRange(r.slotTime) : formatTime(booking)}</span></div>
   <div class="row"><span class="label">Duration</span><span class="value">${r.duration} min</span></div>
   <div class="row"><span class="label">Payment Status</span><span class="value">${paymentStatus}</span></div>
   <div class="row"><span class="label">Completed On</span><span class="value">${completedAt}</span></div>

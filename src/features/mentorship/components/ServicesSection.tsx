@@ -23,7 +23,7 @@ import {
   History,
   User as UserIcon,
 } from "lucide-react";
-import { btnPrimary, C } from "../types/data";
+import { btnPrimary, C, formatSlotRange } from "../types/data";
 import SessionService from "@/lib/api/session.service";
 import MentorService from "@/lib/api/mentorship.service";
 import QueryModal from "./QueryModal";
@@ -1162,7 +1162,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                     <Calendar size={16} color={C.dark} />
                     <div>
                       <div style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>{formatDateTime(scheduledDate)}</div>
-                      {myBooking?.slotTime && <div style={{ fontSize: "11px", color: C.mid }}>{myBooking.slotTime}</div>}
+                      {myBooking?.slotTime && <div style={{ fontSize: "11px", color: C.mid }}>{formatSlotRange(myBooking.slotTime)}</div>}
                     </div>
                   </div>
                   {!isCancelled && !isCompleted && (

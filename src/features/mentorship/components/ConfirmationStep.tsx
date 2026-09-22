@@ -1,7 +1,7 @@
 // components/mentor-profile/booking/ConfirmationStep.tsx
 
 import React from "react";
-import { MONTHS, C, btnPrimary } from "../types/data";
+import { MONTHS, C, btnPrimary, formatSlotRange } from "../types/data";
 import type { Service, CalendarData, FormData } from "../types/types";
 
 interface ConfirmationStepProps {
@@ -18,7 +18,7 @@ const ConfirmationStep: React.FC<ConfirmationStepProps> = ({ selectedService, ca
 
     const rows: [string, string][] = [
         [isRes ? "Resource:" : "Service:", selectedService?.title ?? ""],
-        ...(calendarData?.selectedDate ? ([["Date:", `${calendarData.selectedDate} ${month !== undefined ? MONTHS[month] : ""} ${year}`], ["Time:", calendarData.selectedTime]] as [string, string][]) : []),
+        ...(calendarData?.selectedDate ? ([["Date:", `${calendarData.selectedDate} ${month !== undefined ? MONTHS[month] : ""} ${year}`], ["Time:", calendarData.selectedTime ? formatSlotRange(calendarData.selectedTime) : calendarData.selectedTime]] as [string, string][]) : []),
         ...(formData?.email ? ([["Email:", formData.email]] as [string, string][]) : []),
     ];
 

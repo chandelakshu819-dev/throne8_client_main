@@ -68,7 +68,7 @@ function formatTimeStr(iso?: string) {
   if (!iso) return "Time not set";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "Time not set";
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
 function initialsFrom(name: string) {

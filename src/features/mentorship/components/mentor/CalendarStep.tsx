@@ -4,7 +4,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "./Icons";
-import { TIME_SLOTS, MONTHS, DAYS, C, btnPrimary } from "../../types/data";
+import { TIME_SLOTS, MONTHS, DAYS, C, btnPrimary, formatTimeAMPM, formatSlotRange } from "../../types/data";
 import type { Service, CalendarData } from "../../types/types";
 import AvailabilityService from "@/lib/api/availability.service";
 
@@ -221,7 +221,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                         <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "16px", fontSize: "16px" }}>Total Available Time Slots: {bookableSlots.length}</h3>
                         <p style={{ fontSize: "14px", color: C.mid, marginBottom: "24px" }}>
                             {daySlots.length > 0
-                                ? `Available from ${daySlots[0].startTime} to ${daySlots[daySlots.length - 1].endTime}`
+                                ? `Available from ${formatTimeAMPM(daySlots[0].startTime)} to ${formatTimeAMPM(daySlots[daySlots.length - 1].endTime)}`
                                 : "No slots available"}
                         </p>
 
@@ -246,6 +246,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px", marginBottom: "24px" }}>
                             {bookableSlots.map((slot) => {
                                     const time = `${slot.startTime} - ${slot.endTime}`;
+                                    const displayTime = formatSlotRange(time);
                                     const isDisabled = false; // bookableSlots mein sirf free slots hi aate hain
                                     const sel = selectedTime === time;
 
@@ -276,7 +277,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                                                 transition: "all 0.2s",
                                             }}
                                         >
-                                                                                     {slot.startTime}
+                                                                                     {formatTimeAMPM(slot.startTime)}
                                                                                      </button>
                                     );
                                 })}

@@ -285,7 +285,7 @@ function formatSessionDate(iso: string): string {
     if (isNaN(date.getTime())) return iso;
     return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) +
         ", " +
-        date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+        date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
 function mentorDisplayName(mentor?: SessionMentorInfo): string {

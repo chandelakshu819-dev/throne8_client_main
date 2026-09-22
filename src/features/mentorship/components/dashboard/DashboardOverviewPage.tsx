@@ -54,7 +54,7 @@ function formatWhen(iso?: string) {
   if (isNaN(d.getTime())) return "Time not set"
   const today = new Date()
   const isToday = d.toDateString() === today.toDateString()
-  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
   if (isToday) return `Today · ${time}`
   return `${d.toLocaleDateString([], { day: "numeric", month: "short" })} · ${time}`
 }

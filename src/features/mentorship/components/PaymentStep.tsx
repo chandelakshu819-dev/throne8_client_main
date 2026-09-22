@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { PAY_METHODS, C, btnPrimary } from "../types/data";
+import { PAY_METHODS, C, btnPrimary, formatSlotRange } from "../types/data";
 import type { CalendarData, Service, FormData as BookingFormData } from "../types/types";
 import SessionService from "@/lib/api/session.service";
 

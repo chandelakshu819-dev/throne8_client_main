@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, CheckCircle, Clock, User, Calendar, CreditCard, Tag, AlarmClock } from 'lucide-react';
+import { ExternalLink, Check, Copy, MoreVertical, X, Calendar as CalendarIcon, Clock, FileText, Share2, Star, CheckCircle, User } from "lucide-react";
+import { formatSlotRange } from "../types/data";
 import SessionService from '@/lib/api/session.service';
 
 interface SessionDetailsModalProps {
@@ -180,7 +181,7 @@ const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
                                                         Mentee {idx + 1}
                                                     </p>
                                                     <p className="text-xs" style={{ color: '#8a7a6a' }}>
-                                                        {booking.slotTime ?? '—'} · {booking.bookedAt ? fmt(booking.bookedAt) : '—'}
+                                                        {booking.slotTime ? formatSlotRange(booking.slotTime) : '—'} · {booking.bookedAt ? fmt(booking.bookedAt) : '—'}
                                                     </p>
                                                     <p className="text-xs" style={{ color: '#8a7a6a' }}>
                                                         ₹{booking.pricing?.totalAmount ?? 0} · {booking.payment?.method ?? '—'}
@@ -253,7 +254,7 @@ const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
                                 <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#8a7a6a' }}>Slot Time</span>
                             </div>
                             <p className="font-bold" style={{ color: '#4a3728' }}>
-                                {slotTime ?? (scheduledAt ? fmtTime(scheduledAt) : '—')}
+                                {slotTime ? formatSlotRange(slotTime) : (scheduledAt ? fmtTime(scheduledAt) : '—')}
                             </p>
                         </div>
 
