@@ -60,7 +60,10 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
   // yahan bhi sync kar do, taaki agla generateSlots() naye duration ke sath chale.
   useEffect(() => {
     if (mentorData?.availability?.slotDuration) {
-      setSlotDuration(mentorData.availability.slotDuration);
+      const parsed = Number(mentorData.availability.slotDuration);
+      if (!isNaN(parsed) && parsed > 0) {
+        setSlotDuration(parsed);
+      }
     }
   }, [mentorData?.availability?.slotDuration]);
 
@@ -70,9 +73,9 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
   // slotDuration ko turant, live update karo — bina page refresh ke.
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (typeof detail === "number" && detail > 0) {
-        setSlotDuration(detail);
+      const parsed = Number((e as CustomEvent).detail);
+      if (!isNaN(parsed) && parsed > 0) {
+        setSlotDuration(parsed);
       }
     };
     window.addEventListener("mentorSlotDurationUpdated", handler);
@@ -108,7 +111,10 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
       const DEFAULT_WEEK_SCHEDULE = ALL_DAYS.map(day => ({
         day,
         enabled: ["Saturday", "Sunday"].indexOf(day) === -1,
-        timeRanges: [{ startTime: "09:00", endTime: "17:00" }],
+        // ✅ NEW: har range ab apni khud ki `duration` rakhta hai
+        // (15/30/45/60 min) — ek hi global slotDuration sabhi
+        // din/ranges par force nahi hoga.
+        timeRanges: [{ startTime: "09:00", endTime: "17:00", duration: slotDuration }],
       }));
 
       // ✅ FIX: purane localStorage data me sirf startTime/endTime hota
@@ -118,9 +124,12 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
         (data || []).map((d: any) => ({
           day: d.day,
           enabled: d.enabled,
-          timeRanges: Array.isArray(d.timeRanges) && d.timeRanges.length > 0
+          timeRanges: (Array.isArray(d.timeRanges) && d.timeRanges.length > 0
             ? d.timeRanges
-            : [{ startTime: d.startTime || "09:00", endTime: d.endTime || "17:00" }],
+            : [{ startTime: d.startTime || "09:00", endTime: d.endTime || "17:00" }]
+          // ✅ FIX: purane saved records me `duration` field nahi hogi —
+          // global slotDuration se fallback bana do taaki crash na ho.
+          ).map((r: any) => ({ ...r, duration: r.duration || slotDuration })),
         }));
    
            // ✅ FIX: ab backend ka poora `weeklySchedule` (per-day, multi-range)
@@ -414,29 +423,43 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
   
   
      // ── Save Handler ───────────────────────────────────────
-  const handleSaveAvailability = async () => {
-    if (!mentorData?.mentorId) {
-      setSaveMessage({ type: "error", text: "Mentor ID not found. Please refresh." });
-      return;
-    }
-    setIsSaving(true);
-    setSaveMessage(null);
-    try {
-      if (selectedDate !== null) {
-        const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDate);
-        const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
-        const daySched = weekSchedule.find(d => d.day === dayName);
-        if (!daySched?.enabled) {
-          setSaveMessage({ type: "error", text: `${dayName} is not enabled in your schedule.` });
+     const handleSaveAvailability = async () => {
+      if (!mentorData?.mentorId) {
+        setSaveMessage({ type: "error", text: "Mentor ID not found. Please refresh." });
+        return;
+      }
+      // ✅ FIX: toMin ab function ke top-level pe hai — pehle sirf single-date
+      // (if) branch ke andar define tha, isliye "Save Month" (bulk/else branch)
+      // click karte hi "toMin is not defined" error se silently fail ho jaata
+      // tha jab koi calendar date select nahi ki gayi hoti thi.
+      const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+      setIsSaving(true);
+      setSaveMessage(null);
+      try {
+        if (selectedDate !== null) {
+          const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDate);
+          const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
+          const daySched = weekSchedule.find(d => d.day === dayName);
+          if (!daySched?.enabled) {
+            setSaveMessage({ type: "error", text: `${dayName} is not enabled in your schedule.` });
+            return;
+          }
+          const invalidRange = (daySched.timeRanges || []).find((r: any) => toMin(r.endTime) <= toMin(r.startTime));
+        if (invalidRange) {
+          setSaveMessage({
+            type: "error",
+            text: `Invalid range ${invalidRange.startTime}-${invalidRange.endTime} on ${dayName}: end time must be after start time on the same day (overnight ranges aren't supported).`,
+          });
           return;
         }
-        // ✅ FIX: ab din ke saare timeRanges (subah + shaam wagerah) se
-        // slots generate karke ek hi list me jode jaate hain.
         const slots = (daySched.timeRanges || []).flatMap((r: any) =>
-          generateSlots(r.startTime, r.endTime, slotDuration, bufferTime)
+          generateSlots(r.startTime, r.endTime, toMin(r.endTime) - toMin(r.startTime), bufferTime)
         );
         if (slots.length === 0) {
-          setSaveMessage({ type: "error", text: "No slots generated. Check time range and duration." });
+          setSaveMessage({
+            type: "error",
+            text: `No slots generated for ${dayName}. Duration=${slotDuration}min, range=${(daySched.timeRanges||[]).map((r:any)=>`${r.startTime}-${r.endTime}`).join(', ')}.`,
+          });
           return;
         }
 
@@ -514,8 +537,10 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
           if (!sched) continue;
 
           const slots = (sched.timeRanges || []).flatMap((r: any) =>
-            generateSlots(r.startTime, r.endTime, slotDuration, bufferTime)
+            generateSlots(r.startTime, r.endTime, toMin(r.endTime) - toMin(r.startTime), bufferTime)
           );
+
+
           if (slots.length === 0) continue;
 
           datesQueued++;
@@ -906,11 +931,12 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                       key={d.day}
                       type="button"
                       title={`${d.day}${d.enabled ? ` · ${d.timeRanges?.[0]?.startTime}–${d.timeRanges?.[0]?.endTime}${d.timeRanges?.length > 1 ? ` +${d.timeRanges.length - 1} more` : ''}` : ' · Off'}${isSelectedDay ? ` · Selected on calendar (${selectedDate})` : ''}`}
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setWeekSchedule(prev =>
                           prev.map((dd, i) => (i === idx ? { ...dd, enabled: !dd.enabled } : dd))
-                        )
-                      }
+                        );
+                      }}
                       className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold transition-all"
                       style={{
                         // ✅ FIX: selected calendar date ka day ab solid dark
@@ -999,7 +1025,7 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                               : d
                           ))}
                         />
-                        <span style={{ color: '#8a7a6a' }} className="text-xs font-semibold">to</span>
+                                               <span style={{ color: '#8a7a6a' }} className="text-xs font-semibold">to</span>
                         <TimeInput
                           value={range.endTime}
                           disabled={!item.enabled}
@@ -1010,19 +1036,30 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                           ))}
                         />
 
+                      
+
                                                {/* Action cell: pehli row par "+", baaki rows par "x".
                                                 Har row mein ye cell same jagah par rehta hai, isliye
                             saari rows seedhi line mein aati hain. */}
                         {rIdx === 0 ? (
-                          <button
-                            type="button"
-                            disabled={!item.enabled}
-                            onClick={() => setWeekSchedule(prev => prev.map((d, i) => {
-                              if (i !== idx) return d;
-                              const lastRange = d.timeRanges[d.timeRanges.length - 1];
-                              const start = lastRange?.endTime || "09:00";
-                              return { ...d, timeRanges: [...d.timeRanges, { startTime: start, endTime: start }] };
-                            }))}
+                                                 <button
+                                                 type="button"
+                                                 disabled={!item.enabled}
+                                                 onClick={() => setWeekSchedule(prev => prev.map((d, i) => {
+                                                   if (i !== idx) return d;
+                                                   const lastRange = d.timeRanges[d.timeRanges.length - 1];
+                                                   const start = lastRange?.endTime || "09:00";
+                                                   // ✅ FIX: end ko sirf start ke barabar nahi, balki
+                                                   // kam se kam slotDuration jitna aage rakho, aur
+                                                   // agar wo midnight cross kare to 23:59 pe cap karo
+                                                   // (overnight ranges is calendar model me valid
+                                                   // nahi hain — same-din ke andar hi range hona chahiye).
+                                                   const [sh, sm] = start.split(":").map(Number);
+                                                   let endMinutes = sh * 60 + sm + slotDuration;
+                                                   if (endMinutes > 23 * 60 + 59) endMinutes = 23 * 60 + 59;
+                                                   const end = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
+                                                   return { ...d, timeRanges: [...d.timeRanges, { startTime: start, endTime: end, duration: slotDuration }] };
+                                                 }))}
                             className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 hover:bg-[#f3ece4] disabled:opacity-40 transition-colors"
                             style={{ border: '1px solid #e0d8cf' }}
                             title="Add another time range for this day"
@@ -1053,9 +1090,12 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                             role="switch"
                             aria-checked={item.enabled}
                             title={item.enabled ? 'Available — click to turn off' : 'Not available — click to turn on'}
-                            onClick={() => setWeekSchedule(prev => prev.map((d, i) =>
-                              i === idx ? { ...d, enabled: !d.enabled } : d
-                            ))}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setWeekSchedule(prev => prev.map((d, i) =>
+                                i === idx ? { ...d, enabled: !d.enabled } : d
+                              ));
+                            }}
                             style={{
                               position: 'relative',
                               width: 40,

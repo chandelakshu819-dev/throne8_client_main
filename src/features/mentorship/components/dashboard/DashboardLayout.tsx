@@ -2,6 +2,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+
 
 type ServiceType = {
   name: string;
@@ -72,7 +74,35 @@ function normalizeNotifications(res: any): any[] {
 export default function MentorDashboard(
   { userId, onSwitchRole }: { userId: string; onSwitchRole?: () => void }
 ) {
-  const [activePage, setActivePage] = useState("dashboard");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // ✅ FIX: activePage ab URL query param (?tab=...) se initialize hota hai,
+  // isliye refresh karne par bhi wahi tab load hoga, default "dashboard" par
+  // wapas nahi jayega.
+  const [activePage, setActivePageState] = useState(
+    () => searchParams.get("tab") || "dashboard"
+  );
+
+  // Tab change hote hi URL me bhi likh do (bina full page reload ke) —
+  // taaki refresh, back/forward button, aur direct-link sharing sab kaam karein.
+  const setActivePage = useCallback((page: string) => {
+    setActivePageState(page);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", page);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [pathname, router, searchParams]);
+
+  // Agar user browser back/forward button dabaye, to URL ke hisaab se
+  // activePage bhi update ho jaye.
+  useEffect(() => {
+    const tabFromUrl = searchParams.get("tab") || "dashboard";
+    setActivePageState((prev) => (prev !== tabFromUrl ? tabFromUrl : prev));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  
 
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
