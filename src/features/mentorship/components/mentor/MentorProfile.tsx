@@ -44,6 +44,18 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
             .catch(() => setMentorData(null));
     }, [mentorId]);
 
+    // Fire-and-forget request to trigger backend 'Profile Viewed' notification logic.
+    // This is strictly for the side-effect (notification tracking).
+    useEffect(() => {
+        if (mentorData && mentorData.userId) {
+            // Guard against self-view
+            if (user?.userId === mentorData.userId) {
+                return;
+            }
+            MentorService.getMentorByUserId(mentorData.userId, true).catch(() => {});
+        }
+    }, [mentorData, user?.userId]);
+
     const handleServiceClick = (service: Service): void => {
         setSelectedService(service);
         // ✅ FIX: "Ask a Query" (type "Query") ab calendar flow me nahi

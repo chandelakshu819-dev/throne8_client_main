@@ -21,7 +21,7 @@ import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfile } from "@/features/profile/hooks/useProfile";
-import { getSocket } from "@/core/realtime/socket.client";
+import { useSocket } from "@/core/realtime/useSocket";
 
 
 const pageComponents: Record<string, React.FC<any>> = {
@@ -78,6 +78,10 @@ export default function UserDashboardLayout({ userId, isMentor, onSwitchRole }: 
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
 
+  // ✅ Realtime socket hook: pushes 'notification:new' and 'session:started'
+  // the instant the backend emits them
+  const { latestNotification, sessionStarted } = useSocket();
+
   const fetchNotifications = useCallback(() => {
     setNotificationsLoading(true);
     NotificationService.getMentorshipNotifications({ limit: 50 })
@@ -93,6 +97,38 @@ export default function UserDashboardLayout({ userId, isMentor, onSwitchRole }: 
     if (!userId) return;
     fetchNotifications();
   }, [userId, fetchNotifications]);
+
+  // ✅ Prepend realtime notification to state immediately
+  useEffect(() => {
+    if (!latestNotification) return;
+    setNotifications((prev) => {
+      const already = (Array.isArray(prev) ? prev : []).some(
+        (n) => n._id === latestNotification.notificationId || n.notificationId === latestNotification.notificationId
+      );
+      if (already) return prev;
+
+      const rawType = latestNotification.type || "";
+      const mappedType =
+        rawType.includes("booking") || rawType.includes("session") || rawType.includes("waitlist") ? "booking" :
+        rawType.includes("review") ? "review" :
+        rawType.includes("payment") || rawType.includes("refund") || rawType.includes("package") || rawType.includes("credit") ? "payment" :
+        rawType.includes("query") ? "message" :
+        "system";
+
+      return [
+        {
+          _id: latestNotification.notificationId,
+          notificationId: latestNotification.notificationId,
+          type: mappedType,
+          title: latestNotification.title,
+          message: latestNotification.message,
+          createdAt: latestNotification.createdAt,
+          isRead: false,
+        },
+        ...(Array.isArray(prev) ? prev : []),
+      ];
+    });
+  }, [latestNotification]);
 
   const handleMarkAllRead = useCallback(async () => {
     try {
@@ -123,35 +159,17 @@ export default function UserDashboardLayout({ userId, isMentor, onSwitchRole }: 
     fetchSessions();
   }, [fetchSessions]);
 
-  // ✅ Real-time "mentor started the session" listener.
-  // Backend emits this via emitToUser(menteeId, 'session:started', {...})
-  // from mentorshipSession.service.ts's startSession(). Payload fields
-  // confirmed against that emit call: sessionId, bookingId, roomId, title,
-  // startedAt, scheduledAt, meetingUrl.
+  // ✅ Real-time "mentor started the session" listener via useSocket()
   useEffect(() => {
-    if (!userId) return;
-    const socket = getSocket();
-    if (!socket) return;
-
-    const handleSessionStarted = (payload: {
-      sessionId: string;
-      bookingId: string;
-      roomId: string;
-      title: string;
-    }) => {
-      setLiveSession(payload);
-      // Refresh so "Upcoming" flips to reflect in_progress status if the
-      // mentee is currently viewing UserDashboardUpcomingSessionsPage —
-      // Join Session button flips from disabled/grey to enabled/green
-      // without needing a manual page refresh.
-      fetchSessions();
-    };
-
-    socket.on("session:started", handleSessionStarted);
-    return () => {
-      socket.off("session:started", handleSessionStarted);
-    };
-  }, [userId, fetchSessions]);
+    if (!sessionStarted) return;
+    setLiveSession({
+      sessionId: sessionStarted.sessionId,
+      bookingId: sessionStarted.bookingId,
+      roomId: sessionStarted.roomId || sessionStarted.bookingId,
+      title: sessionStarted.title,
+    });
+    fetchSessions();
+  }, [sessionStarted, fetchSessions]);
 
   // ✅ FIXED: was pointing at "/mentorship/mentor-session" — a route that
   // doesn't exist in the app. The mentor's "Start" button in BookingsPage.tsx

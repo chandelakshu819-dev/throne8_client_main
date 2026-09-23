@@ -71,7 +71,8 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
       setReviews(reviewsRes.data)
       setTotalPages(reviewsRes.pagination.totalPages)
       setPage(1)
-    } catch {
+    } catch (err) {
+       console.error('Review load error:', err);
       setError("Reviews load nahi ho paaye. Try again.")
     } finally {
       setLoading(false)

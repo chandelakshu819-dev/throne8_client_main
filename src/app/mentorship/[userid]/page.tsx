@@ -82,6 +82,19 @@ export default function ThroneUltraPremium() {
         }
     }, [userId]);
 
+    // Fire-and-forget request to trigger backend 'Profile Viewed' notification logic.
+    // This is strictly for the side-effect (notification tracking) and decoupled from page rendering data.
+    // We intentionally do not use this response to setPageMentorData.
+    useEffect(() => {
+        if (userId && userId !== "undefined") {
+            // Skip the request if the visitor is the mentor viewing their own profile (self-view)
+            if (user?.userId === userId) {
+                return;
+            }
+            MentorService.getMentorByUserId(userId, true).catch(() => {});
+        }
+    }, [userId, user?.userId]);
+
     useEffect(() => {
         const observer = new IntersectionObserver(
             (entries) => {
