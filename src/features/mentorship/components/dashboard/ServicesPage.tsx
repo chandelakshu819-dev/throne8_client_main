@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Briefcase, Users, Clock, Star, Plus, Video, MessageSquare,
   Package, FileText, RefreshCw, ClipboardList, CheckCircle2,
-  MoreVertical, Pencil, Trash2, X, ArrowUpDown,
+  MoreVertical, Pencil, Trash2, X, ArrowUpDown, AlertCircle,
 } from 'lucide-react';
 import ServiceModal from './ServiceModal';
 import EditSessionModal from '@/features/mentorship/modals/EditSessionModal';
@@ -135,6 +135,10 @@ export default function ServicesPage({
   const [editingSession, setEditingSession] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  // ✅ NEW: styled popup ke liye — jab delete block ho (active bookings/participants ki wajah se)
+  const [blockedDeleteMessage, setBlockedDeleteMessage] = useState<string | null>(null);
+
+
   // ── Edit Session Modal state ───────────────────────────────────
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<any>(null);
@@ -247,7 +251,7 @@ export default function ServicesPage({
     if (service.type === 'group_session') {
       const participantCount = (service as any).currentParticipants ?? 0;
       if (participantCount > 0) {
-        alert('This group session has registered participants. Cancel it first before deleting.');
+        setBlockedDeleteMessage('This group session has registered participants. Cancel it first before deleting.');
         return;
       }
       setDeleteTarget(service);
@@ -257,7 +261,7 @@ export default function ServicesPage({
     const bookings = (service as any).bookings ?? [];
     const hasActiveBooking = bookings.some((b: any) => b.status !== 'cancelled');
     if (hasActiveBooking) {
-      alert('This service has active bookings. Please cancel the booking(s) first from Mentee Status before deleting.');
+      setBlockedDeleteMessage('This service has active bookings. Please cancel the booking(s) first from Mentee Status before deleting.');
       return;
     }
 
@@ -277,7 +281,7 @@ export default function ServicesPage({
       await fetchAllSessions();
       setDeleteTarget(null);
     } catch (err: any) {
-      alert(err.message || 'Failed to delete service.');
+      setBlockedDeleteMessage(err.message || 'Failed to delete service.');
     } finally {
       setIsDeleting(false);
     }
@@ -873,7 +877,7 @@ export default function ServicesPage({
                       {serviceTypes.find(t => t.name === service.type)?.label || service.type}
                     </span>
 
-                    <p className="mb-4 text-sm line-clamp-2" style={{ color: '#8a7a6a' }}>
+                    <p className="mb-4 text-sm line-clamp-2" style={{ color: '#8a7a6a', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                       {service.description || `Professional ${service.name.toLowerCase()} session`}
                     </p>
 
@@ -1216,6 +1220,47 @@ export default function ServicesPage({
                 style={{ backgroundColor: '#dc2626' }}
               >
                 {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ NEW: styled replacement for the browser's native alert() popup */}
+      {blockedDeleteMessage && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
+          <div
+            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl"
+            style={{ border: '1px solid #e0d8cf' }}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#fef3c7' }}>
+                  <AlertCircle className="w-5 h-5" style={{ color: '#b45309' }} />
+                </div>
+                <h3 className="text-lg font-bold" style={{ color: '#4a3728' }}>
+                  Can't delete this service
+                </h3>
+              </div>
+              <button
+                onClick={() => setBlockedDeleteMessage(null)}
+                className="p-1 hover:bg-[#f3ece4] rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" style={{ color: '#8a7a6a' }} />
+              </button>
+            </div>
+
+            <p className="text-sm mb-6" style={{ color: '#8a7a6a' }}>
+              {blockedDeleteMessage}
+            </p>
+
+            <div className="flex justify-end pt-4" style={{ borderTop: '1px solid #f0ebe4' }}>
+              <button
+                onClick={() => setBlockedDeleteMessage(null)}
+                className="px-5 py-2.5 rounded-xl text-white font-semibold text-sm transition-opacity hover:opacity-90"
+                style={{ backgroundColor: '#4a3728' }}
+              >
+                Got it
               </button>
             </div>
           </div>

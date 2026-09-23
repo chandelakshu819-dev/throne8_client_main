@@ -124,6 +124,16 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   // returns the real participant row with its actual requestStatus.
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
 
+  // ✅ NEW: "Read more/less" toggle state for long service descriptions.
+  // Tracks which session cards currently have their description expanded.
+  const [expandedDescIds, setExpandedDescIds] = useState<string[]>([]);
+  const toggleDescExpanded = (sessionId: string) => {
+    setExpandedDescIds((prev) =>
+      prev.includes(sessionId) ? prev.filter((id) => id !== sessionId) : [...prev, sessionId]
+    );
+  };
+
+
   // ✅ NEW: detail modal state for a clicked group session card
   const [detailGroup, setDetailGroup] = useState<any | null>(null);
   const [groupActionBusy, setGroupActionBusy] = useState(false);
@@ -396,21 +406,45 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           const wl = waitlistEntries[session.sessionId];
           return (
             <div key={session.sessionId}
-              style={{
-                borderRadius: "16px", padding: "20px", background: C.bg,
-                border: `1px solid ${C.border}`, position: "relative",
-                boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
-              }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                <span>{getIcon(session.sessionType)}</span>
-                <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "12px", background: C.border, color: C.dark }}>
-                  {SESSION_TYPE_FILTER[session.sessionType] || session.sessionType}
-                </span>
+            style={{
+              borderRadius: "16px", padding: "20px", background: C.bg,
+              border: `1px solid ${C.border}`, position: "relative",
+              boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
+            }}>
+            {session.thumbnailImage && (
+              <div style={{ width: "100%", height: "120px", borderRadius: "12px", overflow: "hidden", marginBottom: "12px" }}>
+                <img
+                  src={session.thumbnailImage}
+                  alt={session.title}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
               </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+              <span>{getIcon(session.sessionType)}</span>
+              <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "12px", background: C.border, color: C.dark }}>
+                {SESSION_TYPE_FILTER[session.sessionType] || session.sessionType}
+              </span>
+            </div>
               <h3 style={{ fontWeight: "bold", color: C.dark, fontSize: "14px", marginBottom: "8px", lineHeight: "1.4" }}>{session.title}</h3>
-              {session.description && (
-                <p style={{ fontSize: "12px", color: C.mid, marginBottom: "8px", lineHeight: "1.4" }}>{session.description}</p>
-              )}
+              {session.description && (() => {
+                const isExpanded = expandedDescIds.includes(session.sessionId);
+                const isLong = session.description.length > 100;
+                return (
+
+                  <p style={{ fontSize: "12px", color: C.mid, marginBottom: "8px", lineHeight: "1.4", overflowWrap: "break-word", wordBreak: "break-word" }}>
+                    {isExpanded || !isLong ? session.description : `${session.description.slice(0, 100)}...`}
+                    {isLong && (
+                      <span
+                        onClick={(e) => { e.stopPropagation(); toggleDescExpanded(session.sessionId); }}
+                        style={{ color: C.dark, fontWeight: 700, cursor: "pointer", marginLeft: "4px" }}
+                      >
+                        {isExpanded ? "Read less" : "Read more"}
+                      </span>
+                    )}
+                  </p>
+                );
+              })()}
               <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
                 <Clock /> {session.duration} Min
               </div>
@@ -525,9 +559,23 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
               <h3 style={{ fontWeight: "bold", color: C.dark, fontSize: "14px", marginBottom: "8px", lineHeight: "1.4" }}>
                 {group.title}
               </h3>
-              {group.description && (
-                <p style={{ fontSize: "12px", color: C.mid, marginBottom: "8px", lineHeight: "1.4" }}>{group.description}</p>
-              )}
+              {group.description && (() => {
+                const isExpanded = expandedDescIds.includes(group.sessionId);
+                const isLong = group.description.length > 100;
+                return (
+                  <p style={{ fontSize: "12px", color: C.mid, marginBottom: "8px", lineHeight: "1.4", overflowWrap: "break-word", wordBreak: "break-word" }}>
+                    {isExpanded || !isLong ? group.description : `${group.description.slice(0, 100)}...`}
+                    {isLong && (
+                      <span
+                        onClick={(e) => { e.stopPropagation(); toggleDescExpanded(group.sessionId); }}
+                        style={{ color: C.dark, fontWeight: 700, cursor: "pointer", marginLeft: "4px" }}
+                      >
+                        {isExpanded ? "Read less" : "Read more"}
+                      </span>
+                    )}
+                  </p>
+                );
+              })()}
               <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: C.mid, marginBottom: "4px" }}>
                 <Clock /> {formatGroupDate(group.scheduledAt)} · {group.duration} Min
               </div>
@@ -660,10 +708,10 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   </div>
                 )}
 
-                {detailGroup.description && (
-                  <p style={{ fontSize: "13.5px", color: C.mid, lineHeight: "1.6", marginBottom: "18px" }}>
-                    {detailGroup.description}
-                  </p>
+{detailGroup.description && (
+                                      <p className="mb-4 text-sm line-clamp-2" style={{ color: '#8a7a6a', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                                      {group.description || "Interactive group session led by an expert mentor."}
+                                    </p>
                 )}
               </div>
 
