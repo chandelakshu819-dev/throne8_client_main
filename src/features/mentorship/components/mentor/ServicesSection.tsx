@@ -456,10 +456,16 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   {/* ✅ FIX: status ab sirf info ke taur par dikhta hai — Book button ko block nahi karta */}
                   {latestBooking && (latestBooking.status === "confirmed" || latestBooking.status === "pending") && (
                     <div style={{ fontSize: "10px", fontWeight: 700, color: "#10b981", textAlign: "right" }}>
-                      {latestBooking.status === "confirmed" ? "✅ You have a confirmed session" : "✅ You have a session pending confirmation"}
+                      {session.sessionType === "ask_query"
+                        ? "✅ Your query is pending a reply"
+                        : latestBooking.status === "confirmed" ? "✅ You have a confirmed session" : "✅ You have a session pending confirmation"}
                     </div>
                   )}
-                  {wl ? (
+                                  {session.sessionType === "ask_query" ? (
+                    <button onClick={() => onServiceClick(svc)} style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}>
+                      {latestBooking ? "Ask Another Query" : "Ask a Query"}
+                    </button>
+                  ) : wl ? (
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: "12px", fontWeight: 700, color: wl.status === "notified" ? "#10b981" : C.dark }}>
                         {wl.status === "notified"
@@ -709,9 +715,9 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 )}
 
 {detailGroup.description && (
-                                      <p className="mb-4 text-sm line-clamp-2" style={{ color: '#8a7a6a', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
-                                      {group.description || "Interactive group session led by an expert mentor."}
-                                    </p>
+                  <p style={{ fontSize: "13.5px", color: C.mid, lineHeight: "1.6", marginBottom: "18px", overflowWrap: "break-word", wordBreak: "break-word" }}>
+                    {detailGroup.description}
+                  </p>
                 )}
               </div>
 
