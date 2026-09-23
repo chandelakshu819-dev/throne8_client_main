@@ -39,7 +39,7 @@ const SESSION_TYPE_LABEL: Record<string, string> = {
   group_session: "Group",
   deep_dive: "1:1 Call",
   portfolio_review: "1:1 Call",
-  ask_query: "Query", // ✅ FIX: missing tha, isliye ask_query bhi "1:1 Call" ban kar calendar flow me chala jaata tha
+  ask_query: "Query",
 };
 
 // Session type ko filter label me map karo
@@ -69,11 +69,6 @@ const GROUP_STATUS_LABEL: Record<string, string> = {
   rescheduled: "Rescheduled",
 };
 
-// ✅ NEW: maps a mentee's own join-request status (participant.requestStatus)
-// to a label + color. This is what was missing — the UI previously treated
-// "has a participant row at all" as "seat reserved", regardless of whether
-// the mentor had accepted it yet. A PENDING request must never look
-// identical to an ACCEPTED one.
 const REQUEST_STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
   pending: { label: "Request Pending", bg: "#fef3c7", fg: "#b45309" },
   accepted: { label: "You're In", bg: "#dcfce7", fg: "#15803d" },
@@ -117,15 +112,11 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   const [sessions, setSessions] = useState<any[]>([]);
   const [groupSessions, setGroupSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [joiningId, setJoiningId] = useState<string | null>(null);
-  const [joinError, setJoinError] = useState<string | null>(null);
-  // ✅ joinedIds now means "I have an active (pending or accepted) request
-  // with this session" — an optimistic flag used only until fetchGroupSessions()
+  // ✅ joinedIds means "I have an active (pending or accepted) request with
+  // this session" — an optimistic flag used only until fetchGroupSessions()
   // returns the real participant row with its actual requestStatus.
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
 
-  // ✅ NEW: "Read more/less" toggle state for long service descriptions.
-  // Tracks which session cards currently have their description expanded.
   const [expandedDescIds, setExpandedDescIds] = useState<string[]>([]);
   const toggleDescExpanded = (sessionId: string) => {
     setExpandedDescIds((prev) =>
@@ -133,8 +124,11 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     );
   };
 
-
-  // ✅ NEW: detail modal state for a clicked group session card
+  // ✅ detail modal state for a clicked group session card.
+  // ✅ FIX: this modal (date/time/duration/seats + an explicit "Join Group"
+  // button) is now the ONLY place a join request can be sent from. The
+  // card's own button used to fire the request immediately — that's what
+  // let a request go out before the user ever saw session details.
   const [detailGroup, setDetailGroup] = useState<any | null>(null);
   const [groupActionBusy, setGroupActionBusy] = useState(false);
   const [groupActionError, setGroupActionError] = useState<string | null>(null);
@@ -199,9 +193,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     }
   };
 
-  // ✅ Extracted so join/leave actions can refresh group sessions from the
-  // server instead of hand-patching local state (keeps currentParticipants,
-  // status, and participants[] accurate).
   const fetchGroupSessions = useCallback(() => {
     if (!mentorId) return Promise.resolve();
     return MentorService.getAllGroupSessions({ mentorId })
@@ -236,29 +227,24 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     }).finally(() => setLoading(false));
   }, [mentorId, fetchGroupSessions]);
 
-  // Keep the open detail modal's data in sync with the latest fetched list
   useEffect(() => {
     if (!detailGroup) return;
     const fresh = groupSessions.find((g) => g.sessionId === detailGroup.sessionId);
     if (fresh) setDetailGroup(fresh);
   }, [groupSessions]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Countdown ko har 60s me refresh karo jab detail modal khula ho
   useEffect(() => {
     if (!detailGroup) return;
     const interval = setInterval(() => forceTick((t) => t + 1), 60000);
     return () => clearInterval(interval);
   }, [detailGroup]);
 
-  // Dynamic filters — session types se generate karo (group sessions included)
   const uniqueTypes = Array.from(new Set(sessions.map((s) => s.sessionType)));
   const dynamicFilters = ["All", ...uniqueTypes.map((t) => SESSION_TYPE_FILTER[t] || t)];
-  const openGroupSessionsCount = groupSessions.filter((g) => g.status === 'open' || g.status === undefined).length;
   if (groupSessions.length > 0 && !dynamicFilters.includes("Group Session")) {
     dynamicFilters.push("Group Session");
   }
 
-  // Filter logic
   const filtered = activeFilter === "All"
     ? sessions
     : activeFilter === "Group Session"
@@ -266,7 +252,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       : sessions.filter((s) => (SESSION_TYPE_FILTER[s.sessionType] || s.sessionType) === activeFilter);
 
   const showGroupSessions = activeFilter === "All" || activeFilter === "Group Session";
-  // On "All" only show open/joinable ones as cards; "Group Session" filter shows everything (open, full, in_progress, completed...)
   const visibleGroupSessions = activeFilter === "Group Session"
     ? groupSessions
     : groupSessions.filter((g) => g.status === 'open' || g.status === undefined);
@@ -286,39 +271,30 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     return "";
   };
 
-  const handleJoinGroupSession = async (groupId: string) => {
-    setJoinError(null);
-    setJoiningId(groupId);
-    try {
-      await MentorService.joinGroupSession(groupId);
-      setJoinedIds((prev) => [...prev, groupId]);
-      await fetchGroupSessions();
-      // ✅ NEW: makes it explicit this is a request, not a confirmed seat
-      showToast("Join request sent. Waiting for mentor approval.");
-    } catch (err: any) {
-      setJoinError(err.message || "Failed to join session.");
-    } finally {
-      setJoiningId(null);
-    }
-  };
-
   const closeGroupDetail = () => {
     setDetailGroup(null);
     setGroupActionError(null);
   };
 
+  // ✅ FIX: this is now the single place a join request is actually sent
+  // from — only reachable after the user has opened the detail modal (seen
+  // date/time/duration/seats) and pressed "Join Group" there.
+  // ✅ FIX: was calling MentorService.joinGroupSession() — the OLD
+  // direct-join method that adds the mentee as a participant immediately,
+  // with no mentor approval step. Switched to
+  // MentorService.requestToJoinGroupSession(), which creates a pending
+  // request that only becomes a real seat once the mentor accepts it.
   const handleJoinFromModal = async () => {
     if (!detailGroup) return;
     setGroupActionBusy(true);
     setGroupActionError(null);
     try {
-      await MentorService.joinGroupSession(detailGroup.sessionId);
+      await MentorService.requestToJoinGroupSession(detailGroup.sessionId);
       setJoinedIds((prev) => [...prev, detailGroup.sessionId]);
       await fetchGroupSessions();
-      // ✅ NEW
       showToast("Join request sent. Waiting for mentor approval.");
     } catch (err: any) {
-      setGroupActionError(err.message || "Failed to join session.");
+      setGroupActionError(err.message || "Failed to send join request.");
     } finally {
       setGroupActionBusy(false);
     }
@@ -351,7 +327,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       </h2>
       <p style={{ color: C.mid, fontSize: "13px", marginBottom: "20px" }}>Discover our mentorship offerings designed for your success</p>
 
-      {/* Dynamic Filters */}
       <div style={{ display: "flex", gap: "10px", marginBottom: "24px", flexWrap: "wrap" }}>
         {dynamicFilters.map((f) => (
           <button key={f} onClick={() => setActiveFilter(f)} style={{
@@ -366,13 +341,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
         ))}
       </div>
 
-      {joinError && (
-        <div style={{ marginBottom: "16px", padding: "10px 14px", borderRadius: "10px", background: "#fee2e2", color: "#dc2626", fontSize: "13px", fontWeight: 600 }}>
-          {joinError}
-        </div>
-      )}
-
-      {/* Session Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
 
         {loading && (
@@ -391,14 +359,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           </div>
         )}
 
-               {/* Regular session Cards */}
                {!loading && filtered.map((session) => {
           const svc = getServiceFromSession(session);
-          // ✅ FIX: pehle koi bhi (chahe kitni bhi purani) booking milte hi
-          // poori card disable (pointerEvents:none) ho jaati thi — mentee
-          // dobara kabhi is service ka naya slot book nahi kar pata tha.
-          // Ab sirf latest booking ka status info ke liye dikhega, Book
-          // button hamesha clickable rahega.
           const myBookings = session.bookings?.filter(
             (b: any) => b.menteeId === currentUserId
           ) ?? [];
@@ -431,7 +393,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 const isExpanded = expandedDescIds.includes(session.sessionId);
                 const isLong = session.description.length > 100;
                 return (
-
                   <p style={{ fontSize: "12px", color: C.mid, marginBottom: "8px", lineHeight: "1.4", overflowWrap: "break-word", wordBreak: "break-word" }}>
                     {isExpanded || !isLong ? session.description : `${session.description.slice(0, 100)}...`}
                     {isLong && (
@@ -453,19 +414,12 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   {session.pricing?.basePrice === 0 ? "Free" : `₹${session.pricing?.basePrice}`}
                 </span>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
-                  {/* ✅ FIX: status ab sirf info ke taur par dikhta hai — Book button ko block nahi karta */}
                   {latestBooking && (latestBooking.status === "confirmed" || latestBooking.status === "pending") && (
                     <div style={{ fontSize: "10px", fontWeight: 700, color: "#10b981", textAlign: "right" }}>
-                      {session.sessionType === "ask_query"
-                        ? "✅ Your query is pending a reply"
-                        : latestBooking.status === "confirmed" ? "✅ You have a confirmed session" : "✅ You have a session pending confirmation"}
+                      {latestBooking.status === "confirmed" ? "✅ You have a confirmed session" : "✅ You have a session pending confirmation"}
                     </div>
                   )}
-                                  {session.sessionType === "ask_query" ? (
-                    <button onClick={() => onServiceClick(svc)} style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}>
-                      {latestBooking ? "Ask Another Query" : "Ask a Query"}
-                    </button>
-                  ) : wl ? (
+                  {wl ? (
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: "12px", fontWeight: 700, color: wl.status === "notified" ? "#10b981" : C.dark }}>
                         {wl.status === "notified"
@@ -517,18 +471,16 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           );
         })}
 
-        {/* ✅ Group session cards — clickable, opens the detail modal below.
-            ✅ FIX: previously "alreadyJoined" only checked whether a
-            participant row existed at all, so a PENDING request looked
-            identical to an ACCEPTED one ("✅ Seat Reserved"). Now the
-            mentee's own requestStatus (pending/accepted/rejected) is read
-            from group.participants and shown honestly. */}
+        {/* ✅ Group session cards — clicking anywhere on the card (including
+            the action button) only OPENS the detail modal. No API call
+            happens from here. The modal is where the user sees the
+            date/time/duration/seat-count and then explicitly confirms —
+            only that confirm click sends the join request. */}
         {!loading && showGroupSessions && visibleGroupSessions.map((group) => {
           const seatsLeft = (group.maxParticipants ?? 0) - (group.currentParticipants ?? 0);
           const myParticipant = group.participants?.find((p: any) => p.menteeId === currentUserId);
           const myRequestStatus: string | undefined =
             myParticipant?.requestStatus || (joinedIds.includes(group.sessionId) ? "pending" : undefined);
-          const isJoining = joiningId === group.sessionId;
           const pricePerPerson = group.pricing?.pricePerPerson ?? group.pricePerPerson ?? 0;
           const statusMeta = myRequestStatus ? REQUEST_STATUS_META[myRequestStatus] : undefined;
 
@@ -602,15 +554,20 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 ) : seatsLeft <= 0 ? (
                   <span style={{ fontSize: "12px", fontWeight: 700, color: C.mid }}>Full</span>
                 ) : (
+                  // ✅ FIX: used to call handleJoinGroupSession() directly,
+                  // which fired MentorService.joinGroupSession() (old
+                  // direct-join) the instant it was clicked — no details
+                  // screen, no confirmation. It now only opens the same
+                  // detail modal the card click opens; the request is sent
+                  // from inside that modal instead.
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleJoinGroupSession(group.sessionId);
+                      setDetailGroup(group);
                     }}
-                    disabled={isJoining}
-                    style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px", opacity: isJoining ? 0.6 : 1 }}
+                    style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}
                   >
-                    {isJoining ? "Sending request..." : "Join Group"}
+                    View Details
                   </button>
                 )}
               </div>
@@ -627,9 +584,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
         const isPending = myRequestStatus === "pending";
         const isAccepted = myRequestStatus === "accepted";
         const isRejected = myRequestStatus === "rejected";
-        // "has an active or resolved request" — used to decide whether to
-        // show the "What you'll get" pitch (only for people who haven't
-        // requested at all yet).
         const hasRequested = isPending || isAccepted || isRejected;
         const seatsLeft = (detailGroup.maxParticipants ?? 0) - (detailGroup.currentParticipants ?? 0);
         const pricePerPerson = detailGroup.pricing?.pricePerPerson ?? detailGroup.pricePerPerson ?? 0;
@@ -714,9 +668,9 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   </div>
                 )}
 
-{detailGroup.description && (
-                  <p style={{ fontSize: "13.5px", color: C.mid, lineHeight: "1.6", marginBottom: "18px", overflowWrap: "break-word", wordBreak: "break-word" }}>
-                    {detailGroup.description}
+                {detailGroup.description && (
+                  <p className="mb-4 text-sm line-clamp-2" style={{ color: '#8a7a6a', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                    {detailGroup.description || "Interactive group session led by an expert mentor."}
                   </p>
                 )}
               </div>
@@ -740,9 +694,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   </div>
                 )}
 
-                {/* ✅ FIX: now shows requestStatus honestly (Pending / You're
-                    In / Declined) instead of only attendance+payment, which
-                    gave no indication of whether the mentor had approved it. */}
                 {myParticipant && (
                   <div style={{
                     background: C.bg, borderRadius: "14px", padding: "14px 16px", border: `1px solid ${C.border}`,
@@ -874,13 +825,13 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 )}
               </div>
 
-              {/* ✅ FIX: footer now branches on the real requestStatus —
-                  Accepted → Leave Session; Pending → Cancel Request
-                  (disabled-looking but still actionable); Rejected/none with
+              {/* Footer branches on the real requestStatus — Accepted →
+                  Leave Session; Pending → Cancel Request; Rejected/none with
                   seats left → Join Group (or "Request Again"); no seats →
-                  Session Full. Previously this only checked isJoined and
-                  always offered "Reserve Seat" / "Leave Session", with no
-                  pending state at all. */}
+                  Session Full. This "Join Group" click is the ONLY trigger
+                  for handleJoinFromModal, i.e. the ONLY place a request is
+                  actually sent — always after the user has seen the details
+                  above. */}
               <div style={{ padding: "16px 24px 24px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: "10px" }}>
                 <button onClick={closeGroupDetail} style={{ flex: 1, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 600, background: C.border, color: C.dark, border: "none", cursor: "pointer" }}>
                   Close
