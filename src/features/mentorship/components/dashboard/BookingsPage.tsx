@@ -436,6 +436,21 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     });
   };
 
+    // ✅ FIX: convert a single "HH:mm" (24-hour / "train time") string to
+  // 12-hour "h:mm AM/PM". Leaves anything that isn't plain HH:mm
+  // (e.g. already has AM/PM) untouched.
+  const to12Hour = (part: string): string => {
+    const match = part.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/);
+    if (!match) return part; // not a bare 24hr time — leave as-is
+
+    let hours = parseInt(match[1], 10);
+    const minutes = match[2];
+    const period = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+
+    return `${hours}:${minutes} ${period}`;
+  };
+
   const formatSlotRange = (slotTime?: string | null) => {
     if (!slotTime) {
       return "";
@@ -447,15 +462,13 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       return "";
     }
 
-    // Already formatted:
-    // "10:00 AM - 11:00 AM"
-    if (value.includes(" - ")) {
-      return value;
-    }
-
-    // Handle:
-    // "10:00 AM-11:00 AM"
-    // "10:00-11:00"
+    // ✅ FIX: pehle yahan "value.includes(' - ')" hote hi raw string
+    // seedha return ho jaata tha — chahe wo "16:30 - 17:00" (24hr,
+    // 'train time') ho ya "10:00 AM - 11:00 AM" (already formatted).
+    // Isliye 24hr slotTime kabhi convert hi nahi hota tha aur Bookings
+    // table me seedha "16:30 - 17:00" dikhta tha. Ab dono parts ko
+    // individually 12-hour format me convert karte hain — jo part
+    // already AM/PM me hai wo to12Hour() se untouched wapas aata hai.
     const parts = value
       .split("-")
       .map((part) => part.trim());
@@ -465,10 +478,10 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       parts[0] &&
       parts[1]
     ) {
-      return `${parts[0]} - ${parts[1]}`;
+      return `${to12Hour(parts[0])} - ${to12Hour(parts[1])}`;
     }
 
-    return value;
+    return to12Hour(value);
   };
 
   // Time formatter
