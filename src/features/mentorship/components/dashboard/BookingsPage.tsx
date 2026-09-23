@@ -32,10 +32,10 @@ type MentorBookingRow = {
   serviceName: string;
   scheduledAt: string;
   slotTime: string;
-  // ✅ NEW: distinguishes a 1:1 booking row from a group-session
-  // participant row (both are flattened into the same table by
-  // fetchSessions()). Used to branch Start/Cancel/Complete/Reschedule
-  // actions to the correct backend (session vs group-session) endpoints.
+  // distinguishes a 1:1 booking row from a group-session row (both a
+  // still-PENDING join request and an already-ACCEPTED participant are
+  // group-session rows). Used to branch Accept/Reject/Start/Cancel actions
+  // to the correct backend (session vs group-session) endpoints.
   isGroupSession?: boolean;
   status:
     | "pending"
@@ -143,7 +143,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Cancel modal
+  // Cancel / Reject modal (used both for cancelling a confirmed session
+  // and for declining a still-pending group join request)
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelSessionId, setCancelSessionId] = useState<string | null>(null);
   const [cancelBookingId, setCancelBookingId] = useState<string | null>(null);
@@ -174,7 +175,9 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   // Receipt
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  // Fetch mentor sessions (1:1 bookings + group-session participants, merged)
+  // Fetch mentor sessions: 1:1 bookings + accepted group-session
+  // participants + still-PENDING group-session join requests, all merged
+  // into one row shape so the tabs/stat cards work uniformly.
   const fetchSessions = async () => {
     if (!mentorData?.mentorId) return;
 
@@ -182,15 +185,19 @@ export default function BookingsPage({ mentorData }: BookingProps) {
 
     return Promise.all([
       SessionService.getMentorSessions(mentorData.mentorId),
-      // ✅ NEW: group-session participants, shaped by the backend into the
-      // same row structure as 1:1 bookings. If this call fails, we still
-      // want 1:1 bookings to render — so it never rejects the Promise.all.
       SessionService.getMentorGroupSessionParticipants().catch((err) => {
         console.error("Failed to fetch group session bookings:", err);
         return { data: [] } as any;
       }),
+      // ✅ NEW: pending group-session join requests — without this, a
+      // mentee's "Join Group" request never shows up under the Pending
+      // tab / Pending stat card, even though the notification fires.
+      SessionService.getMentorGroupJoinRequests().catch((err) => {
+        console.error("Failed to fetch group join requests:", err);
+        return { data: [] } as any;
+      }),
     ])
-      .then(([sessionsRes, groupRes]) => {
+      .then(([sessionsRes, groupRes, groupRequestsRes]) => {
         const _all = sessionsRes.data as any[];
 
         const filtered = _all.filter(
@@ -220,7 +227,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
           }));
         });
 
-        // ✅ NEW: group session participant rows — backend already returns
+        // Accepted group-session participants — backend already returns
         // them pre-shaped (bookingId, sessionId, menteeId, menteeName,
         // menteeProfilePhoto, serviceName, scheduledAt, status).
         const groupRows: MentorBookingRow[] = (
@@ -238,7 +245,27 @@ export default function BookingsPage({ mentorData }: BookingProps) {
           isGroupSession: true,
         }));
 
-        const combined = [...flattened, ...groupRows];
+        // ✅ NEW: still-pending group join requests. status is forced to
+        // "pending" so they land in the Pending tab/stat card alongside
+        // pending 1:1 bookings.
+        const groupRequestRows: MentorBookingRow[] = (
+          (groupRequestsRes?.data as any[]) || []
+        ).map((g: any) => ({
+          bookingId: `${g.sessionId}-${g.menteeId}-request`,
+          sessionId: g.sessionId,
+          menteeId: g.menteeId,
+          menteeName: g.menteeName || "Student",
+          menteeProfilePhoto: null,
+          serviceName: g.sessionTitle
+            ? `${g.sessionTitle} (Group Session)`
+            : "Group Session",
+          scheduledAt: g.scheduledAt,
+          slotTime: "",
+          status: "pending",
+          isGroupSession: true,
+        }));
+
+        const combined = [...flattened, ...groupRows, ...groupRequestRows];
 
         const sorted = combined.sort((a, b) => {
           const dateA = a.scheduledAt
@@ -409,9 +436,6 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     });
   };
 
-  // ============================================================
-  // FIX: formatSlotRange was missing
-  // ============================================================
   const formatSlotRange = (slotTime?: string | null) => {
     if (!slotTime) {
       return "";
@@ -478,7 +502,9 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     });
   };
 
-  // Confirm booking
+  // Confirm / Accept booking (branches to group join-request acceptance
+  // when the row is a pending group-session request, since that goes
+  // through acceptJoinRequest, not the 1:1 confirmSession endpoint)
   const handleConfirm = async (
     sessionId: string,
     bookingId?: string
@@ -486,15 +512,33 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     setActionLoading(sessionId);
 
     try {
-      await SessionService.confirmSession(
-        sessionId,
-        bookingId
+      const bookingRow = allBookings.find(
+        (b) => b.sessionId === sessionId && b.bookingId === bookingId
       );
 
-      showToast(
-        "Booking confirmed successfully",
-        "success"
-      );
+      if (bookingRow?.isGroupSession) {
+        if (!bookingRow.menteeId) {
+          showToast("Could not identify the join request.", "error");
+          return;
+        }
+
+        await SessionService.acceptGroupJoinRequest(
+          sessionId,
+          bookingRow.menteeId
+        );
+
+        showToast("Join request accepted", "success");
+      } else {
+        await SessionService.confirmSession(
+          sessionId,
+          bookingId
+        );
+
+        showToast(
+          "Booking confirmed successfully",
+          "success"
+        );
+      }
 
       await fetchSessions();
       setBookingTab("upcoming");
@@ -850,14 +894,33 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     }
   };
 
-  // Cancel session (branches to group-session endpoint when the row is a
-  // group-session participant — group cancellation reason is required
-  // exactly the same way, but has no per-participant bookingId concept)
+  // Cancel a confirmed session OR reject a still-pending group join
+  // request — branches by row status, not just by isGroupSession, since
+  // an accepted group participant and a pending group join request need
+  // completely different backend calls.
   const handleCancelSubmit = async () => {
-    if (
-      !cancelSessionId ||
-      !cancelReason.trim()
-    ) {
+    if (!cancelSessionId) {
+      showToast(
+        "Something went wrong. Please try again.",
+        "error"
+      );
+
+      return;
+    }
+
+    const bookingRow = allBookings.find(
+      (b) =>
+        b.sessionId === cancelSessionId &&
+        b.bookingId === cancelBookingId
+    );
+
+    const isPendingGroupRequest =
+      bookingRow?.isGroupSession &&
+      bookingRow.status === "pending";
+
+    // Rejecting a join request needs no reason; cancelling a confirmed
+    // session (1:1 or the whole group session) still does.
+    if (!isPendingGroupRequest && !cancelReason.trim()) {
       showToast(
         "Please provide a reason.",
         "error"
@@ -871,16 +934,33 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     );
 
     try {
-      const bookingRow = allBookings.find(
-        (b) =>
-          b.sessionId === cancelSessionId &&
-          b.bookingId === cancelBookingId
-      );
+      if (isPendingGroupRequest) {
+        if (!bookingRow?.menteeId) {
+          showToast(
+            "Could not identify the join request.",
+            "error"
+          );
+          return;
+        }
 
-      if (bookingRow?.isGroupSession) {
+        await SessionService.rejectGroupJoinRequest(
+          cancelSessionId,
+          bookingRow.menteeId
+        );
+
+        showToast(
+          "Join request declined",
+          "success"
+        );
+      } else if (bookingRow?.isGroupSession) {
         await SessionService.cancelGroupSession(
           cancelSessionId,
           cancelReason
+        );
+
+        showToast(
+          "Session cancelled successfully",
+          "success"
         );
       } else {
         if (!cancelBookingId) {
@@ -896,12 +976,12 @@ export default function BookingsPage({ mentorData }: BookingProps) {
           cancelReason,
           cancelBookingId
         );
-      }
 
-      showToast(
-        "Session cancelled successfully",
-        "success"
-      );
+        showToast(
+          "Session cancelled successfully",
+          "success"
+        );
+      }
 
       setShowCancelModal(false);
 
@@ -913,7 +993,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     } catch (err: any) {
       showToast(
         err?.message ||
-          "Failed to cancel session.",
+          "Failed to process request.",
         "error"
       );
     } finally {
@@ -1525,8 +1605,9 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                               }
                             </span>
 
-                            {/* ✅ NEW: small badge distinguishing group
-                                session participants from 1:1 bookings */}
+                            {/* small badge distinguishing group session
+                                rows (pending request or accepted
+                                participant) from 1:1 bookings */}
                             {booking.isGroupSession && (
                               <span
                                 className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
@@ -1689,7 +1770,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                                   Start
                                 </button>
 
-                                {/* ✅ Reschedule not supported for group
+                                {/* Reschedule not supported for group
                                     sessions yet — 1:1 only */}
                                 {!booking.isGroupSession && (
                                   <button
@@ -1856,7 +1937,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       </div>
 
       {/* =====================================================
-          CANCEL MODAL
+          CANCEL / REJECT MODAL
       ===================================================== */}
 
       {showCancelModal &&
@@ -1878,7 +1959,13 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   color: "#4a3728",
                 }}
               >
-                Confirm Cancellation
+                {allBookings.find(
+                  (b) =>
+                    b.sessionId === cancelSessionId &&
+                    b.bookingId === cancelBookingId
+                )?.status === "pending"
+                  ? "Decline Join Request"
+                  : "Confirm Cancellation"}
               </h3>
 
               <div>
@@ -1888,7 +1975,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                     color: "#8a7a6a",
                   }}
                 >
-                  Reason for cancellation
+                  Reason (optional for join requests)
                 </label>
 
                 <input
@@ -1955,7 +2042,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   {actionLoading ===
                   cancelSessionId
                     ? "Processing..."
-                    : "Confirm Cancel"}
+                    : "Confirm"}
                 </button>
 
               </div>

@@ -89,6 +89,16 @@ export interface BookSessionInput {
     };
 }
 
+// ── Group join-request status (mentee's own request state) ──
+export interface GroupJoinRequestStatus {
+    sessionId: string;
+    menteeId: string;
+    requestStatus: "pending" | "accepted" | "rejected";
+    attendanceStatus?: string;
+    registeredAt?: string;
+    paymentStatus?: string;
+}
+
 class SessionService {
 
     // ── GROUP SESSIONS base endpoint ────────────────────────
@@ -465,6 +475,97 @@ class SessionService {
         } catch (error: any) {
             console.error("❌ [CANCEL_GROUP_SESSION] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to cancel group session.");
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // GROUP SESSIONS — join-request flow (mentee side + mentor decisions)
+    // ✅ NEW: these five were missing on the client entirely. The backend
+    // (group.service.ts / group.controller.ts) already implements the
+    // whole pending→accept/reject flow — BookingsPage.tsx was already
+    // calling `getMentorGroupJoinRequests`, `acceptGroupJoinRequest`, and
+    // `rejectGroupJoinRequest` on this class, so without these the mentor's
+    // Pending tab actions were throwing "SessionService.xxx is not a
+    // function" at runtime. `joinGroupSession` / `getMyGroupJoinRequestStatus`
+    // are the mentee-side counterparts needed for the "Join Group" button.
+    // ══════════════════════════════════════════════════════════════════
+
+    // ── MENTEE: send a request to join a group session (PENDING) ───────
+    // Maps to POST /group-sessions/:id/join (backend also aliases /request).
+    // Does NOT confirm a seat — mentor must accept first.
+    static async joinGroupSession(sessionId: string, transactionId?: string): Promise<ApiResponse> {
+        try {
+            const { data } = await api.post<ApiResponse>(
+                `${SessionService.GROUP_SESSIONS_ENDPOINT}/${sessionId}/join`,
+                transactionId ? { transactionId } : {}
+            );
+            return data;
+        } catch (error: any) {
+            console.error("❌ [JOIN_GROUP_SESSION] Failed", error?.response?.data || error?.message);
+            if (error?.response?.status === 400) throw new Error(error.response.data?.message || "Unable to send join request.");
+            if (error?.response?.status === 404) throw new Error("Session not found.");
+            throw new Error(error?.response?.data?.message || "Failed to send join request.");
+        }
+    }
+
+    // ── MENTEE: get my own join-request status for a session ───────────
+    // Maps to GET /group-sessions/:id/request. Backend 404s when the
+    // mentee has never requested to join — that's a normal "not requested
+    // yet" state, not an error, so it resolves to null instead of throwing.
+    static async getMyGroupJoinRequestStatus(sessionId: string): Promise<GroupJoinRequestStatus | null> {
+        try {
+            const { data } = await api.get<ApiResponse>(
+                `${SessionService.GROUP_SESSIONS_ENDPOINT}/${sessionId}/request`
+            );
+            return data?.data ?? null;
+        } catch (error: any) {
+            if (error?.response?.status === 404) return null;
+            console.error("❌ [GET_MY_GROUP_JOIN_REQUEST_STATUS] Failed", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to fetch join request status.");
+        }
+    }
+
+    // ── MENTOR: all PENDING join requests across my group sessions ─────
+    // Maps to GET /group-sessions/mentor/join-requests. Powers the
+    // Pending tab / Pending stat card in BookingsPage.tsx.
+    static async getMentorGroupJoinRequests(): Promise<ApiResponse> {
+        try {
+            const { data } = await api.get<ApiResponse>(
+                `${SessionService.GROUP_SESSIONS_ENDPOINT}/mentor/join-requests`
+            );
+            console.log("✅ [GET_MENTOR_GROUP_JOIN_REQUESTS] Fetched:", data);
+            return data;
+        } catch (error: any) {
+            console.error("❌ [GET_MENTOR_GROUP_JOIN_REQUESTS] Failed", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to fetch group join requests.");
+        }
+    }
+
+    // ── MENTOR: accept a pending join request → mentee becomes participant ──
+    // Maps to PATCH /group-sessions/:id/requests/:menteeId/accept.
+    static async acceptGroupJoinRequest(sessionId: string, menteeId: string): Promise<ApiResponse> {
+        try {
+            const { data } = await api.patch<ApiResponse>(
+                `${SessionService.GROUP_SESSIONS_ENDPOINT}/${sessionId}/requests/${menteeId}/accept`
+            );
+            return data;
+        } catch (error: any) {
+            console.error("❌ [ACCEPT_GROUP_JOIN_REQUEST] Failed", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to accept join request.");
+        }
+    }
+
+    // ── MENTOR: reject a pending join request ───────────────────────────
+    // Maps to PATCH /group-sessions/:id/requests/:menteeId/reject.
+    static async rejectGroupJoinRequest(sessionId: string, menteeId: string): Promise<ApiResponse> {
+        try {
+            const { data } = await api.patch<ApiResponse>(
+                `${SessionService.GROUP_SESSIONS_ENDPOINT}/${sessionId}/requests/${menteeId}/reject`
+            );
+            return data;
+        } catch (error: any) {
+            console.error("❌ [REJECT_GROUP_JOIN_REQUEST] Failed", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to reject join request.");
         }
     }
 }

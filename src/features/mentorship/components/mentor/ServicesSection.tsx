@@ -69,6 +69,17 @@ const GROUP_STATUS_LABEL: Record<string, string> = {
   rescheduled: "Rescheduled",
 };
 
+// ✅ NEW: maps a mentee's own join-request status (participant.requestStatus)
+// to a label + color. This is what was missing — the UI previously treated
+// "has a participant row at all" as "seat reserved", regardless of whether
+// the mentor had accepted it yet. A PENDING request must never look
+// identical to an ACCEPTED one.
+const REQUEST_STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
+  pending: { label: "Request Pending", bg: "#fef3c7", fg: "#b45309" },
+  accepted: { label: "You're In", bg: "#dcfce7", fg: "#15803d" },
+  rejected: { label: "Request Declined", bg: "#fee2e2", fg: "#dc2626" },
+};
+
 const formatGroupDate = (dateString?: string) => {
   if (!dateString) return "Date not available";
   try {
@@ -108,6 +119,9 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   const [loading, setLoading] = useState(true);
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
+  // ✅ joinedIds now means "I have an active (pending or accepted) request
+  // with this session" — an optimistic flag used only until fetchGroupSessions()
+  // returns the real participant row with its actual requestStatus.
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
 
   // ✅ NEW: detail modal state for a clicked group session card
@@ -269,6 +283,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       await MentorService.joinGroupSession(groupId);
       setJoinedIds((prev) => [...prev, groupId]);
       await fetchGroupSessions();
+      // ✅ NEW: makes it explicit this is a request, not a confirmed seat
+      showToast("Join request sent. Waiting for mentor approval.");
     } catch (err: any) {
       setJoinError(err.message || "Failed to join session.");
     } finally {
@@ -289,6 +305,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       await MentorService.joinGroupSession(detailGroup.sessionId);
       setJoinedIds((prev) => [...prev, detailGroup.sessionId]);
       await fetchGroupSessions();
+      // ✅ NEW
+      showToast("Join request sent. Waiting for mentor approval.");
     } catch (err: any) {
       setGroupActionError(err.message || "Failed to join session.");
     } finally {
@@ -298,7 +316,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
 
   const handleLeaveFromModal = async () => {
     if (!detailGroup) return;
-    if (!window.confirm("Kya aap sach me is group session se leave karna chahte hain?")) return;
+    if (!window.confirm("Kya aap sach me is group session se leave/cancel karna chahte hain?")) return;
     setGroupActionBusy(true);
     setGroupActionError(null);
     try {
@@ -459,14 +477,20 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           );
         })}
 
-        {/* ✅ Group session cards — now clickable, opens the detail modal below,
-            same as 1:1 sessions do via onServiceClick + detail views. */}
+        {/* ✅ Group session cards — clickable, opens the detail modal below.
+            ✅ FIX: previously "alreadyJoined" only checked whether a
+            participant row existed at all, so a PENDING request looked
+            identical to an ACCEPTED one ("✅ Seat Reserved"). Now the
+            mentee's own requestStatus (pending/accepted/rejected) is read
+            from group.participants and shown honestly. */}
         {!loading && showGroupSessions && visibleGroupSessions.map((group) => {
           const seatsLeft = (group.maxParticipants ?? 0) - (group.currentParticipants ?? 0);
-          const alreadyJoined = joinedIds.includes(group.sessionId) ||
-            group.participants?.some((p: any) => p.menteeId === currentUserId);
+          const myParticipant = group.participants?.find((p: any) => p.menteeId === currentUserId);
+          const myRequestStatus: string | undefined =
+            myParticipant?.requestStatus || (joinedIds.includes(group.sessionId) ? "pending" : undefined);
           const isJoining = joiningId === group.sessionId;
           const pricePerPerson = group.pricing?.pricePerPerson ?? group.pricePerPerson ?? 0;
+          const statusMeta = myRequestStatus ? REQUEST_STATUS_META[myRequestStatus] : undefined;
 
           return (
             <div key={group.sessionId}
@@ -514,8 +538,13 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 <span style={{ fontWeight: "bold", color: pricePerPerson === 0 ? "#10b981" : C.dark, fontSize: "15px" }}>
                   {pricePerPerson === 0 ? "Free" : `₹${pricePerPerson}/person`}
                 </span>
-                {alreadyJoined ? (
-                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>✅ Seat Reserved</div>
+                {statusMeta ? (
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: statusMeta.fg }}>
+                    {myRequestStatus === "pending" && "⏳ "}
+                    {myRequestStatus === "accepted" && "✅ "}
+                    {myRequestStatus === "rejected" && "❌ "}
+                    {statusMeta.label}
+                  </div>
                 ) : seatsLeft <= 0 ? (
                   <span style={{ fontSize: "12px", fontWeight: 700, color: C.mid }}>Full</span>
                 ) : (
@@ -527,7 +556,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                     disabled={isJoining}
                     style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px", opacity: isJoining ? 0.6 : 1 }}
                   >
-                    {isJoining ? "Reserving..." : "Reserve Seat"}
+                    {isJoining ? "Sending request..." : "Join Group"}
                   </button>
                 )}
               </div>
@@ -539,7 +568,15 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       {/* ================= Group Session Detail Modal ================= */}
       {detailGroup && (() => {
         const myParticipant = detailGroup.participants?.find((p: any) => p.menteeId === currentUserId);
-        const isJoined = !!myParticipant || joinedIds.includes(detailGroup.sessionId);
+        const myRequestStatus: string | undefined =
+          myParticipant?.requestStatus || (joinedIds.includes(detailGroup.sessionId) ? "pending" : undefined);
+        const isPending = myRequestStatus === "pending";
+        const isAccepted = myRequestStatus === "accepted";
+        const isRejected = myRequestStatus === "rejected";
+        // "has an active or resolved request" — used to decide whether to
+        // show the "What you'll get" pitch (only for people who haven't
+        // requested at all yet).
+        const hasRequested = isPending || isAccepted || isRejected;
         const seatsLeft = (detailGroup.maxParticipants ?? 0) - (detailGroup.currentParticipants ?? 0);
         const pricePerPerson = detailGroup.pricing?.pricePerPerson ?? detailGroup.pricePerPerson ?? 0;
         const scheduledDate = detailGroup.scheduledAt ? new Date(detailGroup.scheduledAt) : null;
@@ -649,24 +686,50 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   </div>
                 )}
 
-                {isJoined && myParticipant && (
+                {/* ✅ FIX: now shows requestStatus honestly (Pending / You're
+                    In / Declined) instead of only attendance+payment, which
+                    gave no indication of whether the mentor had approved it. */}
+                {myParticipant && (
                   <div style={{
                     background: C.bg, borderRadius: "14px", padding: "14px 16px", border: `1px solid ${C.border}`,
                     marginBottom: "14px",
                   }}>
                     <div style={{ fontSize: "12px", fontWeight: 700, color: C.dark, marginBottom: "6px" }}>Your Registration</div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", padding: "3px 0" }}>
-                      <span style={{ color: C.mid }}>Status</span>
-                      <span style={{ color: C.dark, fontWeight: 600, textTransform: "capitalize" }}>{myParticipant.attendanceStatus}</span>
+                      <span style={{ color: C.mid }}>Request Status</span>
+                      <span style={{
+                        color: REQUEST_STATUS_META[myParticipant.requestStatus]?.fg || C.dark,
+                        fontWeight: 700, textTransform: "capitalize",
+                      }}>
+                        {REQUEST_STATUS_META[myParticipant.requestStatus]?.label || myParticipant.requestStatus}
+                      </span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", padding: "3px 0" }}>
-                      <span style={{ color: C.mid }}>Payment</span>
-                      <span style={{ color: C.dark, fontWeight: 600, textTransform: "capitalize" }}>{myParticipant.paymentStatus}</span>
-                    </div>
+                    {isAccepted && (
+                      <>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", padding: "3px 0" }}>
+                          <span style={{ color: C.mid }}>Attendance</span>
+                          <span style={{ color: C.dark, fontWeight: 600, textTransform: "capitalize" }}>{myParticipant.attendanceStatus}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", padding: "3px 0" }}>
+                          <span style={{ color: C.mid }}>Payment</span>
+                          <span style={{ color: C.dark, fontWeight: 600, textTransform: "capitalize" }}>{myParticipant.paymentStatus}</span>
+                        </div>
+                      </>
+                    )}
+                    {isPending && (
+                      <div style={{ fontSize: "12px", color: C.mid, marginTop: "6px", lineHeight: "1.5" }}>
+                        Join request sent. Waiting for mentor approval — you'll be notified once it's reviewed.
+                      </div>
+                    )}
+                    {isRejected && (
+                      <div style={{ fontSize: "12px", color: C.mid, marginTop: "6px", lineHeight: "1.5" }}>
+                        The mentor declined this request. You can send a new request if seats are still open.
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {isInProgress && isJoined && (
+                {isInProgress && isAccepted && (
                   <button
                     onClick={() => {
                       if (detailGroup.meeting?.meetingUrl) window.open(detailGroup.meeting.meetingUrl, "_blank");
@@ -684,7 +747,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   </button>
                 )}
 
-                {!isJoined && !isCancelled && !isCompleted && (
+                {!hasRequested && !isCancelled && !isCompleted && (
                   <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}`, marginBottom: "18px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
                       <Sparkles size={15} color={C.dark} />
@@ -757,13 +820,20 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 )}
               </div>
 
+              {/* ✅ FIX: footer now branches on the real requestStatus —
+                  Accepted → Leave Session; Pending → Cancel Request
+                  (disabled-looking but still actionable); Rejected/none with
+                  seats left → Join Group (or "Request Again"); no seats →
+                  Session Full. Previously this only checked isJoined and
+                  always offered "Reserve Seat" / "Leave Session", with no
+                  pending state at all. */}
               <div style={{ padding: "16px 24px 24px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: "10px" }}>
                 <button onClick={closeGroupDetail} style={{ flex: 1, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 600, background: C.border, color: C.dark, border: "none", cursor: "pointer" }}>
                   Close
                 </button>
 
                 {!isCancelled && !isCompleted && (
-                  isJoined ? (
+                  isAccepted ? (
                     <button
                       onClick={handleLeaveFromModal}
                       disabled={groupActionBusy}
@@ -775,13 +845,25 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                     >
                       {groupActionBusy ? "Leaving..." : "Leave Session"}
                     </button>
+                  ) : isPending ? (
+                    <button
+                      onClick={handleLeaveFromModal}
+                      disabled={groupActionBusy}
+                      style={{
+                        flex: 2, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 700,
+                        background: "#fef3c7", color: "#b45309", border: "1.5px solid #fde68a",
+                        cursor: groupActionBusy ? "not-allowed" : "pointer", opacity: groupActionBusy ? 0.6 : 1,
+                      }}
+                    >
+                      {groupActionBusy ? "Cancelling..." : "⏳ Cancel Request"}
+                    </button>
                   ) : seatsLeft > 0 ? (
                     <button
                       onClick={handleJoinFromModal}
                       disabled={groupActionBusy}
                       style={{ flex: 2, ...btnPrimary, padding: "12px", borderRadius: "12px", fontSize: "13.5px", opacity: groupActionBusy ? 0.6 : 1 }}
                     >
-                      {groupActionBusy ? "Reserving..." : "Reserve Seat"}
+                      {groupActionBusy ? "Sending request..." : isRejected ? "Request Again" : "Join Group"}
                     </button>
                   ) : (
                     <button disabled style={{ flex: 2, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 700, background: C.border, color: C.mid, border: "none", cursor: "not-allowed" }}>
