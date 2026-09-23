@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ExternalLink, Check, Copy, MoreVertical, X, Calendar as CalendarIcon, Clock, FileText, Share2, Star, CheckCircle, User } from "lucide-react";
+import { ExternalLink, Check, Copy, MoreVertical, X, Calendar, Clock, FileText, Share2, Star, CheckCircle, User, Tag, CreditCard, Users, Play, AlarmClock } from "lucide-react";
 import { formatSlotRange } from "../types/data";
 import SessionService from '@/lib/api/session.service';
 import MentorService from '@/lib/api/mentorship.service';
