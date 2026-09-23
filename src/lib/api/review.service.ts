@@ -66,10 +66,16 @@ export interface SubmitReviewInput {
 const ReviewService = {
   getMentorReviews: (mentorId: string, page = 1, limit = 10) =>
     api
-      .get<PaginatedResponse<MentorReview>>(`/mentorship/reviews/mentor/${mentorId}`, {
-        params: { page, limit },
-      })
-      .then((res) => res.data),
+      .get<{
+        success: boolean;
+        message: string;
+        data: MentorReview[];
+        meta: { page: number; limit: number; total: number; totalPages: number };
+      }>(`/mentorship/reviews/mentor/${mentorId}`, { params: { page, limit } })
+      .then((res) => ({
+        data: res.data.data,
+        pagination: res.data.meta,
+      })),
 
   getReviewStats: (mentorId: string) =>
     api
