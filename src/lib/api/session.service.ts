@@ -47,6 +47,7 @@ export interface PopularService {
     count: number;
     revenue: number;
 }
+
 export interface AnalyticsData {
     mentor: { id: string; userId: string; title: string; status: string };
     sessions: {
@@ -68,6 +69,7 @@ export interface AnalyticsData {
     };
     period: { startDate?: string; endDate?: string };
 }
+
 export interface AnalyticsResponse {
     success: boolean;
     data: AnalyticsData;
@@ -111,11 +113,6 @@ class SessionService {
 
     static async createSession(input: CreateSessionInput): Promise<ApiResponse> {
         try {
-            console.log("📅 [CREATE_SESSION] Creating...", {
-                sessionType: input.sessionType,
-                scheduledAt: input.scheduledAt,
-            });
-
             const formData = new FormData();
             Object.entries(input).forEach(([key, value]) => {
                 if (value !== undefined) {
@@ -135,10 +132,9 @@ class SessionService {
                 { headers: { 'Content-Type': 'multipart/form-data' } }
             );
 
-            // console.log("✅ [CREATE_SESSION] Created:", data.data?.sessionId);
             return data;
         } catch (error: any) {
-            console.error("❌ [CREATE_SESSION] Failed", error?.response?.data || error?.message);
+            console.error("[CREATE_SESSION] Failed", error?.response?.data || error?.message);
             if (error?.response?.status === 400) throw new Error(error.response.data?.message || "Invalid session data.");
             if (error?.response?.status === 404) throw new Error("Mentor not found.");
             if (error?.response?.status === 409) throw new Error("Slot already booked.");
@@ -152,10 +148,9 @@ class SessionService {
             const { data } = await api.get<ApiResponse>(
                 `${config.NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT}/${mentorId}`
             );
-            console.log("✅ [GET_MENTOR_SESSIONS] Fetched:", data, "sessions");
             return data;
         } catch (error: any) {
-            console.error("❌ [GET_MENTOR_SESSIONS] Failed", error?.response?.data);
+            console.error("[GET_MENTOR_SESSIONS] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to fetch mentor sessions.");
         }
     }
@@ -163,13 +158,12 @@ class SessionService {
     // ── GET MENTOR ANALYTICS ───────────────────────────────
     static async getMentorAnalytics(mentorId: string): Promise<AnalyticsResponse> {
         try {
-            console.log("📊 [GET_MENTOR_ANALYTICS] Fetching for:", mentorId);
             const { data } = await api.get<AnalyticsResponse>(
                 `/mentorship/analytics/mentor/${mentorId}/stats`
             );
             return data;
         } catch (error: any) {
-            console.error("❌ [GET_MENTOR_ANALYTICS] Failed:", error?.response?.data || error?.message);
+            console.error("[GET_MENTOR_ANALYTICS] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to fetch mentor analytics.");
         }
     }
@@ -182,11 +176,7 @@ class SessionService {
             );
             return data;
         } catch (error: any) {
-            console.error("RAW ERROR TYPE:", typeof error, error?.constructor?.name);
-            console.error("IS AXIOS ERROR:", error?.isAxiosError);
-            console.error("RESPONSE:", error?.response);
-            console.error("RESPONSE DATA:", error?.response?.data);
-            console.error("MESSAGE:", error?.message);
+            console.error("[BOOK_SESSION] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to book session.");
         }
     }
@@ -198,30 +188,25 @@ class SessionService {
                 `${config.NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT}`,
                 { params: filters }
             );
-            console.log("✅ [GET_ALL_SESSIONS_DB] Fetched:", data, "sessions");
             return data;
         } catch (error: any) {
+            console.error("[GET_ALL_SESSIONS_DB] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to fetch all sessions.");
         }
     }
 
     // ── GET UPCOMING SESSIONS (mentor/user-scoped, real mentee data) ───
-    // ✅ FIX: was missing entirely — the dashboard was falling back to
-    // getAllSessionsFromDB(), an admin endpoint with no mentor/user filter,
-    // which is why "Upcoming sessions" showed random platform-wide session
-    // templates instead of this mentor's actual bookings with real mentee
-    // names/photos. Backend derives the user from the auth token — no
-    // userId param needed here, just role.
+    // Backend derives the user from the auth token — no userId param
+    // needed here, just role.
     static async getUpcomingSessions(params: { role?: "mentor" | "mentee"; limit?: number } = {}): Promise<ApiResponse> {
         try {
             const endpoint = config.NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT
                 || `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/upcoming`;
 
             const { data } = await api.get<ApiResponse>(endpoint, { params });
-            console.log("✅ [GET_UPCOMING_SESSIONS] Fetched:", data);
             return data;
         } catch (error: any) {
-            console.error("❌ [GET_UPCOMING_SESSIONS] Failed", error?.response?.data || error?.message);
+            console.error("[GET_UPCOMING_SESSIONS] Failed", error?.response?.data || error?.message);
             if (error?.response?.status === 401) throw new Error("Please login again.");
             if (error?.code === "ERR_NETWORK") throw new Error("Unable to connect to server.");
             throw new Error(error?.response?.data?.message || "Failed to fetch upcoming sessions.");
@@ -235,10 +220,9 @@ class SessionService {
                 || `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/past`;
 
             const { data } = await api.get<ApiResponse>(endpoint, { params });
-            console.log("✅ [GET_PAST_SESSIONS] Fetched:", data);
             return data;
         } catch (error: any) {
-            console.error("❌ [GET_PAST_SESSIONS] Failed", error?.response?.data || error?.message);
+            console.error("[GET_PAST_SESSIONS] Failed", error?.response?.data || error?.message);
             if (error?.response?.status === 401) throw new Error("Please login again.");
             if (error?.code === "ERR_NETWORK") throw new Error("Unable to connect to server.");
             throw new Error(error?.response?.data?.message || "Failed to fetch past sessions.");
@@ -248,16 +232,12 @@ class SessionService {
     // ── GET SESSION BY ID ──────────────────────────────────
     static async getSessionById(sessionId: string): Promise<ApiResponse> {
         try {
-            // console.log("🔍 [GET_SESSION] Fetching:", sessionId);
-
             const { data } = await api.get<ApiResponse>(
                 `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}`
             );
-
-            // console.log("✅ [GET_SESSION] Fetched:", data.data?.sessionId);
             return data;
         } catch (error: any) {
-            console.error("❌ [GET_SESSION] Failed", error?.response?.data || error?.message);
+            console.error("[GET_SESSION] Failed", error?.response?.data || error?.message);
             if (error?.response?.status === 404) throw new Error("Session not found.");
             if (error?.response?.status === 403) throw new Error("Not authorized to view this session.");
             if (error?.code === "ERR_NETWORK") throw new Error("Unable to connect to server.");
@@ -268,24 +248,18 @@ class SessionService {
     // ── GET ALL SESSIONS ───────────────────────────────────
     static async getAllSessions(filters: SessionFilters = {}): Promise<ApiResponse> {
         try {
-            console.log("📋 [GET_ALL_SESSIONS] Fetching with filters:", filters);
-
             const endpoint = config.NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT
                 || `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/get-all`;
 
             const { data } = await api.get<ApiResponse>(endpoint, { params: filters });
-
-            // console.log("✅ [GET_ALL_SESSIONS] Fetched:", data, "sessions");
             return data;
         } catch (error: any) {
-            console.error("❌ [GET_ALL_SESSIONS] Failed", error?.response?.data || error?.message);
+            console.error("[GET_ALL_SESSIONS] Failed", error?.response?.data || error?.message);
             if (error?.response?.status === 401) throw new Error("Please login again.");
             if (error?.code === "ERR_NETWORK") throw new Error("Unable to connect to server.");
             throw new Error(error?.response?.data?.message || "Failed to fetch sessions.");
         }
     }
-
-
 
     static async confirmSession(sessionId: string, bookingId?: string): Promise<ApiResponse> {
         try {
@@ -330,14 +304,14 @@ class SessionService {
             );
             return data;
         } catch (error: any) {
-            console.error("❌ [DELETE_SESSION] Failed", error?.response?.data || error?.message);
+            console.error("[DELETE_SESSION] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to delete session.");
         }
     }
 
     static async updateSession(sessionId: string, payload: Record<string, any>): Promise<ApiResponse> {
         try {
-            // ⚠️ Always send multipart/form-data (even without a new image).
+            // Always send multipart/form-data (even without a new image).
             // The backend's uploadSingle('thumbnailImage') middleware chain only
             // reliably parses multipart requests on this route — plain JSON PUT
             // requests were causing a 500. Sending FormData consistently avoids
@@ -364,7 +338,7 @@ class SessionService {
             );
             return data;
         } catch (error: any) {
-            console.error("❌ [UPDATE_SESSION] Failed", error?.response?.data || error?.message);
+            console.error("[UPDATE_SESSION] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to update session.");
         }
     }
@@ -394,7 +368,7 @@ class SessionService {
     }
 
     // ── GET SESSION RECEIPT (for completed booking's Download/View) ────
-    // ✅ NEW: fetches real booking data (mentee name, price, payment status,
+    // Fetches real booking data (mentee name, price, payment status,
     // completedAt) to build the receipt shown/downloaded from BookingsPage.
     static async getSessionReceipt(sessionId: string, bookingId?: string): Promise<ApiResponse> {
         try {
@@ -404,7 +378,7 @@ class SessionService {
             );
             return data;
         } catch (error: any) {
-            console.error("❌ [GET_SESSION_RECEIPT] Failed", error?.response?.data || error?.message);
+            console.error("[GET_SESSION_RECEIPT] Failed", error?.response?.data || error?.message);
             if (error?.response?.status === 404) throw new Error("Session not found.");
             if (error?.response?.status === 400) throw new Error(error?.response?.data?.message || "Receipt not available.");
             throw new Error(error?.response?.data?.message || "Failed to fetch receipt.");
@@ -416,7 +390,6 @@ class SessionService {
     // ══════════════════════════════════════════════════════════════════
 
     // ── GET all group-session participants for the logged-in mentor ────
-    // ✅ NEW: powers the "group sessions inside Booking dashboard" merge.
     // Backend already shapes each row like a 1:1 booking row
     // (bookingId, sessionId, menteeId, menteeName, menteeProfilePhoto,
     // serviceName, scheduledAt, status, isGroupSession: true) so
@@ -426,10 +399,9 @@ class SessionService {
             const { data } = await api.get<ApiResponse>(
                 `${SessionService.GROUP_SESSIONS_ENDPOINT}/mentor/participants`
             );
-            console.log("✅ [GET_MENTOR_GROUP_PARTICIPANTS] Fetched:", data);
             return data;
         } catch (error: any) {
-            console.error("❌ [GET_MENTOR_GROUP_PARTICIPANTS] Failed", error?.response?.data || error?.message);
+            console.error("[GET_MENTOR_GROUP_PARTICIPANTS] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to fetch group session bookings.");
         }
     }
@@ -442,7 +414,7 @@ class SessionService {
             );
             return data;
         } catch (error: any) {
-            console.error("❌ [START_GROUP_SESSION] Failed", error?.response?.data || error?.message);
+            console.error("[START_GROUP_SESSION] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to start group session.");
         }
     }
@@ -459,7 +431,7 @@ class SessionService {
             );
             return data;
         } catch (error: any) {
-            console.error("❌ [COMPLETE_GROUP_SESSION] Failed", error?.response?.data || error?.message);
+            console.error("[COMPLETE_GROUP_SESSION] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to complete group session.");
         }
     }
@@ -473,21 +445,13 @@ class SessionService {
             );
             return data;
         } catch (error: any) {
-            console.error("❌ [CANCEL_GROUP_SESSION] Failed", error?.response?.data || error?.message);
+            console.error("[CANCEL_GROUP_SESSION] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to cancel group session.");
         }
     }
 
     // ══════════════════════════════════════════════════════════════════
     // GROUP SESSIONS — join-request flow (mentee side + mentor decisions)
-    // ✅ NEW: these five were missing on the client entirely. The backend
-    // (group.service.ts / group.controller.ts) already implements the
-    // whole pending→accept/reject flow — BookingsPage.tsx was already
-    // calling `getMentorGroupJoinRequests`, `acceptGroupJoinRequest`, and
-    // `rejectGroupJoinRequest` on this class, so without these the mentor's
-    // Pending tab actions were throwing "SessionService.xxx is not a
-    // function" at runtime. `joinGroupSession` / `getMyGroupJoinRequestStatus`
-    // are the mentee-side counterparts needed for the "Join Group" button.
     // ══════════════════════════════════════════════════════════════════
 
     // ── MENTEE: send a request to join a group session (PENDING) ───────
@@ -501,10 +465,28 @@ class SessionService {
             );
             return data;
         } catch (error: any) {
-            console.error("❌ [JOIN_GROUP_SESSION] Failed", error?.response?.data || error?.message);
+            console.error("[JOIN_GROUP_SESSION] Failed", error?.response?.data || error?.message);
             if (error?.response?.status === 400) throw new Error(error.response.data?.message || "Unable to send join request.");
             if (error?.response?.status === 404) throw new Error("Session not found.");
             throw new Error(error?.response?.data?.message || "Failed to send join request.");
+        }
+    }
+
+    // ── Get the logged-in user's own group sessions (mentor OR mentee) ──
+    // Maps to GET /group-sessions/my-sessions?role=mentee. For a mentee this
+    // returns full GroupSession docs they've requested/joined — used by
+    // UserDashboardMyBookingsPage.tsx to merge group sessions into the
+    // combined bookings view alongside 1:1 sessions.
+    static async getMyGroupSessions(role: "mentor" | "mentee" = "mentee"): Promise<ApiResponse> {
+        try {
+            const { data } = await api.get<ApiResponse>(
+                `${SessionService.GROUP_SESSIONS_ENDPOINT}/my-sessions`,
+                { params: { role } }
+            );
+            return data;
+        } catch (error: any) {
+            console.error("[GET_MY_GROUP_SESSIONS] Failed", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to fetch your group sessions.");
         }
     }
 
@@ -520,7 +502,7 @@ class SessionService {
             return data?.data ?? null;
         } catch (error: any) {
             if (error?.response?.status === 404) return null;
-            console.error("❌ [GET_MY_GROUP_JOIN_REQUEST_STATUS] Failed", error?.response?.data || error?.message);
+            console.error("[GET_MY_GROUP_JOIN_REQUEST_STATUS] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to fetch join request status.");
         }
     }
@@ -533,10 +515,9 @@ class SessionService {
             const { data } = await api.get<ApiResponse>(
                 `${SessionService.GROUP_SESSIONS_ENDPOINT}/mentor/join-requests`
             );
-            console.log("✅ [GET_MENTOR_GROUP_JOIN_REQUESTS] Fetched:", data);
             return data;
         } catch (error: any) {
-            console.error("❌ [GET_MENTOR_GROUP_JOIN_REQUESTS] Failed", error?.response?.data || error?.message);
+            console.error("[GET_MENTOR_GROUP_JOIN_REQUESTS] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to fetch group join requests.");
         }
     }
@@ -550,7 +531,7 @@ class SessionService {
             );
             return data;
         } catch (error: any) {
-            console.error("❌ [ACCEPT_GROUP_JOIN_REQUEST] Failed", error?.response?.data || error?.message);
+            console.error("[ACCEPT_GROUP_JOIN_REQUEST] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to accept join request.");
         }
     }
@@ -564,7 +545,7 @@ class SessionService {
             );
             return data;
         } catch (error: any) {
-            console.error("❌ [REJECT_GROUP_JOIN_REQUEST] Failed", error?.response?.data || error?.message);
+            console.error("[REJECT_GROUP_JOIN_REQUEST] Failed", error?.response?.data || error?.message);
             throw new Error(error?.response?.data?.message || "Failed to reject join request.");
         }
     }
