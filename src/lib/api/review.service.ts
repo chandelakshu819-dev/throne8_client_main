@@ -65,7 +65,6 @@ export interface SubmitReviewInput {
 
 const ReviewService = {
   getMentorReviews: (mentorId: string, page = 1, limit = 10) =>
-<<<<<<< Updated upstream
     api
       .get<{
         success: boolean;
@@ -77,17 +76,6 @@ const ReviewService = {
         data: res.data.data,
         pagination: res.data.meta,
       })),
-=======
-  api
-    .get<{ data: MentorReview[]; meta: { page: number; limit: number; total: number; totalPages: number } }>(
-      `/mentorship/reviews/mentor/${mentorId}`,
-      { params: { page, limit } }
-    )
-    .then((res) => ({
-      data: res.data.data,
-      pagination: res.data.meta,
-    })),
->>>>>>> Stashed changes
 
   getReviewStats: (mentorId: string) =>
     api

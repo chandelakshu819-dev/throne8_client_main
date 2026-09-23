@@ -117,22 +117,22 @@ class MentorService {
     }
   }
 
-<<<<<<< Updated upstream
   static async getMentorByUserId(
-    userId: string
+    userId: string,
+    forceFresh: boolean = false
   ): Promise<MentorResponse> {
     try {
+      const url = `${config.NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT}/${userId}`;
+
+      const requestConfig = forceFresh
+        ? { params: { _t: Date.now() } }
+        : undefined;
+
       const { data } = await api.get<MentorResponse>(
-        `${config.NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT}/${userId}`
+        url,
+        requestConfig
       );
 
-=======
-  static async getMentorByUserId(userId: string, forceFresh: boolean = false): Promise<MentorResponse> {
-    try {
-      const url = `${config.NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT}/${userId}`;
-      const requestConfig = forceFresh ? { params: { _t: Date.now() } } : undefined;
-      const { data } = await api.get<MentorResponse>(url, requestConfig);
->>>>>>> Stashed changes
       return data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
@@ -290,20 +290,17 @@ class MentorService {
     mentorId: string
   ): Promise<MentorResponse> {
     try {
-<<<<<<< Updated upstream
       const { data } = await api.get<MentorResponse>(
         `${config.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT}/${mentorId}`
       );
-=======
-      const { data } = await api.get<MentorResponse>(`${config.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT}/${mentorId}`);
-      
-      // Fire-and-forget request to trigger backend 'Profile Viewed' notification logic.
-      // We extract data.userId because getMentorByUserId strictly requires a user-collection ID, not a mentor-collection ID.
-      // This side-effect is decoupled and not awaited, so it won't delay callers.
-      if (data && data.userId) {
-        MentorService.getMentorByUserId(data.userId, true).catch(() => {});
+
+      // Fire-and-forget request to trigger backend
+      // 'Profile Viewed' notification logic.
+      // userId is the user-collection ID returned by this endpoint.
+      const mentor = data as MentorResponse & { userId?: string };
+      if (mentor.userId) {
+        MentorService.getMentorByUserId(mentor.userId, true).catch(() => {});
       }
->>>>>>> Stashed changes
 
       return data;
     } catch (error: any) {
