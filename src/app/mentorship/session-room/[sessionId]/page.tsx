@@ -3,10 +3,17 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useLiveRoom } from '@/core/webrtc/useLiveRoom';
-import { getSocket } from '@/core/realtime/socket.client';
+
+import { getSocket, initializeSocket } from '@/core/realtime/socket.client';
 import SessionService from '@/lib/api/session.service';
 import MentorService from '@/lib/api/mentorship.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+
+type CallStatus = 'active' | 'reconnecting' | 'left' | 'dropped';
+// socket.io khud ~5 attempts (~17s) karta hai; ye sirf safety ceiling hai
+const RECONNECT_GRACE_MS = 30000;
+
+
 function formatDate(iso?: string) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -37,6 +44,16 @@ export default function SessionRoomPage() {
   const [peerNotified, setPeerNotified] = useState(false);
   const hasJoinedRef = useRef(false);
 
+  const [callStatus, setCallStatus] = useState<CallStatus>('active');
+  const callStatusRef = useRef<CallStatus>('active');
+  const [endedByCheck, setEndedByCheck] = useState(false);
+  const [isRejoining, setIsRejoining] = useState(false);
+  const [rejoinError, setRejoinError] = useState<string | null>(null);
+  const rejoinInFlightRef = useRef(false);
+  const dropTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attemptRejoinRef = useRef<() => Promise<'joined' | 'ended' | 'failed' | 'busy'>>(
+    async () => 'failed'
+  );
 
   // ✅ NEW: floating emoji reactions during the live call
   const [floatingReactions, setFloatingReactions] = useState <
@@ -51,7 +68,9 @@ export default function SessionRoomPage() {
     isMicOn,
     isConnecting,
     error: liveRoomError,
+    roomEnded,
     joinRoom,
+
     leaveRoom,
     toggleCamera,
     toggleMic,
@@ -108,7 +127,8 @@ export default function SessionRoomPage() {
   useEffect(() => {
     if (sessionData && currentUserId && !hasJoinedRef.current) {
       hasJoinedRef.current = true;
-      joinRoom(true, true).then(() => {
+      joinRoom(true, true).then((ok) => {
+        if (!ok) return; // permission/socket fail → "joined" notification mat bhejo
         const socket = getSocket();
         socket?.emit('mentorship:notify-join', { sessionId });
         setPeerNotified(true);
@@ -149,10 +169,145 @@ export default function SessionRoomPage() {
     };
   }, [leaveRoom]);
 
+  const updateCallStatus = useCallback((next: CallStatus) => {
+    callStatusRef.current = next;
+    setCallStatus(next);
+  }, []);
+
+  // End Call ab back navigate nahi karta — "You left" screen dikhata hai
   const handleEndCall = useCallback(() => {
+    if (dropTimerRef.current) {
+      clearTimeout(dropTimerRef.current);
+      dropTimerRef.current = null;
+    }
     leaveRoom();
+    updateCallStatus('left');
+  }, [leaveRoom, updateCallStatus]);
+
+  const handleGoBack = useCallback(() => {
     router.back();
-  }, [leaveRoom, router]);
+  }, [router]);
+
+  // Rejoin se pehle: session sach me khatam to nahi ho gayi? (socket event miss ho sakta hai)
+  const checkIfSessionOver = useCallback(async (): Promise<boolean> => {
+    try {
+      let data: any;
+      try {
+        const res = await SessionService.getSessionById(sessionId);
+        data = res?.data ?? res;
+      } catch {
+        const groupRes = await MentorService.getGroupSessionById(sessionId);
+        data = groupRes?.data ?? groupRes;
+      }
+      if (!data) return false;
+
+      const OVER = ['completed', 'cancelled', 'no_show', 'refunded'];
+      const norm = (s: any) => String(s ?? '').toLowerCase();
+
+      if (OVER.includes(norm(data.status))) return true;
+      const myBooking = (data.bookings || []).find(
+        (b: any) => (b.menteeId || b.bookedBy) === currentUserId
+      );
+      return !!myBooking && OVER.includes(norm(myBooking.status));
+    } catch {
+      return false; // check fail ho to rejoin try hone do
+    }
+  }, [sessionId, currentUserId]);
+
+  const attemptRejoin = useCallback(async () => {
+    if (rejoinInFlightRef.current) return 'busy' as const;
+    rejoinInFlightRef.current = true;
+    try {
+      if (await checkIfSessionOver()) {
+        setEndedByCheck(true);
+        return 'ended' as const;
+      }
+      try {
+        initializeSocket(); // socket give-up kar chuka ho to dobara connect karta hai
+      } catch {
+        return 'failed' as const;
+      }
+      leaveRoom(); // purani stream / stale PCs saaf
+      const ok = await joinRoom(true, true);
+      if (ok) return 'joined' as const;
+
+      // Server ne join reject kiya: ho sakta hai session abhi khatam hui ho
+      if (await checkIfSessionOver()) {
+        setEndedByCheck(true);
+        return 'ended' as const;
+      }
+      return 'failed' as const;
+    } finally {
+      rejoinInFlightRef.current = false;
+    }
+  }, [checkIfSessionOver, joinRoom, leaveRoom]);
+  attemptRejoinRef.current = attemptRejoin;
+
+  const handleRejoin = useCallback(async () => {
+    setRejoinError(null);
+    setIsRejoining(true);
+    const result = await attemptRejoin();
+    setIsRejoining(false);
+    if (result === 'joined') {
+      updateCallStatus('active');
+    } else if (result === 'failed') {
+      setRejoinError('Could not rejoin. Please check your connection and try again.');
+    }
+  }, [attemptRejoin, updateCallStatus]);
+
+  // Network drop: pehle "Reconnecting…", recover na ho to "dropped" (Rejoin screen)
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const clearDropTimer = () => {
+      if (dropTimerRef.current) {
+        clearTimeout(dropTimerRef.current);
+        dropTimerRef.current = null;
+      }
+    };
+
+    const markDropped = () => {
+      clearDropTimer();
+      if (callStatusRef.current !== 'reconnecting') return;
+      leaveRoom();
+      updateCallStatus('dropped');
+    };
+
+    const onDisconnect = (reason: string) => {
+      if (reason === 'io client disconnect') return; // hamne khud kiya
+      if (callStatusRef.current !== 'active' || !hasJoinedRef.current) return;
+      updateCallStatus('reconnecting');
+      if (reason === 'io server disconnect') socket.connect(); // server ne kick kiya to manual connect
+      clearDropTimer();
+      dropTimerRef.current = setTimeout(markDropped, RECONNECT_GRACE_MS);
+    };
+
+    const onConnect = async () => {
+      if (callStatusRef.current !== 'reconnecting') return;
+      clearDropTimer();
+      // naya socket id → server ke live room me nahi hain, clean re-join zaroori
+      const result = await attemptRejoinRef.current();
+      if (result === 'joined') updateCallStatus('active');
+      else if (result === 'failed') updateCallStatus('dropped');
+      // 'ended' → Session Ended screen apne aap priority le leti hai
+    };
+
+    socket.on('disconnect', onDisconnect);
+    socket.on('connect', onConnect);
+    socket.io.on('reconnect_failed', markDropped);
+    return () => {
+      socket.off('disconnect', onDisconnect);
+      socket.off('connect', onConnect);
+      socket.io.off('reconnect_failed', markDropped);
+    };
+  }, [leaveRoom, updateCallStatus]);
+
+  useEffect(() => {
+    return () => {
+      if (dropTimerRef.current) clearTimeout(dropTimerRef.current);
+    };
+  }, []);
 
   // ✅ NEW: emit a reaction to the other participant + show it locally
   const REACTIONS = ['👍', '❤️', '😂', '👏', '🎉'];
@@ -189,8 +344,67 @@ export default function SessionRoomPage() {
     );
   }
 
-  return (
-    <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', backgroundColor: '#1a1a1a', color: 'white' }}>
+   // Priority: ended > left/dropped > normal call
+   const sessionEnded = !!roomEnded || endedByCheck;
+
+   if (sessionEnded) {
+     return (
+       <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#1a1a1a', color: 'white', padding: 24, textAlign: 'center' }}>
+         <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>Session ended</h1>
+         <p style={{ fontSize: 14, opacity: 0.8, maxWidth: 360, margin: 0 }}>
+           {sessionData.title || 'This session'} has ended, so it can’t be rejoined.
+         </p>
+         {roomEnded?.endedAt && (
+           <p style={{ fontSize: 12, opacity: 0.6, margin: 0 }}>Ended at {formatTime(roomEnded.endedAt)}</p>
+         )}
+         <button onClick={handleGoBack} style={{ marginTop: 8, borderRadius: 9999, padding: '10px 24px', border: 'none', fontWeight: 600, color: 'white', backgroundColor: '#4a3728', cursor: 'pointer' }}>
+           Go Back
+         </button>
+       </div>
+     );
+   }
+ 
+   if (callStatus === 'left' || callStatus === 'dropped') {
+     const isDropped = callStatus === 'dropped';
+     return (
+       <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#1a1a1a', color: 'white', padding: 24, textAlign: 'center' }}>
+         <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>
+           {isDropped ? 'Connection lost' : 'You left the session'}
+         </h1>
+         <p style={{ fontSize: 14, opacity: 0.8, maxWidth: 360, margin: 0 }}>
+           {isDropped
+             ? 'Your connection dropped. You can jump back into the same room.'
+             : 'Left by mistake? You can jump back into the same room.'}
+         </p>
+         {(liveRoomError || rejoinError) && (
+           <p style={{ fontSize: 13, color: '#f87171', margin: 0 }}>{liveRoomError || rejoinError}</p>
+         )}
+         <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+           <button
+             onClick={handleRejoin}
+             disabled={isRejoining}
+             style={{ borderRadius: 9999, padding: '10px 24px', border: 'none', fontWeight: 600, color: 'white', backgroundColor: '#7a5c3e', opacity: isRejoining ? 0.6 : 1, cursor: isRejoining ? 'not-allowed' : 'pointer' }}
+           >
+             {isRejoining ? 'Rejoining…' : 'Rejoin Session'}
+           </button>
+           <button
+             onClick={handleGoBack}
+             style={{ borderRadius: 9999, padding: '10px 24px', border: '1px solid rgba(255,255,255,0.3)', color: 'white', backgroundColor: 'transparent', cursor: 'pointer' }}
+           >
+             Go Back
+           </button>
+         </div>
+       </div>
+     );
+   }
+ 
+   return (
+     <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', backgroundColor: '#1a1a1a', color: 'white' }}>
+       {callStatus === 'reconnecting' && (
+         <div style={{ backgroundColor: '#b45309', padding: '6px 24px', textAlign: 'center', fontSize: 13, flexShrink: 0 }}>
+           Connection lost — reconnecting…
+         </div>
+       )}
       {/* Header */}
       <div style={{ backgroundColor: '#4a3728', padding: '12px 24px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

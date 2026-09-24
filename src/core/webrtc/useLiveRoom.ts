@@ -741,7 +741,8 @@ const toggleMic = useCallback(async () => {
   // );
 
 // REPLACE WITH:
-  const joinRoom = useCallback(async (withCamera = true, withMic = true) => {
+const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<boolean> => {
+
 
     console.log('[LiveRoom] joinRoom called', { roomId, userId, userName });
     setRoomEnded(null); // naye join pe purana "ended" state reset
@@ -752,7 +753,7 @@ const toggleMic = useCallback(async () => {
     if (!roomId) {
       console.error('[LiveRoom] roomId is empty, cannot join');
       setError('Room ID missing. Please try again.');
-      return;
+      return false;
     }
 
     setIsConnecting(true);
@@ -762,7 +763,7 @@ const toggleMic = useCallback(async () => {
     if (!socket) {
       setError('Socket not available. Please refresh the page.');
       setIsConnecting(false);
-      return;
+      return false;
     }
     // Socket object mil gaya, lekin abhi tak 'connect' event fire nahi hua
     // ho sakta (naya banaya gaya socket hai). Thoda wait karo taaki
@@ -778,30 +779,67 @@ const toggleMic = useCallback(async () => {
       if (!connected) {
         setError('Socket not connected. Please refresh the page.');
         setIsConnecting(false);
-        return;
+        return false;
       }
     }
     const stream = await startLocalStream(withCamera, withMic);
     if (!stream) {
       setIsConnecting(false);
-      return;
+      return false;
     }
 
     // REPLACE WITH:
-    // roomId ko fresh read karo closure se nahi
     console.log('[LiveRoom] Emitting join-live-room with roomId:', roomId);
-    if (!roomId) {
-      setError('Room ID is missing.');
+
+    // Server accept kare to 'room-participants-list' bhejta hai, reject kare to
+    // 'error' (event: 'join-live-room'). Dono me se ek ka wait karo.
+    const joinResult = await new Promise<'ok' | 'rejected' | 'timeout'>((resolve) => {
+      const cleanup = () => {
+        clearTimeout(timer);
+        socket.off('room-participants-list', onList);
+        socket.off('error', onError);
+      };
+      const onList = (p: { roomId?: string }) => {
+        if (p?.roomId && p.roomId !== roomId) return;
+        cleanup();
+        resolve('ok');
+      };
+      const onError = (p: { event?: string; message?: string }) => {
+        if (p?.event !== 'join-live-room') return;
+        cleanup();
+        setError(p.message || 'Could not join the room.');
+        resolve('rejected');
+      };
+      const timer = setTimeout(() => {
+        cleanup();
+        resolve('timeout');
+      }, 8000);
+
+      socket.on('room-participants-list', onList);
+      socket.on('error', onError);
+      socket.emit('join-live-room', { roomId, userId, userName });
+    });
+
+    if (joinResult === 'rejected') {
+      // getUserMedia ho chuka tha: camera/mic light band karo
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+      setLocalStream(null);
+      setIsCameraOn(false);
+      setIsMicOn(false);
       setIsConnecting(false);
-      return;
+      return false;
     }
-    socket.emit('join-live-room', { roomId, userId, userName });
+    if (joinResult === 'timeout') {
+      console.warn('[LiveRoom] join-live-room: no response in 8s, assuming joined');
+    }
 
 
     
     setIsConnecting(false);
+    return true;
   }, [roomId, userId, userName, startLocalStream]);
-
+  
 
   // ── Leave live room ───────────────────────────────────────
   const leaveRoom = useCallback(() => {
@@ -822,7 +860,11 @@ const toggleMic = useCallback(async () => {
     reconnectTimers.current.forEach((t) => clearTimeout(t));
     reconnectTimers.current.clear();
 
-    if (statsTimerRef.current) clearInterval(statsTimerRef.current);
+        // statsTimerRef yahan clear MAT karo — interval sirf ek baar mount pe banta hai,
+    // yahan clear karne se rejoin ke baad quality monitoring band ho jati thi.
+    // Unmount pe stats effect ka apna cleanup ise clear karta hai.
+    audioAnalysers.current.clear();
+    retryCount.current.clear();
     if (audioContextRef.current) {
       audioContextRef.current.close();
       audioContextRef.current = null;
