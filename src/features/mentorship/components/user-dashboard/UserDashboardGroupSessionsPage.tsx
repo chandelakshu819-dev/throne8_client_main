@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import MentorService from "@/lib/api/mentorship.service";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 
 const COLORS = {
   ink: "#4a3728",
@@ -28,6 +29,16 @@ type TabType = "upcoming" | "registered";
 interface Props {
   // If we want to pass anything from layout in the future
 }
+
+// ✅ NEW: status badge palette for a mentee's own registration on a
+// group session — mirrors REQUEST_STATUS_META used elsewhere in the
+// mentorship feature (ServicesSection.tsx) so the wording/colors stay
+// consistent across the app.
+const REQUEST_STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
+  pending: { label: "Request Pending", bg: "#fef3c7", fg: "#b45309" },
+  accepted: { label: "Confirmed", bg: "#dcfce7", fg: "#15803d" },
+  rejected: { label: "Declined", bg: "#fee2e2", fg: "#dc2626" },
+};
 
 function formatDateStr(iso?: string) {
   if (!iso) return "Date not set";
@@ -51,6 +62,7 @@ function initialsFrom(name: string) {
 
 export default function UserDashboardGroupSessionsPage({}: Props) {
   const router = useRouter();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("upcoming");
   
   const [allSessions, setAllSessions] = useState<any[]>([]);
@@ -80,8 +92,32 @@ export default function UserDashboardGroupSessionsPage({}: Props) {
 
         setAllSessions(upcoming);
 
-        // Fetch Mentors for these sessions
-        const uniqueMentorIds = Array.from(new Set(upcoming.map((s: any) => s.mentorId))).filter(Boolean) as string[];
+        // ✅ FIX: fetch the mentee's own registered group sessions (any
+        // requestStatus — pending/accepted/rejected) via the endpoint that
+        // already existed on the backend
+        // (GET /group-sessions/my-sessions?role=mentee). This tab used to
+        // be hardcoded to an empty array with a comment incorrectly
+        // claiming no such endpoint existed.
+        let registered: any[] = [];
+        try {
+          const registeredRes = await MentorService.getMyGroupSessions('mentee');
+          registered =
+            registeredRes?.data?.sessions ||
+            registeredRes?.data ||
+            registeredRes?.sessions ||
+            registeredRes ||
+            [];
+          if (!Array.isArray(registered)) registered = [];
+        } catch (regErr) {
+          console.error("Failed to load registered group sessions", regErr);
+          registered = [];
+        }
+        setRegisteredSessions(registered);
+
+        // Fetch Mentors for both upcoming + registered sessions
+        const uniqueMentorIds = Array.from(
+          new Set([...upcoming, ...registered].map((s: any) => s.mentorId))
+        ).filter(Boolean) as string[];
         const map = new Map<string, any>();
         
         if (uniqueMentorIds.length > 0) {
@@ -109,10 +145,6 @@ export default function UserDashboardGroupSessionsPage({}: Props) {
         }
         
         setMentorMap(map);
-        
-        // NOTE: No existing backend API provides the authenticated user's registered group sessions.
-        // As per requirements, we will handle this gracefully and not invent fake registrations.
-        setRegisteredSessions([]);
 
       } catch (error) {
         console.error("Failed to load group sessions", error);
@@ -285,8 +317,105 @@ export default function UserDashboardGroupSessionsPage({}: Props) {
     }
 
     return (
-      <div className="grid grid-cols-1 gap-4">
-        {/* Render registered sessions here if the API existed */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {registeredSessions.map((session, idx) => {
+          const uniqueKey = session.sessionId || session._id || session.id || `reg-gs-${idx}`;
+
+          const hostData = mentorMap.get(session.mentorId);
+          const hostName = hostData
+            ? `${hostData.user?.firstName || ''} ${hostData.user?.lastName || ''}`.trim()
+            : session.mentorName || "Mentor";
+          const hostPic = hostData?.profilePic || hostData?.user?.profilePic || session.mentorProfilePhoto || "";
+
+          const myParticipant = (session.participants || []).find(
+            (p: any) => p.menteeId === user?.userId
+          );
+          const statusMeta = myParticipant ? REQUEST_STATUS_META[myParticipant.requestStatus] : undefined;
+
+          return (
+            <div
+              key={uniqueKey}
+              className="flex flex-col bg-white rounded-2xl overflow-hidden border transition-all hover:-translate-y-1 hover:shadow-md h-full flex-grow"
+              style={{ borderColor: COLORS.hairline }}
+            >
+              <div className="relative w-full h-40 bg-[#f4ece1] shrink-0">
+                {session.thumbnailImage || session.thumbnail ? (
+                  <img
+                    src={session.thumbnailImage || session.thumbnail}
+                    alt={session.title || "Group Session"}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Users className="w-12 h-12 text-[#e2d5c8]" />
+                  </div>
+                )}
+                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded-md">
+                  <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                    {session.topic || session.category || 'Group Session'}
+                  </span>
+                </div>
+                {statusMeta && (
+                  <div
+                    className="absolute top-3 right-3 backdrop-blur-sm px-2.5 py-1 rounded-md shadow-sm"
+                    style={{ backgroundColor: statusMeta.bg }}
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: statusMeta.fg }}>
+                      {statusMeta.label}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col flex-1 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  {hostPic ? (
+                    <img
+                      src={hostPic}
+                      alt={hostName}
+                      className="w-6 h-6 rounded-full object-cover border border-[#ece7e2]"
+                    />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-[#f4ece1] text-[#8b7355] flex items-center justify-center font-bold text-[10px]">
+                      {initialsFrom(hostName)}
+                    </div>
+                  )}
+                  <span className="text-xs font-semibold truncate" style={{ color: COLORS.muted }}>
+                    Hosted by {hostName}
+                  </span>
+                </div>
+
+                <h3 className="text-base font-bold leading-tight mb-4 line-clamp-2" style={{ color: COLORS.ink }} title={session.title}>
+                  {session.title || "Mentorship Group Session"}
+                </h3>
+
+                <div className="space-y-2 mt-auto mb-5">
+                  <div className="flex items-center gap-2 text-xs font-medium" style={{ color: COLORS.ink }}>
+                    <CalendarClock className="w-4 h-4 shrink-0" style={{ color: COLORS.muted }} />
+                    <span>{formatDateStr(session.scheduledAt || session.startTime)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-medium" style={{ color: COLORS.ink }}>
+                    <Clock className="w-4 h-4 shrink-0" style={{ color: COLORS.muted }} />
+                    <span>
+                      {formatTimeStr(session.scheduledAt || session.startTime)}
+                      {session.duration ? ` (${session.duration} min)` : ""}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-auto pt-4 border-t" style={{ borderColor: COLORS.hairline }}>
+                  <button
+                    onClick={() => handleViewDetails(uniqueKey)}
+                    className="w-full py-2 text-xs font-semibold rounded-xl border transition-colors hover:bg-[#fbf7f3]"
+                    style={{ borderColor: COLORS.hairline, color: COLORS.ink }}
+                  >
+                    View Details
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   };

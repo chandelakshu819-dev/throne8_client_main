@@ -575,6 +575,53 @@ class MentorService {
     }
   }
 
+  /**
+   * ✅ NEW: the mentee/mentor's own group sessions — powers the "My
+   * Registered Sessions" tab on the user dashboard (mentee side) and any
+   * future mentor-side "my group sessions" view. Backend endpoint already
+   * existed (GET /group-sessions/my-sessions?role=...); this was the
+   * missing frontend method — the dashboard tab was hardcoding an empty
+   * array with a comment incorrectly claiming no such endpoint existed.
+   */
+  static async getMyGroupSessions(
+    role: 'mentor' | 'mentee' = 'mentee'
+  ): Promise<any> {
+    try {
+      const { data } = await api.get(
+        `/mentorship/group-sessions/my-sessions`,
+        {
+          params: { role }
+        }
+      );
+
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+
+        if (error.code === 'ERR_NETWORK') {
+          throw new Error(
+            'Unable to connect to server. Please check your internet connection.'
+          );
+        }
+
+        if (error.response?.status === 401) {
+          throw new Error(
+            'Session expired. Please login again.'
+          );
+        }
+
+        if (apiError?.message) {
+          throw new Error(apiError.message);
+        }
+      }
+
+      throw new Error(
+        'Failed to fetch your group sessions.'
+      );
+    }
+  }
+
   // =========================================================
   // GROUP SESSION JOIN REQUEST
   // =========================================================

@@ -30,6 +30,12 @@ interface ServicesSectionProps {
   bookedSessionIds: string[];
   currentUserId: string;
   mentorName?: string;
+  // ✅ NEW: when the mentee arrives here via a "Join Session" deep-link
+  // from the group-session detail page (?serviceId=<sessionId>), this
+  // carries that sessionId so the matching group session's detail modal
+  // opens automatically instead of forcing the mentee to re-find and
+  // re-click the same card they just came from.
+  deepLinkSessionId?: string;
 }
 
 // Session type ko display label me map karo
@@ -109,6 +115,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   bookedSessionIds,
   currentUserId,
   mentorName = "",
+  deepLinkSessionId,
 }) => {
   const [activeFilter, setActiveFilter] = useState<string>("All");
   const [sessions, setSessions] = useState<any[]>([]);
@@ -135,6 +142,11 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   const [groupActionBusy, setGroupActionBusy] = useState(false);
   const [groupActionError, setGroupActionError] = useState<string | null>(null);
   const [, forceTick] = useState(0);
+
+  // ✅ NEW: tracks whether we've already auto-opened the modal for the
+  // current deepLinkSessionId, so it doesn't keep re-opening every time
+  // groupSessions refreshes (e.g. right after the mentee sends a request).
+  const [deepLinkHandled, setDeepLinkHandled] = useState(false);
 
     // ✅ NEW: mentee's own queries (Query model) — used so ask_query status
   // reflects Query.status ("pending"/"answered"), not the stale Booking status.
@@ -257,6 +269,20 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     return () => clearInterval(interval);
   }, [detailGroup]);
 
+  // ✅ NEW: auto-open the detail modal for the group session named in
+  // ?serviceId= once groupSessions has loaded. Runs once per
+  // deepLinkSessionId — if the match isn't in this mentor's session list
+  // (wrong id, or the session was removed), it just does nothing instead
+  // of erroring.
+  useEffect(() => {
+    if (!deepLinkSessionId || deepLinkHandled || groupSessions.length === 0) return;
+    const match = groupSessions.find((g) => g.sessionId === deepLinkSessionId);
+    if (match) {
+      setDetailGroup(match);
+    }
+    setDeepLinkHandled(true);
+  }, [deepLinkSessionId, deepLinkHandled, groupSessions]);
+
   const uniqueTypes = Array.from(new Set(sessions.map((s) => s.sessionType)));
   const dynamicFilters = ["All", ...uniqueTypes.map((t) => SESSION_TYPE_FILTER[t] || t)];
   if (groupSessions.length > 0 && !dynamicFilters.includes("Group Session")) {
@@ -270,9 +296,20 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       : sessions.filter((s) => (SESSION_TYPE_FILTER[s.sessionType] || s.sessionType) === activeFilter);
 
   const showGroupSessions = activeFilter === "All" || activeFilter === "Group Session";
+  // ✅ FIX: previously this dropped any group session whose status wasn't
+  // 'open' (or undefined) from the "All" tab — including sessions the
+  // mentee already has a stake in (pending request, accepted seat). That
+  // meant an accepted mentee lost visibility of their own session the
+  // moment it filled up ('full') or started ('in_progress') unless they
+  // manually switched to the "Group Session" filter. Now a session the
+  // mentee has any participant row in always stays visible.
   const visibleGroupSessions = activeFilter === "Group Session"
     ? groupSessions
-    : groupSessions.filter((g) => g.status === 'open' || g.status === undefined);
+    : groupSessions.filter((g) => {
+        if (g.status === 'open' || g.status === undefined) return true;
+        const myParticipant = g.participants?.find((p: any) => p.menteeId === currentUserId);
+        return !!myParticipant;
+      });
 
   const getServiceFromSession = (session: any): Service => ({
     id: session.sessionId,

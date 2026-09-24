@@ -16,7 +16,7 @@ import ConfirmationStep from "./ConfirmationStep";
 
 import MentorService from "@/lib/api/mentorship.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "./Icons";
 
 interface MentorProfileProps {
@@ -28,6 +28,16 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
 }) => {
     const { user } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    // ✅ FIX: this was never read anywhere. The "Join Session" button on
+    // the group-session detail page redirects here with
+    // ?serviceId=<groupSessionId>, but nothing consumed it — the mentee
+    // landed on the mentor's profile with no indication of why, and had
+    // to manually re-find the same group session and click it again.
+    // Now it's passed down so ServicesSection can auto-open that exact
+    // session's detail modal.
+    const deepLinkServiceId = searchParams.get("serviceId") || undefined;
+
     const [bookingStep, setBookingStep] = useState<BookingStep>(null);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
@@ -129,6 +139,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                             bookedSessionIds={bookedSessionIds}
                             currentUserId={user?.userId || ""}
                             mentorName={`${mentorData?.user?.firstName ?? ""} ${mentorData?.user?.lastName ?? ""}`.trim()}
+                            deepLinkSessionId={deepLinkServiceId}
                         />
 
                         <ReviewsSection />
