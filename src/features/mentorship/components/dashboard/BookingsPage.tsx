@@ -438,7 +438,16 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         showToast("Group session started", "success");
         setShowStartModal(false);
         setStartModalBooking(null);
-        await fetchSessions();
+
+        // ✅ FIX: pehle yahan sirf toast + list refresh hota tha — mentor
+        // kahin navigate hi nahi hota tha, isliye "start" click karne ke
+        // baad kuch hota hua nahi dikhta tha. 1:1 session ki tarah mentor
+        // ko live room me le jao. roomId = sessionId (group session me
+        // alag bookingId nahi hota — backend bhi isi convention se
+        // 'session:started' event emit karta hai students ko).
+        router.push(
+          `/mentorship/session-room/${encodeURIComponent(sessionId)}`
+        );
         return;
       }
 
