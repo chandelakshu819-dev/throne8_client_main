@@ -8,6 +8,7 @@ import { useMentorRole, MentorshipRole } from "../hooks/useMentorRole";
 interface MentorshipDashboardRouterProps {
   userId: string;
   defaultRole?: MentorshipRole;
+  initialPage?: string;
 }
 
 /**
@@ -20,6 +21,7 @@ interface MentorshipDashboardRouterProps {
 export default function MentorshipDashboardRouter({
   userId,
   defaultRole = "mentee",
+  initialPage,
 }: MentorshipDashboardRouterProps) {
   const { isMentor, loading } = useMentorRole(userId);
   const [activeRole, setActiveRole] = useState<MentorshipRole>(defaultRole);
@@ -44,6 +46,7 @@ export default function MentorshipDashboardRouter({
       userId={userId}
       isMentor={isMentor}
       onSwitchRole={switchToMentor}
+      initialPage={initialPage}
     />
   );
 }

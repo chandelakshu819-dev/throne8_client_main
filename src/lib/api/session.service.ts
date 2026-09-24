@@ -245,6 +245,20 @@ class SessionService {
         }
     }
 
+    // ── JOIN SESSION ───────────────────────────────────────
+    // Validates the session against backend data and returns session info with real room URL
+    static async joinSession(sessionId: string, _bookingId?: string): Promise<{ session: any; roomUrl: string }> {
+        try {
+            const res = await SessionService.getSessionById(sessionId);
+            const session = res?.data ?? res;
+            const roomUrl = `/mentorship/session-room/${encodeURIComponent(sessionId)}`;
+            return { session, roomUrl };
+        } catch (error: any) {
+            console.error("[JOIN_SESSION] Failed", error?.response?.data || error?.message);
+            throw error;
+        }
+    }
+
     // ── GET ALL SESSIONS ───────────────────────────────────
     static async getAllSessions(filters: SessionFilters = {}): Promise<ApiResponse> {
         try {

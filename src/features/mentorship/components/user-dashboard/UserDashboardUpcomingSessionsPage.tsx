@@ -1,7 +1,7 @@
 //src/features/mentorship/components/user-dashboard/UserDashboardUpcomingSessionsPage.tsx
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarClock,
   Clock,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import SessionService from "@/lib/api/session.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { joinMentorshipSession } from "@/features/mentorship/services/sessionJoin.service";
 
 const COLORS = {
   ink: "#4a3728",
@@ -31,14 +32,19 @@ const COLORS = {
 type Session = {
   _id?: string;
   sessionId?: string;
+  bookingId?: string;
   mentorName?: string;
   mentorProfilePhoto?: string;
   title?: string;
   sessionType?: string;
   scheduledAt?: string;
   startTime?: string;
+  date?: string;
   status?: string;
   duration?: number;
+  slotTime?: string;
+  startedAt?: string;
+  endedAt?: string;
   bookings?: Record<string, unknown>[];
 };
 
@@ -58,8 +64,20 @@ function formatDateStr(iso?: string) {
 function formatTimeStr(iso?: string) {
   if (!iso) return "Time not set";
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return "Time not set";
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: true });
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: true });
+  }
+  const match = iso.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i);
+  if (match) {
+    let hours = parseInt(match[1], 10);
+    const minutes = match[2];
+    const ampm = match[4]?.toUpperCase() || (hours >= 12 ? "PM" : "AM");
+    if (!match[4]) {
+      hours = hours % 12 || 12;
+    }
+    return `${hours}:${minutes} ${ampm}`;
+  }
+  return iso;
 }
 
 function initialsFrom(name: string) {
@@ -68,7 +86,10 @@ function initialsFrom(name: string) {
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-const getStatusDisplay = (status: string) => {
+const getStatusDisplay = (status: string, isPast: boolean = false) => {
+  if (isPast && (status.toLowerCase() === 'in_progress' || status.toLowerCase() === 'confirmed' || status.toLowerCase() === 'pending')) {
+    return 'Ended';
+  }
   switch (status.toLowerCase()) {
     case 'pending': return 'Pending';
     case 'confirmed': return 'Confirmed';
@@ -82,16 +103,176 @@ const getStatusDisplay = (status: string) => {
   }
 };
 
+/**
+ * Calculates the session's actual start and end timestamps (in ms) using:
+ * - scheduledAt / date / booking.scheduledAt
+ * - startTime / slotTime
+ * - duration (defaults to 60 minutes if missing or 0)
+ */
+export function getSessionTimeWindow(session: Session): {
+  startMs: number | null;
+  endMs: number | null;
+  durationMinutes: number;
+} {
+  const booking = session.bookings?.[0] as Record<string, unknown> | undefined;
+
+  // 1. Resolve raw date/time candidate
+  const rawDateTime =
+    booking?.scheduledAt ||
+    session.scheduledAt ||
+    session.startTime ||
+    (session as any).date;
+
+  if (!rawDateTime) {
+    return { startMs: null, endMs: null, durationMinutes: 60 };
+  }
+
+  let startDate: Date;
+  const parsed = new Date(rawDateTime as string | number | Date);
+
+  if (!isNaN(parsed.getTime())) {
+    startDate = new Date(parsed.getTime());
+
+    // If startTime is a separate non-ISO string like "14:30" or "02:30 PM", adjust time:
+    const timeStr = typeof session.startTime === "string" ? session.startTime.trim() : null;
+    if (timeStr && !timeStr.includes("T") && !timeStr.includes("Z")) {
+      const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i);
+      if (match) {
+        let hours = parseInt(match[1], 10);
+        const minutes = parseInt(match[2], 10);
+        const ampm = match[4]?.toLowerCase();
+        if (ampm === "pm" && hours < 12) hours += 12;
+        if (ampm === "am" && hours === 12) hours = 0;
+        startDate.setHours(hours, minutes, 0, 0);
+      }
+    }
+  } else {
+    // If not directly parseable, try combining datePart and timePart
+    const datePart = (session as any).date || session.scheduledAt;
+    const timePart = session.startTime || (session as any).slotTime;
+    if (datePart && timePart) {
+      const combined = new Date(`${datePart} ${timePart}`);
+      if (!isNaN(combined.getTime())) {
+        startDate = combined;
+      } else {
+        return { startMs: null, endMs: null, durationMinutes: 60 };
+      }
+    } else {
+      return { startMs: null, endMs: null, durationMinutes: 60 };
+    }
+  }
+
+  const startMs = startDate.getTime();
+
+  // 2. Resolve duration (in minutes, min 5, max 480, default 60)
+  let durationMinutes = 60;
+  if (typeof session.duration === "number" && !isNaN(session.duration) && session.duration > 0) {
+    durationMinutes = session.duration;
+  } else if (typeof session.duration === "string") {
+    const parsedDur = parseInt(session.duration, 10);
+    if (!isNaN(parsedDur) && parsedDur > 0) {
+      durationMinutes = parsedDur;
+    }
+  }
+
+  const endMs = startMs + durationMinutes * 60 * 1000;
+  return { startMs, endMs, durationMinutes };
+}
+
+const TERMINAL_STATUSES = new Set(["cancelled", "completed", "refunded", "no_show"]);
+const INCOMING_EARLY_JOIN_WINDOW_MS = 15 * 60 * 1000; // 15 mins before scheduled start
+
+/**
+ * Evaluates whether a session is currently live and whether it can be joined.
+ *
+ * Requirements:
+ * 1. A session whose scheduled date/time and duration have completely passed (now >= endMs) must NEVER:
+ *    - show "LIVE NOW"
+ *    - show an enabled "Join Session" button
+ *    - be considered currently joinable.
+ * 2. Do NOT rely on backend `status === "in_progress"` alone to determine whether a session is live.
+ * 3. The valid live window is: session start time <= current time < session end time.
+ * 4. `canJoin` is true only when:
+ *    - session is actually within its valid live/join window, OR
+ *    - it is the current Incoming Session target and is within the allowed incoming/join window.
+ * 5. A targetSessionId from Incoming Session popup must NOT make an arbitrary old/past session joinable.
+ * 6. Future sessions must remain non-joinable.
+ */
+export function evaluateSessionLiveStatus(
+  session: Session,
+  isTarget: boolean,
+  now: number = Date.now()
+): {
+  isLive: boolean;
+  canJoin: boolean;
+  isPast: boolean;
+  isFuture: boolean;
+  startMs: number | null;
+  endMs: number | null;
+} {
+  const { startMs, endMs } = getSessionTimeWindow(session);
+
+  const sessionStatus = (session.status || "").toLowerCase().trim();
+  const bookingStatus = typeof session.bookings?.[0]?.status === "string"
+    ? (session.bookings[0].status as string).toLowerCase().trim()
+    : "";
+
+  const isTerminal = TERMINAL_STATUSES.has(sessionStatus) || TERMINAL_STATUSES.has(bookingStatus);
+
+  if (startMs === null || endMs === null || isTerminal) {
+    return {
+      isLive: false,
+      canJoin: false,
+      isPast: endMs !== null ? now >= endMs : false,
+      isFuture: startMs !== null ? now < startMs : false,
+      startMs,
+      endMs,
+    };
+  }
+
+  const isPast = now >= endMs;
+  const isFuture = now < startMs;
+
+  // Valid live window: startMs <= now < endMs
+  const isLive = !isPast && !isFuture;
+
+  // canJoin: actually live OR incoming popup target within allowed early window, but NEVER if past
+  const isWithinIncomingWindow = isTarget && !isPast && now >= (startMs - INCOMING_EARLY_JOIN_WINDOW_MS);
+  const canJoin = isLive || isWithinIncomingWindow;
+
+  return {
+    isLive,
+    canJoin,
+    isPast,
+    isFuture,
+    startMs,
+    endMs,
+  };
+}
+
 export default function UserDashboardUpcomingSessionsPage({ setActivePage, user }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user: authUser } = useAuth();
   const currentUserId = user?.userId || user?.id || user?._id || authUser?.userId || authUser?.id || authUser?._id;
+
+  const targetSessionId = searchParams?.get("sessionId") || null;
+  const targetBookingId = searchParams?.get("bookingId") || null;
 
   const [upcoming, setUpcoming] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  // Periodically refresh current time to update live/ended states dynamically
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Cancel Modal State
   const [cancelModal, setCancelModal] = useState<{
@@ -132,20 +313,45 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
       setLoading(true);
       setError(null);
       const res = await SessionService.getAllSessions({ role: "mentee", limit: 100 });
-      const fetchedSessions = (res.data || []) as Session[];
+      let fetchedSessions = (res.data || []) as Session[];
 
-      // Each mentorship session can contain multiple bookings from different mentees.
-      // Map each of THIS mentee's bookings to its own upcoming session item with its specific scheduled time, booking ID, and status.
+      // If a targetSessionId was specified by the Incoming Session flow but is not in
+      // the list (e.g. status changed or pagination), fetch the real session from the backend:
+      if (targetSessionId) {
+        const found = fetchedSessions.some((s) => (s.sessionId || s._id) === targetSessionId);
+        if (!found) {
+          try {
+            const singleRes = await SessionService.getSessionById(targetSessionId);
+            const singleSession = singleRes?.data ?? singleRes;
+            if (singleSession && (singleSession.sessionId || singleSession._id)) {
+              fetchedSessions = [singleSession, ...fetchedSessions];
+            }
+          } catch (fetchErr) {
+            console.warn("Could not load target session by id", fetchErr);
+          }
+        }
+      }
+
+      // Map each of THIS mentee's bookings to its own upcoming session item.
+      // Uses the actual sessionId and bookingId from the backend response, identifying
+      // the logged-in user's booking without using array indices or default first booking.
       const menteeSessionItems: Session[] = [];
       for (const s of fetchedSessions) {
-        const myBookings = (s.bookings || []).filter(
-          (b: any) => currentUserId && (b.menteeId === currentUserId || b.bookedBy === currentUserId)
-        );
+        const sid = s.sessionId || s._id;
+        const isTarget = targetSessionId ? sid === targetSessionId : false;
+
+        const myBookings = (s.bookings || []).filter((b: any) => {
+          const bId = b.bookingId || b._id;
+          if (targetBookingId && bId === targetBookingId) return true;
+          return Boolean(currentUserId && (b.menteeId === currentUserId || b.bookedBy === currentUserId));
+        });
 
         if (myBookings.length > 0) {
           for (const b of myBookings) {
+            const resolvedBookingId = (b.bookingId as string) || (b._id as string);
             menteeSessionItems.push({
               ...s,
+              bookingId: resolvedBookingId,
               scheduledAt: (b.scheduledAt as string) || s.scheduledAt,
               startTime: (b.scheduledAt as string) || s.startTime,
               status: (b.status as string) || s.status,
@@ -153,7 +359,15 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
             });
           }
         } else {
-          menteeSessionItems.push(s);
+          // If no bookings array matched, check if the session document directly belongs to mentee or is target
+          const isUserMentee = Boolean(currentUserId && (s as any).menteeId === currentUserId);
+          if (isUserMentee || isTarget) {
+            menteeSessionItems.push({
+              ...s,
+              bookingId: targetBookingId || (s as any).bookingId,
+              bookings: s.bookings || [],
+            });
+          }
         }
       }
 
@@ -163,30 +377,45 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
 
       const validUpcoming = menteeSessionItems
         .filter((s) => {
+          const sid = s.sessionId || s._id;
+          const isTarget = targetSessionId ? sid === targetSessionId : false;
+
           const sessionStatus = (s.status || "").toLowerCase().trim();
           const bookingStatus = typeof s.bookings?.[0]?.status === "string"
             ? (s.bookings[0].status as string).toLowerCase().trim()
             : "";
 
-          if (excludedStatuses.has(sessionStatus) || excludedStatuses.has(bookingStatus)) {
+          // Exclude cancelled/completed/refunded/no_show unless specifically targeted
+          if (!isTarget && (excludedStatuses.has(sessionStatus) || excludedStatuses.has(bookingStatus))) {
             return false;
           }
 
-          // Use the actual scheduled datetime in this priority:
-          // bookings?.[0]?.scheduledAt || startTime || scheduledAt
-          const actualTime = s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt;
-          if (!actualTime) return false;
-          const sessionTime = new Date(actualTime as string | number | Date).getTime();
-          if (isNaN(sessionTime) || sessionTime === 0) return false;
+          const { startMs, isLive } = evaluateSessionLiveStatus(s, isTarget, currentNow);
+          const sessionTime = startMs ?? 0;
+          const isInProgress = sessionStatus === "in_progress" || bookingStatus === "in_progress";
 
-          // Only include sessions scheduled for a time strictly after the current local time
-          return sessionTime > currentNow;
+          // Keep if scheduled for future, OR session is currently live, OR session status is in_progress, OR incoming target session
+          return (sessionTime > currentNow) || isLive || isInProgress || isTarget;
         })
         .sort((a, b) => {
-          const timeA = new Date((a.bookings?.[0]?.scheduledAt || a.startTime || a.scheduledAt || 0) as string | number | Date).getTime();
-          const timeB = new Date((b.bookings?.[0]?.scheduledAt || b.startTime || b.scheduledAt || 0) as string | number | Date).getTime();
+          const sidA = a.sessionId || a._id;
+          const sidB = b.sessionId || b._id;
 
-          // Sort chronologically: earliest upcoming session first
+          // Target session from the Incoming popup always floats to the top
+          if (targetSessionId) {
+            if (sidA === targetSessionId) return -1;
+            if (sidB === targetSessionId) return 1;
+          }
+
+          // Active live sessions float right after incoming target session
+          const statusA = evaluateSessionLiveStatus(a, sidA === targetSessionId, currentNow);
+          const statusB = evaluateSessionLiveStatus(b, sidB === targetSessionId, currentNow);
+          if (statusA.isLive && !statusB.isLive) return -1;
+          if (!statusA.isLive && statusB.isLive) return 1;
+
+          const timeA = statusA.startMs ?? 0;
+          const timeB = statusB.startMs ?? 0;
+
           return timeA - timeB;
         });
 
@@ -198,21 +427,37 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
     } finally {
       setLoading(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, targetSessionId, targetBookingId]);
 
   useEffect(() => {
     fetchUpcoming();
   }, [fetchUpcoming]);
 
-  const handleJoinSession = async (sessionId?: string) => {
+  // UX: Automatically locate and scroll the target session card into view
+  useEffect(() => {
+    if (!loading && targetSessionId && upcoming.length > 0) {
+      const el = document.getElementById(`session-card-${targetSessionId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [loading, targetSessionId, upcoming]);
+
+  // Shared session join executor reusing the centralized join service
+  const handleJoinSession = async (sessionId?: string, bookingId?: string) => {
     if (!sessionId) return;
     setJoiningId(sessionId);
     try {
-      await SessionService.getSessionById(sessionId);
-      router.push(`/mentorship/session-room/${sessionId}`);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unable to join session. Please try again.";
-      alert(errorMessage);
+      await joinMentorshipSession({
+        sessionId,
+        bookingId,
+        router,
+        onError: (err: Error) => {
+          alert(err.message || "Unable to join session. Please try again.");
+        },
+      });
+    } catch {
+      // Error handled by onError
     } finally {
       setJoiningId(null);
     }
@@ -377,129 +622,165 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
             const isOnline = !s.sessionType || s.sessionType.toLowerCase() === "virtual" || s.sessionType.toLowerCase() === "online";
             const sid = s.sessionId ?? s._id;
 
-            // Getting bookingId. We check if there are bookings and take the first one's ID.
-            const bookingId = s.bookings?.[0]?.bookingId || s.bookings?.[0]?._id;
+            // Getting bookingId. Use the accurately resolved bookingId, or fall back to matched booking
+            const bookingId = s.bookingId || s.bookings?.[0]?.bookingId || (s.bookings?.[0] as any)?._id;
 
-            const statusLower = (s.status || "").toLowerCase();
-            const canJoin = statusLower === "in_progress";
+            const isTarget = Boolean(targetSessionId && sid === targetSessionId);
+            const { isLive, canJoin, isPast } = evaluateSessionLiveStatus(s, isTarget, currentTime);
 
             return (
               <div
+                id={sid ? `session-card-${sid}` : undefined}
                 key={`${sid ?? idx}-${bookingId ?? idx}`}
-                className="flex flex-col md:flex-row items-start md:items-center gap-4 p-4 md:p-5 rounded-2xl transition-shadow hover:shadow-sm bg-white"
-                style={{ border: `1px solid ${COLORS.hairline}` }}
+                className={`flex flex-col p-4 md:p-5 rounded-2xl transition-all duration-300 ${
+                  isTarget
+                    ? "bg-[#fffdfb] shadow-xl ring-2 ring-[#7a5c3e] border-2 border-[#7a5c3e]"
+                    : "bg-white hover:shadow-sm"
+                }`}
+                style={{ border: isTarget ? "2px solid #7a5c3e" : `1px solid ${COLORS.hairline}` }}
               >
-                {/* 1. Mentor Info */}
-                <div className="flex items-center gap-3 w-full md:w-[28%] shrink-0">
-                  {photo ? (
-                    <img
-                      src={photo}
-                      alt={name}
-                      className="w-12 h-12 rounded-full object-cover shrink-0"
-                      style={{ border: `1px solid ${COLORS.hairline}` }}
-                    />
-                  ) : (
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-base font-bold text-white"
-                      style={{ backgroundColor: COLORS.ink }}
-                    >
-                      {initialsFrom(name)}
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold truncate" style={{ color: COLORS.ink }}>
-                      {name}
-                    </p>
-                    <p className="text-xs truncate mt-0.5" style={{ color: COLORS.muted }}>
-                      Mentor
-                    </p>
-                    <div className="mt-1.5 flex items-center">
-                      <span
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
-                        style={{
-                          backgroundColor: canJoin ? "#dbeafe" : COLORS.chip,
-                          color: canJoin ? "#1d4ed8" : COLORS.accent,
-                        }}
-                      >
-                        {canJoin ? "Live Now" : getStatusDisplay(s.status || "")}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Session Details */}
-                <div className="w-full md:flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 md:px-4 md:border-l" style={{ borderColor: COLORS.hairline }}>
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold line-clamp-2" style={{ color: COLORS.ink }} title={s.title || "Mentorship Session"}>
-                      {s.title || "Mentorship Session"}
-                    </p>
-                    <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
-                      <CalendarClock className="w-3.5 h-3.5 shrink-0" />
-                      <span>{formatDateStr(s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt)}</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5 pt-1 sm:pt-0">
-                    <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
-                      <Clock className="w-3.5 h-3.5 shrink-0" />
-                      <span>
-                        {formatTimeStr(s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt)}
-                        {s.duration ? ` (${s.duration} min)` : ""}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
-                      {isOnline ? (
-                        <Video className="w-3.5 h-3.5 shrink-0" />
-                      ) : (
-                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                {/* Highlight banner when reached from Incoming Session popup */}
+                {isTarget && (
+                  <div
+                    className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl mb-3 text-xs font-bold"
+                    style={{ backgroundColor: "#f3ece4", color: "#4a3728", border: "1px solid #e0d8cf" }}
+                  >
+                    <span className="flex items-center gap-2">
+                      {!isPast && (
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#7a5c3e] opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#7a5c3e]" />
+                        </span>
                       )}
-                      <span>{isOnline ? "Online Meeting" : "In Person"}</span>
+                      <span>{isPast ? "Selected Past Session" : "Incoming Session Ready"}</span>
+                    </span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#e0d8cf] text-[#7a5c3e]">
+                      Selected from Popup
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                  {/* 1. Mentor Info */}
+                  <div className="flex items-center gap-3 w-full md:w-[28%] shrink-0">
+                    {photo ? (
+                      <img
+                        src={photo}
+                        alt={name}
+                        className="w-12 h-12 rounded-full object-cover shrink-0"
+                        style={{ border: `1px solid ${COLORS.hairline}` }}
+                      />
+                    ) : (
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-base font-bold text-white"
+                        style={{ backgroundColor: COLORS.ink }}
+                      >
+                        {initialsFrom(name)}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold truncate" style={{ color: COLORS.ink }}>
+                        {name}
+                      </p>
+                      <p className="text-xs truncate mt-0.5" style={{ color: COLORS.muted }}>
+                        Mentor
+                      </p>
+                      <div className="mt-1.5 flex items-center">
+                        <span
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
+                          style={{
+                            backgroundColor: isLive ? "#dbeafe" : isPast ? "#fee2e2" : COLORS.chip,
+                            color: isLive ? "#1d4ed8" : isPast ? "#b91c1c" : COLORS.accent,
+                          }}
+                        >
+                          {isLive ? "Live Now" : isPast ? (s.status?.toLowerCase() === "completed" ? "Completed" : "Ended") : getStatusDisplay(s.status || "")}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* 3. Actions */}
-                <div className="flex flex-col gap-2 shrink-0 w-full md:w-[165px] md:border-l md:pl-4 pt-4 md:pt-0 border-t md:border-t-0 mt-2 md:mt-0" style={{ borderColor: COLORS.hairline }}>
-                  <button
-                    onClick={() => canJoin && handleJoinSession(sid)}
-                    disabled={!canJoin || joiningId === sid}
-                    title={!canJoin ? "Session hasn't started yet" : "Join this session"}
-                    className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm text-center disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-                    style={{
-                      backgroundColor: canJoin ? COLORS.ink : "#e5e0d8",
-                      color: canJoin ? "#fff" : "#9c9186",
-                    }}
-                  >
-                    {joiningId === sid ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Joining...
-                      </>
-                    ) : (
-                      "Join Session"
-                    )}
-                  </button>
-                  <button
-                    onClick={navigateToBookings}
-                    className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-colors hover:border-[#c9baa9] text-center"
-                    style={{ backgroundColor: COLORS.wash, color: COLORS.accent, border: `1px solid ${COLORS.hairline}` }}
-                  >
-                    View Details
-                  </button>
-                  <div className="flex gap-2 w-full">
+                  {/* 2. Session Details */}
+                  <div className="w-full md:flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 md:px-4 md:border-l" style={{ borderColor: COLORS.hairline }}>
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold line-clamp-2" style={{ color: COLORS.ink }} title={s.title || "Mentorship Session"}>
+                        {s.title || "Mentorship Session"}
+                      </p>
+                      <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
+                        <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+                        <span>{formatDateStr(s.scheduledAt || s.startTime)}</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5 pt-1 sm:pt-0">
+                      <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
+                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {formatTimeStr(s.scheduledAt || s.startTime)}
+                          {s.duration ? ` (${s.duration} min)` : ""}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
+                        {isOnline ? (
+                          <Video className="w-3.5 h-3.5 shrink-0" />
+                        ) : (
+                          <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        )}
+                        <span>{isOnline ? "Online Meeting" : "In Person"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Actions */}
+                  <div className="flex flex-col gap-2 shrink-0 w-full md:w-[165px] md:border-l md:pl-4 pt-4 md:pt-0 border-t md:border-t-0 mt-2 md:mt-0" style={{ borderColor: COLORS.hairline }}>
                     <button
-                      onClick={() => sid && openRescheduleModal(sid, bookingId as string)}
-                      className="flex-1 px-1.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors hover:bg-gray-50 text-center uppercase"
-                      style={{ color: COLORS.muted, border: `1px solid ${COLORS.hairline}` }}
+                      onClick={() => canJoin && handleJoinSession(sid, bookingId as string)}
+                      disabled={!canJoin || joiningId === sid}
+                      title={
+                        isPast
+                          ? "This session has already ended"
+                          : !canJoin
+                          ? "Session hasn't started yet"
+                          : "Join this session"
+                      }
+                      className={`w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm text-center disabled:cursor-not-allowed flex items-center justify-center gap-1.5 ${
+                        isTarget && canJoin ? "animate-pulse ring-2 ring-[#7a5c3e]/40" : ""
+                      }`}
+                      style={{
+                        backgroundColor: canJoin ? COLORS.ink : "#e5e0d8",
+                        color: canJoin ? "#fff" : "#9c9186",
+                      }}
                     >
-                      Reschedule
+                      {joiningId === sid ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Joining...
+                        </>
+                      ) : (
+                        "Join Session"
+                      )}
                     </button>
                     <button
-                      onClick={() => sid && openCancelModal(sid, bookingId as string)}
-                      className="flex-1 px-1.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors hover:bg-red-50 text-center text-red-600 uppercase"
-                      style={{ border: `1px solid #fca5a5` }}
+                      onClick={navigateToBookings}
+                      className="w-full px-3 py-2 rounded-xl text-xs font-semibold transition-colors hover:border-[#c9baa9] text-center"
+                      style={{ backgroundColor: COLORS.wash, color: COLORS.accent, border: `1px solid ${COLORS.hairline}` }}
                     >
-                      Cancel
+                      View Details
                     </button>
+                    <div className="flex gap-2 w-full">
+                      <button
+                        onClick={() => sid && openRescheduleModal(sid, bookingId as string)}
+                        className="flex-1 px-1.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors hover:bg-gray-50 text-center uppercase"
+                        style={{ color: COLORS.muted, border: `1px solid ${COLORS.hairline}` }}
+                      >
+                        Reschedule
+                      </button>
+                      <button
+                        onClick={() => sid && openCancelModal(sid, bookingId as string)}
+                        className="flex-1 px-1.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors hover:bg-red-50 text-center text-red-600 uppercase"
+                        style={{ border: `1px solid #fca5a5` }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
