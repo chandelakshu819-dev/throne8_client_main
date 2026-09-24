@@ -269,20 +269,44 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       ? []
       : sessions.filter((s) => (SESSION_TYPE_FILTER[s.sessionType] || s.sessionType) === activeFilter);
 
-  const showGroupSessions = activeFilter === "All" || activeFilter === "Group Session";
-  const visibleGroupSessions = activeFilter === "Group Session"
-    ? groupSessions
-    : groupSessions.filter((g) => g.status === 'open' || g.status === undefined);
+      const showGroupSessions = activeFilter === "All" || activeFilter === "Group Session";
+      // ✅ CHANGED: auto-generated instances (created behind the scenes when a
+      // mentee picks a slot for a template — they carry a `templateId`) are
+      // internal booking artifacts, not something a mentee browses directly.
+      // Only templates (isTemplate: true) and legacy fixed-date group sessions
+      // (isTemplate: false/undefined, no templateId) show up as cards here.
+      const bookableGroupSessions = groupSessions.filter((g) => !g.templateId);
+      const visibleGroupSessions = activeFilter === "Group Session"
+        ? bookableGroupSessions
+        : bookableGroupSessions.filter((g) => g.status === 'open' || g.status === undefined);
 
-  const getServiceFromSession = (session: any): Service => ({
-    id: session.sessionId,
-    type: SESSION_TYPE_LABEL[session.sessionType] || "1:1 Call",
-    title: session.title,
-    duration: `${session.duration} Min`,
-    originalPrice: null,
-    price: session.pricing?.basePrice === 0 ? "Free" : session.pricing?.basePrice,
-    popular: false,
-  });
+    const getServiceFromSession = (session: any): Service => ({
+      id: session.sessionId,
+      type: SESSION_TYPE_LABEL[session.sessionType] || "1:1 Call",
+      title: session.title,
+      duration: `${session.duration} Min`,
+      originalPrice: null,
+      price: session.pricing?.basePrice === 0 ? "Free" : session.pricing?.basePrice,
+      popular: false,
+    });
+  
+    // ✅ NEW: availability-based group session ("template") ko Service shape
+    // mein convert karta hai taaki onServiceClick() ko wahi 1:1 flow ki tarah
+    // "calendar" bookingStep pe bheja ja sake — CalendarStep already generic
+    // hai (sirf mentorId + duration use karta hai), isliye koi extra change
+    // uss file mein nahi chahiye.
+    const getServiceFromGroupTemplate = (group: any): Service => {
+      const pricePerPerson = group.pricing?.pricePerPerson ?? group.pricePerPerson ?? 0;
+      return {
+        id: group.sessionId,
+        type: "GroupSession",
+        title: group.title,
+        duration: `${group.duration} Min`,
+        originalPrice: null,
+        price: pricePerPerson === 0 ? "Free" : pricePerPerson,
+        popular: false,
+      };
+    };
 
   const getIcon = (sessionType: string): string => {
     if (sessionType === "group_session") return "👥";
@@ -520,9 +544,22 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           const pricePerPerson = group.pricing?.pricePerPerson ?? group.pricePerPerson ?? 0;
           const statusMeta = myRequestStatus ? REQUEST_STATUS_META[myRequestStatus] : undefined;
 
+                  // ✅ NEW: availability-based templates open the slot-picker
+          // (CalendarStep) directly instead of the fixed-date detail modal —
+          // this is the actual fix for "group session shows a fixed time
+          // instead of a calendar".
+          const isTemplate = !!group.isTemplate;
+          const openGroupSession = () => {
+            if (isTemplate) {
+              onServiceClick(getServiceFromGroupTemplate(group));
+            } else {
+              setDetailGroup(group);
+            }
+          };
+
           return (
             <div key={group.sessionId}
-              onClick={() => setDetailGroup(group)}
+              onClick={openGroupSession}
               style={{
                 borderRadius: "16px", padding: "20px", background: C.bg,
                 border: `1px solid ${C.border}`, position: "relative",
@@ -570,17 +607,40 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   </p>
                 );
               })()}
-              <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: C.mid, marginBottom: "4px" }}>
-                <Clock /> {formatGroupDate(group.scheduledAt)} · {group.duration} Min
-              </div>
-              <div style={{ fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
-                {seatsLeft > 0 ? `${seatsLeft} seats available` : "Session full"} · {group.currentParticipants ?? 0}/{group.maxParticipants ?? 0} enrolled
-              </div>
+                            {isTemplate ? (
+                // ✅ NEW: template card — no fixed date/seat-count to show,
+                // since seats belong to a specific slot-instance, not the
+                // template itself.
+                <div style={{ fontSize: "12px", color: C.mid, marginBottom: "14px", display: "flex", alignItems: "center", gap: "4px" }}>
+                  <Clock /> {group.duration} Min · Mentor-led, choose a time that works for you
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: C.mid, marginBottom: "4px" }}>
+                    <Clock /> {formatGroupDate(group.scheduledAt)} · {group.duration} Min
+                  </div>
+                  <div style={{ fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
+                    {seatsLeft > 0 ? `${seatsLeft} seats available` : "Session full"} · {group.currentParticipants ?? 0}/{group.maxParticipants ?? 0} enrolled
+                  </div>
+                </>
+              )}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontWeight: "bold", color: pricePerPerson === 0 ? "#10b981" : C.dark, fontSize: "15px" }}>
                   {pricePerPerson === 0 ? "Free" : `₹${pricePerPerson}/person`}
                 </span>
-                {statusMeta ? (
+                {isTemplate ? (
+                  // ✅ NEW: templates always route to the slot picker —
+                  // there's no fixed-seat "Full" state at the template level.
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onServiceClick(getServiceFromGroupTemplate(group));
+                    }}
+                    style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}
+                  >
+                    Select a Slot
+                  </button>
+                ) : statusMeta ? (
                   <div style={{ fontSize: "12px", fontWeight: 700, color: statusMeta.fg }}>
                     {myRequestStatus === "pending" && "⏳ "}
                     {myRequestStatus === "accepted" && "✅ "}

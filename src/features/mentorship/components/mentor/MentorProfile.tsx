@@ -34,6 +34,9 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     const [formData, setFormData] = useState<BookingFormData | null>(null);
     const [mentorData, setMentorData] = useState<any>(null);
     const [bookedSessionIds, setBookedSessionIds] = useState<string[]>([]);
+    // ✅ NEW: group-session template join-by-slot flow state
+    const [groupJoinBusy, setGroupJoinBusy] = useState(false);
+    const [groupJoinError, setGroupJoinError] = useState<string | null>(null);
 
     useEffect(() => {
         MentorService.getAllMentors()
@@ -73,11 +76,69 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     const resetBooking = (): void => {
         setBookingStep(null); setSelectedService(null);
         setCalendarData(null); setFormData(null);
+        setGroupJoinError(null);
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
+    // ✅ NEW: group-session TEMPLATE ke liye slot choose hote hi seedha
+    // join-by-slot API call karo — yeh 1:1 wali details/payment pipeline
+    // mein NAHI jaata, kyunki group join ek "request" hai, ek paid booking
+    // nahi (payment separately/mentor-approval-baad handle hota hai).
+    const handleGroupSlotSelected = async (d: CalendarData) => {
+        if (!selectedService) return;
+        setGroupJoinBusy(true);
+        setGroupJoinError(null);
+        try {
+            const { selectedDate, currentMonth, availabilityId, slotTime } = d;
+            const year = currentMonth.getFullYear();
+            const month = String(currentMonth.getMonth() + 1).padStart(2, "0");
+            const day = String(selectedDate).padStart(2, "0");
+            const startTime = slotTime.split(" - ")[0]; // "10:00"
+
+            await MentorService.joinGroupSessionBySlot(String(selectedService.id), {
+                date: `${year}-${month}-${day}`,
+                startTime,
+                availabilityId,
+            });
+
+            if (selectedService.id) {
+                setBookedSessionIds((prev) => [...prev, String(selectedService.id)]);
+            }
+            window.alert("Join request sent! You'll be notified once the mentor reviews it.");
+            resetBooking();
+        } catch (err: any) {
+            setGroupJoinError(err.message || "Failed to send join request.");
+        } finally {
+            setGroupJoinBusy(false);
+        }
+    };
+
     if (bookingStep === "query") return <QueryStep mentorId={mentorData?.mentorId || ""} selectedService={selectedService} onBack={resetBooking} onSubmitted={resetBooking} />;
-    if (bookingStep === "calendar") return <CalendarStep mentorId={mentorData?.mentorId || ""} selectedService={selectedService} onBack={() => setBookingStep(null)} onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }} />;
+    if (bookingStep === "calendar") {
+        const isGroupTemplate = selectedService?.type === "GroupSession";
+        return (
+            <>
+                <CalendarStep
+                    mentorId={mentorData?.mentorId || ""}
+                    selectedService={selectedService}
+                    onBack={() => setBookingStep(null)}
+                    onContinue={isGroupTemplate ? handleGroupSlotSelected : (d) => { setCalendarData(d); setBookingStep("details"); }}
+                />
+                {isGroupTemplate && groupJoinBusy && (
+                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000 }}>
+                        <div style={{ background: "#fff", padding: "24px 32px", borderRadius: "16px", fontWeight: 600, color: "#4a3728" }}>
+                            Sending join request...
+                        </div>
+                    </div>
+                )}
+                {isGroupTemplate && groupJoinError && (
+                    <div style={{ position: "fixed", bottom: 20, right: 20, background: "#fee2e2", color: "#dc2626", padding: "12px 16px", borderRadius: "12px", fontWeight: 600, zIndex: 2000, maxWidth: "360px" }}>
+                        {groupJoinError}
+                    </div>
+                )}
+            </>
+        );
+    }
     if (bookingStep === "details") return <DetailsStep selectedService={selectedService} calendarData={calendarData!} onBack={() => setBookingStep("calendar")} onContinue={(d: BookingFormData) => { setFormData(d); setBookingStep("payment"); }} />;
     if (bookingStep === "payment") return (
         <PaymentStep

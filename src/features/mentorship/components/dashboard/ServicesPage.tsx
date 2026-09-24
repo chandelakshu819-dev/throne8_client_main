@@ -60,6 +60,9 @@ const getDefaultFormData = (serviceType: string = '') => ({
   portfolioUrl: '',
   thumbnailImage: '',
   responseTime: '',
+  // ✅ NEW: group_session ke liye — default false (fixed-date, legacy
+  // behavior). Toggle se ServiceModal ise true kar sakta hai.
+  isTemplate: false,
 });
 
 
@@ -308,7 +311,14 @@ export default function ServicesPage({
     setSaveError(null);
 
     try {
+            // ✅ FIX: yeh hamesha "abhi se +10 min" fallback deta tha kyunki
+      // ServiceModal me pehle scheduledAt field hi nahi tha (1:1 sessions
+      // ke liye yeh fallback abhi bhi lagta hai — unke liye alag se date
+      // picker chahiye hoga, lekin group session ab apna scheduledAt
+      // Fix 1 ke naye field se properly deta hai).
       const scheduledAtISO = new Date(formData.scheduledAt || Date.now() + 10 * 60 * 1000).toISOString();
+      const isGroupTemplateMode = formData.serviceType === "group_session" && !!formData.isTemplate;
+
       if (isEditMode && editingSession) {
         if (formData.serviceType === "group_session") {
           // updateGroupSessionValidator sirf ye fields accept karta hai
@@ -368,11 +378,15 @@ export default function ServicesPage({
       }
 
       if (formData.serviceType === "group_session") {
+        // ✅ FIX: template mode (mentees availability se slot chunte hain)
+        // me scheduledAt bilkul bhejte hi nahi — backend Joi validator
+        // (isTemplate: true -> scheduledAt optional) isi ke liye hai.
+        // Fixed-date mode me formData.scheduledAt (ab ServiceModal me
+        // asli datetime input se aata hai) use hota hai.
         const groupSessionInput: CreateGroupSessionInput = {
           title: formData.serviceName,
           description: formData.description || "",
           topic: formData.topic,
-          scheduledAt: scheduledAtISO,
           duration: Number(formData.duration) || 60,
           timezone: "Asia/Kolkata",
           maxParticipants: Number(formData.maxParticipants),
@@ -386,6 +400,8 @@ export default function ServicesPage({
             periodDays: Math.max(0, Math.round((Number(formData.followUpPeriod) || 0) / 24)),
           },
           thumbnailImage: formData.thumbnailImage,
+          isTemplate: isGroupTemplateMode,
+          ...(isGroupTemplateMode ? {} : { scheduledAt: scheduledAtISO }),
         };
         await MentorService.createGroupSession(groupSessionInput);
 

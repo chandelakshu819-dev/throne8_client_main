@@ -8,7 +8,7 @@ export interface CreateGroupSessionInput {
   description: string;
   topic: string;
   category?: string;
-  scheduledAt: string;
+  scheduledAt?: string;   // ✅ CHANGED: optional — isTemplate: true pe nahi bheja jaata
   duration: number;
   timezone: string;
   maxParticipants: number;
@@ -23,7 +23,10 @@ export interface CreateGroupSessionInput {
     allowed: boolean;
     periodDays: number;
   };
+  isTemplate?: boolean;   // ✅ NEW
 }
+
+
 
 class MentorService {
 
@@ -697,6 +700,65 @@ class MentorService {
 
       throw new Error(
         'Failed to fetch join request status.'
+      );
+    }
+  }
+
+  /**
+   * ✅ NEW: mentee ne group-session TEMPLATE ke liye Quick-Call-style
+   * calendar se ek date+time slot choose kiya (mentor ki Availability se).
+   * Backend: agar us exact slot pe already koi open group "instance" hai
+   * to mentee usi instance mein pending join-request bhejta hai; warna
+   * naya instance banta hai (mentor ki availability se wo slot book karke)
+   * aur usi mein request bheji jaati hai.
+   */
+  static async joinGroupSessionBySlot(
+    templateId: string,
+    payload: {
+      date: string;            // "YYYY-MM-DD"
+      startTime: string;       // "HH:mm"
+      availabilityId: string;
+      transactionId?: string;
+    }
+  ): Promise<any> {
+    try {
+      const { data } = await api.post(
+        `/mentorship/group-sessions/${templateId}/join-by-slot`,
+        payload
+      );
+
+      return data;
+
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+
+        if (error.code === 'ERR_NETWORK') {
+          throw new Error(
+            'Unable to connect to server. Please check your internet connection.'
+          );
+        }
+
+        if (error.response?.status === 400) {
+          throw new Error(
+            apiError?.message ||
+            'This slot is no longer available. Please pick another.'
+          );
+        }
+
+        if (error.response?.status === 401) {
+          throw new Error(
+            'Session expired. Please login again.'
+          );
+        }
+
+        if (apiError?.message) {
+          throw new Error(apiError.message);
+        }
+      }
+
+      throw new Error(
+        'Failed to send join request.'
       );
     }
   }

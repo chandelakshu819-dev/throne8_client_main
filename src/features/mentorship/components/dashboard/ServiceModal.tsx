@@ -416,6 +416,68 @@ export default function ServiceModal({
                         </div>
                     )}
 
+                    {/* ✅ NEW: sirf "Group Session" ke liye — mentor choose karta hai
+                        ki session ek FIXED date/time pe ho (jaisa ab tak tha), ya
+                        mentees khud mentor ki Availability calendar se apna slot
+                        chunein (isTemplate: true). Yeh dono cheezein fix karta hai:
+                        1) purana bug jahan "scheduledAt" field hi UI me nahi tha,
+                           isliye har group session "abhi se +10 min" pe ban jaata
+                           tha (ServicesPage.tsx me fallback dekho).
+                        2) naya feature: availability-based group sessions. */}
+                    {formData?.serviceType === 'group_session' && (
+                        <div className="p-4 rounded-xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
+                            <FieldLabel icon={Clock}>Session Timing</FieldLabel>
+                            <div className="flex gap-2 mb-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, isTemplate: false })}
+                                    disabled={isSaving}
+                                    className="flex-1 px-3 py-2.5 rounded-lg text-sm font-semibold border transition-colors disabled:opacity-50"
+                                    style={{
+                                        borderColor: !formData?.isTemplate ? '#4a3728' : '#e0d8cf',
+                                        backgroundColor: !formData?.isTemplate ? '#4a3728' : '#fff',
+                                        color: !formData?.isTemplate ? '#fff' : '#4a3728',
+                                    }}
+                                >
+                                    Fixed Date &amp; Time
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, isTemplate: true, scheduledAt: '' })}
+                                    disabled={isSaving}
+                                    className="flex-1 px-3 py-2.5 rounded-lg text-sm font-semibold border transition-colors disabled:opacity-50"
+                                    style={{
+                                        borderColor: formData?.isTemplate ? '#4a3728' : '#e0d8cf',
+                                        backgroundColor: formData?.isTemplate ? '#4a3728' : '#fff',
+                                        color: formData?.isTemplate ? '#fff' : '#4a3728',
+                                    }}
+                                >
+                                    Mentees Pick a Slot
+                                </button>
+                            </div>
+
+                            {formData?.isTemplate ? (
+                                <p className="text-xs" style={{ color: '#8a7a6a' }}>
+                                    Mentees will choose a date &amp; time from your Availability calendar. Make sure you've set your availability in the Availability tab.
+                                </p>
+                            ) : (
+                                <div>
+                                    <label className="block text-xs font-semibold mb-2" style={{ color: '#4a3728' }}>Scheduled Date &amp; Time</label>
+                                    <input
+                                        type="datetime-local"
+                                        className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                        style={inputStyle(fieldErrors?.scheduledAt)}
+                                        value={formData?.scheduledAt || ''}
+                                        onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
+                                        disabled={isSaving}
+                                    />
+                                    {fieldErrors?.scheduledAt && (
+                                        <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.scheduledAt}</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                                                                      {/* Duration & Participants — Duration hidden for "Ask a Query"
                                         since it's async text, no live call happens */}
                                     {formData?.serviceType !== 'ask_query' && (
