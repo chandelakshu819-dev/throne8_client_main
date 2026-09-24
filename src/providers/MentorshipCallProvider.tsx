@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getSocket } from '@/core/realtime/socket.client';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { navigateToUpcomingSessions } from '@/features/mentorship/services/sessionJoin.service';
 
 interface IncomingSessionPayload {
   sessionId: string;
@@ -77,7 +78,10 @@ export default function MentorshipCallProvider({ children }: { children: React.R
       lastSessionIdRef.current = key;
 
       // Already on the call page for this exact session — don't ring, just skip.
-      if (pathname?.includes('/mentorship/mentor-session') && pathname.includes(payload.sessionId)) {
+      if (
+        (pathname?.includes('/mentorship/mentor-session') || pathname?.includes('/mentorship/session-room')) &&
+        pathname.includes(payload.sessionId)
+      ) {
         return;
       }
 
@@ -97,14 +101,18 @@ export default function MentorshipCallProvider({ children }: { children: React.R
   const handleJoin = () => {
     if (!incoming) return;
     stopRing();
-    const { sessionId, roomId, bookingId } = incoming;
+    const { sessionId, bookingId } = incoming;
     setIncoming(null);
     lastSessionIdRef.current = null;
-    router.push(
-      `/mentorship/mentor-session?sessionId=${encodeURIComponent(sessionId)}&roomId=${encodeURIComponent(
-        roomId
-      )}&bookingId=${encodeURIComponent(bookingId)}`
-    );
+    const uid = user?.userId || (user as any)?.id || (user as any)?._id;
+    if (uid) {
+      navigateToUpcomingSessions({
+        userId: uid,
+        sessionId,
+        bookingId,
+        router,
+      });
+    }
   };
 
   const handleDecline = () => {

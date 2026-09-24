@@ -16,7 +16,7 @@ import UserDashboardPaymentsPage from "./UserDashboardPaymentsPage";
 import UserDashboardNotificationsPage from "./UserDashboardNotificationsPage";
 import UserDashboardRecommendedMentorsPage from "./UserDashboardRecommendedMentorsPage";
 import UserDashboardProfilePreferencesPage from "./UserDashboardProfilePreferencesPage";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -50,9 +50,37 @@ function normalizeNotifications(res: any): any[] {
   return [];
 }
 
-export default function UserDashboardLayout({ userId, isMentor, onSwitchRole }: { userId: string; isMentor?: boolean; onSwitchRole?: () => void }) {
+export default function UserDashboardLayout({
+  userId,
+  isMentor,
+  onSwitchRole,
+  initialPage,
+}: {
+  userId: string;
+  isMentor?: boolean;
+  onSwitchRole?: () => void;
+  initialPage?: string;
+}) {
   const router = useRouter();
-  const [activePage, setActivePage] = useState("dashboard");
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const getResolvedInitialPage = useCallback(() => {
+    if (initialPage && pageComponents[initialPage]) return initialPage;
+    if (pathname?.includes("/upcoming-sessions")) return "upcoming-sessions";
+    const queryTab = searchParams?.get("page") || searchParams?.get("tab");
+    if (queryTab && pageComponents[queryTab]) return queryTab;
+    return "dashboard";
+  }, [initialPage, pathname, searchParams]);
+
+  const [activePage, setActivePage] = useState(getResolvedInitialPage);
+
+  useEffect(() => {
+    if (pathname?.includes("/upcoming-sessions")) {
+      setActivePage("upcoming-sessions");
+    }
+  }, [pathname]);
+
   const [sessions, setSessions] = useState<any[]>([]);
   const { user } = useAuth();
   const { userProfileData, loadProfile } = useProfile();
