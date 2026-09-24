@@ -97,7 +97,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                         role: role.trim() || "Mentor",
                         company: company.trim(),
                         rating: Number(m.stats?.averageRating) || 4.9,
-                        sessions: Number(m.stats?.totalSessions) || 0,
+                        sessions: m.stats?.totalSessions || m.trustScore?.metrics?.totalCompletedSessions || 0,
                         price: Number(m.pricing?.quickCall) || 0,
                         image: m.profilePic ?? "",
                         tags: Array.isArray(m.skills) && m.skills.length > 0 ? m.skills.slice(0, 2) : ["Mentorship", "Career"],
