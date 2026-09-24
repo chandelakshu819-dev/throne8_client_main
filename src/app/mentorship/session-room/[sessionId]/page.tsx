@@ -5,8 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useLiveRoom } from '@/core/webrtc/useLiveRoom';
 import { getSocket } from '@/core/realtime/socket.client';
 import SessionService from '@/lib/api/session.service';
+import MentorService from '@/lib/api/mentorship.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-
 function formatDate(iso?: string) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -66,13 +66,37 @@ export default function SessionRoomPage() {
     const fetchSession = async () => {
       try {
         setLoading(true);
-        const res = await SessionService.getSessionById(sessionId);
-        console.log('[SessionRoom] RAW response:', res); // 👈 ISE CHECK KARO CONSOLE ME
-        const normalized = res?.data ?? res;
-        console.log('[SessionRoom] normalized sessionData:', normalized); // 👈 AUR ISE BHI
+
+        // ✅ FIX: this room hosts BOTH 1:1 sessions AND group sessions
+        // (group sessions route here from BookingsPage's "Start" flow).
+        // Group sessions live in a different collection/endpoint
+        // (/mentorship/group-sessions/:id) than 1:1 sessions
+        // (/mentorship/sessions/:id). Previously this always called the
+        // 1:1 endpoint, which 404'd for a group sessionId
+        // ("Session not found") and silently killed the whole page —
+        // mentor never actually joined the live room, so mentees never
+        // saw them connect either.
+        //
+        // Try the 1:1 endpoint first (most common case), and only fall
+        // back to the group-session endpoint on a 404 — avoids needing a
+        // query param / route change for existing 1:1 links.
+        let normalized: any;
+        try {
+          const res = await SessionService.getSessionById(sessionId);
+          normalized = res?.data ?? res;
+        } catch (oneOnOneErr: any) {
+          console.warn('[SessionRoom] 1:1 session fetch failed, trying group session:', oneOnOneErr.message);
+          const groupRes = await MentorService.getGroupSessionById(sessionId);
+          const groupSession = groupRes?.data ?? groupRes;
+          // Normalize group session shape to what this page expects
+          // (title, scheduledAt, duration, status already match).
+          normalized = groupSession;
+        }
+
+        console.log('[SessionRoom] normalized sessionData:', normalized);
         setSessionData(normalized);
       } catch (err: any) {
-        console.error('[SessionRoom] fetch error:', err);
+        console.error('[SessionRoom] fetch error (both 1:1 and group):', err);
         setLoadError(err.message || 'Failed to load session.');
       } finally {
         setLoading(false);
