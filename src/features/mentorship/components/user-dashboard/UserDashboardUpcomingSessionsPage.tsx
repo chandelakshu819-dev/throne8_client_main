@@ -39,8 +39,12 @@ type Session = {
   sessionType?: string;
   scheduledAt?: string;
   startTime?: string;
+  date?: string;
   status?: string;
   duration?: number;
+  slotTime?: string;
+  startedAt?: string;
+  endedAt?: string;
   bookings?: Record<string, unknown>[];
 };
 
@@ -60,8 +64,20 @@ function formatDateStr(iso?: string) {
 function formatTimeStr(iso?: string) {
   if (!iso) return "Time not set";
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return "Time not set";
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: true });
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: true });
+  }
+  const match = iso.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i);
+  if (match) {
+    let hours = parseInt(match[1], 10);
+    const minutes = match[2];
+    const ampm = match[4]?.toUpperCase() || (hours >= 12 ? "PM" : "AM");
+    if (!match[4]) {
+      hours = hours % 12 || 12;
+    }
+    return `${hours}:${minutes} ${ampm}`;
+  }
+  return iso;
 }
 
 function initialsFrom(name: string) {
@@ -70,7 +86,10 @@ function initialsFrom(name: string) {
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-const getStatusDisplay = (status: string) => {
+const getStatusDisplay = (status: string, isPast: boolean = false) => {
+  if (isPast && (status.toLowerCase() === 'in_progress' || status.toLowerCase() === 'confirmed' || status.toLowerCase() === 'pending')) {
+    return 'Ended';
+  }
   switch (status.toLowerCase()) {
     case 'pending': return 'Pending';
     case 'confirmed': return 'Confirmed';
@@ -83,6 +102,153 @@ const getStatusDisplay = (status: string) => {
     default: return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Scheduled';
   }
 };
+
+/**
+ * Calculates the session's actual start and end timestamps (in ms) using:
+ * - scheduledAt / date / booking.scheduledAt
+ * - startTime / slotTime
+ * - duration (defaults to 60 minutes if missing or 0)
+ */
+export function getSessionTimeWindow(session: Session): {
+  startMs: number | null;
+  endMs: number | null;
+  durationMinutes: number;
+} {
+  const booking = session.bookings?.[0] as Record<string, unknown> | undefined;
+
+  // 1. Resolve raw date/time candidate
+  const rawDateTime =
+    booking?.scheduledAt ||
+    session.scheduledAt ||
+    session.startTime ||
+    (session as any).date;
+
+  if (!rawDateTime) {
+    return { startMs: null, endMs: null, durationMinutes: 60 };
+  }
+
+  let startDate: Date;
+  const parsed = new Date(rawDateTime as string | number | Date);
+
+  if (!isNaN(parsed.getTime())) {
+    startDate = new Date(parsed.getTime());
+
+    // If startTime is a separate non-ISO string like "14:30" or "02:30 PM", adjust time:
+    const timeStr = typeof session.startTime === "string" ? session.startTime.trim() : null;
+    if (timeStr && !timeStr.includes("T") && !timeStr.includes("Z")) {
+      const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i);
+      if (match) {
+        let hours = parseInt(match[1], 10);
+        const minutes = parseInt(match[2], 10);
+        const ampm = match[4]?.toLowerCase();
+        if (ampm === "pm" && hours < 12) hours += 12;
+        if (ampm === "am" && hours === 12) hours = 0;
+        startDate.setHours(hours, minutes, 0, 0);
+      }
+    }
+  } else {
+    // If not directly parseable, try combining datePart and timePart
+    const datePart = (session as any).date || session.scheduledAt;
+    const timePart = session.startTime || (session as any).slotTime;
+    if (datePart && timePart) {
+      const combined = new Date(`${datePart} ${timePart}`);
+      if (!isNaN(combined.getTime())) {
+        startDate = combined;
+      } else {
+        return { startMs: null, endMs: null, durationMinutes: 60 };
+      }
+    } else {
+      return { startMs: null, endMs: null, durationMinutes: 60 };
+    }
+  }
+
+  const startMs = startDate.getTime();
+
+  // 2. Resolve duration (in minutes, min 5, max 480, default 60)
+  let durationMinutes = 60;
+  if (typeof session.duration === "number" && !isNaN(session.duration) && session.duration > 0) {
+    durationMinutes = session.duration;
+  } else if (typeof session.duration === "string") {
+    const parsedDur = parseInt(session.duration, 10);
+    if (!isNaN(parsedDur) && parsedDur > 0) {
+      durationMinutes = parsedDur;
+    }
+  }
+
+  const endMs = startMs + durationMinutes * 60 * 1000;
+  return { startMs, endMs, durationMinutes };
+}
+
+const TERMINAL_STATUSES = new Set(["cancelled", "completed", "refunded", "no_show"]);
+const INCOMING_EARLY_JOIN_WINDOW_MS = 15 * 60 * 1000; // 15 mins before scheduled start
+
+/**
+ * Evaluates whether a session is currently live and whether it can be joined.
+ *
+ * Requirements:
+ * 1. A session whose scheduled date/time and duration have completely passed (now >= endMs) must NEVER:
+ *    - show "LIVE NOW"
+ *    - show an enabled "Join Session" button
+ *    - be considered currently joinable.
+ * 2. Do NOT rely on backend `status === "in_progress"` alone to determine whether a session is live.
+ * 3. The valid live window is: session start time <= current time < session end time.
+ * 4. `canJoin` is true only when:
+ *    - session is actually within its valid live/join window, OR
+ *    - it is the current Incoming Session target and is within the allowed incoming/join window.
+ * 5. A targetSessionId from Incoming Session popup must NOT make an arbitrary old/past session joinable.
+ * 6. Future sessions must remain non-joinable.
+ */
+export function evaluateSessionLiveStatus(
+  session: Session,
+  isTarget: boolean,
+  now: number = Date.now()
+): {
+  isLive: boolean;
+  canJoin: boolean;
+  isPast: boolean;
+  isFuture: boolean;
+  startMs: number | null;
+  endMs: number | null;
+} {
+  const { startMs, endMs } = getSessionTimeWindow(session);
+
+  const sessionStatus = (session.status || "").toLowerCase().trim();
+  const bookingStatus = typeof session.bookings?.[0]?.status === "string"
+    ? (session.bookings[0].status as string).toLowerCase().trim()
+    : "";
+
+  const isTerminal = TERMINAL_STATUSES.has(sessionStatus) || TERMINAL_STATUSES.has(bookingStatus);
+
+  if (startMs === null || endMs === null || isTerminal) {
+    return {
+      isLive: false,
+      canJoin: false,
+      isPast: endMs !== null ? now >= endMs : false,
+      isFuture: startMs !== null ? now < startMs : false,
+      startMs,
+      endMs,
+    };
+  }
+
+  const isPast = now >= endMs;
+  const isFuture = now < startMs;
+
+  // Valid live window: startMs <= now < endMs
+  const isLive = !isPast && !isFuture;
+
+  // canJoin: actually live OR incoming popup target within allowed early window, but NEVER if past
+  const isWithinIncomingWindow = isTarget && !isPast && now >= (startMs - INCOMING_EARLY_JOIN_WINDOW_MS);
+  const canJoin = isLive || isWithinIncomingWindow;
+
+  return {
+    isLive,
+    canJoin,
+    isPast,
+    isFuture,
+    startMs,
+    endMs,
+  };
+}
 
 export default function UserDashboardUpcomingSessionsPage({ setActivePage, user }: Props) {
   const router = useRouter();
@@ -98,6 +264,15 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
   const [error, setError] = useState<string | null>(null);
 
   const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  // Periodically refresh current time to update live/ended states dynamically
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Cancel Modal State
   const [cancelModal, setCancelModal] = useState<{
@@ -215,12 +390,12 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
             return false;
           }
 
-          const actualTime = s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt;
-          const sessionTime = actualTime ? new Date(actualTime as string | number | Date).getTime() : 0;
+          const { startMs, isLive } = evaluateSessionLiveStatus(s, isTarget, currentNow);
+          const sessionTime = startMs ?? 0;
           const isInProgress = sessionStatus === "in_progress" || bookingStatus === "in_progress";
 
-          // Keep if scheduled for future, OR session is currently live/in_progress, OR incoming target session
-          return (sessionTime > currentNow) || isInProgress || isTarget;
+          // Keep if scheduled for future, OR session is currently live, OR session status is in_progress, OR incoming target session
+          return (sessionTime > currentNow) || isLive || isInProgress || isTarget;
         })
         .sort((a, b) => {
           const sidA = a.sessionId || a._id;
@@ -232,8 +407,14 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
             if (sidB === targetSessionId) return 1;
           }
 
-          const timeA = new Date((a.bookings?.[0]?.scheduledAt || a.startTime || a.scheduledAt || 0) as string | number | Date).getTime();
-          const timeB = new Date((b.bookings?.[0]?.scheduledAt || b.startTime || b.scheduledAt || 0) as string | number | Date).getTime();
+          // Active live sessions float right after incoming target session
+          const statusA = evaluateSessionLiveStatus(a, sidA === targetSessionId, currentNow);
+          const statusB = evaluateSessionLiveStatus(b, sidB === targetSessionId, currentNow);
+          if (statusA.isLive && !statusB.isLive) return -1;
+          if (!statusA.isLive && statusB.isLive) return 1;
+
+          const timeA = statusA.startMs ?? 0;
+          const timeB = statusB.startMs ?? 0;
 
           return timeA - timeB;
         });
@@ -445,12 +626,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
             const bookingId = s.bookingId || s.bookings?.[0]?.bookingId || (s.bookings?.[0] as any)?._id;
 
             const isTarget = Boolean(targetSessionId && sid === targetSessionId);
-            const statusLower = (s.status || "").toLowerCase();
-            const bookingStatusLower = typeof s.bookings?.[0]?.status === "string"
-              ? (s.bookings[0].status as string).toLowerCase()
-              : "";
-            const isLive = statusLower === "in_progress" || bookingStatusLower === "in_progress" || isTarget;
-            const canJoin = isLive;
+            const { isLive, canJoin, isPast } = evaluateSessionLiveStatus(s, isTarget, currentTime);
 
             return (
               <div
@@ -470,11 +646,13 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
                     style={{ backgroundColor: "#f3ece4", color: "#4a3728", border: "1px solid #e0d8cf" }}
                   >
                     <span className="flex items-center gap-2">
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#7a5c3e] opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#7a5c3e]" />
-                      </span>
-                      <span>Incoming Session Ready</span>
+                      {!isPast && (
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#7a5c3e] opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#7a5c3e]" />
+                        </span>
+                      )}
+                      <span>{isPast ? "Selected Past Session" : "Incoming Session Ready"}</span>
                     </span>
                     <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#e0d8cf] text-[#7a5c3e]">
                       Selected from Popup
@@ -511,11 +689,11 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
                         <span
                           className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
                           style={{
-                            backgroundColor: isLive ? "#dbeafe" : COLORS.chip,
-                            color: isLive ? "#1d4ed8" : COLORS.accent,
+                            backgroundColor: isLive ? "#dbeafe" : isPast ? "#fee2e2" : COLORS.chip,
+                            color: isLive ? "#1d4ed8" : isPast ? "#b91c1c" : COLORS.accent,
                           }}
                         >
-                          {isLive ? "Live Now" : getStatusDisplay(s.status || "")}
+                          {isLive ? "Live Now" : isPast ? (s.status?.toLowerCase() === "completed" ? "Completed" : "Ended") : getStatusDisplay(s.status || "")}
                         </span>
                       </div>
                     </div>
@@ -557,7 +735,13 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
                     <button
                       onClick={() => canJoin && handleJoinSession(sid, bookingId as string)}
                       disabled={!canJoin || joiningId === sid}
-                      title={!canJoin ? "Session hasn't started yet" : "Join this session"}
+                      title={
+                        isPast
+                          ? "This session has already ended"
+                          : !canJoin
+                          ? "Session hasn't started yet"
+                          : "Join this session"
+                      }
                       className={`w-full px-3 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm text-center disabled:cursor-not-allowed flex items-center justify-center gap-1.5 ${
                         isTarget && canJoin ? "animate-pulse ring-2 ring-[#7a5c3e]/40" : ""
                       }`}
