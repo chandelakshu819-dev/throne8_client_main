@@ -1,6 +1,7 @@
 "use client";
 //src/features/mentorship/components/dashboard/ServicesPage.tsx
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Briefcase, Users, Clock, Star, Plus, Video, MessageSquare,
   Package, FileText, RefreshCw, ClipboardList, CheckCircle2,
@@ -839,7 +840,18 @@ export default function ServicesPage({
                                 </button>
                                 {openMenuId === menuKey && (
                                   <>
-                                    <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                                    {/* ✅ FIX: backdrop portal'd to document.body — the card has
+                                        `hover:-translate-y-0.5` (a transform), and a transform on
+                                        any ancestor makes `position: fixed` descendants scope to
+                                        that ancestor's box instead of the full viewport. So this
+                                        backdrop was only covering the hovered card, not the whole
+                                        screen — clicks truly outside the card never reached it and
+                                        the menu never closed. Portaling escapes that stacking
+                                        context entirely. */}
+                                    {typeof document !== "undefined" && createPortal(
+                                      <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />,
+                                      document.body
+                                    )}
                                     <div
                                       className="absolute right-0 top-8 z-20 w-32 rounded-lg shadow-lg overflow-hidden"
                                       style={{ border: '1px solid #e0d8cf', backgroundColor: '#fff' }}
@@ -1036,7 +1048,13 @@ export default function ServicesPage({
                                 </button>
                                 {openMenuId === menuKey && (
                                   <>
-                                    <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                                    {/* ✅ FIX: same portal fix as the services menu above — see
+                                        the comment there for why the plain "fixed inset-0" backdrop
+                                        wasn't catching outside clicks. */}
+                                    {typeof document !== "undefined" && createPortal(
+                                      <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />,
+                                      document.body
+                                    )}
                                     <div
                                       className="absolute right-0 top-8 z-20 w-32 rounded-lg shadow-lg overflow-hidden"
                                       style={{ border: '1px solid #e0d8cf', backgroundColor: '#fff' }}
@@ -1084,12 +1102,9 @@ export default function ServicesPage({
                       </p>
 
                       <div className="flex flex-col gap-1.5 mb-4">
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
-                          <span className="text-xs" style={{ color: '#8a7a6a' }}>
-                            {formatGroupDate(group.scheduledAt)}
-                          </span>
-                        </div>
+                        {/* ✅ FIX: scheduled date/time (formatGroupDate) removed —
+                            group sessions no longer show a fixed schedule slot,
+                            only the session duration + enrollment count. */}
                         <div className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
                           <span className="text-xs" style={{ color: '#8a7a6a' }}>
@@ -1103,6 +1118,7 @@ export default function ServicesPage({
                           </span>
                         </div>
                       </div>
+
 
                       <div className="flex justify-between items-center gap-3 pt-4" style={{ borderTop: '1px solid #f0ebe4' }}>
                         <span className="text-lg font-bold whitespace-nowrap" style={{ color: '#7a5c3e' }}>

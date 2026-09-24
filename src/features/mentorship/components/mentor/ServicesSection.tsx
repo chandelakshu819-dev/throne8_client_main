@@ -21,6 +21,8 @@ import type { Service } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
 import MentorService from "@/lib/api/mentorship.service";
 import WaitlistModal from "../modal/WaitlistModal";
+import QueryService, { QueryItem } from "@/lib/api/query.service";
+
 
 interface ServicesSectionProps {
   onServiceClick: (service: Service) => void;
@@ -134,6 +136,10 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   const [groupActionError, setGroupActionError] = useState<string | null>(null);
   const [, forceTick] = useState(0);
 
+    // ✅ NEW: mentee's own queries (Query model) — used so ask_query status
+  // reflects Query.status ("pending"/"answered"), not the stale Booking status.
+  const [myQueries, setMyQueries] = useState<QueryItem[]>([]);
+
   // ── Waitlist ──
   const [waitlistEntries, setWaitlistEntries] = useState<Record<string, any>>({});
   const [waitlistTarget, setWaitlistTarget] = useState<any | null>(null);
@@ -158,7 +164,19 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
         setWaitlistEntries(map);
       })
       .catch(() => setWaitlistEntries({}));
-  }, [mentorId, currentUserId]);
+    }, [mentorId, currentUserId]);
+  
+    // ✅ NEW: fetch mentee's own queries so ask_query cards show the real
+    // Query.status instead of the stale Booking status.
+    useEffect(() => {
+      if (!mentorId || !currentUserId) return;
+      QueryService.getAllQueries({ role: "mentee", limit: 50 })
+        .then((res) => {
+          const all = (res.data ?? []) as QueryItem[];
+          setMyQueries(all.filter((q) => q.mentorId === mentorId));
+        })
+        .catch(() => setMyQueries([]));
+    }, [mentorId, currentUserId]);
 
   const handleJoinWaitlist = async (session: any, note: string) => {
     const res = await MentorService.joinWaitlist({
@@ -365,6 +383,12 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
             (b: any) => b.menteeId === currentUserId
           ) ?? [];
           const latestBooking = myBookings[myBookings.length - 1];
+          // ✅ NEW — ask_query ke liye asli status Query model se lo, Booking se nahi
+          const latestQuery = session.sessionType === "ask_query"
+  ? [...myQueries]
+      .filter((q) => q.sessionId === session.sessionId) // scope to this specific ask_query service
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+  : undefined;
           const wl = waitlistEntries[session.sessionId];
           return (
             <div key={session.sessionId}
@@ -414,12 +438,24 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   {session.pricing?.basePrice === 0 ? "Free" : `₹${session.pricing?.basePrice}`}
                 </span>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
-                  {latestBooking && (latestBooking.status === "confirmed" || latestBooking.status === "pending") && (
-                    <div style={{ fontSize: "10px", fontWeight: 700, color: "#10b981", textAlign: "right" }}>
-                      {latestBooking.status === "confirmed" ? "✅ You have a confirmed session" : "✅ You have a session pending confirmation"}
-                    </div>
+                {session.sessionType === "ask_query" ? (
+                    latestQuery && latestQuery.status === "pending" && (
+                      <div style={{ fontSize: "10px", fontWeight: 700, color: "#10b981", textAlign: "right" }}>
+                        ✅ Your query is pending a reply
+                      </div>
+                    )
+                  ) : (
+                    latestBooking && (latestBooking.status === "confirmed" || latestBooking.status === "pending") && (
+                      <div style={{ fontSize: "10px", fontWeight: 700, color: "#10b981", textAlign: "right" }}>
+                        {latestBooking.status === "confirmed" ? "✅ You have a confirmed session" : "✅ You have a session pending confirmation"}
+                      </div>
+                    )
                   )}
-                  {wl ? (
+                  {session.sessionType === "ask_query" ? (
+                    <button onClick={() => onServiceClick(svc)} style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}>
+                      {latestQuery ? "Ask Another Query" : "Ask a Query"}
+                    </button>
+                  ) : wl ? (
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: "12px", fontWeight: 700, color: wl.status === "notified" ? "#10b981" : C.dark }}>
                         {wl.status === "notified"
