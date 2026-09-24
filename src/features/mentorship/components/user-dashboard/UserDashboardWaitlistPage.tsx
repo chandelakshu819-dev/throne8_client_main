@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { Clock } from "lucide-react";
 import MentorService from "@/lib/api/mentorship.service";
 import { useRouter } from "next/navigation";
 
@@ -25,7 +24,7 @@ const WAITLIST_BADGE: Record<WaitlistItem["status"], { label: string; bg: string
 };
 
 function formatSessionDate(dateStr: string) {
-    if (!dateStr) return "";
+    if (!dateStr) return "-";
     return new Date(dateStr).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
@@ -40,6 +39,7 @@ export default function UserDashboardWaitlistPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | WaitlistItem["status"]>("all");
   const [sortBy, setSortBy] = useState<"recent" | "mentor" | "session">("recent");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const fetchWaitlists = useCallback(async () => {
       setLoading(true);
@@ -66,9 +66,7 @@ export default function UserDashboardWaitlistPage() {
   const filteredAndSortedItems = items
     .filter((w) => statusFilter === "all" || w.status === statusFilter)
     .sort((a, b) => {
-      if (sortBy === "mentor") {
-        return (a.mentorName || "").localeCompare(b.mentorName || "");
-      }
+      if (sortBy === "mentor") return (a.mentorName || "").localeCompare(b.mentorName || "");
       if (sortBy === "session") {
         const aName = a.serviceTitle || a.sessionType || "";
         const bName = b.serviceTitle || b.sessionType || "";
@@ -77,46 +75,51 @@ export default function UserDashboardWaitlistPage() {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
+  const waitingCount = items.filter((w) => w.status === "active").length;
+  const approvedCount = items.filter((w) => w.status === "notified").length;
+  const expiredCount = items.filter((w) => w.status === "expired").length;
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2">
-        <div className="flex justify-between items-center flex-wrap gap-2">
-            <h1 className="text-2xl font-bold" style={{ color: '#4a3728' }}>Waitlist</h1>
-            <div className="flex items-center gap-2">
-                <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as any)}
-                    className="text-sm px-3 py-1.5 rounded-lg border"
-                    style={{ borderColor: '#e0d8cf', color: '#7a5c3e', backgroundColor: '#fff' }}
-                >
-                    <option value="all">All statuses</option>
-                    <option value="active">Waiting</option>
-                    <option value="notified">Approved</option>
-                    <option value="expired">Expired</option>
-                    <option value="cancelled">Cancelled</option>
-                </select>
-                <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
-                    className="text-sm px-3 py-1.5 rounded-lg border"
-                    style={{ borderColor: '#e0d8cf', color: '#7a5c3e', backgroundColor: '#fff' }}
-                >
-                    <option value="recent">Most recent</option>
-                    <option value="mentor">Mentor name</option>
-                    <option value="session">Session type</option>
-                </select>
-                <button
-                    onClick={fetchWaitlists}
-                    className="text-sm px-3 py-1.5 rounded-lg border hover:opacity-80 transition-opacity font-medium"
-                    style={{ borderColor: '#e0d8cf', color: '#7a5c3e', backgroundColor: '#fff' }}
-                >
-                    Refresh
-                </button>
-            </div>
+      {/* Header */}
+      <div className="flex justify-between items-start flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: '#1a1a1a' }}>Waitlist</h1>
+          <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
+            All your session requests in one place.
+          </p>
         </div>
-        <p className="text-sm font-medium" style={{ color: '#7a5c3e' }}>
-          Manage the sessions you are waiting for.
-        </p>
+        <div className="flex items-center gap-2">
+            <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="text-sm px-3 py-2 rounded-lg border"
+                style={{ borderColor: '#e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
+            >
+                <option value="all">All statuses</option>
+                <option value="active">Waiting</option>
+                <option value="notified">Approved</option>
+                <option value="expired">Expired</option>
+                <option value="cancelled">Cancelled</option>
+            </select>
+            <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="text-sm px-3 py-2 rounded-lg border"
+                style={{ borderColor: '#e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
+            >
+                <option value="recent">Most recent</option>
+                <option value="mentor">Mentor name</option>
+                <option value="session">Session type</option>
+            </select>
+            <button
+                onClick={fetchWaitlists}
+                className="text-sm px-4 py-2 rounded-lg font-medium text-white flex items-center gap-1.5"
+                style={{ backgroundColor: '#4a3728' }}
+            >
+                ↻ Refresh
+            </button>
+        </div>
       </div>
 
       {loading ? (
@@ -128,16 +131,10 @@ export default function UserDashboardWaitlistPage() {
             {error}
         </div>
       ) : items.length === 0 ? (
-        <div 
+        <div
           className="flex flex-col items-center justify-center py-16 px-6 text-center rounded-2xl"
           style={{ backgroundColor: '#fff', border: '1px solid #e0d8cf' }}
         >
-          <div 
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-            style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}
-          >
-            <Clock className="w-8 h-8" style={{ color: '#c0b0a0' }} />
-          </div>
           <h3 className="text-lg font-bold mb-2" style={{ color: '#4a3728' }}>
             You're not on any waitlists
           </h3>
@@ -147,70 +144,108 @@ export default function UserDashboardWaitlistPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-2xl p-4" style={{ backgroundColor: '#fbf7f3' }}>
-              <p className="text-xs font-medium mb-1" style={{ color: '#8a7a6a' }}>Waiting</p>
-              <p className="text-2xl font-bold" style={{ color: '#c97c4a' }}>
-                {items.filter((w) => w.status === "active").length}
-              </p>
+          {/* Summary cards */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-2xl p-5 flex items-center gap-4" style={{ backgroundColor: '#fdf3ea' }}>
+              <div className="w-11 h-11 rounded-full flex items-center justify-center text-xl" style={{ backgroundColor: '#fbe4cf', color: '#c97c4a' }}>⏳</div>
+              <div>
+                <div className="text-2xl font-bold" style={{ color: '#1a1a1a' }}>{waitingCount}</div>
+                <div className="text-sm font-medium" style={{ color: '#4a3728' }}>Waiting</div>
+                <div className="text-xs" style={{ color: '#8a7a6a' }}>Sessions in queue</div>
+              </div>
             </div>
-            <div className="rounded-2xl p-4" style={{ backgroundColor: '#fbf7f3' }}>
-              <p className="text-xs font-medium mb-1" style={{ color: '#8a7a6a' }}>Approved</p>
-              <p className="text-2xl font-bold" style={{ color: '#6b8f6e' }}>
-                {items.filter((w) => w.status === "notified").length}
-              </p>
+            <div className="rounded-2xl p-5 flex items-center gap-4" style={{ backgroundColor: '#eef6ef' }}>
+              <div className="w-11 h-11 rounded-full flex items-center justify-center text-xl" style={{ backgroundColor: '#d9ecdb', color: '#6b8f6e' }}>✓</div>
+              <div>
+                <div className="text-2xl font-bold" style={{ color: '#1a1a1a' }}>{approvedCount}</div>
+                <div className="text-sm font-medium" style={{ color: '#4a3728' }}>Approved</div>
+                <div className="text-xs" style={{ color: '#8a7a6a' }}>Sessions confirmed</div>
+              </div>
             </div>
-            <div className="rounded-2xl p-4" style={{ backgroundColor: '#fbf7f3' }}>
-              <p className="text-xs font-medium mb-1" style={{ color: '#8a7a6a' }}>Expired</p>
-              <p className="text-2xl font-bold" style={{ color: '#8a7a6a' }}>
-                {items.filter((w) => w.status === "expired").length}
-              </p>
+            <div className="rounded-2xl p-5 flex items-center gap-4" style={{ backgroundColor: '#fdeeee' }}>
+              <div className="w-11 h-11 rounded-full flex items-center justify-center text-xl" style={{ backgroundColor: '#fad4d4', color: '#c85050' }}>⏱</div>
+              <div>
+                <div className="text-2xl font-bold" style={{ color: '#1a1a1a' }}>{expiredCount}</div>
+                <div className="text-sm font-medium" style={{ color: '#4a3728' }}>Expired</div>
+                <div className="text-xs" style={{ color: '#8a7a6a' }}>Requests expired</div>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col gap-4">
-              {filteredAndSortedItems.map((w) => {
+          {/* Table */}
+          <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: '#fff', border: '1px solid #e0d8cf' }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ backgroundColor: '#fbf7f3' }}>
+                  <th className="text-left font-bold px-5 py-3" style={{ color: '#4a3728' }}>#</th>
+                  <th className="text-left font-bold px-5 py-3" style={{ color: '#4a3728' }}>Session</th>
+                  <th className="text-left font-bold px-5 py-3" style={{ color: '#4a3728' }}>Requested by</th>
+                  <th className="text-left font-bold px-5 py-3" style={{ color: '#4a3728' }}>Date</th>
+                  <th className="text-left font-bold px-5 py-3" style={{ color: '#4a3728' }}>Position</th>
+                  <th className="text-left font-bold px-5 py-3" style={{ color: '#4a3728' }}>Status</th>
+                  <th className="text-left font-bold px-5 py-3" style={{ color: '#4a3728' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAndSortedItems.map((w, idx) => {
                   const badge = WAITLIST_BADGE[w.status] || WAITLIST_BADGE.active;
                   return (
-                      <div
-                          key={w.waitlistId}
-                          className="rounded-2xl border p-5 flex flex-wrap items-center justify-between gap-4"
-                          style={{ background: '#fff', borderColor: '#e0d8cf' }}
-                      >
-                          <div>
-                              <div className="text-sm font-bold mb-1" style={{ color: '#4a3728' }}>
-                                  {w.serviceTitle || (w.sessionType ? w.sessionType.replace(/_/g, " ") : "Session")}
-                              </div>
-                              <div className="text-xs" style={{ color: '#8a7a6a' }}>
-                                  {w.mentorName || "Mentor"} - Requested {formatSessionDate(w.createdAt)}
-                                  {w.status === "active" && w.queuePosition ? ` - Position #${w.queuePosition}` : ""}
-                              </div>
-                              {w.status === "notified" && w.bookingWindowExpiresAt && (
-                                  <div className="text-xs mt-1 font-medium" style={{ color: '#6b8f6e' }}>
-                                      Book before {formatSessionDate(w.bookingWindowExpiresAt)}
-                                  </div>
-                              )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                              <span
-                                  className="text-xs font-bold px-2.5 py-1 rounded-full"
-                                  style={{ background: badge.bg, color: badge.fg }}
+                    <tr key={w.waitlistId} style={{ borderTop: '1px solid #f0e9e0' }}>
+                      <td className="px-5 py-4" style={{ color: '#8a7a6a' }}>{idx + 1}</td>
+                      <td className="px-5 py-4 font-bold" style={{ color: '#1a1a1a' }}>
+                        {w.serviceTitle || (w.sessionType ? w.sessionType.replace(/_/g, " ") : "Session")}
+                      </td>
+                      <td className="px-5 py-4" style={{ color: '#4a3728' }}>{w.mentorName || "-"}</td>
+                      <td className="px-5 py-4" style={{ color: '#4a3728' }}>{formatSessionDate(w.createdAt)}</td>
+                      <td className="px-5 py-4" style={{ color: '#4a3728' }}>
+                        {w.status === "active" && w.queuePosition ? `#${w.queuePosition}` : "-"}
+                      </td>
+                      <td className="px-5 py-4">
+                        <span
+                          className="text-xs font-bold px-3 py-1 rounded-full inline-block"
+                          style={{ background: badge.bg, color: badge.fg }}
+                        >
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 relative">
+                        <button
+                          onClick={() => setOpenMenuId(openMenuId === w.waitlistId ? null : w.waitlistId)}
+                          className="px-2 py-1 rounded"
+                          style={{ color: '#8a7a6a' }}
+                        >
+                          •••
+                        </button>
+                        {openMenuId === w.waitlistId && (
+                          <div
+                            className="absolute right-5 top-10 z-10 rounded-lg shadow-lg py-1"
+                            style={{ backgroundColor: '#fff', border: '1px solid #e0d8cf', minWidth: '140px' }}
+                          >
+                            {w.status === "notified" && (
+                              <button
+                                onClick={() => { goBook(w); setOpenMenuId(null); }}
+                                className="w-full text-left px-4 py-2 text-sm hover:opacity-80"
+                                style={{ color: '#4a3728' }}
                               >
-                                  {badge.label}
-                              </span>
-                              {w.status === "notified" && (
-                                  <button
-                                      onClick={() => goBook(w)}
-                                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                                      style={{ background: '#4a3728' }}
-                                  >
-                                      Book now
-                                  </button>
-                              )}
+                                Book now
+                              </button>
+                            )}
+                            {w.status === "active" && (
+                              <button
+                                className="w-full text-left px-4 py-2 text-sm hover:opacity-80"
+                                style={{ color: '#c85050' }}
+                              >
+                                Leave waitlist
+                              </button>
+                            )}
                           </div>
-                      </div>
+                        )}
+                      </td>
+                    </tr>
                   );
-              })}
+                })}
+              </tbody>
+            </table>
           </div>
         </>
       )}
