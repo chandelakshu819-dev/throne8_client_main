@@ -46,10 +46,27 @@ const QueryStep: React.FC<QueryStepProps> = ({ mentorId, selectedService, onBack
     };
 
     return (
-        <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px" }}>
-            <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: C.mid, display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", fontWeight: 500, marginBottom: "24px" }}>
+        <div style={{ minHeight: "100vh", background: C.bg, padding: "100px 16px 32px" }}>
+        <div style={{ maxWidth: "700px", margin: "0 auto 24px" }}>
+            <button
+                onClick={onBack}
+                style={{
+                    background: "transparent",
+                    border: `1px solid ${C.border}`,
+                    cursor: "pointer",
+                    color: C.dark,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                }}
+            >
                 ← Back to Profile
             </button>
+        </div>
 
             <div style={{ maxWidth: "700px", margin: "0 auto", borderRadius: "24px", padding: "40px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)" }}>
                 <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>Ask a Query</h2>
@@ -116,9 +133,10 @@ const QueryStep: React.FC<QueryStepProps> = ({ mentorId, selectedService, onBack
                     }}
                 >
                     {isSubmitting ? "Sending..." : "Send Query to Mentor →"}
-                </button>
+                    </button>
             </div>
         </div>
+       
     );
 };
 

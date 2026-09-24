@@ -1,5 +1,5 @@
 'use client';
-
+// src/features/mentorship/modals/GroupSessionEditModal.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, DollarSign, Image as ImageIcon, Upload, FileText, Briefcase, Clock, Users } from 'lucide-react';
 import MentorService from '@/lib/api/mentorship.service';

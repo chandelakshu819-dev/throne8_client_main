@@ -93,6 +93,29 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
         [daySlots, serviceDuration]
     );
 
+    // ✅ FIX: subtitle ab raw daySlots[0]/[last] ki jagah asli FREE windows
+    // (booked/blocked slots hata kar, contiguous merge karke) dikhata hai.
+    // Pehle "Available from X to Y" hamesha poore din ka first-to-last
+    // range dikhata tha, chahe beech me koi booked/blocked gap ho — isse
+    // mentee ko lagta tha poora window free hai jabki nahi tha.
+    const freeWindows = useMemo(() => {
+        const free = daySlots
+            .filter((s) => !s.isBooked && !s.isBlocked)
+            .map((s) => ({ start: toMinutes(s.startTime), end: toMinutes(s.endTime) }))
+            .sort((a, b) => a.start - b.start);
+
+        const windows: { start: number; end: number }[] = [];
+        for (const s of free) {
+            const last = windows[windows.length - 1];
+            if (last && s.start <= last.end) {
+                last.end = Math.max(last.end, s.end);
+            } else {
+                windows.push({ ...s });
+            }
+        }
+        return windows;
+    }, [daySlots]);
+
 
 
     useEffect(() => {
@@ -253,9 +276,11 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                     <div>
                         <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "16px", fontSize: "16px" }}>Total Available Time Slots: {bookableSlots.length}</h3>
                         <p style={{ fontSize: "14px", color: C.mid, marginBottom: "24px" }}>
-                            {daySlots.length > 0
-                                ? `Available from ${formatTimeAMPM(daySlots[0].startTime)} to ${formatTimeAMPM(daySlots[daySlots.length - 1].endTime)}`
-                                : "No slots available"}
+                            {freeWindows.length > 0
+                                ? freeWindows
+                                    .map((w) => `${formatTimeAMPM(toTimeString(w.start))} - ${formatTimeAMPM(toTimeString(w.end))}`)
+                                    .join(", ")
+                                : "No free time available"}
                         </p>
 
                         {!selectedDate && (

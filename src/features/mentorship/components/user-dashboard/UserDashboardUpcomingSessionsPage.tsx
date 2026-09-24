@@ -11,6 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 import SessionService from "@/lib/api/session.service";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 
 const COLORS = {
   ink: "#4a3728",
@@ -44,6 +45,7 @@ type Session = {
 interface Props {
   sessions?: Session[];
   setActivePage?: (page: string) => void;
+  user?: any;
 }
 
 function formatDateStr(iso?: string) {
@@ -80,8 +82,10 @@ const getStatusDisplay = (status: string) => {
   }
 };
 
-export default function UserDashboardUpcomingSessionsPage({ setActivePage }: Props) {
+export default function UserDashboardUpcomingSessionsPage({ setActivePage, user }: Props) {
   const router = useRouter();
+  const { user: authUser } = useAuth();
+  const currentUserId = user?.userId || user?.id || user?._id || authUser?.userId || authUser?.id || authUser?._id;
 
   const [upcoming, setUpcoming] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,20 +134,61 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage }: Pro
       const res = await SessionService.getAllSessions({ role: "mentee", limit: 100 });
       const fetchedSessions = (res.data || []) as Session[];
 
-      const currentNow = Date.now();
-      const validUpcoming = fetchedSessions
-        .filter((s) => {
-          const actualTime = s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt || 0;
-          const t = new Date(actualTime).getTime();
-          return t >= currentNow && s.status !== "cancelled" && s.status !== "completed" && s.status !== "refunded" && s.status !== "no_show";
-        })
-        .sort(
-          (a, b) => {
-            const timeA = a.bookings?.[0]?.scheduledAt || a.startTime || a.scheduledAt || 0;
-            const timeB = b.bookings?.[0]?.scheduledAt || b.startTime || b.scheduledAt || 0;
-            return new Date(timeA).getTime() - new Date(timeB).getTime();
-          }
+      // Each mentorship session can contain multiple bookings from different mentees.
+      // Map each of THIS mentee's bookings to its own upcoming session item with its specific scheduled time, booking ID, and status.
+      const menteeSessionItems: Session[] = [];
+      for (const s of fetchedSessions) {
+        const myBookings = (s.bookings || []).filter(
+          (b: any) => currentUserId && (b.menteeId === currentUserId || b.bookedBy === currentUserId)
         );
+
+        if (myBookings.length > 0) {
+          for (const b of myBookings) {
+            menteeSessionItems.push({
+              ...s,
+              scheduledAt: (b.scheduledAt as string) || s.scheduledAt,
+              startTime: (b.scheduledAt as string) || s.startTime,
+              status: (b.status as string) || s.status,
+              bookings: [b],
+            });
+          }
+        } else {
+          menteeSessionItems.push(s);
+        }
+      }
+
+      // Current local datetime
+      const currentNow = Date.now();
+      const excludedStatuses = new Set(["cancelled", "completed", "refunded", "no_show"]);
+
+      const validUpcoming = menteeSessionItems
+        .filter((s) => {
+          const sessionStatus = (s.status || "").toLowerCase().trim();
+          const bookingStatus = typeof s.bookings?.[0]?.status === "string"
+            ? (s.bookings[0].status as string).toLowerCase().trim()
+            : "";
+
+          if (excludedStatuses.has(sessionStatus) || excludedStatuses.has(bookingStatus)) {
+            return false;
+          }
+
+          // Use the actual scheduled datetime in this priority:
+          // bookings?.[0]?.scheduledAt || startTime || scheduledAt
+          const actualTime = s.bookings?.[0]?.scheduledAt || s.startTime || s.scheduledAt;
+          if (!actualTime) return false;
+          const sessionTime = new Date(actualTime as string | number | Date).getTime();
+          if (isNaN(sessionTime) || sessionTime === 0) return false;
+
+          // Only include sessions scheduled for a time strictly after the current local time
+          return sessionTime > currentNow;
+        })
+        .sort((a, b) => {
+          const timeA = new Date((a.bookings?.[0]?.scheduledAt || a.startTime || a.scheduledAt || 0) as string | number | Date).getTime();
+          const timeB = new Date((b.bookings?.[0]?.scheduledAt || b.startTime || b.scheduledAt || 0) as string | number | Date).getTime();
+
+          // Sort chronologically: earliest upcoming session first
+          return timeA - timeB;
+        });
 
       setUpcoming(validUpcoming);
     } catch (err: unknown) {
@@ -153,7 +198,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage }: Pro
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     fetchUpcoming();
@@ -340,7 +385,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage }: Pro
 
             return (
               <div
-                key={sid ?? idx}
+                key={`${sid ?? idx}-${bookingId ?? idx}`}
                 className="flex flex-col md:flex-row items-start md:items-center gap-4 p-4 md:p-5 rounded-2xl transition-shadow hover:shadow-sm bg-white"
                 style={{ border: `1px solid ${COLORS.hairline}` }}
               >

@@ -416,7 +416,9 @@ export default function ServiceModal({
                         </div>
                     )}
 
-                                    {/* Duration & Participants */}
+                                                                     {/* Duration & Participants — Duration hidden for "Ask a Query"
+                                        since it's async text, no live call happens */}
+                                    {formData?.serviceType !== 'ask_query' && (
                                     <div className={`grid ${needsParticipants ? 'grid-cols-3' : 'grid-cols-1'} gap-4`}>
                                     <div>
                             <FieldLabel icon={Clock}>Duration (min)</FieldLabel>
@@ -477,6 +479,8 @@ export default function ServiceModal({
                             </>
                         )}
                     </div>
+                                        )}
+
 
                     {/* Follow-up Settings */}
                     <div className="p-4 rounded-xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
