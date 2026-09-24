@@ -1,4 +1,4 @@
-// components/mentor-profile/booking/PaymentStep.tsx
+//src/features/mentorship/components/PaymentStep.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
