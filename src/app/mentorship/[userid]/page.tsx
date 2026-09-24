@@ -134,7 +134,7 @@ export default function ThroneUltraPremium() {
                         role: m.experience?.currentRole?.split(" at ")[0] ?? "Mentor",
                         company: m.experience?.currentRole?.split(" at ")[1] ?? "",
                         rating: m.stats?.averageRating || 0,
-                        sessions: m.stats?.totalSessions || 0,
+                     sessions: m.stats?.totalSessions || m.trustScore?.metrics?.totalCompletedSessions || 0,
                         price: m.pricing?.quickCall || 0,
                         tags: m.skills?.slice(0, 2) ?? [],
                         image: m.profilePic ?? "",
