@@ -86,6 +86,7 @@ export default function UserDashboardOverviewPage({
         const list = Array.isArray(res.data) ? res.data : (res.data?.mentors || []);
         const mapped = list.map((m: any) => ({
             id: m.mentorId,
+            userId: m.userId,
             name: `${m.user?.firstName ?? ""} ${m.user?.lastName ?? ""}`.trim(),
             role: m.experience?.currentRole?.split(" at ")[0] ?? "Mentor",
             company: m.experience?.currentRole?.split(" at ")[1] ?? "",

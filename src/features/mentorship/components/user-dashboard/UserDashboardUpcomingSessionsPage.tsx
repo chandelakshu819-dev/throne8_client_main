@@ -263,6 +263,9 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [activeTab, setActiveTab] = useState<"my-sessions" | "upcoming">("my-sessions");
+  const [filterType, setFilterType] = useState<"all" | "live">("all");
+
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
 
@@ -581,18 +584,124 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
     );
   }
 
+  const filteredSessions = upcoming.filter(s => {
+    const sid = s.sessionId ?? s._id;
+    const isTarget = Boolean(targetSessionId && sid === targetSessionId);
+    const { isLive, isFuture, isPast } = evaluateSessionLiveStatus(s, isTarget, currentTime);
+    
+    // Past sessions must NOT appear in Live Now or Upcoming
+    if (isPast && !isTarget) return false;
+
+    if (activeTab === "upcoming") return isFuture;
+
+    // activeTab === "my-sessions"
+    if (filterType === "all") return true;
+    if (filterType === "live") return isLive;
+    return true;
+  });
+
   return (
     <div className="space-y-6 animate-fadeIn max-w-5xl relative">
-      <div>
-        <h2 className="text-2xl font-bold" style={{ color: COLORS.ink }}>
-          Upcoming Sessions
-        </h2>
-        <p style={{ color: COLORS.muted }} className="text-sm mt-1">
-          Manage and join your scheduled mentorship sessions.
-        </p>
+      {/* PAGE HEADER */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold" style={{ color: COLORS.ink }}>
+            Sessions
+          </h2>
+          <p style={{ color: COLORS.muted }} className="text-sm mt-1">
+            Manage your mentorship sessions, live sessions and upcoming schedules.
+          </p>
+        </div>
+        <button
+          onClick={() => setActivePage && setActivePage("session-history")}
+          className="text-sm font-semibold transition-colors hover:underline flex items-center gap-1"
+          style={{ color: COLORS.accent }}
+        >
+          View Session History &rarr;
+        </button>
       </div>
 
-      {upcoming.length === 0 ? (
+      {/* SUMMARY CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { 
+            label: "Total Sessions", 
+            value: upcoming.filter(s => {
+              const isTarget = Boolean(targetSessionId && (s.sessionId ?? s._id) === targetSessionId);
+              return !evaluateSessionLiveStatus(s, isTarget, currentTime).isPast || isTarget;
+            }).length, 
+            color: COLORS.ink 
+          },
+          { 
+            label: "Live Now 🔴", 
+            value: upcoming.filter(s => evaluateSessionLiveStatus(s, Boolean(targetSessionId && (s.sessionId ?? s._id) === targetSessionId), currentTime).isLive).length, 
+            color: COLORS.danger 
+          },
+          { 
+            label: "Upcoming", 
+            value: upcoming.filter(s => evaluateSessionLiveStatus(s, Boolean(targetSessionId && (s.sessionId ?? s._id) === targetSessionId), currentTime).isFuture).length, 
+            color: COLORS.accent 
+          },
+        ].map((stat, idx) => (
+          <div
+            key={idx}
+            className="flex flex-col items-center justify-center p-5 rounded-2xl shadow-sm bg-white"
+            style={{ border: `1px solid ${COLORS.hairline}` }}
+          >
+            <span className="text-sm font-semibold text-center mb-1" style={{ color: COLORS.muted }}>
+              {stat.label}
+            </span>
+            <span className="text-3xl font-bold" style={{ color: stat.color }}>
+              {stat.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* MAIN SECTION TABS */}
+      <div className="flex items-center gap-2 border-b" style={{ borderColor: COLORS.hairline }}>
+        <button
+          onClick={() => setActiveTab("my-sessions")}
+          className={`px-4 py-3 text-sm font-bold border-b-2 transition-colors ${
+            activeTab === "my-sessions" 
+              ? "border-[#4a3728] text-[#4a3728]" 
+              : "border-transparent text-[#8a7a6a] hover:text-[#4a3728]"
+          }`}
+        >
+          My Sessions
+        </button>
+        <button
+          onClick={() => setActiveTab("upcoming")}
+          className={`px-4 py-3 text-sm font-bold border-b-2 transition-colors ${
+            activeTab === "upcoming" 
+              ? "border-[#4a3728] text-[#4a3728]" 
+              : "border-transparent text-[#8a7a6a] hover:text-[#4a3728]"
+          }`}
+        >
+          Upcoming
+        </button>
+      </div>
+
+      {/* MY SESSIONS FILTERS */}
+      {activeTab === "my-sessions" && (
+        <div className="flex items-center gap-2">
+          {["all", "live"].map(f => (
+            <button
+              key={f}
+              onClick={() => setFilterType(f as any)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors capitalize border ${
+                filterType === f 
+                  ? "bg-[#f3ece4] text-[#4a3728] border-[#c9a87c]" 
+                  : "bg-white text-[#8a7a6a] border-[#e0d8cf] hover:border-[#c9a87c]"
+              }`}
+            >
+              {f === "live" ? "Live Now" : f}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {filteredSessions.length === 0 ? (
         <div
           className="flex flex-col items-center justify-center gap-3 py-16 rounded-2xl text-center"
           style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
@@ -601,9 +710,19 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
             <CalendarClock className="w-8 h-8" style={{ color: COLORS.accent }} />
           </div>
           <div>
-            <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>No upcoming sessions</h3>
+            <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>
+              {activeTab === "upcoming"
+                ? "No upcoming sessions"
+                : filterType === "live"
+                ? "No live sessions right now"
+                : "No upcoming sessions"}
+            </h3>
             <p className="text-sm mt-1" style={{ color: COLORS.muted }}>
-              You don't have any upcoming sessions scheduled at the moment.
+              {activeTab === "upcoming"
+                ? "You don't have any upcoming sessions scheduled at the moment."
+                : filterType === "live"
+                ? "There are no sessions currently live."
+                : "You don't have any upcoming sessions scheduled at the moment."}
             </p>
           </div>
           <button
@@ -616,7 +735,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {upcoming.map((s, idx) => {
+          {filteredSessions.map((s, idx) => {
             const name = s.mentorName || "Mentor";
             const photo = s.mentorProfilePhoto;
             const isOnline = !s.sessionType || s.sessionType.toLowerCase() === "virtual" || s.sessionType.toLowerCase() === "online";
@@ -635,28 +754,38 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
                 className={`flex flex-col p-4 md:p-5 rounded-2xl transition-all duration-300 ${
                   isTarget
                     ? "bg-[#fffdfb] shadow-xl ring-2 ring-[#7a5c3e] border-2 border-[#7a5c3e]"
-                    : "bg-white hover:shadow-sm"
+                    : isLive ? "bg-[#fffdfb] shadow-md ring-1 ring-[#c9a87c]" : "bg-white hover:shadow-sm"
                 }`}
-                style={{ border: isTarget ? "2px solid #7a5c3e" : `1px solid ${COLORS.hairline}` }}
+                style={{ border: isTarget ? "2px solid #7a5c3e" : isLive ? "1px solid #c9a87c" : `1px solid ${COLORS.hairline}` }}
               >
-                {/* Highlight banner when reached from Incoming Session popup */}
-                {isTarget && (
+                {/* Highlight banner when reached from Incoming Session popup or Live */}
+                {(isTarget || isLive) && (
                   <div
                     className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl mb-3 text-xs font-bold"
-                    style={{ backgroundColor: "#f3ece4", color: "#4a3728", border: "1px solid #e0d8cf" }}
+                    style={{ 
+                      backgroundColor: isLive && !isTarget ? "#fee2e2" : "#f3ece4", 
+                      color: isLive && !isTarget ? "#dc2626" : "#4a3728", 
+                      border: isLive && !isTarget ? "1px solid #fca5a5" : "1px solid #e0d8cf" 
+                    }}
                   >
                     <span className="flex items-center gap-2">
-                      {!isPast && (
-                        <span className="relative flex h-2.5 w-2.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#7a5c3e] opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#7a5c3e]" />
-                        </span>
-                      )}
-                      <span>{isPast ? "Selected Past Session" : "Incoming Session Ready"}</span>
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isLive && !isTarget ? 'bg-red-600' : 'bg-[#7a5c3e]'} opacity-75`} />
+                        <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isLive && !isTarget ? 'bg-red-600' : 'bg-[#7a5c3e]'}`} />
+                      </span>
+                      <span>
+                        {isLive && !isTarget 
+                          ? "Your session is live — Join your session here" 
+                          : isPast 
+                          ? "Selected Past Session" 
+                          : "Incoming Session Ready"}
+                      </span>
                     </span>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#e0d8cf] text-[#7a5c3e]">
-                      Selected from Popup
-                    </span>
+                    {isTarget && (
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#e0d8cf] text-[#7a5c3e]">
+                        Selected from Popup
+                      </span>
+                    )}
                   </div>
                 )}
 
@@ -687,13 +816,11 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
                       </p>
                       <div className="mt-1.5 flex items-center">
                         <span
-                          className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
-                          style={{
-                            backgroundColor: isLive ? "#dbeafe" : isPast ? "#fee2e2" : COLORS.chip,
-                            color: isLive ? "#1d4ed8" : isPast ? "#b91c1c" : COLORS.accent,
-                          }}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                            isLive ? "bg-red-100 text-red-600 animate-pulse" : isPast ? "bg-red-50 text-red-700" : "bg-[#f3ece4] text-[#7a5c3e]"
+                          }`}
                         >
-                          {isLive ? "Live Now" : isPast ? (s.status?.toLowerCase() === "completed" ? "Completed" : "Ended") : getStatusDisplay(s.status || "")}
+                          {isLive ? "🔴 Live Now" : isPast ? (s.status?.toLowerCase() === "completed" ? "Completed" : "Ended") : getStatusDisplay(s.status || "")}
                         </span>
                       </div>
                     </div>
@@ -755,7 +882,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
                           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Joining...
                         </>
                       ) : (
-                        "Join Session"
+                        isLive ? "🎥 Join Session" : "Join Session"
                       )}
                     </button>
                     <button
