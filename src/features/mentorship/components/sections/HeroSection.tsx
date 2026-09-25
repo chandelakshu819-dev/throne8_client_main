@@ -189,10 +189,11 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
                         ? Number(selectedMentor.stats.averageRating)
                         : 5.0,
 
-                sessions:
-                    Number(selectedMentor.stats?.totalSessions) ||
-                    Number(selectedMentor.stats?.completedSessions) ||
-                    0,
+              sessions:
+            Number(selectedMentor.stats?.totalSessions) ||
+            Number(selectedMentor.stats?.completedSessions) ||
+            Number(selectedMentor.trustScore?.metrics?.totalCompletedSessions) ||
+             0,
 
                 tags,
 
@@ -566,8 +567,8 @@ text-[#f8e8d2]
                         ·
                     </span>
 
-                    <span>
-                        {mentor?.sessions || 48} sessions completed
+                      <span>
+                      {mentor?.sessions ?? 0} sessions completed
                     </span>
 
                 </div>

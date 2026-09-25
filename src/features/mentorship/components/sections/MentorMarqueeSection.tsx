@@ -22,6 +22,7 @@ export default function MentorMarqueeSection() {
     // Real mentors ko MentorCard format mein convert karo
     const realCards = apiMentors.map((m: any) => ({
         id: m.mentorId,
+        userId: m.userId,
         name: `${m.user?.firstName ?? ""} ${m.user?.lastName ?? ""}`.trim(),
         role: m.experience?.currentRole?.split(" at ")[0] ?? "Mentor",
         company: m.experience?.currentRole?.split(" at ")[1] ?? "",

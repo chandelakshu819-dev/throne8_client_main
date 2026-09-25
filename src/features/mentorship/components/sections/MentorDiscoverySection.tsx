@@ -1,6 +1,7 @@
 // src/features/mentor/components/sections/MentorDiscoverySection.tsx
 "use client";
 
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -22,6 +23,7 @@ interface MentorDiscoverySectionProps {
 
 interface MentorData {
     id: string | number;
+     userId?: string;
     name: string;
     role: string;
     company: string;
@@ -40,6 +42,7 @@ interface MentorData {
 
 export default function MentorDiscoverySection({ toggleCompare, compareList }: MentorDiscoverySectionProps) {
     const router = useRouter();
+     const { user } = useAuth();
     const [allMentors, setAllMentors] = useState<MentorData[]>([]);
     const [filteredMentors, setFilteredMentors] = useState<MentorData[]>([]);
     const [loading, setLoading] = useState(true);
@@ -93,6 +96,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
 
                     return {
                         id: m.mentorId,
+                        userId: m.userId,
                         name: `${m.user?.firstName ?? ""} ${m.user?.lastName ?? ""}`.trim() || m.user?.name || "Mentor",
                         role: role.trim() || "Mentor",
                         company: company.trim(),
@@ -266,10 +270,17 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     };
 
     const handleNavigate = (mentor: MentorData) => {
-        if (mentor.isDummy) return;
-        const slugName = (mentor.name || "mentor").toLowerCase().replace(/\s+/g, "-");
-        router.push(`/mentorship/mentor-card/${slugName}/${mentor.id}`);
-    };
+    if (mentor.isDummy) return;
+
+    // Agar mentor khud apni hi profile pe click kar raha hai
+    if (user?.userId && mentor.userId && user.userId === mentor.userId) {
+        router.push(`/mentorship/user-dashboard/${user.userId}`);
+        return;
+    }
+
+    const slugName = (mentor.name || "mentor").toLowerCase().replace(/\s+/g, "-");
+    router.push(`/mentorship/mentor-card/${slugName}/${mentor.id}`);
+};
 
     // Render individual mentor card
     const renderCard = (mentor: MentorData, isSeniorCard: boolean) => (

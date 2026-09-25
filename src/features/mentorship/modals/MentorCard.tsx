@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Star, Award } from "lucide-react";
 import { Mentor } from "@/features/index";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 
 interface MentorCardProps {
     mentor: Mentor;
@@ -11,10 +12,17 @@ interface MentorCardProps {
 
 export default function MentorCard({ mentor }: MentorCardProps) {
     const router = useRouter();
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
-
-    const handleClick = () => {
+  const handleClick = () => {
         if (mentor.isDummy) return;
+
+        // Agar mentor khud apni hi profile pe click kar raha hai
+        if (user?.userId && mentor.userId && user.userId === mentor.userId) {
+            router.push(`/mentorship/user-dashboard/${user.userId}`);
+            return;
+        }
+
         const slugName = mentor.name.toLowerCase().replace(/\s+/g, "-");
         router.push(`/mentorship/mentor-card/${slugName}/${mentor.id}`);
     };
