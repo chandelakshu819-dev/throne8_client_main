@@ -120,8 +120,6 @@ class MentorService {
     }
   }
 
-<<<<<<< HEAD
-
   static async getMentorByUserId(
     userId: string,
     forceFresh: boolean = false
@@ -138,25 +136,6 @@ class MentorService {
         requestConfig
       );
 
-
-=======
-  static async getMentorByUserId(
-    userId: string,
-    forceFresh: boolean = false
-  ): Promise<MentorResponse> {
-    try {
-      const url = `${config.NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT}/${userId}`;
-
-      const requestConfig = forceFresh
-        ? { params: { _t: Date.now() } }
-        : undefined;
-
-      const { data } = await api.get<MentorResponse>(
-        url,
-        requestConfig
-      );
-
->>>>>>> 83635ab861908f4e2727104caadf36764082842b
       return data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
@@ -310,17 +289,6 @@ class MentorService {
     }
   }
 
-<<<<<<< Updated upstream
-=======
-<<<<<<< HEAD
-  static async getMyMentorProfile(mentorId: string): Promise<MentorResponse> {
-  try {
-    const { data } = await api.get<MentorResponse>(`${config.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT}/${mentorId}`);
-    
-    if (data && data.userId) {
-      MentorService.getMentorByUserId(data.userId, true).catch(() => {});
-=======
->>>>>>> Stashed changes
   static async getMyMentorProfile(
     mentorId: string
   ): Promise<MentorResponse> {
@@ -328,35 +296,6 @@ class MentorService {
       const { data } = await api.get<MentorResponse>(
         `${config.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT}/${mentorId}`
       );
-<<<<<<< Updated upstream
-=======
-
-      // Fire-and-forget request to trigger backend
-      // 'Profile Viewed' notification logic.
-      // userId is the user-collection ID returned by this endpoint.
-      const mentor = data as MentorResponse & { userId?: string };
-      if (mentor.userId) {
-        MentorService.getMentorByUserId(mentor.userId, true).catch(() => {});
-      }
-
-      return data;
-    } catch (error: any) {
-      if (axios.isAxiosError(error)) {
-        if (error.response?.status === 404) {
-          throw new Error('Mentor profile not found.');
-        }
-
-        if (error.response?.status === 401) {
-          throw new Error('Session expired. Please login again.');
-        }
-      }
-
-      throw new Error(
-        'Failed to fetch mentor profile. Please try again.'
-      );
->>>>>>> 83635ab861908f4e2727104caadf36764082842b
-    }
->>>>>>> Stashed changes
 
       // Fire-and-forget request to trigger backend
       // 'Profile Viewed' notification logic.
@@ -425,30 +364,20 @@ class MentorService {
       const formData = new FormData();
 
       Object.entries(input).forEach(([key, value]) => {
-        if (value === undefined || value === null) return;
-        if (key === 'thumbnailImage') {
-          // ✅ FIX: koi image na choose karne par formData.thumbnailImage
-          // '' (empty string) hota hai (ServicesPage.tsx ke
-          // getDefaultFormData me default). Pehle wo bhi File cast karke
-          // append ho jaata tha — matlab server ko ek plain-text
-          // "thumbnailImage" field milta tha (asli file nahi). Multer
-          // (uploadSingle) usse req.file me nahi, req.body.thumbnailImage
-          // me daal deta — aur createGroupSessionValidator me ye key
-          // schema me declared hi nahi, isliye Joi reject kar deta tha.
-          // Sirf tab bhejo jab value asli File ho.
-          if (value instanceof File) {
-            formData.append(key, value);
+        if (value !== undefined) {
+          if (key === 'thumbnailImage') {
+            formData.append(key, value as File);
+          } else if (typeof value === 'object') {
+            formData.append(
+              key,
+              JSON.stringify(value)
+            );
+          } else {
+            formData.append(
+              key,
+              String(value)
+            );
           }
-        } else if (typeof value === 'object') {
-          formData.append(
-            key,
-            JSON.stringify(value)
-          );
-        } else {
-          formData.append(
-            key,
-            String(value)
-          );
         }
       });
 
@@ -518,13 +447,7 @@ class MentorService {
     payload: Record<string, any>
   ): Promise<any> {
     try {
-      // ✅ FIX: backend route for updating a group session is registered
-      // as PUT (`router.put('/:id', ...)` in group.routes.ts), not PATCH.
-      // GroupSessionEditModal.tsx calls this with a FormData payload
-      // (title/topic/description/etc. + optional thumbnailImage file), so
-      // we must NOT set a manual 'Content-Type' header — axios detects a
-      // FormData body and sets the correct multipart boundary itself.
-      const { data } = await api.put(
+      const { data } = await api.patch(
         `/mentorship/group-sessions/${id}`,
         payload
       );
@@ -544,7 +467,6 @@ class MentorService {
       );
     }
   }
-  
 
   static async startGroupSession(
     id: string
