@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, ArrowLeft } from "./Icons";
 import { TIME_SLOTS, MONTHS, DAYS, C, btnPrimary, formatTimeAMPM, formatSlotRange } from "../../types/data";
 import type { Service, CalendarData } from "../../types/types";
 import AvailabilityService from "@/lib/api/availability.service";
+import MentorService from "@/lib/api/mentorship.service";
 
 interface CalendarStepProps {
     selectedService: Service | null;
@@ -77,6 +78,10 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
     const [daySlots, setDaySlots] = useState<any[]>([]);
     const [noAvailability, setNoAvailability] = useState(false);
     const [selectedAvailabilityId, setSelectedAvailabilityId] = useState<string>("");
+    // ✅ NEW: group-session template slots, fetched from the group-specific
+    // endpoint (respects existing "joinable" instances + remaining capacity,
+    // unlike the raw per-mentor Availability used for 1:1 services below).
+    const [groupSlots, setGroupSlots] = useState<any[]>([]);
 
     const year: number = currentMonth.getFullYear();
     const month: number = currentMonth.getMonth();
@@ -86,12 +91,19 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
 
     const today: Date = new Date();
 
+       // ✅ NEW: group-session templates use their own slot source (see
+    // groupSlots effect below) instead of the generic per-mentor
+    // Availability split-by-duration logic used for 1:1 services.
+    const isGroupTemplate = selectedService?.type === "GroupSession";
+
     // ✅ NEW: selected service ke duration ke hisaab se slots
     const serviceDuration = getServiceDuration(selectedService);
-    const bookableSlots = useMemo(
-        () => buildSlotsForDuration(daySlots, serviceDuration),
-        [daySlots, serviceDuration]
-    );
+    const bookableSlots = useMemo(() => {
+        if (isGroupTemplate) {
+            return groupSlots.map((s: any) => ({ startTime: s.startTime, endTime: s.endTime }));
+        }
+        return buildSlotsForDuration(daySlots, serviceDuration);
+    }, [isGroupTemplate, groupSlots, daySlots, serviceDuration]);
 
     // ✅ FIX: subtitle ab raw daySlots[0]/[last] ki jagah asli FREE windows
     // (booked/blocked slots hata kar, contiguous merge karke) dikhata hai.
@@ -119,7 +131,12 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
 
 
     useEffect(() => {
-        if (!mentorId) return;
+        // ✅ FIX: group-session templates fetch their slots from the
+        // dedicated groupSlots effect below (per-selected-date, capacity
+        // aware) — this generic per-mentor Availability fetch is only for
+        // 1:1 services (Quick Call, Deep Dive, etc.) and should be skipped
+        // for group templates so the two don't race/overwrite each other.
+        if (!mentorId || isGroupTemplate) return;
 
         // ✅ FIX: pehle admin-only getAllAvailabilityFromDB({limit:100}) use ho raha
         // tha — sab mentors ke pehle 100 records (date ascending) fetch karke
@@ -147,9 +164,36 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
+        // ✅ NEW: group-session template slots — fetched per selected date from
+    // the group-specific endpoint, which already folds in existing
+    // "joinable" instances (open sessions with spots remaining) instead of
+    // hiding a slot the moment one mentee has booked it.
+    useEffect(() => {
+        if (!isGroupTemplate || !mentorId || !selectedDate || !selectedService?.id) {
+            setGroupSlots([]);
+            return;
+        }
+        const y = year;
+        const m = String(month + 1).padStart(2, "0");
+        const d = String(selectedDate).padStart(2, "0");
+        const dateStr = `${y}-${m}-${d}`;
+
+        MentorService.getGroupTemplateAvailability(String(selectedService.id), dateStr)
+            .then((res: any) => {
+                const slots = res?.data ?? [];
+                setGroupSlots(slots);
+                setNoAvailability(slots.length === 0);
+            })
+            .catch(() => {
+                setGroupSlots([]);
+                setNoAvailability(true);
+            });
+    }, [isGroupTemplate, mentorId, selectedService?.id, selectedDate, year, month]);
+
     useEffect(() => {
         setSelectedTime(null);
 
+        if (isGroupTemplate) return; // handled by the groupSlots effect above
         if (!selectedDate) return;
         const selectedDateObj = new Date(year, month, selectedDate);
         const y2 = selectedDateObj.getFullYear();
@@ -276,11 +320,15 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                     <div>
                         <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "16px", fontSize: "16px" }}>Total Available Time Slots: {bookableSlots.length}</h3>
                         <p style={{ fontSize: "14px", color: C.mid, marginBottom: "24px" }}>
-                            {freeWindows.length > 0
-                                ? freeWindows
-                                    .map((w) => `${formatTimeAMPM(toTimeString(w.start))} - ${formatTimeAMPM(toTimeString(w.end))}`)
-                                    .join(", ")
-                                : "No free time available"}
+                            {isGroupTemplate
+                                ? (bookableSlots.length > 0
+                                    ? "Pick a slot below — some may already have a session open for others to join."
+                                    : "No free time available")
+                                : (freeWindows.length > 0
+                                    ? freeWindows
+                                        .map((w) => `${formatTimeAMPM(toTimeString(w.start))} - ${formatTimeAMPM(toTimeString(w.end))}`)
+                                        .join(", ")
+                                    : "No free time available")}
                         </p>
 
                         {!selectedDate && (

@@ -751,32 +751,70 @@ class MentorService {
     }
   }
 
-  /**
-   * ✅ NEW: mentee ne group-session TEMPLATE ke liye Quick-Call-style
-   * calendar se ek date+time slot choose kiya (mentor ki Availability se).
+    /**
+   * ✅ NEW: fetch a group-session TEMPLATE's bookable slots for a given
+   * date, derived from the mentor's Availability. Powers the mentee-facing
+   * "Select Date & Time" calendar for Group Session (same pattern as
+   * Quick Call's CalendarStep, but backed by /template-slots instead of
+   * /availability/mentor/:id).
+   */
+    static async getGroupTemplateAvailability(
+      templateId: string,
+      date: string // "YYYY-MM-DD"
+    ): Promise<any> {
+      try {
+        const { data } = await api.get(
+          `/mentorship/group-sessions/${templateId}/template-slots`,
+          { params: { date } }
+        );
+        return data;
+      } catch (error: any) {
+        if (axios.isAxiosError(error)) {
+          const apiError = error.response?.data;
+          if (error.code === 'ERR_NETWORK') {
+            throw new Error('Unable to connect to server. Please check your internet connection.');
+          }
+          if (apiError?.message) {
+            throw new Error(apiError.message);
+          }
+        }
+        throw new Error('Failed to fetch group session slots.');
+      }
+    }
+  
+    /**
+     * ✅ NEW: mentee ne group-session TEMPLATE ke liye Quick-Call-style
+     * calendar se ek date+time slot choose kiya (mentor ki Availability se).
    * Backend: agar us exact slot pe already koi open group "instance" hai
    * to mentee usi instance mein pending join-request bhejta hai; warna
    * naya instance banta hai (mentor ki availability se wo slot book karke)
    * aur usi mein request bheji jaati hai.
    */
-  static async joinGroupSessionBySlot(
-    templateId: string,
-    payload: {
-      date: string;            // "YYYY-MM-DD"
-      startTime: string;       // "HH:mm"
-      availabilityId: string;
-      transactionId?: string;
-    }
-  ): Promise<any> {
-    try {
-      const { data } = await api.post(
-        `/mentorship/group-sessions/${templateId}/join-by-slot`,
-        payload
-      );
-
-      return data;
-
-    } catch (error: any) {
+    static async joinGroupSessionBySlot(
+      templateId: string,
+      payload: {
+        date: string;            // "YYYY-MM-DD"
+        startTime: string;       // "HH:mm"
+        availabilityId?: string;
+        transactionId?: string;
+      }
+    ): Promise<any> {
+      try {
+        // ✅ FIX: backend's joinBySlot controller only reads `scheduledAt`
+        // (and `transactionId`) from the body — it never reads `date`,
+        // `startTime` or `availabilityId`. Sending those alone meant every
+        // request failed with 400 "scheduledAt is required to pick a slot".
+        // Combine date + startTime into the ISO datetime the backend expects.
+        const scheduledAt = new Date(`${payload.date}T${payload.startTime}:00`).toISOString();
+  
+        const { data } = await api.post(
+          `/mentorship/group-sessions/${templateId}/join-by-slot`,
+          { scheduledAt, transactionId: payload.transactionId }
+        );
+  
+        return data;
+  
+      } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const apiError = error.response?.data;
 

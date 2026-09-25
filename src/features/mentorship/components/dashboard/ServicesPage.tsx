@@ -60,9 +60,9 @@ const getDefaultFormData = (serviceType: string = '') => ({
   portfolioUrl: '',
   thumbnailImage: '',
   responseTime: '',
-  // ✅ NEW: group_session ke liye — default false (fixed-date, legacy
-  // behavior). Toggle se ServiceModal ise true kar sakta hai.
-  isTemplate: false,
+  // ✅ CHANGED: group_session ab hamesha availability-based hai — koi
+  // Fixed Date & Time option nahi bacha, isliye isTemplate hamesha true.
+  isTemplate: true,
 });
 
 
