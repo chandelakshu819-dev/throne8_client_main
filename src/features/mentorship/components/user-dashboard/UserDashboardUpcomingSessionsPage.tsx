@@ -264,7 +264,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
   const [error, setError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<"my-sessions" | "upcoming">("my-sessions");
-  const [filterType, setFilterType] = useState<"all" | "live" | "booked">("all");
+  const [filterType, setFilterType] = useState<"all" | "live">("all");
 
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
@@ -597,10 +597,6 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
     // activeTab === "my-sessions"
     if (filterType === "all") return true;
     if (filterType === "live") return isLive;
-    if (filterType === "booked") {
-      const status = (s.status || s.bookings?.[0]?.status || "").toLowerCase();
-      return !isLive && (status === "pending" || status === "confirmed");
-    }
     return true;
   });
 
@@ -626,7 +622,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
       </div>
 
       {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { 
             label: "Total Sessions", 
@@ -640,16 +636,6 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
             label: "Live Now 🔴", 
             value: upcoming.filter(s => evaluateSessionLiveStatus(s, Boolean(targetSessionId && (s.sessionId ?? s._id) === targetSessionId), currentTime).isLive).length, 
             color: COLORS.danger 
-          },
-          { 
-            label: "Booked", 
-            value: upcoming.filter(s => {
-              const isTarget = Boolean(targetSessionId && (s.sessionId ?? s._id) === targetSessionId);
-              const { isLive, isPast } = evaluateSessionLiveStatus(s, isTarget, currentTime);
-              const status = (s.status || s.bookings?.[0]?.status || "").toLowerCase();
-              return !isLive && !isPast && (status === "pending" || status === "confirmed");
-            }).length, 
-            color: COLORS.accent 
           },
           { 
             label: "Upcoming", 
@@ -699,7 +685,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
       {/* MY SESSIONS FILTERS */}
       {activeTab === "my-sessions" && (
         <div className="flex items-center gap-2">
-          {["all", "live", "booked"].map(f => (
+          {["all", "live"].map(f => (
             <button
               key={f}
               onClick={() => setFilterType(f as any)}
@@ -729,8 +715,6 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
                 ? "No upcoming sessions"
                 : filterType === "live"
                 ? "No live sessions right now"
-                : filterType === "booked"
-                ? "No booked sessions"
                 : "No upcoming sessions"}
             </h3>
             <p className="text-sm mt-1" style={{ color: COLORS.muted }}>
@@ -738,8 +722,6 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
                 ? "You don't have any upcoming sessions scheduled at the moment."
                 : filterType === "live"
                 ? "There are no sessions currently live."
-                : filterType === "booked"
-                ? "You don't have any booked sessions at the moment."
                 : "You don't have any upcoming sessions scheduled at the moment."}
             </p>
           </div>

@@ -131,9 +131,20 @@ export default function MentorshipCallProvider({ children }: { children: React.R
           style={{ background: 'rgba(74,55,40,0.45)', backdropFilter: 'blur(4px)' }}
         >
           <div
-            className="w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center animate-[pulse_1.5s_ease-in-out_infinite]"
+            className="w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center animate-[pulse_1.5s_ease-in-out_infinite] relative"
             style={{ background: '#fbf7f3', border: '1px solid #e0d8cf' }}
           >
+            <button
+              onClick={() => {
+                stopRing();
+                setIncoming(null);
+                lastSessionIdRef.current = null;
+              }}
+              aria-label="Close"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 focus:outline-none"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
             <div
               className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl"
               style={{ background: 'rgba(74,55,40,0.1)' }}
