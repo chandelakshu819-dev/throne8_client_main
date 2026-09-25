@@ -366,20 +366,30 @@ class MentorService {
       const formData = new FormData();
 
       Object.entries(input).forEach(([key, value]) => {
-        if (value !== undefined) {
-          if (key === 'thumbnailImage') {
-            formData.append(key, value as File);
-          } else if (typeof value === 'object') {
-            formData.append(
-              key,
-              JSON.stringify(value)
-            );
-          } else {
-            formData.append(
-              key,
-              String(value)
-            );
+        if (value === undefined || value === null) return;
+        if (key === 'thumbnailImage') {
+          // ✅ FIX: koi image na choose karne par formData.thumbnailImage
+          // '' (empty string) hota hai (ServicesPage.tsx ke
+          // getDefaultFormData me default). Pehle wo bhi File cast karke
+          // append ho jaata tha — matlab server ko ek plain-text
+          // "thumbnailImage" field milta tha (asli file nahi). Multer
+          // (uploadSingle) usse req.file me nahi, req.body.thumbnailImage
+          // me daal deta — aur createGroupSessionValidator me ye key
+          // schema me declared hi nahi, isliye Joi reject kar deta tha.
+          // Sirf tab bhejo jab value asli File ho.
+          if (value instanceof File) {
+            formData.append(key, value);
           }
+        } else if (typeof value === 'object') {
+          formData.append(
+            key,
+            JSON.stringify(value)
+          );
+        } else {
+          formData.append(
+            key,
+            String(value)
+          );
         }
       });
 
@@ -449,7 +459,13 @@ class MentorService {
     payload: Record<string, any>
   ): Promise<any> {
     try {
-      const { data } = await api.patch(
+      // ✅ FIX: backend route for updating a group session is registered
+      // as PUT (`router.put('/:id', ...)` in group.routes.ts), not PATCH.
+      // GroupSessionEditModal.tsx calls this with a FormData payload
+      // (title/topic/description/etc. + optional thumbnailImage file), so
+      // we must NOT set a manual 'Content-Type' header — axios detects a
+      // FormData body and sets the correct multipart boundary itself.
+      const { data } = await api.put(
         `/mentorship/group-sessions/${id}`,
         payload
       );
@@ -469,6 +485,7 @@ class MentorService {
       );
     }
   }
+  
 
   static async startGroupSession(
     id: string

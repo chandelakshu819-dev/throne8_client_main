@@ -279,10 +279,17 @@ export default function ServicesPage({
     try {
       if (deleteTarget.type === 'group_session') {
         await MentorService.deleteGroupSession(deleteTarget.sessionId);
+        // ✅ FIX: group sessions apiGroupSessions me rehte hain — apiSessions
+        // se ALAG state array. Pehle sirf fetchAllSessions() call hota tha,
+        // jo apiSessions refresh karta hai — group session ka card tab tak
+        // screen pe dikhta rehta tha jab tak page reload na ho, isliye
+        // Delete "kaam nahi kar raha" lagta tha jabki backend me delete ho
+        // chuka hota tha.
+        await fetchGroupSessions();
       } else {
         await SessionService.deleteSession(deleteTarget.sessionId);
+        await fetchAllSessions();
       }
-      await fetchAllSessions();
       setDeleteTarget(null);
     } catch (err: any) {
       setBlockedDeleteMessage(err.message || 'Failed to delete service.');
@@ -290,7 +297,6 @@ export default function ServicesPage({
       setIsDeleting(false);
     }
   };
-
 
     // ── Create/Update session via API ──────────────────────
     const handleCreateServiceWithApi = async () => {
