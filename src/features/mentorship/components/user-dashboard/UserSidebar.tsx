@@ -20,7 +20,7 @@ const USER_MENU_ITEMS = [
   { id: "progress", label: "Mentorship Progress", icon: TrendingUp },
   { id: "queries", label: "My Queries", icon: HelpCircle },
   { id: "recommended-mentors", label: "Recommended Mentors", icon: Sparkles },
-  { id: "upcoming-sessions", label: "Upcoming Sessions", icon: CalendarClock },
+  { id: "upcoming-sessions", label: "Sessions", icon: CalendarClock },
   { id: "my-mentors", label: "My Mentors", icon: Users },
   { id: "my-bookings", label: "My Bookings", icon: Bookmark },
   { id: "payments", label: "Payments & Transactions", icon: Receipt },
