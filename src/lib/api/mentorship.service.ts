@@ -120,6 +120,7 @@ class MentorService {
     }
   }
 
+<<<<<<< HEAD
 
   static async getMentorByUserId(
     userId: string,
@@ -138,6 +139,24 @@ class MentorService {
       );
 
 
+=======
+  static async getMentorByUserId(
+    userId: string,
+    forceFresh: boolean = false
+  ): Promise<MentorResponse> {
+    try {
+      const url = `${config.NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_BY_USER_ENDPOINT}/${userId}`;
+
+      const requestConfig = forceFresh
+        ? { params: { _t: Date.now() } }
+        : undefined;
+
+      const { data } = await api.get<MentorResponse>(
+        url,
+        requestConfig
+      );
+
+>>>>>>> 83635ab861908f4e2727104caadf36764082842b
       return data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
@@ -291,6 +310,17 @@ class MentorService {
     }
   }
 
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+  static async getMyMentorProfile(mentorId: string): Promise<MentorResponse> {
+  try {
+    const { data } = await api.get<MentorResponse>(`${config.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT}/${mentorId}`);
+    
+    if (data && data.userId) {
+      MentorService.getMentorByUserId(data.userId, true).catch(() => {});
+=======
+>>>>>>> Stashed changes
   static async getMyMentorProfile(
     mentorId: string
   ): Promise<MentorResponse> {
@@ -298,6 +328,35 @@ class MentorService {
       const { data } = await api.get<MentorResponse>(
         `${config.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT}/${mentorId}`
       );
+<<<<<<< Updated upstream
+=======
+
+      // Fire-and-forget request to trigger backend
+      // 'Profile Viewed' notification logic.
+      // userId is the user-collection ID returned by this endpoint.
+      const mentor = data as MentorResponse & { userId?: string };
+      if (mentor.userId) {
+        MentorService.getMentorByUserId(mentor.userId, true).catch(() => {});
+      }
+
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 404) {
+          throw new Error('Mentor profile not found.');
+        }
+
+        if (error.response?.status === 401) {
+          throw new Error('Session expired. Please login again.');
+        }
+      }
+
+      throw new Error(
+        'Failed to fetch mentor profile. Please try again.'
+      );
+>>>>>>> 83635ab861908f4e2727104caadf36764082842b
+    }
+>>>>>>> Stashed changes
 
       // Fire-and-forget request to trigger backend
       // 'Profile Viewed' notification logic.

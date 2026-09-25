@@ -17,7 +17,6 @@ import ConfirmationStep from "./ConfirmationStep";
 import MentorService from "@/lib/api/mentorship.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft } from "./Icons";
 
 interface MentorProfileProps {
     mentorId: string;
@@ -170,29 +169,19 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
 
     return (
         <div style={{ minHeight: "100vh", background: C.bg }}>
-            <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "100px 16px 24px" }}>
-                <div style={{ marginBottom: "24px" }}>
-                    <button
-                        onClick={() => router.back()}
-                        style={{
-                            background: "transparent",
-                            border: `1px solid ${C.border}`,
-                            cursor: "pointer",
-                            color: C.dark,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            padding: "8px 16px",
-                            borderRadius: "8px",
-                        }}
-                    >
-                        <ArrowLeft /> Back
-                    </button>
-                </div>
+            {/* ✅ FIX: removed the separate "Back" row + its 100px top
+                padding, which left a large empty band under the navbar.
+                Back is now rendered by MentorSidebar as a floating button
+                in the top-left corner of the profile card itself, the same
+                way the camera icon sits in the top-right. Top padding here
+                only needs to clear the fixed navbar now. */}
+            <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "88px 16px 24px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
-                    <MentorSidebar mentorData={mentorData} />
+                    <MentorSidebar
+                        mentorData={mentorData}
+                        currentUserId={user?.userId}
+                        onBack={() => router.back()}
+                    />
                     <div>
                         <ServicesSection
                             onServiceClick={handleServiceClick}
