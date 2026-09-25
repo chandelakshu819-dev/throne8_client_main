@@ -575,18 +575,16 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           const pricePerPerson = group.pricing?.pricePerPerson ?? group.pricePerPerson ?? 0;
           const statusMeta = myRequestStatus ? REQUEST_STATUS_META[myRequestStatus] : undefined;
 
-                  // ✅ NEW: availability-based templates open the slot-picker
-          // (CalendarStep) directly instead of the fixed-date detail modal —
-          // this is the actual fix for "group session shows a fixed time
-          // instead of a calendar".
+                                   // ✅ CHANGED: card click always opens the detail modal
+          // first (same as fixed-date sessions) — the slot picker
+          // (CalendarStep) now only opens from the "Select a Slot" button
+          // inside that modal, not directly from the card.
           const isTemplate = !!group.isTemplate;
           const openGroupSession = () => {
-            if (isTemplate) {
-              onServiceClick(getServiceFromGroupTemplate(group));
-            } else {
-              setDetailGroup(group);
-            }
+            setDetailGroup(group);
           };
+
+
 
           return (
             <div key={group.sessionId}
@@ -660,25 +658,28 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   {pricePerPerson === 0 ? "Free" : `₹${pricePerPerson}/person`}
                 </span>
                 {isTemplate ? (
-                  // ✅ NEW: templates always route to the slot picker —
-                  // there's no fixed-seat "Full" state at the template level.
+                  // ✅ CHANGED: opens the detail modal instead of jumping
+                  // straight to the slot picker — the slot picker now opens
+                  // from inside the modal's "Select a Slot" button. Label
+                  // switches to "Book Another Slot" once the mentee has
+                  // already booked at least one slot for this template.
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onServiceClick(getServiceFromGroupTemplate(group));
+                      setDetailGroup(group);
                     }}
                     style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}
                   >
-                    Select a Slot
+                    {bookedSessionIds.includes(group.sessionId) ? "Book Another Slot" : "View Details"}
                   </button>
-                ) : statusMeta ? (
-                  <div style={{ fontSize: "12px", fontWeight: 700, color: statusMeta.fg }}>
-                    {myRequestStatus === "pending" && "⏳ "}
-                    {myRequestStatus === "accepted" && "✅ "}
-                    {myRequestStatus === "rejected" && "❌ "}
-                    {statusMeta.label}
-                  </div>
-                ) : seatsLeft <= 0 ? (
+                               ) : statusMeta ? (
+                                <div style={{ fontSize: "12px", fontWeight: 700, color: statusMeta.fg }}>
+                                  {myRequestStatus === "pending" && "⏳ "}
+                                  {myRequestStatus === "accepted" && "✅ "}
+                                  {myRequestStatus === "rejected" && "❌ "}
+                                  {statusMeta.label}
+                                </div>
+                              ) : seatsLeft <= 0 ? (
                   <span style={{ fontSize: "12px", fontWeight: 700, color: C.mid }}>Full</span>
                 ) : (
                   // ✅ FIX: used to call handleJoinGroupSession() directly,
@@ -716,6 +717,10 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
         const pricePerPerson = detailGroup.pricing?.pricePerPerson ?? detailGroup.pricePerPerson ?? 0;
         const scheduledDate = detailGroup.scheduledAt ? new Date(detailGroup.scheduledAt) : null;
         const status = detailGroup.status || 'open';
+        // ✅ NEW: template sessions don't have a fixed date or a seat
+        // reserved at this level — the modal footer needs to route these
+        // to the slot picker instead of sending a join request directly.
+        const isTemplateSession = !!detailGroup.isTemplate;
         const isCancelled = status === 'cancelled';
         const isCompleted = status === 'completed';
         const isInProgress = status === 'in_progress';
@@ -965,7 +970,21 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 </button>
 
                 {!isCancelled && !isCompleted && (
-                  isAccepted ? (
+                                 isTemplateSession ? (
+                                  // ✅ NEW: opens the mentor's Availability calendar
+                                  // (CalendarStep) so the mentee picks a date & time; the
+                                  // join request is sent from PaymentStep after the mock
+                                  // payment "succeeds", not from this modal directly.
+                                  <button
+                                    onClick={() => {
+                                      onServiceClick(getServiceFromGroupTemplate(detailGroup));
+                                      closeGroupDetail();
+                                    }}
+                                    style={{ flex: 2, ...btnPrimary, padding: "12px", borderRadius: "12px", fontSize: "13.5px" }}
+                                  >
+                                    {bookedSessionIds.includes(detailGroup.sessionId) ? "Book Another Slot" : "Select a Slot"}
+                                  </button>
+                                ) : isAccepted ? (
                     <button
                       onClick={handleLeaveFromModal}
                       disabled={groupActionBusy}

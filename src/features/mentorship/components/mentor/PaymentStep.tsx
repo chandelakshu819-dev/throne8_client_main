@@ -5,6 +5,7 @@ import React, { useState } from "react";
 import { PAY_METHODS, C, btnPrimary } from "../../types/data";
 import type { CalendarData, Service, FormData as BookingFormData } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
+import MentorService from "@/lib/api/mentorship.service";
 
 interface PaymentStepProps {
     selectedService: Service | null;
@@ -37,6 +38,14 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
     const gst: number = Math.round(price * 0.18);
     const total: number = price + gst;
 
+       // ✅ NEW: Group Session ("GroupSession" type) is a template — after
+    // the mock payment step "succeeds" here, it sends a join REQUEST for
+    // the selected slot instead of a direct paid booking. This is the
+    // point where availability-based Group Session booking actually
+    // happens, mirroring the same details → payment flow every other
+    // service already uses.
+    const isGroupSession = selectedService?.type === "GroupSession";
+
     const handleBookSession = async () => {
         if (!paymentMethod) return;
         setBooking(true);
@@ -48,33 +57,43 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
             const month = String(currentMonth.getMonth() + 1).padStart(2, "0");
             const day = String(selectedDate).padStart(2, "0");
             const startTime = slotTime.split(" - ")[0]; // "10:00"
-            const scheduledAt = new Date(`${year}-${month}-${day}T${startTime}:00+05:30`).toISOString();
 
-            await SessionService.bookSession({
-                sessionId: String(selectedService?.id || ""),  // ✅ ye ab sessionId hai
-                mentorId,
-                availabilityId,
-                slotTime,
-                scheduledAt,
-                timezone: "Asia/Kolkata",
-                paymentMethod: paymentMethodMap[paymentMethod] || "razorpay",
-                pricing: {
-                    basePrice: price,   
-                    platformFee: Math.round(price * 0.15),
-                    totalAmount: total,
-                    currency: "INR",
-                },
-            });
+            if (isGroupSession) {
+                await MentorService.joinGroupSessionBySlot(String(selectedService?.id || ""), {
+                    date: `${year}-${month}-${day}`,
+                    startTime,
+                    availabilityId,
+                    transactionId: `PAY_${Date.now()}`,
+                });
+            } else {
+                const scheduledAt = new Date(`${year}-${month}-${day}T${startTime}:00+05:30`).toISOString();
+
+                await SessionService.bookSession({
+                    sessionId: String(selectedService?.id || ""),  // ✅ ye ab sessionId hai
+                    mentorId,
+                    availabilityId,
+                    slotTime,
+                    scheduledAt,
+                    timezone: "Asia/Kolkata",
+                    paymentMethod: paymentMethodMap[paymentMethod] || "razorpay",
+                    pricing: {
+                        basePrice: price,
+                        platformFee: Math.round(price * 0.15),
+                        totalAmount: total,
+                        currency: "INR",
+                    },
+                });
+            }
 
             // Success — mentor profile par redirect
             onBookingSuccess();
         } catch (error: any) {
             console.error("Booking failed:", error.message);
             console.error("Full error:", error?.response?.data); // ye undefined rahega
-            console.error("Error object keys:", Object.keys(error)); // 👈 add ye
             setBooking(false);
         }
     };
+
 
     // 👇 Booking loader screen
     if (booking) {
@@ -132,10 +151,9 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
 
                 {paymentMethod && (
                     <button onClick={handleBookSession} style={{ ...btnPrimary, width: "100%", padding: "16px", borderRadius: "12px", fontSize: "17px", marginTop: "16px" }}>
-                        Pay ₹{total} 💳
+                        {isGroupSession ? `Pay ₹${total} & Send Join Request 💳` : `Pay ₹${total} 💳`}
                     </button>
                 )}
-
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "20px", padding: "14px", borderRadius: "12px", background: C.bg, border: `1px solid ${C.border}` }}>
                     <span style={{ fontSize: "20px" }}>🔒</span>
                     <p style={{ fontSize: "12px", color: C.mid, margin: 0 }}>Your payment information is secure and encrypted. We never store your card details.</p>
