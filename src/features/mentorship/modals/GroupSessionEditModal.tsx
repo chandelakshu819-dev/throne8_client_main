@@ -136,10 +136,18 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
         changes.scheduledAt = new Date(formData.scheduledAt).toISOString();
       }
 
+            // ✅ FIX: followUpAllowed dropdown "0"–"7" (kitni baar follow-up
+      // allowed hai) store karta hai — ek COUNT, boolean nahi. Lekin
+      // backend schema (GroupSession.model.ts settings.followUp.allowed
+      // aur updateGroupSessionValidator dono) isse strict Joi.boolean()
+      // expect karte hain. Raw number (0, 3, 7, ...) bhejne se Joi
+      // "followUp.allowed must be a boolean" ke saath HAMESHA reject kar
+      // deta tha — save button click karte hi 400 aata tha, chahe
+      // baaki saare fields sahi hon.
       changes.followUp = {
-          allowed: Number(formData.followUpAllowed || 0),
-          periodDays: Number(formData.followUpPeriod) || 0,
-      };
+        allowed: Number(formData.followUpAllowed || 0) > 0,
+        periodDays: Number(formData.followUpPeriod) || 0,
+    };
 
       const fd = new FormData();
       Object.entries(changes).forEach(([key, val]) => {

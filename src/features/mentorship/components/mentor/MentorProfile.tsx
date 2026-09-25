@@ -41,8 +41,12 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
     const [formData, setFormData] = useState<BookingFormData | null>(null);
+
     const [mentorData, setMentorData] = useState<any>(null);
     const [bookedSessionIds, setBookedSessionIds] = useState<string[]>([]);
+    // ✅ NEW: brief success toast shown after a booking/join-request
+    // completes and the view navigates back to the services list.
+    const [bookingSuccessMsg, setBookingSuccessMsg] = useState<string | null>(null);
     // ✅ NEW: group-session template join-by-slot flow state
     const [groupJoinBusy, setGroupJoinBusy] = useState(false);
     const [groupJoinError, setGroupJoinError] = useState<string | null>(null);
@@ -82,70 +86,32 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
+       // ✅ FIX: this was calling setGroupJoinError(null) — a state setter
+    // that no longer exists (groupJoinBusy/groupJoinError were removed
+    // when the join-request flow moved into PaymentStep). Calling an
+    // undefined setter threw immediately, crashing resetBooking() before
+    // it could clear bookingStep — so the booking succeeded on the
+    // backend but the screen silently got stuck on the payment page.
     const resetBooking = (): void => {
         setBookingStep(null); setSelectedService(null);
         setCalendarData(null); setFormData(null);
-        setGroupJoinError(null);
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-    // ✅ NEW: group-session TEMPLATE ke liye slot choose hote hi seedha
-    // join-by-slot API call karo — yeh 1:1 wali details/payment pipeline
-    // mein NAHI jaata, kyunki group join ek "request" hai, ek paid booking
-    // nahi (payment separately/mentor-approval-baad handle hota hai).
-    const handleGroupSlotSelected = async (d: CalendarData) => {
-        if (!selectedService) return;
-        setGroupJoinBusy(true);
-        setGroupJoinError(null);
-        try {
-            const { selectedDate, currentMonth, availabilityId, slotTime } = d;
-            const year = currentMonth.getFullYear();
-            const month = String(currentMonth.getMonth() + 1).padStart(2, "0");
-            const day = String(selectedDate).padStart(2, "0");
-            const startTime = slotTime.split(" - ")[0]; // "10:00"
-
-            await MentorService.joinGroupSessionBySlot(String(selectedService.id), {
-                date: `${year}-${month}-${day}`,
-                startTime,
-                availabilityId,
-            });
-
-            if (selectedService.id) {
-                setBookedSessionIds((prev) => [...prev, String(selectedService.id)]);
-            }
-            window.alert("Join request sent! You'll be notified once the mentor reviews it.");
-            resetBooking();
-        } catch (err: any) {
-            setGroupJoinError(err.message || "Failed to send join request.");
-        } finally {
-            setGroupJoinBusy(false);
-        }
-    };
-
+       // ✅ CHANGED: group-session template slots now go through the SAME
+    // details → payment pipeline as 1:1 sessions, instead of firing the
+    // join-request API straight off the calendar. The actual API call
+    // (joinGroupSessionBySlot) now happens inside PaymentStep, only after
+    // the mock payment step is "completed" — see PaymentStep.tsx.
     if (bookingStep === "query") return <QueryStep mentorId={mentorData?.mentorId || ""} selectedService={selectedService} onBack={resetBooking} onSubmitted={resetBooking} />;
     if (bookingStep === "calendar") {
-        const isGroupTemplate = selectedService?.type === "GroupSession";
         return (
-            <>
-                <CalendarStep
-                    mentorId={mentorData?.mentorId || ""}
-                    selectedService={selectedService}
-                    onBack={() => setBookingStep(null)}
-                    onContinue={isGroupTemplate ? handleGroupSlotSelected : (d) => { setCalendarData(d); setBookingStep("details"); }}
-                />
-                {isGroupTemplate && groupJoinBusy && (
-                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000 }}>
-                        <div style={{ background: "#fff", padding: "24px 32px", borderRadius: "16px", fontWeight: 600, color: "#4a3728" }}>
-                            Sending join request...
-                        </div>
-                    </div>
-                )}
-                {isGroupTemplate && groupJoinError && (
-                    <div style={{ position: "fixed", bottom: 20, right: 20, background: "#fee2e2", color: "#dc2626", padding: "12px 16px", borderRadius: "12px", fontWeight: 600, zIndex: 2000, maxWidth: "360px" }}>
-                        {groupJoinError}
-                    </div>
-                )}
-            </>
+            <CalendarStep
+                mentorId={mentorData?.mentorId || ""}
+                selectedService={selectedService}
+                onBack={() => setBookingStep(null)}
+                onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }}
+            />
         );
     }
     if (bookingStep === "details") return <DetailsStep selectedService={selectedService} calendarData={calendarData!} onBack={() => setBookingStep("calendar")} onContinue={(d: BookingFormData) => { setFormData(d); setBookingStep("payment"); }} />;
@@ -158,10 +124,17 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
             onBack={() => setBookingStep("details")}
             onConfirm={() => setBookingStep("confirmation")}
             onBookingSuccess={() => {
+                const isGroupTemplate = selectedService?.type === "GroupSession";
                 if (selectedService?.id) {
                     setBookedSessionIds(prev => [...prev, String(selectedService.id)]);
                 }
+                setBookingSuccessMsg(
+                    isGroupTemplate
+                        ? "Slot booked! Your join request has been sent to the mentor."
+                        : "Session booked successfully!"
+                );
                 resetBooking();
+                setTimeout(() => setBookingSuccessMsg(null), 4000);
             }}
         />
     );
@@ -169,13 +142,36 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
 
     return (
         <div style={{ minHeight: "100vh", background: C.bg }}>
-            {/* ✅ FIX: removed the separate "Back" row + its 100px top
-                padding, which left a large empty band under the navbar.
-                Back is now rendered by MentorSidebar as a floating button
-                in the top-left corner of the profile card itself, the same
-                way the camera icon sits in the top-right. Top padding here
-                only needs to clear the fixed navbar now. */}
-            <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "88px 16px 24px" }}>
+            {bookingSuccessMsg && (
+                <div style={{
+                    position: "fixed", top: 20, right: 20, zIndex: 3000, padding: "14px 20px",
+                    borderRadius: "12px", fontSize: "14px", fontWeight: 600, color: "#15803d",
+                    background: "#dcfce7", border: "1px solid #86efac", boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                }}>
+                    ✅ {bookingSuccessMsg}
+                </div>
+            )}
+            <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "100px 16px 24px" }}>
+                <div style={{ marginBottom: "24px" }}>
+                    <button
+                        onClick={() => router.back()}
+                        style={{
+                            background: "transparent",
+                            border: `1px solid ${C.border}`,
+                            cursor: "pointer",
+                            color: C.dark,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            padding: "8px 16px",
+                            borderRadius: "8px",
+                        }}
+                    >
+                        <ArrowLeft /> Back
+                    </button>
+                </div>
                 <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
                     <MentorSidebar
                         mentorData={mentorData}

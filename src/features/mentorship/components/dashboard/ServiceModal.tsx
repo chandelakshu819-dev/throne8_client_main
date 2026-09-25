@@ -417,21 +417,10 @@ export default function ServiceModal({
                     )}
 
 
-                    {/* ✅ CHANGED: Group Session is now always availability-based —
-                        the Fixed Date & Time / Mentees Pick a Slot toggle is
-                        removed. Mentees always choose their slot from the
-                        mentor's Availability calendar (isTemplate is forced
-                        true in ServicesPage.tsx). Just a short info note here. */}
-                    {formData?.serviceType === 'group_session' && (
-                        <div className="p-4 rounded-xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
-                            <FieldLabel icon={Clock}>Session Timing</FieldLabel>
-                            <p className="text-xs" style={{ color: '#8a7a6a' }}>
-                                Mentees will choose a date &amp; time from your Availability calendar. Make sure you've set your availability in the Availability tab.
-                            </p>
-                        </div>
-                    )}
+                   
+                   
 
-                    
+
                                                {/* Duration & Participants — Duration hidden for "Ask a Query"
                                         since it's async text, no live call happens */}
                                     {formData?.serviceType !== 'ask_query' && (

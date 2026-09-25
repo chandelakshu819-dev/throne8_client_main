@@ -381,7 +381,8 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
       const validUpcoming = menteeSessionItems
         .filter((s) => {
           const sid = s.sessionId || s._id;
-          const isTarget = targetSessionId ? sid === targetSessionId : false;
+          const tempStatus = evaluateSessionLiveStatus(s, false, currentNow);
+          const isTarget = Boolean(targetSessionId && sid === targetSessionId && !tempStatus.isPast);
 
           const sessionStatus = (s.status || "").toLowerCase().trim();
           const bookingStatus = typeof s.bookings?.[0]?.status === "string"
@@ -404,15 +405,19 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
           const sidA = a.sessionId || a._id;
           const sidB = b.sessionId || b._id;
 
+          const isPastA = evaluateSessionLiveStatus(a, false, currentNow).isPast;
+          const isPastB = evaluateSessionLiveStatus(b, false, currentNow).isPast;
+
+          const isTargetA = Boolean(targetSessionId && sidA === targetSessionId && !isPastA);
+          const isTargetB = Boolean(targetSessionId && sidB === targetSessionId && !isPastB);
+
           // Target session from the Incoming popup always floats to the top
-          if (targetSessionId) {
-            if (sidA === targetSessionId) return -1;
-            if (sidB === targetSessionId) return 1;
-          }
+          if (isTargetA && !isTargetB) return -1;
+          if (!isTargetA && isTargetB) return 1;
 
           // Active live sessions float right after incoming target session
-          const statusA = evaluateSessionLiveStatus(a, sidA === targetSessionId, currentNow);
-          const statusB = evaluateSessionLiveStatus(b, sidB === targetSessionId, currentNow);
+          const statusA = evaluateSessionLiveStatus(a, isTargetA, currentNow);
+          const statusB = evaluateSessionLiveStatus(b, isTargetB, currentNow);
           if (statusA.isLive && !statusB.isLive) return -1;
           if (!statusA.isLive && statusB.isLive) return 1;
 
@@ -586,7 +591,8 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
 
   const filteredSessions = upcoming.filter(s => {
     const sid = s.sessionId ?? s._id;
-    const isTarget = Boolean(targetSessionId && sid === targetSessionId);
+    const tempStatus = evaluateSessionLiveStatus(s, false, currentTime);
+    const isTarget = Boolean(targetSessionId && sid === targetSessionId && !tempStatus.isPast);
     const { isLive, isFuture, isPast } = evaluateSessionLiveStatus(s, isTarget, currentTime);
     
     // Past sessions must NOT appear in Live Now or Upcoming
@@ -741,10 +747,11 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
             const isOnline = !s.sessionType || s.sessionType.toLowerCase() === "virtual" || s.sessionType.toLowerCase() === "online";
             const sid = s.sessionId ?? s._id;
 
-            // Getting bookingId. Use the accurately resolved bookingId, or fall back to matched booking
-            const bookingId = s.bookingId || s.bookings?.[0]?.bookingId || (s.bookings?.[0] as any)?._id;
+            // Getting bookingId. Use the accurately resolved bookingId
+            const bookingId = s.bookingId;
 
-            const isTarget = Boolean(targetSessionId && sid === targetSessionId);
+            const tempStatus = evaluateSessionLiveStatus(s, false, currentTime);
+            const isTarget = Boolean(targetSessionId && sid === targetSessionId && !tempStatus.isPast);
             const { isLive, canJoin, isPast } = evaluateSessionLiveStatus(s, isTarget, currentTime);
 
             return (
@@ -753,25 +760,25 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
                 key={`${sid ?? idx}-${bookingId ?? idx}`}
                 className={`flex flex-col p-4 md:p-5 rounded-2xl transition-all duration-300 ${
                   isTarget
-                    ? "bg-[#fffdfb] shadow-xl ring-2 ring-[#7a5c3e] border-2 border-[#7a5c3e]"
-                    : isLive ? "bg-[#fffdfb] shadow-md ring-1 ring-[#c9a87c]" : "bg-white hover:shadow-sm"
+                    ? "bg-[#fffdfb] shadow-lg ring-1 ring-[#c9a87c]"
+                    : isLive ? "bg-[#fffdfb] shadow-sm ring-1 ring-[#e0d8cf]" : "bg-white hover:shadow-sm"
                 }`}
-                style={{ border: isTarget ? "2px solid #7a5c3e" : isLive ? "1px solid #c9a87c" : `1px solid ${COLORS.hairline}` }}
+                style={{ border: isTarget ? "1px solid #c9a87c" : `1px solid ${COLORS.hairline}` }}
               >
                 {/* Highlight banner when reached from Incoming Session popup or Live */}
                 {(isTarget || isLive) && (
                   <div
-                    className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl mb-3 text-xs font-bold"
-                    style={{ 
-                      backgroundColor: isLive && !isTarget ? "#fee2e2" : "#f3ece4", 
-                      color: isLive && !isTarget ? "#dc2626" : "#4a3728", 
-                      border: isLive && !isTarget ? "1px solid #fca5a5" : "1px solid #e0d8cf" 
+                    className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl mb-3 text-xs font-bold shadow-sm"
+                    style={{
+                      backgroundColor: isLive && !isTarget ? "#fff5f5" : "#fdf8f4",
+                      color: isLive && !isTarget ? "#dc2626" : "#7a5c3e",
+                      border: isLive && !isTarget ? "1px solid #fecaca" : "1px solid #e0d8cf"
                     }}
                   >
                     <span className="flex items-center gap-2">
                       <span className="relative flex h-2.5 w-2.5">
-                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isLive && !isTarget ? 'bg-red-600' : 'bg-[#7a5c3e]'} opacity-75`} />
-                        <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isLive && !isTarget ? 'bg-red-600' : 'bg-[#7a5c3e]'}`} />
+                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isLive && !isTarget ? 'bg-red-500' : 'bg-[#c9a87c]'} opacity-75`} />
+                        <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isLive && !isTarget ? 'bg-red-500' : 'bg-[#c9a87c]'}`} />
                       </span>
                       <span>
                         {isLive && !isTarget 
@@ -894,15 +901,39 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
                     </button>
                     <div className="flex gap-2 w-full">
                       <button
-                        onClick={() => sid && openRescheduleModal(sid, bookingId as string)}
-                        className="flex-1 px-1.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors hover:bg-gray-50 text-center uppercase"
+                        onClick={() => {
+                          if (!isLive && !isPast && sid) openRescheduleModal(sid, bookingId as string);
+                        }}
+                        disabled={isLive || isPast}
+                        title={
+                          isLive
+                            ? "Cannot reschedule a session that is already in progress"
+                            : isPast
+                            ? "Cannot reschedule a past session"
+                            : "Reschedule"
+                        }
+                        className={`flex-1 px-1.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors text-center uppercase ${
+                          isLive || isPast ? "opacity-50 cursor-not-allowed bg-gray-100" : "hover:bg-gray-50"
+                        }`}
                         style={{ color: COLORS.muted, border: `1px solid ${COLORS.hairline}` }}
                       >
                         Reschedule
                       </button>
                       <button
-                        onClick={() => sid && openCancelModal(sid, bookingId as string)}
-                        className="flex-1 px-1.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors hover:bg-red-50 text-center text-red-600 uppercase"
+                        onClick={() => {
+                          if (!isLive && !isPast && sid) openCancelModal(sid, bookingId as string);
+                        }}
+                        disabled={isLive || isPast}
+                        title={
+                          isLive
+                            ? "Cannot cancel a session that is already in progress"
+                            : isPast
+                            ? "Cannot cancel a past session"
+                            : "Cancel"
+                        }
+                        className={`flex-1 px-1.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors text-center uppercase ${
+                          isLive || isPast ? "opacity-50 cursor-not-allowed bg-red-50 text-red-400" : "hover:bg-red-50 text-red-600"
+                        }`}
                         style={{ border: `1px solid #fca5a5` }}
                       >
                         Cancel
