@@ -130,13 +130,16 @@ export default function ServiceModal({
     // to pehla valid option auto-select kar do — taaki service hamesha
     // mentor ki actual availability slot-duration ke according bane.
     useEffect(() => {
-        if (!availableDurations?.length) return;
+        const durations = formData?.serviceType === 'group_session'
+            ? availableDurations.filter((d) => d >= 30)
+            : availableDurations;
+        if (!durations?.length) return;
         const current = Number(formData?.duration);
-        if (!current || !availableDurations.includes(current)) {
-            setFormData({ ...formData, duration: availableDurations[0] });
+        if (!current || !durations.includes(current)) {
+            setFormData({ ...formData, duration: durations[0] });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [availableDurations]);
+    }, [availableDurations, formData?.serviceType]);
 
     // ✅ NEW: "Ask a Query" select hote hi response time default 1 Day
     // set kar do agar pehle se koi valid value nahi hai.
@@ -152,6 +155,15 @@ export default function ServiceModal({
     const needsDescription = currentServiceType?.needsDescription ?? true;
     const needsParticipants = currentServiceType?.needsParticipants ?? true;
     const ServiceIcon = currentServiceType?.icon || FileText;
+
+    // ✅ FIX: backend's createGroupSessionValidator requires duration >= 30
+    // (Joi.number().min(30).max(180)), but availableDurations' default
+    // ([15, 30, 45, 60]) always included 15 min — selecting it always got
+    // rejected with a generic "Validation failed" the user couldn't debug.
+    // Group sessions now only ever offer durations the backend actually accepts.
+    const effectiveDurations = formData?.serviceType === 'group_session'
+        ? availableDurations.filter((d) => d >= 30)
+        : availableDurations;
 
     const thumbnailPreview = useMemo(() => {
         if (!formData?.thumbnailImage) return null;
@@ -428,7 +440,7 @@ export default function ServiceModal({
                                     <div>
                             <FieldLabel icon={Clock}>Duration (min)</FieldLabel>
                             <div className="flex flex-wrap gap-2">
-                                {availableDurations.map(min => {
+                                {effectiveDurations.map(min => {
                                     const isActive = Number(formData?.duration) === min;
                                     return (
                                         <button
