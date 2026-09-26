@@ -231,7 +231,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
 
     return (
         <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px" }}>
-            <div style={{ maxWidth: "1200px", margin: "0 auto", borderRadius: "24px", padding: "40px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)" }}>
+            <div style={{ maxWidth: "960px", margin: "0 auto", borderRadius: "24px", padding: "40px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)" }}>
                 <div style={{ marginBottom: "16px" }}>
                     <button
                         onClick={onBack}
@@ -255,13 +255,13 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                 <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>Select Date &amp; Time</h2>
                 <p style={{ color: C.mid, fontSize: "13px", marginBottom: "24px" }}>Booking: {selectedService?.title}{serviceDuration > 0 ? ` (${serviceDuration} min)` : ""}</p>
                 {/* 2-Column Grid Layout */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "40px", alignItems: "start" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 350px) 1fr", gap: "48px", alignItems: "start" }}>
                     {/* LEFT COLUMN - CALENDAR */}
-                    <div>
+                    <div style={{ maxWidth: "350px", width: "100%" }}>
                         {/* Month Nav */}
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                             <button className="text-[#4a3728]" onClick={() => setCurrentMonth(new Date(year, month - 1))} style={{ padding: "8px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.bg, cursor: "pointer" }}><ChevronLeft /></button>
-                            <span style={{ fontWeight: "bold", color: C.dark, fontSize: "17px" }}>{MONTHS[month]} {year}</span>
+                            <span style={{ fontWeight: "bold", color: C.dark, fontSize: "16px" }}>{MONTHS[month]} {year}</span>
                             <button className="text-[#4a3728]" onClick={() => setCurrentMonth(new Date(year, month + 1))} style={{ padding: "8px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.bg, cursor: "pointer" }}><ChevronRight /></button>
                         </div>
 
@@ -318,18 +318,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
 
                     {/* RIGHT COLUMN - TIME SLOTS & BUTTON */}
                     <div>
-                        <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "16px", fontSize: "16px" }}>Total Available Time Slots: {bookableSlots.length}</h3>
-                        <p style={{ fontSize: "14px", color: C.mid, marginBottom: "24px" }}>
-                            {isGroupTemplate
-                                ? (bookableSlots.length > 0
-                                    ? "Pick a slot below — some may already have a session open for others to join."
-                                    : "No free time available")
-                                : (freeWindows.length > 0
-                                    ? freeWindows
-                                        .map((w) => `${formatTimeAMPM(toTimeString(w.start))} - ${formatTimeAMPM(toTimeString(w.end))}`)
-                                        .join(", ")
-                                    : "No free time available")}
-                        </p>
+                        <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "20px", fontSize: "16px" }}>Total Available Time Slots: {bookableSlots.length}</h3>
 
                         {!selectedDate && (
                             <p className="text-[#4a3728] font-bold" style={{ textAlign: "center", fontSize: "18px", padding: "16px", background: C.bg, borderRadius: "8px" }}>
