@@ -33,7 +33,7 @@ export default function SessionRoomPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const sessionId = params?.sessionId as string;
-  const bookingId = searchParams?.get('bookingId') || '';
+  const bookingId = searchParams?.get('bookingId') || searchParams?.get('roomId') || '';
   const roomId = bookingId || sessionId;
 
   const { user } = useAuth();
