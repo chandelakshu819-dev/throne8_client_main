@@ -1,5 +1,5 @@
 // mentorDashboard/components/ProfilePage.tsx=> Main Profile
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useRef } from "react"
 import {
   User,
   Camera,
@@ -13,6 +13,8 @@ import {
   Rocket,
   AlertTriangle,
   ArrowRight,
+  X,
+  Trash2,
 } from "lucide-react"
 import VerificationModalPreview from "../profile/modal/VerificationModal";
 import TermsAndConditionsModal from "../profile/modal/TermsAndConditionsModal";
@@ -85,6 +87,8 @@ export default function ProfilePage({
   });
   const [approvalStatus, setApprovalStatus] = useState<'idle' | 'pending' | 'approved' | 'submitting'>('idle');
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ✅ FIX: was hardcoded "1,234 views" for every mentor. Now reads the
   // real count from liveMentorData, trying a few likely field-name shapes
@@ -199,8 +203,12 @@ export default function ProfilePage({
             <div className="flex items-center gap-4">
               {/* Compact editable avatar */}
               <div className="relative group shrink-0">
-                <label className="cursor-pointer block">
-                  <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+                <button
+                  type="button"
+                  onClick={() => setShowPhotoModal(true)}
+                  className="cursor-pointer block text-left focus:outline-none"
+                  title="View / Change Profile Photo"
+                >
                   <div className="w-16 h-16 rounded-xl overflow-hidden" style={{ border: '2px solid #e0d8cf' }}>
                     {currentPhoto ? (
                       <img src={currentPhoto} alt="Profile" className="w-full h-full object-cover" />
@@ -213,13 +221,24 @@ export default function ProfilePage({
                   <div className="absolute inset-0 rounded-xl flex items-center justify-center bg-black/0 group-hover:bg-black/40 transition-colors">
                     <Camera className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
-                </label>
+                </button>
                 {isVerified && (
                   <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: '#4a3728', border: '2px solid #fff' }}>
                     <CheckCircle2 className="w-3 h-3 text-white" />
                   </div>
                 )}
               </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  handlePhotoUpload(e);
+                  setShowPhotoModal(false);
+                }}
+                className="hidden"
+              />
 
               <div>
                 <p className="text-lg font-bold" style={{ color: "#4a3728" }}>
@@ -551,6 +570,84 @@ export default function ProfilePage({
           setShowUpdateModal(false);
         }}
       />
+
+      {/* Profile Photo Preview & Action Modal */}
+      {showPhotoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fadeIn">
+          <div
+            className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-5 shadow-2xl relative"
+            style={{ border: '1px solid #e0d8cf' }}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold" style={{ color: '#4a3728' }}>
+                Profile Photo
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowPhotoModal(false)}
+                className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                style={{ color: '#7a5c3e' }}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Photo preview frame */}
+            <div className="flex justify-center my-2">
+              <div
+                className="w-36 h-36 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center"
+                style={{ border: '3px solid #e0d8cf', backgroundColor: '#4a3728' }}
+              >
+                {currentPhoto ? (
+                  <img src={currentPhoto} alt="Profile Preview" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-4xl font-bold text-white">{initials || 'M'}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="space-y-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-2.5 px-4 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 transition-opacity hover:opacity-90 cursor-pointer"
+                style={{ backgroundColor: '#4a3728' }}
+              >
+                <Camera className="w-4 h-4" />
+                Change Photo
+              </button>
+
+              {currentPhoto && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfilePhoto(null);
+                    if (liveMentorData) {
+                      setLiveMentorData((prev: any) => ({ ...prev, profilePic: null }));
+                    }
+                    setShowPhotoModal(false);
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors hover:bg-red-50 cursor-pointer"
+                  style={{ color: '#dc2626', border: '1px solid #fecaca' }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Remove Photo
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowPhotoModal(false)}
+                className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4] cursor-pointer"
+                style={{ backgroundColor: '#fbf7f3', color: '#7a5c3e', border: '1px solid #e0d8cf' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
