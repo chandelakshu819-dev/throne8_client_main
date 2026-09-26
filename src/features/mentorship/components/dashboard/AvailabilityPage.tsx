@@ -375,6 +375,22 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
     }, [selectedDate, currentDate, existingAvailability]);
 
 
+
+        // ✅ NEW: selected date par kitne slots already booked/blocked hain —
+    // taaki mentor ko pata chale ki uska naya time-range poora free
+    // kyun nahi ho raha (updateAvailability booked/blocked slots ko
+    // kabhi overwrite nahi karta — ye intentional hai, bas UI mein
+    // pehle invisible tha).
+    const busySlotsForSelectedDate = useMemo(() => {
+      if (!existingRecordForSelectedDate) return [];
+      return existingRecordForSelectedDate.slots.filter(
+        (s: any) => s.isBooked || s.isBlocked
+      );
+    }, [existingRecordForSelectedDate]);
+
+
+
+
     // ✅ NEW: which weekday name corresponds to the currently selected calendar
     // date — used to auto-highlight and scroll to that row in Weekly Schedule.
     const selectedDayName = useMemo(() => {
@@ -957,11 +973,15 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
               <button
                 type="button"
                 onClick={handleSaveAvailability}
-                disabled={isSaving}
+                // ✅ FIX: date select kiye bina button disable rahega —
+                // pehle "Save Month" (bulk save) hamesha enabled tha, jisse
+                // mentor galti se poore mahine ke liye save kar deti thi
+                // bina specific date pe click kiye.
+                disabled={isSaving || selectedDate === null}
                 title={
-                  selectedDate
-                    ? `Save availability for ${selectedDate} ${monthNames[currentDate.getMonth()]}`
-                    : `Save full month (${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()})`
+                  selectedDate === null
+                    ? "Select a date on the calendar first"
+                    : `Save availability for ${selectedDate} ${monthNames[currentDate.getMonth()]}`
                 }
                 className="px-3.5 py-1.5 rounded-lg text-white text-xs font-bold flex items-center gap-1.5 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90"
                 style={{ backgroundColor: '#4a3728' }}
@@ -971,9 +991,8 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                   ? "Saving..."
                   : selectedDate
                   ? `${existingRecordForSelectedDate ? "Update" : "Save"} ${selectedDate} ${monthNames[currentDate.getMonth()].slice(0, 3)}`
-                  : "Save Month"}
+                  : "Select a date"}
               </button>
-
               </div>
             </div>
                         {/* ✅ FIX: max-h + overflow-y-auto hata diya — ab list static
@@ -1160,7 +1179,7 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                 hai ki is date par pehle se availability hai (Edit) ya nahi
                 (New) — taaki mentor ko clear pata chale ki Save dabane par
                 naya record banega ya purana overwrite hoga. */}
-            <div
+                        <div
               className="mb-3 px-3 py-2 rounded-lg text-xs font-semibold text-center"
               style={{
                 backgroundColor: selectedDate && existingRecordForSelectedDate ? '#fef3c7' : '#fbf7f3',
@@ -1173,6 +1192,16 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                   ? `Editing existing availability: ${selectedDate} ${monthNames[currentDate.getMonth()]}`
                   : `New availability: ${selectedDate} ${monthNames[currentDate.getMonth()]}`
                 : `Bulk: Full month`}
+              {/* ✅ NEW: booked/blocked portion ka warning — batata hai ki
+                  is date ka kuch time already reserved hai, isliye
+                  naya range set karne par bhi wo hissa free nahi hoga */}
+              {selectedDate && busySlotsForSelectedDate.length > 0 && (
+                <div className="mt-1.5 text-[11px] font-medium" style={{ color: '#b45309' }}>
+                  ⚠️ {busySlotsForSelectedDate.length} time-slot(s) on this date are already{' '}
+                  {busySlotsForSelectedDate.some((s: any) => s.isBooked) ? 'booked' : 'blocked'} and will
+                  stay reserved: {busySlotsForSelectedDate.map((s: any) => `${s.startTime}–${s.endTime}`).join(', ')}
+                </div>
+              )}
             </div>
 
             {/* Day headers */}
