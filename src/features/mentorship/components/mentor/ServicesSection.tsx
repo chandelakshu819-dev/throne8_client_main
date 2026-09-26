@@ -789,9 +789,9 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 )}
 
 {detailGroup.description && (
-                                      <p className="mb-4 text-sm line-clamp-2" style={{ color: '#8a7a6a', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
-                                      {group.description || "Interactive group session led by an expert mentor."}
-                                    </p>
+                  <p className="mb-4 text-sm line-clamp-2" style={{ color: '#8a7a6a', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                    {detailGroup.description || "Interactive group session led by an expert mentor."}
+                  </p>
                 )}
               </div>
 
