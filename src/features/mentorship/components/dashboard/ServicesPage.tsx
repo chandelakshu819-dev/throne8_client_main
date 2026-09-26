@@ -135,6 +135,11 @@ export default function ServicesPage({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  // ✅ FIX: dropdown ab backdrop ke saath hi document.body me portal
+  // hoga (neeche dekho) — isliye ab uski local "absolute right-0 top-8"
+  // positioning kaam nahi karegi. Iski jagah "..." button ke bounding
+  // rect se fixed top/left coordinates yahan store karte hain.
+  const [menuAnchorRect, setMenuAnchorRect] = useState<{ top: number; left: number } | null>(null);  
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingSession, setEditingSession] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
@@ -852,31 +857,41 @@ export default function ServicesPage({
                               </span>
                             )}
 
-                            {service.isApi && (
+{service.isApi && (
                               <div className="relative">
                                 <button
-                                  onClick={() => setOpenMenuId(openMenuId === menuKey ? null : menuKey)}
+                                  onClick={(e) => {
+                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                    setMenuAnchorRect({ top: rect.bottom + 4, left: rect.right - 128 });
+                                    setOpenMenuId(openMenuId === menuKey ? null : menuKey);
+                                  }}
                                   className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#f3ece4] transition-colors"
                                 >
                                   <MoreVertical className="w-4 h-4" style={{ color: '#8a7a6a' }} />
                                 </button>
-                                {openMenuId === menuKey && (
+                                {/* ✅ FIX: pehle sirf backdrop portal ho raha tha, dropdown
+                                    (Edit/Delete) card ke andar hi tha. Card ka transform naya
+                                    stacking context banata hai, isliye dropdown ka z-20 sirf
+                                    card ke ANDAR hi kaam karta tha — portal'd backdrop (jo
+                                    seedha <body> ka child hai) uske upar chala jaata tha,
+                                    aur "Delete" ka pehla click backdrop pakad leta tha
+                                    (menu band ho jaata, click Delete tak pahunchta hi nahi) —
+                                    isiliye baar-baar click karna padta tha. Fix: menu ko bhi
+                                    backdrop ke saath hi document.body me portal karo, aur
+                                    "..." button ke bounding rect (menuAnchorRect) se fixed
+                                    position do — ab dono true siblings hain, z-index sahi
+                                    compare hoga. */}
+                                {openMenuId === menuKey && typeof document !== "undefined" && createPortal(
                                   <>
-                                    {/* ✅ FIX: backdrop portal'd to document.body — the card has
-                                        `hover:-translate-y-0.5` (a transform), and a transform on
-                                        any ancestor makes `position: fixed` descendants scope to
-                                        that ancestor's box instead of the full viewport. So this
-                                        backdrop was only covering the hovered card, not the whole
-                                        screen — clicks truly outside the card never reached it and
-                                        the menu never closed. Portaling escapes that stacking
-                                        context entirely. */}
-                                    {typeof document !== "undefined" && createPortal(
-                                      <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />,
-                                      document.body
-                                    )}
+                                    <div className="fixed inset-0 z-[100]" onClick={() => setOpenMenuId(null)} />
                                     <div
-                                      className="absolute right-0 top-8 z-20 w-32 rounded-lg shadow-lg overflow-hidden"
-                                      style={{ border: '1px solid #e0d8cf', backgroundColor: '#fff' }}
+                                      className="fixed z-[101] w-32 rounded-lg shadow-lg overflow-hidden"
+                                      style={{
+                                        top: menuAnchorRect?.top ?? 0,
+                                        left: menuAnchorRect?.left ?? 0,
+                                        border: '1px solid #e0d8cf',
+                                        backgroundColor: '#fff',
+                                      }}
                                     >
                                       <button
                                         onClick={() => handleEditService(service)}
@@ -895,7 +910,8 @@ export default function ServicesPage({
                                         Delete
                                       </button>
                                     </div>
-                                  </>
+                                  </>,
+                                  document.body
                                 )}
                               </div>
                             )}
@@ -1061,25 +1077,31 @@ export default function ServicesPage({
                                 </span>
                               )}
 
-                              <div className="relative">
+<div className="relative">
                                 <button
-                                  onClick={() => setOpenMenuId(openMenuId === menuKey ? null : menuKey)}
+                                  onClick={(e) => {
+                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                    setMenuAnchorRect({ top: rect.bottom + 4, left: rect.right - 128 });
+                                    setOpenMenuId(openMenuId === menuKey ? null : menuKey);
+                                  }}
                                   className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#f3ece4] transition-colors"
                                 >
                                   <MoreVertical className="w-4 h-4" style={{ color: '#8a7a6a' }} />
                                 </button>
-                                {openMenuId === menuKey && (
+                                {/* ✅ FIX: same stacking-context fix as the services menu
+                                    above — menu ab backdrop ke saath document.body me
+                                    portal hota hai, fixed rect-based position ke saath. */}
+                                {openMenuId === menuKey && typeof document !== "undefined" && createPortal(
                                   <>
-                                    {/* ✅ FIX: same portal fix as the services menu above — see
-                                        the comment there for why the plain "fixed inset-0" backdrop
-                                        wasn't catching outside clicks. */}
-                                    {typeof document !== "undefined" && createPortal(
-                                      <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />,
-                                      document.body
-                                    )}
+                                    <div className="fixed inset-0 z-[100]" onClick={() => setOpenMenuId(null)} />
                                     <div
-                                      className="absolute right-0 top-8 z-20 w-32 rounded-lg shadow-lg overflow-hidden"
-                                      style={{ border: '1px solid #e0d8cf', backgroundColor: '#fff' }}
+                                      className="fixed z-[101] w-32 rounded-lg shadow-lg overflow-hidden"
+                                      style={{
+                                        top: menuAnchorRect?.top ?? 0,
+                                        left: menuAnchorRect?.left ?? 0,
+                                        border: '1px solid #e0d8cf',
+                                        backgroundColor: '#fff',
+                                      }}
                                     >
                                       <button
                                         onClick={() => {
@@ -1102,7 +1124,8 @@ export default function ServicesPage({
                                         Delete
                                       </button>
                                     </div>
-                                  </>
+                                  </>,
+                                  document.body
                                 )}
                               </div>
                             </div>
