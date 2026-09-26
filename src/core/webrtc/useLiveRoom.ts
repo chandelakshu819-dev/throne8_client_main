@@ -220,6 +220,7 @@ export function useLiveRoom({
   const audioAnalysers = useRef<Map<string, AnalyserNode>>(new Map());
   const reconnectTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const retryCount = useRef<Map<string, number>>(new Map());
+  const iceCandidateQueue = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const isMounted = useRef(true);
 
   // ── State ─────────────────────────────────────────────────
@@ -264,6 +265,7 @@ export function useLiveRoom({
     const timer = reconnectTimers.current.get(socketId);
     if (timer) { clearTimeout(timer); reconnectTimers.current.delete(socketId); }
     retryCount.current.delete(socketId);
+    iceCandidateQueue.current.delete(socketId);
     audioAnalysers.current.delete(socketId);
 
     setPeers((prev) => {
@@ -865,6 +867,7 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
     // Unmount pe stats effect ka apna cleanup ise clear karta hai.
     audioAnalysers.current.clear();
     retryCount.current.clear();
+    iceCandidateQueue.current.clear();
     if (audioContextRef.current) {
       audioContextRef.current.close();
       audioContextRef.current = null;
@@ -970,6 +973,13 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
     
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(offer));
+            
+            const queued = iceCandidateQueue.current.get(fromUserId) || [];
+            for (const c of queued) {
+              await pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+            }
+            iceCandidateQueue.current.delete(fromUserId);
+
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
     
@@ -998,6 +1008,12 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
         // Guard against invalid state (e.g., duplicate answer)
         if (pc.signalingState !== 'have-local-offer') return;
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
+
+        const queued = iceCandidateQueue.current.get(fromUserId) || [];
+        for (const c of queued) {
+          await pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+        }
+        iceCandidateQueue.current.delete(fromUserId);
       } catch (err) {
         console.error('[WebRTC] setRemoteDescription (answer) failed', err);
       }
@@ -1012,7 +1028,13 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
       candidate: RTCIceCandidateInit;
     }) => {
       const pc = peerConnections.current.get(fromUserId);
-      if (!pc) return;
+
+      if (!pc || !pc.remoteDescription) {
+        const queued = iceCandidateQueue.current.get(fromUserId) || [];
+        queued.push(candidate);
+        iceCandidateQueue.current.set(fromUserId, queued);
+        return;
+      }
 
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
