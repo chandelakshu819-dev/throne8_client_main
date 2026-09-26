@@ -26,6 +26,7 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
 }) => {
     const [paymentMethod, setPaymentMethod] = useState<string>("");
     const [booking, setBooking] = useState(false);
+    const [bookingError, setBookingError] = useState<string | null>(null);
 
     const paymentMethodMap: Record<string, string> = {
         upi: "razorpay",
@@ -85,14 +86,17 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                 });
             }
 
-            // Success — mentor profile par redirect
-            onBookingSuccess();
-        } catch (error: any) {
-            console.error("Booking failed:", error.message);
-            console.error("Full error:", error?.response?.data); // ye undefined rahega
-            setBooking(false);
-        }
-    };
+                      // Success — mentor profile par redirect
+                      onBookingSuccess();
+                    } catch (error: any) {
+                        console.error("Booking failed:", error.message);
+                        console.error("Full error:", error?.response?.data);
+                        setBookingError(
+                            error?.response?.data?.message || error?.message || "Booking failed. Please try again."
+                        );
+                        setBooking(false);
+                    }
+                };
 
 
     // 👇 Booking loader screen
@@ -149,6 +153,11 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                 {paymentMethod === "card" && <><input type="text" placeholder="Card Number" style={inp} /><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}><input type="text" placeholder="MM/YY" style={{ ...inp, marginBottom: 0 }} /><input type="text" placeholder="CVV" style={{ ...inp, marginBottom: 0 }} /></div></>}
                 {paymentMethod === "wallet" && <select style={sel}><option>Select Wallet</option>{WALLETS.map(w => <option key={w}>{w}</option>)}</select>}
 
+                {bookingError && (
+                    <div style={{ padding: "12px 16px", borderRadius: "12px", background: "#fee2e2", border: "1px solid #fca5a5", color: "#dc2626", fontSize: "13px", fontWeight: 600, marginTop: "16px" }}>
+                        ❌ {bookingError}
+                    </div>
+                )}
                 {paymentMethod && (
                     <button onClick={handleBookSession} style={{ ...btnPrimary, width: "100%", padding: "16px", borderRadius: "12px", fontSize: "17px", marginTop: "16px" }}>
                         {isGroupSession ? `Pay ₹${total} & Send Join Request 💳` : `Pay ₹${total} 💳`}
