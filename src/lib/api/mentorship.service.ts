@@ -654,11 +654,13 @@ class MentorService {
    * Mentor has to accept the request first.
    */
   static async requestToJoinGroupSession(
-    sessionId: string
+    sessionId: string,
+    transactionId?: string
   ): Promise<any> {
     try {
       const { data } = await api.post(
-        `/mentorship/group-sessions/${sessionId}/request`
+        `/mentorship/group-sessions/${sessionId}/request`,
+        { transactionId }
       );
 
       return data;
@@ -822,8 +824,9 @@ class MentorService {
         // `startTime` or `availabilityId`. Sending those alone meant every
         // request failed with 400 "scheduledAt is required to pick a slot".
         // Combine date + startTime into the ISO datetime the backend expects.
-        const scheduledAt = new Date(`${payload.date}T${payload.startTime}:00`).toISOString();
-  
+        const scheduledAt = new Date(`${payload.date}T${payload.startTime}:00+05:30`).toISOString();
+        
+        
         const { data } = await api.post(
           `/mentorship/group-sessions/${templateId}/join-by-slot`,
           { scheduledAt, transactionId: payload.transactionId }
