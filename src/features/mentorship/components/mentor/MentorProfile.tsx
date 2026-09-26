@@ -7,6 +7,8 @@ import type { BookingStep, Service, CalendarData, FormData as BookingFormData } 
 import MentorSidebar from "./MentorSidebar";
 import ServicesSection from "./ServicesSection";
 import ReviewsSection from "./ReviewsSection";
+import { ArrowLeft } from "lucide-react";
+
 
 import CalendarStep from "./CalendarStep";
 import QueryStep from "./QueryStep";
