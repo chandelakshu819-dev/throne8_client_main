@@ -206,7 +206,7 @@ export default function UserDashboardLayout({
   // WebRTC room.
   const handleJoinLiveSession = () => {
     if (!liveSession) return;
-    router.push(`/mentorship/session-room/${liveSession.sessionId}`);
+    router.push(`/mentorship/session-room/${liveSession.sessionId}?bookingId=${liveSession.bookingId || ''}`);
     setLiveSession(null);
   };
 
