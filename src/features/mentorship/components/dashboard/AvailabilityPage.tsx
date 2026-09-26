@@ -375,18 +375,8 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
     }, [selectedDate, currentDate, existingAvailability]);
 
 
-
-        // ✅ NEW: selected date par kitne slots already booked/blocked hain —
-    // taaki mentor ko pata chale ki uska naya time-range poora free
-    // kyun nahi ho raha (updateAvailability booked/blocked slots ko
-    // kabhi overwrite nahi karta — ye intentional hai, bas UI mein
-    // pehle invisible tha).
-    const busySlotsForSelectedDate = useMemo(() => {
-      if (!existingRecordForSelectedDate) return [];
-      return existingRecordForSelectedDate.slots.filter(
-        (s: any) => s.isBooked || s.isBlocked
-      );
-    }, [existingRecordForSelectedDate]);
+        // ✅ REMOVED: busySlotsForSelectedDate ab kahin use nahi ho raha
+    // (mode badge hata diya gaya), isliye ye memo bhi hata diya.
 
 
 
@@ -1175,34 +1165,11 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
               </div>
             </div>
 
-                       {/* Mode badge — ✅ FIX: ab sirf date nahi, balki ye bhi dikhata
-                hai ki is date par pehle se availability hai (Edit) ya nahi
-                (New) — taaki mentor ko clear pata chale ki Save dabane par
-                naya record banega ya purana overwrite hoga. */}
-                        <div
-              className="mb-3 px-3 py-2 rounded-lg text-xs font-semibold text-center"
-              style={{
-                backgroundColor: selectedDate && existingRecordForSelectedDate ? '#fef3c7' : '#fbf7f3',
-                color: selectedDate && existingRecordForSelectedDate ? '#b45309' : '#7a5c3e',
-                border: `1px solid ${selectedDate && existingRecordForSelectedDate ? '#fcd34d' : '#e0d8cf'}`,
-              }}
-            >
-              {selectedDate
-                ? existingRecordForSelectedDate
-                  ? `Editing existing availability: ${selectedDate} ${monthNames[currentDate.getMonth()]}`
-                  : `New availability: ${selectedDate} ${monthNames[currentDate.getMonth()]}`
-                : `Bulk: Full month`}
-              {/* ✅ NEW: booked/blocked portion ka warning — batata hai ki
-                  is date ka kuch time already reserved hai, isliye
-                  naya range set karne par bhi wo hissa free nahi hoga */}
-              {selectedDate && busySlotsForSelectedDate.length > 0 && (
-                <div className="mt-1.5 text-[11px] font-medium" style={{ color: '#b45309' }}>
-                  ⚠️ {busySlotsForSelectedDate.length} time-slot(s) on this date are already{' '}
-                  {busySlotsForSelectedDate.some((s: any) => s.isBooked) ? 'booked' : 'blocked'} and will
-                  stay reserved: {busySlotsForSelectedDate.map((s: any) => `${s.startTime}–${s.endTime}`).join(', ')}
-                </div>
-              )}
-            </div>
+                                            {/* ✅ REMOVED: mode badge + busy-slot warning box hata diya gaya —
+                mentor ke liye ye visually clutter/confusing tha, calendar ke
+                upar dikhta tha. Selected-date info ab sirf Save button ke
+                label ("Update 26 Sep" / "Save 26 Sep") se hi pata chalega. */}
+
 
             {/* Day headers */}
             <div className="grid grid-cols-7 gap-1 mb-1.5">
