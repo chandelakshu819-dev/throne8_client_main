@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { ArrowLeft } from "./Icons";
 import { PAY_METHODS, C, btnPrimary } from "../../types/data";
 import type { CalendarData, Service, FormData as BookingFormData } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
@@ -39,12 +40,6 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
     const gst: number = Math.round(price * 0.18);
     const total: number = price + gst;
 
-       // ✅ NEW: Group Session ("GroupSession" type) is a template — after
-    // the mock payment step "succeeds" here, it sends a join REQUEST for
-    // the selected slot instead of a direct paid booking. This is the
-    // point where availability-based Group Session booking actually
-    // happens, mirroring the same details → payment flow every other
-    // service already uses.
     const isGroupSession = selectedService?.type === "GroupSession";
 
     const handleBookSession = async () => {
@@ -52,12 +47,11 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
         setBooking(true);
 
         try {
-            // scheduledAt banana — date + slotTime se
             const { selectedDate, currentMonth, availabilityId, slotTime } = calendarData;
             const year = currentMonth.getFullYear();
             const month = String(currentMonth.getMonth() + 1).padStart(2, "0");
             const day = String(selectedDate).padStart(2, "0");
-            const startTime = slotTime.split(" - ")[0]; // "10:00"
+            const startTime = slotTime.split(" - ")[0];
 
             if (isGroupSession) {
                 await MentorService.joinGroupSessionBySlot(String(selectedService?.id || ""), {
@@ -70,7 +64,7 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                 const scheduledAt = new Date(`${year}-${month}-${day}T${startTime}:00+05:30`).toISOString();
 
                 await SessionService.bookSession({
-                    sessionId: String(selectedService?.id || ""),  // ✅ ye ab sessionId hai
+                    sessionId: String(selectedService?.id || ""),
                     mentorId,
                     availabilityId,
                     slotTime,
@@ -86,20 +80,17 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                 });
             }
 
-                      // Success — mentor profile par redirect
-                      onBookingSuccess();
-                    } catch (error: any) {
-                        console.error("Booking failed:", error.message);
-                        console.error("Full error:", error?.response?.data);
-                        setBookingError(
-                            error?.response?.data?.message || error?.message || "Booking failed. Please try again."
-                        );
-                        setBooking(false);
-                    }
-                };
+            onBookingSuccess();
+        } catch (error: any) {
+            console.error("Booking failed:", error.message);
+            console.error("Full error:", error?.response?.data);
+            setBookingError(
+                error?.response?.data?.message || error?.message || "Booking failed. Please try again."
+            );
+            setBooking(false);
+        }
+    };
 
-
-    // 👇 Booking loader screen
     if (booking) {
         return (
             <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, gap: "20px" }}>
@@ -116,11 +107,27 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
 
     return (
         <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px" }}>
-            <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: C.mid, display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", fontWeight: 500, marginBottom: "24px" }}>
-                ← Back to Details
-            </button>
-
             <div style={{ maxWidth: "700px", margin: "0 auto", borderRadius: "24px", padding: "40px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)" }}>
+                <div style={{ marginBottom: "16px" }}>
+                    <button
+                        onClick={onBack}
+                        style={{
+                            background: "transparent",
+                            border: `1px solid ${C.border}`,
+                            cursor: "pointer",
+                            color: C.dark,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            padding: "8px 16px",
+                            borderRadius: "8px",
+                        }}
+                    >
+                        <ArrowLeft /> Back
+                    </button>
+                </div>
                 <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>Payment Method</h2>
                 <p style={{ color: C.mid, fontSize: "13px", marginBottom: "24px" }}>Choose your preferred payment method</p>
 
