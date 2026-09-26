@@ -5,8 +5,8 @@ export interface MentorReview {
   _id?: string;
   reviewId?: string;
   sessionId: string;
-  mentorId: string;
-  menteeId?: string;
+  mentorId: string | any;
+  menteeId?: string | any;
   rating: number;
   comment: string;
   helpfulCount?: number;
@@ -18,12 +18,25 @@ export interface MentorReview {
   mentee?: {
     firstName?: string;
     lastName?: string;
+    fullName?: string;
+    name?: string;
     profilePhotoId?: string | null;
+    profilePic?: string | null;
+    title?: string;
   };
   mentor?: {
     firstName?: string;
     lastName?: string;
+    fullName?: string;
+    name?: string;
     profilePhotoId?: string | null;
+    profilePic?: string | null;
+    title?: string;
+  };
+  session?: {
+    title?: string;
+    sessionType?: string;
+    scheduledAt?: string;
   };
 }
 

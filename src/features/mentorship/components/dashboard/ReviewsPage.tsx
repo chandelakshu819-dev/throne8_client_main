@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react"
-import { Star, Quote, ThumbsUp, Loader2 } from "lucide-react"
+import { Star, ThumbsUp, Loader2 } from "lucide-react"
 import ReviewService, { MentorReview, ReviewStats } from "@/lib/api/review.service"
 
 const COLORS = {
@@ -7,13 +7,28 @@ const COLORS = {
   accent: "#7a5c3e",
   hairline: "#e0d8cf",
   wash: "#f6ede8",
+  softWash: "#fbf7f3",
+  chip: "#f3ece4",
   paper: "#fffdfb",
-  gold: "#c9932a",
+  gold: "#c9a87c",
   muted: "#8a7a6a",
 }
 
+const TAG_LABELS: Record<string, string> = {
+  helpful: "Helpful",
+  knowledgeable: "Knowledgeable",
+  patient: "Patient",
+  prepared: "Prepared",
+  punctual: "Punctual",
+  friendly: "Friendly",
+  professional: "Professional",
+  insightful: "Insightful",
+  responsive: "Responsive",
+  exceeded_expectations: "Exceeded expectations",
+}
+
 interface ReviewsPageProps {
-  mentorData?: { mentorId?: string }; // DashboardLayout se aata hai
+  mentorData?: { mentorId?: string }
 }
 
 function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
@@ -25,8 +40,8 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
           width={size}
           height={size}
           style={{
-            color: i < rating ? COLORS.gold : COLORS.hairline,
-            fill: i < rating ? COLORS.gold : "transparent",
+            color: i < rating ? COLORS.gold : COLORS.chip,
+            fill: i < rating ? COLORS.gold : "none",
           }}
         />
       ))}
@@ -34,8 +49,10 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
   )
 }
 
-function timeAgo(dateStr: string) {
+function timeAgo(dateStr?: string) {
+  if (!dateStr) return "recently"
   const diffMs = Date.now() - new Date(dateStr).getTime()
+  if (isNaN(diffMs)) return "recently"
   const mins = Math.floor(diffMs / 60000)
   if (mins < 60) return `${mins || 1} min ago`
   const hrs = Math.floor(mins / 60)
@@ -44,7 +61,38 @@ function timeAgo(dateStr: string) {
   if (days < 7) return `${days}d ago`
   const weeks = Math.floor(days / 7)
   if (weeks < 5) return `${weeks}w ago`
-  return new Date(dateStr).toLocaleDateString()
+  return new Date(dateStr).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+}
+
+function getMenteeName(review: MentorReview): string {
+  if (review.mentee?.fullName && review.mentee.fullName.trim()) return review.mentee.fullName.trim()
+  if (review.mentee?.name && review.mentee.name.trim()) return review.mentee.name.trim()
+  if (review.mentee?.firstName) {
+    const full = `${review.mentee.firstName} ${review.mentee.lastName || ""}`.trim()
+    if (full) return full
+  }
+  if (typeof review.menteeId === "object" && review.menteeId !== null) {
+    const idObj = review.menteeId as any
+    if (idObj.fullName && idObj.fullName.trim()) return idObj.fullName.trim()
+    if (idObj.name && idObj.name.trim()) return idObj.name.trim()
+  }
+  return "Mentee"
+}
+
+function getMenteePhoto(review: MentorReview): string | undefined {
+  if (review.mentee?.profilePic) return review.mentee.profilePic
+  if (review.mentee?.profilePhotoId) return review.mentee.profilePhotoId
+  if (typeof review.menteeId === "object" && review.menteeId !== null) {
+    const idObj = review.menteeId as any
+    if (idObj.profilePic) return idObj.profilePic
+  }
+  return undefined
+}
+
+function initialsFrom(name: string) {
+  const parts = name.trim().split(" ").filter(Boolean)
+  if (parts.length === 0) return "M"
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase()
 }
 
 export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
@@ -72,8 +120,8 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
       setTotalPages(reviewsRes.pagination.totalPages)
       setPage(1)
     } catch (err) {
-       console.error('Review load error:', err);
-      setError("Reviews load nahi ho paaye. Try again.")
+      console.error("Review load error:", err)
+      setError("Failed to load reviews. Please try again.")
     } finally {
       setLoading(false)
     }
@@ -101,22 +149,30 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
   const handleHelpful = async (reviewId: string) => {
     // optimistic update
     setReviews((prev) =>
-      prev.map((r) => (r.reviewId === reviewId ? { ...r, helpfulCount: r.helpfulCount + 1 } : r))
+      prev.map((r) =>
+        r.reviewId === reviewId || r._id === reviewId || r.id === reviewId
+          ? { ...r, helpfulCount: (r.helpfulCount || 0) + 1 }
+          : r
+      )
     )
     try {
       await ReviewService.markHelpful(reviewId)
     } catch (e) {
       // revert on failure
       setReviews((prev) =>
-        prev.map((r) => (r.reviewId === reviewId ? { ...r, helpfulCount: r.helpfulCount - 1 } : r))
+        prev.map((r) =>
+          r.reviewId === reviewId || r._id === reviewId || r.id === reviewId
+            ? { ...r, helpfulCount: Math.max(0, (r.helpfulCount || 1) - 1) }
+            : r
+        )
       )
     }
   }
 
   if (!mentorId) {
     return (
-      <div className="text-sm italic" style={{ color: COLORS.muted }}>
-        Mentor profile load hone ka wait karo...
+      <div className="text-sm italic p-4" style={{ color: COLORS.muted }}>
+        Waiting for mentor profile to load...
       </div>
     )
   }
@@ -125,14 +181,14 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
     return (
       <div className="flex items-center gap-2 py-16 justify-center" style={{ color: COLORS.muted }}>
         <Loader2 className="w-5 h-5 animate-spin" />
-        <span className="text-sm">Loading reviews...</span>
+        <span className="text-sm font-medium">Loading reviews...</span>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="text-sm py-16 text-center" style={{ color: "#b45309" }}>
+      <div className="text-sm py-16 text-center" style={{ color: "#dc2626" }}>
         {error}
       </div>
     )
@@ -159,11 +215,9 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
     { label: "5-star", value: String(fiveStar) },
   ]
 
-  const featured = reviews[0] // sabse recent/pehla ko featured treat kar rahe hain
-  const rest = reviews.slice(1)
-
   return (
-    <div className="space-y-10 max-w-3xl">
+    <div className="space-y-8 max-w-4xl pt-2 pb-8">
+      {/* Page Header */}
       <div>
         <h2 className="text-2xl font-bold" style={{ color: COLORS.ink }}>
           Reviews &amp; ratings
@@ -174,23 +228,24 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
       </div>
 
       {totalReviews === 0 ? (
-        <div className="text-center py-16">
+        <div className="text-center py-16 border rounded-2xl bg-white" style={{ borderColor: COLORS.hairline }}>
           <p className="text-sm italic" style={{ color: COLORS.muted }}>
-            Abhi tak koi review nahi mila. Session complete hone ke baad reviews yahan dikhenge.
+            No reviews received yet. Reviews will appear here after students complete sessions.
           </p>
         </div>
       ) : (
         <>
+          {/* Rating Summary Header */}
           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-x-12 gap-y-6">
             <div>
               <div className="text-7xl font-bold leading-none tabular-nums" style={{ color: COLORS.ink }}>
                 {averageRating.toFixed(1)}
               </div>
               <div className="mt-3">
-                <StarRow rating={Math.round(averageRating)} size={16} />
+                <StarRow rating={Math.round(averageRating)} size={18} />
               </div>
               <p className="text-sm mt-2" style={{ color: COLORS.muted }}>
-                from {totalReviews} reviews
+                from {totalReviews} {totalReviews === 1 ? "review" : "reviews"}
               </p>
             </div>
 
@@ -202,9 +257,9 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
                     <span className="text-xs w-3 text-right" style={{ color: COLORS.muted }}>
                       {row.stars}
                     </span>
-                    <div className="flex-1 h-1.5 rounded-full" style={{ backgroundColor: COLORS.wash }}>
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: COLORS.wash }}>
                       <div
-                        className="h-full rounded-full"
+                        className="h-full rounded-full transition-all duration-300"
                         style={{ width: `${pct}%`, backgroundColor: COLORS.accent }}
                       />
                     </div>
@@ -217,111 +272,173 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
             </div>
           </div>
 
+          {/* Quick Stats Banner */}
           <div
-            className="flex flex-wrap"
-            style={{ borderTop: `1px solid ${COLORS.hairline}`, borderBottom: `1px solid ${COLORS.hairline}` }}
+            className="flex flex-wrap rounded-2xl bg-white overflow-hidden shadow-sm"
+            style={{ border: `1px solid ${COLORS.hairline}` }}
           >
             {statCards.map((stat, idx) => (
               <div
                 key={idx}
-                className="flex-1 min-w-[120px] py-5 px-6"
+                className="flex-1 min-w-[120px] py-4 px-6 text-center sm:text-left"
                 style={{ borderLeft: idx === 0 ? "none" : `1px solid ${COLORS.hairline}` }}
               >
                 <div className="text-2xl font-bold" style={{ color: COLORS.ink }}>
                   {stat.value}
                 </div>
-                <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
+                <div className="text-xs mt-0.5" style={{ color: COLORS.muted }}>
                   {stat.label}
                 </div>
               </div>
             ))}
           </div>
 
-          {featured && (
-            <div className="flex gap-4">
-              <Quote className="w-8 h-8 shrink-0 mt-1" style={{ color: COLORS.hairline }} />
-              <div>
-                <p className="text-xl leading-snug" style={{ color: COLORS.ink }}>
-                  {featured.comment}
-                </p>
-                <div className="flex items-center gap-3 mt-4 flex-wrap">
-                  <StarRow rating={featured.rating} />
-                  <span className="text-sm font-semibold" style={{ color: COLORS.ink }}>
-                    {/* ⚠️ backend abhi naam nahi bhejta — menteeId fallback */}
-                    Mentee
-                  </span>
-                  <span className="text-sm" style={{ color: COLORS.muted }}>
-                    · {timeAgo(featured.createdAt)}
-                  </span>
-                  {featured.tags?.length > 0 && (
-                    <span className="text-xs flex gap-1.5 flex-wrap">
-                      {featured.tags.map((t) => (
-                        <span
-                          key={t}
-                          className="px-2 py-0.5 rounded-full"
-                          style={{ backgroundColor: COLORS.wash, color: COLORS.accent }}
-                        >
-                          {t.replace(/_/g, " ")}
-                        </span>
-                      ))}
-                    </span>
-                  )}
-                </div>
-                {featured.mentorResponse?.comment && (
-                  <div className="mt-3 pl-4" style={{ borderLeft: `2px solid ${COLORS.hairline}` }}>
-                    <p className="text-xs font-semibold mb-1" style={{ color: COLORS.accent }}>
-                      Your response
-                    </p>
-                    <p className="text-sm" style={{ color: COLORS.muted }}>
-                      {featured.mentorResponse.comment}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Individual Reviews Cards (Matching Mentee Reviews UI) */}
+          <div className="space-y-4 pt-2">
+            {reviews.map((review, idx) => {
+              const reviewId = review.reviewId || review._id || review.id || `rev-${idx}`
+              const menteeName = getMenteeName(review)
+              const photo = getMenteePhoto(review)
+              const rating = review.rating || 0
+              const comment = review.comment || "No written feedback provided."
+              const tags = Array.isArray(review.tags) ? review.tags : []
+              const sessionTitle = review.session?.title || "Mentorship Session"
 
-          <div>
-            {rest.map((review) => (
-              <div
-                key={review.reviewId}
-                className="py-5 flex flex-col sm:flex-row sm:items-baseline sm:gap-6"
-                style={{ borderTop: `1px solid ${COLORS.hairline}` }}
-              >
-                <div className="flex items-center gap-2 sm:w-44 shrink-0 mb-1.5 sm:mb-0">
-                  <span className="font-semibold text-sm" style={{ color: COLORS.ink }}>
-                    Mentee
-                  </span>
-                  <StarRow rating={review.rating} size={12} />
+              return (
+                <div
+                  key={reviewId}
+                  className="flex flex-col p-5 rounded-2xl transition-all hover:shadow-md bg-white hover:-translate-y-0.5"
+                  style={{ border: `1px solid ${COLORS.hairline}` }}
+                >
+                  {/* Card Header: Mentee Info & Session Info */}
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {photo ? (
+                        <img
+                          src={photo}
+                          alt={menteeName}
+                          className="w-10 h-10 rounded-full object-cover shrink-0"
+                          style={{ border: `1px solid ${COLORS.hairline}` }}
+                        />
+                      ) : (
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-sm font-bold text-white shadow-sm"
+                          style={{ backgroundColor: COLORS.ink }}
+                        >
+                          {initialsFrom(menteeName)}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-bold truncate" style={{ color: COLORS.ink }}>
+                            {menteeName}
+                          </p>
+                          {review.isVerified !== false && (
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                              style={{ backgroundColor: COLORS.chip, color: COLORS.accent }}
+                            >
+                              Verified Session
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs truncate mt-0.5" style={{ color: COLORS.muted }}>
+                          {sessionTitle}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-xs" style={{ color: COLORS.muted }}>
+                        {timeAgo(review.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Rating & Review Content */}
+                  <div className="pl-4 border-l-2 py-1 space-y-2.5" style={{ borderColor: COLORS.chip }}>
+                    {/* Star Rating */}
+                    <div className="flex items-center gap-2">
+                      <StarRow rating={rating} size={15} />
+                      <span className="text-xs font-bold" style={{ color: COLORS.ink }}>
+                        {rating}.0
+                      </span>
+                    </div>
+
+                    {/* Tags */}
+                    {tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-2.5 py-0.5 rounded-full text-[11px] font-medium"
+                            style={{
+                              backgroundColor: COLORS.softWash,
+                              color: COLORS.accent,
+                              border: `1px solid ${COLORS.hairline}`,
+                            }}
+                          >
+                            {TAG_LABELS[tag] || tag.replace(/_/g, " ")}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Comment */}
+                    <p className="text-sm leading-relaxed" style={{ color: COLORS.ink }}>
+                      "{comment}"
+                    </p>
+
+                    {/* Helpful Button Action */}
+                    <div className="flex items-center gap-4 pt-1">
+                      <button
+                        onClick={() => handleHelpful(reviewId)}
+                        className="flex items-center gap-1.5 text-xs font-semibold transition-colors hover:opacity-80"
+                        style={{ color: COLORS.accent }}
+                        title="Mark review as helpful"
+                      >
+                        <ThumbsUp className="w-3.5 h-3.5" />
+                        <span>Helpful {(review.helpfulCount || 0) > 0 ? `(${review.helpfulCount})` : ""}</span>
+                      </button>
+                    </div>
+
+                    {/* Mentor Response if available */}
+                    {review.mentorResponse?.comment && (
+                      <div
+                        className="mt-3 p-3.5 rounded-xl text-xs space-y-1.5"
+                        style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold" style={{ color: COLORS.accent }}>
+                            Your response
+                          </span>
+                          {review.mentorResponse.respondedAt && (
+                            <span style={{ color: COLORS.muted }}>
+                              {timeAgo(review.mentorResponse.respondedAt)}
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ color: COLORS.ink }}>
+                          "{review.mentorResponse.comment}"
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <p className="text-sm flex-1" style={{ color: COLORS.muted }}>
-                  {review.comment}
-                </p>
-                <div className="flex items-center gap-3 shrink-0">
-                  <button
-                    onClick={() => handleHelpful(review.reviewId)}
-                    className="flex items-center gap-1 text-xs hover:underline"
-                    style={{ color: COLORS.accent }}
-                  >
-                    <ThumbsUp className="w-3 h-3" />
-                    {review.helpfulCount > 0 ? review.helpfulCount : ""}
-                  </button>
-                  <span className="text-xs" style={{ color: COLORS.muted }}>
-                    {timeAgo(review.createdAt)}
-                  </span>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
+          {/* Load More Button */}
           {page < totalPages && (
-            <div className="flex justify-center">
+            <div className="flex justify-center pt-2">
               <button
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="text-sm font-semibold px-5 py-2 rounded-xl transition-opacity hover:opacity-80"
-                style={{ backgroundColor: COLORS.wash, color: COLORS.accent }}
+                className="text-sm font-semibold px-6 py-2.5 rounded-xl transition-opacity hover:opacity-90 flex items-center gap-2 shadow-sm"
+                style={{ backgroundColor: COLORS.ink, color: "#ffffff" }}
               >
+                {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 {loadingMore ? "Loading..." : "Load more reviews"}
               </button>
             </div>
@@ -329,5 +446,5 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
         </>
       )}
     </div>
-  );
+  )
 }
