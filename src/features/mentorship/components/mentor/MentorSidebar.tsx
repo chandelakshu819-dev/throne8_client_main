@@ -1,22 +1,54 @@
 "use client";
 //src/features/mentorship/components/mentor/MentorSidebar.tsx
 import React, { useRef, useState } from "react";
-import { Camera, Star, Briefcase } from "./Icons";
+import { Camera, Star, Briefcase, ArrowLeft } from "./Icons";
 import { C } from "../../types/data";
 
 interface MentorSidebarProps {
     mentorData: any;
+    currentUserId?: string;
+    onBack?: () => void;
 }
 
-const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData }) => {
+const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId, onBack }) => {
     const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
     const bgInputRef = useRef<HTMLInputElement>(null);
+
+    // ✅ FIX: the camera (change-photo) button used to render for ANY
+    // visitor viewing this mentor's profile, letting someone else's
+    // account overwrite the mentor's own banner/photo. It's now gated so
+    // it only shows when the logged-in user IS this mentor.
+    const isOwnProfile = !!currentUserId && !!mentorData?.userId && currentUserId === mentorData.userId;
+
+    const backButton = onBack && (
+        <button
+            onClick={onBack}
+            aria-label="Go back"
+            style={{
+                position: "absolute",
+                top: "12px",
+                left: "12px",
+                padding: "8px",
+                borderRadius: "8px",
+                background: "rgba(251,247,243,0.9)",
+                border: `1px solid ${C.border}`,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 2,
+            }}
+        >
+            <ArrowLeft />
+        </button>
+    );
 
     if (!mentorData) {
         return (
             <div style={{ position: "sticky", top: "100px" }}>
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                <div style={{ borderRadius: "24px", padding: "60px 24px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", background: C.bg, border: `1px solid ${C.border}` }}>
+                <div style={{ position: "relative", borderRadius: "24px", padding: "60px 24px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", background: C.bg, border: `1px solid ${C.border}` }}>
+                    {backButton}
                     <div style={{ width: "36px", height: "36px", border: `3px solid ${C.border}`, borderTop: `3px solid ${C.dark}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
                     <span style={{ fontSize: "13px", color: C.mid }}>Loading mentor profile...</span>
                 </div>
@@ -53,10 +85,15 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData }) => {
 
                 {/* Banner */}
                 <div style={{ position: "relative", height: "120px", background: backgroundImage ? `url(${backgroundImage}) center/cover` : C.grad }}>
-                    <input type="file" ref={bgInputRef} onChange={handleBgUpload} accept="image/*" style={{ display: "none" }} />
-                    <button onClick={() => bgInputRef.current?.click()} style={{ position: "absolute", top: "12px", right: "12px", padding: "8px", borderRadius: "8px", background: "rgba(251,247,243,0.9)", border: `1px solid ${C.border}`, cursor: "pointer" }}>
-                        <Camera />
-                    </button>
+                    {backButton}
+                    {isOwnProfile && (
+                        <>
+                            <input type="file" ref={bgInputRef} onChange={handleBgUpload} accept="image/*" style={{ display: "none" }} />
+                            <button onClick={() => bgInputRef.current?.click()} style={{ position: "absolute", top: "12px", right: "12px", padding: "8px", borderRadius: "8px", background: "rgba(251,247,243,0.9)", border: `1px solid ${C.border}`, cursor: "pointer" }}>
+                                <Camera />
+                            </button>
+                        </>
+                    )}
                     <div style={{ position: "absolute", bottom: "-48px", left: "50%", transform: "translateX(-50%)" }}>
                         <div style={{ position: "relative" }}>
                             {image ? (

@@ -334,7 +334,7 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
                         <div className="flex gap-1.5">
                           {row.status === "in_progress" && !row.isGroupSession && (
                             <button
-                              onClick={() => router.push(`/mentorship/session-room/${row.sessionId}`)}
+                              onClick={() => router.push(`/mentorship/session-room/${row.sessionId}?bookingId=${row.bookingId}`)}
                               className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
                               style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
                             >

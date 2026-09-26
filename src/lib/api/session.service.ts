@@ -251,7 +251,7 @@ class SessionService {
         try {
             const res = await SessionService.getSessionById(sessionId);
             const session = res?.data ?? res;
-            const roomUrl = `/mentorship/session-room/${encodeURIComponent(sessionId)}`;
+            const roomUrl = `/mentorship/session-room/${encodeURIComponent(sessionId)}` + (_bookingId ? `?bookingId=${encodeURIComponent(_bookingId)}` : "");
             return { session, roomUrl };
         } catch (error: any) {
             console.error("[JOIN_SESSION] Failed", error?.response?.data || error?.message);

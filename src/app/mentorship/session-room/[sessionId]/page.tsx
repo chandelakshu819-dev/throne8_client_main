@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useLiveRoom } from '@/core/webrtc/useLiveRoom';
 
 import { getSocket, initializeSocket } from '@/core/realtime/socket.client';
@@ -30,8 +30,11 @@ function formatTime(iso?: string) {
 
 export default function SessionRoomPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const sessionId = params?.sessionId as string;
+  const bookingId = searchParams?.get('bookingId') || '';
+  const roomId = bookingId || sessionId;
 
   const { user } = useAuth();
   const currentUserId = (user as any)?.id || (user as any)?.userId || '';
@@ -75,7 +78,7 @@ export default function SessionRoomPage() {
     toggleCamera,
     toggleMic,
   } = useLiveRoom({
-    roomId: sessionId,
+    roomId,
     userId: currentUserId,
     userName: currentUserName,
   });

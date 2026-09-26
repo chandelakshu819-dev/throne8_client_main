@@ -7,6 +7,8 @@ import type { BookingStep, Service, CalendarData, FormData as BookingFormData } 
 import MentorSidebar from "./MentorSidebar";
 import ServicesSection from "./ServicesSection";
 import ReviewsSection from "./ReviewsSection";
+import { ArrowLeft } from "lucide-react";
+
 
 import CalendarStep from "./CalendarStep";
 import QueryStep from "./QueryStep";
@@ -17,7 +19,6 @@ import ConfirmationStep from "./ConfirmationStep";
 import MentorService from "@/lib/api/mentorship.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft } from "./Icons";
 
 interface MentorProfileProps {
     mentorId: string;
@@ -174,7 +175,11 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                     </button>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
-                    <MentorSidebar mentorData={mentorData} />
+                    <MentorSidebar
+                        mentorData={mentorData}
+                        currentUserId={user?.userId}
+                        onBack={() => router.back()}
+                    />
                     <div>
                         <ServicesSection
                             onServiceClick={handleServiceClick}

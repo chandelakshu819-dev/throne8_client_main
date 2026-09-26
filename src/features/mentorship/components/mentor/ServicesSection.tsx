@@ -126,6 +126,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   // returns the real participant row with its actual requestStatus.
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
 
+  // ✅ NEW: "Read more/less" toggle state for long service descriptions.
+  // Tracks which session cards currently have their description expanded.
   const [expandedDescIds, setExpandedDescIds] = useState<string[]>([]);
   const toggleDescExpanded = (sessionId: string) => {
     setExpandedDescIds((prev) =>
@@ -133,11 +135,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     );
   };
 
-  // ✅ detail modal state for a clicked group session card.
-  // ✅ FIX: this modal (date/time/duration/seats + an explicit "Join Group"
-  // button) is now the ONLY place a join request can be sent from. The
-  // card's own button used to fire the request immediately — that's what
-  // let a request go out before the user ever saw session details.
+
+  // ✅ NEW: detail modal state for a clicked group session card
   const [detailGroup, setDetailGroup] = useState<any | null>(null);
   const [groupActionBusy, setGroupActionBusy] = useState(false);
   const [groupActionError, setGroupActionError] = useState<string | null>(null);
@@ -636,23 +635,12 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   </p>
                 );
               })()}
-                            {isTemplate ? (
-                // ✅ NEW: template card — no fixed date/seat-count to show,
-                // since seats belong to a specific slot-instance, not the
-                // template itself.
-                <div style={{ fontSize: "12px", color: C.mid, marginBottom: "14px", display: "flex", alignItems: "center", gap: "4px" }}>
-                  <Clock /> {group.duration} Min · Mentor-led, choose a time that works for you
-                </div>
-              ) : (
-                <>
-                  <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: C.mid, marginBottom: "4px" }}>
-                    <Clock /> {formatGroupDate(group.scheduledAt)} · {group.duration} Min
-                  </div>
-                  <div style={{ fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
-                    {seatsLeft > 0 ? `${seatsLeft} seats available` : "Session full"} · {group.currentParticipants ?? 0}/{group.maxParticipants ?? 0} enrolled
-                  </div>
-                </>
-              )}
+              <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: C.mid, marginBottom: "4px" }}>
+                <Clock /> {formatGroupDate(group.scheduledAt)} · {group.duration} Min
+              </div>
+              <div style={{ fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
+                {seatsLeft > 0 ? `${seatsLeft} seats available` : "Session full"} · {group.currentParticipants ?? 0}/{group.maxParticipants ?? 0} enrolled
+              </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontWeight: "bold", color: pricePerPerson === 0 ? "#10b981" : C.dark, fontSize: "15px" }}>
                   {pricePerPerson === 0 ? "Free" : `₹${pricePerPerson}/person`}
@@ -800,10 +788,10 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   </div>
                 )}
 
-                {detailGroup.description && (
-                  <p className="mb-4 text-sm line-clamp-2" style={{ color: '#8a7a6a', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
-                    {detailGroup.description || "Interactive group session led by an expert mentor."}
-                  </p>
+{detailGroup.description && (
+                                      <p className="mb-4 text-sm line-clamp-2" style={{ color: '#8a7a6a', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                                      {group.description || "Interactive group session led by an expert mentor."}
+                                    </p>
                 )}
               </div>
 
