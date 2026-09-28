@@ -200,7 +200,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                         ))}
                     </div>
 
-                    {isOwner ? (
+                    {isOwner && (
                         <div style={{ marginBottom: "16px" }}>
                             <button
                                 onClick={() => onEditClick?.()}
@@ -211,42 +211,6 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                                 }}
                             >
                                 Edit Profile
-                            </button>
-                        </div>
-                    ) : (
-                        <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-                            <button
-                                onClick={handleToggleSave}
-                                disabled={savingToggle}
-                                style={{
-                                    flex: 1,
-                                    padding: "10px",
-                                    borderRadius: "10px",
-                                    border: `1px solid ${saved ? "#4a3728" : C.border}`,
-                                    background: saved ? "#4a3728" : C.surface,
-                                    color: saved ? "#fff" : C.dark,
-                                    fontWeight: 600,
-                                    fontSize: "13px",
-                                    cursor: savingToggle ? "not-allowed" : "pointer",
-                                    opacity: savingToggle ? 0.6 : 1,
-                                }}
-                            >
-                                {saved ? "Saved" : "Save Mentor"}
-                            </button>
-                            <button
-                                onClick={() => setReportOpen(true)}
-                                style={{
-                                    padding: "10px 14px",
-                                    borderRadius: "10px",
-                                    border: `1px solid ${C.border}`,
-                                    background: C.surface,
-                                    color: "#b91c1c",
-                                    fontWeight: 600,
-                                    fontSize: "13px",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                Report
                             </button>
                         </div>
                     )}
@@ -325,77 +289,6 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                     </div>
                 </div>
             </div>
-
-            {!isOwner && reportOpen && (
-                <div
-                    style={{
-                        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        zIndex: 2000, padding: "16px",
-                    }}
-                    onClick={() => !reportSubmitting && setReportOpen(false)}
-                >
-                    <div
-                        style={{ background: "#fff", borderRadius: "16px", padding: "24px", maxWidth: "420px", width: "100%" }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <h3 style={{ fontWeight: "bold", fontSize: "16px", color: C.dark, marginBottom: "6px" }}>Report this mentor</h3>
-                        <p style={{ fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
-                            Tell us what&apos;s wrong. Our team will review this report.
-                        </p>
-
-                        {reportSuccess ? (
-                            <div style={{ padding: "12px", borderRadius: "10px", background: "#dcfce7", color: "#15803d", fontSize: "13px", fontWeight: 600 }}>
-                                Report submitted. Thank you.
-                            </div>
-                        ) : (
-                            <>
-                                <textarea
-                                    rows={4}
-                                    value={reportReason}
-                                    onChange={(e) => setReportReason(e.target.value)}
-                                    placeholder="Describe the issue (min 10 characters)..."
-                                    style={{
-                                        width: "100%", padding: "10px", borderRadius: "10px",
-                                        border: `1px solid ${C.border}`, fontSize: "13px", resize: "none",
-                                        marginBottom: "8px",
-                                    }}
-                                    disabled={reportSubmitting}
-                                />
-                                {reportError && (
-                                    <p style={{ fontSize: "12px", color: "#dc2626", marginBottom: "8px" }}>{reportError}</p>
-                                )}
-                                <div style={{ display: "flex", gap: "8px" }}>
-                                    <button
-                                        onClick={() => setReportOpen(false)}
-                                        disabled={reportSubmitting}
-                                        style={{
-                                            flex: 1, padding: "10px", borderRadius: "10px",
-                                            border: `1px solid ${C.border}`, background: "#fff",
-                                            color: C.dark, fontWeight: 600, fontSize: "13px", cursor: "pointer",
-                                        }}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={handleSubmitReport}
-                                        disabled={reportSubmitting}
-                                        style={{
-                                            flex: 1, padding: "10px", borderRadius: "10px",
-                                            border: "none", background: "#b91c1c",
-                                            color: "#fff", fontWeight: 600, fontSize: "13px",
-                                            cursor: reportSubmitting ? "not-allowed" : "pointer",
-                                            opacity: reportSubmitting ? 0.6 : 1,
-                                        }}
-                                    >
-                                        {reportSubmitting ? "Submitting..." : "Submit Report"}
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
