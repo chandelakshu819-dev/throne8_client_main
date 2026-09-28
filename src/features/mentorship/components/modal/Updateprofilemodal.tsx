@@ -1,15 +1,17 @@
 "use client";
-
+/* eslint-disable @typescript-eslint/no-explicit-any */
+//src/features/mentorship/components/modal/Updateprofilemodal.tsx
 import React, { useState, useEffect } from "react";
 import {
     X, Save, User, Code2, Globe,
     ChevronDown, Plus, Check, Loader2,
-    Link2, Github, Linkedin, AlertCircle
+    Link2, Github, Linkedin, AlertCircle,
+    Briefcase, Trash2, Clock
 } from "lucide-react";
 import { api } from "@/lib/api/auth.service";
 import config from "@/config/env.config";
 
-// ── Constants ────────────────────────────────────────────────
+// Constants
 const DOMAINS_OPTIONS = [
     { value: "web_development", label: "Web Development" },
     { value: "career_guidance", label: "Career Guidance" },
@@ -32,7 +34,25 @@ const EXPERIENCE_OPTIONS = [
     { label: "12+ Years", value: 13 },
 ];
 
-// ── Types ────────────────────────────────────────────────────
+// Common IANA timezones for a simple dropdown
+const TIMEZONE_OPTIONS = [
+    "UTC",
+    "Asia/Kolkata",
+    "Asia/Dubai",
+    "Asia/Singapore",
+    "Asia/Tokyo",
+    "Europe/London",
+    "Europe/Berlin",
+    "America/New_York",
+    "America/Chicago",
+    "America/Los_Angeles",
+    "Australia/Sydney",
+];
+
+// Suggested languages (user can still type a custom one)
+const COMMON_LANGUAGES = ["English", "Hindi", "Spanish", "French", "German", "Mandarin", "Arabic", "Portuguese"];
+
+// Types
 interface UpdateProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -41,7 +61,13 @@ interface UpdateProfileModalProps {
     onUpdateSuccess: (updated: any) => void;
 }
 
-type TabKey = "basic" | "expertise" | "social";
+interface PreviousRole {
+    title: string;
+    company: string;
+    duration: string;
+}
+
+type TabKey = "basic" | "expertise" | "experience" | "social";
 
 const inputCls =
     "w-full px-4 py-3 rounded-xl border-2 text-sm font-medium text-[#4a3728] outline-none transition-all focus:ring-2 focus:ring-[#4a3728]/20 focus:border-[#4a3728] bg-white border-[#e0d8cf] placeholder:text-[#b0a090]";
@@ -57,7 +83,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     );
 }
 
-// ── Main Component ───────────────────────────────────────────
+// Main Component
 export default function UpdateProfileModal({
     isOpen,
     onClose,
@@ -66,7 +92,7 @@ export default function UpdateProfileModal({
     onUpdateSuccess,
 }: UpdateProfileModalProps) {
 
-    // ── Form State ───────────────────────────────────────────
+    // Form State
     const [title, setTitle] = useState("");
     const [bio, setBio] = useState("");
     const [currentRole, setCurrentRole] = useState("");
@@ -79,13 +105,24 @@ export default function UpdateProfileModal({
     const [githubUrl, setGithubUrl] = useState("");
     const [portfolioUrl, setPortfolioUrl] = useState("");
 
-    // ── UI State ─────────────────────────────────────────────
+    // Previous work experience state
+    const [previousRoles, setPreviousRoles] = useState<PreviousRole[]>([]);
+    const [newRoleTitle, setNewRoleTitle] = useState("");
+    const [newRoleCompany, setNewRoleCompany] = useState("");
+    const [newRoleDuration, setNewRoleDuration] = useState("");
+
+    // Languages + Timezone state
+    const [languages, setLanguages] = useState<string[]>([]);
+    const [languageInput, setLanguageInput] = useState("");
+    const [timezone, setTimezone] = useState("UTC");
+
+    // UI State
     const [activeTab, setActiveTab] = useState<TabKey>("basic");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
-    // ── Pre-fill on open ─────────────────────────────────────
+    // Pre-fill on open
     useEffect(() => {
         if (!mentorData || !isOpen) return;
         setTitle(mentorData.title ?? "");
@@ -97,6 +134,22 @@ export default function UpdateProfileModal({
         setLinkedinUrl(mentorData.socialProof?.linkedinUrl ?? "");
         setGithubUrl(mentorData.socialProof?.githubUrl ?? "");
         setPortfolioUrl(mentorData.socialProof?.portfolioUrl ?? "");
+
+        setPreviousRoles(
+            (mentorData.experience?.previousRoles ?? []).map((r: any) => ({
+                title: r.title || r.position || "",
+                company: r.company || "",
+                duration: r.duration || "",
+            }))
+        );
+        setNewRoleTitle("");
+        setNewRoleCompany("");
+        setNewRoleDuration("");
+
+        setLanguages(mentorData.languages ?? ["English"]);
+        setLanguageInput("");
+        setTimezone(mentorData.availability?.timezone ?? "UTC");
+
         setActiveTab("basic");
         setError(null);
         setSuccess(false);
@@ -105,7 +158,7 @@ export default function UpdateProfileModal({
 
     if (!isOpen) return null;
 
-    // ── Helpers ──────────────────────────────────────────────
+    // Helpers
     const toggleDomain = (val: string) => {
         setDomains((prev) =>
             prev.includes(val)
@@ -124,14 +177,41 @@ export default function UpdateProfileModal({
         }
     };
 
+    const addPreviousRole = () => {
+        if (!newRoleTitle.trim() || !newRoleCompany.trim() || !newRoleDuration.trim()) return;
+        setPreviousRoles((prev) => [
+            ...prev,
+            { title: newRoleTitle.trim(), company: newRoleCompany.trim(), duration: newRoleDuration.trim() },
+        ]);
+        setNewRoleTitle("");
+        setNewRoleCompany("");
+        setNewRoleDuration("");
+    };
+
+    const removePreviousRole = (index: number) => {
+        setPreviousRoles((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const addLanguage = (lang?: string) => {
+        const val = (lang ?? languageInput).trim();
+        if (val && !languages.includes(val)) {
+            setLanguages((prev) => [...prev, val]);
+        }
+        setLanguageInput("");
+    };
+
+    const removeLanguage = (lang: string) => {
+        setLanguages((prev) => prev.filter((l) => l !== lang));
+    };
+
     const goToTab = (direction: 1 | -1) => {
-        const order: TabKey[] = ["basic", "expertise", "social"];
+        const order: TabKey[] = ["basic", "expertise", "experience", "social"];
         const idx = order.indexOf(activeTab);
         const next = order[idx + direction];
         if (next) setActiveTab(next);
     };
 
-    // ── Submit ───────────────────────────────────────────────
+    // Submit
     const handleSubmit = async () => {
         setError(null);
 
@@ -139,6 +219,7 @@ export default function UpdateProfileModal({
         if (!bio.trim() || bio.length < 50) { setError("Bio must be at least 50 characters."); setActiveTab("basic"); return; }
         if (domains.length === 0) { setError("Select at least 1 domain."); setActiveTab("expertise"); return; }
         if (skills.length === 0) { setError("Add at least 1 skill."); setActiveTab("expertise"); return; }
+        if (languages.length === 0) { setError("Add at least 1 language."); setActiveTab("experience"); return; }
 
         setSaving(true);
         try {
@@ -147,9 +228,14 @@ export default function UpdateProfileModal({
                 bio,
                 domains,
                 skills,
+                languages,
                 experience: {
                     total: experienceTotal,
                     currentRole,
+                    previousRoles,
+                },
+                availability: {
+                    timezone,
                 },
                 socialProof: {
                     linkedinUrl,
@@ -178,6 +264,7 @@ export default function UpdateProfileModal({
     const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
         { key: "basic", label: "Basic Info", icon: <User className="w-4 h-4" /> },
         { key: "expertise", label: "Expertise", icon: <Code2 className="w-4 h-4" /> },
+        { key: "experience", label: "Experience", icon: <Briefcase className="w-4 h-4" /> },
         { key: "social", label: "Social Links", icon: <Globe className="w-4 h-4" /> },
     ];
 
@@ -191,7 +278,7 @@ export default function UpdateProfileModal({
                 style={{ backgroundColor: "#fdf9f6" }}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* ── Header ── */}
+                {/* Header */}
                 <div
                     className="relative px-8 pt-8 pb-0 flex-shrink-0 overflow-hidden"
                     style={{ background: "linear-gradient(135deg, #4a3728 0%, #7a5c3e 100%)" }}
@@ -230,7 +317,7 @@ export default function UpdateProfileModal({
                     </div>
                 </div>
 
-                {/* ── Scrollable Body ── */}
+                {/* Scrollable Body */}
                 <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
 
                     {/* Error / Success */}
@@ -247,7 +334,7 @@ export default function UpdateProfileModal({
                         </div>
                     )}
 
-                    {/* ── TAB: Basic Info ── */}
+                    {/* TAB: Basic Info */}
                     {activeTab === "basic" && (
                         <div className="space-y-5">
                             <Field label="Mentor Title *">
@@ -297,7 +384,7 @@ export default function UpdateProfileModal({
                         </div>
                     )}
 
-                    {/* ── TAB: Expertise ── */}
+                    {/* TAB: Expertise */}
                     {activeTab === "expertise" && (
                         <div className="space-y-5">
                             <Field label={`Domains * — ${domains.length}/5 selected`}>
@@ -387,7 +474,135 @@ export default function UpdateProfileModal({
                         </div>
                     )}
 
-                    {/* ── TAB: Social Links ── */}
+                    {/* TAB: Experience (Previous Work Experience + Languages + Timezone) */}
+                    {activeTab === "experience" && (
+                        <div className="space-y-6">
+                            {/* Previous Work Experience */}
+                            <Field label={`Previous Work Experience (${previousRoles.length})`}>
+                                <div className="space-y-2 mb-3">
+                                    {previousRoles.length === 0 && (
+                                        <p className="text-xs text-[#8a7a6a]">No previous roles added yet. Add one below.</p>
+                                    )}
+                                    {previousRoles.map((role, i) => (
+                                        <div key={i} className="flex items-center justify-between p-3 rounded-xl border" style={{ backgroundColor: "#fbf7f3", borderColor: "#e0d8cf" }}>
+                                            <div>
+                                                <p className="text-sm font-bold" style={{ color: "#4a3728" }}>{role.title}</p>
+                                                <p className="text-xs" style={{ color: "#7a5c3e" }}>{role.company} · {role.duration}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removePreviousRole(i)}
+                                                className="p-2 rounded-lg hover:bg-red-50 text-red-500 flex-shrink-0"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="p-3 rounded-xl border space-y-2" style={{ backgroundColor: "#fff", borderColor: "#e0d8cf" }}>
+                                    <p className="text-xs font-bold" style={{ color: "#7a5c3e" }}>Add a role</p>
+                                    <input
+                                        type="text"
+                                        value={newRoleTitle}
+                                        onChange={(e) => setNewRoleTitle(e.target.value)}
+                                        placeholder="Job title (e.g. Software Engineer)"
+                                        className={inputCls}
+                                    />
+                                    <input
+                                        type="text"
+                                        value={newRoleCompany}
+                                        onChange={(e) => setNewRoleCompany(e.target.value)}
+                                        placeholder="Company (e.g. Acme Corp)"
+                                        className={inputCls}
+                                    />
+                                    <input
+                                        type="text"
+                                        value={newRoleDuration}
+                                        onChange={(e) => setNewRoleDuration(e.target.value)}
+                                        placeholder="Duration (e.g. Jan 2020 - Mar 2022)"
+                                        className={inputCls}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={addPreviousRole}
+                                        disabled={!newRoleTitle.trim() || !newRoleCompany.trim() || !newRoleDuration.trim()}
+                                        className="w-full py-2.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        style={{ backgroundColor: "#4a3728" }}
+                                    >
+                                        <Plus className="w-4 h-4" /> Add Role
+                                    </button>
+                                </div>
+                            </Field>
+
+                            {/* Languages */}
+                            <Field label={`Languages Spoken * — ${languages.length} added`}>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={languageInput}
+                                        onChange={(e) => setLanguageInput(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLanguage(); } }}
+                                        placeholder="Type a language and press Enter..."
+                                        className={`${inputCls} flex-1`}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => addLanguage()}
+                                        className="px-4 py-3 rounded-xl text-white font-bold flex-shrink-0"
+                                        style={{ backgroundColor: "#4a3728" }}
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                {/* Quick-add suggestions */}
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {COMMON_LANGUAGES.filter((l) => !languages.includes(l)).map((l) => (
+                                        <button
+                                            key={l}
+                                            type="button"
+                                            onClick={() => addLanguage(l)}
+                                            className="px-2.5 py-1 rounded-full text-xs font-semibold border"
+                                            style={{ borderColor: "#e0d8cf", color: "#7a5c3e" }}
+                                        >
+                                            + {l}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {languages.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mt-3">
+                                        {languages.map((lang) => (
+                                            <span key={lang} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: "#4a3728" }}>
+                                                {lang}
+                                                <button type="button" onClick={() => removeLanguage(lang)} className="hover:text-red-300 ml-0.5">×</button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </Field>
+
+                            {/* Timezone */}
+                            <Field label="Timezone *">
+                                <div className="relative">
+                                    <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#7a5c3e] pointer-events-none" />
+                                    <select
+                                        value={timezone}
+                                        onChange={(e) => setTimezone(e.target.value)}
+                                        className={`${inputCls} pl-10`}
+                                    >
+                                        {TIMEZONE_OPTIONS.map((tz) => (
+                                            <option key={tz} value={tz}>{tz}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <p className="text-xs text-[#8a7a6a] mt-1">This helps mentees know when you&apos;re typically available.</p>
+                            </Field>
+                        </div>
+                    )}
+
+                    {/* TAB: Social Links */}
                     {activeTab === "social" && (
                         <div className="space-y-5">
                             <Field label="LinkedIn URL *">
@@ -433,7 +648,7 @@ export default function UpdateProfileModal({
                     )}
                 </div>
 
-                {/* ── Footer ── */}
+                {/* Footer */}
                 <div
                     className="flex-shrink-0 px-8 py-4 flex items-center justify-between border-t"
                     style={{ borderColor: "#e0d8cf", backgroundColor: "#fdf9f6" }}

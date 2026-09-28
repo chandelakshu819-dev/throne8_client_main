@@ -9,16 +9,18 @@ import ServicesSection from "./ServicesSection";
 import ReviewsSection from "./ReviewsSection";
 import { ArrowLeft } from "lucide-react";
 
-
 import CalendarStep from "./CalendarStep";
 import QueryStep from "./QueryStep";
 import DetailsStep from "./DetailsStep";
 import PaymentStep from "./PaymentStep";
 import ConfirmationStep from "./ConfirmationStep";
+import UpdateProfileModal from "../modal/Updateprofilemodal";
 
 import MentorService from "@/lib/api/mentorship.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useRouter, useSearchParams } from "next/navigation";
+
+type LocalBookingStep = BookingStep | "query";
 
 interface MentorProfileProps {
     mentorId: string;
@@ -30,43 +32,36 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     const { user } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
-    // ✅ FIX: this was never read anywhere. The "Join Session" button on
-    // the group-session detail page redirects here with
-    // ?serviceId=<groupSessionId>, but nothing consumed it — the mentee
-    // landed on the mentor's profile with no indication of why, and had
-    // to manually re-find the same group session and click it again.
-    // Now it's passed down so ServicesSection can auto-open that exact
-    // session's detail modal.
     const deepLinkServiceId = searchParams.get("serviceId") || undefined;
 
-    const [bookingStep, setBookingStep] = useState<BookingStep>(null);
+    const [bookingStep, setBookingStep] = useState<LocalBookingStep>(null);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
     const [formData, setFormData] = useState<BookingFormData | null>(null);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [mentorData, setMentorData] = useState<any>(null);
     const [bookedSessionIds, setBookedSessionIds] = useState<string[]>([]);
-    // ✅ NEW: brief success toast shown after a booking/join-request
-    // completes and the view navigates back to the services list.
     const [bookingSuccessMsg, setBookingSuccessMsg] = useState<string | null>(null);
-    // ✅ NEW: group-session template join-by-slot flow state
-    const [groupJoinBusy, setGroupJoinBusy] = useState(false);
-    const [groupJoinError, setGroupJoinError] = useState<string | null>(null);
+    const [editModalOpen, setEditModalOpen] = useState(false);
 
-    useEffect(() => {
+    const fetchMentor = () => {
         MentorService.getAllMentors()
             .then((res) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const found = res?.data?.find((m: any) => m.mentorId === mentorId) ?? null;
                 setMentorData(found);
             })
             .catch(() => setMentorData(null));
+    };
+
+    useEffect(() => {
+        fetchMentor();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mentorId]);
 
-    // Fire-and-forget request to trigger backend 'Profile Viewed' notification logic.
-    // This is strictly for the side-effect (notification tracking).
     useEffect(() => {
         if (mentorData && mentorData.userId) {
-            // Guard against self-view
             if (user?.userId === mentorData.userId) {
                 return;
             }
@@ -76,8 +71,6 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
 
     const handleServiceClick = (service: Service): void => {
         setSelectedService(service);
-        // ✅ FIX: "Ask a Query" (type "Query") ab calendar flow me nahi
-        // jaayegi — seedha query/message-writing step khulega.
         setBookingStep(
             service.type === "Query"
                 ? "query"
@@ -88,23 +81,12 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-       // ✅ FIX: this was calling setGroupJoinError(null) — a state setter
-    // that no longer exists (groupJoinBusy/groupJoinError were removed
-    // when the join-request flow moved into PaymentStep). Calling an
-    // undefined setter threw immediately, crashing resetBooking() before
-    // it could clear bookingStep — so the booking succeeded on the
-    // backend but the screen silently got stuck on the payment page.
     const resetBooking = (): void => {
         setBookingStep(null); setSelectedService(null);
         setCalendarData(null); setFormData(null);
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-       // ✅ CHANGED: group-session template slots now go through the SAME
-    // details → payment pipeline as 1:1 sessions, instead of firing the
-    // join-request API straight off the calendar. The actual API call
-    // (joinGroupSessionBySlot) now happens inside PaymentStep, only after
-    // the mock payment step is "completed" — see PaymentStep.tsx.
     if (bookingStep === "query") return <QueryStep mentorId={mentorData?.mentorId || ""} selectedService={selectedService} onBack={resetBooking} onSubmitted={resetBooking} />;
     if (bookingStep === "calendar") {
         return (
@@ -150,7 +132,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                     borderRadius: "12px", fontSize: "14px", fontWeight: 600, color: "#15803d",
                     background: "#dcfce7", border: "1px solid #86efac", boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
                 }}>
-                    ✅ {bookingSuccessMsg}
+                    {bookingSuccessMsg}
                 </div>
             )}
             <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "100px 16px 24px" }}>
@@ -179,6 +161,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                         mentorData={mentorData}
                         currentUserId={user?.userId}
                         onBack={() => router.back()}
+                        onEditClick={() => setEditModalOpen(true)}
                     />
                     <div>
                         <ServicesSection
@@ -189,11 +172,22 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                             mentorName={`${mentorData?.user?.firstName ?? ""} ${mentorData?.user?.lastName ?? ""}`.trim()}
                             deepLinkSessionId={deepLinkServiceId}
                         />
-
-                        <ReviewsSection />
+                        <ReviewsSection mentorId={mentorData?.mentorId || ""} />
                     </div>
                 </div>
             </div>
+
+            <UpdateProfileModal
+                isOpen={editModalOpen}
+                onClose={() => setEditModalOpen(false)}
+                mentorData={mentorData}
+                mentorId={mentorData?.mentorId || ""}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                onUpdateSuccess={(updated: any) => {
+                    setMentorData(updated);
+                    fetchMentor();
+                }}
+            />
         </div>
     );
 };

@@ -1135,32 +1135,26 @@ class MentorService {
     mentorId: string
   ): Promise<{ saved: boolean }> {
     try {
-      const { data } = await api.patch<{ saved: boolean }>(
+      const { data } = await api.patch<{ success: boolean; message: string; data: { saved: boolean } }>(
         `/mentorship/mentors/${mentorId}/save`
       );
 
-      return data;
+      return data.data;
 
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const apiError = error.response?.data;
 
         if (error.code === 'ERR_NETWORK') {
-          throw new Error(
-            'Unable to connect to server. Please check your internet connection.'
-          );
+          throw new Error('Unable to connect to server. Please check your internet connection.');
         }
 
         if (error.response?.status === 401) {
-          throw new Error(
-            'Session expired. Please login again.'
-          );
+          throw new Error('Session expired. Please login again.');
         }
 
         if (error.response?.status === 404) {
-          throw new Error(
-            'Mentor not found.'
-          );
+          throw new Error('Mentor not found.');
         }
 
         if (apiError?.message) {
@@ -1168,12 +1162,9 @@ class MentorService {
         }
       }
 
-      throw new Error(
-        'Failed to save/unsave mentor. Please try again.'
-      );
+      throw new Error('Failed to save/unsave mentor. Please try again.');
     }
   }
-
   static async reportMentor(
     mentorId: string,
     reason: string
@@ -1227,6 +1218,7 @@ class MentorService {
       );
     }
   }
+
 
   // =========================================================
   // NORMAL SESSION

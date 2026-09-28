@@ -909,72 +909,86 @@ function ResourcesTab({ toast }: ResourcesTabProps) {
     );
 }
 
-// ─── HISTORY TAB (still mock — separate task) ──────────────────────────────────
-interface SessionHistory {
-    name: string;
-    date: string;
-    stars: number;
-}
-
+// ─── HISTORY TAB (real data) ───────────────────────────────────────────────────
 function HistoryTab() {
-    const sessions: SessionHistory[] = [
-        { name: "Career Goals Planning", date: "28 March 2026 - Rahul Sharma - 45 min", stars: 5 },
-        { name: "DSA Mock Interview - Round 1", date: "21 March 2026 - Priya Gupta - 60 min", stars: 4 },
-        { name: "Resume Review & Feedback", date: "15 March 2026 - Amit Verma - 30 min", stars: 5 },
-        { name: "System Design Basics", date: "8 March 2026 - Priya Gupta - 45 min", stars: 4 },
-        { name: "Intro Session - Goals Discussion", date: "1 March 2026 - Rahul Sharma - 30 min", stars: 5 },
-        { name: "LinkedIn Profile Optimization", date: "22 Feb 2026 - Amit Verma - 30 min", stars: 4 },
-        { name: "Behavioral Interview Prep", date: "14 Feb 2026 - Priya Gupta - 45 min", stars: 5 },
-        { name: "OOP Concepts Deep Dive", date: "5 Feb 2026 - Rahul Sharma - 60 min", stars: 4 },
-    ];
+    const [sessions, setSessions] = useState<MenteeSession[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        setLoading(true);
+        setError(null);
+        SessionService.getAllSessions({ role: "mentee", status: "completed", limit: 50 })
+            .then((res) => {
+                if (!cancelled) setSessions((res?.data ?? []) as MenteeSession[]);
+            })
+            .catch((e: any) => {
+                if (!cancelled) setError(e?.message || "History load nahi ho payi.");
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+        return () => { cancelled = true; };
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="py-16 text-center text-sm" style={{ color: C.muted }}>
+                History load ho rahi hai...
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="py-16 text-center text-sm" style={{ color: C.warn }}>
+                {error}
+            </div>
+        );
+    }
 
     return (
         <div>
             <SectionTitle>Completed Sessions</SectionTitle>
-            <div className="flex flex-col gap-3">
-                {sessions.map((s) => (
-                    <div
-                        key={s.name}
-                        className="rounded-xl border p-4 flex items-center gap-4 transition-all hover:shadow-md hover:translate-x-1"
-                        style={{ background: C.card, borderColor: C.border }}
-                    >
+            {sessions.length === 0 ? (
+                <p className="text-sm" style={{ color: C.muted }}>
+                    Abhi tak koi session complete nahi hui.
+                </p>
+            ) : (
+                <div className="flex flex-col gap-3">
+                    {sessions.map((s) => (
                         <div
-                            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-                            style={{
-                                background: "rgba(107,143,110,0.12)",
-                                color: C.success,
-                                fontSize: "1rem",
-                            }}
+                            key={s.sessionId}
+                            className="rounded-xl border p-4 flex items-center gap-4 transition-all hover:shadow-md hover:translate-x-1"
+                            style={{ background: C.card, borderColor: C.border }}
                         >
-                            OK
-                        </div>
-                        <div className="flex-1">
                             <div
-                                className="text-sm font-semibold mb-0.5"
-                                style={{ color: C.primary }}
+                                className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                                style={{ background: "rgba(107,143,110,0.12)", color: C.success, fontSize: "1rem" }}
                             >
-                                {s.name}
+                                OK
                             </div>
-                            <div className="text-xs" style={{ color: C.muted }}>
-                                {s.date}
+                            <div className="flex-1">
+                                <div className="text-sm font-semibold mb-0.5" style={{ color: C.primary }}>
+                                    {s.title}
+                                </div>
+                                <div className="text-xs" style={{ color: C.muted }}>
+                                    {mentorDisplayName(s.mentor)} - {formatSessionDate(s.scheduledAt)} - {s.duration} min
+                                </div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                                <div className="text-xs" style={{ color: C.success }}>
+                                    Completed
+                                </div>
                             </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                            <div className="text-sm mb-0.5" style={{ color: C.accent }}>
-                                {"*".repeat(s.stars)}
-                                {"-".repeat(5 - s.stars)}
-                            </div>
-                            <div className="text-xs" style={{ color: C.success }}>
-                                Completed
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
-
 // ─── WAITLIST TAB ─────────────────────────────────────────────────────────────
 interface WaitlistItem {
     waitlistId: string;
