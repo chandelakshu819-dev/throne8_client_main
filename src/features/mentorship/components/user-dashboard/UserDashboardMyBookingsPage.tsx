@@ -23,7 +23,9 @@ type MyBookingRow = {
     | "rescheduled"
     | "in_progress"
     | "completed"
-    | "cancelled";
+    | "cancelled"
+    | "ended";
+  duration?: number;
   isGroupSession: boolean;
 };
 
@@ -44,7 +46,36 @@ const statusBadge: Record<string, { bg: string; fg: string; label: string }> = {
   in_progress: { bg: "#dbeafe", fg: "#1d4ed8", label: "In Progress" },
   completed: { bg: "#f3e8ff", fg: "#7c3aed", label: "Completed" },
   cancelled: { bg: "#fee2e2", fg: "#dc2626", label: "Cancelled" },
+  ended: { bg: "#f3f4f6", fg: "#4b5563", label: "Ended" },
 };
+
+function computeDynamicStatus(
+  baseStatus: MyBookingRow["status"],
+  scheduledAt: string | undefined,
+  durationMinutes: number = 30
+): MyBookingRow["status"] {
+  if (["completed", "cancelled"].includes(baseStatus)) return baseStatus;
+
+  if (!scheduledAt) return baseStatus;
+  const startTime = new Date(scheduledAt).getTime();
+  if (Number.isNaN(startTime)) return baseStatus;
+
+  const endTime = startTime + durationMinutes * 60 * 1000;
+  const now = Date.now();
+
+  if (now > endTime) {
+    return "ended";
+  }
+
+  if (now >= startTime && now <= endTime) {
+    if (baseStatus === "pending") return "pending";
+    return "in_progress";
+  }
+
+  if (baseStatus === "pending") return "pending";
+  if (baseStatus === "rescheduled") return "rescheduled";
+  return "confirmed";
+}
 
 // Maps a GroupSession participant's requestStatus + the parent session's
 // status into the same status vocabulary used for 1:1 bookings, so both
@@ -98,8 +129,9 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
                 sessionId: s.sessionId,
                 serviceName: s.title || "Session",
                 scheduledAt: s.scheduledAt,
+                duration: s.duration,
                 slotTime: s.slotTime,
-                status: s.status,
+                status: computeDynamicStatus(s.status, s.scheduledAt, s.duration),
                 isGroupSession: false,
               },
             ];
@@ -112,8 +144,9 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
           sessionId: s.sessionId,
           serviceName: s.title || "Session",
           scheduledAt: b.scheduledAt || s.scheduledAt,
+          duration: s.duration,
           slotTime: b.slotTime,
-          status: b.status,
+          status: computeDynamicStatus(b.status, b.scheduledAt || s.scheduledAt, s.duration),
           isGroupSession: false,
         }));
       });
@@ -126,14 +159,17 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
             (p: any) => p.menteeId === userId
           );
           if (!participant) return null;
+          
+          const baseStatus = resolveGroupRowStatus(participant.requestStatus, s.status);
 
           return {
             bookingId: `${s.sessionId}-${userId}`,
             sessionId: s.sessionId,
             serviceName: `${s.title} (Group Session)`,
             scheduledAt: s.scheduledAt,
+            duration: s.duration,
             slotTime: undefined,
-            status: resolveGroupRowStatus(participant.requestStatus, s.status),
+            status: computeDynamicStatus(baseStatus, s.scheduledAt, s.duration),
             isGroupSession: true,
           } as MyBookingRow;
         })
@@ -159,7 +195,7 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
     (b) => b.status === "confirmed" || b.status === "rescheduled"
   );
   const inProgressBookings = allBookings.filter((b) => b.status === "in_progress");
-  const completedBookings = allBookings.filter((b) => b.status === "completed");
+  const completedBookings = allBookings.filter((b) => b.status === "completed" || b.status === "ended");
 
   const currentBookings = useMemo(() => {
     switch (bookingTab) {
@@ -172,7 +208,7 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
       case "completed":
         return completedBookings;
       default:
-        return allBookings.filter((b) => b.status !== "completed" && b.status !== "cancelled");
+        return allBookings.filter((b) => b.status !== "completed" && b.status !== "cancelled" && b.status !== "ended");
     }
   }, [bookingTab, allBookings]);
 
@@ -238,7 +274,7 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
           {(["all", "pending", "upcoming", "in_progress", "completed"] as const).map((tab) => {
             const count =
               tab === "all"
-                ? allBookings.filter((b) => b.status !== "completed" && b.status !== "cancelled").length
+                ? allBookings.filter((b) => b.status !== "completed" && b.status !== "cancelled" && b.status !== "ended").length
                 : tab === "pending"
                 ? pendingBookings.length
                 : tab === "upcoming"
