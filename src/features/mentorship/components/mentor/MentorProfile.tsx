@@ -109,7 +109,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     if (bookingStep === "calendar") {
         return (
             <CalendarStep
-                mentorId={mentorData?.mentorId || ""}
+                mentorId={mentorData?.mentorId || mentorId || ""}
                 selectedService={selectedService}
                 onBack={() => setBookingStep(null)}
                 onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }}

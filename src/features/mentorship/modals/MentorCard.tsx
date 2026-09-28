@@ -88,7 +88,7 @@ export default function MentorCard({ mentor }: MentorCardProps) {
                     {/* Attendance Badge */}
                     <div className="flex justify-center mb-4">
                         <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-[#4a3728]/10 text-[#4a3728] border border-[#4a3728]/15">
-                            ✓ 95% Attendance
+                            ✓ {(mentor as any)?.stats?.completionRate ?? (mentor as any)?.completionRate ?? 100}% Attendance
                         </span>
                     </div>
 

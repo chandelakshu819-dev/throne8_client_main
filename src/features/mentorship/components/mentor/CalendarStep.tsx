@@ -21,6 +21,9 @@ interface CalendarStepProps {
 interface BookableSlot {
     startTime: string;
     endTime: string;
+    isBooked?: boolean;
+    isBlocked?: boolean;
+    status?: 'available' | 'booked' | 'blocked' | 'full' | 'joinable';
 }
 
 const toMinutes = (t: string): number => {
@@ -38,31 +41,54 @@ const getServiceDuration = (service: any): number => {
     return Number.isFinite(n) && n > 0 ? n : 0;
 };
 
-// Free slots ko jodkar continuous windows banao, phir service duration se dobara kaato
+// Continuous windows se service duration ke slots banao, aur booked/blocked ranges mark karo
 const buildSlotsForDuration = (daySlots: any[], duration: number): BookableSlot[] => {
-    const free = daySlots
-        .filter((s) => !s.isBooked && !s.isBlocked)
-        .map((s) => ({ start: toMinutes(s.startTime), end: toMinutes(s.endTime) }))
-        .sort((a, b) => a.start - b.start);
+    if (!daySlots || daySlots.length === 0) return [];
 
-    if (duration <= 0) {
-        return free.map((s) => ({ startTime: toTimeString(s.start), endTime: toTimeString(s.end) }));
-    }
+    const sorted = [...daySlots].sort((a, b) => toMinutes(a.startTime) - toMinutes(b.startTime));
 
+    // Continuous availability windows across all slots for the day
     const windows: { start: number; end: number }[] = [];
-    for (const s of free) {
+    for (const s of sorted) {
+        const start = toMinutes(s.startTime);
+        const end = toMinutes(s.endTime);
         const last = windows[windows.length - 1];
-        if (last && s.start <= last.end) {
-            last.end = Math.max(last.end, s.end);
+        if (last && start <= last.end) {
+            last.end = Math.max(last.end, end);
         } else {
-            windows.push({ ...s });
+            windows.push({ start, end });
         }
     }
 
+    const busyRanges = daySlots
+        .filter((s) => s.isBooked || s.isBlocked)
+        .map((s) => ({
+            start: toMinutes(s.startTime),
+            end: toMinutes(s.endTime),
+            isBooked: !!s.isBooked,
+            isBlocked: !!s.isBlocked,
+        }));
+
+    const effDuration = duration > 0 ? duration : 30;
     const result: BookableSlot[] = [];
+
     for (const w of windows) {
-        for (let start = w.start; start + duration <= w.end; start += duration) {
-            result.push({ startTime: toTimeString(start), endTime: toTimeString(start + duration) });
+        for (let start = w.start; start + effDuration <= w.end; start += effDuration) {
+            const end = start + effDuration;
+            const startTimeStr = toTimeString(start);
+            const endTimeStr = toTimeString(end);
+
+            const busyMatch = busyRanges.find((b) => start < b.end && end > b.start);
+            const isBooked = !!busyMatch?.isBooked;
+            const isBlocked = !!busyMatch?.isBlocked;
+
+            result.push({
+                startTime: startTimeStr,
+                endTime: endTimeStr,
+                isBooked,
+                isBlocked,
+                status: isBlocked ? 'blocked' : isBooked ? 'booked' : 'available',
+            });
         }
     }
     return result;
@@ -78,38 +104,35 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
     const [daySlots, setDaySlots] = useState<any[]>([]);
     const [noAvailability, setNoAvailability] = useState(false);
     const [selectedAvailabilityId, setSelectedAvailabilityId] = useState<string>("");
-    // ✅ NEW: group-session template slots, fetched from the group-specific
-    // endpoint (respects existing "joinable" instances + remaining capacity,
-    // unlike the raw per-mentor Availability used for 1:1 services below).
     const [groupSlots, setGroupSlots] = useState<any[]>([]);
 
     const year: number = currentMonth.getFullYear();
     const month: number = currentMonth.getMonth();
     const daysInMonth: number = new Date(year, month + 1, 0).getDate();
     const startingDay: number = new Date(year, month, 1).getDay();
-   
 
     const today: Date = new Date();
 
-       // ✅ NEW: group-session templates use their own slot source (see
-    // groupSlots effect below) instead of the generic per-mentor
-    // Availability split-by-duration logic used for 1:1 services.
     const isGroupTemplate = selectedService?.type === "GroupSession";
-
-    // ✅ NEW: selected service ke duration ke hisaab se slots
     const serviceDuration = getServiceDuration(selectedService);
-    const bookableSlots = useMemo(() => {
+
+    const allGeneratedSlots = useMemo(() => {
         if (isGroupTemplate) {
-            return groupSlots.map((s: any) => ({ startTime: s.startTime, endTime: s.endTime }));
+            return groupSlots.map((s: any) => ({
+                startTime: s.startTime,
+                endTime: s.endTime,
+                isBooked: s.status === 'full' || s.spotsRemaining === 0,
+                isBlocked: false,
+                status: s.status || (s.spotsRemaining === 0 ? 'full' : 'available'),
+            }));
         }
         return buildSlotsForDuration(daySlots, serviceDuration);
     }, [isGroupTemplate, groupSlots, daySlots, serviceDuration]);
 
-    // ✅ FIX: subtitle ab raw daySlots[0]/[last] ki jagah asli FREE windows
-    // (booked/blocked slots hata kar, contiguous merge karke) dikhata hai.
-    // Pehle "Available from X to Y" hamesha poore din ka first-to-last
-    // range dikhata tha, chahe beech me koi booked/blocked gap ho — isse
-    // mentee ko lagta tha poora window free hai jabki nahi tha.
+    const availableSlotsCount = useMemo(() => {
+        return allGeneratedSlots.filter((s) => !s.isBooked && !s.isBlocked && s.status !== 'full').length;
+    }, [allGeneratedSlots]);
+
     const freeWindows = useMemo(() => {
         const free = daySlots
             .filter((s) => !s.isBooked && !s.isBlocked)
@@ -128,26 +151,9 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
         return windows;
     }, [daySlots]);
 
-
-
     useEffect(() => {
-        // ✅ FIX: group-session templates fetch their slots from the
-        // dedicated groupSlots effect below (per-selected-date, capacity
-        // aware) — this generic per-mentor Availability fetch is only for
-        // 1:1 services (Quick Call, Deep Dive, etc.) and should be skipped
-        // for group templates so the two don't race/overwrite each other.
         if (!mentorId || isGroupTemplate) return;
 
-        // ✅ FIX: pehle admin-only getAllAvailabilityFromDB({limit:100}) use ho raha
-        // tha — sab mentors ke pehle 100 records (date ascending) fetch karke
-        // client-side filter karta tha. Agar DB mein (sab mentors milakar) 100 se
-        // zyada records hote, to is mentor ka aage wala date (e.g. 24 Sept) un
-        // pehle 100 mein hi nahi aata — mentee ko "No Availability Set" dikhta
-        // tha jabki mentor ke apne dashboard par wahi date "Available" dikhta tha.
-        // Ab wahi mentorId-scoped, date-range-filtered endpoint use kar rahe hain
-        // jo mentor ka apna Availability page use karta hai — aur currentMonth
-        // change hone par bhi refetch hota hai (pehle sirf mentorId change par
-        // hota tha, month navigate karne par stale data dikhta rehta tha).
         const y = currentMonth.getFullYear();
         const m = String(currentMonth.getMonth() + 1).padStart(2, "0");
         const lastDay = new Date(y, currentMonth.getMonth() + 1, 0).getDate();
@@ -164,10 +170,6 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-        // ✅ NEW: group-session template slots — fetched per selected date from
-    // the group-specific endpoint, which already folds in existing
-    // "joinable" instances (open sessions with spots remaining) instead of
-    // hiding a slot the moment one mentee has booked it.
     useEffect(() => {
         if (!isGroupTemplate || !mentorId || !selectedDate || !selectedService?.id) {
             setGroupSlots([]);
@@ -193,7 +195,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
     useEffect(() => {
         setSelectedTime(null);
 
-        if (isGroupTemplate) return; // handled by the groupSlots effect above
+        if (isGroupTemplate) return;
         if (!selectedDate) return;
         const selectedDateObj = new Date(year, month, selectedDate);
         const y2 = selectedDateObj.getFullYear();
@@ -202,8 +204,17 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
         const dateStr = `${y2}-${m2}-${d2}`;
 
         const matched = availability.find((a: any) => {
-            const availDate = a.date.substring(0, 10);
-            return availDate === dateStr;
+            if (!a?.date) return false;
+            const d = new Date(a.date);
+            if (isNaN(d.getTime())) return false;
+            
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            const localDateStr = `${y}-${m}-${day}`;
+            const utcDateStr = typeof a.date === "string" ? a.date.substring(0, 10) : d.toISOString().substring(0, 10);
+
+            return localDateStr === dateStr || utcDateStr === dateStr;
         });
 
         if (matched) {
@@ -318,7 +329,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
 
                     {/* RIGHT COLUMN - TIME SLOTS & BUTTON */}
                     <div>
-                        <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "20px", fontSize: "16px" }}>Total Available Time Slots: {bookableSlots.length}</h3>
+                        <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "20px", fontSize: "16px" }}>Total Available Time Slots: {availableSlotsCount}</h3>
 
                         {!selectedDate && (
                             <p className="text-[#4a3728] font-bold" style={{ textAlign: "center", fontSize: "18px", padding: "16px", background: C.bg, borderRadius: "8px" }}>
@@ -331,18 +342,16 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                                 No Availability Set for {MONTHS[month]} {selectedDate}, {year} by the Mentor.
                             </p>
                         )}
-                       {selectedDate && !noAvailability && bookableSlots.length === 0 && (
-                            
+                        {selectedDate && !noAvailability && allGeneratedSlots.length === 0 && (
                             <p className="text-[#4a3728] font-bold" style={{ textAlign: "center", fontSize: "18px", padding: "16px", background: C.bg, borderRadius: "8px" }}>
-                              No {serviceDuration > 0 ? `${serviceDuration}-minute ` : ""}slots free for {MONTHS[month]} {selectedDate}, {year}. All slots are Booked or Blocked, or the free time is too short.
+                                No {serviceDuration > 0 ? `${serviceDuration}-minute ` : ""}slots configured for {MONTHS[month]} {selectedDate}, {year}.
                             </p>
                         )}
-                     {selectedDate && !noAvailability && bookableSlots.length > 0 && (
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px", marginBottom: "24px" }}>
-                            {bookableSlots.map((slot) => {
+                        {selectedDate && !noAvailability && allGeneratedSlots.length > 0 && (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px", marginBottom: "24px" }}>
+                                {allGeneratedSlots.map((slot) => {
                                     const time = `${slot.startTime} - ${slot.endTime}`;
-                                    const displayTime = formatSlotRange(time);
-                                    const isDisabled = false; // bookableSlots mein sirf free slots hi aate hain
+                                    const isDisabled = slot.isBooked || slot.isBlocked || slot.status === 'full' || slot.status === 'booked';
                                     const sel = selectedTime === time;
 
                                     return (
@@ -352,28 +361,38 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                                             title={isDisabled ? "Slot is Already Booked" : ""}
                                             onClick={() => !isDisabled && setSelectedTime(time)}
                                             style={{
-                                                padding: "12px 8px",
+                                                padding: "10px 8px",
                                                 borderRadius: "8px",
                                                 fontSize: "13px",
                                                 fontWeight: 500,
-                                                border: `1px solid ${C.muted}`,
+                                                border: isDisabled ? `1px solid ${C.border}` : sel ? `1px solid ${C.mid}` : `1px solid ${C.muted}`,
                                                 background: isDisabled
-                                                    ? "#e5e5e5"
+                                                    ? "#e2dbd4"
                                                     : sel
                                                         ? C.mid
                                                         : C.border,
                                                 color: isDisabled
-                                                    ? "#9e9e9e"
+                                                    ? "#8c7a6b"
                                                     : sel
                                                         ? "#fff"
                                                         : C.dark,
                                                 cursor: isDisabled ? "not-allowed" : "pointer",
-                                                opacity: isDisabled ? 0.6 : 1,
+                                                opacity: isDisabled ? 0.75 : 1,
                                                 transition: "all 0.2s",
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                gap: "2px",
                                             }}
                                         >
-                                                                                     {formatTimeAMPM(slot.startTime)}
-                                                                                     </button>
+                                            <span>{formatTimeAMPM(slot.startTime)}</span>
+                                            {isDisabled && (
+                                                <span style={{ fontSize: "10px", fontWeight: "bold", color: "#8c7a6b", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                                    • BOOKED
+                                                </span>
+                                            )}
+                                        </button>
                                     );
                                 })}
                             </div>

@@ -62,9 +62,10 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
     const image = mentorData?.profilePic || "";
     const verified = mentorData?.verification?.isVerified ?? false;
     const totalSessions = mentorData?.stats?.totalSessions ?? 0;
-    const completionRate = mentorData?.stats?.completionRate != null ? `${mentorData.stats.completionRate}%` : "N/A";
-    const responseTime = mentorData?.stats?.responseTime != null ? `< ${mentorData.stats.responseTime} hrs` : "N/A";
-    const successRate = mentorData?.stats?.completionRate != null ? `${mentorData.stats.completionRate}%` : "N/A";
+    const completionRate = mentorData?.stats?.completionRate != null ? `${mentorData.stats.completionRate}%` : "100%";
+    const rawRespTime = mentorData?.stats?.responseTime;
+    const responseTime = rawRespTime != null && rawRespTime > 0 ? `< ${rawRespTime} hr${rawRespTime > 1 ? 's' : ''}` : "< 1 hr";
+    const successRate = mentorData?.stats?.successRate != null ? `${mentorData.stats.successRate}%` : (mentorData?.stats?.completionRate != null ? `${mentorData.stats.completionRate}%` : "100%");
     const currentRole = mentorData?.experience?.currentRole || "Not specified";
     const experience = mentorData?.experience?.total != null ? `${mentorData.experience.total} years of Experience` : "Experience not specified";
     const previousRoles = mentorData?.experience?.previousRoles || [];
@@ -180,7 +181,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                         {/* Current Role */}
                         <div style={{ borderRadius: "12px", padding: "14px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "10px" }}>
                             <div style={{ fontWeight: "bold", color: C.dark, fontSize: "13px", marginBottom: "2px" }}>{currentRole}</div>
-                            <div style={{ fontSize: "11px", color: C.mid }}>📅 Present</div>
+                            <div style={{ fontSize: "11px", color: C.mid }}>Present</div>
                         </div>
 
                         {/* Previous Roles */}

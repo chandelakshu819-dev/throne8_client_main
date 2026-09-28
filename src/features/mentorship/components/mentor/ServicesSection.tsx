@@ -2,6 +2,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import { Clock } from "./Icons";
 import {
   X,
@@ -693,328 +695,22 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           </div>
 
       {/* ================= Group Session Detail Modal ================= */}
-      {detailGroup && (() => {
-        const myParticipant = detailGroup.participants?.find((p: any) => p.menteeId === currentUserId);
-        const myRequestStatus: string | undefined =
-          myParticipant?.requestStatus || (joinedIds.includes(detailGroup.sessionId) ? "pending" : undefined);
-        const isPending = myRequestStatus === "pending";
-        const isAccepted = myRequestStatus === "accepted";
-        const isRejected = myRequestStatus === "rejected";
-        const hasRequested = isPending || isAccepted || isRejected;
-        const seatsLeft = (detailGroup.maxParticipants ?? 0) - (detailGroup.currentParticipants ?? 0);
-        const pricePerPerson = detailGroup.pricing?.pricePerPerson ?? detailGroup.pricePerPerson ?? 0;
-        const scheduledDate = detailGroup.scheduledAt ? new Date(detailGroup.scheduledAt) : null;
-        const status = detailGroup.status || 'open';
-        // ✅ NEW: template sessions don't have a fixed date or a seat
-        // reserved at this level — the modal footer needs to route these
-        // to the slot picker instead of sending a join request directly.
-        const isTemplateSession = !!detailGroup.isTemplate;
-        const isCancelled = status === 'cancelled';
-        const isCompleted = status === 'completed';
-        const isInProgress = status === 'in_progress';
-
-        const statusColor = isCancelled ? "#ef4444" : isCompleted ? "#10b981" : isInProgress ? "#1d4ed8" : "#b45309";
-        const statusBg = isCancelled ? "#fef2f2" : isCompleted ? "#ecfdf5" : isInProgress ? "#dbeafe" : "#fef3c7";
-
-        return (
-          <div
-            onClick={closeGroupDetail}
-            style={{
-              position: "fixed", inset: 0, background: "rgba(30,20,10,0.45)",
-              backdropFilter: "blur(2px)", display: "flex", alignItems: "center",
-              justifyContent: "center", zIndex: 1000, padding: "16px",
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                background: C.surface, borderRadius: "20px", maxWidth: "480px", width: "100%",
-                maxHeight: "88vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
-                border: `1px solid ${C.border}`,
-              }}
-            >
-              <div style={{ padding: "24px 24px 0 24px", position: "relative" }}>
-                <button
-                  onClick={closeGroupDetail}
-                  style={{
-                    position: "absolute", top: "20px", right: "20px", width: "30px", height: "30px",
-                    borderRadius: "50%", border: "none", background: C.border, color: C.dark,
-                    display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-                  }}
-                  aria-label="Close"
-                >
-                  <X size={16} />
-                </button>
-
-                {detailGroup.thumbnailImage ? (
-                  <div style={{ width: "100%", height: "140px", borderRadius: "14px", overflow: "hidden", marginBottom: "16px" }}>
-                    <img src={detailGroup.thumbnailImage} alt={detailGroup.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
-                    <div style={{
-                      width: "40px", height: "40px", borderRadius: "12px", display: "flex",
-                      alignItems: "center", justifyContent: "center", background: C.grad, color: "#fff", flexShrink: 0,
-                    }}>
-                      <Users size={19} />
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
-                  <span style={{
-                    fontSize: "12px", fontWeight: 600, padding: "4px 12px", borderRadius: "12px",
-                    background: C.border, color: C.dark,
-                  }}>
-                    Group Session
-                  </span>
-                  <span style={{
-                    display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px",
-                    borderRadius: "12px", background: statusBg, color: statusColor, fontSize: "12px", fontWeight: 700,
-                  }}>
-                    {isCancelled ? <Ban size={12} /> : <CheckCircle2 size={12} />}
-                    {GROUP_STATUS_LABEL[status] || status}
-                  </span>
-                </div>
-
-                <h2 style={{ fontSize: "19px", fontWeight: 700, color: C.dark, marginBottom: "6px", lineHeight: "1.35" }}>
-                  {detailGroup.title}
-                </h2>
-
-                {mentorName && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", color: C.mid, fontSize: "13px" }}>
-                    <UserIcon size={14} />
-                    <span>hosted by <strong style={{ color: C.dark }}>{mentorName}</strong></span>
-                  </div>
-                )}
-
-{detailGroup.description && (
-                  <p className="mb-4 text-sm line-clamp-2" style={{ color: '#8a7a6a', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
-                    {detailGroup.description || "Interactive group session led by an expert mentor."}
-                  </p>
-                )}
-              </div>
-
-              <div style={{ padding: "0 24px" }}>
-                {scheduledDate && (
-                  <div style={{
-                    background: C.bg, borderRadius: "14px", padding: "14px 16px", border: `1px solid ${C.border}`,
-                    marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between",
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <Calendar size={16} color={C.dark} />
-                      <div>
-                        <div style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>{formatGroupDate(detailGroup.scheduledAt)}</div>
-                        <div style={{ fontSize: "11px", color: C.mid }}>{detailGroup.duration} min · {detailGroup.timezone}</div>
-                      </div>
-                    </div>
-                    {!isCancelled && !isCompleted && (
-                      <span style={{ fontSize: "12px", fontWeight: 700, color: "#b45309" }}>{formatCountdown(scheduledDate)}</span>
-                    )}
-                  </div>
-                )}
-
-                {myParticipant && (
-                  <div style={{
-                    background: C.bg, borderRadius: "14px", padding: "14px 16px", border: `1px solid ${C.border}`,
-                    marginBottom: "14px",
-                  }}>
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: C.dark, marginBottom: "6px" }}>Your Registration</div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", padding: "3px 0" }}>
-                      <span style={{ color: C.mid }}>Request Status</span>
-                      <span style={{
-                        color: REQUEST_STATUS_META[myParticipant.requestStatus]?.fg || C.dark,
-                        fontWeight: 700, textTransform: "capitalize",
-                      }}>
-                        {REQUEST_STATUS_META[myParticipant.requestStatus]?.label || myParticipant.requestStatus}
-                      </span>
-                    </div>
-                    {isAccepted && (
-                      <>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", padding: "3px 0" }}>
-                          <span style={{ color: C.mid }}>Attendance</span>
-                          <span style={{ color: C.dark, fontWeight: 600, textTransform: "capitalize" }}>{myParticipant.attendanceStatus}</span>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", padding: "3px 0" }}>
-                          <span style={{ color: C.mid }}>Payment</span>
-                          <span style={{ color: C.dark, fontWeight: 600, textTransform: "capitalize" }}>{myParticipant.paymentStatus}</span>
-                        </div>
-                      </>
-                    )}
-                    {isPending && (
-                      <div style={{ fontSize: "12px", color: C.mid, marginTop: "6px", lineHeight: "1.5" }}>
-                        Join request sent. Waiting for mentor approval — you'll be notified once it's reviewed.
-                      </div>
-                    )}
-                    {isRejected && (
-                      <div style={{ fontSize: "12px", color: C.mid, marginTop: "6px", lineHeight: "1.5" }}>
-                        The mentor declined this request. You can send a new request if seats are still open.
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {isInProgress && isAccepted && (
-                  <button
-                    onClick={() => {
-                      if (detailGroup.meeting?.meetingUrl) window.open(detailGroup.meeting.meetingUrl, "_blank");
-                    }}
-                    disabled={!detailGroup.meeting?.meetingUrl}
-                    style={{
-                      width: "100%", ...btnPrimary, padding: "12px", borderRadius: "12px", fontSize: "14px",
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "18px",
-                      opacity: detailGroup.meeting?.meetingUrl ? 1 : 0.5,
-                      cursor: detailGroup.meeting?.meetingUrl ? "pointer" : "not-allowed",
-                    }}
-                  >
-                    <Video size={16} />
-                    {detailGroup.meeting?.meetingUrl ? "Join Session" : "Meeting link not shared yet"}
-                  </button>
-                )}
-
-                {!hasRequested && !isCancelled && !isCompleted && (
-                  <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}`, marginBottom: "18px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
-                      <Sparkles size={15} color={C.dark} />
-                      <span style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>What you'll get</span>
-                    </div>
-                    <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
-                      {GROUP_SESSION_HIGHLIGHTS.map((h, i) => (
-                        <li key={i} style={{
-                          display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", color: C.dark,
-                          marginBottom: i === GROUP_SESSION_HIGHLIGHTS.length - 1 ? 0 : "8px", lineHeight: "1.5",
-                        }}>
-                          <CheckCircle2 size={14} color="#10b981" style={{ marginTop: "2px", flexShrink: 0 }} />
-                          <span>{h}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-                  <div style={{ flex: 1, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
-                    <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px", color: C.mid }}><Clock /></div>
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>{detailGroup.duration} min</div>
-                    <div style={{ fontSize: "10px", color: C.mid }}>Duration</div>
-                  </div>
-                  <div style={{ flex: 1, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
-                    <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px", color: C.mid }}><IndianRupee size={15} /></div>
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: pricePerPerson === 0 ? "#10b981" : C.dark }}>
-                      {pricePerPerson === 0 ? "Free" : `₹${pricePerPerson}`}
-                    </div>
-                    <div style={{ fontSize: "10px", color: C.mid }}>Per person</div>
-                  </div>
-                  <div style={{ flex: 1, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
-                    <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px", color: C.mid }}><Users size={15} /></div>
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>
-                      {detailGroup.currentParticipants ?? 0}/{detailGroup.maxParticipants ?? 0}
-                    </div>
-                    <div style={{ fontSize: "10px", color: C.mid }}>Enrolled</div>
-                  </div>
-                </div>
-
-                {detailGroup.agenda && (
-                  <div style={{ marginBottom: "16px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
-                      <ClipboardList size={15} color={C.dark} />
-                      <span style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>Agenda</span>
-                    </div>
-                    <div style={{ background: C.bg, borderRadius: "12px", padding: "12px 14px", border: `1px solid ${C.border}`, fontSize: "12.5px", color: C.dark, lineHeight: "1.5" }}>
-                      {detailGroup.agenda}
-                    </div>
-                  </div>
-                )}
-
-                {myParticipant?.registeredAt && (
-                  <div style={{ marginBottom: "16px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
-                      <History size={15} color={C.dark} />
-                      <span style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>Timeline</span>
-                    </div>
-                    <div style={{ background: C.bg, borderRadius: "12px", padding: "12px 14px", border: `1px solid ${C.border}`, fontSize: "12.5px", color: C.dark }}>
-                      Registered on {new Date(myParticipant.registeredAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    </div>
-                  </div>
-                )}
-
-                {groupActionError && (
-                  <div style={{ marginBottom: "16px", padding: "10px 14px", borderRadius: "10px", background: "#fee2e2", color: "#dc2626", fontSize: "13px", fontWeight: 600 }}>
-                    {groupActionError}
-                  </div>
-                )}
-              </div>
-
-              {/* Footer branches on the real requestStatus — Accepted →
-                  Leave Session; Pending → Cancel Request; Rejected/none with
-                  seats left → Join Group (or "Request Again"); no seats →
-                  Session Full. This "Join Group" click is the ONLY trigger
-                  for handleJoinFromModal, i.e. the ONLY place a request is
-                  actually sent — always after the user has seen the details
-                  above. */}
-              <div style={{ padding: "16px 24px 24px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: "10px" }}>
-                <button onClick={closeGroupDetail} style={{ flex: 1, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 600, background: C.border, color: C.dark, border: "none", cursor: "pointer" }}>
-                  Close
-                </button>
-
-                {!isCancelled && !isCompleted && (
-                                 isTemplateSession ? (
-                                  // ✅ NEW: opens the mentor's Availability calendar
-                                  // (CalendarStep) so the mentee picks a date & time; the
-                                  // join request is sent from PaymentStep after the mock
-                                  // payment "succeeds", not from this modal directly.
-                                  <button
-                                    onClick={() => {
-                                      onServiceClick(getServiceFromGroupTemplate(detailGroup));
-                                      closeGroupDetail();
-                                    }}
-                                    style={{ flex: 2, ...btnPrimary, padding: "12px", borderRadius: "12px", fontSize: "13.5px" }}
-                                  >
-                                    {bookedSessionIds.includes(detailGroup.sessionId) ? "Book Another Slot" : "Select a Slot"}
-                                  </button>
-                                ) : isAccepted ? (
-                    <button
-                      onClick={handleLeaveFromModal}
-                      disabled={groupActionBusy}
-                      style={{
-                        flex: 2, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 700,
-                        background: "#fef2f2", color: "#dc2626", border: "1.5px solid #fca5a5",
-                        cursor: groupActionBusy ? "not-allowed" : "pointer", opacity: groupActionBusy ? 0.6 : 1,
-                      }}
-                    >
-                      {groupActionBusy ? "Leaving..." : "Leave Session"}
-                    </button>
-                  ) : isPending ? (
-                    <button
-                      onClick={handleLeaveFromModal}
-                      disabled={groupActionBusy}
-                      style={{
-                        flex: 2, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 700,
-                        background: "#fef3c7", color: "#b45309", border: "1.5px solid #fde68a",
-                        cursor: groupActionBusy ? "not-allowed" : "pointer", opacity: groupActionBusy ? 0.6 : 1,
-                      }}
-                    >
-                      {groupActionBusy ? "Cancelling..." : "⏳ Cancel Request"}
-                    </button>
-                  ) : seatsLeft > 0 ? (
-                    <button
-                      onClick={handleJoinFromModal}
-                      disabled={groupActionBusy}
-                      style={{ flex: 2, ...btnPrimary, padding: "12px", borderRadius: "12px", fontSize: "13.5px", opacity: groupActionBusy ? 0.6 : 1 }}
-                    >
-                      {groupActionBusy ? "Sending request..." : isRejected ? "Request Again" : "Join Group"}
-                    </button>
-                  ) : (
-                    <button disabled style={{ flex: 2, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 700, background: C.border, color: C.mid, border: "none", cursor: "not-allowed" }}>
-                      Session Full
-                    </button>
-                  )
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {detailGroup && (
+        <GroupSessionDetailModal
+          detailGroup={detailGroup}
+          currentUserId={currentUserId}
+          mentorName={mentorName}
+          joinedIds={joinedIds}
+          bookedSessionIds={bookedSessionIds}
+          groupActionError={groupActionError}
+          groupActionBusy={groupActionBusy}
+          onClose={closeGroupDetail}
+          onJoinFromModal={handleJoinFromModal}
+          onLeaveFromModal={handleLeaveFromModal}
+          onServiceClick={onServiceClick}
+          getServiceFromGroupTemplate={getServiceFromGroupTemplate}
+        />
+      )}
 
 {waitlistTarget && (
   <WaitlistModal
@@ -1044,7 +740,386 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   </div>
 )}
 </div>
-);
+  );
 };
 
-export default ServicesSection;
+interface GroupSessionDetailModalProps {
+  detailGroup: any;
+  currentUserId: string;
+  mentorName: string;
+  joinedIds: string[];
+  bookedSessionIds: string[];
+  groupActionError: string | null;
+  groupActionBusy: boolean;
+  onClose: () => void;
+  onJoinFromModal: () => void;
+  onLeaveFromModal: () => void;
+  onServiceClick: (service: Service) => void;
+  getServiceFromGroupTemplate: (group: any) => Service;
+}
+
+const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
+  detailGroup,
+  currentUserId,
+  mentorName,
+  joinedIds,
+  bookedSessionIds,
+  groupActionError,
+  groupActionBusy,
+  onClose,
+  onJoinFromModal,
+  onLeaveFromModal,
+  onServiceClick,
+  getServiceFromGroupTemplate,
+}) => {
+  useScrollLock(true, onClose);
+
+  const myParticipant = detailGroup.participants?.find((p: any) => p.menteeId === currentUserId);
+  const myRequestStatus: string | undefined =
+    myParticipant?.requestStatus || (joinedIds.includes(detailGroup.sessionId) ? "pending" : undefined);
+  const isPending = myRequestStatus === "pending";
+  const isAccepted = myRequestStatus === "accepted";
+  const isRejected = myRequestStatus === "rejected";
+  const hasRequested = isPending || isAccepted || isRejected;
+  const seatsLeft = (detailGroup.maxParticipants ?? 0) - (detailGroup.currentParticipants ?? 0);
+  const pricePerPerson = detailGroup.pricing?.pricePerPerson ?? detailGroup.pricePerPerson ?? 0;
+  const scheduledDate = detailGroup.scheduledAt ? new Date(detailGroup.scheduledAt) : null;
+  const status = detailGroup.status || "open";
+  const isTemplateSession = !!detailGroup.isTemplate;
+  const isCancelled = status === "cancelled";
+  const isCompleted = status === "completed";
+  const isInProgress = status === "in_progress";
+
+  const statusColor = isCancelled ? "#ef4444" : isCompleted ? "#10b981" : isInProgress ? "#1d4ed8" : "#b45309";
+  const statusBg = isCancelled ? "#fef2f2" : isCompleted ? "#ecfdf5" : isInProgress ? "#dbeafe" : "#fef3c7";
+
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(30,20,10,0.55)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: "16px",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "relative",
+          background: C.surface,
+          borderRadius: "20px",
+          maxWidth: "480px",
+          width: "100%",
+          maxHeight: "90vh",
+          maxHeight: "calc(100dvh - 32px)",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          border: `1px solid ${C.border}`,
+          overflow: "hidden",
+        }}
+      >
+        {/* 📌 Static (Fixed) Pinned Close Button */}
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: "14px",
+            right: "14px",
+            zIndex: 30,
+            width: "36px",
+            height: "36px",
+            borderRadius: "50%",
+            border: "1px solid rgba(0,0,0,0.1)",
+            background: "rgba(255, 255, 255, 0.9)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            color: C.dark,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            outline: "none",
+            transition: "transform 0.15s ease, background-color 0.15s ease",
+          }}
+          aria-label="Close"
+        >
+          <X size={18} />
+        </button>
+
+        {/* 📜 Inner Scrollable Content Wrapper */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+            WebkitOverflowScrolling: "touch",
+            padding: "20px 20px 12px 20px",
+          }}
+        >
+          {detailGroup.thumbnailImage ? (
+            <div style={{ width: "100%", height: "140px", borderRadius: "14px", overflow: "hidden", marginBottom: "16px" }}>
+              <img src={detailGroup.thumbnailImage} alt={detailGroup.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+              <div style={{
+                width: "40px", height: "40px", borderRadius: "12px", display: "flex",
+                alignItems: "center", justifyContent: "center", background: C.grad, color: "#fff", flexShrink: 0,
+              }}>
+                <Users size={19} />
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
+            <span style={{
+              fontSize: "12px", fontWeight: 600, padding: "4px 12px", borderRadius: "12px",
+              background: C.border, color: C.dark,
+            }}>
+              Group Session
+            </span>
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px",
+              borderRadius: "12px", background: statusBg, color: statusColor, fontSize: "12px", fontWeight: 700,
+            }}>
+              {isCancelled ? <Ban size={12} /> : <CheckCircle2 size={12} />}
+              {GROUP_STATUS_LABEL[status] || status}
+            </span>
+          </div>
+
+          <h2 style={{ fontSize: "19px", fontWeight: 700, color: C.dark, marginBottom: "6px", lineHeight: "1.35" }}>
+            {detailGroup.title}
+          </h2>
+
+          {mentorName && (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", color: C.mid, fontSize: "13px" }}>
+              <UserIcon size={14} />
+              <span>hosted by <strong style={{ color: C.dark }}>{mentorName}</strong></span>
+            </div>
+          )}
+
+          {detailGroup.description && (
+            <p className="mb-4 text-sm" style={{ color: '#8a7a6a', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+              {detailGroup.description || "Interactive group session led by an expert mentor."}
+            </p>
+          )}
+
+          {scheduledDate && (
+            <div style={{
+              background: C.bg, borderRadius: "14px", padding: "14px 16px", border: `1px solid ${C.border}`,
+              marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <Calendar size={16} color={C.dark} />
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>{formatGroupDate(detailGroup.scheduledAt)}</div>
+                  <div style={{ fontSize: "11px", color: C.mid }}>{detailGroup.duration} min · {detailGroup.timezone}</div>
+                </div>
+              </div>
+              {!isCancelled && !isCompleted && (
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "#b45309" }}>{formatCountdown(scheduledDate)}</span>
+              )}
+            </div>
+          )}
+
+          {myParticipant && (
+            <div style={{
+              background: C.bg, borderRadius: "14px", padding: "14px 16px", border: `1px solid ${C.border}`,
+              marginBottom: "14px",
+            }}>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: C.dark, marginBottom: "6px" }}>Your Registration</div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", padding: "3px 0" }}>
+                <span style={{ color: C.mid }}>Request Status</span>
+                <span style={{
+                  color: REQUEST_STATUS_META[myParticipant.requestStatus]?.fg || C.dark,
+                  fontWeight: 700, textTransform: "capitalize",
+                }}>
+                  {REQUEST_STATUS_META[myParticipant.requestStatus]?.label || myParticipant.requestStatus}
+                </span>
+              </div>
+              {isAccepted && (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", padding: "3px 0" }}>
+                    <span style={{ color: C.mid }}>Attendance</span>
+                    <span style={{ color: C.dark, fontWeight: 600, textTransform: "capitalize" }}>{myParticipant.attendanceStatus}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12.5px", padding: "3px 0" }}>
+                    <span style={{ color: C.mid }}>Payment</span>
+                    <span style={{ color: C.dark, fontWeight: 600, textTransform: "capitalize" }}>{myParticipant.paymentStatus}</span>
+                  </div>
+                </>
+              )}
+              {isPending && (
+                <div style={{ fontSize: "12px", color: C.mid, marginTop: "6px", lineHeight: "1.5" }}>
+                  Join request sent. Waiting for mentor approval — you'll be notified once it's reviewed.
+                </div>
+              )}
+              {isRejected && (
+                <div style={{ fontSize: "12px", color: C.mid, marginTop: "6px", lineHeight: "1.5" }}>
+                  The mentor declined this request. You can send a new request if seats are still open.
+                </div>
+              )}
+            </div>
+          )}
+
+          {isInProgress && isAccepted && (
+            <button
+              onClick={() => {
+                if (detailGroup.meeting?.meetingUrl) window.open(detailGroup.meeting.meetingUrl, "_blank");
+              }}
+              disabled={!detailGroup.meeting?.meetingUrl}
+              style={{
+                width: "100%", ...btnPrimary, padding: "12px", borderRadius: "12px", fontSize: "14px",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", marginBottom: "18px",
+                opacity: detailGroup.meeting?.meetingUrl ? 1 : 0.5,
+                cursor: detailGroup.meeting?.meetingUrl ? "pointer" : "not-allowed",
+              }}
+            >
+              <Video size={16} />
+              {detailGroup.meeting?.meetingUrl ? "Join Session" : "Meeting link not shared yet"}
+            </button>
+          )}
+
+          {!hasRequested && !isCancelled && !isCompleted && (
+            <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}`, marginBottom: "18px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
+                <Sparkles size={15} color={C.dark} />
+                <span style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>What you'll get</span>
+              </div>
+              <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                {GROUP_SESSION_HIGHLIGHTS.map((h, i) => (
+                  <li key={i} style={{
+                    display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", color: C.dark,
+                    marginBottom: i === GROUP_SESSION_HIGHLIGHTS.length - 1 ? 0 : "8px", lineHeight: "1.5",
+                  }}>
+                    <CheckCircle2 size={14} color="#10b981" style={{ marginTop: "2px", flexShrink: 0 }} />
+                    <span>{h}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+            <div style={{ flex: 1, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px", color: C.mid }}><Clock /></div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>{detailGroup.duration} min</div>
+              <div style={{ fontSize: "10px", color: C.mid }}>Duration</div>
+            </div>
+            <div style={{ flex: 1, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px", color: C.mid }}><IndianRupee size={15} /></div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: pricePerPerson === 0 ? "#10b981" : C.dark }}>
+                {pricePerPerson === 0 ? "Free" : `₹${pricePerPerson}`}
+              </div>
+              <div style={{ fontSize: "10px", color: C.mid }}>Per person</div>
+            </div>
+            <div style={{ flex: 1, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px", color: C.mid }}><Users size={15} /></div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>
+                {detailGroup.currentParticipants ?? 0}/{detailGroup.maxParticipants ?? 0}
+              </div>
+              <div style={{ fontSize: "10px", color: C.mid }}>Enrolled</div>
+            </div>
+          </div>
+
+          {detailGroup.agenda && (
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                <ClipboardList size={15} color={C.dark} />
+                <span style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>Agenda</span>
+              </div>
+              <div style={{ background: C.bg, borderRadius: "12px", padding: "12px 14px", border: `1px solid ${C.border}`, fontSize: "12.5px", color: C.dark, lineHeight: "1.5" }}>
+                {detailGroup.agenda}
+              </div>
+            </div>
+          )}
+
+          {myParticipant?.registeredAt && (
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                <History size={15} color={C.dark} />
+                <span style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>Timeline</span>
+              </div>
+              <div style={{ background: C.bg, borderRadius: "12px", padding: "12px 14px", border: `1px solid ${C.border}`, fontSize: "12.5px", color: C.dark }}>
+                Registered on {new Date(myParticipant.registeredAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </div>
+            </div>
+          )}
+
+          {groupActionError && (
+            <div style={{ marginBottom: "16px", padding: "10px 14px", borderRadius: "10px", background: "#fee2e2", color: "#dc2626", fontSize: "13px", fontWeight: 600 }}>
+              {groupActionError}
+            </div>
+          )}
+        </div>
+
+        {/* 🔘 Sticky Fixed Footer */}
+        <div style={{ padding: "16px 20px", borderTop: `1px solid ${C.border}`, background: C.surface, display: "flex", gap: "10px", flexShrink: 0 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 600, background: C.border, color: C.dark, border: "none", cursor: "pointer" }}>
+            Close
+          </button>
+
+          {!isCancelled && !isCompleted && (
+            isTemplateSession ? (
+              <button
+                onClick={() => {
+                  onServiceClick(getServiceFromGroupTemplate(detailGroup));
+                  onClose();
+                }}
+                style={{ flex: 2, ...btnPrimary, padding: "12px", borderRadius: "12px", fontSize: "13.5px" }}
+              >
+                {bookedSessionIds.includes(detailGroup.sessionId) ? "Book Another Slot" : "Select a Slot"}
+              </button>
+            ) : isAccepted ? (
+              <button
+                onClick={onLeaveFromModal}
+                disabled={groupActionBusy}
+                style={{
+                  flex: 2, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 700,
+                  background: "#fef2f2", color: "#dc2626", border: "1.5px solid #fca5a5",
+                  cursor: groupActionBusy ? "not-allowed" : "pointer", opacity: groupActionBusy ? 0.6 : 1,
+                }}
+              >
+                {groupActionBusy ? "Leaving..." : "Leave Session"}
+              </button>
+            ) : isPending ? (
+              <button
+                onClick={onLeaveFromModal}
+                disabled={groupActionBusy}
+                style={{
+                  flex: 2, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 700,
+                  background: "#fef3c7", color: "#b45309", border: "1.5px solid #fde68a",
+                  cursor: groupActionBusy ? "not-allowed" : "pointer", opacity: groupActionBusy ? 0.6 : 1,
+                }}
+              >
+                {groupActionBusy ? "Cancelling..." : "⏳ Cancel Request"}
+              </button>
+            ) : seatsLeft > 0 ? (
+              <button
+                onClick={onJoinFromModal}
+                disabled={groupActionBusy}
+                style={{ flex: 2, ...btnPrimary, padding: "12px", borderRadius: "12px", fontSize: "13.5px", opacity: groupActionBusy ? 0.6 : 1 }}
+              >
+                {groupActionBusy ? "Sending request..." : isRejected ? "Request Again" : "Join Group"}
+              </button>
+            ) : (
+              <button disabled style={{ flex: 2, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 700, background: C.border, color: C.mid, border: "none", cursor: "not-allowed" }}>
+                Session Full
+              </button>
+            )
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};

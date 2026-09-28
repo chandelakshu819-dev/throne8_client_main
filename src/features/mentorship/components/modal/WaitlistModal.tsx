@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { C } from "../../types/data";
+import { useScrollLock } from "@/hooks/useScrollLock";
 
 interface WaitlistModalProps {
   service: { title: string; sessionType: string; duration?: number; price?: number };
@@ -12,6 +13,7 @@ interface WaitlistModalProps {
 }
 
 const WaitlistModal: React.FC<WaitlistModalProps> = ({ service, mentorName, onClose, onConfirm }) => {
+  useScrollLock(true, onClose);
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
