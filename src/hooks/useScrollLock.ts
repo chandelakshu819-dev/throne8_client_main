@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 let lockCount = 0;
 let originalBodyOverflow = "";
@@ -15,13 +15,18 @@ const lockedContainers = new Map<HTMLElement, string>();
  * handles Escape key presses, and supports nested modals.
  */
 export function useScrollLock(isOpen: boolean, onEscape?: () => void) {
+  const onEscapeRef = useRef(onEscape);
+  useEffect(() => {
+    onEscapeRef.current = onEscape;
+  });
+
   useEffect(() => {
     if (!isOpen) return;
 
     // 1. Escape key handler
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && onEscape) {
-        onEscape();
+      if (e.key === "Escape") {
+        onEscapeRef.current?.();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -70,7 +75,7 @@ export function useScrollLock(isOpen: boolean, onEscape?: () => void) {
         lockedContainers.clear();
       }
     };
-  }, [isOpen, onEscape]);
+  }, [isOpen]);
 }
 
 export default useScrollLock;

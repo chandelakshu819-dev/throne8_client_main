@@ -817,7 +817,6 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
           borderRadius: "20px",
           maxWidth: "480px",
           width: "100%",
-          maxHeight: "90vh",
           maxHeight: "calc(100dvh - 32px)",
           display: "flex",
           flexDirection: "column",
@@ -1119,7 +1118,9 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
           )}
         </div>
       </div>
-    </div>,
+      </div>,
     document.body
   );
 };
+
+export default ServicesSection;
