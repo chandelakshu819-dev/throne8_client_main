@@ -1,6 +1,8 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @next/next/no-img-element */
 //src/features/mentorship/components/mentor/MentorSidebar.tsx
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Camera, Star, Briefcase, ArrowLeft } from "./Icons";
 import { C } from "../../types/data";
 import MentorService from "@/lib/api/mentorship.service";
@@ -9,17 +11,32 @@ interface MentorSidebarProps {
     mentorData: any;
     currentUserId?: string;
     onBack?: () => void;
+    onEditClick?: () => void;
 }
 
-const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId, onBack }) => {
+const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId, onBack, onEditClick }) => {
     const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
     const bgInputRef = useRef<HTMLInputElement>(null);
 
-    // ✅ FIX: the camera (change-photo) button used to render for ANY
-    // visitor viewing this mentor's profile, letting someone else's
-    // account overwrite the mentor's own banner/photo. It's now gated so
-    // it only shows when the logged-in user IS this mentor.
-    const isOwnProfile = !!currentUserId && !!mentorData?.userId && currentUserId === mentorData.userId;
+    const [saved, setSaved] = useState<boolean>(false);
+    const [savingToggle, setSavingToggle] = useState<boolean>(false);
+
+    const [reportOpen, setReportOpen] = useState<boolean>(false);
+    const [reportReason, setReportReason] = useState<string>("");
+    const [reportSubmitting, setReportSubmitting] = useState<boolean>(false);
+    const [reportError, setReportError] = useState<string | null>(null);
+    const [reportSuccess, setReportSuccess] = useState<boolean>(false);
+
+    useEffect(() => {
+        if (mentorData?.savedBy && currentUserId) {
+            setSaved(mentorData.savedBy.includes(currentUserId));
+        } else {
+            setSaved(false);
+        }
+    }, [mentorData?.savedBy, currentUserId]);
+
+    // Camera (change-photo) button sirf tab dikhega jab logged-in user hi is mentor ka owner ho
+    const isOwner = !!currentUserId && !!mentorData?.userId && currentUserId === mentorData.userId;
 
     const backButton = onBack && (
         <button
@@ -82,8 +99,6 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
     const languages: string[] = mentorData?.languages || [];
     const timezone: string = mentorData?.availability?.timezone || "";
 
-    const isOwner = !!currentUserId && !!mentorData?.userId && currentUserId === mentorData.userId;
-
     const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>): void => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -100,7 +115,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
         try {
             const res = await MentorService.toggleSaveMentor(mentorData.mentorId);
             setSaved(res.saved);
-        } catch (err) {
+        } catch {
             setSaved(previous);
         } finally {
             setSavingToggle(false);
@@ -123,8 +138,8 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                 setReportReason("");
                 setReportSuccess(false);
             }, 1500);
-        } catch (err: any) {
-            setReportError(err?.message || "Failed to submit report. Please try again.");
+        } catch (err: unknown) {
+            setReportError(err instanceof Error && err.message ? err.message : "Failed to submit report. Please try again.");
         } finally {
             setReportSubmitting(false);
         }
@@ -136,7 +151,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
 
                 <div style={{ position: "relative", height: "120px", background: backgroundImage ? `url(${backgroundImage}) center/cover` : C.grad }}>
                     {backButton}
-                    {isOwnProfile && (
+                    {isOwner && (
                         <>
                             <input type="file" ref={bgInputRef} onChange={handleBgUpload} accept="image/*" style={{ display: "none" }} />
                             <button onClick={() => bgInputRef.current?.click()} style={{ position: "absolute", top: "12px", right: "12px", padding: "8px", borderRadius: "8px", background: "rgba(251,247,243,0.9)", border: `1px solid ${C.border}`, cursor: "pointer" }}>
@@ -188,7 +203,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                     {isOwner ? (
                         <div style={{ marginBottom: "16px" }}>
                             <button
-                                onClick={onEditClick}
+                                onClick={() => onEditClick?.()}
                                 style={{
                                     width: "100%", padding: "10px", borderRadius: "10px",
                                     border: "1px solid #4a3728", background: "#4a3728", color: "#fff",
@@ -326,7 +341,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                     >
                         <h3 style={{ fontWeight: "bold", fontSize: "16px", color: C.dark, marginBottom: "6px" }}>Report this mentor</h3>
                         <p style={{ fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
-                            Tell us what's wrong. Our team will review this report.
+                            Tell us what&apos;s wrong. Our team will review this report.
                         </p>
 
                         {reportSuccess ? (
