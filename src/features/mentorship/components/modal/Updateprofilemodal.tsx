@@ -1,16 +1,17 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 //src/features/mentorship/components/modal/Updateprofilemodal.tsx
 import React, { useState, useEffect } from "react";
 import {
     X, Save, User, Code2, Globe,
     ChevronDown, Plus, Check, Loader2,
     Link2, Github, Linkedin, AlertCircle,
-    Briefcase, Trash2, Clock // ✅ NEW icons
+    Briefcase, Trash2, Clock
 } from "lucide-react";
 import { api } from "@/lib/api/auth.service";
 import config from "@/config/env.config";
 
-// ── Constants ────────────────────────────────────────────────
+// Constants
 const DOMAINS_OPTIONS = [
     { value: "web_development", label: "Web Development" },
     { value: "career_guidance", label: "Career Guidance" },
@@ -33,8 +34,7 @@ const EXPERIENCE_OPTIONS = [
     { label: "12+ Years", value: 13 },
 ];
 
-// ✅ NEW: common IANA timezones for a simple dropdown (avoids pulling in
-// a full timezone library just for this select)
+// Common IANA timezones for a simple dropdown
 const TIMEZONE_OPTIONS = [
     "UTC",
     "Asia/Kolkata",
@@ -49,10 +49,10 @@ const TIMEZONE_OPTIONS = [
     "Australia/Sydney",
 ];
 
-// ✅ NEW: suggested languages (user can still type a custom one)
+// Suggested languages (user can still type a custom one)
 const COMMON_LANGUAGES = ["English", "Hindi", "Spanish", "French", "German", "Mandarin", "Arabic", "Portuguese"];
 
-// ── Types ────────────────────────────────────────────────────
+// Types
 interface UpdateProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -61,14 +61,13 @@ interface UpdateProfileModalProps {
     onUpdateSuccess: (updated: any) => void;
 }
 
-// ✅ NEW type for a previous role row
 interface PreviousRole {
     title: string;
     company: string;
     duration: string;
 }
 
-type TabKey = "basic" | "expertise" | "experience" | "social"; // ✅ NEW: "experience" tab added
+type TabKey = "basic" | "expertise" | "experience" | "social";
 
 const inputCls =
     "w-full px-4 py-3 rounded-xl border-2 text-sm font-medium text-[#4a3728] outline-none transition-all focus:ring-2 focus:ring-[#4a3728]/20 focus:border-[#4a3728] bg-white border-[#e0d8cf] placeholder:text-[#b0a090]";
@@ -84,7 +83,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     );
 }
 
-// ── Main Component ───────────────────────────────────────────
+// Main Component
 export default function UpdateProfileModal({
     isOpen,
     onClose,
@@ -93,7 +92,7 @@ export default function UpdateProfileModal({
     onUpdateSuccess,
 }: UpdateProfileModalProps) {
 
-    // ── Form State ───────────────────────────────────────────
+    // Form State
     const [title, setTitle] = useState("");
     const [bio, setBio] = useState("");
     const [currentRole, setCurrentRole] = useState("");
@@ -106,24 +105,24 @@ export default function UpdateProfileModal({
     const [githubUrl, setGithubUrl] = useState("");
     const [portfolioUrl, setPortfolioUrl] = useState("");
 
-    // ✅ NEW: Previous work experience state
+    // Previous work experience state
     const [previousRoles, setPreviousRoles] = useState<PreviousRole[]>([]);
     const [newRoleTitle, setNewRoleTitle] = useState("");
     const [newRoleCompany, setNewRoleCompany] = useState("");
     const [newRoleDuration, setNewRoleDuration] = useState("");
 
-    // ✅ NEW: Languages + Timezone state
+    // Languages + Timezone state
     const [languages, setLanguages] = useState<string[]>([]);
     const [languageInput, setLanguageInput] = useState("");
     const [timezone, setTimezone] = useState("UTC");
 
-    // ── UI State ─────────────────────────────────────────────
+    // UI State
     const [activeTab, setActiveTab] = useState<TabKey>("basic");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
-    // ── Pre-fill on open ─────────────────────────────────────
+    // Pre-fill on open
     useEffect(() => {
         if (!mentorData || !isOpen) return;
         setTitle(mentorData.title ?? "");
@@ -136,7 +135,6 @@ export default function UpdateProfileModal({
         setGithubUrl(mentorData.socialProof?.githubUrl ?? "");
         setPortfolioUrl(mentorData.socialProof?.portfolioUrl ?? "");
 
-        // ✅ NEW: pre-fill previous roles
         setPreviousRoles(
             (mentorData.experience?.previousRoles ?? []).map((r: any) => ({
                 title: r.title || r.position || "",
@@ -148,7 +146,6 @@ export default function UpdateProfileModal({
         setNewRoleCompany("");
         setNewRoleDuration("");
 
-        // ✅ NEW: pre-fill languages + timezone
         setLanguages(mentorData.languages ?? ["English"]);
         setLanguageInput("");
         setTimezone(mentorData.availability?.timezone ?? "UTC");
@@ -161,7 +158,7 @@ export default function UpdateProfileModal({
 
     if (!isOpen) return null;
 
-    // ── Helpers ──────────────────────────────────────────────
+    // Helpers
     const toggleDomain = (val: string) => {
         setDomains((prev) =>
             prev.includes(val)
@@ -180,7 +177,6 @@ export default function UpdateProfileModal({
         }
     };
 
-    // ✅ NEW: add / remove previous role
     const addPreviousRole = () => {
         if (!newRoleTitle.trim() || !newRoleCompany.trim() || !newRoleDuration.trim()) return;
         setPreviousRoles((prev) => [
@@ -196,7 +192,6 @@ export default function UpdateProfileModal({
         setPreviousRoles((prev) => prev.filter((_, i) => i !== index));
     };
 
-    // ✅ NEW: add / remove language
     const addLanguage = (lang?: string) => {
         const val = (lang ?? languageInput).trim();
         if (val && !languages.includes(val)) {
@@ -210,13 +205,13 @@ export default function UpdateProfileModal({
     };
 
     const goToTab = (direction: 1 | -1) => {
-        const order: TabKey[] = ["basic", "expertise", "experience", "social"]; // ✅ NEW tab included in order
+        const order: TabKey[] = ["basic", "expertise", "experience", "social"];
         const idx = order.indexOf(activeTab);
         const next = order[idx + direction];
         if (next) setActiveTab(next);
     };
 
-    // ── Submit ───────────────────────────────────────────────
+    // Submit
     const handleSubmit = async () => {
         setError(null);
 
@@ -233,14 +228,14 @@ export default function UpdateProfileModal({
                 bio,
                 domains,
                 skills,
-                languages, // ✅ NEW
+                languages,
                 experience: {
                     total: experienceTotal,
                     currentRole,
-                    previousRoles, // ✅ NEW — array of {title, company, duration}
+                    previousRoles,
                 },
                 availability: {
-                    timezone, // ✅ NEW
+                    timezone,
                 },
                 socialProof: {
                     linkedinUrl,
@@ -269,7 +264,7 @@ export default function UpdateProfileModal({
     const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
         { key: "basic", label: "Basic Info", icon: <User className="w-4 h-4" /> },
         { key: "expertise", label: "Expertise", icon: <Code2 className="w-4 h-4" /> },
-        { key: "experience", label: "Experience", icon: <Briefcase className="w-4 h-4" /> }, // ✅ NEW tab
+        { key: "experience", label: "Experience", icon: <Briefcase className="w-4 h-4" /> },
         { key: "social", label: "Social Links", icon: <Globe className="w-4 h-4" /> },
     ];
 
@@ -283,7 +278,7 @@ export default function UpdateProfileModal({
                 style={{ backgroundColor: "#fdf9f6" }}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* ── Header ── */}
+                {/* Header */}
                 <div
                     className="relative px-8 pt-8 pb-0 flex-shrink-0 overflow-hidden"
                     style={{ background: "linear-gradient(135deg, #4a3728 0%, #7a5c3e 100%)" }}
@@ -322,7 +317,7 @@ export default function UpdateProfileModal({
                     </div>
                 </div>
 
-                {/* ── Scrollable Body ── */}
+                {/* Scrollable Body */}
                 <div className="flex-1 overflow-y-auto px-8 py-6 space-y-5">
 
                     {/* Error / Success */}
@@ -339,7 +334,7 @@ export default function UpdateProfileModal({
                         </div>
                     )}
 
-                    {/* ── TAB: Basic Info ── */}
+                    {/* TAB: Basic Info */}
                     {activeTab === "basic" && (
                         <div className="space-y-5">
                             <Field label="Mentor Title *">
@@ -389,7 +384,7 @@ export default function UpdateProfileModal({
                         </div>
                     )}
 
-                    {/* ── TAB: Expertise ── */}
+                    {/* TAB: Expertise */}
                     {activeTab === "expertise" && (
                         <div className="space-y-5">
                             <Field label={`Domains * — ${domains.length}/5 selected`}>
@@ -479,7 +474,7 @@ export default function UpdateProfileModal({
                         </div>
                     )}
 
-                    {/* ✅ NEW TAB: Experience — Previous Work Experience + Languages + Timezone */}
+                    {/* TAB: Experience (Previous Work Experience + Languages + Timezone) */}
                     {activeTab === "experience" && (
                         <div className="space-y-6">
                             {/* Previous Work Experience */}
@@ -602,12 +597,12 @@ export default function UpdateProfileModal({
                                         ))}
                                     </select>
                                 </div>
-                                <p className="text-xs text-[#8a7a6a] mt-1">This helps mentees know when you're typically available.</p>
+                                <p className="text-xs text-[#8a7a6a] mt-1">This helps mentees know when you&apos;re typically available.</p>
                             </Field>
                         </div>
                     )}
 
-                    {/* ── TAB: Social Links ── */}
+                    {/* TAB: Social Links */}
                     {activeTab === "social" && (
                         <div className="space-y-5">
                             <Field label="LinkedIn URL *">
@@ -653,7 +648,7 @@ export default function UpdateProfileModal({
                     )}
                 </div>
 
-                {/* ── Footer ── */}
+                {/* Footer */}
                 <div
                     className="flex-shrink-0 px-8 py-4 flex items-center justify-between border-t"
                     style={{ borderColor: "#e0d8cf", backgroundColor: "#fdf9f6" }}

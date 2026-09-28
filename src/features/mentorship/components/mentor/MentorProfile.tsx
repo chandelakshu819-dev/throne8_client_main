@@ -9,12 +9,12 @@ import ServicesSection from "./ServicesSection";
 import ReviewsSection from "./ReviewsSection";
 import { ArrowLeft } from "lucide-react";
 
-
 import CalendarStep from "./CalendarStep";
 import QueryStep from "./QueryStep";
 import DetailsStep from "./DetailsStep";
 import PaymentStep from "./PaymentStep";
 import ConfirmationStep from "./ConfirmationStep";
+import UpdateProfileModal from "../modal/Updateprofilemodal";
 
 import MentorService from "@/lib/api/mentorship.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -161,6 +161,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                         mentorData={mentorData}
                         currentUserId={user?.userId}
                         onBack={() => router.back()}
+                        onEditClick={() => setEditModalOpen(true)}
                     />
                     <div>
                         <ServicesSection
@@ -181,7 +182,8 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                 onClose={() => setEditModalOpen(false)}
                 mentorData={mentorData}
                 mentorId={mentorData?.mentorId || ""}
-                onUpdateSuccess={(updated) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                onUpdateSuccess={(updated: any) => {
                     setMentorData(updated);
                     fetchMentor();
                 }}
