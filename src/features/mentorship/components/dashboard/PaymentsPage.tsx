@@ -25,6 +25,10 @@ import WithdrawalService, {
   AddUpiPayload,
 } from "@/lib/api/withdrawal.service";
 
+import WithdrawalJumpButton from "./WithdrawalJumpButton";
+import { usePaymentFilters, TransactionRow } from "@/features/mentorship/hooks/usePaymentFilters";
+import PaymentFilters from "./PaymentFilters";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,21 +56,6 @@ function maskAccount(num: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
-
-type TransactionRow = {
-  bookingId: string;
-  menteeId: string;
-  menteeName: string;
-  menteeProfilePhotoId: string | null;
-  rawDate: Date;
-  date: string;
-  basePrice: number;
-  platformFee: number;
-  total: number;
-  method: string;
-  paymentStatus: string;
-  bookingStatus: string;
-};
 
 type ModalType = "bank" | "upi" | null;
 
@@ -447,6 +436,14 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
   const [methodsLoading, setMethodsLoading] = useState(true);
   const [addModal, setAddModal] = useState<ModalType>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isWithdrawalHighlighted, setIsWithdrawalHighlighted] = useState(false);
+
+  const handleTriggerHighlight = () => {
+    setIsWithdrawalHighlighted(true);
+    setTimeout(() => {
+      setIsWithdrawalHighlighted(false);
+    }, 1500);
+  };
 
   const mentorId = mentorData?.mentorId;
 
@@ -462,8 +459,11 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
         const rows: TransactionRow[] = sessions.flatMap((s: any) =>
           (s.bookings || []).map((b: any) => ({
             bookingId: b._id,
+            transactionId: b.payment?.transactionId || b.paymentId || b.payment?.razorpayPaymentId || b._id,
             menteeId: b.menteeId || b.bookedBy || "",
             menteeName: b.mentee?.fullName || s.bookedMenteeName || "Unknown",
+            menteeEmail: b.mentee?.email || b.menteeEmail || "",
+            menteePhone: b.mentee?.phone || b.menteePhone || "",
             menteeProfilePhotoId: b.mentee?.profilePic || null,
             rawDate: b.bookedAt ? new Date(b.bookedAt) : new Date(s.scheduledAt || Date.now()),
             date: b.bookedAt
@@ -477,6 +477,8 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
             method: b.payment?.method || s.payment?.method || "—",
             paymentStatus: derivePaymentStatus(b.status),
             bookingStatus: b.status || "pending",
+            sessionType: s.sessionType || s.title || b.sessionType || "1-on-1 Session",
+            payoutStatus: b.payoutStatus || b.payment?.payoutStatus || (b.status === "completed" ? "paid_out" : "pending_payout"),
           }))
         );
         setTransactions(rows);
@@ -484,6 +486,25 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
       .catch(() => setTxError("Failed to load payment data. Please try again."))
       .finally(() => setTxLoading(false));
   }, [mentorId]);
+
+  // ── Payment Filters Hook ────────────────────────────────────────────────
+  const {
+    filters,
+    updateFilter,
+    clearAllFilters,
+    filteredTransactions,
+    filteredTotal,
+    moreFilterCount,
+    isFilterActive,
+    activeChips,
+    totalCount,
+    filteredCount,
+  } = usePaymentFilters(transactions);
+
+  // Extract unique available session types from dataset
+  const availableSessionTypes = Array.from(
+    new Set(transactions.map((t) => t.sessionType).filter(Boolean) as string[])
+  );
 
   // ── Fetch withdrawal methods ────────────────────────────────────────────
   useEffect(() => {
@@ -536,9 +557,6 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
   const pendingAmount = transactions
     .filter((t) => t.paymentStatus === "pending")
     .reduce((sum, t) => sum + t.total, 0);
-
-  const grandTotal = transactions.reduce((sum, t) => sum + t.total, 0);
-
 
   const earningsStats = [
     {
@@ -649,39 +667,98 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
       </div>
 
       {/* Transaction History */}
-      <div className="bg-white p-8 rounded-2xl shadow-xl border-2 border-[#e0d8cf]">
-        <h3 className="text-2xl font-bold mb-6" style={{ color: "#4a3728" }}>Transaction History</h3>
+      <div className="bg-white p-6 md:p-8 rounded-2xl shadow-xl border-2 border-[#e0d8cf]">
+        <h3 className="text-2xl font-bold mb-4" style={{ color: "#4a3728" }}>
+          Transaction History
+        </h3>
 
-        {txLoading ? (
-          <div className="flex items-center justify-center py-12 text-[#8a7a6a]">
-            <Loader2 className="w-5 h-5 animate-spin mr-3" />
-            <span className="font-semibold">Loading transactions...</span>
-          </div>
-        ) : txError ? (
+        {/* Payment Filters Bar (with Search and Withdrawal Jump Button) */}
+        <PaymentFilters
+          filters={filters}
+          updateFilter={updateFilter}
+          clearAllFilters={clearAllFilters}
+          moreFilterCount={moreFilterCount}
+          isFilterActive={isFilterActive}
+          activeChips={activeChips}
+          totalCount={totalCount}
+          filteredCount={filteredCount}
+          availableSessionTypes={availableSessionTypes}
+          disabled={txLoading}
+          withdrawalJumpButtonNode={
+            <WithdrawalJumpButton
+              hasNoMethods={!methodsLoading && methods.length === 0}
+              targetId="withdrawal-methods"
+              onScrollTriggered={handleTriggerHighlight}
+            />
+          }
+        />
+
+        {txError ? (
           <div className="py-8 text-center text-red-500">
             <AlertCircle className="w-8 h-8 mx-auto mb-2" />
             <p className="font-semibold">{txError}</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr style={{ backgroundColor: "#fbf7f3" }}>
+          <div className="relative overflow-x-auto max-h-[60vh] overflow-y-auto border border-[#e0d8cf] rounded-xl shadow-inner bg-white">
+            <table className="w-full text-sm border-collapse">
+              <thead className="sticky top-0 z-20 shadow-sm" style={{ backgroundColor: "#fbf7f3" }}>
+                <tr className="border-b border-[#e0d8cf]" style={{ backgroundColor: "#fbf7f3" }}>
                   {["Mentee", "Date", "Base Price", "Platform Fee", "Total", "Method", "Status"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left font-semibold" style={{ color: "#4a3728" }}>{h}</th>
+                    <th key={h} className="px-4 py-3 text-left font-semibold whitespace-nowrap" style={{ color: "#4a3728" }}>
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
-              <tbody>
-                {transactions.length === 0 ? (
+              <tbody className="divide-y divide-[#e0d8cf]">
+                {txLoading ? (
+                  // 5-6 Skeleton rows matching layout
+                  [...Array(6)].map((_, idx) => (
+                    <tr key={idx} className="animate-pulse border-t border-[#e0d8cf]">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-[#e8ddd4] shrink-0" />
+                          <div className="space-y-1.5 flex-1">
+                            <div className="h-3.5 bg-[#e8ddd4] rounded w-28" />
+                            <div className="h-2.5 bg-[#f0ebe4] rounded w-16" />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3"><div className="h-3.5 bg-[#e8ddd4] rounded w-20" /></td>
+                      <td className="px-4 py-3"><div className="h-3.5 bg-[#e8ddd4] rounded w-12" /></td>
+                      <td className="px-4 py-3"><div className="h-3.5 bg-[#e8ddd4] rounded w-10" /></td>
+                      <td className="px-4 py-3"><div className="h-3.5 bg-[#e8ddd4] rounded w-12" /></td>
+                      <td className="px-4 py-3"><div className="h-4 bg-[#e8ddd4] rounded-full w-16" /></td>
+                      <td className="px-4 py-3"><div className="h-4 bg-[#e8ddd4] rounded-full w-20" /></td>
+                    </tr>
+                  ))
+                ) : transactions.length === 0 ? (
+                  // Mentor has no payments at all
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-[#8a7a6a]">
-                      <CreditCard className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p className="font-semibold">No transactions yet</p>
+                      <CreditCard className="w-10 h-10 mx-auto mb-2 opacity-30 text-[#8a7a6a]" />
+                      <p className="font-bold text-base text-[#4a3728]">No payments yet</p>
+                      <p className="text-xs mt-1 text-[#8a7a6a]">You have no payment or transaction records yet.</p>
+                    </td>
+                  </tr>
+                ) : filteredTransactions.length === 0 ? (
+                  // Active filters matched 0 rows
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-[#8a7a6a]">
+                      <CreditCard className="w-10 h-10 mx-auto mb-2 opacity-30 text-[#8a7a6a]" />
+                      <p className="font-bold text-base text-[#4a3728]">No transactions found</p>
+                      <p className="text-xs mt-1 text-[#8a7a6a]">No transactions found. Try changing your filters.</p>
+                      <button
+                        type="button"
+                        onClick={clearAllFilters}
+                        className="mt-3 px-4 py-1.5 rounded-xl border-2 border-[#4a3728] text-[#4a3728] text-xs font-semibold hover:bg-[#4a3728] hover:text-white transition-all shadow-sm"
+                      >
+                        Clear Filters
+                      </button>
                     </td>
                   </tr>
                 ) : (
-                  transactions.map((t) => {
+                  filteredTransactions.map((t) => {
                     const photo = t.menteeId ? photoUrls[t.menteeId] : null;
                     return (
                       <tr key={t.bookingId} className="border-t border-[#e0d8cf] hover:bg-[#fbf7f3] transition-colors">
@@ -695,19 +772,24 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
                               style={{ backgroundColor: "#4a3728" }}>
                               {(t.menteeName || "?")[0].toUpperCase()}
                             </div>
-                            <span className="font-medium text-[#4a3728]">{t.menteeName}</span>
+                            <div>
+                              <span className="font-medium text-[#4a3728] block">{t.menteeName}</span>
+                              {t.transactionId && (
+                                <span className="text-[10px] text-[#8a7a6a] font-mono block">ID: {t.transactionId}</span>
+                              )}
+                            </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-[#8a7a6a]">{t.date}</td>
-                        <td className="px-4 py-3 font-medium text-[#4a3728]">₹{t.basePrice}</td>
-                        <td className="px-4 py-3 text-[#8a7a6a]">₹{t.platformFee}</td>
-                        <td className="px-4 py-3 font-bold text-green-600">₹{t.total}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-[#8a7a6a] whitespace-nowrap">{t.date}</td>
+                        <td className="px-4 py-3 font-medium text-[#4a3728] whitespace-nowrap">₹{t.basePrice}</td>
+                        <td className="px-4 py-3 text-[#8a7a6a] whitespace-nowrap">₹{t.platformFee}</td>
+                        <td className="px-4 py-3 font-bold text-green-600 whitespace-nowrap">₹{t.total}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span className="px-2 py-1 rounded-full text-xs font-semibold capitalize" style={{ backgroundColor: "#fbf7f3", color: "#4a3728" }}>
                             {t.method}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${paymentStatusBadge(t.paymentStatus)}`}>
                             {t.paymentStatus}
                           </span>
@@ -717,22 +799,35 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
                   })
                 )}
               </tbody>
-              {transactions.length > 0 && (
-                <tfoot>
-                  <tr style={{ backgroundColor: "#4a3728" }}>
-                    <td colSpan={4} className="px-4 py-3 text-white font-bold">Grand Total</td>
-                    <td className="px-4 py-3 text-white font-bold text-lg">₹{grandTotal.toLocaleString("en-IN")}</td>
-                    <td colSpan={2}></td>
-                  </tr>
-                </tfoot>
-              )}
+              <tfoot className="sticky bottom-0 z-20 shadow-[0_-4px_12px_rgba(0,0,0,0.15)]">
+                <tr style={{ backgroundColor: "#4a3728" }} className="text-white">
+                  <td colSpan={4} className="px-4 py-2.5 text-sm font-bold whitespace-nowrap rounded-bl-xl">
+                    {isFilterActive ? "Filtered Total" : "Grand Total"}
+                  </td>
+                  <td className="px-4 py-2.5 text-lg font-bold whitespace-nowrap">
+                    {txLoading ? (
+                      <div className="h-5 w-20 bg-white/30 rounded animate-pulse inline-block" />
+                    ) : (
+                      `₹${filteredTotal.toLocaleString("en-IN")}`
+                    )}
+                  </td>
+                  <td colSpan={2} className="px-4 py-2.5 rounded-br-xl"></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
       </div>
 
       {/* Withdrawal Methods */}
-      <div className="bg-white p-8 rounded-2xl shadow-xl border-2 border-[#e0d8cf]">
+      <div
+        id="withdrawal-methods"
+        className={`bg-white p-6 md:p-8 rounded-2xl shadow-xl border-2 scroll-mt-24 transition-all duration-500 ${
+          isWithdrawalHighlighted
+            ? "border-[#4a3728] ring-4 ring-[#4a3728]/20 shadow-2xl scale-[1.005]"
+            : "border-[#e0d8cf]"
+        }`}
+      >
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-2xl font-bold text-[#4a3728]">Withdrawal Methods</h3>
