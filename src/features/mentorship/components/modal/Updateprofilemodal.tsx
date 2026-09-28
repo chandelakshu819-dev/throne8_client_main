@@ -1,10 +1,11 @@
 "use client";
-
+//src/features/mentorship/components/modal/Updateprofilemodal.tsx
 import React, { useState, useEffect } from "react";
 import {
     X, Save, User, Code2, Globe,
     ChevronDown, Plus, Check, Loader2,
-    Link2, Github, Linkedin, AlertCircle
+    Link2, Github, Linkedin, AlertCircle,
+    Briefcase, Trash2, Clock // ✅ NEW icons
 } from "lucide-react";
 import { api } from "@/lib/api/auth.service";
 import config from "@/config/env.config";
@@ -32,6 +33,25 @@ const EXPERIENCE_OPTIONS = [
     { label: "12+ Years", value: 13 },
 ];
 
+// ✅ NEW: common IANA timezones for a simple dropdown (avoids pulling in
+// a full timezone library just for this select)
+const TIMEZONE_OPTIONS = [
+    "UTC",
+    "Asia/Kolkata",
+    "Asia/Dubai",
+    "Asia/Singapore",
+    "Asia/Tokyo",
+    "Europe/London",
+    "Europe/Berlin",
+    "America/New_York",
+    "America/Chicago",
+    "America/Los_Angeles",
+    "Australia/Sydney",
+];
+
+// ✅ NEW: suggested languages (user can still type a custom one)
+const COMMON_LANGUAGES = ["English", "Hindi", "Spanish", "French", "German", "Mandarin", "Arabic", "Portuguese"];
+
 // ── Types ────────────────────────────────────────────────────
 interface UpdateProfileModalProps {
     isOpen: boolean;
@@ -41,7 +61,14 @@ interface UpdateProfileModalProps {
     onUpdateSuccess: (updated: any) => void;
 }
 
-type TabKey = "basic" | "expertise" | "social";
+// ✅ NEW type for a previous role row
+interface PreviousRole {
+    title: string;
+    company: string;
+    duration: string;
+}
+
+type TabKey = "basic" | "expertise" | "experience" | "social"; // ✅ NEW: "experience" tab added
 
 const inputCls =
     "w-full px-4 py-3 rounded-xl border-2 text-sm font-medium text-[#4a3728] outline-none transition-all focus:ring-2 focus:ring-[#4a3728]/20 focus:border-[#4a3728] bg-white border-[#e0d8cf] placeholder:text-[#b0a090]";
@@ -79,6 +106,17 @@ export default function UpdateProfileModal({
     const [githubUrl, setGithubUrl] = useState("");
     const [portfolioUrl, setPortfolioUrl] = useState("");
 
+    // ✅ NEW: Previous work experience state
+    const [previousRoles, setPreviousRoles] = useState<PreviousRole[]>([]);
+    const [newRoleTitle, setNewRoleTitle] = useState("");
+    const [newRoleCompany, setNewRoleCompany] = useState("");
+    const [newRoleDuration, setNewRoleDuration] = useState("");
+
+    // ✅ NEW: Languages + Timezone state
+    const [languages, setLanguages] = useState<string[]>([]);
+    const [languageInput, setLanguageInput] = useState("");
+    const [timezone, setTimezone] = useState("UTC");
+
     // ── UI State ─────────────────────────────────────────────
     const [activeTab, setActiveTab] = useState<TabKey>("basic");
     const [saving, setSaving] = useState(false);
@@ -97,6 +135,24 @@ export default function UpdateProfileModal({
         setLinkedinUrl(mentorData.socialProof?.linkedinUrl ?? "");
         setGithubUrl(mentorData.socialProof?.githubUrl ?? "");
         setPortfolioUrl(mentorData.socialProof?.portfolioUrl ?? "");
+
+        // ✅ NEW: pre-fill previous roles
+        setPreviousRoles(
+            (mentorData.experience?.previousRoles ?? []).map((r: any) => ({
+                title: r.title || r.position || "",
+                company: r.company || "",
+                duration: r.duration || "",
+            }))
+        );
+        setNewRoleTitle("");
+        setNewRoleCompany("");
+        setNewRoleDuration("");
+
+        // ✅ NEW: pre-fill languages + timezone
+        setLanguages(mentorData.languages ?? ["English"]);
+        setLanguageInput("");
+        setTimezone(mentorData.availability?.timezone ?? "UTC");
+
         setActiveTab("basic");
         setError(null);
         setSuccess(false);
@@ -124,8 +180,37 @@ export default function UpdateProfileModal({
         }
     };
 
+    // ✅ NEW: add / remove previous role
+    const addPreviousRole = () => {
+        if (!newRoleTitle.trim() || !newRoleCompany.trim() || !newRoleDuration.trim()) return;
+        setPreviousRoles((prev) => [
+            ...prev,
+            { title: newRoleTitle.trim(), company: newRoleCompany.trim(), duration: newRoleDuration.trim() },
+        ]);
+        setNewRoleTitle("");
+        setNewRoleCompany("");
+        setNewRoleDuration("");
+    };
+
+    const removePreviousRole = (index: number) => {
+        setPreviousRoles((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    // ✅ NEW: add / remove language
+    const addLanguage = (lang?: string) => {
+        const val = (lang ?? languageInput).trim();
+        if (val && !languages.includes(val)) {
+            setLanguages((prev) => [...prev, val]);
+        }
+        setLanguageInput("");
+    };
+
+    const removeLanguage = (lang: string) => {
+        setLanguages((prev) => prev.filter((l) => l !== lang));
+    };
+
     const goToTab = (direction: 1 | -1) => {
-        const order: TabKey[] = ["basic", "expertise", "social"];
+        const order: TabKey[] = ["basic", "expertise", "experience", "social"]; // ✅ NEW tab included in order
         const idx = order.indexOf(activeTab);
         const next = order[idx + direction];
         if (next) setActiveTab(next);
@@ -139,6 +224,7 @@ export default function UpdateProfileModal({
         if (!bio.trim() || bio.length < 50) { setError("Bio must be at least 50 characters."); setActiveTab("basic"); return; }
         if (domains.length === 0) { setError("Select at least 1 domain."); setActiveTab("expertise"); return; }
         if (skills.length === 0) { setError("Add at least 1 skill."); setActiveTab("expertise"); return; }
+        if (languages.length === 0) { setError("Add at least 1 language."); setActiveTab("experience"); return; }
 
         setSaving(true);
         try {
@@ -147,9 +233,14 @@ export default function UpdateProfileModal({
                 bio,
                 domains,
                 skills,
+                languages, // ✅ NEW
                 experience: {
                     total: experienceTotal,
                     currentRole,
+                    previousRoles, // ✅ NEW — array of {title, company, duration}
+                },
+                availability: {
+                    timezone, // ✅ NEW
                 },
                 socialProof: {
                     linkedinUrl,
@@ -178,6 +269,7 @@ export default function UpdateProfileModal({
     const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
         { key: "basic", label: "Basic Info", icon: <User className="w-4 h-4" /> },
         { key: "expertise", label: "Expertise", icon: <Code2 className="w-4 h-4" /> },
+        { key: "experience", label: "Experience", icon: <Briefcase className="w-4 h-4" /> }, // ✅ NEW tab
         { key: "social", label: "Social Links", icon: <Globe className="w-4 h-4" /> },
     ];
 
@@ -383,6 +475,134 @@ export default function UpdateProfileModal({
                                         ))}
                                     </div>
                                 )}
+                            </Field>
+                        </div>
+                    )}
+
+                    {/* ✅ NEW TAB: Experience — Previous Work Experience + Languages + Timezone */}
+                    {activeTab === "experience" && (
+                        <div className="space-y-6">
+                            {/* Previous Work Experience */}
+                            <Field label={`Previous Work Experience (${previousRoles.length})`}>
+                                <div className="space-y-2 mb-3">
+                                    {previousRoles.length === 0 && (
+                                        <p className="text-xs text-[#8a7a6a]">No previous roles added yet. Add one below.</p>
+                                    )}
+                                    {previousRoles.map((role, i) => (
+                                        <div key={i} className="flex items-center justify-between p-3 rounded-xl border" style={{ backgroundColor: "#fbf7f3", borderColor: "#e0d8cf" }}>
+                                            <div>
+                                                <p className="text-sm font-bold" style={{ color: "#4a3728" }}>{role.title}</p>
+                                                <p className="text-xs" style={{ color: "#7a5c3e" }}>{role.company} · {role.duration}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removePreviousRole(i)}
+                                                className="p-2 rounded-lg hover:bg-red-50 text-red-500 flex-shrink-0"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="p-3 rounded-xl border space-y-2" style={{ backgroundColor: "#fff", borderColor: "#e0d8cf" }}>
+                                    <p className="text-xs font-bold" style={{ color: "#7a5c3e" }}>Add a role</p>
+                                    <input
+                                        type="text"
+                                        value={newRoleTitle}
+                                        onChange={(e) => setNewRoleTitle(e.target.value)}
+                                        placeholder="Job title (e.g. Software Engineer)"
+                                        className={inputCls}
+                                    />
+                                    <input
+                                        type="text"
+                                        value={newRoleCompany}
+                                        onChange={(e) => setNewRoleCompany(e.target.value)}
+                                        placeholder="Company (e.g. Acme Corp)"
+                                        className={inputCls}
+                                    />
+                                    <input
+                                        type="text"
+                                        value={newRoleDuration}
+                                        onChange={(e) => setNewRoleDuration(e.target.value)}
+                                        placeholder="Duration (e.g. Jan 2020 - Mar 2022)"
+                                        className={inputCls}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={addPreviousRole}
+                                        disabled={!newRoleTitle.trim() || !newRoleCompany.trim() || !newRoleDuration.trim()}
+                                        className="w-full py-2.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        style={{ backgroundColor: "#4a3728" }}
+                                    >
+                                        <Plus className="w-4 h-4" /> Add Role
+                                    </button>
+                                </div>
+                            </Field>
+
+                            {/* Languages */}
+                            <Field label={`Languages Spoken * — ${languages.length} added`}>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={languageInput}
+                                        onChange={(e) => setLanguageInput(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLanguage(); } }}
+                                        placeholder="Type a language and press Enter..."
+                                        className={`${inputCls} flex-1`}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => addLanguage()}
+                                        className="px-4 py-3 rounded-xl text-white font-bold flex-shrink-0"
+                                        style={{ backgroundColor: "#4a3728" }}
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                {/* Quick-add suggestions */}
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {COMMON_LANGUAGES.filter((l) => !languages.includes(l)).map((l) => (
+                                        <button
+                                            key={l}
+                                            type="button"
+                                            onClick={() => addLanguage(l)}
+                                            className="px-2.5 py-1 rounded-full text-xs font-semibold border"
+                                            style={{ borderColor: "#e0d8cf", color: "#7a5c3e" }}
+                                        >
+                                            + {l}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {languages.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mt-3">
+                                        {languages.map((lang) => (
+                                            <span key={lang} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: "#4a3728" }}>
+                                                {lang}
+                                                <button type="button" onClick={() => removeLanguage(lang)} className="hover:text-red-300 ml-0.5">×</button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </Field>
+
+                            {/* Timezone */}
+                            <Field label="Timezone *">
+                                <div className="relative">
+                                    <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#7a5c3e] pointer-events-none" />
+                                    <select
+                                        value={timezone}
+                                        onChange={(e) => setTimezone(e.target.value)}
+                                        className={`${inputCls} pl-10`}
+                                    >
+                                        {TIMEZONE_OPTIONS.map((tz) => (
+                                            <option key={tz} value={tz}>{tz}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <p className="text-xs text-[#8a7a6a] mt-1">This helps mentees know when you're typically available.</p>
                             </Field>
                         </div>
                     )}

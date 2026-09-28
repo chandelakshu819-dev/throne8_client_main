@@ -2,13 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import { MentorCard } from "@/features/index";
-import { MENTORS } from "@/features/index";
 import MentorService from "@/lib/api/mentorship.service";
-
-const TOTAL_CARDS = 8; // marquee ke liye minimum cards
 
 export default function MentorMarqueeSection() {
     const [apiMentors, setApiMentors] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         MentorService.getAllMentors({ page: 1, limit: 10 })
@@ -16,7 +14,8 @@ export default function MentorMarqueeSection() {
                 const list = res.data ?? [];
                 setApiMentors(list);
             })
-            .catch(() => setApiMentors([]));
+            .catch(() => setApiMentors([]))
+            .finally(() => setLoading(false));
     }, []);
 
     // Real mentors ko MentorCard format mein convert karo
@@ -27,7 +26,7 @@ export default function MentorMarqueeSection() {
         role: m.experience?.currentRole?.split(" at ")[0] ?? "Mentor",
         company: m.experience?.currentRole?.split(" at ")[1] ?? "",
         rating: m.stats?.averageRating || 0,
-     sessions: m.stats?.totalSessions || m.trustScore?.metrics?.totalCompletedSessions || 0,
+        sessions: m.stats?.totalSessions || m.trustScore?.metrics?.totalCompletedSessions || 0,
         price: m.pricing?.quickCall || 0,
         match: 90,
         image: m.profilePic ?? "",
@@ -36,24 +35,11 @@ export default function MentorMarqueeSection() {
         isDummy: false,
     }));
 
-    // Remaining slots ko dummy se fill karo
-    const dummyCount = Math.max(0, TOTAL_CARDS - realCards.length);
-    const dummyCards = Array(dummyCount).fill(null).map((_, i) => ({
-        id: `dummy-${i}`,
-        name: "Coming Soon",
-        role: "Mentor",
-        company: "—",
-        rating: 0,
-        sessions: 0,
-        price: 0,
-        match: 0,
-        image: "",
-        tags: [],
-        exp: "—",
-        isDummy: true,
-    }));
-
-    const allCards = [...realCards, ...dummyCards];
+    // Marquee ke liye smooth loop chahiye — agar real mentors kam hain
+    // (jaise 1-2) to unhi ko repeat karke dikhate hain, dummy data nahi.
+    if (!loading && realCards.length === 0) {
+        return null; // koi real mentor nahi hai to section hi mat dikhao
+    }
 
     return (
         <section className="py-14 bg-[#f7f1e6] overflow-hidden border-y border-[#f0edea]">
@@ -67,7 +53,7 @@ export default function MentorMarqueeSection() {
             </div>
             <div className="group/marquee">
                 <div className="animate-marquee group-hover/marquee:pause-animation flex gap-6">
-                    {[...allCards, ...allCards, ...allCards].map((mentor, i) => (
+                    {[...realCards, ...realCards, ...realCards].map((mentor, i) => (
                         <MentorCard key={i} mentor={mentor} />
                     ))}
                 </div>

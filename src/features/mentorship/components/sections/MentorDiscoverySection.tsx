@@ -195,63 +195,8 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     const seniorMentors = filteredMentors.filter((m) => m.isSenior);
     const baseRegularMentors = filteredMentors.filter((m) => !m.isSenior);
 
-    // 3 frontend-only dummy mentors to bring total count to 5 (2 real + 3 dummy)
-    const DUMMY_REGULAR_MENTORS: MentorData[] = [
-        {
-            id: "dummy-1",
-            name: "New Mentor",
-            role: "Profile in Onboarding",
-            company: "",
-            rating: 0,
-            sessions: 0,
-            price: 0,
-            image: "",
-            tags: ["Mentorship"],
-            exp: "0 Yrs",
-            expTotal: 0,
-            domains: [],
-            isSenior: false,
-            acceptsBooking: false,
-            isDummy: true,
-        },
-        {
-            id: "dummy-2",
-            name: "New Mentor",
-            role: "Profile in Onboarding",
-            company: "",
-            rating: 0,
-            sessions: 0,
-            price: 0,
-            image: "",
-            tags: ["Mentorship"],
-            exp: "0 Yrs",
-            expTotal: 0,
-            domains: [],
-            isSenior: false,
-            acceptsBooking: false,
-            isDummy: true,
-        },
-        {
-            id: "dummy-3",
-            name: "New Mentor",
-            role: "Profile in Onboarding",
-            company: "",
-            rating: 0,
-            sessions: 0,
-            price: 0,
-            image: "",
-            tags: ["Mentorship"],
-            exp: "0 Yrs",
-            expTotal: 0,
-            domains: [],
-            isSenior: false,
-            acceptsBooking: false,
-            isDummy: true,
-        },
-    ];
-
-    // Append dummy mentors exclusively to regularMentors
-    const regularMentors = [...baseRegularMentors, ...DUMMY_REGULAR_MENTORS];
+       // Real mentors only — no dummy/placeholder cards
+    const regularMentors = baseRegularMentors;
 
     // Sliced lists for initial view
     const visibleSeniorMentors = showAllSeniorMentors 
