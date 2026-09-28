@@ -427,7 +427,7 @@ export default function SessionRoomPage() {
       </div>
 
           {/* Video grid */}
-          <div style={{ position: 'relative', display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 16 }}>
+          <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 16, overflowY: 'auto' }}>
         {/* Floating reaction overlay */}
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
           {floatingReactions.map((r) => (

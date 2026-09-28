@@ -833,7 +833,16 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
       return false;
     }
     if (joinResult === 'timeout') {
-      console.warn('[LiveRoom] join-live-room: no response in 8s, assuming joined');
+      console.error('[LiveRoom] join-live-room: timeout, treating as failed');
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+      setLocalStream(null);
+      setPeers(new Map());
+      setIsCameraOn(false);
+      setIsMicOn(false);
+      setIsConnecting(false);
+      setError('Connection timed out. Please try again.');
+      return false;
     }
 
 
@@ -942,6 +951,24 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
       userName?: string;
     }) => {
       if (!isMounted.current || !remoteUserId || remoteUserId === userId) return;
+
+      setPeers((prev) => {
+        const next = new Map(prev);
+        if (!next.has(remoteUserId)) {
+          next.set(remoteUserId, {
+            socketId: remoteUserId,
+            userId: remoteUserId,
+            userName: remoteUserName,
+            stream: null,
+            cameraOn: true,
+            micOn: true,
+            isSpeaking: false,
+            quality: 'good',
+            connectionState: 'new',
+          });
+        }
+        return next;
+      });
 
       onPeerJoined?.({
         socketId: remoteUserId,
