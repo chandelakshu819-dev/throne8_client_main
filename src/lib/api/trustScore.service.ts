@@ -16,6 +16,10 @@ export interface TrustScoreData {
   trustScore?: {
     overall: number;
     breakdown: TrustScoreBreakdown;
+    tier: { min: number; name: string; color: string; bg: string; ring: string };
+    nextTier: { min: number; name: string; color: string; bg: string; ring: string } | null;
+    pointsToNextTier: number;
+    improvementSuggestions: { text: string }[];
   } | null;
   averageRating?: number;
   totalReviews?: number;
@@ -30,6 +34,14 @@ export const trustScoreService = {
       return null;
     }
   },
+  syncByUserId: async (userId: string): Promise<TrustScoreData | null> => {
+    try {
+      const response = await api.post(`/mentorship/trust-score/${userId}/sync`);
+      return response.data?.data || response.data || null;
+    } catch {
+      return null;
+    }
+  }
 };
 
 export default trustScoreService;

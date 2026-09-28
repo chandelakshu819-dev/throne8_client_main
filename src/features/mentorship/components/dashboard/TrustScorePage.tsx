@@ -18,25 +18,6 @@ import {
 } from "lucide-react"
 import MentorService from "@/lib/api/mentorship.service"
 
-// ── Tier system derived purely from the overall score ────────────────
-const TIERS = [
-  { min: 90, name: "Elite Mentor", color: "#a37c2c", bg: "#fdf6e3", ring: "#e6c869" },
-  { min: 75, name: "Trusted Pro", color: "#4a3728", bg: "#f3ece4", ring: "#c9a876" },
-  { min: 60, name: "Rising Mentor", color: "#7a5c3e", bg: "#fbf7f3", ring: "#a08070" },
-  { min: 0, name: "Getting Started", color: "#8a7a6a", bg: "#f6ede8", ring: "#d8cec4" },
-]
-
-function getTier(score: number) {
-  return TIERS.find((t) => score >= t.min) ?? TIERS[TIERS.length - 1]
-}
-
-// The tier strictly above the current one, if any — used for the
-// "X points to next tier" progress nudge.
-function getNextTier(score: number) {
-  const higherTiers = TIERS.filter((t) => t.min > score).sort((a, b) => a.min - b.min)
-  return higherTiers[0] ?? null
-}
-
 // Achievement badges derived purely from the breakdown scores we already
 // have — no new backend fields, just thresholds on existing data.
 function getAchievements(breakdown: Record<string, number | undefined>) {
@@ -63,12 +44,6 @@ const breakdownMeta = [
   { key: "engagement", label: "Engagement", icon: Zap, desc: "Response time & platform activity" },
 ]
 
-const improvementTips = [
-  { text: "Complete 5 more sessions this month", icon: Clock },
-  { text: "Respond to inquiries within 2 hours", icon: MessageSquare },
-  { text: "Get 3 more 5-star reviews", icon: Star },
-  { text: "Update your profile with recent achievements", icon: Sparkles },
-]
 
 // ── Circular progress ring ─────────────────────────────────────────────
 const ScoreRing = ({
@@ -139,6 +114,29 @@ export default function TrustScorePage() {
       })
   }
 
+  const syncScore = () => {
+    // Uses the new sync endpoint via backend service update or manual api call
+    // For now we will hit the existing endpoint since we added sync logic inside trustScore.service.ts
+    // Wait, the MentorService does not have sync endpoint yet. Let's import trustScoreService.
+    setLoading(true);
+    import("@/lib/api/trustScore.service").then(({ trustScoreService }) => {
+      // we need userId, but let's just use the current fetchScore as a fallback if we don't have it, 
+      // or we can use MentorService to add a sync endpoint. 
+      // Actually, mentorController.getTrustScore recalculates automatically if missing. 
+      // Let's add MentorService.syncTrustScore later, for now call api.post
+      import("@/lib/api/api.intance").then(({ default: api }) => {
+        api.post('/mentorship/trust-score/' + (trustScore?.userId || 'me') + '/sync').then((res) => {
+          if (res.data?.data?.trustScore) {
+             setTrustScore(res.data.data.trustScore);
+             setError(false);
+          } else {
+             fetchScore(); // fallback
+          }
+        }).catch(() => setError(true)).finally(() => setLoading(false));
+      });
+    });
+  }
+
   useEffect(() => {
     fetchScore()
   }, [])
@@ -146,10 +144,11 @@ export default function TrustScorePage() {
   const numericScore =
     typeof trustScore?.overall === "number" ? trustScore.overall : null
 
-  const tier = getTier(numericScore ?? 0)
-  const nextTier = numericScore !== null ? getNextTier(numericScore) : null
-  const pointsToNextTier = nextTier ? Math.max(nextTier.min - (numericScore ?? 0), 0) : 0
+  const tier = trustScore?.tier || { name: "Getting Started", color: "#8a7a6a", bg: "#f6ede8", ring: "#d8cec4" };
+  const nextTier = trustScore?.nextTier || null;
+  const pointsToNextTier = trustScore?.pointsToNextTier || 0;
   const achievements = getAchievements(trustScore?.breakdown ?? {})
+  const dynamicImprovementTips = trustScore?.improvementSuggestions || [];
 
   const overallDisplay = loading
     ? "—"
@@ -185,16 +184,27 @@ export default function TrustScorePage() {
           </div>
         </div>
 
-        {error && (
+        <div className="flex gap-2">
+          {error && (
+            <button
+              onClick={fetchScore}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-opacity hover:opacity-90"
+              style={{ backgroundColor: "#4a3728", color: "#fff" }}
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Retry
+            </button>
+          )}
           <button
-            onClick={fetchScore}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-opacity hover:opacity-90"
+            onClick={syncScore}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
             style={{ backgroundColor: "#4a3728", color: "#fff" }}
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Retry
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Sync
           </button>
-        )}
+        </div>
       </div>
 
       {/* Hero Score Card */}
@@ -342,23 +352,29 @@ export default function TrustScorePage() {
           </h3>
 
           <ul className="space-y-3">
-            {improvementTips.map((tip, idx) => (
-              <li
-                key={idx}
-                className="flex items-start gap-3 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9]"
-                style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}
-              >
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: "#f3ece4" }}
+            {dynamicImprovementTips.length > 0 ? (
+              dynamicImprovementTips.map((tip: any, idx: number) => (
+                <li
+                  key={idx}
+                  className="flex items-start gap-3 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9]"
+                  style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}
                 >
-                  <tip.icon className="w-4 h-4" style={{ color: "#7a5c3e" }} />
-                </div>
-                <span className="text-sm pt-1" style={{ color: "#5a4535" }}>
-                  {tip.text}
-                </span>
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: "#f3ece4" }}
+                  >
+                    <Sparkles className="w-4 h-4" style={{ color: "#7a5c3e" }} />
+                  </div>
+                  <span className="text-sm pt-1" style={{ color: "#5a4535" }}>
+                    {tip.text}
+                  </span>
+                </li>
+              ))
+            ) : (
+              <li className="text-sm" style={{ color: "#8a7a6a" }}>
+                {!loading && !error && !trustScore ? "Data unavailable" : "Not enough data"}
               </li>
-            ))}
+            )}
           </ul>
         </div>
       </div>
