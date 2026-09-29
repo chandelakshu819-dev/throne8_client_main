@@ -5,15 +5,21 @@ import Link from "next/link";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { Star } from "./Icons";
 import { C } from "../../types/data";
-import MentorService from "@/lib/api/mentorship.service";
+import ReviewService, {
+    MentorReview,
+    ReviewStats,
+    ReviewSort,
+    ReviewReaction,
+} from "@/lib/api/review.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+
+interface ReviewsSectionProps {
+    mentorId: string;
+}
 
 const PAGE_SIZE = 10;
 const MAX_REPLY_LENGTH = 500;
 const MIN_REPLY_LENGTH = 10;
-
-type ReviewSort = "newest" | "helpful" | "highest" | "lowest";
-type Reaction = "like" | "dislike";
 
 const SORT_OPTIONS: { value: ReviewSort; label: string }[] = [
     { value: "newest", label: "Newest" },
@@ -22,49 +28,8 @@ const SORT_OPTIONS: { value: ReviewSort; label: string }[] = [
     { value: "lowest", label: "Lowest rated" },
 ];
 
-interface ReviewsSectionProps {
-    mentorId: string;
-}
-
-interface ReviewItem {
-    reviewId: string;
-    rating: number;
-    comment: string;
-    tags?: string[];
-    isVerified?: boolean;
-    createdAt: string;
-    updatedAt?: string;
-    helpfulCount?: number;
-    notHelpfulCount?: number;
-    // userIds resolved by the backend (used for navigation / permissions)
-    menteeUserId?: string;
-    mentorUserId?: string;
-    mentee?: {
-        firstName?: string;
-        lastName?: string;
-        fullName?: string;
-        profilePic?: string | null;
-        profilePhotoId?: string | null;
-        title?: string;
-    };
-    session?: {
-        title?: string;
-        sessionType?: string;
-        scheduledAt?: string;
-    };
-    mentorResponse?: {
-        comment: string;
-        respondedAt: string;
-    };
-}
-
-interface ReviewStats {
-    averageRating: number;
-    totalReviews: number;
-    distribution: { 5: number; 4: number; 3: number; 2: number; 1: number };
-}
-
-const formatRelativeDate = (dateStr: string): string => {
+const formatRelativeDate = (dateStr?: string): string => {
+    if (!dateStr) return "";
     const date = new Date(dateStr);
     const diffMs = Date.now() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -78,6 +43,19 @@ const formatRelativeDate = (dateStr: string): string => {
     if (diffMonths <= 1) return "1 month ago";
     return `${diffMonths} months ago`;
 };
+
+// mentee object shape varies (firstName/lastName OR fullName OR name) — normalize here
+const getMenteeName = (review: MentorReview): string => {
+    const mentee = review.mentee;
+    if (!mentee) return "Anonymous";
+    const combined = `${mentee.firstName ?? ""} ${mentee.lastName ?? ""}`.trim();
+    return combined || mentee.fullName || mentee.name || "Anonymous";
+};
+
+const getReviewKey = (review: MentorReview, idx: number): string =>
+    review.reviewId || review.id || review._id || String(idx);
+
+const isImageUrl = (v?: string | null): v is string => !!v && /^(https?:)?\/\//.test(v);
 
 const linkBtn: React.CSSProperties = {
     fontSize: "12px",
@@ -129,20 +107,18 @@ const ReactionButton: React.FC<{
     </button>
 );
 
-const isImageUrl = (v?: string | null): v is string => !!v && /^(https?:)?\/\//.test(v);
-
 const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
     const { user, isAuthenticated } = useAuth();
     const currentUserId = user?.userId ? String(user.userId) : "";
 
-    const [reviews, setReviews] = useState<ReviewItem[]>([]);
+    const [reviews, setReviews] = useState<MentorReview[]>([]);
     const [stats, setStats] = useState<ReviewStats | null>(null);
     const [loading, setLoading] = useState<boolean>(!!mentorId);
     const [statsLoading, setStatsLoading] = useState<boolean>(!!mentorId);
     const [loadingMore, setLoadingMore] = useState(false);
     const [page, setPage] = useState(1);
     const [sort, setSort] = useState<ReviewSort>("newest");
-    const [reactions, setReactions] = useState<Record<string, Reaction>>({});
+    const [reactions, setReactions] = useState<Record<string, ReviewReaction>>({});
     const [busyReactions, setBusyReactions] = useState<Record<string, boolean>>({});
     const [notice, setNotice] = useState<string | null>(null);
 
@@ -164,8 +140,8 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
             return;
         }
         setStatsLoading(true);
-        MentorService.getMentorReviewStats(mentorId)
-            .then((res) => setStats(res?.data ?? null))
+        ReviewService.getReviewStats(mentorId)
+            .then((res) => setStats(res ?? null))
             .catch(() => setStats(null))
             .finally(() => setStatsLoading(false));
     }, [mentorId]);
@@ -180,11 +156,12 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
         let cancelled = false;
         setLoading(true);
         setPage(1);
-        MentorService.getMentorReviews(mentorId, { page: 1, limit: PAGE_SIZE, sort })
+        ReviewService.getMentorReviews(mentorId, 1, PAGE_SIZE, sort)
             .then((res) => {
                 if (!cancelled) setReviews(res?.data ?? []);
             })
-            .catch(() => {
+            .catch((err) => {
+                console.error("Failed to load reviews", err);
                 if (!cancelled) setReviews([]);
             })
             .finally(() => {
@@ -201,7 +178,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
             setReactions({});
             return;
         }
-        MentorService.getMyReviewReactions(mentorId)
+        ReviewService.getMyReviewReactions(mentorId)
             .then(setReactions)
             .catch(() => setReactions({}));
     }, [mentorId, isAuthenticated]);
@@ -211,15 +188,11 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
         setLoadingMore(true);
         try {
             const next = page + 1;
-            const res = await MentorService.getMentorReviews(mentorId, {
-                page: next,
-                limit: PAGE_SIZE,
-                sort,
-            });
-            const incoming: ReviewItem[] = res?.data ?? [];
+            const res = await ReviewService.getMentorReviews(mentorId, next, PAGE_SIZE, sort);
+            const incoming: MentorReview[] = res?.data ?? [];
             setReviews((prev) => {
-                const seen = new Set(prev.map((r) => r.reviewId));
-                return [...prev, ...incoming.filter((r) => !seen.has(r.reviewId))];
+                const seen = new Set(prev.map((r) => getReviewKey(r, -1)));
+                return [...prev, ...incoming.filter((r) => !seen.has(getReviewKey(r, -1)))];
             });
             setPage(next);
         } catch (e: any) {
@@ -229,18 +202,19 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
         }
     }, [loadingMore, page, mentorId, sort]);
 
-    const handleReact = async (review: ReviewItem, type: Reaction) => {
+    const handleReact = async (review: MentorReview, type: ReviewReaction) => {
         if (!isAuthenticated) {
             showNotice("Please login to react to reviews.");
             return;
         }
-        if (busyReactions[review.reviewId]) return;
+        const id = review.reviewId || review.id || review._id;
+        if (!id || busyReactions[id]) return;
 
-        const previous = reactions[review.reviewId];
-        const next: Reaction | undefined = previous === type ? undefined : type;
+        const previous = reactions[id];
+        const next: ReviewReaction | undefined = previous === type ? undefined : type;
 
         // optimistic update
-        const applyCounts = (r: ReviewItem): ReviewItem => {
+        const applyCounts = (r: MentorReview): MentorReview => {
             let like = r.helpfulCount ?? 0;
             let dislike = r.notHelpfulCount ?? 0;
             if (previous === "like") like -= 1;
@@ -249,24 +223,24 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
             if (next === "dislike") dislike += 1;
             return { ...r, helpfulCount: Math.max(0, like), notHelpfulCount: Math.max(0, dislike) };
         };
-        const setReaction = (val: Reaction | undefined | null) =>
+        const setReaction = (val: ReviewReaction | undefined | null) =>
             setReactions((prev) => {
                 const copy = { ...prev };
-                if (val) copy[review.reviewId] = val;
-                else delete copy[review.reviewId];
+                if (val) copy[id] = val;
+                else delete copy[id];
                 return copy;
             });
 
-        setBusyReactions((b) => ({ ...b, [review.reviewId]: true }));
-        setReviews((list) => list.map((r) => (r.reviewId === review.reviewId ? applyCounts(r) : r)));
+        setBusyReactions((b) => ({ ...b, [id]: true }));
+        setReviews((list) => list.map((r) => (getReviewKey(r, -1) === id ? applyCounts(r) : r)));
         setReaction(next);
 
         try {
-            const result = await MentorService.reactToReview(review.reviewId, type);
+            const result = await ReviewService.reactToReview(id, type);
             // reconcile with the server's truth
             setReviews((list) =>
                 list.map((r) =>
-                    r.reviewId === review.reviewId
+                    getReviewKey(r, -1) === id
                         ? { ...r, helpfulCount: result.helpfulCount, notHelpfulCount: result.notHelpfulCount }
                         : r
                 )
@@ -276,7 +250,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
             // rollback
             setReviews((list) =>
                 list.map((r) =>
-                    r.reviewId === review.reviewId
+                    getReviewKey(r, -1) === id
                         ? { ...r, helpfulCount: review.helpfulCount, notHelpfulCount: review.notHelpfulCount }
                         : r
                 )
@@ -284,16 +258,19 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
             setReaction(previous);
             showNotice(e?.message || "Could not update your reaction.");
         } finally {
-            setBusyReactions((b) => ({ ...b, [review.reviewId]: false }));
+            setBusyReactions((b) => ({ ...b, [id]: false }));
         }
     };
 
-    const openReply = (review: ReviewItem) => {
-        setReplyingId(review.reviewId);
+    const openReply = (review: MentorReview) => {
+        const id = review.reviewId || review.id || review._id || "";
+        setReplyingId(id);
         setReplyText(review.mentorResponse?.comment ?? "");
     };
 
-    const submitReply = async (review: ReviewItem) => {
+    const submitReply = async (review: MentorReview) => {
+        const id = review.reviewId || review.id || review._id;
+        if (!id) return;
         const text = replyText.trim();
         if (text.length < MIN_REPLY_LENGTH) {
             showNotice(`Reply must be at least ${MIN_REPLY_LENGTH} characters.`);
@@ -301,10 +278,10 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
         }
         setReplySaving(true);
         try {
-            const updated = await MentorService.replyToReview(review.reviewId, text);
+            const updated = await ReviewService.replyToReview(id, text);
             setReviews((list) =>
                 list.map((r) =>
-                    r.reviewId === review.reviewId
+                    getReviewKey(r, -1) === id
                         ? {
                               ...r,
                               mentorResponse: updated?.mentorResponse ?? {
@@ -324,12 +301,14 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
         }
     };
 
-    const removeReply = async (review: ReviewItem) => {
+    const removeReply = async (review: MentorReview) => {
+        const id = review.reviewId || review.id || review._id;
+        if (!id) return;
         if (!window.confirm("Delete your reply?")) return;
         try {
-            await MentorService.deleteReviewReply(review.reviewId);
+            await ReviewService.deleteReviewReply(id);
             setReviews((list) =>
-                list.map((r) => (r.reviewId === review.reviewId ? { ...r, mentorResponse: undefined } : r))
+                list.map((r) => (getReviewKey(r, -1) === id ? { ...r, mentorResponse: undefined } : r))
             );
         } catch (e: any) {
             showNotice(e?.message || "Failed to delete reply.");
@@ -410,22 +389,21 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
                         <Spinner label="Loading..." />
                     ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                        {reviews.map((review) => {
-                            const menteeName = review.mentee
-                                ? (review.mentee.fullName || `${review.mentee.firstName ?? ""} ${review.mentee.lastName ?? ""}`).trim()
-                                : "";
-                            const displayName = menteeName || "Anonymous";
+                        {reviews.map((review, idx) => {
+                            const reviewId = getReviewKey(review, idx);
+                            const displayName = getMenteeName(review);
                             const avatar = review.mentee?.profilePic || review.mentee?.profilePhotoId;
                             const profileHref = review.menteeUserId ? `/profile/${review.menteeUserId}` : null;
 
                             const isOwnReview = !!currentUserId && currentUserId === review.menteeUserId;
                             const isReviewedMentor = !!currentUserId && currentUserId === review.mentorUserId;
-                            const myReaction = reactions[review.reviewId];
-                            const reactDisabled = isOwnReview || !!busyReactions[review.reviewId];
+                            const myReaction = reactions[reviewId];
+                            const reactDisabled = isOwnReview || !!busyReactions[reviewId];
                             const wasEdited =
                                 !!review.updatedAt &&
+                                !!review.createdAt &&
                                 new Date(review.updatedAt).getTime() - new Date(review.createdAt).getTime() > 60_000;
-                            const isReplying = replyingId === review.reviewId;
+                            const isReplying = replyingId === reviewId;
 
                             const identity = (
                                 <>
@@ -449,7 +427,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
                             );
 
                             return (
-                                <div key={review.reviewId} style={{ borderRadius: "16px", padding: "20px", background: C.bg, border: `1px solid ${C.border}` }}>
+                                <div key={reviewId} style={{ borderRadius: "16px", padding: "20px", background: C.bg, border: `1px solid ${C.border}` }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
                                         {profileHref ? (
                                             <Link

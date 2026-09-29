@@ -3,33 +3,14 @@
 import React, { useEffect, useState } from "react";
 import { Star } from "./Icons";
 import { C } from "../types/data";
-import MentorService from "@/lib/api/mentorship.service";
+import ReviewService, { MentorReview, ReviewStats } from "@/lib/api/review.service";
 
 interface ReviewsSectionProps {
     mentorId: string;
 }
 
-interface ReviewItem {
-    reviewId: string;
-    rating: number;
-    comment: string;
-    tags?: string[];
-    isVerified?: boolean;
-    createdAt: string;
-    mentee?: {
-        firstName?: string;
-        lastName?: string;
-        profilePhotoId?: string | null;
-    };
-}
-
-interface ReviewStats {
-    averageRating: number;
-    totalReviews: number;
-    distribution: { 5: number; 4: number; 3: number; 2: number; 1: number };
-}
-
-const formatRelativeDate = (dateStr: string): string => {
+const formatRelativeDate = (dateStr?: string): string => {
+    if (!dateStr) return "";
     const date = new Date(dateStr);
     const diffMs = Date.now() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -44,8 +25,19 @@ const formatRelativeDate = (dateStr: string): string => {
     return `${diffMonths} months ago`;
 };
 
+// mentee object shape varies (firstName/lastName OR fullName OR name) — normalize here
+const getMenteeName = (review: MentorReview): string => {
+    const mentee = review.mentee;
+    if (!mentee) return "Anonymous";
+    const combined = `${mentee.firstName ?? ""} ${mentee.lastName ?? ""}`.trim();
+    return combined || mentee.fullName || mentee.name || "Anonymous";
+};
+
+const getReviewKey = (review: MentorReview, idx: number): string =>
+    review.reviewId || review.id || review._id || String(idx);
+
 const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
-    const [reviews, setReviews] = useState<ReviewItem[]>([]);
+    const [reviews, setReviews] = useState<MentorReview[]>([]);
     const [stats, setStats] = useState<ReviewStats | null>(null);
     const [loading, setLoading] = useState<boolean>(!!mentorId);
 
@@ -59,14 +51,15 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
 
         setLoading(true);
         Promise.all([
-            MentorService.getMentorReviews(mentorId, { limit: 10 }),
-            MentorService.getMentorReviewStats(mentorId),
+            ReviewService.getMentorReviews(mentorId, 1, 10),
+            ReviewService.getReviewStats(mentorId),
         ])
             .then(([reviewsRes, statsRes]) => {
                 setReviews(reviewsRes?.data ?? []);
-                setStats(statsRes?.data ?? null);
+                setStats(statsRes ?? null);
             })
-            .catch(() => {
+            .catch((err) => {
+                console.error("Failed to load reviews", err);
                 setReviews([]);
                 setStats(null);
             })
@@ -126,17 +119,15 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
 
                     <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "16px" }}>Recent Reviews</h3>
                     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                        {reviews.map((review) => {
-                            const menteeName = review.mentee
-                                ? `${review.mentee.firstName ?? ""} ${review.mentee.lastName ?? ""}`.trim()
-                                : "";
-                            const displayName = menteeName || "Anonymous";
+                        {reviews.map((review, idx) => {
+                            const displayName = getMenteeName(review);
+                            const photo = review.mentee?.profilePhotoId || review.mentee?.profilePic || null;
                             return (
-                                <div key={review.reviewId} style={{ borderRadius: "16px", padding: "20px", background: C.bg, border: `1px solid ${C.border}` }}>
+                                <div key={getReviewKey(review, idx)} style={{ borderRadius: "16px", padding: "20px", background: C.bg, border: `1px solid ${C.border}` }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                            {review.mentee?.profilePhotoId ? (
-                                                <img src={review.mentee.profilePhotoId} alt={displayName} style={{ width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover" }} />
+                                            {photo ? (
+                                                <img src={photo} alt={displayName} style={{ width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover" }} />
                                             ) : (
                                                 <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: C.grad, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: "bold" }}>
                                                     {displayName.charAt(0).toUpperCase()}
