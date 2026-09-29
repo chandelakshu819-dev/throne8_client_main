@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import {
   Briefcase, Users, Clock, Star, Plus, Video, MessageSquare,
   Package, FileText, RefreshCw, ClipboardList, CheckCircle2,
-  MoreVertical, Pencil, Trash2, X, ArrowUpDown, AlertCircle,
+  MoreVertical, Pencil, Trash2, X, ArrowUpDown, AlertCircle, Search,
 } from 'lucide-react';
 import ServiceModal from './ServiceModal';
 import EditSessionModal from '@/features/mentorship/modals/EditSessionModal';
@@ -104,6 +104,9 @@ const getPriceLabel = (price: number, type: string) => {
   return `₹${price}/hr`;
 };
 
+// Ek baar me kitni cards dikhani hain (baaki "Show all" se khulengi)
+const INITIAL_VISIBLE_COUNT = 6;
+
 type SortOption = 'recent' | 'price_high' | 'price_low' | 'name';
 
 const SORT_LABELS: Record<SortOption, string> = {
@@ -155,6 +158,10 @@ export default function ServicesPage({
   // ── Sort state (client-side only, no backend impact) ───
   const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAllServices, setShowAllServices] = useState(false);
+  const [showAllGroupSessions, setShowAllGroupSessions] = useState(false);
 
   // ── Stats from API ────────────────────────────────────
   const totalSessions = apiSessions.length;
@@ -558,6 +565,33 @@ export default function ServicesPage({
     }
   });
 
+  // ── Search + 6-card limit ──
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredServices = normalizedQuery
+    ? sortedServices.filter((s: any) => {
+        const typeLabel = serviceTypes.find(t => t.name === s.type)?.label || '';
+        return [s.name, s.description, typeLabel]
+          .filter(Boolean)
+          .some((v: string) => String(v).toLowerCase().includes(normalizedQuery));
+      })
+    : sortedServices;
+    // Group sessions par bhi wahi search (title / description / topic / "group session")
+    const filteredGroupSessions = normalizedQuery
+    ? apiGroupSessions.filter((g: any) =>
+        [g.title, g.description, g.topic, 'group session']
+          .filter(Boolean)
+          .some((v: string) => String(v).toLowerCase().includes(normalizedQuery))
+      )
+    : apiGroupSessions;
+
+  const visibleServices = showAllServices
+    ? filteredServices
+    : filteredServices.slice(0, INITIAL_VISIBLE_COUNT);
+  const visibleGroupSessions = showAllGroupSessions
+    ? filteredGroupSessions
+    : filteredGroupSessions.slice(0, INITIAL_VISIBLE_COUNT);
+
+
   const formatGroupDate = (dateString?: string) => {
     if (!dateString) return "Date not available";
     try {
@@ -741,6 +775,53 @@ export default function ServicesPage({
                 </span>
               )}
 
+{(sortedServices.length > 0 || apiGroupSessions.length > 0) && (
+                <div className="flex items-center">
+                  {searchOpen ? (
+                    <div
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl border bg-white"
+                      style={{ borderColor: '#e0d8cf' }}
+                    >
+                      <Search className="w-4 h-4" style={{ color: '#8a7a6a' }} />
+                      <input
+                        autoFocus
+                        value={searchQuery}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value);
+                          setShowAllServices(false);
+                          setShowAllGroupSessions(false);
+                        }}
+                        placeholder="Search services & group sessions..."
+                        className="w-48 sm:w-64 text-xs outline-none bg-transparent"
+                        style={{ color: '#4a3728' }}
+                      />
+                      <button
+                        onClick={() => {
+                          setSearchQuery('');
+                          setSearchOpen(false);
+                          setShowAllServices(false);
+                          setShowAllGroupSessions(false);
+                        }}
+                        aria-label="Close search"
+                      >
+
+
+                        <X className="w-4 h-4" style={{ color: '#8a7a6a' }} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setSearchOpen(true)}
+                      aria-label="Search services"
+                      className="w-9 h-9 flex items-center justify-center rounded-xl border transition-colors hover:bg-[#f3ece4]"
+                      style={{ borderColor: '#e0d8cf', color: '#5c4a3a', backgroundColor: '#fff' }}
+                    >
+                      <Search className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              )}
+
               {sortedServices.length > 1 && (
                 <div className="relative">
                   <button
@@ -790,9 +871,17 @@ export default function ServicesPage({
                 Select a service type above and create your first offering.
               </p>
             </div>
+          ) : filteredServices.length === 0 ? (
+            <div className="text-center py-14 rounded-2xl border" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
+              <p className="text-base font-bold" style={{ color: '#4a3728' }}>No services found</p>
+              <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
+                &quot;{searchQuery}&quot; se koi service match nahi hui.
+              </p>
+            </div>
           ) : (
+            <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {sortedServices.map((service, idx) => {
+              {visibleServices.map((service, idx) => {
                 const Icon = getServiceIcon(service.type);
                 const accent = getServiceAccent(service.type);
                 return (
@@ -974,6 +1063,18 @@ export default function ServicesPage({
                 );
               })}
             </div>
+            {filteredServices.length > INITIAL_VISIBLE_COUNT && (
+              <div className="flex justify-center mt-6">
+                <button
+                  onClick={() => setShowAllServices((v) => !v)}
+                  className="px-6 py-2.5 rounded-xl text-sm font-semibold border transition-colors hover:bg-[#f3ece4]"
+                  style={{ borderColor: '#e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
+                >
+                  {showAllServices ? 'Show less' : `Show all services (${filteredServices.length})`}
+                </button>
+              </div>
+            )}
+            </>
           )}
         </div>
 
@@ -1015,9 +1116,18 @@ export default function ServicesPage({
                   Create your first group session to start teaching multiple mentees.
                 </p>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {apiGroupSessions.map((group, idx) => {
+                       ) : filteredGroupSessions.length === 0 ? (
+                        <div className="text-center py-14 rounded-2xl border" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
+                          <p className="text-base font-bold" style={{ color: '#4a3728' }}>No group sessions found</p>
+                          <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
+                            &quot;{searchQuery}&quot; se koi group session match nahi hua.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {visibleGroupSessions.map((group, idx) => {
+
                   return (
                   <div
                     key={group.sessionId || group.id || idx}
@@ -1188,6 +1298,18 @@ export default function ServicesPage({
                   );
                 })}
               </div>
+              {filteredGroupSessions.length > INITIAL_VISIBLE_COUNT && (
+                <div className="flex justify-center mt-6">
+                  <button
+                    onClick={() => setShowAllGroupSessions((v) => !v)}
+                    className="px-6 py-2.5 rounded-xl text-sm font-semibold border transition-colors hover:bg-[#f3ece4]"
+                    style={{ borderColor: '#e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
+                  >
+                    {showAllGroupSessions ? 'Show less' : `Show all group sessions (${filteredGroupSessions.length})`}
+                  </button>
+                </div>
+              )}
+              </>
             )}
           </div>
 

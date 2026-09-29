@@ -1,4 +1,5 @@
-import React from "react"
+import React, { useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   CalendarClock,
   ShieldCheck,
@@ -30,6 +31,7 @@ const COLORS = {
 type Session = {
   _id?: string
   sessionId?: string
+  menteeId?: string
   menteeName?: string
   bookedMenteeName?: string
   menteeProfilePhoto?: string
@@ -67,6 +69,31 @@ function initialsFrom(name: string) {
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase()
 }
 
+function MenteeAvatar({ photo, name }: { photo?: string | null; name: string }) {
+  const [imgError, setImgError] = useState(false)
+
+  if (photo && !imgError) {
+    return (
+      <img
+        src={photo}
+        alt={name}
+        onError={() => setImgError(true)}
+        className="w-9 h-9 rounded-full object-cover shrink-0"
+        style={{ border: `1px solid ${COLORS.hairline}` }}
+      />
+    )
+  }
+
+  return (
+    <div
+      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white"
+      style={{ backgroundColor: COLORS.ink }}
+    >
+      {initialsFrom(name)}
+    </div>
+  )
+}
+
 export default function DashboardOverviewPage({
   mentorData,
   dashboardData,
@@ -76,6 +103,7 @@ export default function DashboardOverviewPage({
   sessions = [],
   setActivePage,
 }: DashboardOverviewPageProps) {
+  const router = useRouter()
 
   // Loading skeleton state
   if (dashboardLoading && !dashboardData) {
@@ -268,6 +296,16 @@ export default function DashboardOverviewPage({
             {upcoming.map((s, idx) => {
               const name = s.menteeName || s.bookedMenteeName || "Student"
               const photo = s.menteeProfilePhoto
+              const menteeId = s.menteeId
+              const isClickable = Boolean(menteeId)
+
+              const handleMenteeClick = (e: React.MouseEvent | React.KeyboardEvent) => {
+                if (!menteeId) return
+                e.stopPropagation()
+                if ("key" in e && e.key !== "Enter" && e.key !== " ") return
+                if ("key" in e) e.preventDefault()
+                router.push(`/profile/${menteeId}`)
+              }
 
               return (
                 <div
@@ -275,24 +313,27 @@ export default function DashboardOverviewPage({
                   className="flex items-center justify-between gap-4 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9]"
                   style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    {photo ? (
-                      <img
-                        src={photo}
-                        alt={name}
-                        className="w-9 h-9 rounded-full object-cover shrink-0"
-                        style={{ border: `1px solid ${COLORS.hairline}` }}
-                      />
-                    ) : (
-                      <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white"
-                        style={{ backgroundColor: COLORS.ink }}
-                      >
-                        {initialsFrom(name)}
-                      </div>
-                    )}
+                  <div
+                    {...(isClickable
+                      ? {
+                          role: "link",
+                          tabIndex: 0,
+                          onClick: handleMenteeClick,
+                          onKeyDown: handleMenteeClick,
+                        }
+                      : {})}
+                    className={`flex items-center gap-3 min-w-0 ${
+                      isClickable ? "cursor-pointer group" : ""
+                    }`}
+                  >
+                    <MenteeAvatar photo={photo} name={name} />
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate" style={{ color: COLORS.ink }}>
+                      <p
+                        className={`text-sm font-semibold truncate ${
+                          isClickable ? "group-hover:underline" : ""
+                        }`}
+                        style={{ color: COLORS.ink }}
+                      >
                         {name}
                       </p>
                       <p className="text-xs mt-0.5 truncate" style={{ color: COLORS.muted }}>
