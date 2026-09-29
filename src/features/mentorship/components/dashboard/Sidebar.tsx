@@ -7,6 +7,7 @@ interface SidebarProps {
   activePage: string;
   setActivePage: (page: string) => void;
   mentorData: any;
+  dashboardData?: any;
   unreadNotificationCount?: number;
   onSwitchRole?: () => void;
 }
@@ -15,19 +16,21 @@ export default function Sidebar({
   activePage,
   setActivePage,
   mentorData,
+  dashboardData,
   unreadNotificationCount = 0,
   onSwitchRole,
 }: SidebarProps) {
-  const firstName = mentorData?.user?.firstName ?? "A";
-  const lastName = mentorData?.user?.lastName ?? "S";
-  const initials = `${firstName[0]}${lastName[0]}`;
-  const fullName = `${firstName} ${lastName}`;
-  const domain = (mentorData?.domains?.[0]?.replace("_", " ") ?? "Mentor")
+  const firstName = dashboardData?.user?.firstName ?? mentorData?.user?.firstName ?? "A";
+  const lastName = dashboardData?.user?.lastName ?? mentorData?.user?.lastName ?? "S";
+  const initials = `${firstName[0] || 'A'}${lastName[0] || ''}`;
+  const fullName = dashboardData?.user?.name || `${firstName} ${lastName}`.trim();
+  const rawDomain = dashboardData?.category || mentorData?.domains?.[0] || "Mentor";
+  const domain = (rawDomain.replace("_", " "))
     .split(" ")
     .map((word: any) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
-  const profilePic = mentorData?.profilePic ?? null;
-  const rating = mentorData?.stats?.averageRating || 0;
+  const profilePic = dashboardData?.profilePic ?? mentorData?.profilePic ?? null;
+  const rating = dashboardData?.stats?.rating ?? dashboardData?.rating ?? mentorData?.stats?.averageRating ?? 0;
 
   return (
     <aside className="w-80 flex flex-col" style={{ backgroundColor: '#fff', borderRight: '1px solid #ece4db' }}>

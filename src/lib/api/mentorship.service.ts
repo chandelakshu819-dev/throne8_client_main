@@ -148,6 +148,17 @@ class MentorService {
     }
   }
 
+  static async getMentorDashboard(mentorId: string): Promise<any> {
+    try {
+      const endpoint = `${(config as any).NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT || process.env.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT || '/mentorship/mentors'}/${mentorId}/dashboard`;
+      const { data } = await api.get<any>(endpoint);
+      return data;
+    } catch (error: any) {
+      console.error("[GET_MENTOR_DASHBOARD] Failed", error?.response?.data || error?.message);
+      throw new Error(error?.response?.data?.message || "Failed to fetch mentor dashboard data.");
+    }
+  }
+
   static async updateMentorAvailability(
     mentorId: string,
     availability: {

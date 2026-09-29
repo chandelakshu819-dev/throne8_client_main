@@ -113,6 +113,70 @@ export default function MentorDashboard(
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // ── Unified Dashboard Overview Data ──────────────────────────
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+
+  const fetchDashboardData = useCallback(async () => {
+    if (!userId) return;
+    setDashboardLoading(true);
+    setDashboardError(null);
+
+    let fetchedData = null;
+    try {
+      const targetId = mentorData?.mentorId || userId;
+      const res = await MentorService.getMentorDashboard(targetId);
+      fetchedData = res?.data ?? res;
+    } catch (err: any) {
+      console.warn("[DashboardLayout] Unified endpoint not reachable or returned 404:", err?.message);
+    }
+
+    if (fetchedData && typeof fetchedData === 'object' && Object.keys(fetchedData).length > 0) {
+      setDashboardData(fetchedData);
+      setDashboardError(null);
+    } else if (mentorData) {
+      // Graceful fallback if backend endpoint is not yet deployed/reachable
+      const fallbackUpcoming = (sessions || []).map((s: any) => ({
+        _id: s._id || s.sessionId,
+        sessionId: s.sessionId || String(s._id),
+        menteeName: s.menteeName || s.bookedMenteeName || "Student",
+        menteeProfilePhoto: s.menteeProfilePhoto || null,
+        title: s.title || s.sessionType || "Session",
+        sessionType: s.sessionType || "Session",
+        scheduledAt: s.scheduledAt || s.startTime || new Date().toISOString(),
+        status: s.status || "pending",
+      }));
+
+      setDashboardData({
+        mentorId: mentorData?.mentorId,
+        userId: mentorData?.userId,
+        user: mentorData?.user,
+        profilePic: mentorData?.profilePic,
+        category: (Array.isArray(mentorData?.domains) && mentorData?.domains[0]) || mentorData?.title || 'Web Development',
+        rating: mentorData?.stats?.averageRating ?? 0,
+        totalReviews: mentorData?.stats?.totalReviews ?? 0,
+        stats: {
+          totalSessions: mentorData?.stats?.totalSessions ?? mentorData?.stats?.completedSessions ?? 0,
+          upcoming: fallbackUpcoming.filter((s: any) => new Date(s.scheduledAt).getTime() >= Date.now()).length,
+          rating: mentorData?.stats?.averageRating ?? 0,
+          trustScore: mentorData?.trustScore?.score ?? mentorData?.stats?.trustScore ?? null,
+        },
+        isVerified: Boolean(mentorData?.verification?.isVerified || mentorData?.isVerified),
+        upcomingSessions: fallbackUpcoming,
+      });
+      setDashboardError(null);
+    } else {
+      setDashboardError("Unable to load mentor dashboard data.");
+    }
+    setDashboardLoading(false);
+  }, [userId, mentorData, sessions]);
+
+  useEffect(() => {
+    if (!userId) return;
+    fetchDashboardData();
+  }, [userId, mentorData, sessions, fetchDashboardData]);
+
    // ── Notification states (mentorship-scoped) ─────────────────
    const [notifications, setNotifications] = useState<any[]>([]);
    const [notificationsLoading, setNotificationsLoading] = useState(true);
@@ -288,6 +352,7 @@ export default function MentorDashboard(
           activePage={activePage}
           setActivePage={setActivePage}
           mentorData={mentorData}
+          dashboardData={dashboardData}
           unreadNotificationCount={safeNotifications.filter((n) => !n.isRead).length}
           onSwitchRole={onSwitchRole}
         />
@@ -298,6 +363,11 @@ export default function MentorDashboard(
               setActivePage={setActivePage}
 
               mentorData={mentorData}
+              dashboardData={dashboardData}
+              dashboardLoading={dashboardLoading}
+              dashboardError={dashboardError}
+              onRetryDashboard={fetchDashboardData}
+
               profilePhoto={profilePhoto}
               isVerified={isVerified}
               agreedToTerms={agreedToTerms}

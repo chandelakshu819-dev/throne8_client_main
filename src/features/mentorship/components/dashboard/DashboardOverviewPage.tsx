@@ -1,4 +1,3 @@
-// mentorDashboard/components/DashboardOverviewPage.tsx
 import React from "react"
 import {
   CalendarClock,
@@ -11,6 +10,8 @@ import {
   CalendarPlus,
   ClipboardList,
   BarChart3,
+  AlertCircle,
+  RotateCcw,
 } from "lucide-react"
 
 const COLORS = {
@@ -26,9 +27,6 @@ const COLORS = {
   faint: "#a08070",
 }
 
-// ✅ FIX: These are the real fields the backend now returns (from
-// sessionRepository.findAll()'s $lookup enrichment) — not "studentName"
-// or "student.firstName/lastName", which were never populated.
 type Session = {
   _id?: string
   sessionId?: string
@@ -44,6 +42,10 @@ type Session = {
 
 interface DashboardOverviewPageProps {
   mentorData?: any
+  dashboardData?: any
+  dashboardLoading?: boolean
+  dashboardError?: string | null
+  onRetryDashboard?: () => void
   sessions?: Session[]
   setActivePage?: (page: string) => void
 }
@@ -67,32 +69,95 @@ function initialsFrom(name: string) {
 
 export default function DashboardOverviewPage({
   mentorData,
+  dashboardData,
+  dashboardLoading = false,
+  dashboardError = null,
+  onRetryDashboard,
   sessions = [],
   setActivePage,
 }: DashboardOverviewPageProps) {
-  const firstName = mentorData?.user?.firstName ?? "there"
-  const rating = mentorData?.stats?.averageRating ?? 0
-  const totalSessions = mentorData?.stats?.totalSessions ?? sessions.length
-  const trustScore = mentorData?.trustScore?.score ?? mentorData?.stats?.trustScore
-  const isVerified = Boolean(mentorData?.isVerified)
 
-  const now = Date.now()
-  const upcoming = [...sessions]
-    .filter((s) => {
-      const t = new Date(s.startTime || s.scheduledAt || 0).getTime()
-      return t >= now && s.status !== "cancelled"
-    })
-    .sort(
-      (a, b) =>
-        new Date(a.startTime || a.scheduledAt || 0).getTime() -
-        new Date(b.startTime || b.scheduledAt || 0).getTime()
+  // Loading skeleton state
+  if (dashboardLoading && !dashboardData) {
+    return (
+      <div className="space-y-8 max-w-4xl animate-pulse">
+        <div className="space-y-2">
+          <div className="h-7 w-48 bg-[#e0d8cf] rounded-md" />
+          <div className="h-4 w-64 bg-[#e0d8cf]/60 rounded-md" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white p-4 rounded-2xl border border-[#e0d8cf] space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-[#f3ece4]" />
+              <div className="h-6 w-16 bg-[#e0d8cf] rounded" />
+              <div className="h-3 w-20 bg-[#e0d8cf]/60 rounded" />
+            </div>
+          ))}
+        </div>
+        <div className="h-20 w-full bg-[#f6ede8] rounded-2xl border border-[#e0d8cf]" />
+        <div className="bg-white p-6 rounded-2xl border border-[#e0d8cf] space-y-4">
+          <div className="h-5 w-36 bg-[#e0d8cf] rounded" />
+          {[1, 2].map((i) => (
+            <div key={i} className="h-16 w-full bg-[#fbf7f3] rounded-xl border border-[#e0d8cf]" />
+          ))}
+        </div>
+      </div>
     )
-    .slice(0, 4)
+  }
+
+  // Error state
+  if (dashboardError && !dashboardData) {
+    return (
+      <div className="max-w-4xl p-6 rounded-2xl bg-red-50 border border-red-200 text-red-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
+          <div>
+            <h3 className="font-bold text-base">Unable to load mentor dashboard data</h3>
+            <p className="text-sm text-red-600 mt-0.5">{dashboardError}</p>
+          </div>
+        </div>
+        {onRetryDashboard && (
+          <button
+            onClick={onRetryDashboard}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors flex items-center gap-2"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Try Again
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  const firstName = dashboardData?.user?.firstName ?? mentorData?.user?.firstName ?? "there"
+  const rating = dashboardData?.stats?.rating ?? dashboardData?.rating ?? mentorData?.stats?.averageRating ?? 0
+  const totalSessions = dashboardData?.stats?.totalSessions ?? mentorData?.stats?.totalSessions ?? sessions.length
+  const trustScore = dashboardData?.stats?.trustScore ?? mentorData?.trustScore?.score ?? mentorData?.stats?.trustScore ?? null
+  const isVerified = dashboardData?.isVerified ?? Boolean(mentorData?.verification?.isVerified || mentorData?.isVerified)
+
+  // Use pre-computed upcomingSessions from unified API if available, else filter raw sessions
+  const upcomingRaw: Session[] = dashboardData?.upcomingSessions ?? sessions
+  const now = Date.now()
+  const upcoming = dashboardData?.upcomingSessions
+    ? dashboardData.upcomingSessions
+    : [...upcomingRaw]
+        .filter((s) => {
+          const t = new Date(s.startTime || s.scheduledAt || 0).getTime()
+          return t >= now && s.status !== "cancelled"
+        })
+        .sort(
+          (a, b) =>
+            new Date(a.startTime || a.scheduledAt || 0).getTime() -
+            new Date(b.startTime || b.scheduledAt || 0).getTime()
+        )
+        .slice(0, 4)
+
+  const upcomingCount = dashboardData?.stats?.upcoming ?? upcoming.length
 
   const stats = [
     { label: "Total sessions", value: String(totalSessions), muted: false, icon: ClipboardList },
-    { label: "Upcoming", value: String(upcoming.length), muted: false, icon: CalendarClock },
-    { label: "Rating", value: rating ? rating.toFixed(1) : "New", muted: !rating, icon: Star },
+    { label: "Upcoming", value: String(upcomingCount), muted: false, icon: CalendarClock },
+    { label: "Rating", value: rating ? Number(rating).toFixed(1) : "New", muted: !rating, icon: Star },
     {
       label: "Trust score",
       value: trustScore != null ? String(trustScore) : "Building",
@@ -201,9 +266,6 @@ export default function DashboardOverviewPage({
         ) : (
           <div className="space-y-3">
             {upcoming.map((s, idx) => {
-              // ✅ FIX: real name comes from backend as menteeName / bookedMenteeName
-              // (built server-side from the mentee's actual firstName + lastName).
-              // "Student" only shows now if the backend genuinely has no user record.
               const name = s.menteeName || s.bookedMenteeName || "Student"
               const photo = s.menteeProfilePhoto
 
