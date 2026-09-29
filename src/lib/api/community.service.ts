@@ -106,7 +106,7 @@ export class CommunityService {
     await api.delete(`/mentorship/community/events/${id}`);
   }
 
-  static async rsvp(id: string): Promise<{ status: string; message?: string }> {
+  static async rsvp(id: string): Promise<CommunityEvent> {
     const { data } = await api.post(`/mentorship/community/events/${id}/rsvp`);
     return data.data;
   }
@@ -156,6 +156,14 @@ export class CommunityService {
 
   static async deleteForum(id: string): Promise<void> {
     await api.delete(`/mentorship/forums/${id}`);
+  }
+
+  static async updateForum(
+    id: string,
+    payload: { topic?: string; description?: string }
+  ): Promise<Forum> {
+    const { data } = await api.patch(`/mentorship/forums/${id}`, payload);
+    return data.data;
   }
 
   static async pinForum(id: string, isPinned: boolean): Promise<Forum> {

@@ -98,6 +98,13 @@ export default function ThreadDetailView({
   const [isDeleting, setIsDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Edit-thread state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTopic, setEditTopic] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
   // Sync state if props change
   React.useEffect(() => {
     setThread(initialThread);
@@ -210,7 +217,48 @@ export default function ThreadDetailView({
     }
   };
 
+  // Edit Thread (author or admin only)
+  const handleStartEdit = () => {
+    setEditTopic(thread.topic);
+    setEditDescription(thread.description || "");
+    setEditError(null);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditTopic("");
+    setEditDescription("");
+    setEditError(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editTopic.trim()) return;
+    setIsSavingEdit(true);
+    setEditError(null);
+    try {
+      const updated = await CommunityService.updateForum(thread._id, {
+        topic: editTopic.trim(),
+        description: editDescription.trim() || undefined,
+      });
+      setThread(updated);
+      onThreadUpdate?.(updated);
+      setIsEditing(false);
+    } catch (err: any) {
+      setEditError(err.response?.data?.message || "Failed to save changes. Please try again.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   // Add Reply
+  // Parses @Name tokens from typed text to populate the mentions array.
+  // The backend stores mentions as plain strings — no userId lookup needed.
+  function parseMentions(text: string): string[] {
+    const matches = text.match(/@(\w+)/g) || [];
+    return [...new Set(matches.map((m) => m.slice(1)))];
+  }
+
   const handleCreateReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyContent.trim() || thread.isLocked || isSubmittingReply) return;
@@ -224,8 +272,10 @@ export default function ThreadDetailView({
     setIsSubmittingReply(true);
 
     try {
+      const mentions = parseMentions(replyContent);
       const newReply = await CommunityService.addReply(thread._id, {
         content: replyContent.trim(),
+        ...(mentions.length > 0 && { mentions }),
       });
       setReplies((prev) => [...prev, newReply]);
       setThread((prev) => ({
@@ -308,9 +358,53 @@ export default function ThreadDetailView({
         </div>
 
         {/* Topic Title */}
-        <h1 className="text-2xl font-bold mb-3" style={{ color: COLORS.ink }}>
-          {thread.topic}
-        </h1>
+        {isEditing ? (
+          <div className="mb-4 space-y-2">
+            <input
+              type="text"
+              value={editTopic}
+              onChange={(e) => setEditTopic(e.target.value)}
+              placeholder="Thread topic"
+              className="w-full text-lg font-bold px-3 py-2 rounded-xl"
+              style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: "#fff", color: COLORS.ink }}
+            />
+            <textarea
+              rows={4}
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              placeholder="Description (optional)..."
+              className="w-full text-sm px-3 py-2 rounded-xl"
+              style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: "#fff", color: COLORS.ink }}
+            />
+            {editError && (
+              <p className="text-xs" style={{ color: "#b3543f" }}>{editError}</p>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit || !editTopic.trim()}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50 transition-colors"
+                style={{ backgroundColor: COLORS.accent, color: "#fff" }}
+              >
+                {isSavingEdit ? "Saving..." : "Save Changes"}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                disabled={isSavingEdit}
+                className="text-xs font-medium px-2.5 py-1.5 rounded-full transition-colors"
+                style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <h1 className="text-2xl font-bold mb-3" style={{ color: COLORS.ink }}>
+            {thread.topic}
+          </h1>
+        )}
 
         {/* Author Byline */}
         <div className="flex items-center gap-2.5 mb-5 pb-4" style={{ borderBottom: `1px solid ${COLORS.hairline}` }}>
@@ -330,18 +424,20 @@ export default function ThreadDetailView({
           </div>
         </div>
 
-        {/* Thread Body/Description */}
-        {thread.description ? (
-          <div
-            className="text-sm leading-relaxed whitespace-pre-wrap mb-6"
-            style={{ color: COLORS.ink }}
-          >
-            {thread.description}
-          </div>
-        ) : (
-          <p className="text-sm italic mb-6" style={{ color: COLORS.muted }}>
-            No additional description provided.
-          </p>
+        {/* Thread Body/Description — only shown when not editing */}
+        {!isEditing && (
+          thread.description ? (
+            <div
+              className="text-sm leading-relaxed whitespace-pre-wrap mb-6"
+              style={{ color: COLORS.ink }}
+            >
+              {thread.description}
+            </div>
+          ) : (
+            <p className="text-sm italic mb-6" style={{ color: COLORS.muted }}>
+              No additional description provided.
+            </p>
+          )
         )}
 
         {/* Action Bar */}
@@ -376,12 +472,12 @@ export default function ThreadDetailView({
             </span>
           </div>
 
-          {/* Author/Admin Actions: Pin & Lock */}
+          {/* Author/Admin Actions: Pin, Lock, Edit & Delete */}
           {isAuthorOrAdmin && (
             <div className="flex items-center gap-2">
               <button
                 onClick={handleTogglePin}
-                disabled={isPinning || isDeleting}
+                disabled={isPinning || isDeleting || isEditing}
                 className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full transition-colors disabled:opacity-50"
                 style={{
                   backgroundColor: thread.isPinned ? "#fef3c7" : COLORS.softWash,
@@ -399,7 +495,7 @@ export default function ThreadDetailView({
 
               <button
                 onClick={handleToggleLock}
-                disabled={isLocking || isDeleting}
+                disabled={isLocking || isDeleting || isEditing}
                 className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full transition-colors disabled:opacity-50"
                 style={{
                   backgroundColor: thread.isLocked ? "#fee2e2" : COLORS.softWash,
@@ -417,9 +513,26 @@ export default function ThreadDetailView({
                 <span>{thread.isLocked ? "Unlock Thread" : "Lock Thread"}</span>
               </button>
 
+              {/* Edit button */}
+              {!isEditing && (
+                <button
+                  onClick={handleStartEdit}
+                  disabled={isPinning || isLocking || isDeleting}
+                  className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full transition-colors disabled:opacity-50"
+                  style={{
+                    backgroundColor: COLORS.softWash,
+                    color: COLORS.accent,
+                    border: `1px solid ${COLORS.hairline}`,
+                  }}
+                  title="Edit topic and description"
+                >
+                  <span>✏ Edit</span>
+                </button>
+              )}
+
               <button
                 onClick={handleDeleteThread}
-                disabled={isDeleting || isPinning || isLocking}
+                disabled={isDeleting || isPinning || isLocking || isEditing}
                 className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 hover:opacity-80"
                 style={{
                   backgroundColor: "#fef2f2",
@@ -569,7 +682,7 @@ export default function ThreadDetailView({
               thread.isLocked
                 ? "This thread is locked. Replies cannot be submitted."
                 : currentUser
-                ? "Write your reply here..."
+                ? "Write your reply... Use @Name to mention someone."
                 : "Please log in to post a reply."
             }
             className="w-full text-sm p-3 rounded-xl mb-3 focus:outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
@@ -586,7 +699,7 @@ export default function ThreadDetailView({
                 ? "Thread is locked"
                 : !currentUser
                 ? "Authentication required"
-                : "Markdown formatting supported"}
+                : "Use @Name to mention someone · Markdown supported"}
             </span>
 
             <button

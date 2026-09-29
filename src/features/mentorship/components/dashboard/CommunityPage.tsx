@@ -11,6 +11,7 @@ import {
   EventAttendee,
   ForumCategory,
   EventType,
+  CommunityStats,
 } from "@/types/community.types"
 
 const COLORS = {
@@ -117,6 +118,9 @@ export default function CommunityPage() {
   const [mentorsLoading, setMentorsLoading] = useState(true)
   const [mentorsError, setMentorsError] = useState<string | null>(null)
 
+  // Community stats
+  const [communityStats, setCommunityStats] = useState<CommunityStats | null>(null)
+
   // Events
   const [events, setEvents] = useState<CommunityEvent[]>([])
   const [eventsLoading, setEventsLoading] = useState(true)
@@ -177,7 +181,26 @@ export default function CommunityPage() {
       try {
         const data = await CommunityService.listEvents({ limit: 3 })
         const list = Array.isArray(data) ? data : data.items
-        if (!cancelled) setEvents(list.filter((e) => !e.isCancelled))
+        const upcomingList = list.filter((e) => !e.isCancelled)
+        if (!cancelled) setEvents(upcomingList)
+
+        // Hydrate isGoing state for the current user across devices/sessions.
+        // With only 3 events shown, 3 extra GETs is acceptable. This prevents
+        // the fresh-session double-RSVP bug where rsvpGoing starts empty even
+        // when the user already registered from another device/tab.
+        if (user && upcomingList.length > 0) {
+          const goingIds = await Promise.all(
+            upcomingList.map((e) =>
+              CommunityService.getEvent(e._id)
+                .then((full) => (full.isGoing ? e._id : null))
+                .catch(() => null) // non-critical — fail silently per event
+            )
+          )
+          const goingSet = new Set(goingIds.filter((id): id is string => id !== null))
+          if (!cancelled && goingSet.size > 0) {
+            setRsvpGoing((prev) => new Set([...prev, ...goingSet]))
+          }
+        }
       } catch (err) {
         if (!cancelled) setEventsError("Couldn't load events right now.")
       } finally {
@@ -185,14 +208,24 @@ export default function CommunityPage() {
       }
     }
 
+    async function loadStats() {
+      try {
+        const stats = await CommunityService.getStats()
+        if (!cancelled) setCommunityStats(stats)
+      } catch {
+        // stats strip is non-critical — fail silently
+      }
+    }
+
     loadForums()
     loadTopMentors()
     loadEvents()
+    loadStats()
 
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [user])
 
   // ── Quick-creation forms ──
   const [showForumForm, setShowForumForm] = useState(false)
@@ -278,12 +311,16 @@ export default function CommunityPage() {
             )
           )
         } else {
-          await CommunityService.rsvp(eventId)
+          // Use the backend-returned event with its authoritative participantsCount.
+          // This prevents double-incrementing when the user was already registered
+          // from another device/session (backend returns alreadyGoing:true and
+          // the count is NOT incremented server-side).
+          const updatedEvent = await CommunityService.rsvp(eventId)
           setRsvpGoing((prev) => new Set(prev).add(eventId))
           setEvents((prev) =>
             prev.map((e) =>
               e._id === eventId
-                ? { ...e, participantsCount: e.participantsCount + 1 }
+                ? { ...e, participantsCount: updatedEvent?.participantsCount ?? e.participantsCount }
                 : e
             )
           )
@@ -423,6 +460,25 @@ export default function CommunityPage() {
             Connect with other mentors
           </p>
         </div>
+        {/* Community stats strip */}
+        {communityStats && (
+          <div className="ml-auto flex items-center gap-3">
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold"
+              style={{ backgroundColor: COLORS.chip, color: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}
+            >
+              <Users className="w-3.5 h-3.5" style={{ color: COLORS.accent }} />
+              <span>{communityStats.totalMentors} mentors</span>
+            </div>
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold"
+              style={{ backgroundColor: COLORS.chip, color: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}
+            >
+              <TrendingUp className="w-3.5 h-3.5" style={{ color: COLORS.accent }} />
+              <span>{communityStats.activeMentors} active</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Two-column layout */}
@@ -577,9 +633,10 @@ export default function CommunityPage() {
           >
             <div className="space-y-3">
               {topMentors.map((mentor) => (
-                <div
+                <Link
                   key={mentor.mentorId}
-                  className="flex items-center justify-between gap-3 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9]"
+                  href={`/mentorship/mentorProfile/${mentor.userId}`}
+                  className="flex items-center justify-between gap-3 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9] block"
                   style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: COLORS.softWash }}
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -616,7 +673,7 @@ export default function CommunityPage() {
                       {mentor.rating.toFixed(1)}
                     </span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </SectionState>
