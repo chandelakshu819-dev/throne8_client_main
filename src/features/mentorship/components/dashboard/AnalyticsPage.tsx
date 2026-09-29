@@ -41,6 +41,7 @@ interface PopularServiceStat {
 interface MonthlyEarningStat {
   month: string
   amount: number
+  bookings?: number
 }
 
 interface RatingTrendStat {
@@ -261,7 +262,8 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
       : []),
   ]
 
-  const totalBookings = data.popularServices.reduce((sum: number, s: PopularServiceStat) => sum + s.bookings, 0)
+  const totalServiceBookings = data.popularServices.reduce((sum: number, s: PopularServiceStat) => sum + s.bookings, 0)
+  const totalEarningsBookings = data.monthlyEarnings.reduce((sum: number, e: MonthlyEarningStat) => sum + (e.bookings || 0), 0)
 
   const popularServices = data.popularServices.map((s: PopularServiceStat, idx: number) => {
     const meta = SERVICE_ICON_MAP[s.sessionType] || {
@@ -272,7 +274,7 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
       name: s.sessionType,
       bookings: s.bookings,
       revenue: s.revenue || 0,
-      percentage: totalBookings ? Math.round((s.bookings / totalBookings) * 100) : 0,
+      percentage: totalServiceBookings ? Math.round((s.bookings / totalServiceBookings) * 100) : 0,
       icon: meta.icon,
       color: meta.color,
     }
@@ -302,7 +304,7 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
         <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl" style={{ backgroundColor: "#4a3728" }}>
           <TrendingUp className="w-4 h-4 text-white" />
           <span className="text-sm font-bold text-white">
-            {totalBookings} bookings · ₹{totalEarnings.toLocaleString()}
+            {totalEarningsBookings} bookings · ₹{totalEarnings.toLocaleString()}
           </span>
           <span className="text-xs text-white/70">last 4 months</span>
         </div>
@@ -350,7 +352,7 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
               className="text-xs font-bold px-2.5 py-1 rounded-full"
               style={{ backgroundColor: "#f3ece4", color: "#7a5c3e" }}
             >
-              {totalBookings} total bookings
+              {totalServiceBookings} total bookings
             </span>
           </div>
 
