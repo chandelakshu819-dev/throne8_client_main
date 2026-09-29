@@ -1045,6 +1045,7 @@ class MentorService {
     params?: {
       page?: number;
       limit?: number;
+      sort?: 'newest' | 'helpful' | 'highest' | 'lowest';
     }
   ): Promise<any> {
     try {
@@ -1092,6 +1093,72 @@ class MentorService {
       throw new Error(
         'Failed to fetch review stats. Please try again.'
       );
+    }
+  }
+
+  // ---- Review interactions (like / dislike / mentor reply) ----
+
+  private static reviewError(error: any, fallback: string): Error {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 401) {
+        return new Error('Please login to continue.');
+      }
+      const apiMessage = error.response?.data?.message;
+      if (apiMessage) return new Error(apiMessage);
+    }
+    return new Error(fallback);
+  }
+
+  /** Logged-in user's like/dislike state for a mentor's reviews: { [reviewId]: 'like' | 'dislike' } */
+  static async getMyReviewReactions(
+    mentorId: string
+  ): Promise<Record<string, 'like' | 'dislike'>> {
+    try {
+      const { data } = await api.get(`/reviews/mentor/${mentorId}/my-reactions`);
+      return data?.data ?? {};
+    } catch (error: any) {
+      throw MentorService.reviewError(error, 'Failed to fetch your reactions.');
+    }
+  }
+
+  /** Toggle like/dislike. Clicking the active reaction again removes it. */
+  static async reactToReview(
+    reviewId: string,
+    type: 'like' | 'dislike'
+  ): Promise<{
+    reviewId: string;
+    helpfulCount: number;
+    notHelpfulCount: number;
+    userReaction: 'like' | 'dislike' | null;
+  }> {
+    try {
+      const { data } = await api.post(`/reviews/${reviewId}/react`, { type });
+      return data?.data;
+    } catch (error: any) {
+      throw MentorService.reviewError(error, 'Failed to update reaction.');
+    }
+  }
+
+  /** Mentor adds (or edits) the reply on a review */
+  static async replyToReview(
+    reviewId: string,
+    response: string
+  ): Promise<any> {
+    try {
+      const { data } = await api.post(`/reviews/${reviewId}/response`, {
+        response,
+      });
+      return data?.data;
+    } catch (error: any) {
+      throw MentorService.reviewError(error, 'Failed to post reply.');
+    }
+  }
+
+  static async deleteReviewReply(reviewId: string): Promise<void> {
+    try {
+      await api.delete(`/reviews/${reviewId}/response`);
+    } catch (error: any) {
+      throw MentorService.reviewError(error, 'Failed to delete reply.');
     }
   }
 

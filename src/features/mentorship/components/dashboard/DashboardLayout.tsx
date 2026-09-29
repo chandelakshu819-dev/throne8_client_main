@@ -140,8 +140,9 @@ export default function MentorDashboard(
       const fallbackUpcoming = (sessions || []).map((s: any) => ({
         _id: s._id || s.sessionId,
         sessionId: s.sessionId || String(s._id),
-        menteeName: s.menteeName || s.bookedMenteeName || "Student",
-        menteeProfilePhoto: s.menteeProfilePhoto || null,
+        menteeId: s.menteeId || s.bookedBy || s.mentee?.userId || (Array.isArray(s.bookings) && s.bookings[0]?.bookedBy) || null,
+        menteeName: s.menteeName || s.bookedMenteeName || s.mentee?.fullName || (s.mentee?.firstName ? `${s.mentee.firstName} ${s.mentee.lastName || ''}`.trim() : null) || "Student",
+        menteeProfilePhoto: s.menteeProfilePhoto || s.mentee?.profilePic || s.mentee?.profilePhotoUrl || null,
         title: s.title || s.sessionType || "Session",
         sessionType: s.sessionType || "Session",
         scheduledAt: s.scheduledAt || s.startTime || new Date().toISOString(),

@@ -304,7 +304,7 @@ export default function DashboardOverviewPage({
                 e.stopPropagation()
                 if ("key" in e && e.key !== "Enter" && e.key !== " ") return
                 if ("key" in e) e.preventDefault()
-                router.push(`/profile/${menteeId}`)
+                router.push(`/mentorship/user-dashboard/${menteeId}`)
               }
 
               return (
