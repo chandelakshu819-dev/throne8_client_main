@@ -1,6 +1,7 @@
 // mentorDashboard/components/CommunityPage.tsx
 import React, { useEffect, useState, useCallback } from "react"
-import { Star, Users, Calendar, MessageCircle, TrendingUp, Loader2 } from "lucide-react"
+import Link from "next/link"
+import { Star, Users, Calendar, MessageCircle, TrendingUp, Loader2, Pin, Lock } from "lucide-react"
 import CommunityService from "@/lib/api/community.service"
 import { useAuth } from "@/features/auth/hooks/useAuth"
 import {
@@ -112,7 +113,7 @@ export default function CommunityPage() {
       setForumsError(null)
       try {
         const data = await CommunityService.listForums({ limit: 4 })
-        const list = Array.isArray(data) ? data : data.data
+        const list = Array.isArray(data) ? data : data.items
         if (!cancelled) setForums(list)
       } catch (err) {
         // forums require auth — a 401 here likely means the session expired
@@ -140,7 +141,7 @@ export default function CommunityPage() {
       setEventsError(null)
       try {
         const data = await CommunityService.listEvents({ limit: 3 })
-        const list = Array.isArray(data) ? data : data.data
+        const list = Array.isArray(data) ? data : data.items
         if (!cancelled) setEvents(list.filter((e) => !e.isCancelled))
       } catch (err) {
         if (!cancelled) setEventsError("Couldn't load events right now.")
@@ -157,6 +158,60 @@ export default function CommunityPage() {
       cancelled = true
     }
   }, [])
+
+  // ── Quick-test forms (temporary, for verifying create endpoints work) ──
+  const [showForumForm, setShowForumForm] = useState(false)
+  const [forumTopic, setForumTopic] = useState("")
+  const [forumSubmitting, setForumSubmitting] = useState(false)
+  const [forumSubmitError, setForumSubmitError] = useState<string | null>(null)
+
+  const [showEventForm, setShowEventForm] = useState(false)
+  const [eventTitle, setEventTitle] = useState("")
+  const [eventDate, setEventDate] = useState("")
+  const [eventSubmitting, setEventSubmitting] = useState(false)
+  const [eventSubmitError, setEventSubmitError] = useState<string | null>(null)
+
+  const handleCreateForum = useCallback(async () => {
+    if (!forumTopic.trim()) return
+    setForumSubmitting(true)
+    setForumSubmitError(null)
+    try {
+      const newForum = await CommunityService.createForum({
+        topic: forumTopic.trim(),
+        category: "general",
+      })
+      setForums((prev) => [newForum, ...prev])
+      setForumTopic("")
+      setShowForumForm(false)
+    } catch (err) {
+      setForumSubmitError("Couldn't create thread — check console for details.")
+      console.error("Create forum failed", err)
+    } finally {
+      setForumSubmitting(false)
+    }
+  }, [forumTopic])
+
+  const handleCreateEvent = useCallback(async () => {
+    if (!eventTitle.trim() || !eventDate) return
+    setEventSubmitting(true)
+    setEventSubmitError(null)
+    try {
+      const newEvent = await CommunityService.createEvent({
+        title: eventTitle.trim(),
+        date: new Date(eventDate).toISOString(),
+        type: "meetup",
+      })
+      setEvents((prev) => [newEvent, ...prev])
+      setEventTitle("")
+      setEventDate("")
+      setShowEventForm(false)
+    } catch (err) {
+      setEventSubmitError("Couldn't create event — check console for details.")
+      console.error("Create event failed", err)
+    } finally {
+      setEventSubmitting(false)
+    }
+  }, [eventTitle, eventDate])
 
   const handleRsvp = useCallback(
     async (eventId: string, currentlyGoing: boolean) => {
@@ -227,10 +282,44 @@ export default function CommunityPage() {
             <h3 className="text-base font-bold" style={{ color: COLORS.ink }}>
               Discussion Forums
             </h3>
-            <span className="text-xs font-semibold" style={{ color: "#a08070" }}>
-              {forums.length} active
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold" style={{ color: "#a08070" }}>
+                {forums.length} active
+              </span>
+              {user && (
+                <button
+                  onClick={() => setShowForumForm((v) => !v)}
+                  className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                  style={{ backgroundColor: COLORS.ink, color: "#fff" }}
+                >
+                  + New Thread
+                </button>
+              )}
+            </div>
           </div>
+          {showForumForm && (
+            <div className="mb-4 p-3 rounded-xl" style={{ border: `1px solid ${COLORS.hairline}` }}>
+              <input
+                type="text"
+                value={forumTopic}
+                onChange={(e) => setForumTopic(e.target.value)}
+                placeholder="Thread topic, e.g. Test thread"
+                className="w-full text-sm px-3 py-2 rounded-lg mb-2"
+                style={{ border: `1px solid ${COLORS.hairline}` }}
+              />
+              {forumSubmitError && (
+                <p className="text-xs mb-2" style={{ color: "#b3543f" }}>{forumSubmitError}</p>
+              )}
+              <button
+                onClick={handleCreateForum}
+                disabled={forumSubmitting || !forumTopic.trim()}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50"
+                style={{ backgroundColor: COLORS.accent, color: "#fff" }}
+              >
+                {forumSubmitting ? "Posting..." : "Post Thread"}
+              </button>
+            </div>
+          )}
           <SectionState
             loading={forumsLoading}
             error={forumsError}
@@ -238,28 +327,48 @@ export default function CommunityPage() {
             emptyLabel="No discussions yet — start one!"
           >
             <div className="space-y-3">
-              {forums.map((forum) => (
-                <div
-                  key={forum._id}
-                  className="flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-colors hover:border-[#c9baa9]"
-                  style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: COLORS.softWash }}
-                >
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: COLORS.chip }}
+              {forums.map((forum) => {
+                const authorName =
+                  typeof forum.author === "object" && forum.author !== null && forum.author.name
+                    ? forum.author.name
+                    : "Community Member"
+
+                return (
+                  <Link
+                    key={forum._id}
+                    href={`/mentorship/community/forum/${forum._id}`}
+                    className="flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-colors hover:border-[#c9baa9] block"
+                    style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: COLORS.softWash }}
                   >
-                    <MessageCircle className="w-4 h-4" style={{ color: COLORS.accent }} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold" style={{ color: COLORS.ink }}>
-                      {forum.topic}
-                    </p>
-                    <p className="text-xs mt-1" style={{ color: COLORS.muted }}>
-                      {forum.replyCount} replies · {timeAgo(forum.lastActivityAt)}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: COLORS.chip }}
+                    >
+                      <MessageCircle className="w-4 h-4" style={{ color: COLORS.accent }} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold truncate" style={{ color: COLORS.ink }}>
+                          {forum.topic}
+                        </p>
+                        {forum.isPinned && (
+                          <span title="Pinned">
+                            <Pin className="w-3.5 h-3.5 shrink-0" style={{ color: COLORS.accent }} />
+                          </span>
+                        )}
+                        {forum.isLocked && (
+                          <span title="Locked">
+                            <Lock className="w-3.5 h-3.5 shrink-0" style={{ color: COLORS.muted }} />
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs mt-1" style={{ color: COLORS.muted }}>
+                        {authorName} · {forum.replyCount} replies · {timeAgo(forum.lastActivityAt)}
+                      </p>
+                    </div>
+                  </Link>
+                )
+              })}
             </div>
           </SectionState>
         </div>
@@ -289,7 +398,7 @@ export default function CommunityPage() {
                     {mentor.profilePic ? (
                       <img
                         src={mentor.profilePic}
-                        alt={mentor.name || mentor.title}
+                        alt={mentor.name || mentor.domains?.[0] || "Mentor"}
                         className="w-10 h-10 rounded-full object-cover shrink-0"
                       />
                     ) : (
@@ -297,15 +406,16 @@ export default function CommunityPage() {
                         className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
                         style={{ backgroundColor: COLORS.ink }}
                       >
-                        {(mentor.name || mentor.title || "?")[0]}
+                        {(mentor.name || mentor.domains?.[0] || "?")[0]}
                       </div>
                     )}
                     <div className="min-w-0">
                       <p className="text-sm font-semibold truncate" style={{ color: COLORS.ink }}>
-                        {mentor.name || mentor.title}
+                        {/* backend doesn't populate `name` yet — falls back to domain until it does */}
+                        {mentor.name || mentor.domains?.[0] || "Mentor"}
                       </p>
                       <p className="text-xs mt-0.5 truncate" style={{ color: COLORS.muted }}>
-                        {mentor.domains?.[0] ?? mentor.title} · {mentor.stats.completedSessions} sessions
+                        {mentor.domains?.[0] ?? "General"} · {mentor.sessionsCompleted} sessions
                       </p>
                     </div>
                   </div>
@@ -315,7 +425,7 @@ export default function CommunityPage() {
                   >
                     <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />
                     <span className="text-sm font-bold" style={{ color: COLORS.ink }}>
-                      {mentor.stats.averageRating.toFixed(1)}
+                      {mentor.rating.toFixed(1)}
                     </span>
                   </div>
                 </div>
@@ -327,9 +437,50 @@ export default function CommunityPage() {
 
       {/* Upcoming Events */}
       <div className="bg-white p-6 rounded-2xl" style={{ border: `1px solid ${COLORS.hairline}` }}>
-        <h3 className="text-base font-bold mb-5" style={{ color: COLORS.ink }}>
-          Upcoming Community Events
-        </h3>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-base font-bold" style={{ color: COLORS.ink }}>
+            Upcoming Community Events
+          </h3>
+          {user && (
+            <button
+              onClick={() => setShowEventForm((v) => !v)}
+              className="text-xs font-semibold px-2.5 py-1 rounded-full"
+              style={{ backgroundColor: COLORS.ink, color: "#fff" }}
+            >
+              + New Event
+            </button>
+          )}
+        </div>
+        {showEventForm && (
+          <div className="mb-4 p-3 rounded-xl flex flex-col md:flex-row gap-2" style={{ border: `1px solid ${COLORS.hairline}` }}>
+            <input
+              type="text"
+              value={eventTitle}
+              onChange={(e) => setEventTitle(e.target.value)}
+              placeholder="Event title, e.g. Test event"
+              className="flex-1 text-sm px-3 py-2 rounded-lg"
+              style={{ border: `1px solid ${COLORS.hairline}` }}
+            />
+            <input
+              type="datetime-local"
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
+              className="text-sm px-3 py-2 rounded-lg"
+              style={{ border: `1px solid ${COLORS.hairline}` }}
+            />
+            <button
+              onClick={handleCreateEvent}
+              disabled={eventSubmitting || !eventTitle.trim() || !eventDate}
+              className="text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50 shrink-0"
+              style={{ backgroundColor: COLORS.accent, color: "#fff" }}
+            >
+              {eventSubmitting ? "Creating..." : "Create Event"}
+            </button>
+            {eventSubmitError && (
+              <p className="text-xs" style={{ color: "#b3543f" }}>{eventSubmitError}</p>
+            )}
+          </div>
+        )}
         <SectionState
           loading={eventsLoading}
           error={eventsError}
@@ -355,6 +506,9 @@ export default function CommunityPage() {
                   <h4 className="text-sm font-bold mb-1.5" style={{ color: COLORS.ink }}>
                     {event.title}
                   </h4>
+                  <p className="text-xs mb-1" style={{ color: COLORS.muted }}>
+                    by {event.createdBy?.name || "Community Member"}
+                  </p>
                   <p className="text-xs mb-3" style={{ color: COLORS.muted }}>
                     {formatEventDate(event.date)}
                   </p>

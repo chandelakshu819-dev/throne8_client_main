@@ -15,15 +15,20 @@ export interface MentorStats {
   completionRate: number;
 }
 
+// Confirmed from src/Mentorship/services/community.service.ts (backend):
+// getTopMentors() returns a FLAT shape, not the nested `stats` object from
+// the raw Mentor model. `name`/`fullName` are read off the Mentor doc
+// directly, but the Mentor schema has neither field (name only exists on
+// the populated User) — so `name` will be undefined until the backend
+// query populates `user` or the frontend falls back to `title`/`domains`.
 export interface LeaderboardMentor {
   mentorId: string;
   userId: string;
-  name?: string; // confirm: not in the raw model, may be populated from User ref
+  name?: string; // likely undefined for now — see note above
   profilePic: string;
-  title: string;
   domains: string[];
-  stats: MentorStats;
-  status: 'pending_approval' | 'active' | 'inactive' | 'rejected' | 'suspended';
+  rating: number;
+  sessionsCompleted: number;
 }
 
 export type LeaderboardPeriod = 'weekly' | 'monthly' | 'all-time';
@@ -49,13 +54,18 @@ export interface CommunityStats {
 
 export type EventType = 'meetup' | 'webinar' | 'workshop' | 'networking';
 
+export interface EventCreator {
+  userId: string;
+  name?: string;
+}
+
 export interface CommunityEvent {
   _id: string;
   title: string;
   description?: string;
   date: string; // ISO date string
   type: EventType;
-  createdBy: string; // User ObjectId
+  createdBy: EventCreator | null; // now an attached User object, not a raw ObjectId/UUID
   participantsCount: number;
   resourceLink?: string;
   isCancelled: boolean;
@@ -102,12 +112,14 @@ export interface EventAttendee {
   status: RsvpStatus;
 }
 
+// Confirmed from the live forums response: the backend paginates as
+// { items, total, page, pages } — NOT { data, limit, totalPages } as
+// originally assumed. Fixed here to match what's actually returned.
 export interface PaginatedResponse<T> {
-  data: T[];
-  page: number;
-  limit: number;
+  items: T[];
   total: number;
-  totalPages: number;
+  page: number;
+  pages: number;
 }
 
 // ─────────────────────────────────────────────
@@ -117,7 +129,7 @@ export interface PaginatedResponse<T> {
 export type ForumCategory = 'teaching-tips' | 'pricing' | 'tech-stack' | 'general';
 
 export interface ForumAuthor {
-  _id: string;
+  userId?: string;
   name?: string;
   profilePic?: string;
 }
@@ -127,7 +139,7 @@ export interface Forum {
   topic: string;
   description?: string;
   category: ForumCategory;
-  author: ForumAuthor | string;
+  author: ForumAuthor | string | null;
   replyCount: number;
   upvotes: string[]; // array of User IDs who upvoted
   isPinned: boolean;
@@ -140,7 +152,7 @@ export interface Forum {
 export interface ForumReply {
   _id: string;
   forum: string;
-  author: ForumAuthor | string;
+  author: ForumAuthor | string | null;
   content: string;
   mentions: string[];
   upvotes: string[];
