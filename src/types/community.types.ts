@@ -105,10 +105,11 @@ export interface EventAttendee {
   _id: string;
   event: string;
   user: {
-    _id: string;
+    _id?: string;
+    userId?: string;
     name?: string;
     profilePic?: string;
-  };
+  } | null;
   status: RsvpStatus;
 }
 

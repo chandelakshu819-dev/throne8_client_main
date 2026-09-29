@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Loader2,
   Send,
+  Trash2,
   User as UserIcon,
 } from "lucide-react";
 import { Forum, ForumReply, ForumAuthor } from "@/types/community.types";
@@ -56,6 +57,8 @@ function getCategoryLabel(category?: string): string {
 interface ThreadDetailViewProps {
   thread: Forum;
   replies: ForumReply[];
+  repliesPage?: number;
+  repliesTotalPages?: number;
   currentUser: {
     userId?: string;
     role?: string;
@@ -69,6 +72,8 @@ interface ThreadDetailViewProps {
 export default function ThreadDetailView({
   thread: initialThread,
   replies: initialReplies,
+  repliesPage: initialRepliesPage = 1,
+  repliesTotalPages: initialRepliesTotalPages = 1,
   currentUser,
   isAuthorOrAdmin,
   onThreadUpdate,
@@ -78,6 +83,10 @@ export default function ThreadDetailView({
 
   const [thread, setThread] = useState<Forum>(initialThread);
   const [replies, setReplies] = useState<ForumReply[]>(initialReplies);
+  const [repliesPage, setRepliesPage] = useState<number>(initialRepliesPage);
+  const [repliesTotalPages, setRepliesTotalPages] = useState<number>(initialRepliesTotalPages);
+  const [isLoadingMoreReplies, setIsLoadingMoreReplies] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
 
   const [replyContent, setReplyContent] = useState("");
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
@@ -86,6 +95,7 @@ export default function ThreadDetailView({
   const [isUpvoting, setIsUpvoting] = useState(false);
   const [isPinning, setIsPinning] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Sync state if props change
@@ -96,6 +106,33 @@ export default function ThreadDetailView({
   React.useEffect(() => {
     setReplies(initialReplies);
   }, [initialReplies]);
+
+  React.useEffect(() => {
+    if (initialRepliesPage) setRepliesPage(initialRepliesPage);
+  }, [initialRepliesPage]);
+
+  React.useEffect(() => {
+    if (initialRepliesTotalPages) setRepliesTotalPages(initialRepliesTotalPages);
+  }, [initialRepliesTotalPages]);
+
+  // Load More Replies
+  const handleLoadMoreReplies = async () => {
+    if (isLoadingMoreReplies || repliesPage >= repliesTotalPages) return;
+    setIsLoadingMoreReplies(true);
+    setLoadMoreError(null);
+    try {
+      const nextPage = repliesPage + 1;
+      const res = await CommunityService.listReplies(thread._id, { page: nextPage });
+      const newItems = Array.isArray(res) ? res : res.items || [];
+      setReplies((prev) => [...prev, ...newItems]);
+      setRepliesPage(res.page || nextPage);
+      setRepliesTotalPages(res.pages || repliesTotalPages);
+    } catch (err: any) {
+      setLoadMoreError(err.response?.data?.message || "Failed to load more replies.");
+    } finally {
+      setIsLoadingMoreReplies(false);
+    }
+  };
 
   const currentUserId = currentUser?.userId || (currentUser as any)?.id || (currentUser as any)?._id;
   const hasUpvoted = Boolean(currentUserId && thread.upvotes?.includes(currentUserId));
@@ -150,6 +187,26 @@ export default function ThreadDetailView({
       setActionError(err.response?.data?.message || "Failed to update lock status.");
     } finally {
       setIsLocking(false);
+    }
+  };
+
+  // Delete Thread (author or admin only)
+  const handleDeleteThread = async () => {
+    if (!window.confirm("Are you sure you want to delete this discussion thread? This action cannot be undone.")) {
+      return;
+    }
+    setActionError(null);
+    setIsDeleting(true);
+    try {
+      await CommunityService.deleteForum(thread._id);
+      if (currentUserId) {
+        router.push(`/mentorship/mentorProfile/${currentUserId}?tab=community`);
+      } else {
+        router.push("/mentorship");
+      }
+    } catch (err: any) {
+      setActionError(err.response?.data?.message || "Failed to delete thread. Please try again.");
+      setIsDeleting(false);
     }
   };
 
@@ -324,7 +381,7 @@ export default function ThreadDetailView({
             <div className="flex items-center gap-2">
               <button
                 onClick={handleTogglePin}
-                disabled={isPinning}
+                disabled={isPinning || isDeleting}
                 className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full transition-colors disabled:opacity-50"
                 style={{
                   backgroundColor: thread.isPinned ? "#fef3c7" : COLORS.softWash,
@@ -342,7 +399,7 @@ export default function ThreadDetailView({
 
               <button
                 onClick={handleToggleLock}
-                disabled={isLocking}
+                disabled={isLocking || isDeleting}
                 className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full transition-colors disabled:opacity-50"
                 style={{
                   backgroundColor: thread.isLocked ? "#fee2e2" : COLORS.softWash,
@@ -358,6 +415,25 @@ export default function ThreadDetailView({
                   <Lock className="w-3 h-3" />
                 )}
                 <span>{thread.isLocked ? "Unlock Thread" : "Lock Thread"}</span>
+              </button>
+
+              <button
+                onClick={handleDeleteThread}
+                disabled={isDeleting || isPinning || isLocking}
+                className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 hover:opacity-80"
+                style={{
+                  backgroundColor: "#fef2f2",
+                  color: "#dc2626",
+                  border: "1px solid #fecaca",
+                }}
+                title="Delete this discussion thread"
+              >
+                {isDeleting ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3 h-3" />
+                )}
+                <span>{isDeleting ? "Deleting..." : "Delete Thread"}</span>
               </button>
             </div>
           )}
@@ -433,6 +509,37 @@ export default function ThreadDetailView({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Load More Replies */}
+        {repliesPage < repliesTotalPages && (
+          <div className="mt-6 text-center pt-2">
+            {loadMoreError && (
+              <p className="text-xs mb-2" style={{ color: "#b3543f" }}>
+                {loadMoreError}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleLoadMoreReplies}
+              disabled={isLoadingMoreReplies}
+              className="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-full transition-all disabled:opacity-50 hover:opacity-80"
+              style={{
+                backgroundColor: COLORS.chip,
+                color: COLORS.ink,
+                border: `1px solid ${COLORS.hairline}`,
+              }}
+            >
+              {isLoadingMoreReplies ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: COLORS.accent }} />
+                  <span>Loading replies...</span>
+                </>
+              ) : (
+                <span>Load More Replies</span>
+              )}
+            </button>
           </div>
         )}
       </div>

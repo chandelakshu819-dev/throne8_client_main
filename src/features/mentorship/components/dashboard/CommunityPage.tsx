@@ -8,6 +8,9 @@ import {
   Forum,
   LeaderboardMentor,
   CommunityEvent,
+  EventAttendee,
+  ForumCategory,
+  EventType,
 } from "@/types/community.types"
 
 const COLORS = {
@@ -40,6 +43,22 @@ function formatEventDate(dateStr: string): string {
     day: "numeric",
     year: "numeric",
   })
+}
+
+function toLocalDatetimeInput(isoStr: string): string {
+  try {
+    const d = new Date(isoStr)
+    if (isNaN(d.getTime())) return ""
+    const pad = (n: number) => String(n).padStart(2, "0")
+    const yyyy = d.getFullYear()
+    const mm = pad(d.getMonth() + 1)
+    const dd = pad(d.getDate())
+    const hh = pad(d.getHours())
+    const min = pad(d.getMinutes())
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`
+  } catch {
+    return ""
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -85,6 +104,8 @@ function SectionState({
 
 export default function CommunityPage() {
   const { user } = useAuth()
+  const currentUserId = user?.userId || (user as any)?.id || (user as any)?._id
+  const isAdmin = user?.role === "admin"
 
   // Forums
   const [forums, setForums] = useState<Forum[]>([])
@@ -104,6 +125,20 @@ export default function CommunityPage() {
   // only GET /events/:id does, so we track user actions locally per session
   const [rsvpPending, setRsvpPending] = useState<Set<string>>(new Set())
   const [rsvpGoing, setRsvpGoing] = useState<Set<string>>(new Set())
+
+  // Event attendees state
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null)
+  const [attendeesCache, setAttendeesCache] = useState<
+    Record<string, { loading: boolean; error: string | null; items: EventAttendee[] }>
+  >({})
+
+  // Event edit / cancel state
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState("")
+  const [editDate, setEditDate] = useState("")
+  const [editSubmitting, setEditSubmitting] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [cancellingEventId, setCancellingEventId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -159,15 +194,19 @@ export default function CommunityPage() {
     }
   }, [])
 
-  // ── Quick-test forms (temporary, for verifying create endpoints work) ──
+  // ── Quick-creation forms ──
   const [showForumForm, setShowForumForm] = useState(false)
   const [forumTopic, setForumTopic] = useState("")
+  const [forumCategory, setForumCategory] = useState<ForumCategory>("general")
+  const [forumDescription, setForumDescription] = useState("")
   const [forumSubmitting, setForumSubmitting] = useState(false)
   const [forumSubmitError, setForumSubmitError] = useState<string | null>(null)
 
   const [showEventForm, setShowEventForm] = useState(false)
   const [eventTitle, setEventTitle] = useState("")
   const [eventDate, setEventDate] = useState("")
+  const [eventType, setEventType] = useState<EventType>("meetup")
+  const [eventDescription, setEventDescription] = useState("")
   const [eventSubmitting, setEventSubmitting] = useState(false)
   const [eventSubmitError, setEventSubmitError] = useState<string | null>(null)
 
@@ -178,10 +217,13 @@ export default function CommunityPage() {
     try {
       const newForum = await CommunityService.createForum({
         topic: forumTopic.trim(),
-        category: "general",
+        category: forumCategory,
+        description: forumDescription.trim() || undefined,
       })
       setForums((prev) => [newForum, ...prev])
       setForumTopic("")
+      setForumCategory("general")
+      setForumDescription("")
       setShowForumForm(false)
     } catch (err) {
       setForumSubmitError("Couldn't create thread — check console for details.")
@@ -189,7 +231,7 @@ export default function CommunityPage() {
     } finally {
       setForumSubmitting(false)
     }
-  }, [forumTopic])
+  }, [forumTopic, forumCategory, forumDescription])
 
   const handleCreateEvent = useCallback(async () => {
     if (!eventTitle.trim() || !eventDate) return
@@ -199,11 +241,14 @@ export default function CommunityPage() {
       const newEvent = await CommunityService.createEvent({
         title: eventTitle.trim(),
         date: new Date(eventDate).toISOString(),
-        type: "meetup",
+        type: eventType,
+        description: eventDescription.trim() || undefined,
       })
       setEvents((prev) => [newEvent, ...prev])
       setEventTitle("")
       setEventDate("")
+      setEventType("meetup")
+      setEventDescription("")
       setShowEventForm(false)
     } catch (err) {
       setEventSubmitError("Couldn't create event — check console for details.")
@@ -211,7 +256,7 @@ export default function CommunityPage() {
     } finally {
       setEventSubmitting(false)
     }
-  }, [eventTitle, eventDate])
+  }, [eventTitle, eventDate, eventType, eventDescription])
 
   const handleRsvp = useCallback(
     async (eventId: string, currentlyGoing: boolean) => {
@@ -243,6 +288,16 @@ export default function CommunityPage() {
             )
           )
         }
+        // Invalidate or refresh attendees if currently expanded
+        if (expandedEventId === eventId) {
+          fetchAttendees(eventId)
+        } else {
+          setAttendeesCache((prev) => {
+            const next = { ...prev }
+            delete next[eventId]
+            return next
+          })
+        }
       } catch (err) {
         // silent fail is bad UX long-term — swap for a toast once one exists in this codebase
         console.error("RSVP action failed", err)
@@ -254,7 +309,103 @@ export default function CommunityPage() {
         })
       }
     },
-    [user]
+    [user, expandedEventId]
+  )
+
+  const fetchAttendees = useCallback(async (eventId: string) => {
+    setAttendeesCache((prev) => ({
+      ...prev,
+      [eventId]: { loading: true, error: null, items: prev[eventId]?.items || [] },
+    }))
+    try {
+      const res = await CommunityService.listAttendees(eventId)
+      const items = Array.isArray(res) ? res : res.items || []
+      setAttendeesCache((prev) => ({
+        ...prev,
+        [eventId]: { loading: false, error: null, items },
+      }))
+    } catch (err: any) {
+      setAttendeesCache((prev) => ({
+        ...prev,
+        [eventId]: {
+          loading: false,
+          error: err.response?.data?.message || "Couldn't load attendees.",
+          items: [],
+        },
+      }))
+    }
+  }, [])
+
+  const handleToggleAttendees = useCallback(
+    async (eventId: string) => {
+      if (expandedEventId === eventId) {
+        setExpandedEventId(null)
+        return
+      }
+      setExpandedEventId(eventId)
+      if (!attendeesCache[eventId] || attendeesCache[eventId].error) {
+        await fetchAttendees(eventId)
+      }
+    },
+    [expandedEventId, attendeesCache, fetchAttendees]
+  )
+
+  const startEditingEvent = useCallback((event: CommunityEvent) => {
+    setEditingEventId(event._id)
+    setEditTitle(event.title)
+    setEditDate(toLocalDatetimeInput(event.date))
+    setEditError(null)
+  }, [])
+
+  const cancelEditingEvent = useCallback(() => {
+    setEditingEventId(null)
+    setEditTitle("")
+    setEditDate("")
+    setEditError(null)
+  }, [])
+
+  const handleSaveEventEdit = useCallback(
+    async (eventId: string) => {
+      if (!editTitle.trim() || !editDate) return
+      setEditSubmitting(true)
+      setEditError(null)
+      try {
+        const updated = await CommunityService.updateEvent(eventId, {
+          title: editTitle.trim(),
+          date: new Date(editDate).toISOString(),
+        })
+        setEvents((prev) =>
+          prev.map((e) => (e._id === eventId ? { ...e, ...updated } : e))
+        )
+        setEditingEventId(null)
+      } catch (err: any) {
+        setEditError(err.response?.data?.message || "Couldn't update event. Please try again.")
+      } finally {
+        setEditSubmitting(false)
+      }
+    },
+    [editTitle, editDate]
+  )
+
+  const handleCancelEvent = useCallback(
+    async (eventId: string) => {
+      if (!window.confirm("Are you sure you want to cancel this event? It will be removed from the community list.")) {
+        return
+      }
+      setCancellingEventId(eventId)
+      try {
+        await CommunityService.cancelEvent(eventId)
+        setEvents((prev) => prev.filter((e) => e._id !== eventId))
+        if (expandedEventId === eventId) {
+          setExpandedEventId(null)
+        }
+      } catch (err: any) {
+        alert(err.response?.data?.message || "Failed to cancel event. Please try again.")
+      } finally {
+        setCancellingEventId(null)
+      }
+    },
+    [expandedEventId]
   )
 
   return (
@@ -298,26 +449,63 @@ export default function CommunityPage() {
             </div>
           </div>
           {showForumForm && (
-            <div className="mb-4 p-3 rounded-xl" style={{ border: `1px solid ${COLORS.hairline}` }}>
-              <input
-                type="text"
-                value={forumTopic}
-                onChange={(e) => setForumTopic(e.target.value)}
-                placeholder="Thread topic, e.g. Test thread"
-                className="w-full text-sm px-3 py-2 rounded-lg mb-2"
-                style={{ border: `1px solid ${COLORS.hairline}` }}
+            <div className="mb-4 p-4 rounded-xl space-y-3" style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: COLORS.softWash }}>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  value={forumTopic}
+                  onChange={(e) => setForumTopic(e.target.value)}
+                  placeholder="Thread topic (e.g. Tips for First-Time Mentors)"
+                  className="flex-1 text-sm px-3 py-2 rounded-lg"
+                  style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: "#fff" }}
+                />
+                <select
+                  value={forumCategory}
+                  onChange={(e) => setForumCategory(e.target.value as ForumCategory)}
+                  className="text-sm px-3 py-2 rounded-lg"
+                  style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: "#fff", color: COLORS.ink }}
+                >
+                  <option value="general">General</option>
+                  <option value="teaching-tips">Teaching Tips</option>
+                  <option value="pricing">Pricing</option>
+                  <option value="tech-stack">Tech Stack</option>
+                </select>
+              </div>
+              <textarea
+                rows={3}
+                value={forumDescription}
+                onChange={(e) => setForumDescription(e.target.value)}
+                placeholder="Description or opening thoughts (optional)..."
+                className="w-full text-sm px-3 py-2 rounded-lg"
+                style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: "#fff" }}
               />
               {forumSubmitError && (
-                <p className="text-xs mb-2" style={{ color: "#b3543f" }}>{forumSubmitError}</p>
+                <p className="text-xs" style={{ color: "#b3543f" }}>{forumSubmitError}</p>
               )}
-              <button
-                onClick={handleCreateForum}
-                disabled={forumSubmitting || !forumTopic.trim()}
-                className="text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50"
-                style={{ backgroundColor: COLORS.accent, color: "#fff" }}
-              >
-                {forumSubmitting ? "Posting..." : "Post Thread"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCreateForum}
+                  disabled={forumSubmitting || !forumTopic.trim()}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50 transition-colors"
+                  style={{ backgroundColor: COLORS.accent, color: "#fff" }}
+                >
+                  {forumSubmitting ? "Posting..." : "Post Thread"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForumForm(false)
+                    setForumTopic("")
+                    setForumDescription("")
+                    setForumSubmitError(null)
+                  }}
+                  className="text-xs font-medium px-2.5 py-1.5 rounded-full transition-colors"
+                  style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
           <SectionState
@@ -452,33 +640,71 @@ export default function CommunityPage() {
           )}
         </div>
         {showEventForm && (
-          <div className="mb-4 p-3 rounded-xl flex flex-col md:flex-row gap-2" style={{ border: `1px solid ${COLORS.hairline}` }}>
-            <input
-              type="text"
-              value={eventTitle}
-              onChange={(e) => setEventTitle(e.target.value)}
-              placeholder="Event title, e.g. Test event"
-              className="flex-1 text-sm px-3 py-2 rounded-lg"
-              style={{ border: `1px solid ${COLORS.hairline}` }}
+          <div className="mb-4 p-4 rounded-xl space-y-3" style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: COLORS.softWash }}>
+            <div className="flex flex-col md:flex-row gap-2">
+              <input
+                type="text"
+                value={eventTitle}
+                onChange={(e) => setEventTitle(e.target.value)}
+                placeholder="Event title (e.g. Monthly Mentors Meetup)"
+                className="flex-1 text-sm px-3 py-2 rounded-lg"
+                style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: "#fff" }}
+              />
+              <select
+                value={eventType}
+                onChange={(e) => setEventType(e.target.value as EventType)}
+                className="text-sm px-3 py-2 rounded-lg"
+                style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: "#fff", color: COLORS.ink }}
+              >
+                <option value="meetup">Meetup</option>
+                <option value="webinar">Webinar</option>
+                <option value="workshop">Workshop</option>
+                <option value="networking">Networking</option>
+              </select>
+              <input
+                type="datetime-local"
+                value={eventDate}
+                onChange={(e) => setEventDate(e.target.value)}
+                className="text-sm px-3 py-2 rounded-lg"
+                style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: "#fff" }}
+              />
+            </div>
+            <textarea
+              rows={2}
+              value={eventDescription}
+              onChange={(e) => setEventDescription(e.target.value)}
+              placeholder="Event description or details (optional)..."
+              className="w-full text-sm px-3 py-2 rounded-lg"
+              style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: "#fff" }}
             />
-            <input
-              type="datetime-local"
-              value={eventDate}
-              onChange={(e) => setEventDate(e.target.value)}
-              className="text-sm px-3 py-2 rounded-lg"
-              style={{ border: `1px solid ${COLORS.hairline}` }}
-            />
-            <button
-              onClick={handleCreateEvent}
-              disabled={eventSubmitting || !eventTitle.trim() || !eventDate}
-              className="text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50 shrink-0"
-              style={{ backgroundColor: COLORS.accent, color: "#fff" }}
-            >
-              {eventSubmitting ? "Creating..." : "Create Event"}
-            </button>
             {eventSubmitError && (
               <p className="text-xs" style={{ color: "#b3543f" }}>{eventSubmitError}</p>
             )}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCreateEvent}
+                disabled={eventSubmitting || !eventTitle.trim() || !eventDate}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full disabled:opacity-50 transition-colors"
+                style={{ backgroundColor: COLORS.accent, color: "#fff" }}
+              >
+                {eventSubmitting ? "Creating..." : "Create Event"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEventForm(false)
+                  setEventTitle("")
+                  setEventDate("")
+                  setEventDescription("")
+                  setEventSubmitError(null)
+                }}
+                className="text-xs font-medium px-2.5 py-1.5 rounded-full transition-colors"
+                style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
         <SectionState
@@ -491,33 +717,124 @@ export default function CommunityPage() {
             {events.map((event) => {
               const going = rsvpGoing.has(event._id)
               const pending = rsvpPending.has(event._id)
+              const isCreator = Boolean(
+                currentUserId &&
+                  event.createdBy?.userId &&
+                  currentUserId === event.createdBy.userId
+              )
+              const canManageEvent = Boolean(isCreator || isAdmin)
+              const isEditing = editingEventId === event._id
+
               return (
                 <div
                   key={event._id}
                   className="p-5 rounded-xl transition-colors hover:border-[#c9baa9]"
                   style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: COLORS.softWash }}
                 >
-                  <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center mb-4"
-                    style={{ backgroundColor: COLORS.chip }}
-                  >
-                    <Calendar className="w-4.5 h-4.5" style={{ color: COLORS.accent }} />
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: COLORS.chip }}
+                    >
+                      <Calendar className="w-4.5 h-4.5" style={{ color: COLORS.accent }} />
+                    </div>
+
+                    {canManageEvent && !isEditing && (
+                      <div className="flex items-center gap-1.5 text-[11px] pt-1">
+                        <button
+                          type="button"
+                          onClick={() => startEditingEvent(event)}
+                          className="font-medium underline hover:opacity-80 transition-opacity"
+                          style={{ color: COLORS.accent }}
+                        >
+                          Edit
+                        </button>
+                        <span style={{ color: COLORS.hairline }}>•</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCancelEvent(event._id)}
+                          disabled={cancellingEventId === event._id}
+                          className="font-medium underline hover:opacity-80 transition-opacity disabled:opacity-50"
+                          style={{ color: "#dc2626" }}
+                        >
+                          {cancellingEventId === event._id ? "Cancelling..." : "Cancel Event"}
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <h4 className="text-sm font-bold mb-1.5" style={{ color: COLORS.ink }}>
-                    {event.title}
-                  </h4>
-                  <p className="text-xs mb-1" style={{ color: COLORS.muted }}>
-                    by {event.createdBy?.name || "Community Member"}
-                  </p>
-                  <p className="text-xs mb-3" style={{ color: COLORS.muted }}>
-                    {formatEventDate(event.date)}
-                  </p>
+
+                  {isEditing ? (
+                    <div className="space-y-2 mb-3 pt-1">
+                      <input
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        placeholder="Event title"
+                        className="w-full text-xs px-2.5 py-1.5 rounded-lg"
+                        style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: "#fff" }}
+                      />
+                      <input
+                        type="datetime-local"
+                        value={editDate}
+                        onChange={(e) => setEditDate(e.target.value)}
+                        className="w-full text-xs px-2.5 py-1.5 rounded-lg"
+                        style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: "#fff" }}
+                      />
+                      {editError && (
+                        <p className="text-[11px]" style={{ color: "#b3543f" }}>
+                          {editError}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleSaveEventEdit(event._id)}
+                          disabled={editSubmitting || !editTitle.trim() || !editDate}
+                          className="text-xs font-semibold px-3 py-1 rounded-full transition-colors disabled:opacity-50"
+                          style={{ backgroundColor: COLORS.accent, color: "#fff" }}
+                        >
+                          {editSubmitting ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEditingEvent}
+                          disabled={editSubmitting}
+                          className="text-xs font-medium px-2.5 py-1 rounded-full transition-colors"
+                          style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <h4 className="text-sm font-bold mb-1.5" style={{ color: COLORS.ink }}>
+                        {event.title}
+                      </h4>
+                      <p className="text-xs mb-1" style={{ color: COLORS.muted }}>
+                        by {event.createdBy?.name || "Community Member"}
+                      </p>
+                      <p className="text-xs mb-3" style={{ color: COLORS.muted }}>
+                        {formatEventDate(event.date)}
+                      </p>
+                    </>
+                  )}
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5" style={{ color: COLORS.accent }} />
-                      <span className="text-xs font-semibold" style={{ color: COLORS.accent }}>
-                        {event.participantsCount} attending
-                      </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" style={{ color: COLORS.accent }} />
+                        <span className="text-xs font-semibold" style={{ color: COLORS.accent }}>
+                          {event.participantsCount} attending
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAttendees(event._id)}
+                        className="text-[11px] font-medium underline transition-opacity hover:opacity-80"
+                        style={{ color: COLORS.accent }}
+                      >
+                        {expandedEventId === event._id ? "Hide" : "View attendees"}
+                      </button>
                     </div>
                     {user && (
                       <button
@@ -534,6 +851,65 @@ export default function CommunityPage() {
                       </button>
                     )}
                   </div>
+
+                  {/* Expanded Attendees List */}
+                  {expandedEventId === event._id && (
+                    <div
+                      className="mt-3 pt-3 border-t text-xs"
+                      style={{ borderColor: COLORS.hairline }}
+                    >
+                      {attendeesCache[event._id]?.loading ? (
+                        <div className="flex items-center justify-center py-3">
+                          <Loader2 className="w-4 h-4 animate-spin" style={{ color: COLORS.accent }} />
+                        </div>
+                      ) : attendeesCache[event._id]?.error ? (
+                        <p className="text-[11px] py-1" style={{ color: "#b3543f" }}>
+                          {attendeesCache[event._id]?.error}
+                        </p>
+                      ) : (attendeesCache[event._id]?.items || []).length === 0 ? (
+                        <p className="text-[11px] py-1 text-center" style={{ color: COLORS.muted }}>
+                          No attendees registered yet.
+                        </p>
+                      ) : (
+                        <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                          <p className="text-[11px] font-semibold mb-1" style={{ color: COLORS.muted }}>
+                            Attendees:
+                          </p>
+                          {(attendeesCache[event._id]?.items || []).map((attendee) => {
+                            const attendeeName =
+                              attendee.user && typeof attendee.user === "object" && attendee.user.name
+                                ? attendee.user.name.trim()
+                                : "Unknown attendee";
+                            return (
+                              <div
+                                key={attendee._id}
+                                className="flex items-center gap-2 p-1.5 rounded-lg"
+                                style={{ backgroundColor: "#fff" }}
+                              >
+                                {attendee.user?.profilePic ? (
+                                  <img
+                                    src={attendee.user.profilePic}
+                                    alt={attendeeName}
+                                    className="w-5 h-5 rounded-full object-cover shrink-0"
+                                  />
+                                ) : (
+                                  <div
+                                    className="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] shrink-0"
+                                    style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
+                                  >
+                                    {attendeeName[0]?.toUpperCase() || "U"}
+                                  </div>
+                                )}
+                                <span className="truncate text-xs font-medium" style={{ color: COLORS.ink }}>
+                                  {attendeeName}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}

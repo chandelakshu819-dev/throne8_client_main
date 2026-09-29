@@ -30,6 +30,8 @@ export default function ForumThreadPage({
   const { user, isLoading: authLoading } = useAuth();
   const [thread, setThread] = useState<Forum | null>(null);
   const [replies, setReplies] = useState<ForumReply[]>([]);
+  const [repliesPage, setRepliesPage] = useState(1);
+  const [repliesTotalPages, setRepliesTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,6 +70,8 @@ export default function ForumThreadPage({
           setThread(threadData);
           const replyList = Array.isArray(repliesData) ? repliesData : repliesData.items || [];
           setReplies(replyList);
+          setRepliesPage(!Array.isArray(repliesData) && repliesData.page ? repliesData.page : 1);
+          setRepliesTotalPages(!Array.isArray(repliesData) && repliesData.pages ? repliesData.pages : 1);
         }
       } catch (err: any) {
         if (!cancelled) {
@@ -147,6 +151,8 @@ export default function ForumThreadPage({
       <ThreadDetailView
         thread={thread}
         replies={replies}
+        repliesPage={repliesPage}
+        repliesTotalPages={repliesTotalPages}
         currentUser={user}
         isAuthorOrAdmin={isAuthorOrAdmin}
         onThreadUpdate={(updated) => setThread(updated)}
