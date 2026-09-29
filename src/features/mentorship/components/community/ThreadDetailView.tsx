@@ -1,7 +1,7 @@
 // src/features/mentorship/components/community/ThreadDetailView.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { Forum, ForumReply, ForumAuthor } from "@/types/community.types";
 import CommunityService from "@/lib/api/community.service";
+import AuthService from "@/lib/api/auth.service";
+import ProfileService from "@/lib/api/profile.service";
 
 const COLORS = {
   ink: "#4a3728",
@@ -52,6 +54,172 @@ function getCategoryLabel(category?: string): string {
     .split("-")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+interface MentionCandidate {
+  userId: string;
+  name: string;
+  email?: string;
+  avatar?: string;
+}
+
+interface MentionDropdownProps {
+  candidates: MentionCandidate[];
+  isSearching: boolean;
+  activeIndex: number;
+  onSelect: (candidate: MentionCandidate) => void;
+  onHover: (index: number) => void;
+  dropdownRef: React.RefObject<HTMLDivElement | null>;
+}
+
+function MentionDropdown({
+  candidates,
+  isSearching,
+  activeIndex,
+  onSelect,
+  onHover,
+  dropdownRef,
+}: MentionDropdownProps) {
+  if (!isSearching && candidates.length === 0) {
+    return (
+      <div
+        ref={dropdownRef}
+        className="absolute z-50 bottom-full left-0 mb-2 w-72 rounded-xl bg-white shadow-xl overflow-hidden"
+        style={{ border: `1px solid ${COLORS.hairline}` }}
+      >
+        <div className="px-3.5 py-3 text-xs" style={{ color: COLORS.muted }}>
+          No matching members found
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={dropdownRef}
+      className="absolute z-50 bottom-full left-0 mb-2 w-72 max-h-56 overflow-y-auto rounded-xl bg-white shadow-xl"
+      style={{
+        border: `1px solid ${COLORS.hairline}`,
+        boxShadow: "0 10px 25px -5px rgba(74, 55, 40, 0.12), 0 8px 10px -6px rgba(74, 55, 40, 0.08)",
+      }}
+    >
+      <div
+        className="px-3 py-1.5 text-[11px] font-semibold border-b tracking-wide"
+        style={{ borderColor: COLORS.hairline, color: COLORS.muted, backgroundColor: COLORS.softWash }}
+      >
+        Mentions
+      </div>
+      {isSearching ? (
+        <div className="flex items-center gap-2 px-3.5 py-3 text-xs" style={{ color: COLORS.muted }}>
+          <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: COLORS.accent }} />
+          <span>Searching members...</span>
+        </div>
+      ) : (
+        candidates.map((user, idx) => (
+          <button
+            key={user.userId}
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onSelect(user);
+            }}
+            onMouseEnter={() => onHover(idx)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors cursor-pointer"
+            style={{
+              backgroundColor: idx === activeIndex ? COLORS.chip : "transparent",
+            }}
+          >
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="w-7 h-7 rounded-full object-cover shrink-0"
+              />
+            ) : (
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-[11px] shrink-0"
+                style={{
+                  backgroundColor: COLORS.softWash,
+                  color: COLORS.ink,
+                  border: `1px solid ${COLORS.hairline}`,
+                }}
+              >
+                {user.name[0]?.toUpperCase() || "U"}
+              </div>
+            )}
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-semibold truncate" style={{ color: COLORS.ink }}>
+                {user.name}
+              </span>
+              {user.email && (
+                <span className="text-[10px] truncate" style={{ color: COLORS.muted }}>
+                  {user.email}
+                </span>
+              )}
+            </div>
+          </button>
+        ))
+      )}
+    </div>
+  );
+}
+
+function formatReplyWithMentions(content: string) {
+  if (!content) return "";
+  const parts = content.split(/(@[a-zA-Z0-9_.-]+(?:\s+[a-zA-Z0-9_.-]+)?)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith("@") && part.length > 1) {
+      return (
+        <span
+          key={idx}
+          className="font-semibold px-1.5 py-0.5 rounded-md text-[11px] inline-block my-0.5"
+          style={{
+            backgroundColor: COLORS.chip,
+            color: COLORS.accent,
+            border: `1px solid ${COLORS.hairline}`,
+          }}
+        >
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
+async function resolveMentionCandidates(users: any[]): Promise<MentionCandidate[]> {
+  const photoIds = users
+    .map((u: any) => u.profilePhotoId)
+    .filter((id: any): id is string => Boolean(id));
+
+  let photoMap: Record<string, string> = {};
+  if (photoIds.length > 0) {
+    try {
+      const photosResponse = await ProfileService.getMultipleProfilePhotosByIds(photoIds);
+      const photos = photosResponse?.data?.photos || [];
+      photos.forEach((p: any) => {
+        if (p.photoId && p.cloudinarySecureUrl) {
+          photoMap[p.photoId] = p.cloudinarySecureUrl;
+        }
+      });
+    } catch (err) {
+      console.warn("Failed to fetch profile photos for mentions:", err);
+    }
+  }
+
+  return users.map((u: any) => {
+    const fullName =
+      u.fullName ||
+      `${u.firstName || ""} ${u.lastName || ""}`.trim() ||
+      u.email ||
+      "Member";
+    return {
+      userId: u.userId,
+      name: fullName,
+      email: u.email,
+      avatar: (u.profilePhotoId && photoMap[u.profilePhotoId]) || u.profileImageUrl || u.profilePhotoUrl || undefined,
+    };
+  });
 }
 
 interface ThreadDetailViewProps {
@@ -91,6 +259,70 @@ export default function ThreadDetailView({
   const [replyContent, setReplyContent] = useState("");
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
+
+  // Mention autocomplete state
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionResults, setMentionResults] = useState<MentionCandidate[]>([]);
+  const [isSearchingMentions, setIsSearchingMentions] = useState(false);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [activeMentionIndex, setActiveMentionIndex] = useState(0);
+  const [selectedMentions, setSelectedMentions] = useState<Map<string, string>>(new Map());
+
+  const mentionStartRef = useRef<number | null>(null);
+  const mentionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const mentionDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Inline reply state
+  const [replyingToReplyId, setReplyingToReplyId] = useState<string | null>(null);
+  const [inlineReplyContent, setInlineReplyContent] = useState("");
+  const [isSubmittingInlineReply, setIsSubmittingInlineReply] = useState(false);
+  const [inlineReplyError, setInlineReplyError] = useState<string | null>(null);
+
+  // Inline mention autocomplete state
+  const [inlineMentionQuery, setInlineMentionQuery] = useState("");
+  const [inlineMentionResults, setInlineMentionResults] = useState<MentionCandidate[]>([]);
+  const [isSearchingInlineMentions, setIsSearchingInlineMentions] = useState(false);
+  const [showInlineMentionDropdown, setShowInlineMentionDropdown] = useState(false);
+  const [activeInlineMentionIndex, setActiveInlineMentionIndex] = useState(0);
+  const [selectedInlineMentions, setSelectedInlineMentions] = useState<Map<string, string>>(new Map());
+
+  const inlineMentionStartRef = useRef<number | null>(null);
+  const inlineMentionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inlineReplyTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const inlineMentionDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        mentionDropdownRef.current &&
+        !mentionDropdownRef.current.contains(target) &&
+        replyTextareaRef.current &&
+        !replyTextareaRef.current.contains(target)
+      ) {
+        setShowMentionDropdown(false);
+      }
+      if (
+        inlineMentionDropdownRef.current &&
+        !inlineMentionDropdownRef.current.contains(target) &&
+        inlineReplyTextareaRef.current &&
+        !inlineReplyTextareaRef.current.contains(target)
+      ) {
+        setShowInlineMentionDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      if (mentionDebounceRef.current) {
+        clearTimeout(mentionDebounceRef.current);
+      }
+      if (inlineMentionDebounceRef.current) {
+        clearTimeout(inlineMentionDebounceRef.current);
+      }
+    };
+  }, []);
 
   const [isUpvoting, setIsUpvoting] = useState(false);
   const [isPinning, setIsPinning] = useState(false);
@@ -251,13 +483,127 @@ export default function ThreadDetailView({
     }
   };
 
-  // Add Reply
-  // Parses @Name tokens from typed text to populate the mentions array.
-  // The backend stores mentions as plain strings — no userId lookup needed.
-  function parseMentions(text: string): string[] {
-    const matches = text.match(/@(\w+)/g) || [];
-    return [...new Set(matches.map((m) => m.slice(1)))];
-  }
+  // Debounced search for @mentions
+  const searchMentionUsers = useCallback((query: string) => {
+    if (mentionDebounceRef.current) {
+      clearTimeout(mentionDebounceRef.current);
+    }
+
+    if (!query) {
+      setMentionResults([]);
+      setIsSearchingMentions(false);
+      return;
+    }
+
+    mentionDebounceRef.current = setTimeout(async () => {
+      setIsSearchingMentions(true);
+      try {
+        const res = await AuthService.getAllUsers({ search: query, limit: 5 } as any);
+        const users: any[] = res?.data?.users || [];
+        const candidates = await resolveMentionCandidates(users);
+        setMentionResults(candidates);
+        setActiveMentionIndex(0);
+      } catch (err) {
+        console.error("Failed to search users for mentions:", err);
+        setMentionResults([]);
+      } finally {
+        setIsSearchingMentions(false);
+      }
+    }, 250);
+  }, []);
+
+  // Text change handler in reply textarea to detect "@" token at cursor
+  const handleReplyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    setReplyContent(val);
+
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf("@");
+
+    if (atIndex === -1) {
+      setShowMentionDropdown(false);
+      mentionStartRef.current = null;
+      return;
+    }
+
+    // "@" must be at the very start of the text or preceded by whitespace / newline
+    const charBeforeAt = atIndex > 0 ? textBeforeCursor[atIndex - 1] : " ";
+    const isValidStart = /\s/.test(charBeforeAt) || atIndex === 0;
+
+    const textAfterAt = textBeforeCursor.slice(atIndex + 1);
+    const hasSpaceAfterAt = /\s/.test(textAfterAt);
+
+    if (isValidStart && !hasSpaceAfterAt) {
+      mentionStartRef.current = atIndex;
+      setMentionQuery(textAfterAt);
+      setShowMentionDropdown(true);
+      searchMentionUsers(textAfterAt);
+    } else {
+      setShowMentionDropdown(false);
+      mentionStartRef.current = null;
+    }
+  };
+
+  // Keyboard navigation for mention dropdown (Arrow Up/Down, Enter, Esc)
+  const handleReplyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showMentionDropdown && mentionResults.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveMentionIndex((prev) => (prev + 1) % mentionResults.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveMentionIndex((prev) => (prev - 1 + mentionResults.length) % mentionResults.length);
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleSelectMention(mentionResults[activeMentionIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setShowMentionDropdown(false);
+        return;
+      }
+    }
+  };
+
+  // Select mention candidate and replace @partial with @FullName 
+  const handleSelectMention = (candidate: MentionCandidate) => {
+    const textarea = replyTextareaRef.current;
+    const atIndex = mentionStartRef.current;
+    if (atIndex === null || atIndex === undefined) return;
+
+    const cursorPos = textarea?.selectionStart ?? (atIndex + mentionQuery.length + 1);
+    const mentionToken = `@${candidate.name} `;
+
+    const before = replyContent.slice(0, atIndex);
+    const after = replyContent.slice(cursorPos);
+    const updatedContent = before + mentionToken + after;
+
+    setReplyContent(updatedContent);
+
+    // Track userId mapped to candidate's name
+    setSelectedMentions((prev) => {
+      const next = new Map(prev);
+      next.set(candidate.name, candidate.userId);
+      return next;
+    });
+
+    setShowMentionDropdown(false);
+    mentionStartRef.current = null;
+
+    requestAnimationFrame(() => {
+      if (textarea) {
+        textarea.focus();
+        const newCursorPos = atIndex + mentionToken.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    });
+  };
 
   const handleCreateReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -272,10 +618,17 @@ export default function ThreadDetailView({
     setIsSubmittingReply(true);
 
     try {
-      const mentions = parseMentions(replyContent);
+      // Precise ID-based tracking: only submit userIds whose @Name token remains in replyContent
+      const mentionIds: string[] = [];
+      selectedMentions.forEach((userId, name) => {
+        if (replyContent.includes(`@${name}`) && !mentionIds.includes(userId)) {
+          mentionIds.push(userId);
+        }
+      });
+
       const newReply = await CommunityService.addReply(thread._id, {
         content: replyContent.trim(),
-        ...(mentions.length > 0 && { mentions }),
+        ...(mentionIds.length > 0 && { mentions: mentionIds }),
       });
       setReplies((prev) => [...prev, newReply]);
       setThread((prev) => ({
@@ -283,11 +636,170 @@ export default function ThreadDetailView({
         replyCount: (prev.replyCount || 0) + 1,
       }));
       setReplyContent("");
+      setSelectedMentions(new Map());
       onReplyAdded?.(newReply);
     } catch (err: any) {
       setReplyError(err.response?.data?.message || "Failed to post reply. Please try again.");
     } finally {
       setIsSubmittingReply(false);
+    }
+  };
+
+  // Inline mention search
+  const searchInlineMentionUsers = useCallback((query: string) => {
+    if (inlineMentionDebounceRef.current) {
+      clearTimeout(inlineMentionDebounceRef.current);
+    }
+
+    if (!query) {
+      setInlineMentionResults([]);
+      setIsSearchingInlineMentions(false);
+      return;
+    }
+
+    inlineMentionDebounceRef.current = setTimeout(async () => {
+      setIsSearchingInlineMentions(true);
+      try {
+        const res = await AuthService.getAllUsers({ search: query, limit: 5 } as any);
+        const users: any[] = res?.data?.users || [];
+        const candidates = await resolveMentionCandidates(users);
+        setInlineMentionResults(candidates);
+        setActiveInlineMentionIndex(0);
+      } catch (err) {
+        console.error("Failed to search users for inline mention:", err);
+        setInlineMentionResults([]);
+      } finally {
+        setIsSearchingInlineMentions(false);
+      }
+    }, 250);
+  }, []);
+
+  const handleInlineReplyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    setInlineReplyContent(val);
+
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf("@");
+
+    if (atIndex === -1) {
+      setShowInlineMentionDropdown(false);
+      inlineMentionStartRef.current = null;
+      return;
+    }
+
+    const charBeforeAt = atIndex > 0 ? textBeforeCursor[atIndex - 1] : " ";
+    const isValidStart = /\s/.test(charBeforeAt) || atIndex === 0;
+
+    const textAfterAt = textBeforeCursor.slice(atIndex + 1);
+    const hasSpaceAfterAt = /\s/.test(textAfterAt);
+
+    if (isValidStart && !hasSpaceAfterAt) {
+      inlineMentionStartRef.current = atIndex;
+      setInlineMentionQuery(textAfterAt);
+      setShowInlineMentionDropdown(true);
+      searchInlineMentionUsers(textAfterAt);
+    } else {
+      setShowInlineMentionDropdown(false);
+      inlineMentionStartRef.current = null;
+    }
+  };
+
+  const handleInlineReplyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showInlineMentionDropdown && inlineMentionResults.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveInlineMentionIndex((prev) => (prev + 1) % inlineMentionResults.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveInlineMentionIndex((prev) => (prev - 1 + inlineMentionResults.length) % inlineMentionResults.length);
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleSelectInlineMention(inlineMentionResults[activeInlineMentionIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setShowInlineMentionDropdown(false);
+        return;
+      }
+    }
+  };
+
+  const handleSelectInlineMention = (candidate: MentionCandidate) => {
+    const textarea = inlineReplyTextareaRef.current;
+    const atIndex = inlineMentionStartRef.current;
+    if (atIndex === null || atIndex === undefined) return;
+
+    const cursorPos = textarea?.selectionStart ?? (atIndex + inlineMentionQuery.length + 1);
+    const mentionToken = `@${candidate.name} `;
+
+    const before = inlineReplyContent.slice(0, atIndex);
+    const after = inlineReplyContent.slice(cursorPos);
+    const updatedContent = before + mentionToken + after;
+
+    setInlineReplyContent(updatedContent);
+
+    setSelectedInlineMentions((prev) => {
+      const next = new Map(prev);
+      next.set(candidate.name, candidate.userId);
+      return next;
+    });
+
+    setShowInlineMentionDropdown(false);
+    inlineMentionStartRef.current = null;
+
+    requestAnimationFrame(() => {
+      if (textarea) {
+        textarea.focus();
+        const newCursorPos = atIndex + mentionToken.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    });
+  };
+
+  // Create an inline reply directly to another reply
+  const handleCreateInlineReply = async (parentReplyId: string) => {
+    if (!inlineReplyContent.trim() || thread.isLocked || isSubmittingInlineReply) return;
+    if (!currentUser) {
+      setInlineReplyError("Please log in to post a reply.");
+      return;
+    }
+
+    setInlineReplyError(null);
+    setIsSubmittingInlineReply(true);
+
+    try {
+      const mentionIds: string[] = [];
+      selectedInlineMentions.forEach((userId, name) => {
+        if (inlineReplyContent.includes(`@${name}`) && !mentionIds.includes(userId)) {
+          mentionIds.push(userId);
+        }
+      });
+
+      const newReply = await CommunityService.addReply(thread._id, {
+        content: inlineReplyContent.trim(),
+        ...(mentionIds.length > 0 && { mentions: mentionIds }),
+        parentReplyId,
+      });
+
+      setReplies((prev) => [...prev, newReply]);
+      setThread((prev) => ({
+        ...prev,
+        replyCount: (prev.replyCount || 0) + 1,
+      }));
+      setInlineReplyContent("");
+      setReplyingToReplyId(null);
+      setSelectedInlineMentions(new Map());
+      onReplyAdded?.(newReply);
+    } catch (err: any) {
+      setInlineReplyError(err.response?.data?.message || "Failed to post reply. Please try again.");
+    } finally {
+      setIsSubmittingInlineReply(false);
     }
   };
 
@@ -586,42 +1098,239 @@ export default function ThreadDetailView({
           </p>
         ) : (
           <div className="space-y-4">
-            {replies.map((reply) => {
-              const replyAuthorName = getAuthorDisplayName(reply.author);
-              return (
-                <div
-                  key={reply._id}
-                  className="p-4 rounded-xl"
-                  style={{
-                    backgroundColor: COLORS.softWash,
-                    border: `1px solid ${COLORS.hairline}`,
-                  }}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0"
-                        style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
-                      >
-                        {replyAuthorName[0]?.toUpperCase() || "C"}
+            {(() => {
+              // Group replies into top-level and 1-level nested children
+              const topLevelReplies: ForumReply[] = [];
+              const childRepliesMap = new Map<string, ForumReply[]>();
+              const topLevelIds = new Set<string>();
+
+              replies.forEach((r) => {
+                if (!r.parentReplyId) {
+                  topLevelReplies.push(r);
+                  topLevelIds.add(r._id);
+                }
+              });
+
+              replies.forEach((r) => {
+                if (r.parentReplyId) {
+                  if (topLevelIds.has(r.parentReplyId)) {
+                    const list = childRepliesMap.get(r.parentReplyId) || [];
+                    list.push(r);
+                    childRepliesMap.set(r.parentReplyId, list);
+                  } else {
+                    // Fallback: if parent not in memory yet, render at top-level
+                    topLevelReplies.push(r);
+                    topLevelIds.add(r._id);
+                  }
+                }
+              });
+
+              return topLevelReplies.map((reply) => {
+                const replyAuthorName = getAuthorDisplayName(reply.author);
+                const isReplying = replyingToReplyId === reply._id;
+                const childReplies = childRepliesMap.get(reply._id) || [];
+
+                return (
+                  <div
+                    key={reply._id}
+                    className="p-4 rounded-xl"
+                    style={{
+                      backgroundColor: COLORS.softWash,
+                      border: `1px solid ${COLORS.hairline}`,
+                    }}
+                  >
+                    {/* Top-level reply header */}
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] shrink-0"
+                          style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
+                        >
+                          {replyAuthorName[0]?.toUpperCase() || "C"}
+                        </div>
+                        <span className="text-xs font-semibold" style={{ color: COLORS.ink }}>
+                          {replyAuthorName}
+                        </span>
                       </div>
-                      <span className="text-xs font-semibold" style={{ color: COLORS.ink }}>
-                        {replyAuthorName}
+                      <span className="text-[11px]" style={{ color: COLORS.muted }}>
+                        {timeAgo(reply.createdAt)}
                       </span>
                     </div>
-                    <span className="text-[11px]" style={{ color: COLORS.muted }}>
-                      {timeAgo(reply.createdAt)}
-                    </span>
+
+                    {/* Top-level reply content */}
+                    <div
+                      className="text-xs leading-relaxed whitespace-pre-wrap pl-8"
+                      style={{ color: COLORS.ink }}
+                    >
+                      {formatReplyWithMentions(reply.content)}
+                    </div>
+
+                    {/* Action bar: Reply link */}
+                    {currentUser && !thread.isLocked && (
+                      <div className="pl-8 mt-2.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isReplying) {
+                              setReplyingToReplyId(null);
+                              setInlineReplyContent("");
+                              setInlineReplyError(null);
+                              setShowInlineMentionDropdown(false);
+                            } else {
+                              setReplyingToReplyId(reply._id);
+                              setInlineReplyContent(`@${replyAuthorName} `);
+                              setInlineReplyError(null);
+                              setShowInlineMentionDropdown(false);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold transition-colors hover:opacity-80 cursor-pointer"
+                          style={{ color: COLORS.accent }}
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          <span>{isReplying ? "Cancel Reply" : "Reply"}</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Inline Reply Form */}
+                    {isReplying && (
+                      <div
+                        className="mt-3 ml-8 p-3.5 rounded-xl bg-white shadow-sm"
+                        style={{ border: `1px solid ${COLORS.hairline}` }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold" style={{ color: COLORS.ink }}>
+                            Replying to <span style={{ color: COLORS.accent }}>@{replyAuthorName}</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplyingToReplyId(null);
+                              setInlineReplyContent("");
+                              setInlineReplyError(null);
+                              setShowInlineMentionDropdown(false);
+                            }}
+                            className="text-xs transition-colors hover:underline cursor-pointer"
+                            style={{ color: COLORS.muted }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+
+                        {inlineReplyError && (
+                          <p className="text-xs mb-2" style={{ color: "#b3543f" }}>
+                            {inlineReplyError}
+                          </p>
+                        )}
+
+                        <div className="relative mb-2">
+                          <textarea
+                            ref={inlineReplyTextareaRef}
+                            rows={2}
+                            value={inlineReplyContent}
+                            onChange={handleInlineReplyChange}
+                            onKeyDown={handleInlineReplyKeyDown}
+                            disabled={isSubmittingInlineReply}
+                            placeholder={`Reply to ${replyAuthorName}... (@ to mention)`}
+                            className="w-full text-xs p-2.5 rounded-lg focus:outline-none transition-colors"
+                            style={{
+                              border: `1px solid ${COLORS.hairline}`,
+                              backgroundColor: "#fff",
+                              color: COLORS.ink,
+                            }}
+                          />
+
+                          {showInlineMentionDropdown && (
+                            <MentionDropdown
+                              candidates={inlineMentionResults}
+                              isSearching={isSearchingInlineMentions}
+                              activeIndex={activeInlineMentionIndex}
+                              onSelect={handleSelectInlineMention}
+                              onHover={setActiveInlineMentionIndex}
+                              dropdownRef={inlineMentionDropdownRef}
+                            />
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px]" style={{ color: COLORS.muted }}>
+                            Use @Name to mention someone
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => handleCreateInlineReply(reply._id)}
+                            disabled={isSubmittingInlineReply || !inlineReplyContent.trim()}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                            style={{ backgroundColor: COLORS.accent, color: "#fff" }}
+                          >
+                            {isSubmittingInlineReply ? (
+                              <>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                <span>Replying...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Send className="w-3 h-3" />
+                                <span>Post Reply</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Nested child replies (1 level of nesting) */}
+                    {childReplies.length > 0 && (
+                      <div
+                        className="mt-3 ml-8 space-y-2.5 border-l-2 pl-3"
+                        style={{ borderColor: COLORS.hairline }}
+                      >
+                        {childReplies.map((nested) => {
+                          const nestedAuthorName = getAuthorDisplayName(nested.author);
+                          return (
+                            <div
+                              key={nested._id}
+                              className="p-3 rounded-xl"
+                              style={{
+                                backgroundColor: "#ffffff",
+                                border: `1px solid ${COLORS.hairline}`,
+                              }}
+                            >
+                              <div className="flex items-center justify-between gap-2 mb-1.5">
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] shrink-0"
+                                    style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
+                                  >
+                                    {nestedAuthorName[0]?.toUpperCase() || "C"}
+                                  </div>
+                                  <span
+                                    className="text-xs font-semibold"
+                                    style={{ color: COLORS.ink }}
+                                  >
+                                    {nestedAuthorName}
+                                  </span>
+                                </div>
+                                <span className="text-[10px]" style={{ color: COLORS.muted }}>
+                                  {timeAgo(nested.createdAt)}
+                                </span>
+                              </div>
+                              <div
+                                className="text-xs leading-relaxed whitespace-pre-wrap pl-7"
+                                style={{ color: COLORS.ink }}
+                              >
+                                {formatReplyWithMentions(nested.content)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <div
-                    className="text-xs leading-relaxed whitespace-pre-wrap pl-8"
-                    style={{ color: COLORS.ink }}
-                  >
-                    {reply.content}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         )}
 
@@ -673,25 +1382,41 @@ export default function ThreadDetailView({
         )}
 
         <form onSubmit={handleCreateReply}>
-          <textarea
-            rows={4}
-            value={replyContent}
-            onChange={(e) => setReplyContent(e.target.value)}
-            disabled={thread.isLocked || isSubmittingReply}
-            placeholder={
-              thread.isLocked
-                ? "This thread is locked. Replies cannot be submitted."
-                : currentUser
-                ? "Write your reply... Use @Name to mention someone."
-                : "Please log in to post a reply."
-            }
-            className="w-full text-sm p-3 rounded-xl mb-3 focus:outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            style={{
-              border: `1px solid ${COLORS.hairline}`,
-              backgroundColor: thread.isLocked ? "#f9f9f9" : "#fff",
-              color: COLORS.ink,
-            }}
-          />
+          <div className="relative mb-3">
+            <textarea
+              ref={replyTextareaRef}
+              rows={4}
+              value={replyContent}
+              onChange={handleReplyChange}
+              onKeyDown={handleReplyKeyDown}
+              disabled={thread.isLocked || isSubmittingReply}
+              placeholder={
+                thread.isLocked
+                  ? "This thread is locked. Replies cannot be submitted."
+                  : currentUser
+                  ? "Write your reply... Use @Name to mention someone."
+                  : "Please log in to post a reply."
+              }
+              className="w-full text-sm p-3 rounded-xl focus:outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{
+                border: `1px solid ${COLORS.hairline}`,
+                backgroundColor: thread.isLocked ? "#f9f9f9" : "#fff",
+                color: COLORS.ink,
+              }}
+            />
+
+            {/* Mention Autocomplete Dropdown */}
+            {showMentionDropdown && (
+              <MentionDropdown
+                candidates={mentionResults}
+                isSearching={isSearchingMentions}
+                activeIndex={activeMentionIndex}
+                onSelect={handleSelectMention}
+                onHover={setActiveMentionIndex}
+                dropdownRef={mentionDropdownRef}
+              />
+            )}
+          </div>
 
           <div className="flex items-center justify-between">
             <span className="text-xs" style={{ color: COLORS.muted }}>
