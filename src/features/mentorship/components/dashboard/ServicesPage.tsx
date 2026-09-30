@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import {
   Briefcase, Users, Clock, Star, Plus, Video, MessageSquare,
   Package, FileText, RefreshCw, ClipboardList, CheckCircle2,
-  MoreVertical, Pencil, Trash2, X, ArrowUpDown, AlertCircle, Search,
+  MoreVertical, Pencil, Trash2, X, ArrowUpDown, AlertCircle, Search, ArrowLeft
 } from 'lucide-react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import ServiceModal from './ServiceModal';
@@ -653,13 +653,31 @@ export default function ServicesPage({
                 params.delete('q');
                 router.push(`${pathname}?${params.toString()}`);
               }}
-              className="self-start flex items-center gap-2 text-sm font-semibold hover:underline mb-2"
-              style={{ color: '#8a7a6a' }}
+              className="self-start flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200 mb-6 hover:-translate-y-0.5 focus:outline-none focus:ring-2"
+              style={{ 
+                backgroundColor: '#fbf7f3', 
+                color: '#4a3728',
+                border: '1px solid #e0d8cf' 
+              }}
             >
-              ← Back to Services
+              <ArrowLeft className="w-4 h-4" />
+              Back to Services
             </button>
-            <h2 className="text-2xl font-bold tracking-tight" style={{ color: '#4a3728' }}>Search Results</h2>
-            <p style={{ color: '#8a7a6a' }} className="text-sm">Results for: "{urlSearchQuery}"</p>
+            <h2 className="text-3xl font-extrabold tracking-tight mb-2" style={{ color: '#4a3728' }}>
+              Search Results
+            </h2>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-sm" style={{ color: '#8a7a6a' }}>Results for</span>
+                <span className="px-3 py-1 rounded-full text-[13px] font-bold shadow-sm" style={{ backgroundColor: '#f3ece4', color: '#4a3728', border: '1px solid #e0d8cf' }}>
+                  {urlSearchQuery}
+                </span>
+              </div>
+              <span className="text-[#d8cec4]">|</span>
+              <span className="text-sm font-semibold" style={{ color: '#7a5c3e' }}>
+                {filteredServices.length} {filteredServices.length === 1 ? 'service' : 'services'} • {filteredGroupSessions.length} {filteredGroupSessions.length === 1 ? 'group session' : 'group sessions'} found
+              </span>
+            </div>
           </div>
         ) : (
           <>
@@ -918,10 +936,20 @@ export default function ServicesPage({
 
         {/* Current Services — real API data */}
         <div>
-          <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-            <h3 className="text-lg font-bold" style={{ color: '#4a3728' }}>Current Services</h3>
+          <div className="flex items-start sm:items-center justify-between mb-6 flex-col sm:flex-row gap-4">
+            <div>
+              <h3 className="text-lg font-bold" style={{ color: '#4a3728' }}>Current Services</h3>
+              <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
+                {isSearchView ? "Your matching mentoring services" : "Manage your individual mentoring services"}
+              </p>
+            </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 self-end sm:self-auto">
+              {isSearchView && (
+                <span className="text-sm font-semibold mr-2" style={{ color: '#7a5c3e' }}>
+                  {filteredServices.length} {filteredServices.length === 1 ? 'service' : 'services'} found
+                </span>
+              )}
               {sessionsLoading && (
                 <span className="text-xs font-semibold px-3 py-1 rounded-full"
                   style={{ backgroundColor: '#f3ece4', color: '#7a5c3e' }}>
@@ -964,7 +992,7 @@ export default function ServicesPage({
               )}
             </div>
           </div>
-          <p className="text-sm mb-6" style={{ color: '#8a7a6a' }}>Manage your individual mentoring services</p>
+
 
           {!sessionsLoading && sortedServices.length === 0 ? (
             <div className="text-center py-14 rounded-2xl border" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
@@ -980,7 +1008,10 @@ export default function ServicesPage({
               </p>
             </div>
           ) : filteredServices.length === 0 ? (
-            <div className="text-center py-14 rounded-2xl border" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
+            <div className="flex flex-col items-center justify-center py-10 px-4 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
+              <div className="w-12 h-12 mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f3ece4' }}>
+                <ClipboardList className="w-5 h-5" style={{ color: '#8a7a6a' }} />
+              </div>
               <p className="text-base font-bold" style={{ color: '#4a3728' }}>No services found</p>
               <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
                 No services matched your search for '{isSearchView ? urlSearchQuery : searchQuery}'.
@@ -993,8 +1024,8 @@ export default function ServicesPage({
                     params.delete('q');
                     router.push(`${pathname}?${params.toString()}`);
                   }}
-                  className="mt-6 px-6 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:opacity-90"
-                  style={{ backgroundColor: '#4a3728', color: '#fff' }}
+                  className="mt-5 px-5 py-2 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
+                  style={{ border: '1.5px solid #e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
                 >
                   Back to Services
                 </button>
@@ -1002,7 +1033,10 @@ export default function ServicesPage({
             </div>
           ) : (
             <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div 
+              className="grid gap-6"
+              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
+            >
               {visibleServices.map((service, idx) => {
                   return (
                     <ServiceCard
@@ -1036,10 +1070,22 @@ export default function ServicesPage({
 
         {/* Current Group Sessions */}
         <div className="animate-fadeIn">
-            <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+          <div className="flex items-start sm:items-center justify-between mb-6 flex-col sm:flex-row gap-4">
+            <div>
               <h3 className="text-lg font-bold" style={{ color: '#4a3728' }}>Current Group Sessions</h3>
+              <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
+                {isSearchView ? "Your matching group sessions" : "Manage your upcoming group learning sessions"}
+              </p>
             </div>
-            <p className="text-sm mb-6" style={{ color: '#8a7a6a' }}>Manage your upcoming group learning sessions</p>
+            
+            <div className="flex items-center gap-3 self-end sm:self-auto">
+              {isSearchView && (
+                <span className="text-sm font-semibold" style={{ color: '#7a5c3e' }}>
+                  {filteredGroupSessions.length} {filteredGroupSessions.length === 1 ? 'group session' : 'group sessions'} found
+                </span>
+              )}
+            </div>
+          </div>
 
             {groupSessionsLoading ? (
               <div className="flex items-center justify-center p-16 border-2 border-dashed rounded-3xl" style={{ borderColor: '#e0d8cf', backgroundColor: '#fcfaf8', minHeight: '320px' }}>
@@ -1063,39 +1109,45 @@ export default function ServicesPage({
                 </button>
               </div>
             ) : apiGroupSessions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 px-4 rounded-3xl" style={{ minHeight: '360px', backgroundColor: '#fcfaf8', border: '2px dashed #e0d8cf' }}>
-                <div className="w-24 h-24 mb-6 rounded-full flex items-center justify-center animate-bounce shadow-xl" style={{ backgroundColor: '#fff', border: '4px solid #fbf7f3' }}>
-                  <span className="text-5xl">👥</span>
+              <div className="flex flex-col items-center justify-center py-10 px-4 rounded-2xl" style={{ backgroundColor: '#fcfaf8', border: '1px solid #e0d8cf' }}>
+                <div className="w-12 h-12 mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f3ece4' }}>
+                  <Users className="w-5 h-5" style={{ color: '#8a7a6a' }} />
                 </div>
-                <h4 className="text-3xl font-extrabold mb-3 text-center" style={{ color: '#4a3728' }}>No group sessions yet</h4>
-                <p className="text-lg text-center max-w-md mb-8" style={{ color: '#8a7a6a' }}>
+                <h4 className="text-base font-bold text-center" style={{ color: '#4a3728' }}>No group sessions</h4>
+                <p className="text-sm text-center max-w-sm mt-1" style={{ color: '#8a7a6a' }}>
                   Create your first group session to start teaching multiple mentees.
                 </p>
               </div>
-                       ) : filteredGroupSessions.length === 0 ? (
-                        <div className="text-center py-14 rounded-2xl border" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
-                          <p className="text-base font-bold" style={{ color: '#4a3728' }}>No group sessions found</p>
-                          <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
-                            No group sessions matched your search for '{isSearchView ? urlSearchQuery : searchQuery}'.
-                          </p>
-                          {isSearchView && (
-                            <button
-                              onClick={() => {
-                                const params = new URLSearchParams(searchParams.toString());
-                                params.set('tab', 'services');
-                                params.delete('q');
-                                router.push(`${pathname}?${params.toString()}`);
-                              }}
-                              className="mt-6 px-6 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:opacity-90"
-                              style={{ backgroundColor: '#4a3728', color: '#fff' }}
-                            >
-                              Back to Services
-                            </button>
-                          )}
-                        </div>
+            ) : filteredGroupSessions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 px-4 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
+                <div className="w-12 h-12 mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f3ece4' }}>
+                  <Users className="w-5 h-5" style={{ color: '#8a7a6a' }} />
+                </div>
+                <p className="text-base font-bold" style={{ color: '#4a3728' }}>No group sessions found</p>
+                <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
+                  No group sessions matched your search for '{isSearchView ? urlSearchQuery : searchQuery}'.
+                </p>
+                {isSearchView && (
+                  <button
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.set('tab', 'services');
+                      params.delete('q');
+                      router.push(`${pathname}?${params.toString()}`);
+                    }}
+                    className="mt-5 px-5 py-2 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
+                    style={{ border: '1.5px solid #e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
+                  >
+                    Back to Services
+                  </button>
+                )}
+              </div>
                       ) : (
                         <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div 
+                          className="grid gap-6"
+                          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
+                        >
                           {visibleGroupSessions.map((group, idx) => {
 
                   return (

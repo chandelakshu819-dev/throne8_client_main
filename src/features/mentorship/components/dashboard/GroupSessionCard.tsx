@@ -22,8 +22,8 @@ export function GroupSessionCard({ group, idx = 0, onEdit, onDelete, onMenteeSta
 
   return (
     <div
-      className="bg-white rounded-2xl border overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
-      style={{ borderColor: '#e0d8cf' }}
+      className="bg-white rounded-[20px] border flex flex-col h-full overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+      style={{ borderColor: '#e0d8cf', boxShadow: '0 4px 20px -4px rgba(74, 55, 40, 0.08)' }}
     >
       {/* Thumbnail */}
       <div
@@ -48,9 +48,9 @@ export function GroupSessionCard({ group, idx = 0, onEdit, onDelete, onMenteeSta
         </span>
       </div>
 
-      <div className="p-5">
-        {/* status counts + menu */}
-        <div className="flex items-start justify-end mb-4">
+      <div className="p-6 flex flex-col flex-1">
+        <div className="flex-1">
+          <div className="flex items-start justify-end mb-4">
           <div className="flex items-center gap-1.5 flex-wrap justify-end">
             {pending > 0 && (
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
@@ -147,9 +147,9 @@ export function GroupSessionCard({ group, idx = 0, onEdit, onDelete, onMenteeSta
             </span>
           </div>
         </div>
+        </div>
 
-
-        <div className="flex justify-between items-center gap-3 pt-4" style={{ borderTop: '1px solid #f0ebe4' }}>
+        <div className="flex justify-between items-center gap-3 pt-5 mt-auto" style={{ borderTop: '1px solid #f0ebe4' }}>
           <span className="text-lg font-bold whitespace-nowrap" style={{ color: '#7a5c3e' }}>
             {getPriceLabel(group.pricing?.pricePerPerson || group.pricePerPerson, 'group_session')}
           </span>
