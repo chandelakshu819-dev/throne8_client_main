@@ -61,6 +61,7 @@ const pageComponents: Record<string, React.FC<any>> = {
   trust: TrustScorePage,
   community: CommunityPage,
   marketing: MarketingKitPage,
+  services_search: ServicesPage,
 };
 
 function normalizeNotifications(res: any): any[] {

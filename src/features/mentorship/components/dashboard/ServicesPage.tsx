@@ -7,11 +7,14 @@ import {
   Package, FileText, RefreshCw, ClipboardList, CheckCircle2,
   MoreVertical, Pencil, Trash2, X, ArrowUpDown, AlertCircle, Search,
 } from 'lucide-react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import ServiceModal from './ServiceModal';
 import EditSessionModal from '@/features/mentorship/modals/EditSessionModal';
 import MentorService, { CreateGroupSessionInput } from "@/lib/api/mentorship.service";
 import SessionService, { CreateSessionInput } from "@/lib/api/session.service";
 import { validateSessionForm } from '@/features/profile/validators/session.schema';
+import { ServiceCard } from './ServiceCard';
+import { GroupSessionCard } from './GroupSessionCard';
 
 interface ServicesPageProps {
   mentorData?: any;
@@ -27,7 +30,7 @@ interface ServicesPageProps {
 
 // NOTE: `emoji` kept only because ServiceModal still expects it as a prop.
 // It is no longer rendered anywhere in this file — `icon` (lucide component) is used instead.
-const serviceTypes = [
+export const serviceTypes = [
   { name: 'quick_call', label: 'Quick Call', icon: Video, description: 'Quick 30-minute call', emoji: '⚡', accent: '#2563eb' },
   { name: 'deep_dive', label: 'Deep Dive', icon: Video, description: 'In-depth 60-minute session', emoji: '🎯', accent: '#7c3aed' },
   { name: 'resume_review', label: 'Resume Review', icon: FileText, description: 'Professional resume review', emoji: '📄', accent: '#d97706' },
@@ -77,10 +80,10 @@ const toLocalDatetimeString = (date: Date) => {
 const FallbackIcon = ClipboardList;
 const FALLBACK_ACCENT = '#7a5c3e';
 
-const getServiceIcon = (typeName: string) =>
+export const getServiceIcon = (typeName: string) =>
   serviceTypes.find(t => t.name === typeName)?.icon || FallbackIcon;
 
-const getServiceAccent = (typeName: string) =>
+export const getServiceAccent = (typeName: string) =>
   serviceTypes.find(t => t.name === typeName)?.accent || FALLBACK_ACCENT;
 
 // Status badge color helper
@@ -98,7 +101,7 @@ const statusStyle = (status: string) => {
 // ── Price unit helper ───────────────────────────────────
 // group_session is priced per-person, everything else is per-hour.
 // Free (0) always just shows "Free" regardless of type.
-const getPriceLabel = (price: number, type: string) => {
+export const getPriceLabel = (price: number, type: string) => {
   if (!price || price === 0) return 'Free';
   if (type === 'group_session') return `₹${price}/person`;
   return `₹${price}/hr`;
@@ -127,6 +130,9 @@ export default function ServicesPage({
   setFormData,
   handleCreateService,
 }: ServicesPageProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   // ── API state ─────────────────────────────────────────
   const [apiSessions, setApiSessions] = useState<any[]>([]);
@@ -163,6 +169,9 @@ export default function ServicesPage({
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [showAllServices, setShowAllServices] = useState(false);
   const [showAllGroupSessions, setShowAllGroupSessions] = useState(false);
+
+  const isSearchView = searchParams.get('tab') === 'services_search';
+  const urlSearchQuery = searchParams.get('q') || '';
 
   // Debounce search query by 250ms for performance on large lists
   useEffect(() => {
@@ -587,7 +596,7 @@ export default function ServicesPage({
   });
 
   // ── Search + 6-card limit ──
-  const normalizedQuery = debouncedQuery.trim().toLowerCase();
+  const normalizedQuery = (isSearchView ? urlSearchQuery : debouncedQuery).trim().toLowerCase();
   const filteredServices = normalizedQuery
     ? sortedServices.filter((s: any) => {
         const typeLabel = serviceTypes.find(t => t.name === s.type)?.label || '';
@@ -605,10 +614,10 @@ export default function ServicesPage({
       )
     : apiGroupSessions;
 
-  const visibleServices = showAllServices
+  const visibleServices = (isSearchView || showAllServices)
     ? filteredServices
     : filteredServices.slice(0, INITIAL_VISIBLE_COUNT);
-  const visibleGroupSessions = showAllGroupSessions
+  const visibleGroupSessions = (isSearchView || showAllGroupSessions)
     ? filteredGroupSessions
     : filteredGroupSessions.slice(0, INITIAL_VISIBLE_COUNT);
 
@@ -635,8 +644,26 @@ export default function ServicesPage({
   return (
     <>
       <div className="space-y-8 animate-fadeIn">
-
-        {/* Header */}
+        {isSearchView ? (
+          <div className="flex flex-col gap-3 mb-8">
+            <button
+              onClick={() => {
+                const params = new URLSearchParams(searchParams.toString());
+                params.set('tab', 'services');
+                params.delete('q');
+                router.push(`${pathname}?${params.toString()}`);
+              }}
+              className="self-start flex items-center gap-2 text-sm font-semibold hover:underline mb-2"
+              style={{ color: '#8a7a6a' }}
+            >
+              ← Back to Services
+            </button>
+            <h2 className="text-2xl font-bold tracking-tight" style={{ color: '#4a3728' }}>Search Results</h2>
+            <p style={{ color: '#8a7a6a' }} className="text-sm">Results for: "{urlSearchQuery}"</p>
+          </div>
+        ) : (
+          <>
+            {/* Header */}
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
@@ -669,6 +696,12 @@ export default function ServicesPage({
                       setSearchQuery('');
                       setSearchOpen(false);
                       (e.target as HTMLElement).blur();
+                    }
+                    if (e.key === 'Enter' && searchQuery.trim()) {
+                      const params = new URLSearchParams(searchParams.toString());
+                      params.set('tab', 'services_search');
+                      params.set('q', searchQuery.trim());
+                      router.push(`${pathname}?${params.toString()}`);
                     }
                   }}
                   placeholder="Search services..."
@@ -729,6 +762,12 @@ export default function ServicesPage({
                   if (e.key === 'Escape') {
                     setSearchQuery('');
                     setSearchOpen(false);
+                  }
+                  if (e.key === 'Enter' && searchQuery.trim()) {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.set('tab', 'services_search');
+                    params.set('q', searchQuery.trim());
+                    router.push(`${pathname}?${params.toString()}`);
                   }
                 }}
                 placeholder="Search services..."
@@ -874,6 +913,8 @@ export default function ServicesPage({
             </div>
           </div>
         </div>
+        </>
+        )}
 
         {/* Current Services — real API data */}
         <div>
@@ -940,196 +981,42 @@ export default function ServicesPage({
             </div>
           ) : filteredServices.length === 0 ? (
             <div className="text-center py-14 rounded-2xl border" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
-              <p className="text-base font-bold" style={{ color: '#4a3728' }}>No services match your search.</p>
-              {searchQuery && (
-                <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
-                  No services match &quot;{searchQuery}&quot;.
-                </p>
+              <p className="text-base font-bold" style={{ color: '#4a3728' }}>No services found</p>
+              <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
+                No services matched your search for '{isSearchView ? urlSearchQuery : searchQuery}'.
+              </p>
+              {isSearchView && (
+                <button
+                  onClick={() => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.set('tab', 'services');
+                    params.delete('q');
+                    router.push(`${pathname}?${params.toString()}`);
+                  }}
+                  className="mt-6 px-6 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:opacity-90"
+                  style={{ backgroundColor: '#4a3728', color: '#fff' }}
+                >
+                  Back to Services
+                </button>
               )}
             </div>
           ) : (
             <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {visibleServices.map((service, idx) => {
-                const Icon = getServiceIcon(service.type);
-                const accent = getServiceAccent(service.type);
-                return (
-                  <div
-                    key={service.sessionId || idx}
-                    className="bg-white rounded-2xl border overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
-                    style={{ borderColor: '#e0d8cf' }}
-                  >
-                    {/* Thumbnail — real service image if one was uploaded,
-                        otherwise a quiet brand-toned panel (no per-type
-                        rainbow accent) so the grid reads as one collection */}
-                    <div
-                      className="w-full h-32 flex items-center justify-center relative"
-                      style={{ backgroundColor: '#f3ece4' }}
-                    >
-                      {(service as any).thumbnailImage ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={(service as any).thumbnailImage}
-                          alt={service.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Icon className="w-8 h-8" style={{ color: '#8a7a6a' }} />
-                      )}
-                      <span
-                        className="absolute top-3 left-3 w-8 h-8 rounded-lg flex items-center justify-center shadow-sm"
-                        style={{ backgroundColor: '#fff' }}
-                      >
-                        <Icon className="w-4 h-4" style={{ color: accent }} />
-                      </span>
-                    </div>
-
-                    <div className="p-5">
-                    {/* status counts + menu */}
-                    <div className="flex items-start justify-end mb-4">
-                      {(() => {
-                        const bookings = (service as any).bookings ?? [];
-                        const pending = bookings.filter((b: any) => b.status === 'pending').length;
-                        const confirmed = bookings.filter((b: any) => b.status === 'confirmed').length;
-                        const completed = bookings.filter((b: any) => b.status === 'completed').length;
-                        const menuKey = service.sessionId || String(idx);
-
-                        return (
-                          <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                            {pending > 0 && (
-                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                                style={{ backgroundColor: '#fef3c7', color: '#b45309' }}>
-                                {pending} pending
-                              </span>
-                            )}
-                            {confirmed > 0 && (
-                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                                style={{ backgroundColor: '#dcfce7', color: '#15803d' }}>
-                                {confirmed} confirmed
-                              </span>
-                            )}
-                            {completed > 0 && (
-                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                                style={{ backgroundColor: '#dbeafe', color: '#1d4ed8' }}>
-                                {completed} done
-                              </span>
-                            )}
-
-{service.isApi && (
-                              <div className="relative">
-                                <button
-                                  onClick={(e) => {
-                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                    setMenuAnchorRect({ top: rect.bottom + 4, left: rect.right - 128 });
-                                    setOpenMenuId(openMenuId === menuKey ? null : menuKey);
-                                  }}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#f3ece4] transition-colors"
-                                >
-                                  <MoreVertical className="w-4 h-4" style={{ color: '#8a7a6a' }} />
-                                </button>
-                                {/* ✅ FIX: pehle sirf backdrop portal ho raha tha, dropdown
-                                    (Edit/Delete) card ke andar hi tha. Card ka transform naya
-                                    stacking context banata hai, isliye dropdown ka z-20 sirf
-                                    card ke ANDAR hi kaam karta tha — portal'd backdrop (jo
-                                    seedha <body> ka child hai) uske upar chala jaata tha,
-                                    aur "Delete" ka pehla click backdrop pakad leta tha
-                                    (menu band ho jaata, click Delete tak pahunchta hi nahi) —
-                                    isiliye baar-baar click karna padta tha. Fix: menu ko bhi
-                                    backdrop ke saath hi document.body me portal karo, aur
-                                    "..." button ke bounding rect (menuAnchorRect) se fixed
-                                    position do — ab dono true siblings hain, z-index sahi
-                                    compare hoga. */}
-                                {openMenuId === menuKey && typeof document !== "undefined" && createPortal(
-                                  <>
-                                    <div className="fixed inset-0 z-[100]" onClick={() => setOpenMenuId(null)} />
-                                    <div
-                                      className="fixed z-[101] w-32 rounded-lg shadow-lg overflow-hidden"
-                                      style={{
-                                        top: menuAnchorRect?.top ?? 0,
-                                        left: menuAnchorRect?.left ?? 0,
-                                        border: '1px solid #e0d8cf',
-                                        backgroundColor: '#fff',
-                                      }}
-                                    >
-                                      <button
-                                        onClick={() => handleEditService(service)}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#f3ece4] transition-colors"
-                                        style={{ color: '#4a3728' }}
-                                      >
-                                        <Pencil className="w-3 h-3" />
-                                        Edit
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteService(service)}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#fee2e2] transition-colors"
-                                        style={{ color: '#dc2626' }}
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                        Delete
-                                      </button>
-                                    </div>
-                                  </>,
-                                  document.body
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    <h3 className="text-base font-bold mb-1.5" style={{ color: '#4a3728' }}>{service.name}</h3>
-
-                    <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold mb-3"
-                      style={{ backgroundColor: `${accent}1A`, color: accent }}>
-                      {serviceTypes.find(t => t.name === service.type)?.label || service.type}
-                    </span>
-
-                    <p className="mb-4 text-sm line-clamp-2" style={{ color: '#8a7a6a', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
-                      {service.description || `Professional ${service.name.toLowerCase()} session`}
-                    </p>
-
-                    <div className="flex flex-col gap-1.5 mb-4">
-                     
-                      {/* ✅ NEW: duration ab card par bhi dikhega, pehle
-                          sirf edit modal me hi dikhta tha kyunki card
-                          data me duration field hi missing thi (Fix 1) */}
-                      {(service as any).duration > 0 && (
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
-                          <span className="text-xs" style={{ color: '#8a7a6a' }}>
-                            {(service as any).duration} Minutes
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
-                        <span className="text-xs" style={{ color: '#8a7a6a' }}>
-                          {service.sessions} sessions completed
-                        </span>
-                      </div>
-                    </div>
-                    
-
-                    <div className="flex justify-between items-center gap-3 pt-4" style={{ borderTop: '1px solid #f0ebe4' }}>
-                      <span className="text-lg font-bold whitespace-nowrap" style={{ color: '#7a5c3e' }}>
-                        {getPriceLabel(service.price, service.type)}
-                      </span>
-                      <button
-                        onClick={() => {
-                          setSelectedSession(service);
-                          setModalMode('view');
-                          setIsEditModalOpen(true);
-                        }}
-                        className="editCurrentSessions px-4 py-2 rounded-lg text-white text-sm font-semibold transition-colors hover:opacity-90 whitespace-nowrap"
-                        style={{ backgroundColor: '#4a3728' }}
-                      >
-                        Mentee Status
-                      </button>
-                    </div>
-                    </div>
-                  </div>
-                );
+                  return (
+                    <ServiceCard
+                      key={service.sessionId || idx}
+                      service={service}
+                      onEdit={handleEditService}
+                      onDelete={handleDeleteService}
+                      onMenteeStatus={(srv) => {
+                        setSelectedSession(srv);
+                        setModalMode('view');
+                        setIsEditModalOpen(true);
+                      }}
+                    />
+                  );
               })}
             </div>
             {filteredServices.length > INITIAL_VISIBLE_COUNT && (
@@ -1187,11 +1074,23 @@ export default function ServicesPage({
               </div>
                        ) : filteredGroupSessions.length === 0 ? (
                         <div className="text-center py-14 rounded-2xl border" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
-                          <p className="text-base font-bold" style={{ color: '#4a3728' }}>No services match your search.</p>
-                          {searchQuery && (
-                            <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
-                              No group sessions match &quot;{searchQuery}&quot;.
-                            </p>
+                          <p className="text-base font-bold" style={{ color: '#4a3728' }}>No group sessions found</p>
+                          <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
+                            No group sessions matched your search for '{isSearchView ? urlSearchQuery : searchQuery}'.
+                          </p>
+                          {isSearchView && (
+                            <button
+                              onClick={() => {
+                                const params = new URLSearchParams(searchParams.toString());
+                                params.set('tab', 'services');
+                                params.delete('q');
+                                router.push(`${pathname}?${params.toString()}`);
+                              }}
+                              className="mt-6 px-6 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:opacity-90"
+                              style={{ backgroundColor: '#4a3728', color: '#fff' }}
+                            >
+                              Back to Services
+                            </button>
                           )}
                         </div>
                       ) : (
@@ -1200,172 +1099,21 @@ export default function ServicesPage({
                           {visibleGroupSessions.map((group, idx) => {
 
                   return (
-                  <div
-                    key={group.sessionId || group.id || idx}
-                    className="bg-white rounded-2xl border overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
-                    style={{ borderColor: '#e0d8cf' }}
-                  >
-                    {/* Thumbnail */}
-                    <div
-                      className="w-full h-32 flex items-center justify-center relative"
-                      style={{ backgroundColor: '#f3ece4' }}
-                    >
-                      {group.thumbnailImage ? (
-                        <img
-                          src={group.thumbnailImage}
-                          alt={group.title || "Group Session"}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Users className="w-8 h-8" style={{ color: '#8a7a6a' }} />
-                      )}
-                      <span
-                        className="absolute top-3 left-3 w-8 h-8 rounded-lg flex items-center justify-center shadow-sm"
-                        style={{ backgroundColor: '#fff' }}
-                      >
-                        <Users className="w-4 h-4" style={{ color: '#15803d' }} />
-                      </span>
-                    </div>
-
-                    <div className="p-5">
-                      {/* status counts + menu */}
-                      <div className="flex items-start justify-end mb-4">
-                        {(() => {
-                          const bookings = group.bookings ?? [];
-                          const pending = bookings.filter((b: any) => b.status === 'pending').length;
-                          const confirmed = bookings.filter((b: any) => b.status === 'confirmed').length;
-                          const completed = bookings.filter((b: any) => b.status === 'completed').length;
-                          const menuKey = `gs_${group.sessionId || idx}`;
-
-                          return (
-                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                              {pending > 0 && (
-                                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                                  style={{ backgroundColor: '#fef3c7', color: '#b45309' }}>
-                                  {pending} pending
-                                </span>
-                              )}
-                              {confirmed > 0 && (
-                                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                                  style={{ backgroundColor: '#dcfce7', color: '#15803d' }}>
-                                  {confirmed} confirmed
-                                </span>
-                              )}
-                              {completed > 0 && (
-                                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                                  style={{ backgroundColor: '#dbeafe', color: '#1d4ed8' }}>
-                                  {completed} done
-                                </span>
-                              )}
-
-<div className="relative">
-                                <button
-                                  onClick={(e) => {
-                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                    setMenuAnchorRect({ top: rect.bottom + 4, left: rect.right - 128 });
-                                    setOpenMenuId(openMenuId === menuKey ? null : menuKey);
-                                  }}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#f3ece4] transition-colors"
-                                >
-                                  <MoreVertical className="w-4 h-4" style={{ color: '#8a7a6a' }} />
-                                </button>
-                                {/* ✅ FIX: same stacking-context fix as the services menu
-                                    above — menu ab backdrop ke saath document.body me
-                                    portal hota hai, fixed rect-based position ke saath. */}
-                                {openMenuId === menuKey && typeof document !== "undefined" && createPortal(
-                                  <>
-                                    <div className="fixed inset-0 z-[100]" onClick={() => setOpenMenuId(null)} />
-                                    <div
-                                      className="fixed z-[101] w-32 rounded-lg shadow-lg overflow-hidden"
-                                      style={{
-                                        top: menuAnchorRect?.top ?? 0,
-                                        left: menuAnchorRect?.left ?? 0,
-                                        border: '1px solid #e0d8cf',
-                                        backgroundColor: '#fff',
-                                      }}
-                                    >
-                                      <button
-                                        onClick={() => {
-                                          setSelectedSession({ ...group, isGroupSession: true });
-                                          setModalMode('edit');
-                                          setIsEditModalOpen(true);
-                                        }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#f3ece4] transition-colors"
-                                        style={{ color: '#4a3728' }}
-                                      >
-                                        <Pencil className="w-3 h-3" />
-                                        Edit
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteService({...group, type: 'group_session'})}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#fee2e2] transition-colors"
-                                        style={{ color: '#dc2626' }}
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                        Delete
-                                      </button>
-                                    </div>
-                                  </>,
-                                  document.body
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-
-                      <h3 className="text-base font-bold mb-1.5 line-clamp-1" style={{ color: '#4a3728' }}>
-                        {group.title || "Group Session"}
-                      </h3>
-
-                      <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold mb-3"
-                        style={{ backgroundColor: '#15803d1A', color: '#15803d' }}>
-                        Group Session
-                      </span>
-
-                      <p className="mb-4 text-sm line-clamp-2" style={{ color: '#8a7a6a' }}>
-                        {group.description || "Interactive group session led by an expert mentor."}
-                      </p>
-
-                      <div className="flex flex-col gap-1.5 mb-4">
-                        {/* ✅ FIX: scheduled date/time (formatGroupDate) removed —
-                            group sessions no longer show a fixed schedule slot,
-                            only the session duration + enrollment count. */}
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
-                          <span className="text-xs" style={{ color: '#8a7a6a' }}>
-                            {group.duration || 0} Minutes
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Users className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
-                          <span className="text-xs" style={{ color: '#8a7a6a' }}>
-                            {group.currentParticipants ?? 0} / {group.maxParticipants ?? 0} Enrolled
-                          </span>
-                        </div>
-                      </div>
-
-
-                      <div className="flex justify-between items-center gap-3 pt-4" style={{ borderTop: '1px solid #f0ebe4' }}>
-                        <span className="text-lg font-bold whitespace-nowrap" style={{ color: '#7a5c3e' }}>
-                          {getPriceLabel(group.pricing?.pricePerPerson || group.pricePerPerson, 'group_session')}
-                        </span>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedSession({ ...group, isGroupSession: true });
-                              setModalMode('view');
-                              setIsEditModalOpen(true);
-                            }}
-                            className="px-4 py-2 rounded-lg text-white text-sm font-semibold transition-colors hover:opacity-90 whitespace-nowrap"
-                            style={{ backgroundColor: '#4a3728' }}
-                          >
-                            Mentee Status
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    <GroupSessionCard
+                      key={group.sessionId || group.id || idx}
+                      group={group}
+                      onEdit={() => {
+                        setSelectedSession({ ...group, isGroupSession: true });
+                        setModalMode('edit');
+                        setIsEditModalOpen(true);
+                      }}
+                      onDelete={() => handleDeleteService({...group, type: 'group_session'})}
+                      onMenteeStatus={(grp) => {
+                        setSelectedSession({ ...grp, isGroupSession: true });
+                        setModalMode('view');
+                        setIsEditModalOpen(true);
+                      }}
+                    />
                   );
                 })}
               </div>
