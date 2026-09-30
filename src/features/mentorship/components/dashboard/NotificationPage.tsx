@@ -1,7 +1,6 @@
-// mentorDashboard/components/NotificationPage.tsx
-import React, { useMemo } from "react"
+import React, { useMemo, useState } from "react"
 import Link from "next/link"
-import { CalendarClock, Star, CreditCard, Bell, MessageSquare, CheckCheck, BellRing } from "lucide-react"
+import { CalendarClock, Star, CreditCard, Bell, MessageSquare, CheckCheck, BellRing, User as UserIcon } from "lucide-react"
 
 const COLORS = {
   ink: "#4a3728",
@@ -63,10 +62,14 @@ function timeAgo(iso?: string) {
 }
 
 function getInitials(name?: string) {
-  if (!name) return "M"
+  if (!name || !name.trim()) return ""
   const parts = name.trim().split(/\s+/)
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
   return name.slice(0, 2).toUpperCase()
+}
+
+function escapeRegExp(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
 function groupByRecency(items: NotificationItem[]) {
@@ -95,20 +98,32 @@ function groupByRecency(items: NotificationItem[]) {
 }
 
 function MenteeAvatar({ photo, name, menteeId }: { photo?: string; name?: string; menteeId: string }) {
-  const content = photo ? (
+  const [imgError, setImgError] = useState(false)
+  const initials = getInitials(name)
+  const showImage = photo && !imgError
+
+  const content = showImage ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={photo}
-      alt={name || "Mentee"}
+      alt={name || "User profile"}
+      onError={() => setImgError(true)}
       className="w-10 h-10 rounded-full object-cover shrink-0"
       style={{ border: `1px solid ${COLORS.hairline}` }}
     />
-  ) : (
+  ) : initials ? (
     <div
       className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-white text-sm"
       style={{ backgroundColor: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}
     >
-      {getInitials(name)}
+      {initials}
+    </div>
+  ) : (
+    <div
+      className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+      style={{ backgroundColor: COLORS.chip, border: `1px solid ${COLORS.hairline}` }}
+    >
+      <UserIcon className="w-5 h-5" style={{ color: COLORS.accent }} />
     </div>
   )
 
@@ -116,7 +131,7 @@ function MenteeAvatar({ photo, name, menteeId }: { photo?: string; name?: string
     <Link
       href={`/profile/${menteeId}`}
       onClick={(e) => e.stopPropagation()}
-      aria-label={`View ${name || 'mentee'}'s profile`}
+      aria-label={`View ${name || 'user'}'s profile`}
       className="shrink-0 transition-opacity hover:opacity-90 cursor-pointer"
     >
       {content}
@@ -138,27 +153,32 @@ function RenderTextWithMenteeLink({
   if (!text) return null
   if (!menteeId) return <>{text}</>
 
-  if (menteeName && text.includes(menteeName)) {
-    const parts = text.split(menteeName)
-    return (
-      <>
-        {parts.map((part, idx) => (
-          <React.Fragment key={idx}>
-            {part}
-            {idx < parts.length - 1 && (
-              <Link
-                href={`/profile/${menteeId}`}
-                onClick={(e) => e.stopPropagation()}
-                className="font-semibold hover:underline cursor-pointer"
-                style={{ color: COLORS.ink }}
-              >
-                {menteeName}
-              </Link>
-            )}
-          </React.Fragment>
-        ))}
-      </>
-    )
+  const cleanName = menteeName?.trim()
+  if (cleanName) {
+    const regex = new RegExp(`(${escapeRegExp(cleanName)})`, "gi")
+    if (regex.test(text)) {
+      const parts = text.split(regex)
+      return (
+        <>
+          {parts.map((part, idx) => {
+            if (part.toLowerCase() === cleanName.toLowerCase()) {
+              return (
+                <Link
+                  key={idx}
+                  href={`/profile/${menteeId}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="font-semibold hover:underline cursor-pointer"
+                  style={{ color: COLORS.ink }}
+                >
+                  {part}
+                </Link>
+              )
+            }
+            return <React.Fragment key={idx}>{part}</React.Fragment>
+          })}
+        </>
+      )
+    }
   }
 
   if (isTitle) {
