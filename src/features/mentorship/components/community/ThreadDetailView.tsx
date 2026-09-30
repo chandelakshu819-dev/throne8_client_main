@@ -16,7 +16,10 @@ import {
   Send,
   Trash2,
   User as UserIcon,
+  Flag,
+  Check,
 } from "lucide-react";
+
 import { Forum, ForumReply, ForumAuthor } from "@/types/community.types";
 import CommunityService from "@/lib/api/community.service";
 import AuthService from "@/lib/api/auth.service";
@@ -69,8 +72,9 @@ interface MentionDropdownProps {
   activeIndex: number;
   onSelect: (candidate: MentionCandidate) => void;
   onHover: (index: number) => void;
-  dropdownRef: React.RefObject<HTMLDivElement | null>;
+  dropdownRef: React.RefObject<HTMLDivElement>;
 }
+
 
 function MentionDropdown({
   candidates,
@@ -299,7 +303,80 @@ export default function ThreadDetailView({
   const inlineReplyTextareaRef = useRef<HTMLTextAreaElement>(null);
   const inlineMentionDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Report state
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    type: "forum" | "reply";
+    id: string;
+    replyId?: string;
+  } | null>(null);
+  const [reportReason, setReportReason] = useState<"spam" | "harassment" | "inappropriate" | "other">("spam");
+  const [reportNote, setReportNote] = useState("");
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportSuccess, setReportSuccess] = useState<string | null>(null);
+  const [reportedIds, setReportedIds] = useState<Set<string>>(new Set());
+
+  const handleOpenReport = (target: { type: "forum" | "reply"; id: string; replyId?: string }) => {
+    if (!currentUser) {
+      setActionError("Please log in to report content.");
+      return;
+    }
+    setReportTarget(target);
+    setReportReason("spam");
+    setReportNote("");
+    setReportError(null);
+    setReportSuccess(null);
+    setReportModalOpen(true);
+  };
+
+  const handleCloseReport = () => {
+    setReportModalOpen(false);
+    setReportTarget(null);
+    setReportError(null);
+    setReportSuccess(null);
+  };
+
+  const handleSubmitReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reportTarget || isSubmittingReport) return;
+    setIsSubmittingReport(true);
+    setReportError(null);
+
+    const targetKey = reportTarget.replyId ? `reply-${reportTarget.replyId}` : `forum-${reportTarget.id}`;
+
+    try {
+      if (reportTarget.type === "forum") {
+        await CommunityService.reportForum(reportTarget.id, reportReason, reportNote.trim() || undefined);
+      } else if (reportTarget.replyId) {
+        await CommunityService.reportReply(
+          reportTarget.id,
+          reportTarget.replyId,
+          reportReason,
+          reportNote.trim() || undefined
+        );
+      }
+      setReportedIds((prev) => new Set(prev).add(targetKey));
+      setReportSuccess("Report submitted successfully. Thank you for keeping the community safe.");
+      setTimeout(() => {
+        handleCloseReport();
+      }, 1800);
+    } catch (err: any) {
+      const status = err.response?.status;
+      const message = err.response?.data?.message || "";
+      if (status === 409 || message.toLowerCase().includes("already reported")) {
+        setReportedIds((prev) => new Set(prev).add(targetKey));
+        setReportError("You have already reported this content.");
+      } else {
+        setReportError(message || "Failed to submit report. Please try again.");
+      }
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
   useEffect(() => {
+
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
       if (
@@ -1069,7 +1146,22 @@ export default function ThreadDetailView({
               <MessageCircle className="w-3.5 h-3.5" />
               <span>{replies.length} replies</span>
             </span>
+
+            {currentUser && (
+              <button
+                type="button"
+                onClick={() => handleOpenReport({ type: "forum", id: thread._id })}
+                disabled={reportedIds.has(`forum-${thread._id}`)}
+                className="inline-flex items-center gap-1 text-xs font-medium transition-colors hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ color: COLORS.muted }}
+                title="Report this thread"
+              >
+                <Flag className="w-3 h-3" />
+                <span>{reportedIds.has(`forum-${thread._id}`) ? "Reported" : "Report"}</span>
+              </button>
+            )}
           </div>
+
 
           {/* Author/Admin Actions: Pin, Lock, Edit & Delete */}
           {isAuthorOrAdmin && (
@@ -1341,7 +1433,31 @@ export default function ThreadDetailView({
                           </button>
                         </>
                       )}
+
+                      {/* Neutral Report button */}
+                      {currentUser && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleOpenReport({
+                              type: "reply",
+                              id: thread._id,
+                              replyId: reply._id,
+                            })
+                          }
+                          disabled={reportedIds.has(`reply-${reply._id}`)}
+                          className="inline-flex items-center gap-1 text-xs font-medium transition-colors hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          style={{ color: COLORS.muted }}
+                          title="Report this reply"
+                        >
+                          <Flag className="w-3 h-3" />
+                          <span>
+                            {reportedIds.has(`reply-${reply._id}`) ? "Reported" : "Report"}
+                          </span>
+                        </button>
+                      )}
                     </div>
+
 
                     {/* Inline Reply Form */}
                     {isReplying && !reply.parentReplyId && (
@@ -1519,28 +1635,52 @@ export default function ThreadDetailView({
                                 </div>
                               )}
 
-                              {canManageReply(nested) && !isEditingNested && (
+                              {!isEditingNested && (
                                 <div className="pl-7 mt-1.5 flex items-center gap-2.5 text-[11px]">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleStartEditReply(nested)}
-                                    className="font-medium hover:underline cursor-pointer"
-                                    style={{ color: COLORS.accent }}
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteReply(nested._id)}
-                                    disabled={deletingReplyId === nested._id}
-                                    className="font-medium hover:underline cursor-pointer disabled:opacity-50"
-                                    style={{ color: "#dc2626" }}
-                                  >
-                                    {deletingReplyId === nested._id ? "Deleting..." : "Delete"}
-                                  </button>
+                                  {currentUser && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleOpenReport({
+                                          type: "reply",
+                                          id: thread._id,
+                                          replyId: nested._id,
+                                        })
+                                      }
+                                      disabled={reportedIds.has(`reply-${nested._id}`)}
+                                      className="font-medium hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                      style={{ color: COLORS.muted }}
+                                      title="Report this reply"
+                                    >
+                                      {reportedIds.has(`reply-${nested._id}`) ? "Reported" : "Report"}
+                                    </button>
+                                  )}
+
+                                  {canManageReply(nested) && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStartEditReply(nested)}
+                                        className="font-medium hover:underline cursor-pointer"
+                                        style={{ color: COLORS.accent }}
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteReply(nested._id)}
+                                        disabled={deletingReplyId === nested._id}
+                                        className="font-medium hover:underline cursor-pointer disabled:opacity-50"
+                                        style={{ color: "#dc2626" }}
+                                      >
+                                        {deletingReplyId === nested._id ? "Deleting..." : "Delete"}
+                                      </button>
+                                    </>
+                                  )}
                                 </div>
                               )}
                             </div>
+
                           );
                         })}
                       </div>
@@ -1642,7 +1782,7 @@ export default function ThreadDetailView({
                 ? "Thread is locked"
                 : !currentUser
                 ? "Authentication required"
-                : "Use @Name to mention someone · Markdown supported"}
+                : "Use @Name to mention someone"}
             </span>
 
             <button
@@ -1674,6 +1814,152 @@ export default function ThreadDetailView({
           </div>
         </form>
       </div>
+
+      {/* Report Content Modal */}
+      {reportModalOpen && reportTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+          <div
+            className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden p-6"
+            style={{ border: `1px solid ${COLORS.hairline}` }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: "#fef2f2", color: "#dc2626" }}
+                >
+                  <Flag className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold" style={{ color: COLORS.ink }}>
+                    Report {reportTarget.type === "forum" ? "Discussion Thread" : "Reply"}
+                  </h3>
+                  <p className="text-[11px]" style={{ color: COLORS.muted }}>
+                    Help us understand what is wrong with this content.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseReport}
+                className="text-xs font-semibold px-2 py-1 rounded-lg transition-colors hover:bg-gray-100"
+                style={{ color: COLORS.muted }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {reportSuccess ? (
+              <div className="py-6 text-center space-y-2">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center mx-auto"
+                  style={{ backgroundColor: "#ecfdf5", color: "#059669" }}
+                >
+                  <Check className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-semibold" style={{ color: COLORS.ink }}>
+                  {reportSuccess}
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitReport} className="space-y-4">
+                {reportError && (
+                  <div
+                    className="p-3 rounded-xl flex items-center gap-2 text-xs"
+                    style={{
+                      backgroundColor: reportError.includes("already reported") ? "#fef3c7" : "#fef2f2",
+                      color: reportError.includes("already reported") ? "#92400e" : "#b91c1c",
+                      border: `1px solid ${reportError.includes("already reported") ? "#fde68a" : "#fecaca"}`,
+                    }}
+                  >
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{reportError}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold mb-2" style={{ color: COLORS.ink }}>
+                    Reason for report <span className="text-red-500">*</span>
+                  </label>
+                  <div className="space-y-2">
+                    {[
+                      { value: "spam", label: "Spam or advertising" },
+                      { value: "harassment", label: "Harassment, hate speech, or abuse" },
+                      { value: "inappropriate", label: "Inappropriate or offensive content" },
+                      { value: "other", label: "Other issue" },
+                    ].map((opt) => (
+                      <label
+                        key={opt.value}
+                        className="flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer text-xs font-medium transition-colors"
+                        style={{
+                          backgroundColor: reportReason === opt.value ? COLORS.chip : "#ffffff",
+                          border: `1px solid ${reportReason === opt.value ? COLORS.accent : COLORS.hairline}`,
+                          color: COLORS.ink,
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="reportReason"
+                          value={opt.value}
+                          checked={reportReason === opt.value}
+                          onChange={() => setReportReason(opt.value as any)}
+                        />
+                        <span>{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink }}>
+                    Additional notes (optional)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={reportNote}
+                    onChange={(e) => setReportNote(e.target.value)}
+                    placeholder="Provide any additional context for moderators..."
+                    className="w-full text-xs p-2.5 rounded-xl focus:outline-none transition-colors"
+                    style={{
+                      border: `1px solid ${COLORS.hairline}`,
+                      backgroundColor: "#fff",
+                      color: COLORS.ink,
+                    }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseReport}
+                    disabled={isSubmittingReport}
+                    className="text-xs font-medium px-4 py-2 rounded-full transition-colors"
+                    style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReport}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-full transition-all disabled:opacity-50"
+                    style={{ backgroundColor: COLORS.accent, color: "#fff" }}
+                  >
+                    {isSubmittingReport ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Submitting...</span>
+                      </>
+                    ) : (
+                      <span>Submit Report</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

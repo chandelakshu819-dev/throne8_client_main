@@ -95,11 +95,13 @@ export interface CreateEventPayload {
 export type UpdateEventPayload = Partial<CreateEventPayload>;
 
 export interface ListEventsParams {
+  search?: string;
   page?: number;
   limit?: number;
   type?: EventType;
   upcoming?: boolean; // confirm: not explicitly documented, verify with backend before relying on it
 }
+
 
 export interface EventAttendee {
   _id: string;
@@ -175,10 +177,13 @@ export interface AddReplyPayload {
 }
 
 export interface ListForumsParams {
+  search?: string;
   page?: number;
   limit?: number;
   category?: ForumCategory;
+  sort?: "recent" | "trending";
 }
+
 
 export interface ListRepliesParams {
   page?: number;

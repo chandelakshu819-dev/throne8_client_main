@@ -140,7 +140,7 @@ export default function UserDashboardLayout({
         rawType.includes("booking") || rawType.includes("session") || rawType.includes("waitlist") ? "booking" :
         rawType.includes("review") ? "review" :
         rawType.includes("payment") || rawType.includes("refund") || rawType.includes("package") || rawType.includes("credit") ? "payment" :
-        rawType.includes("query") ? "message" :
+        rawType.includes("query") || rawType.includes("forum") ? "message" :
         "system";
 
       return [

@@ -23,8 +23,10 @@ const ADMIN_MENU_ITEMS = [
   { id: "sessions", label: "Sessions", icon: CalendarClock },
   { id: "reviews", label: "All Reviews", icon: Star },
   { id: "reported-reviews", label: "Reported Reviews", icon: Flag },
+  { id: "community-reports", label: "Community Reports", icon: Flag },
   { id: "payments", label: "Payment Logs", icon: Receipt },
 ];
+
 
 export default function AdminSidebar({
   activePage,
