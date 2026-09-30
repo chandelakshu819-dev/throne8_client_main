@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback } from "react"
-import { Star, ThumbsUp, Loader2 } from "lucide-react"
+import React, { useEffect, useState, useCallback, useMemo } from "react"
+import { Star, ThumbsUp, ThumbsDown, Loader2, MessageSquare, Edit2, Trash2, Send, X } from "lucide-react"
 import ReviewService, { MentorReview, ReviewStats } from "@/lib/api/review.service"
+import TokenStorage from "@/lib/store/token.storage"
 
 const COLORS = {
   ink: "#4a3728",
@@ -12,6 +13,7 @@ const COLORS = {
   paper: "#fffdfb",
   gold: "#c9a87c",
   muted: "#8a7a6a",
+  danger: "#dc2626",
 }
 
 const TAG_LABELS: Record<string, string> = {
@@ -28,7 +30,7 @@ const TAG_LABELS: Record<string, string> = {
 }
 
 interface ReviewsPageProps {
-  mentorData?: { mentorId?: string }
+  mentorData?: { mentorId?: string; userId?: string; isOwner?: boolean }
 }
 
 function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
@@ -100,24 +102,50 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
 
   const [stats, setStats] = useState<ReviewStats | null>(null)
   const [reviews, setReviews] = useState<MentorReview[]>([])
+  const [myReactions, setMyReactions] = useState<Record<string, "like" | "dislike">>({})
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Mentor reply state
+  const [replyingReviewId, setReplyingReviewId] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState<string>("")
+  const [isSubmittingReply, setIsSubmittingReply] = useState<boolean>(false)
+  const [deletingReplyReviewId, setDeletingReplyReviewId] = useState<string | null>(null)
+
+  const loggedInUserId = useMemo(() => {
+    if (typeof window === "undefined") return null
+    return TokenStorage.getUserData()?.userId || null
+  }, [])
+
+  const isMentorOwner = useMemo(() => {
+    if (!mentorData) return true // Default true when rendered on mentor dashboard overview
+    if (!loggedInUserId) return false
+    const mUserId = (mentorData as any).userId
+    const mMentorId = (mentorData as any).mentorId
+    return (
+      String(loggedInUserId) === String(mUserId) ||
+      String(loggedInUserId) === String(mMentorId) ||
+      (mentorData as any).isOwner === true
+    )
+  }, [loggedInUserId, mentorData])
+
   const loadInitial = useCallback(async () => {
     if (!mentorId) return
     setLoading(true)
     setError(null)
     try {
-      const [statsRes, reviewsRes] = await Promise.all([
+      const [statsRes, reviewsRes, reactionsRes] = await Promise.all([
         ReviewService.getReviewStats(mentorId),
         ReviewService.getMentorReviews(mentorId, 1, 10),
+        ReviewService.getMyReactions(mentorId).catch(() => ({})),
       ])
       setStats(statsRes)
       setReviews(reviewsRes.data)
       setTotalPages(reviewsRes.pagination.totalPages)
+      setMyReactions(reactionsRes || {})
       setPage(1)
     } catch (err) {
       console.error("Review load error:", err)
@@ -146,26 +174,131 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
     }
   }
 
-  const handleHelpful = async (reviewId: string) => {
-    // optimistic update
+  const handleReact = async (reviewId: string, type: "like" | "dislike", reviewMenteeId?: any) => {
+    const rMenteeUserId = typeof reviewMenteeId === "object" ? reviewMenteeId?.userId : reviewMenteeId
+    if (loggedInUserId && String(rMenteeUserId) === String(loggedInUserId)) {
+      return
+    }
+
+    const prevReaction = myReactions[reviewId]
+    const nextReaction = prevReaction === type ? null : type
+
+    const prevMyReactions = { ...myReactions }
+    const prevReviews = [...reviews]
+
+    setMyReactions((prev) => {
+      const copy = { ...prev }
+      if (nextReaction) {
+        copy[reviewId] = nextReaction
+      } else {
+        delete copy[reviewId]
+      }
+      return copy
+    })
+
     setReviews((prev) =>
-      prev.map((r) =>
-        r.reviewId === reviewId || r._id === reviewId || r.id === reviewId
-          ? { ...r, helpfulCount: (r.helpfulCount || 0) + 1 }
-          : r
-      )
+      prev.map((r) => {
+        const idMatches = r.reviewId === reviewId || r._id === reviewId || r.id === reviewId
+        if (!idMatches) return r
+
+        let helpful = r.helpfulCount || 0
+        let notHelpful = r.notHelpfulCount || 0
+
+        if (prevReaction === "like") helpful = Math.max(0, helpful - 1)
+        if (prevReaction === "dislike") notHelpful = Math.max(0, notHelpful - 1)
+
+        if (nextReaction === "like") helpful += 1
+        if (nextReaction === "dislike") notHelpful += 1
+
+        return {
+          ...r,
+          helpfulCount: helpful,
+          notHelpfulCount: notHelpful,
+          userReaction: nextReaction,
+        }
+      })
     )
+
     try {
-      await ReviewService.markHelpful(reviewId)
-    } catch (e) {
-      // revert on failure
-      setReviews((prev) =>
-        prev.map((r) =>
-          r.reviewId === reviewId || r._id === reviewId || r.id === reviewId
-            ? { ...r, helpfulCount: Math.max(0, (r.helpfulCount || 1) - 1) }
-            : r
+      const res = await ReviewService.reactToReview(reviewId, type)
+      if (res) {
+        setReviews((prev) =>
+          prev.map((r) => {
+            const idMatches = r.reviewId === reviewId || r._id === reviewId || r.id === reviewId
+            if (!idMatches) return r
+            return {
+              ...r,
+              helpfulCount: res.helpfulCount,
+              notHelpfulCount: res.notHelpfulCount,
+              userReaction: res.userReaction,
+            }
+          })
         )
+      }
+    } catch (err) {
+      setMyReactions(prevMyReactions)
+      setReviews(prevReviews)
+    }
+  }
+
+  const handleOpenReplyForm = (reviewId: string, currentComment?: string) => {
+    setReplyingReviewId(reviewId)
+    setReplyText(currentComment || "")
+  }
+
+  const handleCancelReply = () => {
+    setReplyingReviewId(null)
+    setReplyText("")
+  }
+
+  const handleSubmitReply = async (reviewId: string) => {
+    const text = replyText.trim()
+    if (text.length < 10 || text.length > 500) return
+    setIsSubmittingReply(true)
+    try {
+      await ReviewService.addMentorResponse(reviewId, text)
+      setReviews((prev) =>
+        prev.map((r) => {
+          const idMatches = r.reviewId === reviewId || r._id === reviewId || r.id === reviewId
+          if (!idMatches) return r
+          return {
+            ...r,
+            mentorResponse: {
+              comment: text,
+              respondedAt: new Date().toISOString(),
+            },
+          }
+        })
       )
+      setReplyingReviewId(null)
+      setReplyText("")
+    } catch (err: any) {
+      console.error("Failed to submit mentor reply:", err)
+      alert(err?.response?.data?.message || err?.message || "Failed to submit response.")
+    } finally {
+      setIsSubmittingReply(false)
+    }
+  }
+
+  const handleDeleteReply = async (reviewId: string) => {
+    setDeletingReplyReviewId(reviewId)
+    try {
+      await ReviewService.deleteMentorResponse(reviewId)
+      setReviews((prev) =>
+        prev.map((r) => {
+          const idMatches = r.reviewId === reviewId || r._id === reviewId || r.id === reviewId
+          if (!idMatches) return r
+          return {
+            ...r,
+            mentorResponse: undefined,
+          }
+        })
+      )
+    } catch (err: any) {
+      console.error("Failed to delete mentor reply:", err)
+      alert(err?.response?.data?.message || err?.message || "Failed to delete response.")
+    } finally {
+      setDeletingReplyReviewId(null)
     }
   }
 
@@ -188,7 +321,7 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
 
   if (error) {
     return (
-      <div className="text-sm py-16 text-center" style={{ color: "#dc2626" }}>
+      <div className="text-sm py-16 text-center" style={{ color: COLORS.danger }}>
         {error}
       </div>
     )
@@ -293,7 +426,7 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
             ))}
           </div>
 
-          {/* Individual Reviews Cards (Matching Mentee Reviews UI) */}
+          {/* Individual Reviews Cards */}
           <div className="space-y-4 pt-2">
             {reviews.map((review, idx) => {
               const reviewId = review.reviewId || review._id || review.id || `rev-${idx}`
@@ -303,6 +436,8 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
               const comment = review.comment || "No written feedback provided."
               const tags = Array.isArray(review.tags) ? review.tags : []
               const sessionTitle = review.session?.title || "Mentorship Session"
+              const rMenteeUserId = typeof review.menteeId === "object" ? review.menteeId?.userId : review.menteeId
+              const isOwnReview = Boolean(loggedInUserId && String(rMenteeUserId) === String(loggedInUserId))
 
               return (
                 <div
@@ -389,34 +524,140 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
                       "{comment}"
                     </p>
 
-                    {/* Helpful Button Action */}
-                    <div className="flex items-center gap-4 pt-1">
-                      <button
-                        onClick={() => handleHelpful(reviewId)}
-                        className="flex items-center gap-1.5 text-xs font-semibold transition-colors hover:opacity-80"
-                        style={{ color: COLORS.accent }}
-                        title="Mark review as helpful"
-                      >
-                        <ThumbsUp className="w-3.5 h-3.5" />
-                        <span>Helpful {(review.helpfulCount || 0) > 0 ? `(${review.helpfulCount})` : ""}</span>
-                      </button>
+                    {/* Action Buttons: Like, Dislike & Reply */}
+                    <div className="flex items-center justify-between gap-4 pt-2 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        {/* Like Button */}
+                        <button
+                          onClick={() => handleReact(reviewId, "like", review.menteeId)}
+                          disabled={isOwnReview}
+                          className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors hover:bg-[#f6ede8] disabled:opacity-50"
+                          style={{
+                            color: myReactions[reviewId] === "like" ? COLORS.accent : COLORS.muted,
+                            backgroundColor: myReactions[reviewId] === "like" ? COLORS.softWash : "transparent",
+                            border: `1px solid ${myReactions[reviewId] === "like" ? COLORS.accent : COLORS.hairline}`,
+                          }}
+                          title={isOwnReview ? "You cannot react to your own review" : "Like review"}
+                        >
+                          <ThumbsUp className="w-3.5 h-3.5" style={{ fill: myReactions[reviewId] === "like" ? COLORS.accent : "none" }} />
+                          <span>Like {(review.helpfulCount || 0) > 0 ? `(${review.helpfulCount})` : "(0)"}</span>
+                        </button>
+
+                        {/* Dislike Button */}
+                        <button
+                          onClick={() => handleReact(reviewId, "dislike", review.menteeId)}
+                          disabled={isOwnReview}
+                          className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors hover:bg-[#f6ede8] disabled:opacity-50"
+                          style={{
+                            color: myReactions[reviewId] === "dislike" ? COLORS.danger : COLORS.muted,
+                            backgroundColor: myReactions[reviewId] === "dislike" ? "#fef2f2" : "transparent",
+                            border: `1px solid ${myReactions[reviewId] === "dislike" ? "#fecaca" : COLORS.hairline}`,
+                          }}
+                          title={isOwnReview ? "You cannot react to your own review" : "Dislike review"}
+                        >
+                          <ThumbsDown className="w-3.5 h-3.5" style={{ fill: myReactions[reviewId] === "dislike" ? COLORS.danger : "none" }} />
+                          <span>Dislike {(review.notHelpfulCount || 0) > 0 ? `(${review.notHelpfulCount})` : "(0)"}</span>
+                        </button>
+                      </div>
+
+                      {/* Mentor Reply Button */}
+                      {isMentorOwner && !review.mentorResponse?.comment && replyingReviewId !== reviewId && (
+                        <button
+                          onClick={() => handleOpenReplyForm(reviewId)}
+                          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-lg transition-colors text-white shadow-sm"
+                          style={{ backgroundColor: COLORS.ink }}
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>Reply</span>
+                        </button>
+                      )}
                     </div>
 
-                    {/* Mentor Response if available */}
-                    {review.mentorResponse?.comment && (
+                    {/* Inline Reply Form */}
+                    {replyingReviewId === reviewId && (
+                      <div className="mt-3 p-3.5 rounded-xl border space-y-3" style={{ backgroundColor: COLORS.softWash, borderColor: COLORS.accent }}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold" style={{ color: COLORS.accent }}>
+                            {review.mentorResponse?.comment ? "Edit your response" : "Write a response to mentee"}
+                          </span>
+                          <button onClick={handleCancelReply} className="text-xs font-semibold hover:opacity-75" style={{ color: COLORS.muted }}>
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <textarea
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          placeholder="Write a constructive response (10 - 500 characters)..."
+                          rows={3}
+                          className="w-full text-xs p-2.5 rounded-lg border focus:outline-none focus:ring-1 focus:ring-[#7a5c3e]"
+                          style={{ borderColor: COLORS.hairline, backgroundColor: "#fff", color: COLORS.ink }}
+                        />
+
+                        <div className="flex items-center justify-between">
+                          <span className={`text-[11px] font-medium ${replyText.length < 10 || replyText.length > 500 ? "text-red-500" : "text-gray-500"}`}>
+                            {replyText.length}/500 characters (min 10)
+                          </span>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={handleCancelReply}
+                              disabled={isSubmittingReply}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold border"
+                              style={{ borderColor: COLORS.hairline, color: COLORS.ink, backgroundColor: "#fff" }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleSubmitReply(reviewId)}
+                              disabled={isSubmittingReply || replyText.trim().length < 10 || replyText.trim().length > 500}
+                              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity disabled:opacity-50"
+                              style={{ backgroundColor: COLORS.accent }}
+                            >
+                              {isSubmittingReply ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                              <span>{isSubmittingReply ? "Saving..." : "Send reply"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Display Existing Response */}
+                    {review.mentorResponse?.comment && replyingReviewId !== reviewId && (
                       <div
                         className="mt-3 p-3.5 rounded-xl text-xs space-y-1.5"
                         style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2">
                           <span className="font-bold" style={{ color: COLORS.accent }}>
-                            Your response
+                            {isMentorOwner ? "Your response" : "Mentor's response"}
                           </span>
-                          {review.mentorResponse.respondedAt && (
-                            <span style={{ color: COLORS.muted }}>
-                              {timeAgo(review.mentorResponse.respondedAt)}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {review.mentorResponse.respondedAt && (
+                              <span style={{ color: COLORS.muted }}>
+                                {timeAgo(review.mentorResponse.respondedAt)}
+                              </span>
+                            )}
+                            {isMentorOwner && (
+                              <div className="flex items-center gap-1 ml-2">
+                                <button
+                                  onClick={() => handleOpenReplyForm(reviewId, review.mentorResponse?.comment)}
+                                  className="p-1 rounded text-xs font-medium hover:bg-[#e0d8cf] text-gray-700"
+                                  title="Edit response"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteReply(reviewId)}
+                                  disabled={deletingReplyReviewId === reviewId}
+                                  className="p-1 rounded text-xs font-medium hover:bg-red-50 text-red-500"
+                                  title="Delete response"
+                                >
+                                  {deletingReplyReviewId === reviewId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <p style={{ color: COLORS.ink }}>
                           "{review.mentorResponse.comment}"

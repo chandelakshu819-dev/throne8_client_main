@@ -10,6 +10,8 @@ export interface MentorReview {
   rating: number;
   comment: string;
   helpfulCount?: number;
+  notHelpfulCount?: number;
+  userReaction?: "like" | "dislike" | null;
   isVerified?: boolean;
   tags?: string[];
   mentorResponse?: { comment: string; respondedAt: string };
@@ -117,6 +119,41 @@ const ReviewService = {
 
   deleteReview: (reviewId: string) =>
     api.delete<{ message: string; success: boolean }>(`/mentorship/reviews/${reviewId}`).then((res) => res.data),
+
+  reactToReview: (reviewId: string, type: "like" | "dislike") =>
+    api
+      .post<{
+        success: boolean;
+        message: string;
+        data: { reviewId: string; helpfulCount: number; notHelpfulCount: number; userReaction: "like" | "dislike" | null };
+      }>(`/mentorship/reviews/${reviewId}/react`, { type })
+      .then((res) => res.data.data),
+
+  getMyReactions: (mentorId: string) =>
+    api
+      .get<{
+        success: boolean;
+        message: string;
+        data: Record<string, "like" | "dislike">;
+      }>(`/mentorship/reviews/mentor/${mentorId}/my-reactions`)
+      .then((res) => res.data.data || {}),
+
+  addMentorResponse: (reviewId: string, response: string) =>
+    api
+      .post<{
+        success: boolean;
+        message: string;
+        data: MentorReview;
+      }>(`/mentorship/reviews/${reviewId}/response`, { response })
+      .then((res) => res.data.data),
+
+  deleteMentorResponse: (reviewId: string) =>
+    api
+      .delete<{
+        success: boolean;
+        message: string;
+      }>(`/mentorship/reviews/${reviewId}/response`)
+      .then((res) => res.data),
 };
 
 export default ReviewService;
