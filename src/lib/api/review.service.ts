@@ -123,6 +123,9 @@ const ReviewService = {
       .then((res) => res.data.data ?? {})
       .catch(() => ({} as Record<string, ReviewReaction>)),
 
+  // alias used by the dashboard ReviewsPage component — same endpoint, different name
+  getMyReactions: (mentorId: string) => ReviewService.getMyReviewReactions(mentorId),
+
   // matches POST /:id/react  body: { type: 'like' | 'dislike' } (toggle, auth required)
   reactToReview: (reviewId: string, type: ReviewReaction) =>
     api
@@ -143,9 +146,15 @@ const ReviewService = {
       .post<{ data: MentorReview }>(`/mentorship/reviews/${reviewId}/response`, { response })
       .then((res) => res.data.data),
 
+  // alias used by the dashboard ReviewsPage component — same endpoint, different name
+  addMentorResponse: (reviewId: string, response: string) => ReviewService.replyToReview(reviewId, response),
+
   // matches DELETE /:id/response (mentor only, auth required)
   deleteReviewReply: (reviewId: string) =>
     api.delete<{ message: string; success: boolean }>(`/mentorship/reviews/${reviewId}/response`).then((res) => res.data),
+
+  // alias used by the dashboard ReviewsPage component — same endpoint, different name
+  deleteMentorResponse: (reviewId: string) => ReviewService.deleteReviewReply(reviewId),
 
   reportReview: (reviewId: string, reason: string) =>
     api.post<{ message: string; success: boolean }>(`/mentorship/reviews/${reviewId}/report`, { reason }).then((res) => res.data),
