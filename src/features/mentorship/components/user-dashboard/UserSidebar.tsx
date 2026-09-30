@@ -56,7 +56,7 @@ export default function UserSidebar({
     : getInitials(fullName) || "U";
 
   return (
-    <aside className="w-80 flex flex-col" style={{ backgroundColor: '#fff', borderRight: '1px solid #ece4db' }}>
+    <aside className="w-80 flex flex-col h-full overflow-hidden" style={{ backgroundColor: '#fff', borderRight: '1px solid #ece4db' }}>
       {/* Profile Card */}
       <div
         onClick={() => setActivePage("profile-preferences")}
