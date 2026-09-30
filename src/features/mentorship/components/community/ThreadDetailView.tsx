@@ -279,6 +279,13 @@ export default function ThreadDetailView({
   const [isSubmittingInlineReply, setIsSubmittingInlineReply] = useState(false);
   const [inlineReplyError, setInlineReplyError] = useState<string | null>(null);
 
+  // Edit & Delete reply state
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [editReplyContent, setEditReplyContent] = useState("");
+  const [isSavingReplyEdit, setIsSavingReplyEdit] = useState(false);
+  const [editReplyError, setEditReplyError] = useState<string | null>(null);
+  const [deletingReplyId, setDeletingReplyId] = useState<string | null>(null);
+
   // Inline mention autocomplete state
   const [inlineMentionQuery, setInlineMentionQuery] = useState("");
   const [inlineMentionResults, setInlineMentionResults] = useState<MentionCandidate[]>([]);
@@ -480,6 +487,86 @@ export default function ThreadDetailView({
       setEditError(err.response?.data?.message || "Failed to save changes. Please try again.");
     } finally {
       setIsSavingEdit(false);
+    }
+  };
+
+  const isAdmin = currentUser?.role === "admin";
+
+  const canManageReply = (reply: ForumReply) => {
+    if (!currentUser) return false;
+    if (isAdmin) return true;
+    const authorId =
+      typeof reply.author === "object" && reply.author !== null
+        ? (reply.author as any).userId || (reply.author as any).id || (reply.author as any)._id
+        : typeof reply.author === "string"
+        ? reply.author
+        : null;
+    return Boolean(currentUserId && authorId && currentUserId === authorId);
+  };
+
+  const handleStartEditReply = (reply: ForumReply) => {
+    setEditingReplyId(reply._id);
+    setEditReplyContent(reply.content);
+    setEditReplyError(null);
+  };
+
+  const handleCancelEditReply = () => {
+    setEditingReplyId(null);
+    setEditReplyContent("");
+    setEditReplyError(null);
+  };
+
+  const handleSaveReplyEdit = async (replyId: string) => {
+    if (!editReplyContent.trim()) return;
+    setIsSavingReplyEdit(true);
+    setEditReplyError(null);
+    try {
+      const updated = await CommunityService.updateReply(
+        thread._id,
+        replyId,
+        editReplyContent.trim()
+      );
+      setReplies((prev) =>
+        prev.map((r) =>
+          r._id === replyId
+            ? { ...r, ...updated, content: updated?.content || editReplyContent.trim() }
+            : r
+        )
+      );
+      setEditingReplyId(null);
+      setEditReplyContent("");
+    } catch (err: any) {
+      setEditReplyError(
+        err.response?.data?.message || "Failed to save reply changes. Please try again."
+      );
+    } finally {
+      setIsSavingReplyEdit(false);
+    }
+  };
+
+  const handleDeleteReply = async (replyId: string) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this reply? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+    setDeletingReplyId(replyId);
+    try {
+      await CommunityService.deleteReply(thread._id, replyId);
+      // Remove reply and child replies from local state
+      setReplies((prev) =>
+        prev.filter((r) => r._id !== replyId && r.parentReplyId !== replyId)
+      );
+      setThread((prev) => {
+        if (!prev) return prev;
+        return { ...prev, replyCount: Math.max(0, (prev.replyCount || 1) - 1) };
+      });
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Failed to delete reply. Please try again.");
+    } finally {
+      setDeletingReplyId(null);
     }
   };
 
@@ -1157,17 +1244,59 @@ export default function ThreadDetailView({
                       </span>
                     </div>
 
-                    {/* Top-level reply content */}
-                    <div
-                      className="text-xs leading-relaxed whitespace-pre-wrap pl-8"
-                      style={{ color: COLORS.ink }}
-                    >
-                      {formatReplyWithMentions(reply.content)}
-                    </div>
+                    {/* Top-level reply content or inline edit form */}
+                    {editingReplyId === reply._id ? (
+                      <div className="pl-8 my-2 space-y-2">
+                        <textarea
+                          rows={3}
+                          value={editReplyContent}
+                          onChange={(e) => setEditReplyContent(e.target.value)}
+                          placeholder="Edit your reply..."
+                          className="w-full text-xs p-2.5 rounded-lg focus:outline-none transition-colors"
+                          style={{
+                            border: `1px solid ${COLORS.hairline}`,
+                            backgroundColor: "#fff",
+                            color: COLORS.ink,
+                          }}
+                        />
+                        {editReplyError && (
+                          <p className="text-xs" style={{ color: "#b3543f" }}>
+                            {editReplyError}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSaveReplyEdit(reply._id)}
+                            disabled={isSavingReplyEdit || !editReplyContent.trim()}
+                            className="text-xs font-semibold px-3 py-1 rounded-full disabled:opacity-50 transition-colors"
+                            style={{ backgroundColor: COLORS.accent, color: "#fff" }}
+                          >
+                            {isSavingReplyEdit ? "Saving..." : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelEditReply}
+                            disabled={isSavingReplyEdit}
+                            className="text-xs font-medium px-2.5 py-1 rounded-full transition-colors"
+                            style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className="text-xs leading-relaxed whitespace-pre-wrap pl-8"
+                        style={{ color: COLORS.ink }}
+                      >
+                        {formatReplyWithMentions(reply.content)}
+                      </div>
+                    )}
 
-                    {/* Action bar: Reply link */}
-                    {currentUser && !thread.isLocked && (
-                      <div className="pl-8 mt-2.5">
+                    {/* Action bar: Reply, Edit, Delete */}
+                    <div className="pl-8 mt-2.5 flex items-center gap-3">
+                      {currentUser && !thread.isLocked && !reply.parentReplyId && (
                         <button
                           type="button"
                           onClick={() => {
@@ -1189,11 +1318,33 @@ export default function ThreadDetailView({
                           <MessageCircle className="w-3.5 h-3.5" />
                           <span>{isReplying ? "Cancel Reply" : "Reply"}</span>
                         </button>
-                      </div>
-                    )}
+                      )}
+
+                      {canManageReply(reply) && editingReplyId !== reply._id && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditReply(reply)}
+                            className="text-xs font-medium hover:underline cursor-pointer"
+                            style={{ color: COLORS.accent }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteReply(reply._id)}
+                            disabled={deletingReplyId === reply._id}
+                            className="text-xs font-medium hover:underline cursor-pointer disabled:opacity-50"
+                            style={{ color: "#dc2626" }}
+                          >
+                            {deletingReplyId === reply._id ? "Deleting..." : "Delete"}
+                          </button>
+                        </>
+                      )}
+                    </div>
 
                     {/* Inline Reply Form */}
-                    {isReplying && (
+                    {isReplying && !reply.parentReplyId && (
                       <div
                         className="mt-3 ml-8 p-3.5 rounded-xl bg-white shadow-sm"
                         style={{ border: `1px solid ${COLORS.hairline}` }}
@@ -1288,6 +1439,8 @@ export default function ThreadDetailView({
                       >
                         {childReplies.map((nested) => {
                           const nestedAuthorName = getAuthorDisplayName(nested.author);
+                          const isEditingNested = editingReplyId === nested._id;
+
                           return (
                             <div
                               key={nested._id}
@@ -1316,12 +1469,77 @@ export default function ThreadDetailView({
                                   {timeAgo(nested.createdAt)}
                                 </span>
                               </div>
-                              <div
-                                className="text-xs leading-relaxed whitespace-pre-wrap pl-7"
-                                style={{ color: COLORS.ink }}
-                              >
-                                {formatReplyWithMentions(nested.content)}
-                              </div>
+
+                              {isEditingNested ? (
+                                <div className="pl-7 my-2 space-y-2">
+                                  <textarea
+                                    rows={2}
+                                    value={editReplyContent}
+                                    onChange={(e) => setEditReplyContent(e.target.value)}
+                                    placeholder="Edit your reply..."
+                                    className="w-full text-xs p-2 rounded-lg focus:outline-none transition-colors"
+                                    style={{
+                                      border: `1px solid ${COLORS.hairline}`,
+                                      backgroundColor: "#fff",
+                                      color: COLORS.ink,
+                                    }}
+                                  />
+                                  {editReplyError && (
+                                    <p className="text-xs" style={{ color: "#b3543f" }}>
+                                      {editReplyError}
+                                    </p>
+                                  )}
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSaveReplyEdit(nested._id)}
+                                      disabled={isSavingReplyEdit || !editReplyContent.trim()}
+                                      className="text-xs font-semibold px-2.5 py-1 rounded-full disabled:opacity-50 transition-colors"
+                                      style={{ backgroundColor: COLORS.accent, color: "#fff" }}
+                                    >
+                                      {isSavingReplyEdit ? "Saving..." : "Save"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleCancelEditReply}
+                                      disabled={isSavingReplyEdit}
+                                      className="text-xs font-medium px-2.5 py-1 rounded-full transition-colors"
+                                      style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div
+                                  className="text-xs leading-relaxed whitespace-pre-wrap pl-7"
+                                  style={{ color: COLORS.ink }}
+                                >
+                                  {formatReplyWithMentions(nested.content)}
+                                </div>
+                              )}
+
+                              {canManageReply(nested) && !isEditingNested && (
+                                <div className="pl-7 mt-1.5 flex items-center gap-2.5 text-[11px]">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEditReply(nested)}
+                                    className="font-medium hover:underline cursor-pointer"
+                                    style={{ color: COLORS.accent }}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteReply(nested._id)}
+                                    disabled={deletingReplyId === nested._id}
+                                    className="font-medium hover:underline cursor-pointer disabled:opacity-50"
+                                    style={{ color: "#dc2626" }}
+                                  >
+                                    {deletingReplyId === nested._id ? "Deleting..." : "Delete"}
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           );
                         })}

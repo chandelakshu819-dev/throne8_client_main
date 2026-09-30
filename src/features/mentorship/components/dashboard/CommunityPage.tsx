@@ -490,6 +490,13 @@ export default function CommunityPage() {
               Discussion Forums
             </h3>
             <div className="flex items-center gap-3">
+              <Link
+                href="/mentorship/community/forums"
+                className="text-xs font-semibold hover:underline"
+                style={{ color: COLORS.accent }}
+              >
+                View All
+              </Link>
               <span className="text-xs font-semibold" style={{ color: "#a08070" }}>
                 {forums.length} active
               </span>
@@ -686,15 +693,24 @@ export default function CommunityPage() {
           <h3 className="text-base font-bold" style={{ color: COLORS.ink }}>
             Upcoming Community Events
           </h3>
-          {user && (
-            <button
-              onClick={() => setShowEventForm((v) => !v)}
-              className="text-xs font-semibold px-2.5 py-1 rounded-full"
-              style={{ backgroundColor: COLORS.ink, color: "#fff" }}
+          <div className="flex items-center gap-3">
+            <Link
+              href="/mentorship/community/events"
+              className="text-xs font-semibold hover:underline"
+              style={{ color: COLORS.accent }}
             >
-              + New Event
-            </button>
-          )}
+              View All
+            </Link>
+            {user && (
+              <button
+                onClick={() => setShowEventForm((v) => !v)}
+                className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                style={{ backgroundColor: COLORS.ink, color: "#fff" }}
+              >
+                + New Event
+              </button>
+            )}
+          </div>
         </div>
         {showEventForm && (
           <div className="mb-4 p-4 rounded-xl space-y-3" style={{ border: `1px solid ${COLORS.hairline}`, backgroundColor: COLORS.softWash }}>

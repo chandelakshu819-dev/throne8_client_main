@@ -196,6 +196,22 @@ export class CommunityService {
     const { data } = await api.post(`/mentorship/forums/${id}/replies`, payload);
     return data.data;
   }
+
+  static async updateReply(
+    forumId: string,
+    replyId: string,
+    content: string
+  ): Promise<ForumReply> {
+    const { data } = await api.patch(`/mentorship/forums/${forumId}/replies/${replyId}`, { content });
+    return data.data;
+  }
+
+  static async deleteReply(
+    forumId: string,
+    replyId: string
+  ): Promise<void> {
+    await api.delete(`/mentorship/forums/${forumId}/replies/${replyId}`);
+  }
 }
 
 export default CommunityService;
