@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 
 export const MENU_ITEMS = [
+  { id: 'dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
   { id: 'profile',      label: 'Profile',      icon: User },
   { id: 'services',     label: 'Services',     icon: Briefcase },
   { id: 'booking',      label: 'Booking',      icon: Calendar },
@@ -14,7 +15,6 @@ export const MENU_ITEMS = [
   { id: 'availability', label: 'Availability', icon: Clock },
   { id: 'payment',      label: 'Payment',      icon: CreditCard },
   { id: 'review',       label: 'Review',       icon: Star },
-  { id: 'dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
   { id: 'notification', label: 'Notification', icon: Bell },
   { id: 'marketing',    label: 'Marketing Kit', icon: Package },
   { id: 'analytics',    label: 'Analytics',    icon: BarChart3 },
