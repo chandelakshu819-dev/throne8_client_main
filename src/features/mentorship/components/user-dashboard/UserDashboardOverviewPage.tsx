@@ -172,7 +172,7 @@ export default function UserDashboardOverviewPage({
     <div className="space-y-8 animate-fadeIn max-w-4xl">
       {/* Greeting */}
       <div>
-        <h2 className="text-2xl font-bold" style={{ color: COLORS.ink }}>
+        <h2 className="text-xl md:text-2xl font-bold" style={{ color: COLORS.ink }}>
           Welcome back, {firstName}
         </h2>
         <p style={{ color: COLORS.muted }} className="text-sm mt-1">
@@ -185,7 +185,7 @@ export default function UserDashboardOverviewPage({
         {stats.map((stat, idx) => (
           <div
             key={idx}
-            className="bg-white p-4 rounded-2xl transition-colors hover:border-[#c9baa9]"
+            className={`bg-white p-4 rounded-2xl transition-colors hover:border-[#c9baa9] ${idx === stats.length - 1 ? 'col-span-2 md:col-span-1' : ''}`}
             style={{ border: `1px solid ${COLORS.hairline}` }}
           >
             <div
@@ -236,7 +236,7 @@ export default function UserDashboardOverviewPage({
                   return (
                     <div
                       key={s.sessionId ?? s._id ?? idx}
-                      className="flex items-center justify-between gap-4 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9]"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9]"
                       style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
                     >
                       <div className="flex items-center gap-3 min-w-0">

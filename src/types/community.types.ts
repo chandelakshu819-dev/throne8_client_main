@@ -68,6 +68,7 @@ export interface CommunityEvent {
   createdBy: EventCreator | null; // now an attached User object, not a raw ObjectId/UUID
   participantsCount: number;
   resourceLink?: string;
+  imageUrl?: string;
   isCancelled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -90,6 +91,8 @@ export interface CreateEventPayload {
   date: string;
   type?: EventType;
   resourceLink?: string;
+  imageUrl?: string;
+  image?: File;
 }
 
 export type UpdateEventPayload = Partial<CreateEventPayload>;
