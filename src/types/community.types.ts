@@ -157,6 +157,7 @@ export interface ForumReply {
   content: string;
   mentions: string[];
   upvotes: string[];
+  parentReplyId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -170,6 +171,7 @@ export interface CreateForumPayload {
 export interface AddReplyPayload {
   content: string;
   mentions?: string[];
+  parentReplyId?: string | null;
 }
 
 export interface ListForumsParams {

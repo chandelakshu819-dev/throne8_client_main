@@ -7,11 +7,13 @@ export interface MentorReview {
   sessionId: string;
   mentorId: string | any;
   menteeId?: string | any;
+  // resolved plain user ids, used for profile links / permission checks on the client
+  menteeUserId?: string;
+  mentorUserId?: string;
   rating: number;
   comment: string;
   helpfulCount?: number;
   notHelpfulCount?: number;
-  userReaction?: "like" | "dislike" | null;
   isVerified?: boolean;
   tags?: string[];
   mentorResponse?: { comment: string; respondedAt: string };
@@ -53,6 +55,15 @@ interface PaginatedResponse<T> {
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
+export type ReviewSort = "newest" | "helpful" | "highest" | "lowest";
+export type ReviewReaction = "like" | "dislike";
+
+export interface ReactionResult {
+  helpfulCount: number;
+  notHelpfulCount: number;
+  userReaction: ReviewReaction | null;
+}
+
 // matches backend's allowed tags list exactly
 // (see MentorshipReviewSchema.tags.enum in the backend model)
 export const REVIEW_TAGS = [
@@ -79,28 +90,65 @@ export interface SubmitReviewInput {
 }
 
 const ReviewService = {
-  getMentorReviews: (mentorId: string, page = 1, limit = 10) =>
+  // matches GET /mentor/:mentorId?page=&limit=&sort=
+  getMentorReviews: (mentorId: string, page = 1, limit = 10, sort: ReviewSort = "newest") =>
     api
       .get<{
         success: boolean;
         message: string;
         data: MentorReview[];
         meta: { page: number; limit: number; total: number; totalPages: number };
-      }>(`/mentorship/reviews/mentor/${mentorId}`, { params: { page, limit } })
+      }>(`/mentorship/reviews/mentor/${mentorId}`, { params: { page, limit, sort } })
       .then((res) => ({
         data: res.data.data,
         pagination: res.data.meta,
       })),
 
+  getTopReviews: (mentorId: string, limit = 5) =>
+    api
+      .get<{ data: MentorReview[] }>(`/mentorship/reviews/mentor/${mentorId}/top`, { params: { limit } })
+      .then((res) => res.data.data),
+
+  // matches GET /mentor/:mentorId/stats
   getReviewStats: (mentorId: string) =>
     api
       .get<{ data: ReviewStats }>(`/mentorship/reviews/mentor/${mentorId}/stats`)
+      .then((res) => res.data.data),
+
+  // matches GET /mentor/:mentorId/my-reactions (auth required)
+  // returns a map of reviewId -> the logged-in user's reaction on that review
+  getMyReviewReactions: (mentorId: string) =>
+    api
+      .get<{ data: Record<string, ReviewReaction> }>(`/mentorship/reviews/mentor/${mentorId}/my-reactions`)
+      .then((res) => res.data.data ?? {})
+      .catch(() => ({} as Record<string, ReviewReaction>)),
+
+  // matches POST /:id/react  body: { type: 'like' | 'dislike' } (toggle, auth required)
+  reactToReview: (reviewId: string, type: ReviewReaction) =>
+    api
+      .post<{ data: ReactionResult }>(`/mentorship/reviews/${reviewId}/react`, { type })
       .then((res) => res.data.data),
 
   markHelpful: (reviewId: string) => api.post(`/mentorship/reviews/${reviewId}/helpful`),
 
   submitReview: (input: SubmitReviewInput) =>
     api.post<{ data: MentorReview }>(`/mentorship/reviews`, input).then((res) => res.data.data),
+
+  updateReview: (reviewId: string, input: Partial<Pick<SubmitReviewInput, "rating" | "comment" | "tags">>) =>
+    api.put<{ data: MentorReview }>(`/mentorship/reviews/${reviewId}`, input).then((res) => res.data.data),
+
+  // matches POST /:id/response  body: { response: string } (mentor only, auth required)
+  replyToReview: (reviewId: string, response: string) =>
+    api
+      .post<{ data: MentorReview }>(`/mentorship/reviews/${reviewId}/response`, { response })
+      .then((res) => res.data.data),
+
+  // matches DELETE /:id/response (mentor only, auth required)
+  deleteReviewReply: (reviewId: string) =>
+    api.delete<{ message: string; success: boolean }>(`/mentorship/reviews/${reviewId}/response`).then((res) => res.data),
+
+  reportReview: (reviewId: string, reason: string) =>
+    api.post<{ message: string; success: boolean }>(`/mentorship/reviews/${reviewId}/report`, { reason }).then((res) => res.data),
 
   // NEW: fetches all reviews the logged-in mentee has submitted, so we can
   // cross-reference against `sessions` by sessionId and know which sessions
@@ -119,41 +167,6 @@ const ReviewService = {
 
   deleteReview: (reviewId: string) =>
     api.delete<{ message: string; success: boolean }>(`/mentorship/reviews/${reviewId}`).then((res) => res.data),
-
-  reactToReview: (reviewId: string, type: "like" | "dislike") =>
-    api
-      .post<{
-        success: boolean;
-        message: string;
-        data: { reviewId: string; helpfulCount: number; notHelpfulCount: number; userReaction: "like" | "dislike" | null };
-      }>(`/mentorship/reviews/${reviewId}/react`, { type })
-      .then((res) => res.data.data),
-
-  getMyReactions: (mentorId: string) =>
-    api
-      .get<{
-        success: boolean;
-        message: string;
-        data: Record<string, "like" | "dislike">;
-      }>(`/mentorship/reviews/mentor/${mentorId}/my-reactions`)
-      .then((res) => res.data.data || {}),
-
-  addMentorResponse: (reviewId: string, response: string) =>
-    api
-      .post<{
-        success: boolean;
-        message: string;
-        data: MentorReview;
-      }>(`/mentorship/reviews/${reviewId}/response`, { response })
-      .then((res) => res.data.data),
-
-  deleteMentorResponse: (reviewId: string) =>
-    api
-      .delete<{
-        success: boolean;
-        message: string;
-      }>(`/mentorship/reviews/${reviewId}/response`)
-      .then((res) => res.data),
 };
 
 export default ReviewService;
