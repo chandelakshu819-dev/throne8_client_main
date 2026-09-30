@@ -1,7 +1,7 @@
 // src/app/mentorship/community/forums/page.tsx
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   MessageCircle,
@@ -12,7 +12,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  Search,
+  X,
 } from "lucide-react";
+
 import CommunityService from "@/lib/api/community.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { Forum, ForumCategory } from "@/types/community.types";
@@ -44,6 +47,11 @@ export default function AllForumsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Search state
+  const [searchInput, setSearchInput] = useState("");
+  const [activeSearch, setActiveSearch] = useState("");
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Pagination state
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -58,32 +66,63 @@ export default function AllForumsPage() {
   const [forumSubmitting, setForumSubmitting] = useState(false);
   const [forumSubmitError, setForumSubmitError] = useState<string | null>(null);
 
-  const fetchForums = useCallback(async (targetPage: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await CommunityService.listForums({ page: targetPage, limit });
-      if (Array.isArray(data)) {
-        setForums(data);
-        setTotal(data.length);
-        setPages(1);
-        setPage(1);
-      } else {
-        setForums(data.items || []);
-        setTotal(data.total || 0);
-        setPage(data.page || 1);
-        setPages(data.pages || 1);
+  const fetchForums = useCallback(
+    async (targetPage: number, querySearch = activeSearch) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const trimmed = querySearch.trim();
+        const data = await CommunityService.listForums({
+          page: targetPage,
+          limit,
+          ...(trimmed ? { search: trimmed } : {}),
+        });
+        if (Array.isArray(data)) {
+          setForums(data);
+          setTotal(data.length);
+          setPages(1);
+          setPage(1);
+        } else {
+          setForums(data.items || []);
+          setTotal(data.total || 0);
+          setPage(data.page || 1);
+          setPages(data.pages || 1);
+        }
+      } catch (err: any) {
+        setError(err.response?.data?.message || "Couldn't load discussions right now.");
+      } finally {
+        setLoading(false);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Couldn't load discussions right now.");
-    } finally {
-      setLoading(false);
-    }
-  }, [limit]);
+    },
+    [limit, activeSearch]
+  );
 
   useEffect(() => {
-    fetchForums(page);
-  }, [page, fetchForums]);
+    fetchForums(page, activeSearch);
+  }, [page, activeSearch, fetchForums]);
+
+  // Debounced search handler (250ms delay)
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearchInput(val);
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    searchDebounceRef.current = setTimeout(() => {
+      setPage(1);
+      setActiveSearch(val);
+    }, 250);
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput("");
+    setActiveSearch("");
+    setPage(1);
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+  };
+
 
   const handleCreateForum = async () => {
     if (!forumTopic.trim()) return;
@@ -247,6 +286,39 @@ export default function AllForumsPage() {
           className="bg-white p-6 rounded-2xl shadow-sm"
           style={{ border: `1px solid ${COLORS.hairline}` }}
         >
+          {/* Search Input */}
+          <div className="mb-5 relative">
+            <div className="relative flex items-center">
+              <Search
+                className="w-4 h-4 absolute left-3.5 pointer-events-none"
+                style={{ color: COLORS.muted }}
+              />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={handleSearchChange}
+                placeholder="Search discussions by topic or keywords..."
+                className="w-full text-xs pl-9 pr-9 py-2.5 rounded-xl focus:outline-none transition-colors"
+                style={{
+                  border: `1px solid ${COLORS.hairline}`,
+                  backgroundColor: COLORS.softWash,
+                  color: COLORS.ink,
+                }}
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="absolute right-2.5 p-1 rounded-full text-xs hover:bg-gray-200 transition-colors cursor-pointer"
+                  style={{ color: COLORS.muted }}
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-6 h-6 animate-spin" style={{ color: COLORS.accent }} />
@@ -258,7 +330,7 @@ export default function AllForumsPage() {
               </p>
               <button
                 type="button"
-                onClick={() => fetchForums(page)}
+                onClick={() => fetchForums(page, activeSearch)}
                 className="text-xs font-semibold px-3 py-1.5 rounded-full"
                 style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
               >
@@ -267,10 +339,30 @@ export default function AllForumsPage() {
             </div>
           ) : forums.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-sm" style={{ color: COLORS.muted }}>
-                No discussions found. Be the first to start a conversation!
-              </p>
+              {activeSearch ? (
+                <>
+                  <p className="text-sm font-semibold mb-1" style={{ color: COLORS.ink }}>
+                    No discussions found matching &ldquo;{activeSearch}&rdquo;
+                  </p>
+                  <p className="text-xs mb-4" style={{ color: COLORS.muted }}>
+                    Try searching with different keywords or clear your search filter.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="text-xs font-semibold px-3.5 py-1.5 rounded-full cursor-pointer transition-colors"
+                    style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
+                  >
+                    Clear Search
+                  </button>
+                </>
+              ) : (
+                <p className="text-sm" style={{ color: COLORS.muted }}>
+                  No discussions found. Be the first to start a conversation!
+                </p>
+              )}
             </div>
+
           ) : (
             <div className="space-y-3">
               {forums.map((forum) => {

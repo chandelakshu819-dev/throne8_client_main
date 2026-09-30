@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import AdminLayout from "./AdminLayout";
 import AdminService from "@/lib/api/admin.service";
+import CommunityReportsView from "./CommunityReportsView";
 
 const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Mentorship module overview" },
@@ -20,8 +21,10 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   sessions: { title: "Sessions", subtitle: "All booked mentorship sessions" },
   reviews: { title: "All Reviews", subtitle: "Every review submitted by mentees" },
   "reported-reviews": { title: "Reported Reviews", subtitle: "Reviews flagged for moderation" },
+  "community-reports": { title: "Community Reports", subtitle: "Review and moderate flagged forum threads and replies" },
   payments: { title: "Payment Logs", subtitle: "Transaction history across the module" },
 };
+
 
 interface DashboardStats {
   totalMentors?: number;
@@ -221,11 +224,13 @@ export default function MentorshipAdminPage() {
 
       {activePage === "dashboard" && <DashboardOverview stats={stats} loading={loading} />}
 
-      {activePage !== "dashboard" && (
+      {activePage === "community-reports" && <CommunityReportsView />}
+
+      {activePage !== "dashboard" && activePage !== "community-reports" && (
         <p style={{ color: "#8a7a6a" }}>
           {PAGE_META[activePage]?.title} page — agla step mein banega.
         </p>
       )}
     </AdminLayout>
   );
-}
+}

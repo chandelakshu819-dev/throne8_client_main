@@ -1,7 +1,7 @@
 // src/app/mentorship/community/events/page.tsx
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Calendar,
@@ -11,6 +11,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  Search,
+  X,
 } from "lucide-react";
 import CommunityService from "@/lib/api/community.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -60,6 +62,11 @@ export default function AllEventsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Search state
+  const [searchInput, setSearchInput] = useState("");
+  const [activeSearch, setActiveSearch] = useState("");
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Pagination state
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -93,49 +100,79 @@ export default function AllEventsPage() {
   const [eventSubmitting, setEventSubmitting] = useState(false);
   const [eventSubmitError, setEventSubmitError] = useState<string | null>(null);
 
-  const fetchEvents = useCallback(async (targetPage: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await CommunityService.listEvents({ page: targetPage, limit });
-      const itemsList = Array.isArray(data) ? data : data.items || [];
-      const upcomingList = itemsList.filter((e) => !e.isCancelled);
+  const fetchEvents = useCallback(
+    async (targetPage: number, querySearch = activeSearch) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const trimmed = querySearch.trim();
+        const data = await CommunityService.listEvents({
+          page: targetPage,
+          limit,
+          ...(trimmed ? { search: trimmed } : {}),
+        });
+        const itemsList = Array.isArray(data) ? data : data.items || [];
+        const upcomingList = itemsList.filter((e) => !e.isCancelled);
 
-      setEvents(upcomingList);
-      if (Array.isArray(data)) {
-        setTotal(upcomingList.length);
-        setPages(1);
-        setPage(1);
-      } else {
-        setTotal(data.total || upcomingList.length);
-        setPage(data.page || 1);
-        setPages(data.pages || 1);
-      }
-
-      // Hydrate RSVP state for current user
-      if (user && upcomingList.length > 0) {
-        const goingIds = await Promise.all(
-          upcomingList.map((e) =>
-            CommunityService.getEvent(e._id)
-              .then((full) => (full.isGoing ? e._id : null))
-              .catch(() => null)
-          )
-        );
-        const resolved = goingIds.filter(Boolean) as string[];
-        if (resolved.length > 0) {
-          setRsvpGoing(new Set(resolved));
+        setEvents(upcomingList);
+        if (Array.isArray(data)) {
+          setTotal(upcomingList.length);
+          setPages(1);
+          setPage(1);
+        } else {
+          setTotal(data.total || upcomingList.length);
+          setPage(data.page || 1);
+          setPages(data.pages || 1);
         }
+
+        // Hydrate RSVP state for current user
+        if (user && upcomingList.length > 0) {
+          const goingIds = await Promise.all(
+            upcomingList.map((e) =>
+              CommunityService.getEvent(e._id)
+                .then((full) => (full.isGoing ? e._id : null))
+                .catch(() => null)
+            )
+          );
+          const resolved = goingIds.filter(Boolean) as string[];
+          if (resolved.length > 0) {
+            setRsvpGoing(new Set(resolved));
+          }
+        }
+      } catch (err: any) {
+        setError(err.response?.data?.message || "Couldn't load community events right now.");
+      } finally {
+        setLoading(false);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Couldn't load community events right now.");
-    } finally {
-      setLoading(false);
-    }
-  }, [limit, user]);
+    },
+    [limit, user, activeSearch]
+  );
 
   useEffect(() => {
-    fetchEvents(page);
-  }, [page, fetchEvents]);
+    fetchEvents(page, activeSearch);
+  }, [page, activeSearch, fetchEvents]);
+
+  // Debounced search handler (250ms delay)
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearchInput(val);
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    searchDebounceRef.current = setTimeout(() => {
+      setPage(1);
+      setActiveSearch(val);
+    }, 250);
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput("");
+    setActiveSearch("");
+    setPage(1);
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+  };
 
   const handleCreateEvent = async () => {
     if (!eventTitle.trim() || !eventDate) return;
@@ -154,7 +191,7 @@ export default function AllEventsPage() {
       setEventDescription("");
       setShowEventForm(false);
       if (page === 1) {
-        fetchEvents(1);
+        fetchEvents(1, activeSearch);
       } else {
         setPage(1);
       }
@@ -449,6 +486,39 @@ export default function AllEventsPage() {
           className="bg-white p-6 rounded-2xl shadow-sm"
           style={{ border: `1px solid ${COLORS.hairline}` }}
         >
+          {/* Search Input */}
+          <div className="mb-5 relative">
+            <div className="relative flex items-center">
+              <Search
+                className="w-4 h-4 absolute left-3.5 pointer-events-none"
+                style={{ color: COLORS.muted }}
+              />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={handleSearchChange}
+                placeholder="Search events by title or keywords..."
+                className="w-full text-xs pl-9 pr-9 py-2.5 rounded-xl focus:outline-none transition-colors"
+                style={{
+                  border: `1px solid ${COLORS.hairline}`,
+                  backgroundColor: COLORS.softWash,
+                  color: COLORS.ink,
+                }}
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  className="absolute right-2.5 p-1 rounded-full text-xs hover:bg-gray-200 transition-colors cursor-pointer"
+                  style={{ color: COLORS.muted }}
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-6 h-6 animate-spin" style={{ color: COLORS.accent }} />
@@ -460,7 +530,7 @@ export default function AllEventsPage() {
               </p>
               <button
                 type="button"
-                onClick={() => fetchEvents(page)}
+                onClick={() => fetchEvents(page, activeSearch)}
                 className="text-xs font-semibold px-3 py-1.5 rounded-full"
                 style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
               >
@@ -469,9 +539,28 @@ export default function AllEventsPage() {
             </div>
           ) : events.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-sm" style={{ color: COLORS.muted }}>
-                No upcoming events right now.
-              </p>
+              {activeSearch ? (
+                <>
+                  <p className="text-sm font-semibold mb-1" style={{ color: COLORS.ink }}>
+                    No events found matching &ldquo;{activeSearch}&rdquo;
+                  </p>
+                  <p className="text-xs mb-4" style={{ color: COLORS.muted }}>
+                    Try searching with different keywords or clear your search filter.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-full"
+                    style={{ backgroundColor: COLORS.chip, color: COLORS.ink }}
+                  >
+                    Clear Search
+                  </button>
+                </>
+              ) : (
+                <p className="text-sm" style={{ color: COLORS.muted }}>
+                  No upcoming events right now.
+                </p>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

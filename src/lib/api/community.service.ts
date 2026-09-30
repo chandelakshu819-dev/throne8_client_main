@@ -212,6 +212,54 @@ export class CommunityService {
   ): Promise<void> {
     await api.delete(`/mentorship/forums/${forumId}/replies/${replyId}`);
   }
+
+  static async reportForum(
+    id: string,
+    reason: "spam" | "harassment" | "inappropriate" | "other",
+    note?: string
+  ): Promise<any> {
+    const { data } = await api.post(`/mentorship/forums/${id}/report`, { reason, note });
+    return data.data;
+  }
+
+  static async reportReply(
+    forumId: string,
+    replyId: string,
+    reason: "spam" | "harassment" | "inappropriate" | "other",
+    note?: string
+  ): Promise<any> {
+    const { data } = await api.post(`/mentorship/forums/${forumId}/replies/${replyId}/report`, {
+      reason,
+      note,
+    });
+    return data.data;
+  }
+
+  // ─────────────────────────────────────────
+  // Admin: Community Reports Moderation
+  // ─────────────────────────────────────────
+  static async listCommunityReports(
+    params: {
+      status?: "pending" | "resolved" | "dismissed";
+      targetType?: "forum" | "forumReply";
+      page?: number;
+      limit?: number;
+    } = {}
+  ): Promise<PaginatedResponse<any>> {
+    const { data } = await api.get("/mentorship/forums/reports", { params });
+    return data.data;
+  }
+
+  static async updateReportStatus(
+    reportId: string,
+    status: "resolved" | "dismissed"
+  ): Promise<any> {
+    const { data } = await api.patch(`/mentorship/forums/reports/${reportId}`, {
+      status,
+    });
+    return data.data;
+  }
 }
 
 export default CommunityService;
+
