@@ -13,6 +13,7 @@ export interface RealtimeNotification {
     message: string;
     isRead: boolean;
     createdAt: string;
+    data?: Record<string, any>;
 }
 
 export interface SessionStartedEvent {

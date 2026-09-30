@@ -152,6 +152,7 @@ export default function UserDashboardLayout({
           message: latestNotification.message,
           createdAt: latestNotification.createdAt,
           isRead: false,
+          data: latestNotification.data || {},
         },
         ...(Array.isArray(prev) ? prev : []),
       ];

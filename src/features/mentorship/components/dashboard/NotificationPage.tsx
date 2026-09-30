@@ -124,32 +124,57 @@ function MenteeAvatar({ photo, name, menteeId }: { photo?: string; name?: string
   )
 }
 
-function RenderTextWithMenteeLink({ text, menteeId, menteeName }: { text?: string; menteeId?: string; menteeName?: string }) {
+function RenderTextWithMenteeLink({
+  text,
+  menteeId,
+  menteeName,
+  isTitle,
+}: {
+  text?: string
+  menteeId?: string
+  menteeName?: string
+  isTitle?: boolean
+}) {
   if (!text) return null
-  if (!menteeId || !menteeName || !text.includes(menteeName)) {
-    return <>{text}</>
+  if (!menteeId) return <>{text}</>
+
+  if (menteeName && text.includes(menteeName)) {
+    const parts = text.split(menteeName)
+    return (
+      <>
+        {parts.map((part, idx) => (
+          <React.Fragment key={idx}>
+            {part}
+            {idx < parts.length - 1 && (
+              <Link
+                href={`/profile/${menteeId}`}
+                onClick={(e) => e.stopPropagation()}
+                className="font-semibold hover:underline cursor-pointer"
+                style={{ color: COLORS.ink }}
+              >
+                {menteeName}
+              </Link>
+            )}
+          </React.Fragment>
+        ))}
+      </>
+    )
   }
 
-  const parts = text.split(menteeName)
-  return (
-    <>
-      {parts.map((part, idx) => (
-        <React.Fragment key={idx}>
-          {part}
-          {idx < parts.length - 1 && (
-            <Link
-              href={`/profile/${menteeId}`}
-              onClick={(e) => e.stopPropagation()}
-              className="font-semibold hover:underline cursor-pointer"
-              style={{ color: COLORS.ink }}
-            >
-              {menteeName}
-            </Link>
-          )}
-        </React.Fragment>
-      ))}
-    </>
-  )
+  if (isTitle) {
+    return (
+      <Link
+        href={`/profile/${menteeId}`}
+        onClick={(e) => e.stopPropagation()}
+        className="hover:underline cursor-pointer"
+        style={{ color: COLORS.ink }}
+      >
+        {text}
+      </Link>
+    )
+  }
+
+  return <>{text}</>
 }
 
 export default function NotificationPage({
@@ -246,10 +271,18 @@ export default function NotificationPage({
               const Icon = TYPE_ICON[item.type ?? "system"] ?? Bell
 
               return (
-                <button
+                <div
                   key={item._id ?? idx}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => item._id && onMarkRead?.(item._id)}
-                  className="w-full flex items-start gap-3.5 p-3.5 rounded-xl text-left transition-colors hover:border-[#c9baa9]"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      item._id && onMarkRead?.(item._id)
+                    }
+                  }}
+                  className="w-full flex items-start gap-3.5 p-3.5 rounded-xl text-left transition-colors hover:border-[#c9baa9] cursor-pointer"
                   style={{
                     backgroundColor: item.isRead ? "transparent" : COLORS.softWash,
                     border: `1px solid ${item.isRead ? "transparent" : COLORS.hairline}`,
@@ -275,7 +308,7 @@ export default function NotificationPage({
                           fontWeight: item.isRead ? 500 : 700,
                         }}
                       >
-                        <RenderTextWithMenteeLink text={item.title} menteeId={menteeId} menteeName={menteeName} />
+                        <RenderTextWithMenteeLink text={item.title} menteeId={menteeId} menteeName={menteeName} isTitle />
                       </p>
                       {!item.isRead && (
                         <span
@@ -292,7 +325,7 @@ export default function NotificationPage({
                   <span className="text-xs shrink-0 mt-0.5 font-medium" style={{ color: COLORS.muted }}>
                     {timeAgo(item.createdAt)}
                   </span>
-                </button>
+                </div>
               )
             })}
           </div>

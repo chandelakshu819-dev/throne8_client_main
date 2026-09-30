@@ -232,6 +232,7 @@ export default function MentorDashboard(
           message: latestNotification.message,
           createdAt: latestNotification.createdAt,
           isRead: false,
+          data: latestNotification.data || {},
         },
         ...(Array.isArray(prev) ? prev : []),
       ];
