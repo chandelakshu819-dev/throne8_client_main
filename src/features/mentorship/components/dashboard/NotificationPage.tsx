@@ -264,9 +264,9 @@ export default function NotificationPage({
           </h3>
           <div className="space-y-2">
             {group.items.map((item, idx) => {
-              const menteeId = item.data?.menteeId
-              const menteeName = item.data?.menteeName
-              const menteePhoto = item.data?.menteePhoto
+              const menteeId = item.data?.menteeId || item.data?.actorId || item.data?.viewerId || item.data?.replierId
+              const menteeName = item.data?.menteeName || item.data?.actorName || item.data?.viewerName || item.data?.replierName
+              const menteePhoto = item.data?.menteePhoto || item.data?.actorPhoto || item.data?.viewerPhoto || item.data?.replierPhoto
               const hasMentee = Boolean(menteeId)
               const Icon = TYPE_ICON[item.type ?? "system"] ?? Bell
 
