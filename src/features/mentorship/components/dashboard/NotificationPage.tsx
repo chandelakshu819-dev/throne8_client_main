@@ -1,5 +1,6 @@
 // mentorDashboard/components/NotificationPage.tsx
 import React, { useMemo } from "react"
+import Link from "next/link"
 import { CalendarClock, Star, CreditCard, Bell, MessageSquare, CheckCheck, BellRing } from "lucide-react"
 
 const COLORS = {
@@ -23,6 +24,12 @@ type NotificationItem = {
   message?: string
   createdAt?: string
   isRead?: boolean
+  data?: {
+    menteeId?: string
+    menteeName?: string
+    menteePhoto?: string
+    [key: string]: any
+  }
 }
 
 interface NotificationPageProps {
@@ -55,6 +62,13 @@ function timeAgo(iso?: string) {
   return d.toLocaleDateString([], { day: "numeric", month: "short" })
 }
 
+function getInitials(name?: string) {
+  if (!name) return "M"
+  const parts = name.trim().split(/\s+/)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return name.slice(0, 2).toUpperCase()
+}
+
 function groupByRecency(items: NotificationItem[]) {
   const today: NotificationItem[] = []
   const thisWeek: NotificationItem[] = []
@@ -78,6 +92,64 @@ function groupByRecency(items: NotificationItem[]) {
     { label: "This week", items: thisWeek },
     { label: "Earlier", items: earlier },
   ].filter((g) => g.items.length > 0)
+}
+
+function MenteeAvatar({ photo, name, menteeId }: { photo?: string; name?: string; menteeId: string }) {
+  const content = photo ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={photo}
+      alt={name || "Mentee"}
+      className="w-10 h-10 rounded-full object-cover shrink-0"
+      style={{ border: `1px solid ${COLORS.hairline}` }}
+    />
+  ) : (
+    <div
+      className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-white text-sm"
+      style={{ backgroundColor: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}
+    >
+      {getInitials(name)}
+    </div>
+  )
+
+  return (
+    <Link
+      href={`/profile/${menteeId}`}
+      onClick={(e) => e.stopPropagation()}
+      aria-label={`View ${name || 'mentee'}'s profile`}
+      className="shrink-0 transition-opacity hover:opacity-90 cursor-pointer"
+    >
+      {content}
+    </Link>
+  )
+}
+
+function RenderTextWithMenteeLink({ text, menteeId, menteeName }: { text?: string; menteeId?: string; menteeName?: string }) {
+  if (!text) return null
+  if (!menteeId || !menteeName || !text.includes(menteeName)) {
+    return <>{text}</>
+  }
+
+  const parts = text.split(menteeName)
+  return (
+    <>
+      {parts.map((part, idx) => (
+        <React.Fragment key={idx}>
+          {part}
+          {idx < parts.length - 1 && (
+            <Link
+              href={`/profile/${menteeId}`}
+              onClick={(e) => e.stopPropagation()}
+              className="font-semibold hover:underline cursor-pointer"
+              style={{ color: COLORS.ink }}
+            >
+              {menteeName}
+            </Link>
+          )}
+        </React.Fragment>
+      ))}
+    </>
+  )
 }
 
 export default function NotificationPage({
@@ -167,7 +239,12 @@ export default function NotificationPage({
           </h3>
           <div className="space-y-2">
             {group.items.map((item, idx) => {
+              const menteeId = item.data?.menteeId
+              const menteeName = item.data?.menteeName
+              const menteePhoto = item.data?.menteePhoto
+              const hasMentee = Boolean(menteeId)
               const Icon = TYPE_ICON[item.type ?? "system"] ?? Bell
+
               return (
                 <button
                   key={item._id ?? idx}
@@ -178,12 +255,16 @@ export default function NotificationPage({
                     border: `1px solid ${item.isRead ? "transparent" : COLORS.hairline}`,
                   }}
                 >
-                  <span
-                    className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: COLORS.chip }}
-                  >
-                    <Icon className="w-4 h-4" style={{ color: COLORS.accent }} />
-                  </span>
+                  {hasMentee ? (
+                    <MenteeAvatar photo={menteePhoto} name={menteeName} menteeId={menteeId!} />
+                  ) : (
+                    <span
+                      className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: COLORS.chip }}
+                    >
+                      <Icon className="w-4 h-4" style={{ color: COLORS.accent }} />
+                    </span>
+                  )}
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -194,7 +275,7 @@ export default function NotificationPage({
                           fontWeight: item.isRead ? 500 : 700,
                         }}
                       >
-                        {item.title}
+                        <RenderTextWithMenteeLink text={item.title} menteeId={menteeId} menteeName={menteeName} />
                       </p>
                       {!item.isRead && (
                         <span
@@ -204,7 +285,7 @@ export default function NotificationPage({
                       )}
                     </div>
                     <p className="text-sm mt-0.5 line-clamp-2" style={{ color: COLORS.muted }}>
-                      {item.message}
+                      <RenderTextWithMenteeLink text={item.message} menteeId={menteeId} menteeName={menteeName} />
                     </p>
                   </div>
 

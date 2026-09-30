@@ -59,6 +59,7 @@ class NotificationService {
             message: raw.message,
             createdAt: raw.createdAt,
             isRead: raw.status?.read ?? raw.isRead ?? false,
+            data: raw.data || {},
         };
     }
 

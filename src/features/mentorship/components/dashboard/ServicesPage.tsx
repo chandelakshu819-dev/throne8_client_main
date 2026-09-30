@@ -160,8 +160,29 @@ export default function ServicesPage({
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [showAllServices, setShowAllServices] = useState(false);
   const [showAllGroupSessions, setShowAllGroupSessions] = useState(false);
+
+  // Debounce search query by 250ms for performance on large lists
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // Handle Escape key to clear and close search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && (searchQuery || searchOpen)) {
+        setSearchQuery('');
+        setSearchOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [searchQuery, searchOpen]);
 
   // ── Stats from API ────────────────────────────────────
   const totalSessions = apiSessions.length;
@@ -566,7 +587,7 @@ export default function ServicesPage({
   });
 
   // ── Search + 6-card limit ──
-  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const normalizedQuery = debouncedQuery.trim().toLowerCase();
   const filteredServices = normalizedQuery
     ? sortedServices.filter((s: any) => {
         const typeLabel = serviceTypes.find(t => t.name === s.type)?.label || '';
@@ -616,25 +637,117 @@ export default function ServicesPage({
       <div className="space-y-8 animate-fadeIn">
 
         {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm" style={{ backgroundColor: '#4a3728' }}>
-              <Briefcase className="w-6 h-6 text-white" />
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm" style={{ backgroundColor: '#4a3728' }}>
+                <Briefcase className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight" style={{ color: '#4a3728' }}>My Services</h2>
+                <p style={{ color: '#8a7a6a' }} className="text-sm">Manage your offerings</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight" style={{ color: '#4a3728' }}>My Services</h2>
-              <p style={{ color: '#8a7a6a' }} className="text-sm">Manage your offerings</p>
+
+            <div className="flex items-center gap-3">
+              {/* Desktop Search Input */}
+              <div
+                className="hidden sm:flex items-center gap-2 px-3.5 py-2.5 rounded-xl border bg-white w-60 md:w-64 transition-all focus-within:ring-2 focus-within:ring-[#7a5c3e]/20"
+                style={{ borderColor: '#e0d8cf' }}
+              >
+                <Search className="w-4 h-4 shrink-0" style={{ color: '#8a7a6a' }} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setShowAllServices(false);
+                    setShowAllGroupSessions(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setSearchQuery('');
+                      setSearchOpen(false);
+                      (e.target as HTMLElement).blur();
+                    }
+                  }}
+                  placeholder="Search services..."
+                  aria-label="Search services"
+                  className="w-full text-sm outline-none bg-transparent placeholder-[#8a7a6a]"
+                  style={{ color: '#4a3728' }}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    aria-label="Clear search"
+                    className="p-0.5 hover:bg-[#f3ece4] rounded-md transition-colors shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
+                  </button>
+                )}
+              </div>
+
+              {/* Mobile Search Icon Button */}
+              <button
+                onClick={() => setSearchOpen(!searchOpen)}
+                aria-label="Search services"
+                className="sm:hidden flex items-center justify-center w-10 h-10 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
+                style={{ color: '#7a5c3e', border: '1.5px solid #e0d8cf', backgroundColor: '#fff' }}
+              >
+                <Search className="w-4 h-4" />
+              </button>
+
+              {/* Refresh Button */}
+              <button
+                onClick={fetchAllSessions}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
+                style={{ color: '#7a5c3e', border: '1.5px solid #e0d8cf', backgroundColor: '#fff' }}
+              >
+                <RefreshCw className={`w-4 h-4 ${sessionsLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
             </div>
           </div>
 
-          <button
-            onClick={fetchAllSessions}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
-            style={{ color: '#7a5c3e', border: '1.5px solid #e0d8cf', backgroundColor: '#fff' }}
-          >
-            <RefreshCw className={`w-4 h-4 ${sessionsLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          {/* Mobile Expanded Search Bar */}
+          {searchOpen && (
+            <div
+              className="sm:hidden flex items-center gap-2 px-3.5 py-2.5 rounded-xl border bg-white w-full transition-all animate-fadeIn"
+              style={{ borderColor: '#e0d8cf' }}
+            >
+              <Search className="w-4 h-4 shrink-0" style={{ color: '#8a7a6a' }} />
+              <input
+                autoFocus
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowAllServices(false);
+                  setShowAllGroupSessions(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setSearchQuery('');
+                    setSearchOpen(false);
+                  }
+                }}
+                placeholder="Search services..."
+                aria-label="Search services"
+                className="w-full text-sm outline-none bg-transparent placeholder-[#8a7a6a]"
+                style={{ color: '#4a3728' }}
+              />
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSearchOpen(false);
+                }}
+                aria-label="Close search"
+                className="p-1 hover:bg-[#f3ece4] rounded-md transition-colors shrink-0"
+              >
+                <X className="w-4 h-4" style={{ color: '#8a7a6a' }} />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Stats — real data from API, now as standalone cards */}
@@ -775,52 +888,6 @@ export default function ServicesPage({
                 </span>
               )}
 
-{(sortedServices.length > 0 || apiGroupSessions.length > 0) && (
-                <div className="flex items-center">
-                  {searchOpen ? (
-                    <div
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl border bg-white"
-                      style={{ borderColor: '#e0d8cf' }}
-                    >
-                      <Search className="w-4 h-4" style={{ color: '#8a7a6a' }} />
-                      <input
-                        autoFocus
-                        value={searchQuery}
-                        onChange={(e) => {
-                          setSearchQuery(e.target.value);
-                          setShowAllServices(false);
-                          setShowAllGroupSessions(false);
-                        }}
-                        placeholder="Search services & group sessions..."
-                        className="w-48 sm:w-64 text-xs outline-none bg-transparent"
-                        style={{ color: '#4a3728' }}
-                      />
-                      <button
-                        onClick={() => {
-                          setSearchQuery('');
-                          setSearchOpen(false);
-                          setShowAllServices(false);
-                          setShowAllGroupSessions(false);
-                        }}
-                        aria-label="Close search"
-                      >
-
-
-                        <X className="w-4 h-4" style={{ color: '#8a7a6a' }} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setSearchOpen(true)}
-                      aria-label="Search services"
-                      className="w-9 h-9 flex items-center justify-center rounded-xl border transition-colors hover:bg-[#f3ece4]"
-                      style={{ borderColor: '#e0d8cf', color: '#5c4a3a', backgroundColor: '#fff' }}
-                    >
-                      <Search className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              )}
 
               {sortedServices.length > 1 && (
                 <div className="relative">
@@ -873,10 +940,12 @@ export default function ServicesPage({
             </div>
           ) : filteredServices.length === 0 ? (
             <div className="text-center py-14 rounded-2xl border" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
-              <p className="text-base font-bold" style={{ color: '#4a3728' }}>No services found</p>
-              <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
-                &quot;{searchQuery}&quot; se koi service match nahi hui.
-              </p>
+              <p className="text-base font-bold" style={{ color: '#4a3728' }}>No services match your search.</p>
+              {searchQuery && (
+                <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
+                  No services match &quot;{searchQuery}&quot;.
+                </p>
+              )}
             </div>
           ) : (
             <>
@@ -1118,10 +1187,12 @@ export default function ServicesPage({
               </div>
                        ) : filteredGroupSessions.length === 0 ? (
                         <div className="text-center py-14 rounded-2xl border" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
-                          <p className="text-base font-bold" style={{ color: '#4a3728' }}>No group sessions found</p>
-                          <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
-                            &quot;{searchQuery}&quot; se koi group session match nahi hua.
-                          </p>
+                          <p className="text-base font-bold" style={{ color: '#4a3728' }}>No services match your search.</p>
+                          {searchQuery && (
+                            <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
+                              No group sessions match &quot;{searchQuery}&quot;.
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <>
