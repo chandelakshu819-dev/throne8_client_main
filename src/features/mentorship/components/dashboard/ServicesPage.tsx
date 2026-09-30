@@ -172,6 +172,13 @@ export default function ServicesPage({
 
   const isSearchView = searchParams.get('tab') === 'services_search';
   const urlSearchQuery = searchParams.get('q') || '';
+  const [resultsSearchQuery, setResultsSearchQuery] = useState(urlSearchQuery);
+
+  useEffect(() => {
+    if (isSearchView) {
+      setResultsSearchQuery(urlSearchQuery);
+    }
+  }, [urlSearchQuery, isSearchView]);
 
   // Debounce search query by 250ms for performance on large lists
   useEffect(() => {
@@ -646,23 +653,67 @@ export default function ServicesPage({
       <div className="space-y-8 animate-fadeIn">
         {isSearchView ? (
           <div className="flex flex-col gap-3 mb-8">
-            <button
-              onClick={() => {
-                const params = new URLSearchParams(searchParams.toString());
-                params.set('tab', 'services');
-                params.delete('q');
-                router.push(`${pathname}?${params.toString()}`);
-              }}
-              className="self-start flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200 mb-6 hover:-translate-y-0.5 focus:outline-none focus:ring-2"
-              style={{ 
-                backgroundColor: '#fbf7f3', 
-                color: '#4a3728',
-                border: '1px solid #e0d8cf' 
-              }}
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Services
-            </button>
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 w-full mb-2">
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams.toString());
+                  params.set('tab', 'services');
+                  params.delete('q');
+                  router.push(`${pathname}?${params.toString()}`);
+                }}
+                className="self-start flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2"
+                style={{ 
+                  backgroundColor: '#fbf7f3', 
+                  color: '#4a3728',
+                  border: '1px solid #e0d8cf' 
+                }}
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Services
+              </button>
+
+              <div
+                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border bg-white w-full sm:w-64 transition-all focus-within:ring-2 focus-within:ring-[#7a5c3e]/20"
+                style={{ borderColor: '#e0d8cf' }}
+              >
+                <Search className="w-4 h-4 shrink-0" style={{ color: '#8a7a6a' }} />
+                <input
+                  type="text"
+                  value={resultsSearchQuery}
+                  onChange={(e) => setResultsSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setResultsSearchQuery(urlSearchQuery);
+                      (e.target as HTMLElement).blur();
+                    }
+                    if (e.key === 'Enter') {
+                      const params = new URLSearchParams(searchParams.toString());
+                      if (resultsSearchQuery.trim()) {
+                        params.set('tab', 'services_search');
+                        params.set('q', resultsSearchQuery.trim());
+                      } else {
+                        params.set('tab', 'services');
+                        params.delete('q');
+                      }
+                      router.push(`${pathname}?${params.toString()}`);
+                    }
+                  }}
+                  placeholder="Search services..."
+                  aria-label="Search services"
+                  className="w-full text-sm outline-none bg-transparent placeholder-[#8a7a6a]"
+                  style={{ color: '#4a3728' }}
+                />
+                {resultsSearchQuery && (
+                  <button
+                    onClick={() => setResultsSearchQuery('')}
+                    aria-label="Clear search"
+                    className="p-0.5 hover:bg-[#f3ece4] rounded-md transition-colors shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
+                  </button>
+                )}
+              </div>
+            </div>
             <h2 className="text-3xl font-extrabold tracking-tight mb-2" style={{ color: '#4a3728' }}>
               Search Results
             </h2>
