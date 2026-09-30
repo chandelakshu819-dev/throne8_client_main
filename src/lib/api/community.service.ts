@@ -85,6 +85,22 @@ export class CommunityService {
   static async createEvent(
     payload: CreateEventPayload
   ): Promise<CommunityEvent> {
+    if (payload.image instanceof File) {
+      const formData = new FormData();
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          if (key === 'image') {
+            formData.append('image', value as File);
+          } else {
+            formData.append(key, String(value));
+          }
+        }
+      });
+      const { data } = await api.post("/mentorship/community/events", formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data.data;
+    }
     const { data } = await api.post("/mentorship/community/events", payload);
     return data.data;
   }
@@ -93,6 +109,22 @@ export class CommunityService {
     id: string,
     payload: UpdateEventPayload
   ): Promise<CommunityEvent> {
+    if (payload.image instanceof File) {
+      const formData = new FormData();
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          if (key === 'image') {
+            formData.append('image', value as File);
+          } else {
+            formData.append(key, String(value));
+          }
+        }
+      });
+      const { data } = await api.put(`/mentorship/community/events/${id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data.data;
+    }
     const { data } = await api.put(`/mentorship/community/events/${id}`, payload);
     return data.data;
   }
