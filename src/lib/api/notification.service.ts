@@ -46,7 +46,7 @@ class NotificationService {
         if (rawType.includes("booking") || rawType.includes("session") || rawType.includes("waitlist")) return "booking";
         if (rawType.includes("review")) return "review";
         if (rawType.includes("payment") || rawType.includes("refund") || rawType.includes("package") || rawType.includes("credit")) return "payment";
-        if (rawType.includes("query")) return "message";
+        if (rawType.includes("query") || rawType.includes("forum")) return "message";
         return "system";
     }
 
