@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface MentorItem {
@@ -228,8 +229,13 @@ export default function FindMentorModal({
     const [activeFilter, setActiveFilter] = useState<FilterType>("all");
     const [activeQuick, setActiveQuick] = useState<string | null>(null);
     const [showAll, setShowAll] = useState<boolean>(false);
+    const [mounted, setMounted] = useState<boolean>(false);
 
-    if (!isOpen) return null;
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!isOpen || !mounted) return null;
 
     const filtered = mentors.filter((m) => {
         const matchFilter =
@@ -248,7 +254,7 @@ export default function FindMentorModal({
     const visible = showAll ? filtered : filtered.slice(0, INITIAL_SHOW);
     const hasMore = filtered.length > INITIAL_SHOW;
 
-    return (
+    return createPortal(
         <div
             className="fixed inset-0 z-[200] flex items-center justify-center p-4"
             style={{ backgroundColor: "rgba(74,55,40,0.45)", backdropFilter: "blur(6px)" }}
@@ -397,7 +403,8 @@ export default function FindMentorModal({
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 
