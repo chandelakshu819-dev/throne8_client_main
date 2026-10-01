@@ -135,8 +135,8 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                     {bookingSuccessMsg}
                 </div>
             )}
-            <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "100px 16px 24px" }}>
-                <div style={{ marginBottom: "24px" }}>
+            <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "88px 16px 24px" }}>
+                <div style={{ marginBottom: "16px" }}>
                     <button
                         onClick={() => router.back()}
                         style={{
@@ -153,14 +153,13 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                             borderRadius: "8px",
                         }}
                     >
-                        <ArrowLeft /> Back
+                        <ArrowLeft size={18} /> Back
                     </button>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
                     <MentorSidebar
                         mentorData={mentorData}
                         currentUserId={user?.userId}
-                        onBack={() => router.back()}
                         onEditClick={() => setEditModalOpen(true)}
                     />
                     <div>

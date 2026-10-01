@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @next/next/no-img-element */
 //src/features/mentorship/components/mentor/MentorSidebar.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Camera, Star, Briefcase, ArrowLeft } from "./Icons";
 import { C } from "../../types/data";
 import MentorService from "@/lib/api/mentorship.service";
@@ -13,6 +13,8 @@ interface MentorSidebarProps {
     onBack?: () => void;
     onEditClick?: () => void;
 }
+
+const ABOUT_LINES = 4;
 
 const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId, onBack, onEditClick }) => {
     const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
@@ -27,6 +29,10 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
     const [reportError, setReportError] = useState<string | null>(null);
     const [reportSuccess, setReportSuccess] = useState<boolean>(false);
 
+    const [aboutExpanded, setAboutExpanded] = useState<boolean>(false);
+    const [aboutClamped, setAboutClamped] = useState<boolean>(false);
+    const aboutRef = useRef<HTMLParagraphElement>(null);
+
     useEffect(() => {
         if (mentorData?.savedBy && currentUserId) {
             setSaved(mentorData.savedBy.includes(currentUserId));
@@ -34,6 +40,24 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
             setSaved(false);
         }
     }, [mentorData?.savedBy, currentUserId]);
+
+    // About text 4 line se lamba hai ya nahi, yeh measure karta hai
+    const measureAbout = () => {
+        const el = aboutRef.current;
+        if (!el || aboutExpanded) return;
+        setAboutClamped(el.scrollHeight > el.clientHeight + 1);
+    };
+
+    useLayoutEffect(() => {
+        measureAbout();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mentorData?.bio, !!mentorData]);
+
+    useEffect(() => {
+        window.addEventListener("resize", measureAbout);
+        return () => window.removeEventListener("resize", measureAbout);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [aboutExpanded]);
 
     // Camera (change-photo) button sirf tab dikhega jab logged-in user hi is mentor ka owner ho
     const isOwner = !!currentUserId && !!mentorData?.userId && currentUserId === mentorData.userId;
@@ -98,6 +122,15 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
     const skills = mentorData?.skills || [];
     const languages: string[] = mentorData?.languages || [];
     const timezone: string = mentorData?.availability?.timezone || "";
+
+    const aboutClampStyle: React.CSSProperties = aboutExpanded
+        ? {}
+        : {
+              display: "-webkit-box",
+              WebkitLineClamp: ABOUT_LINES,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+          };
 
     const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>): void => {
         const file = e.target.files?.[0];
@@ -169,7 +202,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                                 </div>
                             )}
                             {verified && (
-                                <div style={{ position: "absolute", bottom: "2px", right: "2px", width: "24px", height: "24px", borderRadius: "50%", background: "#10b981", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "12px", border: "2px solid #fff" }}>✓</div>
+                                <div style={{ position: "absolute", bottom: "2px", right: "2px", width: "24px", height: "24px", borderRadius: "50%", background: "#10b981", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "12px", border: "2px solid #fff" }}>&#10003;</div>
                             )}
                         </div>
                     </div>
@@ -262,7 +295,37 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
 
                     <div style={{ textAlign: "left", marginBottom: "20px" }}>
                         <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "8px" }}>About</h3>
-                        <p style={{ fontSize: "13px", color: C.mid, lineHeight: "1.6" }}>{about}</p>
+                        <p
+                            ref={aboutRef}
+                            style={{
+                                fontSize: "13px",
+                                color: C.mid,
+                                lineHeight: "1.6",
+                                whiteSpace: "pre-line",
+                                overflowWrap: "anywhere",
+                                ...aboutClampStyle,
+                            }}
+                        >
+                            {about}
+                        </p>
+                        {(aboutClamped || aboutExpanded) && (
+                            <button
+                                type="button"
+                                onClick={() => setAboutExpanded((v) => !v)}
+                                style={{
+                                    marginTop: "6px",
+                                    background: "none",
+                                    border: "none",
+                                    padding: 0,
+                                    color: C.dark,
+                                    fontWeight: 700,
+                                    fontSize: "12px",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                {aboutExpanded ? "See less" : "See more"}
+                            </button>
+                        )}
                     </div>
 
                     <div style={{ textAlign: "left" }}>
