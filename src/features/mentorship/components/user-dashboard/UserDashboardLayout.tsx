@@ -296,6 +296,7 @@ export default function UserDashboardLayout({
             onSwitchRole={onSwitchRole}
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            sessions={sessions}
           />
         </div>
         <main className="flex-1 overflow-y-auto">

@@ -75,6 +75,14 @@ export default function Sidebar({
 
           {!isCollapsed && (
             <>
+              <div className="flex flex-col items-center mb-1 w-full px-2">
+                <span className="text-[10px] font-bold tracking-widest uppercase mb-1" style={{ color: '#a08070' }}>
+                  Mentor Dashboard
+                </span>
+                <span className="text-xs text-[#7a5c3e] mb-1 whitespace-nowrap overflow-hidden text-ellipsis w-full">
+                  Mentoring by
+                </span>
+              </div>
               <h2 className="text-lg font-bold whitespace-nowrap overflow-hidden text-ellipsis w-full" style={{ color: '#4a3728' }}>{fullName}</h2>
 
               <span

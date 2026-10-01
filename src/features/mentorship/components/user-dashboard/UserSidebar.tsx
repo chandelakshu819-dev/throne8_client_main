@@ -14,6 +14,7 @@ interface UserSidebarProps {
   onSwitchRole?: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  sessions?: any[];
 }
 
 const USER_MENU_ITEMS = [
@@ -41,6 +42,7 @@ export default function UserSidebar({
   onSwitchRole,
   isCollapsed = false,
   onToggleCollapse,
+  sessions = [],
 }: UserSidebarProps) {
   const { user } = useAuth();
   const { userProfileData, profileImageUrl, loadProfile } = useProfile();
@@ -58,6 +60,20 @@ export default function UserSidebar({
   const initials = (firstName || lastName)
     ? `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase()
     : getInitials(fullName) || "U";
+
+  let mentorText = "No mentor selected";
+  if (sessions && sessions.length > 0) {
+    const uniqueMentors = Array.from(new Set(
+      sessions
+        .map(s => s.mentorName || s.mentor?.name)
+        .filter(Boolean)
+    ));
+    if (uniqueMentors.length === 1) {
+      mentorText = uniqueMentors[0] as string;
+    } else if (uniqueMentors.length > 1) {
+      mentorText = `${uniqueMentors[0]} + ${uniqueMentors.length - 1} more`;
+    }
+  }
 
   return (
     <aside 
@@ -101,6 +117,17 @@ export default function UserSidebar({
 
           {!isCollapsed && (
             <>
+              <div className="flex flex-col items-center mb-1 w-full px-2">
+                <span className="text-[10px] font-bold tracking-widest uppercase mb-1" style={{ color: '#a08070' }}>
+                  Mentee Dashboard
+                </span>
+                <span className="text-xs text-[#7a5c3e] mb-1 whitespace-nowrap overflow-hidden text-ellipsis w-full" title={mentorText !== "No mentor selected" ? `Learning with ${mentorText}` : mentorText}>
+                  {mentorText === "No mentor selected" ? mentorText : (
+                    <>Learning with <span className="font-semibold">{mentorText}</span></>
+                  )}
+                </span>
+              </div>
+
               <h2 className="text-lg font-bold group-hover:text-[#7a5c3e] transition-colors whitespace-nowrap overflow-hidden text-ellipsis w-full" style={{ color: '#4a3728' }}>{fullName}</h2>
 
               <div className="flex items-center gap-2 mt-2">
