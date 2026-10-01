@@ -346,19 +346,68 @@ export default function MentorDashboard(
 
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   return (
     <div className="flex flex-col h-screen bg-[#f6ede8]">
       <div className="h-20 shrink-0" aria-hidden="true" />
 
-      <div className="flex flex-1 min-h-0">
-        <Sidebar
-          activePage={activePage}
-          setActivePage={setActivePage}
-          mentorData={mentorData}
-          dashboardData={dashboardData}
-          unreadNotificationCount={safeNotifications.filter((n) => !n.isRead).length}
-          onSwitchRole={onSwitchRole}
-        />
+      {/* Mobile Header */}
+      <div className="md:hidden flex items-center justify-between px-4 h-16 shrink-0 bg-[#fbf7f3] border-b border-[#e0d8cf]">
+        <button 
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="p-2 -ml-2 text-[#4a3728] hover:bg-[#f3ece4] rounded-lg transition-colors"
+          aria-label="Open menu"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+        </button>
+        
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-[#4a3728] flex items-center justify-center">
+            <span className="text-[#e0d8cf] font-black text-[10px]">T8</span>
+          </div>
+          <span className="text-[#4a3728] font-bold text-sm tracking-tight">throne8</span>
+        </div>
+
+        <div className="w-8 h-8 rounded-full overflow-hidden border border-[#e0d8cf] flex-shrink-0">
+          {dashboardData?.profilePic || mentorData?.profilePic ? (
+            <img src={dashboardData?.profilePic || mentorData?.profilePic} alt="Profile" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-[#4a3728] text-white flex items-center justify-center text-xs font-bold">
+              {(dashboardData?.user?.firstName?.[0] || mentorData?.user?.firstName?.[0] || 'M').toUpperCase()}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-1 min-h-0 relative">
+        {/* Mobile Menu Overlay */}
+        {isMobileMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+        <div className={`
+          absolute md:relative z-50 h-full transform transition-transform duration-300 ease-in-out
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}>
+          <Sidebar
+            activePage={activePage}
+            setActivePage={(page) => {
+              setActivePage(page);
+              setIsMobileMenuOpen(false);
+            }}
+            mentorData={mentorData}
+            dashboardData={dashboardData}
+            unreadNotificationCount={safeNotifications.filter((n) => !n.isRead).length}
+            onSwitchRole={onSwitchRole}
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          />
+        </div>
 
         <main className="flex-1 overflow-y-auto">
           <div className="px-4 md:px-6 py-8 max-w-[1600px] mx-auto">
