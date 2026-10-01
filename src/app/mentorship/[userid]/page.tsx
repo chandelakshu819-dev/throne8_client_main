@@ -148,7 +148,7 @@ export default function ThroneUltraPremium() {
     };
 
     return (
-     <div className="min-h-screen bg-[#f7f1e6] text-[#4a3728] font-sans selection:bg-[#4a3728] selection:text-white">
+     <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#f7f1e6] text-[#4a3728] font-sans selection:bg-[#4a3728] selection:text-white">
             <GlobalStyles />
 
             {/* Navigation */}

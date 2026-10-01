@@ -51,10 +51,12 @@ export default function MentorMarqueeSection() {
                     Handpicked experts from leading tech companies
                 </p>
             </div>
-            <div className="group/marquee">
-                <div className="animate-marquee group-hover/marquee:pause-animation flex gap-6">
+            <div className="w-full">
+                <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 sm:gap-6 px-6 pb-4 scrollbar-hide md:animate-marquee md:group-hover/marquee:pause-animation group/marquee">
                     {[...realCards, ...realCards, ...realCards].map((mentor, i) => (
-                        <MentorCard key={i} mentor={mentor} />
+                        <div key={i} className="snap-center shrink-0">
+                            <MentorCard mentor={mentor} />
+                        </div>
                     ))}
                 </div>
             </div>

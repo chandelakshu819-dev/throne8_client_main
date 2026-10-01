@@ -280,10 +280,10 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
 
                        {/* Explore Mentors - Primary CTA */}
                        {/* 4. Explore Mentors - Primary CTA */}
-<div className="flex flex-wrap items-center gap-3 mb-3.5">
+<div className="flex flex-wrap items-center gap-3 mb-3.5 w-full">
     <button
         onClick={handleExploreAction}
-        className="bg-[#38281e] hover:bg-[#2a1e16] text-white px-6 py-2.5 sm:py-3 rounded-full font-bold text-sm shadow-xs hover:shadow-md transition-all duration-200 flex items-center justify-center gap-2 group cursor-pointer"
+        className="w-full sm:w-auto bg-[#38281e] hover:bg-[#2a1e16] text-white px-6 py-2.5 sm:py-3 rounded-full font-bold text-sm shadow-xs hover:shadow-md transition-all duration-200 flex items-center justify-center gap-2 group cursor-pointer"
     >
         <Search className="w-4 h-4" />
         <span>Explore Mentors</span>
