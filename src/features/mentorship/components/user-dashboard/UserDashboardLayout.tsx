@@ -215,6 +215,7 @@ export default function UserDashboardLayout({
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   return (
     <div className="flex flex-col h-screen bg-[#f6ede8]">
@@ -293,6 +294,8 @@ export default function UserDashboardLayout({
             unreadNotificationCount={safeNotifications.filter((n) => !n.isRead).length}
             isMentor={isMentor}
             onSwitchRole={onSwitchRole}
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           />
         </div>
         <main className="flex-1 overflow-y-auto">
