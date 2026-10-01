@@ -76,9 +76,12 @@ export default function Sidebar({
           {!isCollapsed && (
             <>
               <div className="flex flex-col items-center mb-1 w-full px-2">
-                <span className="text-[10px] font-bold tracking-widest uppercase mb-1" style={{ color: '#a08070' }}>
+                <div 
+                  className="mb-3 px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase border"
+                  style={{ backgroundColor: '#f3ece4', color: '#4a3728', borderColor: '#e0d8cf' }}
+                >
                   Mentor Dashboard
-                </span>
+                </div>
                 <span className="text-xs text-[#7a5c3e] mb-1 whitespace-nowrap overflow-hidden text-ellipsis w-full">
                   Mentoring by
                 </span>
