@@ -13,6 +13,8 @@ import {
 import SessionService from "@/lib/api/session.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { joinMentorshipSession } from "@/features/mentorship/services/sessionJoin.service";
+import MentorService from "@/lib/api/mentorship.service";
+import FindMentorModal from "@/features/mentorship/components/sections/FindMentorModal";
 
 const COLORS = {
   ink: "#4a3728",
@@ -267,6 +269,37 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
   const [filterType, setFilterType] = useState<"all" | "live">("all");
 
   const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [isFindMentorOpen, setIsFindMentorOpen] = useState(false);
+  const [findMentorMentors, setFindMentorMentors] = useState<any[]>([]);
+  const [findMentorLoading, setFindMentorLoading] = useState(false);
+
+  const handleOpenFindMentor = async () => {
+    setIsFindMentorOpen(true);
+    if (findMentorMentors.length === 0) {
+      setFindMentorLoading(true);
+      try {
+        const res = await MentorService.getAllMentors({ page: 1, limit: 100 });
+        const list = Array.isArray(res.data) ? res.data : (res.data?.mentors || []);
+        const mapped = list.map((m: any) => ({
+            id: m.mentorId,
+            userId: m.userId,
+            name: `${m.user?.firstName ?? ""} ${m.user?.lastName ?? ""}`.trim(),
+            role: m.experience?.currentRole?.split(" at ")[0] ?? "Mentor",
+            company: m.experience?.currentRole?.split(" at ")[1] ?? "",
+            rating: m.stats?.averageRating || 0,
+            sessions: m.stats?.totalSessions || m.trustScore?.metrics?.totalCompletedSessions || 0,
+            price: m.pricing?.quickCall || 0,
+            tags: m.skills?.slice(0, 2) ?? [],
+            image: m.profilePic ?? "",
+        }));
+        setFindMentorMentors(mapped);
+      } catch (err) {
+        console.error("Failed to fetch mentors", err);
+      } finally {
+        setFindMentorLoading(false);
+      }
+    }
+  };
   const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   // Periodically refresh current time to update live/ended states dynamically
@@ -732,7 +765,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
             </p>
           </div>
           <button
-            onClick={() => router.push("/mentorship/explore")}
+            onClick={handleOpenFindMentor}
             className="mt-4 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90 shadow-md"
             style={{ backgroundColor: COLORS.ink, color: "#fff" }}
           >
@@ -1070,6 +1103,13 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
           </div>
         </div>
       )}
+
+      <FindMentorModal
+        isOpen={isFindMentorOpen}
+        onClose={() => setIsFindMentorOpen(false)}
+        mentors={findMentorMentors}
+        loading={findMentorLoading}
+      />
     </div>
   );
 }
