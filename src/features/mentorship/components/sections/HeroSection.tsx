@@ -15,6 +15,7 @@ import {
     CheckCircle2,
     TrendingUp,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import MentorService from "@/lib/api/mentorship.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 const seniorKeywords = [
@@ -256,7 +257,12 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8 items-center">
 
                 {/* ── LEFT SIDE ─────────────────────────────────────────────────── */}
-                <div className="lg:col-span-6 xl:col-span-6 flex flex-col justify-center text-left">
+                <motion.div 
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    className="lg:col-span-6 xl:col-span-6 flex flex-col justify-center text-left"
+                >
 
                     {/* 1. Eyebrow Tag */}
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#f0e8de] border border-[#e5d9ce] w-fit mb-3.5 shadow-xs">
@@ -295,10 +301,15 @@ export default function HeroSection({ onFindMentorClick, onJoinClick, mentorData
                         <CheckCircle2 className="w-4 h-4 text-[#8c6b4a] shrink-0" />
                         <span>Join 500+ professionals learning from industry leaders.</span>
                     </div>
-                </div>
+                </motion.div>
 
                 {/* ── RIGHT SIDE ────────────────────────────────────────────────── */}
-                <div className="lg:col-span-6 xl:col-span-6 relative flex flex-col items-center lg:items-end w-full pt-2 lg:pt-0 lg:-translate-x-[70px]">
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.7, ease: "easeOut", delay: 0.2 }}
+                    className="lg:col-span-6 xl:col-span-6 relative flex flex-col items-center lg:items-end w-full pt-2 lg:pt-0 lg:-translate-x-[70px]"
+                >
                   
 
                     {/* Outer Collage Wrapper */}
@@ -653,8 +664,9 @@ text-[#f8e8d2]
                    
                         
 
-                    </div>
-                </div>
+                </motion.div>
+
+            </div>
 
             
         </section>
