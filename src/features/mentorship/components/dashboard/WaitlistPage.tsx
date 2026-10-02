@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Users, Clock, CheckCircle2, XCircle, Check, X } from "lucide-react";
 import MentorService from "@/lib/api/mentorship.service";
+import MenteeLink from "@/features/mentorship/components/shared/MenteeLink";
 
 interface Props {
   mentorData: any;
@@ -189,14 +190,14 @@ export default function WaitlistPage({ mentorData }: Props) {
                   return (
                     <tr key={e.waitlistId} className="hover:bg-[#fbf7f3]">
                       <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: "#4a3728" }}>
-                            {e.menteeName?.[0]?.toUpperCase() ?? "?"}
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold" style={{ color: "#4a3728" }}>{e.menteeName}</div>
-                            {e.notes && <div className="text-xs max-w-[200px] truncate" style={{ color: "#8a7a6a" }} title={e.notes}>{e.notes}</div>}
-                          </div>
+                        <div className="flex flex-col gap-0.5">
+                          <MenteeLink
+                            menteeId={e.menteeId || e.userId}
+                            name={e.menteeName}
+                            avatar={e.menteeProfilePhoto || e.avatar}
+                            avatarSize="w-9 h-9"
+                          />
+                          {e.notes && <div className="text-xs max-w-[200px] truncate ml-11" style={{ color: "#8a7a6a" }} title={e.notes}>{e.notes}</div>}
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-sm" style={{ color: "#8a7a6a" }}>

@@ -129,7 +129,7 @@ function MenteeAvatar({ photo, name, menteeId }: { photo?: string; name?: string
 
   return (
     <Link
-      href={`/profile/${menteeId}`}
+      href={`/mentorship/menteeProfile/${menteeId}`}
       onClick={(e) => e.stopPropagation()}
       aria-label={`View ${name || 'user'}'s profile`}
       className="shrink-0 transition-opacity hover:opacity-90 cursor-pointer"
@@ -165,7 +165,7 @@ function RenderTextWithMenteeLink({
               return (
                 <Link
                   key={idx}
-                  href={`/profile/${menteeId}`}
+                  href={`/mentorship/menteeProfile/${menteeId}`}
                   onClick={(e) => e.stopPropagation()}
                   className="font-semibold hover:underline cursor-pointer"
                   style={{ color: COLORS.ink }}
@@ -184,7 +184,7 @@ function RenderTextWithMenteeLink({
   if (isTitle) {
     return (
       <Link
-        href={`/profile/${menteeId}`}
+        href={`/mentorship/menteeProfile/${menteeId}`}
         onClick={(e) => e.stopPropagation()}
         className="hover:underline cursor-pointer"
         style={{ color: COLORS.ink }}
@@ -284,7 +284,7 @@ export default function NotificationPage({
           </h3>
           <div className="space-y-2">
             {group.items.map((item, idx) => {
-              const menteeId = item.data?.menteeId || item.data?.actorId || item.data?.viewerId || item.data?.replierId
+              const menteeId = item.data?.menteeId || item.data?.actorId || item.data?.viewerId || item.data?.replierId || item.data?.sender_id || item.data?.user_id || item.data?.userId
               const menteeName = item.data?.menteeName || item.data?.actorName || item.data?.viewerName || item.data?.replierName
               const menteePhoto = item.data?.menteePhoto || item.data?.actorPhoto || item.data?.viewerPhoto || item.data?.replierPhoto
               const hasMentee = Boolean(menteeId)

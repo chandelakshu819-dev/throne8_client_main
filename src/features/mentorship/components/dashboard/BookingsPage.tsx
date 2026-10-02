@@ -19,6 +19,7 @@ import {
 import SessionService from "@/lib/api/session.service";
 import ProfileService from "@/lib/api/profile.service";
 import { useSocket } from "@/core/realtime/useSocket";
+import MenteeLink from "@/features/mentorship/components/shared/MenteeLink";
 
 interface BookingProps {
   mentorData: any;
@@ -874,30 +875,16 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                           </div>
                         ) : (
                           <div className="flex items-center gap-3">
-                            {resolvedPhoto ? (
-                              <img
-                                src={resolvedPhoto}
-                                alt={booking.menteeName}
-                                className="w-9 h-9 rounded-full object-cover"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = "none";
-                                  e.currentTarget.nextElementSibling?.classList.remove("hidden");
-                                }}
-                              />
-                            ) : null}
-
-                            <div
-                              className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold ${resolvedPhoto ? "hidden" : ""}`}
-                              style={{ backgroundColor: "#4a3728" }}
-                            >
-                              {booking.menteeName?.[0]?.toUpperCase() ?? "?"}
-                            </div>
-
-                            <span className="text-sm font-semibold" style={{ color: "#4a3728" }}>{booking.menteeName}</span>
+                            <MenteeLink
+                              menteeId={booking.menteeId}
+                              name={booking.menteeName}
+                              avatar={resolvedPhoto}
+                              avatarSize="w-9 h-9"
+                            />
 
                             {booking.isGroupSession && (
                               <span
-                                className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                                className="px-1.5 py-0.5 rounded-full text-[10px] font-bold ml-1"
                                 style={{ backgroundColor: "#f3e8ff", color: "#7c3aed" }}
                               >
                                 Group
@@ -1208,9 +1195,14 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                     </span>
                   </div>
                 ) : (
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-sm items-center">
                     <span style={{ color: "#8a7a6a" }}>Mentee</span>
-                    <span style={{ color: "#4a3728" }} className="font-semibold">{startModalBooking.menteeName}</span>
+                    <MenteeLink
+                      menteeId={startModalBooking.menteeId}
+                      name={startModalBooking.menteeName}
+                      showAvatar={false}
+                      underlineOnHover
+                    />
                   </div>
                 )}
 
@@ -1276,9 +1268,14 @@ export default function BookingsPage({ mentorData }: BookingProps) {
               <p className="text-xs mb-4" style={{ color: "#8a7a6a" }}>Completed session summary.</p>
 
               <div className="space-y-2.5 rounded-xl p-4 mb-4" style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-sm items-center">
                   <span style={{ color: "#8a7a6a" }}>Student</span>
-                  <span style={{ color: "#4a3728" }} className="font-semibold">{detailsBooking.menteeName}</span>
+                  <MenteeLink
+                    menteeId={detailsBooking.menteeId}
+                    name={detailsBooking.menteeName}
+                    showAvatar={false}
+                    underlineOnHover
+                  />
                 </div>
                 <div className="flex justify-between text-sm">
                   <span style={{ color: "#8a7a6a" }}>Service</span>
@@ -1350,17 +1347,13 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                         className="flex items-center gap-3 rounded-xl p-2.5"
                         style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}
                       >
-                        {photo ? (
-                          <img src={photo} alt={p.menteeName} className="w-8 h-8 rounded-full object-cover" />
-                        ) : (
-                          <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                            style={{ backgroundColor: "#4a3728" }}
-                          >
-                            {p.menteeName?.[0]?.toUpperCase() ?? "?"}
-                          </div>
-                        )}
-                        <span className="text-sm font-semibold flex-1" style={{ color: "#4a3728" }}>{p.menteeName}</span>
+                        <MenteeLink
+                          menteeId={p.menteeId}
+                          name={p.menteeName}
+                          avatar={photo}
+                          avatarSize="w-8 h-8"
+                          className="flex-1 min-w-0"
+                        />
                         {p.attendanceStatus && p.attendanceStatus !== "registered" && (
                           <span
                             className="px-2 py-0.5 rounded-full text-[10px] font-bold capitalize"

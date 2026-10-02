@@ -393,7 +393,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
                             const reviewId = getReviewKey(review, idx);
                             const displayName = getMenteeName(review);
                             const avatar = review.mentee?.profilePic || review.mentee?.profilePhotoId;
-                            const profileHref = review.menteeUserId ? `/profile/${review.menteeUserId}` : null;
+                            const profileHref = review.menteeUserId ? `/mentorship/menteeProfile/${review.menteeUserId}` : null;
 
                             const isOwnReview = !!currentUserId && currentUserId === review.menteeUserId;
                             const isReviewedMentor = !!currentUserId && currentUserId === review.mentorUserId;

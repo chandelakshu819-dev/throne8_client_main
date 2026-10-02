@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import QueryService, { QueryItem } from "@/lib/api/query.service";
 import ProfileService from "@/lib/api/profile.service";
+import MenteeLink from "@/features/mentorship/components/shared/MenteeLink";
 
 interface QueriesPageProps {
   mentorData: any;
@@ -291,21 +292,18 @@ export default function QueriesPage({ mentorData }: QueriesPageProps) {
               const needsFollowUpAnswer = q.status === "answered" && q.followUp?.askedAt && !q.followUp?.answeredAt;
 
               return (
-                <div key={q.queryId} className="p-5 flex gap-4 transition-colors hover:bg-[#fbf7f3]">
-                  {resolvedPhoto ? (
-                    <img src={resolvedPhoto} alt={menteeName(q)} className="w-10 h-10 rounded-full object-cover shrink-0" />
-                  ) : (
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-                      style={{ backgroundColor: "#4a3728" }}
-                    >
-                      {menteeName(q)[0]?.toUpperCase() ?? "?"}
-                    </div>
-                  )}
+                <div key={q.queryId} className="p-5 flex items-start gap-4 transition-colors hover:bg-[#fbf7f3]">
+                  <MenteeLink
+                    menteeId={q.menteeId}
+                    name={menteeName(q)}
+                    avatar={resolvedPhoto}
+                    avatarSize="w-10 h-10"
+                    showAvatar={true}
+                  />
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-3 mb-1.5">
-                      <span className="text-sm font-semibold" style={{ color: "#4a3728" }}>{menteeName(q)}</span>
+                      <div />
                       <div className="flex items-center gap-2 shrink-0">
                         <span
                           className="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-semibold"

@@ -54,11 +54,19 @@ const THEME = {
 interface UserDashboardProfilePreferencesPageProps {
   user?: any;
   setActivePage?: (page: string) => void;
+  readOnly?: boolean;
+  viewerRole?: string;
+  menteeId?: string;
+  onBack?: () => void;
 }
 
 export default function UserDashboardProfilePreferencesPage({
   user: initialAuthUser,
   setActivePage,
+  readOnly = false,
+  viewerRole,
+  menteeId,
+  onBack,
 }: UserDashboardProfilePreferencesPageProps) {
   const { loadProfile } = useProfile();
 
@@ -107,9 +115,19 @@ export default function UserDashboardProfilePreferencesPage({
     else setRefreshing(true);
 
     try {
-      // 1. Authenticated user profile data
-      const profileRes = await AuthService.getUserProfile();
-      const userData = profileRes?.data || profileRes;
+      let userData: any = null;
+
+      if (readOnly && menteeId) {
+        // Fetch specified mentee profile by menteeId
+        const profileRes = await AuthService.getUserProfileById(menteeId);
+        const rawData = profileRes?.data ?? profileRes;
+        userData = rawData?.user || rawData?.data || rawData;
+      } else {
+        // Authenticated user profile data
+        const profileRes = await AuthService.getUserProfile();
+        userData = profileRes?.data || profileRes;
+      }
+
       setProfile(userData);
 
       // Load notification preferences if present
@@ -121,8 +139,19 @@ export default function UserDashboardProfilePreferencesPage({
         });
       }
 
-      // Fetch avatar if photoId is available
-      if (userData?.profilePhotoId) {
+      // Check direct photo URL on user object first
+      const directPhotoUrl =
+        userData?.profilePhotoUrl ||
+        userData?.profilePic ||
+        userData?.profilePhoto?.cloudinarySecureUrl ||
+        userData?.avatar?.url ||
+        (typeof userData?.avatar === "string" ? userData.avatar : "") ||
+        userData?.photoUrl ||
+        userData?.image;
+
+      if (typeof directPhotoUrl === "string" && directPhotoUrl.startsWith("http")) {
+        setProfilePhotoUrl(directPhotoUrl);
+      } else if (userData?.profilePhotoId) {
         try {
           const photoRes = await ProfileService.getProfilePhotoById(userData.profilePhotoId);
           const url = photoRes?.data?.photo?.cloudinarySecureUrl;
@@ -130,6 +159,8 @@ export default function UserDashboardProfilePreferencesPage({
         } catch (err) {
           console.warn("Could not fetch profile photo:", err);
         }
+      } else {
+        setProfilePhotoUrl("");
       }
 
       // 2. Fetch User Skills
@@ -167,11 +198,11 @@ export default function UserDashboardProfilePreferencesPage({
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [readOnly, menteeId]);
 
   useEffect(() => {
     fetchAllUserData();
-  }, [fetchAllUserData]);
+  }, [fetchAllUserData, menteeId]);
 
   // Dismiss feedback automatically
   useEffect(() => {
@@ -184,10 +215,10 @@ export default function UserDashboardProfilePreferencesPage({
   // 2. Photo Upload Handler
   // ==========================================
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (readOnly) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setFeedback({ type: "error", message: "Image must be less than 5MB" });
       return;
@@ -200,7 +231,6 @@ export default function UserDashboardProfilePreferencesPage({
       if (newUrl) {
         setProfilePhotoUrl(newUrl);
         setFeedback({ type: "success", message: "Profile photo updated successfully!" });
-        // Refresh profile data to sync photo ID
         fetchAllUserData(true);
         if (typeof loadProfile === "function") {
           loadProfile();
@@ -219,6 +249,7 @@ export default function UserDashboardProfilePreferencesPage({
   // 3. Notification Preferences Handler
   // ==========================================
   const handleToggleNotif = async (key: "email" | "push" | "sms") => {
+    if (readOnly) return;
     const nextPrefs = { ...notifPrefs, [key]: !notifPrefs[key] };
     setNotifPrefs(nextPrefs);
     setSavingNotifPrefs(true);
@@ -235,7 +266,6 @@ export default function UserDashboardProfilePreferencesPage({
       setTimeout(() => setNotifSuccessMsg(null), 3500);
     } catch (err: any) {
       console.error("Failed to save notification preferences:", err);
-      // Rollback optimistic update
       setNotifPrefs(notifPrefs);
       setNotifErrorMsg(err?.message || "Failed to save preference to server.");
       setTimeout(() => setNotifErrorMsg(null), 4000);
@@ -247,18 +277,19 @@ export default function UserDashboardProfilePreferencesPage({
   // ==========================================
   // Derived Profile Data
   // ==========================================
-  const firstName = profile?.firstName || initialAuthUser?.firstName || "";
-  const lastName = profile?.lastName || initialAuthUser?.lastName || "";
-  const fullName = `${firstName} ${lastName}`.trim() || "Authenticated User";
-  const initials = `${firstName[0] || "U"}${lastName[0] || ""}`.toUpperCase();
-  const email = profile?.email || initialAuthUser?.email || "";
+  const firstName = profile?.firstName || (profile?.name ? profile.name.split(" ")[0] : "") || (profile?.fullName ? profile.fullName.split(" ")[0] : "") || (!readOnly ? initialAuthUser?.firstName : "") || "";
+  const lastName = profile?.lastName || (profile?.name ? profile.name.split(" ").slice(1).join(" ") : "") || (profile?.fullName ? profile.fullName.split(" ").slice(1).join(" ") : "") || (!readOnly ? initialAuthUser?.lastName : "") || "";
+  const rawFullName = profile?.name || profile?.fullName || `${firstName} ${lastName}`.trim();
+  const fullName = rawFullName || (readOnly ? "Mentee" : "Authenticated User");
+  const initials = `${firstName[0] || (fullName ? fullName[0] : "M")}${lastName[0] || (fullName && fullName.split(" ")[1] ? fullName.split(" ")[1][0] : "")}`.toUpperCase() || "M";
+  const email = profile?.email || (!readOnly ? initialAuthUser?.email : "") || "";
   const phoneNumber = profile?.phoneNumber || "";
-  const location = profile?.location || "";
+  const location = profile?.location || profile?.address || "";
   const pronouns = profile?.pronouns || "";
-  const currentPosition = profile?.currentPosition || profile?.onboarding?.workingProfile?.jobTitle || profile?.onboarding?.fresherProfile?.preferredRole || "";
-  const company = profile?.company || profile?.onboarding?.workingProfile?.companyName || "";
+  const currentPosition = profile?.currentPosition || profile?.position || profile?.role || profile?.onboarding?.workingProfile?.jobTitle || profile?.onboarding?.fresherProfile?.preferredRole || "";
+  const company = profile?.company || profile?.organization || profile?.onboarding?.workingProfile?.companyName || "";
   const education = profile?.education || (profile?.onboarding?.studentProfile ? `${profile.onboarding.studentProfile.degree || ""} ${profile.onboarding.studentProfile.fieldOfStudy ? "in " + profile.onboarding.studentProfile.fieldOfStudy : ""} - ${profile.onboarding.studentProfile.collegeName || ""}`.trim() : "");
-  const userType = profile?.onboarding?.userType || profile?.role || "mentee";
+  const userType = profile?.onboarding?.userType || profile?.role || "Student";
 
   // ==========================================
   // Loading skeleton state
@@ -281,27 +312,40 @@ export default function UserDashboardProfilePreferencesPage({
       {/* Top Header & Refresh Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
+          {readOnly && onBack && (
+            <button
+              onClick={onBack}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-200 hover:bg-[#fbf7f3] mb-3"
+              style={{ borderColor: THEME.border, color: THEME.primary }}
+            >
+              ← Back
+            </button>
+          )}
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight" style={{ color: THEME.primary }}>
-            Profile & Preferences
+            {readOnly ? `${fullName}'s Mentee Profile` : "Profile & Preferences"}
           </h1>
           <p className="text-sm mt-1" style={{ color: THEME.textMuted }}>
-            Manage your authenticated profile details, career direction, verified skills, and notifications.
+            {readOnly
+              ? "Read-only profile details, skills, and experience."
+              : "Manage your authenticated profile details, career direction, verified skills, and notifications."}
           </p>
         </div>
 
-        <button
-          onClick={() => fetchAllUserData(true)}
-          disabled={refreshing}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
-          style={{
-            backgroundColor: THEME.cardBg,
-            borderColor: THEME.border,
-            color: THEME.primary,
-          }}
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-          {refreshing ? "Refreshing..." : "Refresh Data"}
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => fetchAllUserData(true)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+            style={{
+              backgroundColor: THEME.cardBg,
+              borderColor: THEME.border,
+              color: THEME.primary,
+            }}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing..." : "Refresh Data"}
+          </button>
+        )}
       </div>
 
       {/* Global Alert Notification */}
@@ -351,6 +395,7 @@ export default function UserDashboardProfilePreferencesPage({
                     src={profilePhotoUrl}
                     alt={fullName}
                     className="w-full h-full object-cover"
+                    onError={() => setProfilePhotoUrl("")}
                   />
                 ) : (
                   <span>{initials}</span>
@@ -358,27 +403,31 @@ export default function UserDashboardProfilePreferencesPage({
               </div>
 
               {/* Photo upload overlay button */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingPhoto}
-                title="Change Profile Photo"
-                className="absolute -bottom-2 -right-2 w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-md transition-all duration-200 hover:scale-105 active:scale-95"
-                style={{ backgroundColor: THEME.primary }}
-              >
-                {uploadingPhoto ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Camera className="w-4 h-4" />
-                )}
-              </button>
+              {!readOnly && (
+                <>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingPhoto}
+                    title="Change Profile Photo"
+                    className="absolute -bottom-2 -right-2 w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-md transition-all duration-200 hover:scale-105 active:scale-95"
+                    style={{ backgroundColor: THEME.primary }}
+                  >
+                    {uploadingPhoto ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Camera className="w-4 h-4" />
+                    )}
+                  </button>
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={handlePhotoSelect}
-              />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handlePhotoSelect}
+                  />
+                </>
+              )}
             </div>
 
             {/* Profile Info Summary */}
@@ -439,14 +488,16 @@ export default function UserDashboardProfilePreferencesPage({
           </div>
 
           {/* Edit Profile Action */}
-          <button
-            onClick={() => setIsEditProfileOpen(true)}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md active:translate-y-0 shrink-0"
-            style={{ backgroundColor: THEME.primary }}
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            Edit Profile
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => setIsEditProfileOpen(true)}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md active:translate-y-0 shrink-0"
+              style={{ backgroundColor: THEME.primary }}
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              Edit Profile
+            </button>
+          )}
         </div>
 
         {/* Extended Details Grid */}
@@ -511,13 +562,15 @@ export default function UserDashboardProfilePreferencesPage({
                 </div>
               </div>
 
-              <button
-                onClick={() => setIsRoleEditOpen(true)}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all duration-150 hover:bg-[#fbf7f3]"
-                style={{ borderColor: THEME.border, color: THEME.primary }}
-              >
-                Change Role
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => setIsRoleEditOpen(true)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all duration-150 hover:bg-[#fbf7f3]"
+                  style={{ borderColor: THEME.border, color: THEME.primary }}
+                >
+                  Change Role
+                </button>
+              )}
             </div>
 
             <div className="p-4 rounded-xl border mb-3" style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}>
@@ -548,152 +601,154 @@ export default function UserDashboardProfilePreferencesPage({
         </section>
 
         {/* SECTION 7: Notification Preferences */}
-        <section
-          className="rounded-2xl p-6 border shadow-sm flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
-          style={{
-            backgroundColor: THEME.cardBg,
-            borderColor: THEME.border,
-          }}
-        >
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: THEME.tagBg }}
-                >
-                  <Bell className="w-4 h-4" style={{ color: THEME.primary }} />
+        {!readOnly && (
+          <section
+            className="rounded-2xl p-6 border shadow-sm flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
+            style={{
+              backgroundColor: THEME.cardBg,
+              borderColor: THEME.border,
+            }}
+          >
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: THEME.tagBg }}
+                  >
+                    <Bell className="w-4 h-4" style={{ color: THEME.primary }} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold" style={{ color: THEME.primary }}>
+                      Notification Preferences
+                    </h3>
+                    <p className="text-xs" style={{ color: THEME.textMuted }}>
+                      Configure how you receive session and booking updates
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold" style={{ color: THEME.primary }}>
-                    Notification Preferences
-                  </h3>
-                  <p className="text-xs" style={{ color: THEME.textMuted }}>
-                    Configure how you receive session and booking updates
-                  </p>
-                </div>
+
+                {savingNotifPrefs && (
+                  <span className="flex items-center gap-1.5 text-xs text-amber-700 font-medium">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Saving...
+                  </span>
+                )}
               </div>
 
-              {savingNotifPrefs && (
-                <span className="flex items-center gap-1.5 text-xs text-amber-700 font-medium">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Saving...
-                </span>
+              {notifSuccessMsg && (
+                <div className="mb-3 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  {notifSuccessMsg}
+                </div>
               )}
+
+              {notifErrorMsg && (
+                <div className="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs font-medium flex items-center gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {notifErrorMsg}
+                </div>
+              )}
+
+              {/* Toggle Switches */}
+              <div className="space-y-3">
+                {/* Email Notifications */}
+                <div className="flex items-center justify-between p-3 rounded-xl border" style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}>
+                  <div>
+                    <h4 className="text-xs font-bold" style={{ color: THEME.primary }}>
+                      Email Notifications
+                    </h4>
+                    <p className="text-[11px]" style={{ color: THEME.textMuted }}>
+                      Receive session confirmations and reminder emails
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={notifPrefs.email}
+                    disabled={savingNotifPrefs}
+                    onClick={() => handleToggleNotif("email")}
+                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-200 focus:outline-none ${
+                      notifPrefs.email ? "bg-[#4a3728]" : "bg-gray-300"
+                    }`}
+                  >
+                    <div
+                      className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ${
+                        notifPrefs.email ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Push Notifications */}
+                <div className="flex items-center justify-between p-3 rounded-xl border" style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}>
+                  <div>
+                    <h4 className="text-xs font-bold" style={{ color: THEME.primary }}>
+                      In-App Push Alerts
+                    </h4>
+                    <p className="text-[11px]" style={{ color: THEME.textMuted }}>
+                      Live banners when your mentor begins a scheduled call
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={notifPrefs.push}
+                    disabled={savingNotifPrefs}
+                    onClick={() => handleToggleNotif("push")}
+                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-200 focus:outline-none ${
+                      notifPrefs.push ? "bg-[#4a3728]" : "bg-gray-300"
+                    }`}
+                  >
+                    <div
+                      className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ${
+                        notifPrefs.push ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* SMS Notifications */}
+                <div className="flex items-center justify-between p-3 rounded-xl border" style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}>
+                  <div>
+                    <h4 className="text-xs font-bold" style={{ color: THEME.primary }}>
+                      SMS Alerts
+                    </h4>
+                    <p className="text-[11px]" style={{ color: THEME.textMuted }}>
+                      Text notifications sent directly to your verified phone
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={notifPrefs.sms}
+                    disabled={savingNotifPrefs}
+                    onClick={() => handleToggleNotif("sms")}
+                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-200 focus:outline-none ${
+                      notifPrefs.sms ? "bg-[#4a3728]" : "bg-gray-300"
+                    }`}
+                  >
+                    <div
+                      className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ${
+                        notifPrefs.sms ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {notifSuccessMsg && (
-              <div className="mb-3 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                {notifSuccessMsg}
-              </div>
-            )}
-
-            {notifErrorMsg && (
-              <div className="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs font-medium flex items-center gap-2">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                {notifErrorMsg}
-              </div>
-            )}
-
-            {/* Toggle Switches */}
-            <div className="space-y-3">
-              {/* Email Notifications */}
-              <div className="flex items-center justify-between p-3 rounded-xl border" style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}>
-                <div>
-                  <h4 className="text-xs font-bold" style={{ color: THEME.primary }}>
-                    Email Notifications
-                  </h4>
-                  <p className="text-[11px]" style={{ color: THEME.textMuted }}>
-                    Receive session confirmations and reminder emails
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={notifPrefs.email}
-                  disabled={savingNotifPrefs}
-                  onClick={() => handleToggleNotif("email")}
-                  className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-200 focus:outline-none ${
-                    notifPrefs.email ? "bg-[#4a3728]" : "bg-gray-300"
-                  }`}
-                >
-                  <div
-                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ${
-                      notifPrefs.email ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Push Notifications */}
-              <div className="flex items-center justify-between p-3 rounded-xl border" style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}>
-                <div>
-                  <h4 className="text-xs font-bold" style={{ color: THEME.primary }}>
-                    In-App Push Alerts
-                  </h4>
-                  <p className="text-[11px]" style={{ color: THEME.textMuted }}>
-                    Live banners when your mentor begins a scheduled call
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={notifPrefs.push}
-                  disabled={savingNotifPrefs}
-                  onClick={() => handleToggleNotif("push")}
-                  className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-200 focus:outline-none ${
-                    notifPrefs.push ? "bg-[#4a3728]" : "bg-gray-300"
-                  }`}
-                >
-                  <div
-                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ${
-                      notifPrefs.push ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* SMS Notifications */}
-              <div className="flex items-center justify-between p-3 rounded-xl border" style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}>
-                <div>
-                  <h4 className="text-xs font-bold" style={{ color: THEME.primary }}>
-                    SMS Alerts
-                  </h4>
-                  <p className="text-[11px]" style={{ color: THEME.textMuted }}>
-                    Text notifications sent directly to your verified phone
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={notifPrefs.sms}
-                  disabled={savingNotifPrefs}
-                  onClick={() => handleToggleNotif("sms")}
-                  className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-200 focus:outline-none ${
-                    notifPrefs.sms ? "bg-[#4a3728]" : "bg-gray-300"
-                  }`}
-                >
-                  <div
-                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ${
-                      notifPrefs.sms ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
+            <div className="pt-4 mt-4 border-t flex items-center justify-between text-xs" style={{ borderColor: THEME.borderLight }}>
+              <span style={{ color: THEME.textMuted }}>Endpoint: PUT /auth/update-profile</span>
+              <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                ✓ Persisted in DB
+              </span>
             </div>
-          </div>
-
-          <div className="pt-4 mt-4 border-t flex items-center justify-between text-xs" style={{ borderColor: THEME.borderLight }}>
-            <span style={{ color: THEME.textMuted }}>Endpoint: PUT /auth/update-profile</span>
-            <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-              ✓ Persisted in DB
-            </span>
-          </div>
-        </section>
+          </section>
+        )}
       </div>
 
       {/* ======================================================== */}
@@ -732,14 +787,16 @@ export default function UserDashboardProfilePreferencesPage({
             </div>
           </div>
 
-          <button
-            onClick={() => setIsAddSkillOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md active:translate-y-0"
-            style={{ backgroundColor: THEME.primary }}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Skill
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => setIsAddSkillOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md active:translate-y-0"
+              style={{ backgroundColor: THEME.primary }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Skill
+            </button>
+          )}
         </div>
 
         {loadingSkills ? (
@@ -753,15 +810,17 @@ export default function UserDashboardProfilePreferencesPage({
             style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}
           >
             <p className="text-xs font-medium" style={{ color: THEME.textMuted }}>
-              No skills added yet. Add your core skills to highlight your areas of expertise to mentors.
+              No skills added yet.
             </p>
-            <button
-              onClick={() => setIsAddSkillOpen(true)}
-              className="text-xs font-bold underline transition-colors hover:opacity-80"
-              style={{ color: THEME.primary }}
-            >
-              + Add your first skill
-            </button>
+            {!readOnly && (
+              <button
+                onClick={() => setIsAddSkillOpen(true)}
+                className="text-xs font-bold underline transition-colors hover:opacity-80"
+                style={{ color: THEME.primary }}
+              >
+                + Add your first skill
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -769,6 +828,7 @@ export default function UserDashboardProfilePreferencesPage({
               <SkillCard
                 key={skill.skillId || skill._id || skill.skillName}
                 skill={skill}
+                readOnly={readOnly}
                 onDelete={async () => {
                   try {
                     await ProfileService.deleteSkill(skill.skillId || skill._id);
@@ -820,14 +880,16 @@ export default function UserDashboardProfilePreferencesPage({
             </div>
           </div>
 
-          <button
-            onClick={() => setIsAddExpOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md active:translate-y-0"
-            style={{ backgroundColor: THEME.primary }}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Experience
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => setIsAddExpOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md active:translate-y-0"
+              style={{ backgroundColor: THEME.primary }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Experience
+            </button>
+          )}
         </div>
 
         {loadingExperiences ? (
@@ -841,15 +903,17 @@ export default function UserDashboardProfilePreferencesPage({
             style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}
           >
             <p className="text-xs font-medium" style={{ color: THEME.textMuted }}>
-              No experience records found on your profile.
+              No experience records found on profile.
             </p>
-            <button
-              onClick={() => setIsAddExpOpen(true)}
-              className="text-xs font-bold underline transition-colors hover:opacity-80"
-              style={{ color: THEME.primary }}
-            >
-              + Add work experience
-            </button>
+            {!readOnly && (
+              <button
+                onClick={() => setIsAddExpOpen(true)}
+                className="text-xs font-bold underline transition-colors hover:opacity-80"
+                style={{ color: THEME.primary }}
+              >
+                + Add work experience
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -857,6 +921,7 @@ export default function UserDashboardProfilePreferencesPage({
               <ExperienceRow
                 key={exp.experienceId || exp._id}
                 exp={exp}
+                readOnly={readOnly}
                 onDelete={async () => {
                   try {
                     await ProfileService.deleteExperience(exp.experienceId || exp._id);
@@ -1023,7 +1088,7 @@ export default function UserDashboardProfilePreferencesPage({
 // ==========================================================
 // Subcomponent: Skill Card
 // ==========================================================
-function SkillCard({ skill, onDelete }: { skill: any; onDelete: () => Promise<void> }) {
+function SkillCard({ skill, onDelete, readOnly }: { skill: any; onDelete: () => Promise<void>; readOnly?: boolean }) {
   const [deleting, setDeleting] = useState(false);
 
   const getStrengthBadge = (strength: string) => {
@@ -1068,19 +1133,21 @@ function SkillCard({ skill, onDelete }: { skill: any; onDelete: () => Promise<vo
         </div>
       </div>
 
-      <button
-        onClick={async () => {
-          if (!confirm(`Delete "${skill.skillName}"?`)) return;
-          setDeleting(true);
-          await onDelete();
-          setDeleting(false);
-        }}
-        disabled={deleting}
-        title="Delete skill"
-        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
-      >
-        {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-      </button>
+      {!readOnly && (
+        <button
+          onClick={async () => {
+            if (!confirm(`Delete "${skill.skillName}"?`)) return;
+            setDeleting(true);
+            await onDelete();
+            setDeleting(false);
+          }}
+          disabled={deleting}
+          title="Delete skill"
+          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
+        >
+          {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+        </button>
+      )}
     </div>
   );
 }
@@ -1088,7 +1155,7 @@ function SkillCard({ skill, onDelete }: { skill: any; onDelete: () => Promise<vo
 // ==========================================================
 // Subcomponent: Experience Row
 // ==========================================================
-function ExperienceRow({ exp, onDelete }: { exp: any; onDelete: () => Promise<void> }) {
+function ExperienceRow({ exp, onDelete, readOnly }: { exp: any; onDelete: () => Promise<void>; readOnly?: boolean }) {
   const [deleting, setDeleting] = useState(false);
 
   const formatDate = (d?: string) => {
@@ -1155,19 +1222,21 @@ function ExperienceRow({ exp, onDelete }: { exp: any; onDelete: () => Promise<vo
         )}
       </div>
 
-      <button
-        onClick={async () => {
-          if (!confirm(`Delete experience at ${exp.companyName}?`)) return;
-          setDeleting(true);
-          await onDelete();
-          setDeleting(false);
-        }}
-        disabled={deleting}
-        className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors self-end sm:self-start shrink-0"
-        title="Delete experience"
-      >
-        {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-      </button>
+      {!readOnly && (
+        <button
+          onClick={async () => {
+            if (!confirm(`Delete experience at ${exp.companyName}?`)) return;
+            setDeleting(true);
+            await onDelete();
+            setDeleting(false);
+          }}
+          disabled={deleting}
+          className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors self-end sm:self-start shrink-0"
+          title="Delete experience"
+        >
+          {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+        </button>
+      )}
     </div>
   );
 }

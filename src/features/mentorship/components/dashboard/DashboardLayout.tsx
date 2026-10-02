@@ -32,10 +32,32 @@ import MentorService from "@/lib/api/mentorship.service";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
 import MarketingKitPage from "./MarketingKitPage";
+import UserDashboardProfilePreferencesPage from "@/features/mentorship/components/user-dashboard/UserDashboardProfilePreferencesPage";
+import { useParams } from "next/navigation";
 // ✅ NEW — realtime notification push (booking requests, session started, etc.)
 import { useSocket } from "@/core/realtime/useSocket";
 
+function MenteeProfileTabWrapper(props: any) {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const menteeId = (params?.menteeId as string) || (params?.userId as string) || searchParams.get("menteeId") || props.menteeId || "";
 
+  return (
+    <UserDashboardProfilePreferencesPage
+      readOnly={true}
+      viewerRole="mentor"
+      menteeId={menteeId}
+      onBack={() => {
+        if (typeof window !== "undefined" && window.history.length > 1) {
+          router.back();
+        } else {
+          props.setActivePage?.("dashboard");
+        }
+      }}
+    />
+  );
+}
 
 const SERVICE_TYPES: ServiceType[] = [
   { name: "Consultation", emoji: "💬", icon: MessageCircle, description: "One-on-one consultation sessions" },
@@ -62,6 +84,7 @@ const pageComponents: Record<string, React.FC<any>> = {
   community: CommunityPage,
   marketing: MarketingKitPage,
   services_search: ServicesPage,
+  mentee_profile: MenteeProfileTabWrapper,
 };
 
 function normalizeNotifications(res: any): any[] {
@@ -78,41 +101,59 @@ export default function MentorDashboard(
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const routeParams = useParams();
 
-  // ✅ FIX: activePage ab URL query param (?tab=...) se initialize hota hai,
-  // isliye refresh karne par bhi wahi tab load hoga, default "dashboard" par
-  // wapas nahi jayega.
-  const [activePage, setActivePageState] = useState(
-    () => searchParams.get("tab") || "dashboard"
+  const [mentorData, setMentorData] = useState<any>(null);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const isMenteeProfileRoute = Boolean(
+    routeParams?.menteeId || (pathname && (pathname.includes("/mentorship/mentee-profile/") || pathname.includes("/mentorship/menteeProfile/")))
   );
+
+  const [activePage, setActivePageState] = useState(() => {
+    if (isMenteeProfileRoute) {
+      return "mentee_profile";
+    }
+    return searchParams.get("tab") || "dashboard";
+  });
 
   // Tab change hote hi URL me bhi likh do (bina full page reload ke) —
   // taaki refresh, back/forward button, aur direct-link sharing sab kaam karein.
-  const setActivePage = useCallback((page: string) => {
+  const setActivePage = useCallback((page: string, subtab?: string) => {
     setActivePageState(page);
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", page);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [pathname, router, searchParams]);
+    const targetMentorId = mentorData?.mentorId || userId;
+    const subtabParam = subtab ? `&subtab=${subtab}` : "";
+
+    if (isMenteeProfileRoute) {
+      router.push(`/mentorship/mentorProfile/${targetMentorId}?tab=${page}${subtabParam}`);
+    } else {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", page);
+      if (subtab) {
+        params.set("subtab", subtab);
+      } else {
+        params.delete("subtab");
+      }
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
+  }, [pathname, router, searchParams, isMenteeProfileRoute, mentorData?.mentorId, userId]);
 
   // Agar user browser back/forward button dabaye, to URL ke hisaab se
   // activePage bhi update ho jaye.
   useEffect(() => {
+    if (isMenteeProfileRoute) {
+      setActivePageState("mentee_profile");
+      return;
+    }
     const tabFromUrl = searchParams.get("tab") || "dashboard";
     setActivePageState((prev) => (prev !== tabFromUrl ? tabFromUrl : prev));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
-  
+  }, [searchParams, isMenteeProfileRoute]);
 
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [agreedToCode, setAgreedToCode] = useState(false);
-
-  const [mentorData, setMentorData] = useState<any>(null);
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // ── Unified Dashboard Overview Data ──────────────────────────
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -319,7 +360,22 @@ export default function MentorDashboard(
       });
   };
 
+
+  const handlePhotoRemove = async () => {
+    if (!mentorData?.mentorId) return;
+    try {
+      await MentorService.removeProfilePhoto(mentorData.mentorId);
+      setMentorData((prev: any) => ({ ...prev, profilePic: null }));
+      setDashboardData((prev: any) => (prev ? { ...prev, profilePic: null } : prev));
+      setProfilePhoto(null);
+    } catch (err) {
+      console.error("Failed to remove profile photo:", err);
+      alert("Failed to remove photo. Please try again.");
+    }
+  };
+
   const handleCreateService = () => {
+
     if (!serviceFormData.serviceName || !serviceFormData.price) return;
 
     setCompletedServices(prev => [
@@ -431,6 +487,7 @@ export default function MentorDashboard(
               handlePhotoUpload={handlePhotoUpload}
 
               showServiceForm={showServiceForm}
+              handlePhotoRemove={handlePhotoRemove}
               setShowServiceForm={setShowServiceForm}
               selectedServiceType={selectedServiceType}
               setSelectedServiceType={setSelectedServiceType}

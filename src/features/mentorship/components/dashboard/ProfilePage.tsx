@@ -32,6 +32,8 @@ interface ProfilePageProps {
   setAgreedToTerms: (val: boolean) => void
   setAgreedToCode: (val: boolean) => void
   handlePhotoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
+  handlePhotoRemove?: () => Promise<void> | void
+
 }
 
 // Reusable info tile used across the Basic Information grid
@@ -68,7 +70,9 @@ export default function ProfilePage({
   setAgreedToTerms,
   setAgreedToCode,
   handlePhotoUpload,
+  handlePhotoRemove,
 }: ProfilePageProps) {
+
   // ✅ FIX: local override state — save hone ke turant baad UI update ho, refresh na karna pade
   const [liveMentorData, setLiveMentorData] = useState(mentorData);
   useEffect(() => {
@@ -621,11 +625,10 @@ export default function ProfilePage({
               {currentPhoto && (
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
+                    await handlePhotoRemove?.();
                     setProfilePhoto(null);
-                    if (liveMentorData) {
-                      setLiveMentorData((prev: any) => ({ ...prev, profilePic: null }));
-                    }
+                    setLiveMentorData((prev: any) => ({ ...prev, profilePic: null }));
                     setShowPhotoModal(false);
                   }}
                   className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors hover:bg-red-50 cursor-pointer"

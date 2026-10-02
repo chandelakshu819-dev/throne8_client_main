@@ -281,12 +281,10 @@ class AuthService {
     */
     static async getUserProfileById(userId: string): Promise<any> {
         try {
-            console.log('👤 [GET_PROFILE_BYiD] Fetching user profile data...');
-
-            const { data } = await api.get(`${config.NEXT_PUBLIC_GET_USER_ENDPOINT || process.env.NEXT_PUBLIC_GET_USER_ENDPOINT}/${userId}`);
-
+            console.log('👤 [GET_PROFILE_BYiD] Fetching user profile data for userId:', userId);
+            const endpoint = config.NEXT_PUBLIC_GET_USER_ENDPOINT || '/auth/get-user';
+            const { data } = await api.get(`${endpoint}/${userId}`);
             console.log('✅ [GET_PROFILE_BYiD] Profile fetched successfully', data);
-
             return data;
 
         } catch (error: any) {
