@@ -5,11 +5,13 @@ import React from "react";
 interface SlotPickerSectionProps {
     selectedDate: number;
     setSelectedDate: (index: number) => void;
+    onJoinWaitlist?: () => void;
 }
 
 export default function SlotPickerSection({
     selectedDate,
     setSelectedDate,
+    onJoinWaitlist,
 }: SlotPickerSectionProps) {
     const next7Days = [
         { day: "Mon", date: "06 Jan" },
@@ -78,7 +80,10 @@ export default function SlotPickerSection({
                                     {t}
                                 </button>
                             ))}
-                            <button className="py-3.5 rounded-2xl bg-[#8b7355]/10 text-[#8b7355] text-xs font-black col-span-2 hover:bg-[#8b7355] hover:text-white transition-all">
+                            <button
+                                onClick={onJoinWaitlist}
+                                className="py-3.5 rounded-2xl bg-[#8b7355]/10 text-[#8b7355] text-xs font-black col-span-2 hover:bg-[#8b7355] hover:text-white transition-all cursor-pointer"
+                            >
                                 Join Waitlist
                             </button>
                         </div>

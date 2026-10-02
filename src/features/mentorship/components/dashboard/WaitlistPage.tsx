@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Users, Clock, CheckCircle2, XCircle, Check, X } from "lucide-react";
+import { Users, Clock, CheckCircle2, XCircle, Check, X, ArrowUp, ArrowDown, Sparkles, Filter, ToggleLeft, ToggleRight } from "lucide-react";
 import MentorService from "@/lib/api/mentorship.service";
 import MenteeLink from "@/features/mentorship/components/shared/MenteeLink";
 
@@ -13,22 +13,25 @@ interface Props {
 type WaitTab = "waiting" | "approved" | "removed";
 
 const TAB_STATUSES: Record<WaitTab, string[]> = {
-  waiting: ["active"],
-  approved: ["notified", "booked"],
-  removed: ["cancelled", "expired"],
+  waiting: ["active", "waiting"],
+  approved: ["notified", "booked", "converted"],
+  removed: ["cancelled", "expired", "declined"],
 };
 
 const TAB_META: Record<WaitTab, { label: string; icon: React.ElementType }> = {
   waiting: { label: "Waiting", icon: Clock },
-  approved: { label: "Approved", icon: CheckCircle2 },
-  removed: { label: "Removed", icon: XCircle },
+  approved: { label: "Offered / Converted", icon: CheckCircle2 },
+  removed: { label: "Removed / Declined", icon: XCircle },
 };
 
 const badge: Record<string, { bg: string; fg: string; label: string }> = {
+  waiting: { bg: "#fef3c7", fg: "#b45309", label: "Waiting" },
   active: { bg: "#fef3c7", fg: "#b45309", label: "Waiting" },
-  notified: { bg: "#dcfce7", fg: "#15803d", label: "Approved" },
+  notified: { bg: "#dcfce7", fg: "#15803d", label: "Offered (24h)" },
+  converted: { bg: "#f3e8ff", fg: "#7c3aed", label: "Converted" },
   booked: { bg: "#f3e8ff", fg: "#7c3aed", label: "Booked" },
-  cancelled: { bg: "#fee2e2", fg: "#dc2626", label: "Removed" },
+  declined: { bg: "#fee2e2", fg: "#dc2626", label: "Declined" },
+  cancelled: { bg: "#fee2e2", fg: "#dc2626", label: "Cancelled" },
   expired: { bg: "#f0ebe4", fg: "#8a7a6a", label: "Expired" },
 };
 
@@ -36,6 +39,9 @@ export default function WaitlistPage({ mentorData }: Props) {
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<WaitTab>("waiting");
+  const [selectedService, setSelectedService] = useState<string>("ALL");
+  const [autoOffer, setAutoOffer] = useState<boolean>(mentorData?.autoOfferWaitlist !== false);
+  const [togglingAuto, setTogglingAuto] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -43,16 +49,17 @@ export default function WaitlistPage({ mentorData }: Props) {
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3000);
+    const t = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(t);
   }, [toast]);
 
   const load = async () => {
-    if (!mentorData?.mentorId) return;
+    if (!mentorData?.mentorId && !mentorData?.userId) return;
+    const mId = mentorData.mentorId || mentorData.userId;
     setLoading(true);
     try {
-      const res = await MentorService.getMentorWaitlist(mentorData.mentorId);
-      setEntries(res?.data ?? []);
+      const res = await MentorService.getMentorWaitlist(mId);
+      setEntries(res?.data ?? res ?? []);
     } catch (e: any) {
       showToast(e.message || "Failed to load waitlist.", "error");
     } finally {
@@ -62,27 +69,58 @@ export default function WaitlistPage({ mentorData }: Props) {
 
   useEffect(() => {
     load();
-  }, [mentorData?.mentorId]);
+  }, [mentorData?.mentorId, mentorData?.userId]);
 
-  const rows = useMemo(
-    () =>
-      entries
-        .filter((e) => TAB_STATUSES[tab].includes(e.status))
-        .sort((a, b) => (a.queuePosition ?? 9999) - (b.queuePosition ?? 9999)),
-    [entries, tab]
-  );
+  // Unique services list for filter
+  const serviceOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    entries.forEach((e) => {
+      if (e.serviceId && e.serviceTitle) {
+        map.set(e.serviceId, e.serviceTitle);
+      }
+    });
+    return Array.from(map.entries());
+  }, [entries]);
 
-  const count = (t: WaitTab) => entries.filter((e) => TAB_STATUSES[t].includes(e.status)).length;
+  const filteredEntries = useMemo(() => {
+    return entries.filter((e) => {
+      const matchesTab = TAB_STATUSES[tab].includes(e.status);
+      const matchesService = selectedService === "ALL" || e.serviceId === selectedService;
+      return matchesTab && matchesService;
+    });
+  }, [entries, tab, selectedService]);
 
-  const handleApprove = async (id: string) => {
+  const rows = useMemo(() => {
+    return [...filteredEntries].sort((a, b) => (a.queuePosition ?? 9999) - (b.queuePosition ?? 9999));
+  }, [filteredEntries]);
+
+  const waitingCount = useMemo(() => entries.filter((e) => e.status === "waiting" || e.status === "active").length, [entries]);
+  const offeredCount = useMemo(() => entries.filter((e) => e.status === "notified").length, [entries]);
+  const convertedCount = useMemo(() => entries.filter((e) => e.status === "converted" || e.status === "booked").length, [entries]);
+
+  const handleToggleAutoOffer = async () => {
+    setTogglingAuto(true);
+    const nextVal = !autoOffer;
+    try {
+      await MentorService.toggleAutoOffer(nextVal);
+      setAutoOffer(nextVal);
+      showToast(`Auto-offer slots is now ${nextVal ? "ENABLED" : "DISABLED"}`);
+    } catch (e: any) {
+      showToast(e.message || "Failed to update auto-offer setting.", "error");
+    } finally {
+      setTogglingAuto(false);
+    }
+  };
+
+  const handleOfferSlot = async (id: string) => {
     setActionId(id);
     try {
       await MentorService.approveWaitlistEntry(id);
-      showToast("Approved — the student has been notified.");
+      showToast("Slot offered! The mentee has 24h to claim it.");
       await load();
       setTab("approved");
     } catch (e: any) {
-      showToast(e.message || "Failed to approve.", "error");
+      showToast(e.message || "Failed to offer slot.", "error");
     } finally {
       setActionId(null);
     }
@@ -91,11 +129,24 @@ export default function WaitlistPage({ mentorData }: Props) {
   const handleRemove = async (id: string) => {
     setActionId(id);
     try {
-      await MentorService.leaveWaitlist(id, "Removed by mentor");
+      await MentorService.removeWaitlistEntry(id, "Removed by mentor");
       showToast("Removed from waitlist.");
       await load();
     } catch (e: any) {
       showToast(e.message || "Failed to remove.", "error");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handlePriority = async (id: string, delta: number) => {
+    setActionId(id);
+    try {
+      await MentorService.updateWaitlistPriority(id, delta);
+      showToast(`Position ${delta > 0 ? "moved up" : "moved down"}.`);
+      await load();
+    } catch (e: any) {
+      showToast(e.message || "Failed to change priority.", "error");
     } finally {
       setActionId(null);
     }
@@ -108,7 +159,7 @@ export default function WaitlistPage({ mentorData }: Props) {
     <div className="space-y-6 animate-fadeIn">
       {toast && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed top-5 right-5 z-[9999] flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg"
+          className="fixed top-5 right-5 z-[9999] flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg transition-all"
           style={{
             backgroundColor: toast.type === "success" ? "#dcfce7" : "#fee2e2",
             color: toast.type === "success" ? "#15803d" : "#dc2626",
@@ -122,114 +173,214 @@ export default function WaitlistPage({ mentorData }: Props) {
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#4a3728" }}>
-          <Users className="w-5 h-5 text-white" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-[#4a3728] text-white shadow-md">
+            <Users className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-[#4a3728]">Waitlist Management</h2>
+            <p className="text-sm text-[#8a7a6a]">Manage mentees waiting for slot openings</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-2xl font-bold" style={{ color: "#4a3728" }}>Waitlist</h2>
-          <p className="text-sm" style={{ color: "#8a7a6a" }}>Students waiting for a slot with you</p>
+
+        {/* Auto Offer Toggle Header Card */}
+        <div className="bg-white px-4 py-2.5 rounded-2xl border border-[#e0d8cf] flex items-center gap-3 shadow-sm">
+          <div>
+            <span className="text-xs font-bold text-[#4a3728] block">Auto-Offer Slots</span>
+            <span className="text-[11px] text-[#8a7a6a]">Offer opened slots automatically</span>
+          </div>
+          <button
+            onClick={handleToggleAutoOffer}
+            disabled={togglingAuto}
+            className={`w-12 h-6 rounded-full p-1 transition-colors flex items-center ${
+              autoOffer ? "bg-[#15803d]" : "bg-[#d1c7bd]"
+            }`}
+          >
+            <div
+              className={`w-4 h-4 rounded-full bg-white transition-transform transform ${
+                autoOffer ? "translate-x-6" : "translate-x-0"
+              }`}
+            />
+          </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white p-1.5 rounded-2xl" style={{ border: "1px solid #e0d8cf" }}>
-        <div className="flex gap-1.5">
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white p-5 rounded-3xl border border-[#e0d8cf] shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#fef3c7] text-[#b45309] flex items-center justify-center font-bold">
+            <Clock className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-2xl font-extrabold text-[#4a3728]">{waitingCount}</span>
+            <span className="text-xs font-bold text-[#8a7a6a] block uppercase tracking-wider">People Waiting</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-3xl border border-[#e0d8cf] shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#dcfce7] text-[#15803d] flex items-center justify-center font-bold">
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-2xl font-extrabold text-[#4a3728]">{offeredCount}</span>
+            <span className="text-xs font-bold text-[#8a7a6a] block uppercase tracking-wider">Slots Offered</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-3xl border border-[#e0d8cf] shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#f3e8ff] text-[#7c3aed] flex items-center justify-center font-bold">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-2xl font-extrabold text-[#4a3728]">{convertedCount}</span>
+            <span className="text-xs font-bold text-[#8a7a6a] block uppercase tracking-wider">Converted Bookings</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Controls & Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* Tabs */}
+        <div className="flex-1 bg-white p-1.5 rounded-2xl border border-[#e0d8cf] flex gap-1.5">
           {(Object.keys(TAB_META) as WaitTab[]).map((t) => {
             const { label, icon: Icon } = TAB_META[t];
             const active = tab === t;
+            const countVal = entries.filter((e) => TAB_STATUSES[t].includes(e.status)).length;
             return (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
                 style={{ backgroundColor: active ? "#4a3728" : "transparent", color: active ? "#fff" : "#7a5c3e" }}
               >
-                <div className="flex items-center justify-center gap-2">
-                  <Icon className="w-4 h-4" />
-                  <span>{label}</span>
-                  <span
-                    className="px-2 py-0.5 rounded-full text-xs font-bold"
-                    style={{ backgroundColor: active ? "rgba(255,255,255,0.2)" : "#f3ece4", color: active ? "#fff" : "#7a5c3e" }}
-                  >
-                    {count(t)}
-                  </span>
-                </div>
+                <Icon className="w-4 h-4" />
+                <span>{label}</span>
+                <span
+                  className="px-2 py-0.5 rounded-full text-[11px] font-extrabold"
+                  style={{ backgroundColor: active ? "rgba(255,255,255,0.2)" : "#f3ece4", color: active ? "#fff" : "#7a5c3e" }}
+                >
+                  {countVal}
+                </span>
               </button>
             );
           })}
         </div>
+
+        {/* Service Filter Dropdown */}
+        {serviceOptions.length > 0 && (
+          <div className="bg-white px-3 py-1.5 rounded-2xl border border-[#e0d8cf] flex items-center gap-2">
+            <Filter className="w-4 h-4 text-[#7a5c3e]" />
+            <select
+              value={selectedService}
+              onChange={(e) => setSelectedService(e.target.value)}
+              className="text-xs font-bold text-[#4a3728] bg-transparent focus:outline-none cursor-pointer"
+            >
+              <option value="ALL">All Services</option>
+              {serviceOptions.map(([id, title]) => (
+                <option key={id} value={id}>
+                  {title}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #e0d8cf" }}>
+      <div className="bg-white rounded-3xl overflow-hidden border border-[#e0d8cf] shadow-sm">
         <div className="overflow-x-auto">
           {loading ? (
-            <div className="flex items-center justify-center py-16" style={{ color: "#8a7a6a" }}>
+            <div className="flex items-center justify-center py-16 text-[#8a7a6a]">
               <Clock className="w-5 h-5 animate-spin mr-3" />
               <span className="text-sm font-semibold">Loading waitlist...</span>
             </div>
           ) : rows.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16" style={{ color: "#8a7a6a" }}>
-              <p className="text-sm font-semibold" style={{ color: "#4a3728" }}>No {tab} entries</p>
-              <p className="text-xs mt-1">Students who join your waitlist will appear here</p>
+            <div className="flex flex-col items-center justify-center py-16 text-[#8a7a6a] space-y-2">
+              <Users className="w-10 h-10 text-[#d1c7bd]" />
+              <p className="text-sm font-semibold text-[#4a3728]">No one is on your waitlist yet</p>
+              <p className="text-xs">When mentees request a spot, they will appear here in FIFO queue order.</p>
             </div>
           ) : (
             <table className="w-full">
               <thead style={{ backgroundColor: "#fbf7f3" }}>
                 <tr>
-                  {["Student", "Service", "Requested", "Position", "Status", "Actions"].map((h) => (
-                    <th key={h} className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>{h}</th>
+                  {["Student", "Service", "Joined Date", "Queue Position", "Status", "Actions"].map((h) => (
+                    <th key={h} className="px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-[#8a7a6a]">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y" style={{ borderColor: "#f0ebe4" }}>
+              <tbody className="divide-y divide-[#f0ebe4]">
                 {rows.map((e) => {
-                  const b = badge[e.status] ?? badge.active;
+                  const b = badge[e.status] ?? badge.waiting;
                   const busy = actionId === e.waitlistId;
+                  const isWaiting = e.status === "waiting" || e.status === "active";
+
                   return (
-                    <tr key={e.waitlistId} className="hover:bg-[#fbf7f3]">
-                      <td className="px-5 py-3.5">
+                    <tr key={e.waitlistId} className="hover:bg-[#fbf7f3]/70 transition-colors">
+                      <td className="px-5 py-4">
                         <div className="flex flex-col gap-0.5">
                           <MenteeLink
                             menteeId={e.menteeId || e.userId}
-                            name={e.menteeName}
+                            name={e.menteeName || "Student"}
                             avatar={e.menteeProfilePhoto || e.avatar}
                             avatarSize="w-9 h-9"
                           />
-                          {e.notes && <div className="text-xs max-w-[200px] truncate ml-11" style={{ color: "#8a7a6a" }} title={e.notes}>{e.notes}</div>}
+                          {e.notes && (
+                            <div className="text-xs text-[#8a7a6a] max-w-[220px] truncate ml-11" title={e.notes}>
+                              "{e.notes}"
+                            </div>
+                          )}
                         </div>
                       </td>
-                      <td className="px-5 py-3.5 text-sm" style={{ color: "#8a7a6a" }}>
+                      <td className="px-5 py-4 text-xs font-semibold text-[#4a3728]">
                         {e.serviceTitle || e.sessionType?.replace(/_/g, " ")}
                       </td>
-                      <td className="px-5 py-3.5 text-sm" style={{ color: "#8a7a6a" }}>{fmt(e.createdAt)}</td>
-                      <td className="px-5 py-3.5 text-sm font-semibold" style={{ color: "#4a3728" }}>
-                        {e.queuePosition ? `#${e.queuePosition}` : "—"}
+                      <td className="px-5 py-4 text-xs text-[#8a7a6a]">{fmt(e.createdAt)}</td>
+                      <td className="px-5 py-4 text-xs font-bold text-[#4a3728]">
+                        {e.queuePosition ? `#${e.queuePosition}` : e.position ? `#${e.position}` : "—"}
                       </td>
-                      <td className="px-5 py-3.5">
-                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold" style={{ backgroundColor: b.bg, color: b.fg }}>
+                      <td className="px-5 py-4">
+                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: b.bg, color: b.fg }}>
                           {b.label}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex gap-1.5">
-                          {e.status === "active" && (
-                            <button
-                              onClick={() => handleApprove(e.waitlistId)}
-                              disabled={busy}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 hover:opacity-80"
-                              style={{ backgroundColor: "#dcfce7", color: "#15803d" }}
-                            >
-                              <Check className="w-3.5 h-3.5" /> {busy ? "..." : "Approve"}
-                            </button>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-1.5">
+                          {isWaiting && (
+                            <>
+                              <button
+                                onClick={() => handleOfferSlot(e.waitlistId)}
+                                disabled={busy}
+                                className="px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 bg-[#dcfce7] text-[#15803d] hover:bg-[#bbf7d0] transition-colors"
+                              >
+                                <Check className="w-3.5 h-3.5" /> {busy ? "..." : "Offer Slot"}
+                              </button>
+
+                              <button
+                                onClick={() => handlePriority(e.waitlistId, 1)}
+                                disabled={busy}
+                                title="Move Priority Up"
+                                className="p-1.5 rounded-lg border border-[#e0d8cf] text-[#7a5c3e] hover:bg-[#f3ece4] transition-colors"
+                              >
+                                <ArrowUp className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handlePriority(e.waitlistId, -1)}
+                                disabled={busy}
+                                title="Move Priority Down"
+                                className="p-1.5 rounded-lg border border-[#e0d8cf] text-[#7a5c3e] hover:bg-[#f3ece4] transition-colors"
+                              >
+                                <ArrowDown className="w-3.5 h-3.5" />
+                              </button>
+                            </>
                           )}
-                          {(e.status === "active" || e.status === "notified") && (
+
+                          {(isWaiting || e.status === "notified") && (
                             <button
                               onClick={() => handleRemove(e.waitlistId)}
                               disabled={busy}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 hover:opacity-80"
-                              style={{ backgroundColor: "#fee2e2", color: "#dc2626" }}
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 bg-[#fee2e2] text-[#dc2626] hover:bg-[#fca5a5] transition-colors"
                             >
                               <XCircle className="w-3.5 h-3.5" /> Remove
                             </button>
@@ -246,4 +397,4 @@ export default function WaitlistPage({ mentorData }: Props) {
       </div>
     </div>
   );
-}
+}

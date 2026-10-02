@@ -1552,6 +1552,80 @@ class MentorService {
       );
     }
   }
+
+  static async claimWaitlistSlot(
+    waitlistId: string,
+    sessionId?: string
+  ): Promise<any> {
+    try {
+      const { data } = await api.post(
+        `/mentorship/waitlist/${waitlistId}/claim`,
+        { sessionId }
+      );
+      return data;
+    } catch (error: any) {
+      throw MentorService.waitlistError(error, 'Failed to claim waitlist slot.');
+    }
+  }
+
+  static async declineWaitlistSlot(
+    waitlistId: string,
+    reason?: string
+  ): Promise<any> {
+    try {
+      const { data } = await api.post(
+        `/mentorship/waitlist/${waitlistId}/decline`,
+        { reason }
+      );
+      return data;
+    } catch (error: any) {
+      throw MentorService.waitlistError(error, 'Failed to decline waitlist offer.');
+    }
+  }
+
+  static async updateWaitlistPriority(
+    waitlistId: string,
+    delta: number
+  ): Promise<any> {
+    try {
+      const { data } = await api.patch(
+        `/mentorship/waitlist/${waitlistId}/priority`,
+        { delta }
+      );
+      return data;
+    } catch (error: any) {
+      throw MentorService.waitlistError(error, 'Failed to update priority.');
+    }
+  }
+
+  static async removeWaitlistEntry(
+    waitlistId: string,
+    reason?: string
+  ): Promise<any> {
+    try {
+      const { data } = await api.delete(
+        `/mentorship/waitlist/${waitlistId}/remove`,
+        { data: { reason } }
+      );
+      return data;
+    } catch (error: any) {
+      throw MentorService.waitlistError(error, 'Failed to remove waitlist entry.');
+    }
+  }
+
+  static async toggleAutoOffer(
+    enabled: boolean
+  ): Promise<any> {
+    try {
+      const { data } = await api.patch(
+        `/mentorship/waitlist/settings/auto-offer`,
+        { enabled }
+      );
+      return data;
+    } catch (error: any) {
+      throw MentorService.waitlistError(error, 'Failed to update auto-offer setting.');
+    }
+  }
 }
 
 export default MentorService;
