@@ -67,7 +67,10 @@ export default function UserDashboardReviewModal({
       try {
         setIsLoading(true);
         const myReviews = await ReviewService.getMyReviews();
-        const hasReviewed = myReviews.some((r: any) => r.sessionId === sessionId);
+        const hasReviewed = myReviews.some((r: any) => 
+          String(r.sessionId) === String(sessionId) || 
+          (r.session && r.session._id && String(r.session._id) === String(sessionId))
+        );
         if (mounted) {
           setAlreadyReviewed(hasReviewed);
         }
