@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Users, Clock, CheckCircle2, XCircle, Check, X, ArrowUp, ArrowDown, Sparkles, Filter, ToggleLeft, ToggleRight } from "lucide-react";
+import { Users, Clock, CheckCircle2, XCircle, Check, X, ArrowUp, ArrowDown, Sparkles, Filter, Search, ChevronDown } from "lucide-react";
 import MentorService from "@/lib/api/mentorship.service";
 import MenteeLink from "@/features/mentorship/components/shared/MenteeLink";
 
@@ -39,6 +39,7 @@ export default function WaitlistPage({ mentorData }: Props) {
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<WaitTab>("waiting");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedService, setSelectedService] = useState<string>("ALL");
   const [autoOffer, setAutoOffer] = useState<boolean>(mentorData?.autoOfferWaitlist !== false);
   const [togglingAuto, setTogglingAuto] = useState(false);
@@ -83,12 +84,20 @@ export default function WaitlistPage({ mentorData }: Props) {
   }, [entries]);
 
   const filteredEntries = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     return entries.filter((e) => {
       const matchesTab = TAB_STATUSES[tab].includes(e.status);
       const matchesService = selectedService === "ALL" || e.serviceId === selectedService;
-      return matchesTab && matchesService;
+      const matchesSearch =
+        !q ||
+        (e.menteeName && e.menteeName.toLowerCase().includes(q)) ||
+        (e.serviceTitle && e.serviceTitle.toLowerCase().includes(q)) ||
+        (e.sessionType && e.sessionType.toLowerCase().includes(q)) ||
+        (e.notes && e.notes.toLowerCase().includes(q));
+
+      return matchesTab && matchesService && matchesSearch;
     });
-  }, [entries, tab, selectedService]);
+  }, [entries, tab, selectedService, searchQuery]);
 
   const rows = useMemo(() => {
     return [...filteredEntries].sort((a, b) => (a.queuePosition ?? 9999) - (b.queuePosition ?? 9999));
@@ -239,52 +248,73 @@ export default function WaitlistPage({ mentorData }: Props) {
         </div>
       </div>
 
-      {/* Controls & Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* Tabs */}
-        <div className="flex-1 bg-white p-1.5 rounded-2xl border border-[#e0d8cf] flex gap-1.5">
-          {(Object.keys(TAB_META) as WaitTab[]).map((t) => {
-            const { label, icon: Icon } = TAB_META[t];
-            const active = tab === t;
-            const countVal = entries.filter((e) => TAB_STATUSES[t].includes(e.status)).length;
-            return (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
-                style={{ backgroundColor: active ? "#4a3728" : "transparent", color: active ? "#fff" : "#7a5c3e" }}
+      {/* Navigation Tabs */}
+      <div className="bg-white p-1.5 rounded-2xl border border-[#e0d8cf] flex gap-1.5 shadow-sm">
+        {(Object.keys(TAB_META) as WaitTab[]).map((t) => {
+          const { label, icon: Icon } = TAB_META[t];
+          const active = tab === t;
+          const countVal = entries.filter((e) => TAB_STATUSES[t].includes(e.status)).length;
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+              style={{ backgroundColor: active ? "#4a3728" : "transparent", color: active ? "#fff" : "#7a5c3e" }}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{label}</span>
+              <span
+                className="px-2 py-0.5 rounded-full text-[11px] font-extrabold"
+                style={{ backgroundColor: active ? "rgba(255,255,255,0.2)" : "#f3ece4", color: active ? "#fff" : "#7a5c3e" }}
               >
-                <Icon className="w-4 h-4" />
-                <span>{label}</span>
-                <span
-                  className="px-2 py-0.5 rounded-full text-[11px] font-extrabold"
-                  style={{ backgroundColor: active ? "rgba(255,255,255,0.2)" : "#f3ece4", color: active ? "#fff" : "#7a5c3e" }}
-                >
-                  {countVal}
-                </span>
-              </button>
-            );
-          })}
+                {countVal}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Sleek Search & Filter Control Bar */}
+      <div className="bg-white p-3 rounded-2xl border border-[#e0d8cf] shadow-sm flex flex-col sm:flex-row items-center gap-3">
+        {/* Search Input Box */}
+        <div className="flex-1 w-full relative">
+          <Search className="w-4 h-4 text-[#8a7a6a] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search mentee name, service, or notes..."
+            className="w-full pl-10 pr-8 py-2 rounded-xl bg-[#fbf7f3] border border-[#e0d8cf] text-xs font-medium text-[#4a3728] placeholder-[#a09080] focus:outline-none focus:border-[#4a3728] transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a7a6a] hover:text-[#4a3728]"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
-        {/* Service Filter Dropdown */}
-        {serviceOptions.length > 0 && (
-          <div className="bg-white px-3 py-1.5 rounded-2xl border border-[#e0d8cf] flex items-center gap-2">
-            <Filter className="w-4 h-4 text-[#7a5c3e]" />
+        {/* Service Filter Dropdown with fixed width & truncated option text */}
+        <div className="w-full sm:w-auto flex items-center gap-2 shrink-0">
+          <div className="relative w-full sm:w-[220px]">
+            <Filter className="w-3.5 h-3.5 text-[#7a5c3e] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <select
               value={selectedService}
               onChange={(e) => setSelectedService(e.target.value)}
-              className="text-xs font-bold text-[#4a3728] bg-transparent focus:outline-none cursor-pointer"
+              className="w-full pl-8 pr-7 py-2 rounded-xl bg-[#fbf7f3] border border-[#e0d8cf] text-xs font-bold text-[#4a3728] appearance-none focus:outline-none focus:border-[#4a3728] cursor-pointer truncate"
             >
               <option value="ALL">All Services</option>
               {serviceOptions.map(([id, title]) => (
-                <option key={id} value={id}>
-                  {title}
+                <option key={id} value={id} className="text-xs text-[#4a3728]">
+                  {title.length > 35 ? title.substring(0, 35) + "..." : title}
                 </option>
               ))}
             </select>
+            <ChevronDown className="w-3.5 h-3.5 text-[#7a5c3e] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
-        )}
+        </div>
       </div>
 
       {/* Table */}
@@ -298,8 +328,12 @@ export default function WaitlistPage({ mentorData }: Props) {
           ) : rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-[#8a7a6a] space-y-2">
               <Users className="w-10 h-10 text-[#d1c7bd]" />
-              <p className="text-sm font-semibold text-[#4a3728]">No one is on your waitlist yet</p>
-              <p className="text-xs">When mentees request a spot, they will appear here in FIFO queue order.</p>
+              <p className="text-sm font-semibold text-[#4a3728]">No matching waitlist entries</p>
+              <p className="text-xs">
+                {searchQuery || selectedService !== "ALL"
+                  ? "Try clearing your search filters."
+                  : "When mentees request a spot, they will appear here in FIFO queue order."}
+              </p>
             </div>
           ) : (
             <table className="w-full">
@@ -315,6 +349,7 @@ export default function WaitlistPage({ mentorData }: Props) {
                   const b = badge[e.status] ?? badge.waiting;
                   const busy = actionId === e.waitlistId;
                   const isWaiting = e.status === "waiting" || e.status === "active";
+                  const sTitle = e.serviceTitle || e.sessionType?.replace(/_/g, " ") || "Mentorship Session";
 
                   return (
                     <tr key={e.waitlistId} className="hover:bg-[#fbf7f3]/70 transition-colors">
@@ -333,15 +368,17 @@ export default function WaitlistPage({ mentorData }: Props) {
                           )}
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-xs font-semibold text-[#4a3728]">
-                        {e.serviceTitle || e.sessionType?.replace(/_/g, " ")}
+                      <td className="px-5 py-4 text-xs font-semibold text-[#4a3728] max-w-[240px]">
+                        <span className="truncate block" title={sTitle}>
+                          {sTitle}
+                        </span>
                       </td>
                       <td className="px-5 py-4 text-xs text-[#8a7a6a]">{fmt(e.createdAt)}</td>
                       <td className="px-5 py-4 text-xs font-bold text-[#4a3728]">
                         {e.queuePosition ? `#${e.queuePosition}` : e.position ? `#${e.position}` : "—"}
                       </td>
                       <td className="px-5 py-4">
-                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: b.bg, color: b.fg }}>
+                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-bold shrink-0" style={{ backgroundColor: b.bg, color: b.fg }}>
                           {b.label}
                         </span>
                       </td>
