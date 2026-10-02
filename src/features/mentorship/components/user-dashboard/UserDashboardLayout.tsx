@@ -177,6 +177,17 @@ export default function UserDashboardLayout({
     }
   }, []);
 
+  const handleDeleteNotification = useCallback(async (id: string) => {
+    try {
+      await NotificationService.deleteMentorshipNotification(id);
+      setNotifications(prev => prev.filter(n => n._id !== id && n.notificationId !== id));
+      return true;
+    } catch (error) {
+      console.error("Failed to delete notification:", error);
+      return false;
+    }
+  }, []);
+
   const fetchSessions = useCallback(() => {
     if (!userId) return;
     SessionService.getAllSessions({ role: "mentee", limit: 100 })
@@ -309,6 +320,7 @@ export default function UserDashboardLayout({
               notificationsLoading={notificationsLoading}
               onMarkAllRead={handleMarkAllRead}
               onMarkRead={handleMarkRead}
+              onDeleteNotification={handleDeleteNotification}
             />
           </div>
         </main>

@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useState } from "react"
-import { CalendarClock, Star, CreditCard, Bell, MessageSquare, CheckCheck, BellRing } from "lucide-react"
+import { CalendarClock, Star, CreditCard, Bell, MessageSquare, CheckCheck, BellRing, Trash2 } from "lucide-react"
 import AuthService from "@/lib/api/auth.service"
 import ProfileService from "@/lib/api/profile.service"
 
@@ -35,6 +35,7 @@ interface UserDashboardNotificationsPageProps {
   notificationsLoading?: boolean
   onMarkAllRead?: () => void
   onMarkRead?: (id: string) => void
+  onDeleteNotification?: (id: string) => Promise<boolean>
 }
 
 const TYPE_ICON: Record<NotificationType, React.FC<any>> = {
@@ -90,11 +91,30 @@ export default function UserDashboardNotificationsPage({
   notificationsLoading = false,
   onMarkAllRead,
   onMarkRead,
+  onDeleteNotification,
 }: UserDashboardNotificationsPageProps) {
   const groups = useMemo(() => groupByRecency(notifications), [notifications])
   const unreadCount = notifications.filter((n) => !n.isRead).length
   
   const [avatarsMap, setAvatarsMap] = useState<Record<string, string>>({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handleDelete = async () => {
+    if (!deleteConfirmId || !onDeleteNotification) return;
+    setIsDeleting(true);
+    const success = await onDeleteNotification(deleteConfirmId);
+    setIsDeleting(false);
+    setDeleteConfirmId(null);
+    if (success) {
+      setToastMessage("Notification deleted successfully.");
+      setTimeout(() => setToastMessage(null), 3000);
+    } else {
+      setToastMessage("Failed to delete notification.");
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
 
   useEffect(() => {
     const idsToFetch = new Set<string>();
@@ -236,7 +256,7 @@ export default function UserDashboardNotificationsPage({
                       onMarkRead?.(item._id!);
                     }
                   }}
-                  className={`w-full flex items-start gap-4 p-4 rounded-2xl text-left transition-all duration-200 motion-reduce:transition-none hover:-translate-y-1 hover:shadow-md ${
+                  className={`group w-full flex items-start gap-4 p-4 rounded-2xl text-left transition-all duration-200 motion-reduce:transition-none hover:-translate-y-1 hover:shadow-md ${
                     isInteractive
                       ? 'hover:border-[#c9baa9] cursor-pointer'
                       : 'cursor-default'
@@ -319,15 +339,68 @@ export default function UserDashboardNotificationsPage({
                     })()}
                   </div>
 
-                  <span className="text-xs shrink-0 mt-1 font-semibold" style={{ color: COLORS.muted }}>
-                    {timeAgo(item.createdAt)}
-                  </span>
+                  <div className="flex flex-col items-end shrink-0 gap-2">
+                    <span className="text-xs font-semibold" style={{ color: COLORS.muted }}>
+                      {timeAgo(item.createdAt)}
+                    </span>
+                    {onDeleteNotification && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirmId(item._id!);
+                        }}
+                        className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 text-red-400 hover:text-red-600 focus:opacity-100"
+                        title="Delete notification"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               )
             })}
           </div>
         </div>
       ))}
+
+      {/* Toast */}
+      {toastMessage && (
+        <div className="fixed bottom-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-fadeIn" style={{ backgroundColor: COLORS.ink, color: "white" }}>
+          <CheckCheck className="w-4 h-4" />
+          <span className="text-sm font-medium">{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl animate-fadeIn">
+            <h3 className="text-lg font-bold mb-2" style={{ color: COLORS.ink }}>Delete Notification</h3>
+            <p className="text-sm mb-6" style={{ color: COLORS.muted }}>
+              Delete this notification permanently?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl text-sm font-semibold transition-colors hover:bg-gray-100"
+                style={{ color: COLORS.ink }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 flex items-center gap-2"
+                style={{ backgroundColor: "#b91c1c" }}
+              >
+                {isDeleting && <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

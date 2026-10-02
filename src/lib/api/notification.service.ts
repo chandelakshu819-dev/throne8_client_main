@@ -99,6 +99,16 @@ class NotificationService {
             throw new Error('Failed to mark all notifications as read.');
         }
     }
+
+    static async deleteMentorshipNotification(notificationId: string): Promise<any> {
+        try {
+            const { data } = await api.delete(`/mentorship/notifications/${notificationId}`);
+            return data;
+        } catch (error: any) {
+            console.error('❌ [DELETE_MENTORSHIP_NOTIFICATION] Failed:', error);
+            throw new Error('Failed to delete notification.');
+        }
+    }
 }
 
 export default NotificationService;
