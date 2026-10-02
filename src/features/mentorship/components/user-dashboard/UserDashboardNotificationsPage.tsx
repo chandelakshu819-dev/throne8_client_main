@@ -1,5 +1,7 @@
-import React, { useMemo } from "react"
+import React, { useMemo, useEffect, useState } from "react"
 import { CalendarClock, Star, CreditCard, Bell, MessageSquare, CheckCheck, BellRing } from "lucide-react"
+import AuthService from "@/lib/api/auth.service"
+import ProfileService from "@/lib/api/profile.service"
 
 const COLORS = {
   ink: "#4a3728",
@@ -24,6 +26,8 @@ type NotificationItem = {
   isRead?: boolean
   data?: any
   metadata?: any
+  sender?: any
+  senderDetails?: any
 }
 
 interface UserDashboardNotificationsPageProps {
@@ -89,6 +93,50 @@ export default function UserDashboardNotificationsPage({
 }: UserDashboardNotificationsPageProps) {
   const groups = useMemo(() => groupByRecency(notifications), [notifications])
   const unreadCount = notifications.filter((n) => !n.isRead).length
+  
+  const [avatarsMap, setAvatarsMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const idsToFetch = new Set<string>();
+    notifications.forEach((item) => {
+      const actorId = item.data?.viewerId || item.data?.menteeId || item.data?.mentorId || item.data?.actorId || item.data?.senderId || item.data?.userId || item.data?.actor;
+      if (actorId && typeof actorId === 'string' && !avatarsMap[actorId]) {
+        idsToFetch.add(actorId);
+      }
+    });
+
+    if (idsToFetch.size > 0) {
+      AuthService.getUsersBulk(Array.from(idsToFetch))
+        .then(async (res) => {
+          const users = res?.data?.users || res?.users || res?.data || [];
+          const newMap: Record<string, string> = {};
+          if (Array.isArray(users)) {
+            await Promise.all(
+              users.map(async (u: any) => {
+                if (u && (u.userId || u._id)) {
+                  let avatar = u.profilePhotoUrl || u.profileImage || u.avatar?.url || u.avatar || u.profilePhoto || u.profileImageUrl;
+                  
+                  if (!avatar && u.profilePhotoId) {
+                    try {
+                      const photoRes = await ProfileService.getProfilePhotoById(u.profilePhotoId);
+                      avatar = photoRes?.data?.photo?.cloudinarySecureUrl || photoRes?.data?.cloudinarySecureUrl || photoRes?.cloudinarySecureUrl;
+                    } catch (err) {
+                      console.error("Failed to fetch profile photo:", err);
+                    }
+                  }
+                  
+                  if (avatar) {
+                    newMap[u.userId || u._id] = avatar;
+                  }
+                }
+              })
+            );
+          }
+          setAvatarsMap(prev => ({ ...prev, ...newMap }));
+        })
+        .catch(console.error);
+    }
+  }, [notifications]);
 
   return (
     <div className="space-y-8 animate-fadeIn max-w-4xl mx-auto">
@@ -198,12 +246,40 @@ export default function UserDashboardNotificationsPage({
                     border: `1px solid ${item.isRead ? COLORS.hairline : COLORS.gold}`,
                   }}
                 >
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: item.isRead ? COLORS.wash : COLORS.chip }}
-                  >
-                    <Icon className="w-5 h-5" style={{ color: item.isRead ? COLORS.muted : COLORS.accent }} />
-                  </div>
+                  {(() => {
+                    const actorId = item.data?.viewerId || item.data?.menteeId || item.data?.mentorId || item.data?.actorId || item.data?.senderId || item.data?.userId || item.data?.actor;
+                    const fetchedAvatar = actorId ? avatarsMap[actorId] : null;
+
+                    const avatarUrl = fetchedAvatar || item.sender?.avatar || item.senderDetails?.avatar || item.data?.user?.avatar || item.metadata?.user?.avatar || item.data?.actor?.avatar || item.data?.mentorProfileImage || item.metadata?.mentorProfileImage || item.data?.menteeProfileImage || item.metadata?.menteeProfileImage || item.data?.sender?.avatar || item.data?.user?.profilePhoto || item.data?.sender?.profilePhoto || item.data?.user?.profileImage || item.data?.actor?.profileImage || item.metadata?.actor?.profileImage;
+
+                    if (actorId) {
+                      if (avatarUrl) {
+                        return (
+                          <div className="w-10 h-10 rounded-full overflow-hidden shrink-0" style={{ border: `1px solid ${COLORS.hairline}` }}>
+                            <img src={avatarUrl} alt="User Avatar" className="w-full h-full object-cover" />
+                          </div>
+                        );
+                      } else {
+                        // User has no profile picture - fallback to initial
+                        const name = item.data?.mentorName || item.metadata?.mentorName || item.data?.menteeName || item.metadata?.menteeName || item.data?.user?.name || item.metadata?.user?.name || item.title?.split(' ')?.[0] || 'U';
+                        const initial = typeof name === 'string' ? name.charAt(0).toUpperCase() : 'U';
+                        return (
+                          <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center font-bold text-white text-lg" style={{ backgroundColor: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}>
+                            {initial}
+                          </div>
+                        );
+                      }
+                    }
+
+                    return (
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: item.isRead ? COLORS.wash : COLORS.chip }}
+                      >
+                        <Icon className="w-5 h-5" style={{ color: item.isRead ? COLORS.muted : COLORS.accent }} />
+                      </div>
+                    );
+                  })()}
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
