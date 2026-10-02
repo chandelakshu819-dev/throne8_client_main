@@ -2,6 +2,7 @@ import React, { useMemo, useEffect, useState } from "react"
 import { CalendarClock, Star, CreditCard, Bell, MessageSquare, CheckCheck, BellRing, Trash2 } from "lucide-react"
 import AuthService from "@/lib/api/auth.service"
 import ProfileService from "@/lib/api/profile.service"
+import { useRouter } from "next/navigation"
 
 const COLORS = {
   ink: "#4a3728",
@@ -93,6 +94,7 @@ export default function UserDashboardNotificationsPage({
   onMarkRead,
   onDeleteNotification,
 }: UserDashboardNotificationsPageProps) {
+  const router = useRouter();
   const groups = useMemo(() => groupByRecency(notifications), [notifications])
   const unreadCount = notifications.filter((n) => !n.isRead).length
   
@@ -161,7 +163,7 @@ export default function UserDashboardNotificationsPage({
   return (
     <div className="space-y-8 animate-fadeIn max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4 bg-white p-6 rounded-2xl" style={{ border: `1px solid ${COLORS.hairline}` }}>
+      <div className="sticky top-0 z-10 flex items-center justify-between flex-wrap gap-4 bg-white p-6 rounded-2xl shadow-sm" style={{ border: `1px solid ${COLORS.hairline}` }}>
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center relative" style={{ backgroundColor: COLORS.ink }}>
             <Bell className="w-6 h-6 text-white" />
@@ -248,6 +250,18 @@ export default function UserDashboardNotificationsPage({
 
               const isInteractive = !item.isRead && item._id;
 
+              const actorIdRaw = item.data?.viewerId || item.data?.menteeId || item.data?.mentorId || item.data?.actorId || item.data?.senderId || item.data?.userId || item.data?.actor;
+              const validActorId = typeof actorIdRaw === 'string' ? actorIdRaw : (actorIdRaw?._id || actorIdRaw?.id || null);
+
+              const handleUserClick = (e: React.MouseEvent) => {
+                if (!validActorId) return;
+                e.stopPropagation();
+                if (isInteractive) {
+                  onMarkRead?.(item._id!);
+                }
+                router.push(`/profile/${validActorId}`);
+              };
+
               return (
                 <div
                   key={item._id ?? idx}
@@ -267,15 +281,19 @@ export default function UserDashboardNotificationsPage({
                   }}
                 >
                   {(() => {
-                    const actorId = item.data?.viewerId || item.data?.menteeId || item.data?.mentorId || item.data?.actorId || item.data?.senderId || item.data?.userId || item.data?.actor;
-                    const fetchedAvatar = actorId ? avatarsMap[actorId] : null;
+                    const actorId = actorIdRaw;
+                    const fetchedAvatar = typeof actorId === 'string' ? avatarsMap[actorId] : null;
 
                     const avatarUrl = fetchedAvatar || item.sender?.avatar || item.senderDetails?.avatar || item.data?.user?.avatar || item.metadata?.user?.avatar || item.data?.actor?.avatar || item.data?.mentorProfileImage || item.metadata?.mentorProfileImage || item.data?.menteeProfileImage || item.metadata?.menteeProfileImage || item.data?.sender?.avatar || item.data?.user?.profilePhoto || item.data?.sender?.profilePhoto || item.data?.user?.profileImage || item.data?.actor?.profileImage || item.metadata?.actor?.profileImage;
 
                     if (actorId) {
                       if (avatarUrl) {
                         return (
-                          <div className="w-10 h-10 rounded-full overflow-hidden shrink-0" style={{ border: `1px solid ${COLORS.hairline}` }}>
+                          <div 
+                            className={`w-10 h-10 rounded-full overflow-hidden shrink-0 ${validActorId ? 'cursor-pointer hover:opacity-80 hover:shadow-sm transition-all' : ''}`} 
+                            style={{ border: `1px solid ${COLORS.hairline}` }}
+                            onClick={validActorId ? handleUserClick : undefined}
+                          >
                             <img src={avatarUrl} alt="User Avatar" className="w-full h-full object-cover" />
                           </div>
                         );
@@ -284,7 +302,11 @@ export default function UserDashboardNotificationsPage({
                         const name = item.data?.mentorName || item.metadata?.mentorName || item.data?.menteeName || item.metadata?.menteeName || item.data?.user?.name || item.metadata?.user?.name || item.title?.split(' ')?.[0] || 'U';
                         const initial = typeof name === 'string' ? name.charAt(0).toUpperCase() : 'U';
                         return (
-                          <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center font-bold text-white text-lg" style={{ backgroundColor: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}>
+                          <div 
+                            className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center font-bold text-white text-lg ${validActorId ? 'cursor-pointer hover:opacity-80 hover:shadow-sm transition-all' : ''}`} 
+                            style={{ backgroundColor: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}
+                            onClick={validActorId ? handleUserClick : undefined}
+                          >
                             {initial}
                           </div>
                         );
@@ -330,7 +352,11 @@ export default function UserDashboardNotificationsPage({
 
                       if (!isPayment && name) {
                         return (
-                          <div className="mt-2 inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-[#fbf7f3] border" style={{ color: COLORS.accent, borderColor: COLORS.gold }}>
+                          <div 
+                            className={`mt-2 inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-[#fbf7f3] border ${validActorId ? 'cursor-pointer hover:bg-[#f3ece4] transition-colors' : ''}`} 
+                            style={{ color: COLORS.accent, borderColor: COLORS.gold }}
+                            onClick={validActorId ? handleUserClick : undefined}
+                          >
                             {label}: {name}
                           </div>
                         );
