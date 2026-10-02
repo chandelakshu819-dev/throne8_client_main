@@ -1,4 +1,4 @@
-"use client";
+  "use client";
 
 import React, { useState } from "react";
 import { Star, X, Loader2 } from "lucide-react";
@@ -57,6 +57,10 @@ export default function UserDashboardReviewModal({
     );
   };
 
+  React.useEffect(() => {
+    setError(null);
+  }, [sessionId]);
+
   const canSubmit =
     rating >= 1 && comment.trim().length >= MIN_COMMENT && comment.length <= MAX_COMMENT;
 
@@ -75,7 +79,11 @@ export default function UserDashboardReviewModal({
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || "Failed to submit review. Please try again.");
+      let errorMsg = err?.response?.data?.message || err?.message || "Failed to submit review. Please try again.";
+      if (errorMsg.includes("E11000") || errorMsg.includes("duplicate key")) {
+        errorMsg = "You have already reviewed this session.";
+      }
+      setError(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
