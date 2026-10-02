@@ -139,7 +139,8 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
   const reviewedSessionIds = useMemo(() => {
     const set = new Set<string>();
     reviews.forEach((r) => {
-      if (r.sessionId) set.add(r.sessionId);
+      if (r.sessionId) set.add(String(r.sessionId));
+      if (r.session && (r.session as any)._id) set.add(String((r.session as any)._id));
     });
     return set;
   }, [reviews]);
@@ -150,8 +151,8 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
       .filter((s) => {
         const status = (s.status || "").toLowerCase();
         const isCompleted = status === "completed" || status === "done";
-        const id1 = s.sessionId || "";
-        const id2 = s._id || "";
+        const id1 = s.sessionId ? String(s.sessionId) : "";
+        const id2 = s._id ? String(s._id) : "";
         const isAlreadyReviewed = (id1 && reviewedSessionIds.has(id1)) || (id2 && reviewedSessionIds.has(id2));
         return isCompleted && !isAlreadyReviewed;
       })
@@ -528,7 +529,9 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
               const name = s.mentorName || "Mentor";
               const photo = s.mentorProfilePhoto;
               const sessionId = s.sessionId || s._id || `P-${idx}`;
-              const isAlreadyReviewed = reviewedSessionIds.has(sessionId) || (s._id ? reviewedSessionIds.has(s._id) : false);
+              const id1 = s.sessionId ? String(s.sessionId) : "";
+              const id2 = s._id ? String(s._id) : "";
+              const isAlreadyReviewed = (id1 && reviewedSessionIds.has(id1)) || (id2 && reviewedSessionIds.has(id2));
 
               return (
                 <div

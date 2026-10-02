@@ -1,4 +1,4 @@
-"use client";
+  "use client";
 
 import React, { useState } from "react";
 import { Star, X, Loader2 } from "lucide-react";
@@ -50,6 +50,9 @@ export default function UserDashboardReviewModal({
   const [selectedTags, setSelectedTags] = useState<ReviewTag[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [alreadyReviewed, setAlreadyReviewed] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const toggleTag = (tag: ReviewTag) => {
     setSelectedTags((prev) =>
@@ -57,11 +60,39 @@ export default function UserDashboardReviewModal({
     );
   };
 
+  React.useEffect(() => {
+    setError(null);
+    let mounted = true;
+    const checkReview = async () => {
+      try {
+        setIsLoading(true);
+        const myReviews = await ReviewService.getMyReviews();
+        const hasReviewed = myReviews.some((r: any) => 
+          String(r.sessionId) === String(sessionId) || 
+          (r.session && r.session._id && String(r.session._id) === String(sessionId))
+        );
+        if (mounted) {
+          setAlreadyReviewed(hasReviewed);
+        }
+      } catch (err) {
+        console.error("Failed to check existing reviews", err);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+    checkReview();
+    return () => {
+      mounted = false;
+    };
+  }, [sessionId]);
+
   const canSubmit =
     rating >= 1 && comment.trim().length >= MIN_COMMENT && comment.length <= MAX_COMMENT;
 
   const handleSubmit = async () => {
-    if (!canSubmit || isSubmitting) return;
+    if (!canSubmit || isSubmitting || alreadyReviewed) return;
     setIsSubmitting(true);
     setError(null);
     try {
@@ -75,7 +106,13 @@ export default function UserDashboardReviewModal({
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || "Failed to submit review. Please try again.");
+      let errorMsg = err?.response?.data?.message || err?.message || "Failed to submit review. Please try again.";
+      if (errorMsg.includes("E11000") || errorMsg.includes("duplicate key") || errorMsg.includes("already reviewed")) {
+        setAlreadyReviewed(true);
+        errorMsg = null; // Clear error since we show the UI state
+      } else {
+        setError(errorMsg);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -92,7 +129,7 @@ export default function UserDashboardReviewModal({
             <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>
               Rate this session
             </h3>
-            {mentorName && (
+            {mentorName && !alreadyReviewed && !isLoading && (
               <p className="text-sm mt-0.5" style={{ color: COLORS.muted }}>
                 How was your session with {mentorName}?
               </p>
@@ -106,7 +143,29 @@ export default function UserDashboardReviewModal({
           </button>
         </div>
 
-        <>
+        {isLoading ? (
+          <div className="flex justify-center items-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin" style={{ color: COLORS.accent }} />
+          </div>
+        ) : alreadyReviewed ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: COLORS.wash }}>
+              <Star className="w-8 h-8" style={{ color: COLORS.gold, fill: COLORS.gold }} />
+            </div>
+            <h4 className="text-xl font-bold mb-2" style={{ color: COLORS.ink }}>Already reviewed</h4>
+            <p className="text-sm mb-6" style={{ color: COLORS.muted }}>
+              You have already reviewed this session.
+            </p>
+            <button
+              onClick={onClose}
+              className="px-6 py-2.5 rounded-xl font-semibold text-sm border transition-colors hover:bg-[#f3ece4]"
+              style={{ borderColor: COLORS.hairline, color: COLORS.ink, backgroundColor: COLORS.wash }}
+            >
+              Close
+            </button>
+          </div>
+        ) : (
+          <>
             {/* Star rating */}
             <div className="flex justify-center gap-1.5 mb-5">
               {[1, 2, 3, 4, 5].map((star) => (
@@ -198,6 +257,7 @@ export default function UserDashboardReviewModal({
               </button>
             </div>
           </>
+        )}
       </div>
     </div>
   );

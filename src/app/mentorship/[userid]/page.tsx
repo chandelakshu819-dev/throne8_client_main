@@ -23,6 +23,7 @@ import {
     GlobalStyles,
 } from "@/features/index";
 import MentorshipServicesSection from "@/features/mentorship/components/sections/MentorshipServicesSection";
+import SeniorMentorshipServicesSection from "@/features/mentorship/components/sections/SeniorMentorshipServicesSection";
 import GroupSessionsSection from "@/features/mentorship/components/sections/GroupSessionsSection";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useParams, useRouter } from "next/navigation";
@@ -223,6 +224,9 @@ export default function ThroneUltraPremium() {
                 mentorImage={pageMentorData?.profilePic}
                 mentorRole={pageMentorData?.experience?.currentRole?.split(" at ")[0]}
             />
+
+            {/* Senior 1-to-1 Mentorship Services */}
+            <SeniorMentorshipServicesSection />
 
             {/* Group Sessions */}
             <GroupSessionsSection 

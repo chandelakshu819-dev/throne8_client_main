@@ -152,20 +152,27 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
     }, [daySlots]);
 
     useEffect(() => {
+        // Build a date range covering the entire currently displayed month
+        // to match the same query used by the working Availability dashboard.
         if (!mentorId || isGroupTemplate) return;
-
         const y = currentMonth.getFullYear();
         const m = String(currentMonth.getMonth() + 1).padStart(2, "0");
         const lastDay = new Date(y, currentMonth.getMonth() + 1, 0).getDate();
         const startDate = `${y}-${m}-01`;
         const endDate = `${y}-${m}-${String(lastDay).padStart(2, "0")}`;
 
+        // Use getMentorAvailability — the same endpoint the Availability dashboard uses.
+        // This correctly scopes results to THIS mentor and THIS month.
+        // getAllAvailabilityFromDB is a global endpoint (limit:100 across ALL mentors)
+        // and cannot guarantee this mentor's records are included.
         AvailabilityService.getMentorAvailability(mentorId, { startDate, endDate })
             .then((res: any) => {
-                setAvailability(res?.data?.availabilities ?? []);
+                // Response shape: { data: { availabilities: [...] } }
+                const avails = res?.data?.availabilities ?? [];
+                setAvailability(avails);
             })
             .catch(() => setAvailability([]));
-    }, [mentorId, currentMonth]);
+    }, [mentorId, currentMonth, isGroupTemplate]);
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);

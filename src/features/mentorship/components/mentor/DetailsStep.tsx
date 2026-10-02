@@ -35,21 +35,20 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
 
 
     useEffect(() => {
+        // fetchUserProfile requires userId — pass it explicitly.
+        // Without this the API call never fires and userProfileData stays null.
         if (user?.userId) {
             fetchUserProfile(user.userId);
         }
-    }, [user?.userId, fetchUserProfile]);
+    }, [user?.userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const fullName = userProfileData
         ? `${userProfileData.firstName} ${userProfileData.lastName}`.trim()
         : '';
     const email = userProfileData?.email || '';
-    const phone = userProfileData?.phoneNumber
-        || '';
+    const phone = userProfileData?.phoneNumber || '';
 
-    console.log("👤 User Profile Data in Detail page-:",
-        fullName, email, phone
-    );
+    console.log("👤 User Profile Data in Detail page-:", fullName, email, phone);
 
     const [formData, setFormData] = useState<FormData>({
         name: "",

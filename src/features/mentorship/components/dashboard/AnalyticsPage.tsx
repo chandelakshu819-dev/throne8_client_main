@@ -183,7 +183,28 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
 
     MentorService.getMentorDashboardStats(mentorId)
       .then((res) => {
-        if (!cancelled) setData(res.data)
+        if (!cancelled) {
+          const payload = res.data || res;
+          // Look for the actual booking count in various possible nested locations
+          // using || to skip 0 values (like when conversion.bookings is broken and returns 0)
+          const validBackendBookings = 
+            res.totalBookings || 
+            res.totalSessions ||
+            res.data?.totalBookings ||
+            res.data?.totalSessions ||
+            res.data?.stats?.totalBookings ||
+            res.data?.sessions?.total ||
+            payload.conversion?.bookings ||
+            payload.sessions?.total ||
+            payload.baseStats?.sessions?.total ||
+            payload.stats?.totalBookings ||
+            (payload.popularServices ? payload.popularServices.reduce((sum: number, s: any) => sum + (s.bookings || 0), 0) : 0);
+
+          setData({
+            ...payload,
+            totalBookings: validBackendBookings
+          })
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err.message)
@@ -209,11 +230,20 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
     return (
       <div className="p-8 text-center rounded-2xl bg-white" style={{ border: "1px solid #e0d8cf" }}>
         <p className="font-semibold" style={{ color: "#b91c1c" }}>
-          {error || "No analytics data found."}
+          {error || "No data available."}
         </p>
       </div>
     )
   }
+
+  const actualBookingCount = data.totalBookings || 0;
+  // Use profile views from either all-time (value) or this month (valueThisMonth)
+  const profileViews = data.profileViews?.value || 0;
+  
+  // Formula: Booking Rate = (valid bookings / profile views) × 100
+  const recalculatedBookingRate = profileViews > 0
+    ? Math.round((actualBookingCount / profileViews) * 100)
+    : 0;
 
   const metricCards = [
     {
@@ -225,7 +255,7 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
     },
     {
       label: "Booking Rate",
-      value: `${data.bookingRate.value}%`,
+      value: `${recalculatedBookingRate}%`,
       change: "—",
       trend: (data.bookingRate.trend as "up" | "down") || "up",
       icon: CalendarCheck,
@@ -253,7 +283,7 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
       ? [
           {
             label: "View → Booking Rate",
-            value: `${data.conversion.rate}%`,
+            value: `${recalculatedBookingRate}%`,
             change: "—",
             trend: "up" as const,
             icon: Percent,
@@ -263,8 +293,7 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
   ]
 
   const totalServiceBookings = data.popularServices.reduce((sum: number, s: PopularServiceStat) => sum + s.bookings, 0)
-  const totalEarningsBookings = data.monthlyEarnings.reduce((sum: number, e: MonthlyEarningStat) => sum + (e.bookings || 0), 0)
-
+  const totalEarningsBookings = actualBookingCount;
   const popularServices = data.popularServices.map((s: PopularServiceStat, idx: number) => {
     const meta = SERVICE_ICON_MAP[s.sessionType] || {
       icon: Users,
@@ -358,7 +387,7 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
 
           {popularServices.length === 0 ? (
             <p className="text-sm text-center py-6" style={{ color: "#a08070" }}>
-              No completed sessions yet.
+              No bookings yet.
             </p>
           ) : (
             <>
@@ -425,7 +454,7 @@ export default function AnalyticsPage({ mentorData }: AnalyticsPageProps) {
 
           {data.monthlyEarnings.length === 0 ? (
             <p className="text-sm text-center py-6" style={{ color: "#a08070" }}>
-              No earnings recorded yet.
+              No earnings yet.
             </p>
           ) : (
             <>

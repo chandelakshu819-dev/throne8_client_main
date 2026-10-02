@@ -456,31 +456,62 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
     SessionService.getMentorSessions(mentorId)
       .then((res) => {
         const sessions: any[] = Array.isArray(res.data) ? res.data : [];
-        const rows: TransactionRow[] = sessions.flatMap((s: any) =>
-          (s.bookings || []).map((b: any) => ({
-            bookingId: b._id,
-            transactionId: b.payment?.transactionId || b.paymentId || b.payment?.razorpayPaymentId || b._id,
-            menteeId: b.menteeId || b.bookedBy || "",
-            menteeName: b.mentee?.fullName || s.bookedMenteeName || "Unknown",
-            menteeEmail: b.mentee?.email || b.menteeEmail || "",
-            menteePhone: b.mentee?.phone || b.menteePhone || "",
-            menteeProfilePhotoId: b.mentee?.profilePic || null,
-            rawDate: b.bookedAt ? new Date(b.bookedAt) : new Date(s.scheduledAt || Date.now()),
-            date: b.bookedAt
-              ? new Date(b.bookedAt).toLocaleDateString("en-IN", {
-                  day: "2-digit", month: "short", year: "numeric",
-                })
-              : "—",
-            basePrice: b.pricing?.basePrice ?? s.pricing?.basePrice ?? 0,
-            platformFee: b.pricing?.platformFee ?? s.pricing?.platformFee ?? 0,
-            total: b.pricing?.totalAmount ?? s.pricing?.totalAmount ?? 0,
-            method: b.payment?.method || s.payment?.method || "—",
-            paymentStatus: derivePaymentStatus(b.status),
-            bookingStatus: b.status || "pending",
-            sessionType: s.sessionType || s.title || b.sessionType || "1-on-1 Session",
-            payoutStatus: b.payoutStatus || b.payment?.payoutStatus || (b.status === "completed" ? "paid_out" : "pending_payout"),
-          }))
-        );
+        const rows: TransactionRow[] = sessions.flatMap((s: any) => {
+          const bks = Array.isArray(s.bookings) && s.bookings.length > 0 
+            ? s.bookings.map((b: any) => ({
+                bookingId: b._id,
+                transactionId: b.payment?.transactionId || b.paymentId || b.payment?.razorpayPaymentId || b._id,
+                menteeId: b.menteeId || b.bookedBy || "",
+                menteeName: b.mentee?.fullName || s.bookedMenteeName || "Unknown",
+                menteeEmail: b.mentee?.email || b.menteeEmail || "",
+                menteePhone: b.mentee?.phone || b.menteePhone || "",
+                menteeProfilePhotoId: b.mentee?.profilePic || null,
+                rawDate: b.bookedAt ? new Date(b.bookedAt) : new Date(s.scheduledAt || Date.now()),
+                date: b.bookedAt
+                  ? new Date(b.bookedAt).toLocaleDateString("en-IN", {
+                      day: "2-digit", month: "short", year: "numeric",
+                    })
+                  : "—",
+                basePrice: b.pricing?.basePrice ?? s.pricing?.basePrice ?? 0,
+                platformFee: b.pricing?.platformFee ?? s.pricing?.platformFee ?? 0,
+                total: b.pricing?.totalAmount ?? s.pricing?.totalAmount ?? 0,
+                method: b.payment?.method || s.payment?.method || "—",
+                paymentStatus: derivePaymentStatus(b.status),
+                bookingStatus: b.status || "pending",
+                sessionType: s.sessionType || s.title || b.sessionType || "1-on-1 Session",
+                payoutStatus: b.payoutStatus || b.payment?.payoutStatus || (b.status === "completed" ? "paid_out" : "pending_payout"),
+              }))
+            : [];
+            
+          // If no bookings array, but session has status (old format or 1-on-1)
+          if (bks.length === 0 && (s.status || s.menteeId)) {
+            bks.push({
+              bookingId: s._id,
+              transactionId: s.payment?.transactionId || s.paymentId || s.payment?.razorpayPaymentId || s._id,
+              menteeId: s.menteeId || s.bookedBy || "",
+              menteeName: s.mentee?.fullName || s.bookedMenteeName || "Unknown",
+              menteeEmail: s.mentee?.email || s.menteeEmail || "",
+              menteePhone: s.mentee?.phone || s.menteePhone || "",
+              menteeProfilePhotoId: s.mentee?.profilePic || null,
+              rawDate: new Date(s.scheduledAt || Date.now()),
+              date: s.scheduledAt
+                ? new Date(s.scheduledAt).toLocaleDateString("en-IN", {
+                    day: "2-digit", month: "short", year: "numeric",
+                  })
+                : "—",
+              basePrice: s.pricing?.basePrice ?? 0,
+              platformFee: s.pricing?.platformFee ?? 0,
+              total: s.pricing?.totalAmount ?? 0,
+              method: s.payment?.method || "—",
+              paymentStatus: derivePaymentStatus(s.status),
+              bookingStatus: s.status || "pending",
+              sessionType: s.sessionType || s.title || "1-on-1 Session",
+              payoutStatus: s.payoutStatus || s.payment?.payoutStatus || (s.status === "completed" ? "paid_out" : "pending_payout"),
+            });
+          }
+          
+          return bks;
+        });
         setTransactions(rows);
       })
       .catch(() => setTxError("Failed to load payment data. Please try again."))
@@ -544,7 +575,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
   const earnedRows = transactions.filter((t) =>
     ["confirmed", "rescheduled", "in_progress", "completed"].includes(t.bookingStatus)
   );
-  const totalEarnings = earnedRows.reduce((sum, t) => sum + t.basePrice, 0);
+  const totalEarnings = earnedRows.reduce((sum, t) => sum + t.total, 0);
 
   const now = new Date();
   const thisMonthEarnings = earnedRows
@@ -743,7 +774,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-[#8a7a6a]">
                       <CreditCard className="w-10 h-10 mx-auto mb-2 opacity-30 text-[#8a7a6a]" />
-                      <p className="font-bold text-base text-[#4a3728]">No payments yet</p>
+                      <p className="font-bold text-base text-[#4a3728]">No transactions yet</p>
                       <p className="text-xs mt-1 text-[#8a7a6a]">You have no payment or transaction records yet.</p>
                     </td>
                   </tr>
@@ -752,7 +783,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-[#8a7a6a]">
                       <CreditCard className="w-10 h-10 mx-auto mb-2 opacity-30 text-[#8a7a6a]" />
-                      <p className="font-bold text-base text-[#4a3728]">No transactions found</p>
+                      <p className="font-bold text-base text-[#4a3728]">No transactions yet.</p>
                       <p className="text-xs mt-1 text-[#8a7a6a]">No transactions found. Try changing your filters.</p>
                       <button
                         type="button"
