@@ -46,14 +46,12 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     const [editModalOpen, setEditModalOpen] = useState(false);
 
     const fetchMentor = () => {
-        MentorService.getAllMentors()
-            .then((res) => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const found = res?.data?.find((m: any) => m.mentorId === mentorId) ?? null;
-                setMentorData(found);
-            })
-            .catch(() => setMentorData(null));
-    };
+    MentorService.getMentorById(mentorId)
+        .then((res) => setMentorData(res?.data ?? res ?? null))
+        .catch(() => setMentorData(null));
+};
+
+
 
     useEffect(() => {
         fetchMentor();
@@ -87,11 +85,11 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-    if (bookingStep === "query") return <QueryStep mentorId={mentorData?.mentorId || ""} selectedService={selectedService} onBack={resetBooking} onSubmitted={resetBooking} />;
+    if (bookingStep === "query") return <QueryStep mentorId={mentorId} selectedService={selectedService} onBack={resetBooking} onSubmitted={resetBooking} />;
     if (bookingStep === "calendar") {
         return (
             <CalendarStep
-                mentorId={mentorData?.mentorId || mentorId || ""}
+                mentorId={mentorId}
                 selectedService={selectedService}
                 onBack={() => setBookingStep(null)}
                 onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }}
@@ -104,7 +102,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
             selectedService={selectedService}
             calendarData={calendarData!}
             formData={formData!}
-            mentorId={mentorData?.mentorId || ""}
+            mentorId={mentorId}
             onBack={() => setBookingStep("details")}
             onConfirm={() => setBookingStep("confirmation")}
             onBookingSuccess={() => {
@@ -165,13 +163,13 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                     <div>
                         <ServicesSection
                             onServiceClick={handleServiceClick}
-                            mentorId={mentorData?.mentorId || ""}
+                            mentorId={mentorId}
                             bookedSessionIds={bookedSessionIds}
                             currentUserId={user?.userId || ""}
                             mentorName={`${mentorData?.user?.firstName ?? ""} ${mentorData?.user?.lastName ?? ""}`.trim()}
                             deepLinkSessionId={deepLinkServiceId}
                         />
-                        <ReviewsSection mentorId={mentorData?.mentorId || ""} />
+                        <ReviewsSection mentorId={mentorId} />
                     </div>
                 </div>
             </div>
@@ -180,7 +178,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                 isOpen={editModalOpen}
                 onClose={() => setEditModalOpen(false)}
                 mentorData={mentorData}
-                mentorId={mentorData?.mentorId || ""}
+                mentorId={mentorId}
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 onUpdateSuccess={(updated: any) => {
                     setMentorData(updated);

@@ -363,6 +363,28 @@ class MentorService {
       );
     }
   }
+    static async getMentorById(mentorId: string): Promise<any> {
+    try {
+      const base =
+        config.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT ||
+        process.env.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT ||
+        '/mentorship/mentors';
+
+      const { data } = await api.get(`${base}/${mentorId}`);
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 404) {
+          throw new Error('Mentor profile not found.');
+        }
+        const apiError = error.response?.data;
+        if (apiError?.message) {
+          throw new Error(apiError.message);
+        }
+      }
+      throw new Error('Failed to fetch mentor. Please try again.');
+    }
+  }
 
   // =========================================================
   // GROUP SESSION

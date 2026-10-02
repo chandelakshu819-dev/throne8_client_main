@@ -33,13 +33,10 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     const [bookedSessionIds, setBookedSessionIds] = useState<string[]>([]);
 
     useEffect(() => {
-        MentorService.getAllMentors()
-            .then((res) => {
-                const found = res?.data?.find((m: any) => m.mentorId === mentorId) ?? null;
-                setMentorData(found);
-            })
-            .catch(() => setMentorData(null));
-    }, [mentorId]);
+    MentorService.getMentorById(mentorId)
+        .then((res) => setMentorData(res?.data ?? res ?? null))
+        .catch(() => setMentorData(null));
+}, [mentorId]);
 
     const searchParams = useSearchParams();
 
@@ -127,8 +124,11 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                     <MentorSidebar mentorData={mentorData} />
                     <div style={{ minWidth: 0 }}>
                         {bookingStep === "calendar" && (
-                            <CalendarStep mentorId={mentorData?.mentorId || ""} selectedService={selectedService} onBack={() => setBookingStep(null)} onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }} />
-                        )}
+                    <CalendarStep 
+                    mentorId={mentorId} 
+                    selectedService={selectedService} 
+                    onBack={() => setBookingStep(null)} 
+                    onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }} />                        )}
                         {bookingStep === "details" && (
                             <DetailsStep selectedService={selectedService} calendarData={calendarData!} onBack={() => setBookingStep("calendar")} onContinue={(d: BookingFormData) => { setFormData(d); setBookingStep("payment"); }} />
                         )}
@@ -137,7 +137,8 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                                 selectedService={selectedService}
                                 calendarData={calendarData!}
                                 formData={formData!}
-                                mentorId={mentorData?.mentorId || ""}
+                                 mentorId={mentorId}
+
                                 onBack={() => setBookingStep("details")}
                                 onConfirm={() => setBookingStep("confirmation")}
                                 onBookingSuccess={() => {
@@ -156,11 +157,11 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                             <>
                                 <ServicesSection
                                     onServiceClick={handleServiceClick}
-                                    mentorId={mentorData?.mentorId || ""}
+                                    mentorId={mentorId} 
                                     bookedSessionIds={bookedSessionIds}
                                     currentUserId={user?.userId || ""}
                                 />
-                                <ReviewsSection mentorId={mentorData?.mentorId || ""} />
+                                <ReviewsSection mentorId={mentorId} />
                             </>
                         )}
                     </div>
