@@ -35,11 +35,13 @@ class CompanyService {
 
     static async getAllCompanies(params?: { page?: number; pageSize?: number; search?: string }): Promise<any> {
         try {
-            const { data } = await api.get(`${config.NEXT_PUBLIC_COMPANY_GET_ALL_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_GET_ALL_ENDPOINT}`, { params });
+            const endpoint = config.NEXT_PUBLIC_COMPANY_GET_ALL_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_GET_ALL_ENDPOINT || '/company/companies/get-all';
+            const { data } = await api.get(endpoint, { params });
             console.log('Fetched all companies:', data); // Debug log
             return data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to fetch companies');
+            console.warn('⚠️ [COMPANY] Failed to fetch companies:', error?.response?.data?.message || error?.message);
+            return { data: { response: [], companies: [] } };
         }
     }
 
@@ -48,10 +50,12 @@ class CompanyService {
         pageSize?: number;
     }): Promise<any> {
         try {
-            const { data } = await api.get(`${config.NEXT_PUBLIC_COMPANY_GET_ALL_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_GET_ALL_ENDPOINT}`, { params });
+            const endpoint = config.NEXT_PUBLIC_COMPANY_GET_ALL_ENDPOINT || process.env.NEXT_PUBLIC_COMPANY_GET_ALL_ENDPOINT || '/company/companies/get-all';
+            const { data } = await api.get(endpoint, { params });
             return data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || 'Failed to fetch companies');
+            console.warn('⚠️ [COMPANY] Failed to fetch network companies:', error?.response?.data?.message || error?.message);
+            return { data: { response: [], companies: [] } };
         }
     }
 

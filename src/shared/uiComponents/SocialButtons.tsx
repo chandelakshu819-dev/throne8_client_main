@@ -1,29 +1,75 @@
 'use client';
-import { FcGoogle } from 'react-icons/fc';
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { useState } from 'react';
 import { FaGithub } from 'react-icons/fa';
-import config from '../../../tailwind.config';
+import config from '@/config/env.config';
+import AuthService from '@/lib/api/auth.service';
+import { useRouter } from 'next/navigation';
+import { useAppDispatch } from '@/core/store/store.hooks';
+import { checkAuthStatus } from '@/hooks/auth';
+
 export default function SocialButtons() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const handleGoogleLogin = () => {
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api/v1';
-      window.location.href = `${apiUrl}/auth/google`;
-    } catch (error) {
-      console.error('❌ [GOOGLE] OAuth initiation failed:', error);
-      setApiError('Failed to initiate Google login. Please try again.');
+      setIsSubmitting(true);
+      setApiError(null);
+
+      const idToken = credentialResponse.credential;
+      if (!idToken) {
+        throw new Error('No credential token received from Google.');
+      }
+
+      console.log('🔐 [GOOGLE] Verifying idToken with backend...');
+      const response = await AuthService.googleVerify(idToken);
+
+      // Sync Redux state
+      dispatch(checkAuthStatus());
+
+      if (response?.data?.isNewUser) {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('google_id_token', idToken);
+        }
+        router.push('/onboarding/o-auth');
+      } else {
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('google_id_token');
+        }
+        router.push('/dashboard');
+      }
+    } catch (error: any) {
+      console.error('❌ [GOOGLE] Login failed:', error);
+      setApiError(error.message || 'Google login failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const handleGoogleError = () => {
+    console.error('❌ [GOOGLE] Login failed or cancelled');
+    setApiError('Google sign-in was unsuccessful or cancelled.');
+  };
+
+  const getApiUrl = () => {
+    return config.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api/v1';
+  };
+
   const handleGitHubLogin = () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api/v1';
+      setIsSubmitting(true);
+      const apiUrl = getApiUrl();
       window.location.href = `${apiUrl}/auth/github`;
     } catch (error) {
       console.error('❌ [GITHUB] OAuth initiation failed:', error);
       setApiError('Failed to initiate GitHub login. Please try again.');
+      setIsSubmitting(false);
     }
   };
+
   return (
     <>
       <div className="flex items-center my-8">
@@ -34,24 +80,25 @@ export default function SocialButtons() {
       {apiError && (
         <p className="text-red-500 text-sm text-center mb-3">{apiError}</p>
       )}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4">
-        <button
-          type="button"
-          onClick={handleGoogleLogin}
-          disabled={isSubmitting}
-          className="flex items-center justify-center gap-2 sm:gap-3 py-3 sm:py-4 px-2 sm:px-3 border border-gray-300 rounded-lg sm:rounded-xl hover:bg-gray-50 transition text-xs sm:text-sm"
-        >
-          <FcGoogle className="text-lg sm:text-2xl" />
-          <span className="text-black font-medium hidden sm:inline">Google</span>
-        </button>
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
+        <div className="flex-1 w-full flex justify-center items-center overflow-hidden">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+            shape="rectangular"
+            theme="outline"
+            size="large"
+            text="continue_with"
+          />
+        </div>
         <button
           type="button"
           onClick={handleGitHubLogin}
           disabled={isSubmitting}
-          className="flex items-center justify-center gap-2 sm:gap-3 py-3 sm:py-4 px-2 sm:px-3 border border-gray-300 rounded-lg sm:rounded-xl hover:bg-gray-50 transition text-xs sm:text-sm"
+          className="flex-1 w-full flex items-center justify-center gap-2 sm:gap-3 py-2 px-4 border border-gray-300 rounded hover:bg-gray-50 transition text-sm font-medium text-black min-h-[40px] shadow-sm"
         >
-          <FaGithub className="text-lg sm:text-2xl text-gray-900" />
-          <span className="text-black font-medium hidden sm:inline">GitHub</span>
+          <FaGithub className="text-xl text-gray-900" />
+          <span>GitHub</span>
         </button>
       </div>
     </>

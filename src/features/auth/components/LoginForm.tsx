@@ -86,6 +86,7 @@ export default function LoginForm() {
           {...register('email')}
           type="email"
           placeholder="your@email.com"
+          suppressHydrationWarning
           className="w-full px-3 sm:px-4 md:px-5 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl border border-[#4a3728] bg-white text-black placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#4a3728] focus:border-transparent transition"
         />
         {errors.email && <p className="text-red-500 text-xs sm:text-sm mt-1.5">{errors.email.message}</p>}

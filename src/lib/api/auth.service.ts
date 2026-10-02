@@ -113,6 +113,69 @@ class AuthService {
     static get<T>(arg0: string, p0: { params: SessionFilters; }): { data: any; } | PromiseLike<{ data: any; }> {
         throw new Error("Method not implemented.");
     }
+
+    /**
+     * 🔐 Google Native Token Verification API Call 
+     */
+    static async googleVerify(idToken: string): Promise<any> {
+        try {
+            console.log('🔐 [GOOGLE VERIFY] Verifying token with backend...');
+            const { data } = await api.post('/auth/google/verify', { idToken });
+
+            if (!data.data?.isNewUser && data.data?.tokens && data.data?.user) {
+                TokenStorage.setAuthData(data.data.tokens, data.data.user);
+            }
+
+            console.log('✅ [GOOGLE VERIFY] Successful', {
+                userId: data.data?.user?.userId,
+                isNewUser: data.data?.isNewUser,
+            });
+
+            return data;
+        } catch (error: any) {
+            console.error('❌ [GOOGLE VERIFY] Failed:', error);
+            if (axios.isAxiosError(error)) {
+                const apiError = error.response?.data as ApiError;
+                if (apiError?.message) throw new Error(apiError.message);
+            }
+            throw new Error(error?.message || 'Google authentication failed');
+        }
+    }
+
+    /**
+     * 🔐 Google Native Register API Call
+     */
+    static async googleRegister(registrationData: any): Promise<any> {
+        try {
+            console.log('🔐 [GOOGLE REGISTER] Registering Google user with backend...', registrationData);
+            const { data } = await api.post('/auth/google/register', registrationData);
+
+            if (data.data?.tokens && data.data?.user) {
+                TokenStorage.setAuthData(data.data.tokens, data.data.user);
+            }
+
+            console.log('✅ [GOOGLE REGISTER] Successful', {
+                userId: data.data?.user?.userId,
+            });
+
+            return data;
+        } catch (error: any) {
+            console.error('❌ [GOOGLE REGISTER] Failed:', error);
+            if (axios.isAxiosError(error)) {
+                const apiError = error.response?.data as ApiError;
+                if (error.response?.status === 400) {
+                    const errors = Array.isArray(apiError?.errors)
+                        ? apiError.errors.map((e: any) => typeof e === 'string' ? e : e.message).filter(Boolean).join(', ')
+                        : '';
+                    if (errors) throw new Error(errors);
+                }
+                if (apiError?.message) throw new Error(apiError.message);
+            }
+            throw new Error(error?.message || 'Google registration failed');
+        }
+    }
+
+
     /**
      * 📝 Register API Call
     */

@@ -63,6 +63,7 @@ export default function SignupPage() {
         phoneNumber: finalData.phoneNumber || '',
         location: finalData.location,
         userType: finalData.userType,
+        skills: finalData.skills || [],
 
         ...(finalData.userType === 'working' && {
           jobTitle: finalData.jobTitle,
@@ -113,21 +114,22 @@ export default function SignupPage() {
       case 3:
         return <CurrentStatus onNext={handleNext} onBack={handleBack} />;
 
-      case 4:
-        // ✅ FIXED: Use formData.status (UI field) for conditional rendering
+      case 4: {
+        const userStatus = formData.status || formData.userType;
         return (
           <>
-            {formData.status === 'working' && (
+            {userStatus === 'working' && (
               <WorkingJobDetails onNext={handleNext} onBack={handleBack} />
             )}
-            {formData.status === 'student' && (
+            {userStatus === 'student' && (
               <StudentEducation onNext={handleNext} onBack={handleBack} />
             )}
-            {formData.status === 'fresher' && (
+            {userStatus === 'fresher' && (
               <FresherEducationRole onNext={handleNext} onBack={handleBack} />
             )}
           </>
         );
+      }
 
       case 5:
         return (

@@ -335,7 +335,7 @@ NEXT_PUBLIC_COMPANY_EMPLOYEE_ADVOCACY_ENDPOINT: optionalEnv(process.env.NEXT_PUB
     // 14. OAUTH CLIENT IDs
     // ============================================================
 
-    NEXT_PUBLIC_GOOGLE_CLIENT_ID: optionalEnv(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID),
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID: requireEnv(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID, '707035991312-1b9cebhvfojdp04p0f8vogmiuai42m84.apps.googleusercontent.com', 'NEXT_PUBLIC_GOOGLE_CLIENT_ID'),
     NEXT_PUBLIC_LINKEDIN_CLIENT_ID: optionalEnv(process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID),
 
 

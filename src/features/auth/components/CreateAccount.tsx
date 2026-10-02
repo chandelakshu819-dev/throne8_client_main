@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { schema, FormData } from '../schema';
-
+import SocialButtons from '@/shared/uiComponents/SocialButtons';
 
 interface Step1Props {
   onNext: (data: FormData) => void;
@@ -44,13 +44,13 @@ export default function Step1CreateAccount({ onNext }: Step1Props) {
 
         <form onSubmit={handleSubmit(onNext)} className="space-y-5 sm:space-y-6 md:space-y-8">
           {/* Email */}
-          {/* Email field */}
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">Email</label>
             <input
               {...register('email')}
               type="email"
               placeholder="Email"
+              suppressHydrationWarning
               className={`w-full px-3 sm:px-4 md:px-5 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl border text-sm ${errors.email ? 'border-red-500' : 'border-[#4a3728]'
                 } bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 ${errors.email ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
                 } transition`}
@@ -138,6 +138,8 @@ export default function Step1CreateAccount({ onNext }: Step1Props) {
             </button>
           </div>
         </form>
+
+        <SocialButtons />
       </div>
     </div>
   );

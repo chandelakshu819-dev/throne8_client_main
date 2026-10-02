@@ -5,55 +5,69 @@ import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import TokenStorage from '@/lib/store/token.storage';
+import { useAppDispatch } from '@/core/store/store.hooks';
+import { checkAuthStatus } from '@/hooks/auth';
 
 function CallbackHandler() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const dispatch = useAppDispatch();
 
     useEffect(() => {
-        const accessToken = searchParams.get('accessToken');
-        const refreshToken = searchParams.get('refreshToken');
-        const userId = searchParams.get('userId');
+        const accessToken = searchParams.get('accessToken') || searchParams.get('token') || searchParams.get('access_token');
+        const refreshToken = searchParams.get('refreshToken') || searchParams.get('refresh_token') || accessToken;
+        const userId = searchParams.get('userId') || searchParams.get('id') || searchParams.get('user_id');
         const email = searchParams.get('email');
-        const role = searchParams.get('role');
-        const error = searchParams.get('error');
+        const role = searchParams.get('role') || 'user';
+        const error = searchParams.get('error') || searchParams.get('message');
 
         if (error) {
             console.error('OAuth error:', error);
-            router.replace('/login?error=' + error);
+            router.replace('/login?error=' + encodeURIComponent(error));
             return;
         }
 
-        if (!accessToken || !refreshToken || !userId || !email || !role) {
-            console.error('Missing tokens or user data');
+        if (!accessToken || !userId || !email) {
+            console.error('Missing tokens or user data in callback URL:', {
+                hasAccessToken: !!accessToken,
+                hasRefreshToken: !!refreshToken,
+                hasUserId: !!userId,
+                hasEmail: !!email,
+            });
             router.replace('/login?error=missing_tokens');
             return;
         }
 
-        // ✅ Fix: non-null values pass karo — TypeScript happy
-        TokenStorage.setAuthData(
-            {
-                accessToken,
-                refreshToken,
-                expiresIn: '15m'
-            },
-            {
-                userId,   // ab guaranteed string hai
-                email,
-                role
+        try {
+            TokenStorage.setAuthData(
+                {
+                    accessToken,
+                    refreshToken: refreshToken || accessToken,
+                    expiresIn: searchParams.get('expiresIn') || '15m'
+                },
+                {
+                    userId,
+                    email,
+                    role
+                }
+            );
+
+            // Sync with Redux state
+            dispatch(checkAuthStatus());
+
+            console.log('✅ Google OAuth success, redirecting...');
+
+            const isNewUser = searchParams.get('isNewUser') === 'true' || searchParams.get('isNewUser') === '1';
+            if (isNewUser) {
+                router.replace('/onboarding/o-auth');
+            } else {
+                router.replace('/dashboard');
             }
-        );
-
-        console.log('✅ Google OAuth success, redirecting to dashboard...');
-
-        const isNewUser = searchParams.get('isNewUser') === 'true';
-        if (isNewUser) {
-            router.replace('/onboarding/o-auth');
-        } else {
-            router.replace('/dashboard');
+        } catch (storageError) {
+            console.error('Failed to store OAuth tokens:', storageError);
+            router.replace('/login?error=storage_error');
         }
-
-    }, [searchParams, router]);
+    }, [searchParams, router, dispatch]);
 
     return (
         <div className="min-h-screen flex items-center justify-center">

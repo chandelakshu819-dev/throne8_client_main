@@ -1,157 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import TokenStorage from '@/lib/store/token.storage';
-import AuthService from '@/lib/api/auth.service';
-
-// Register wale components import karo — same as signup page
-// import CurrentStatus from '@/app/(auth)/_components/CurrentStatus';
-// import WorkingJobDetails from '@/app/(auth)/_components/WorkingJobDetails';
-// import StudentEducation from '@/app/(auth)/_components/StudentEducation';
-// import FresherEducationRole from '@/app/(auth)/_components/FresherEducationRole';
-
-// Step counter for progress
-const TOTAL_STEPS = 4; // location+phone, status, details, done
-
-export default function GoogleOnboardingPage() {
-    const router = useRouter();
-    const [currentStep, setCurrentStep] = useState(1);
-    const [formData, setFormData] = useState<any>({});
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const saveAndNext = (stepData: any) => {
-        setFormData((prev: any) => ({ ...prev, ...stepData }));
-        setCurrentStep((prev) => prev + 1);
-    };
-
-    const goBack = () => setCurrentStep((prev) => prev - 1);
-
-    const handleComplete = async (finalStepData: any) => {
-        const allData = { ...formData, ...finalStepData };
-        setLoading(true);
-        setError(null);
-
-        try {
-            // DB mein update karo
-            await AuthService.updateUserProfile({
-                phoneNumber: allData.phoneNumber || '',
-                location: allData.location,
-                onboarding: {
-                    userType: allData.userType,
-                    ...(allData.userType === 'working' && {
-                        workingProfile: {
-                            jobTitle: allData.jobTitle,
-                            companyName: allData.companyName,
-                            startDate: allData.startDate,
-                            endDate: allData.endDate || null,
-                        }
-                    }),
-                    ...(allData.userType === 'student' && {
-                        studentProfile: {
-                            collegeName: allData.collegeName,
-                            degree: allData.degree,
-                            fieldOfStudy: allData.fieldOfStudy,
-                            graduationYear: allData.graduationYear,
-                        }
-                    }),
-                    ...(allData.userType === 'fresher' && {
-                        fresherProfile: {
-                            highestEducation: allData.highestEducation,
-                            preferredRole: allData.preferredRole,
-                            cgpa: allData.cgpa || null,
-                        }
-                    }),
-                }
-            });
-
-            router.replace('/dashboard');
-        } catch (err: any) {
-            setError(err.message || 'Update failed. Please try again.');
-            setLoading(false);
-        }
-    };
-
-    const renderStep = () => {
-        switch (currentStep) {
-            // Step 1 — Location + Phone (naya simple component)
-            case 1:
-                return <LocationPhoneStep onNext={saveAndNext} />;
-
-            // Step 2 — Status (existing component reuse)
-            case 2:
-                return (
-                    <CurrentStatus
-                        onNext={saveAndNext}
-                        onBack={goBack}
-                    />
-                );
-
-            // Step 3 — Details based on status
-            case 3:
-                return (
-                    <>
-                        {formData.status === 'working' && (
-                            <WorkingJobDetails onNext={handleComplete} onBack={goBack} />
-                        )}
-                        {formData.status === 'student' && (
-                            <StudentEducation onNext={handleComplete} onBack={goBack} />
-                        )}
-                        {formData.status === 'fresher' && (
-                            <FresherEducationRole onNext={handleComplete} onBack={goBack} />
-                        )}
-                    </>
-                );
-
-            default:
-                return null;
-        }
-    };
-
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-            <div className="w-full max-w-md">
-                {/* Progress bar */}
-                <div className="flex gap-2 mb-8">
-                    {[1, 2, 3].map((step) => (
-                        <div
-                            key={step}
-                            className={`h-1.5 flex-1 rounded-full transition-all ${step <= currentStep ? 'bg-[#4a3728]' : 'bg-gray-200'
-                                }`}
-                        />
-                    ))}
-                </div>
-
-                {/* Error */}
-                {error && (
-                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
-                        {error}
-                    </div>
-                )}
-
-                {renderStep()}
-
-                {/* Loading overlay */}
-                {loading && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                        <div className="bg-white p-6 rounded-xl shadow-2xl flex items-center gap-4">
-                            <div className="w-8 h-8 border-4 border-[#4a3728] border-t-transparent rounded-full animate-spin" />
-                            <p className="font-semibold text-gray-900">Setting up your profile...</p>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
-
-
-// Google onboarding/google/page.tsx ke neeche — same file mein add karo
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import AuthService from '@/lib/api/auth.service';
+import { useAppDispatch } from '@/core/store/store.hooks';
+import { checkAuthStatus } from '@/hooks/auth';
 import CurrentStatus from '@/features/auth/components/CurrentStatus';
 import WorkingJobDetails from '@/features/auth/components/WorkingJobDetails';
 import StudentEducation from '@/features/auth/components/StudentEducation';
@@ -237,14 +93,163 @@ function LocationPhoneStep({ onNext }: { onNext: (data: any) => void }) {
                         type="submit"
                         disabled={!isValid}
                         className={`px-8 py-4 rounded-xl font-semibold transition shadow-lg ${isValid
-                                ? 'bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white hover:opacity-90'
-                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            ? 'bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white hover:opacity-90'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                             }`}
                     >
                         Next
                     </button>
                 </div>
             </form>
+        </div>
+    );
+}
+
+export default function GoogleOnboardingPage() {
+    const router = useRouter();
+    const dispatch = useAppDispatch();
+    const [currentStep, setCurrentStep] = useState(1);
+    const [formData, setFormData] = useState<any>({});
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const idToken = sessionStorage.getItem('google_id_token');
+            if (!idToken) {
+                setError('Google session not found. Please log in with Google again.');
+            }
+        }
+    }, []);
+
+    const saveAndNext = (stepData: any) => {
+        setFormData((prev: any) => ({ ...prev, ...stepData }));
+        setCurrentStep((prev) => prev + 1);
+    };
+
+    const goBack = () => setCurrentStep((prev) => prev - 1);
+
+    const handleComplete = async (finalStepData: any) => {
+        const allData = { ...formData, ...finalStepData };
+        setLoading(true);
+        setError(null);
+
+        try {
+            const idToken = typeof window !== 'undefined' ? sessionStorage.getItem('google_id_token') : null;
+            if (!idToken) {
+                throw new Error('Google session expired or missing token. Please sign in with Google again.');
+            }
+
+            const cleanData = {
+                idToken,
+                location: allData.location,
+                phoneNumber: allData.phoneNumber || '',
+                userType: allData.userType || allData.status,
+                skills: allData.skills || [],
+
+                ...( (allData.userType === 'working' || allData.status === 'working') && {
+                    jobTitle: allData.jobTitle,
+                    companyName: allData.companyName,
+                    startDate: allData.startDate,
+                    endDate: allData.endDate || undefined,
+                }),
+
+                ...( (allData.userType === 'student' || allData.status === 'student') && {
+                    collegeName: allData.collegeName,
+                    degree: allData.degree,
+                    fieldOfStudy: allData.fieldOfStudy,
+                    graduationYear: allData.graduationYear,
+                }),
+
+                ...( (allData.userType === 'fresher' || allData.status === 'fresher') && {
+                    highestEducation: allData.highestEducation,
+                    preferredRole: allData.preferredRole,
+                    cgpa: allData.cgpa || undefined,
+                }),
+            };
+
+            console.log('📝 [GOOGLE ONBOARDING] Submitting Google registration...', cleanData);
+            await AuthService.googleRegister(cleanData);
+
+            if (typeof window !== 'undefined') {
+                sessionStorage.removeItem('google_id_token');
+            }
+
+            dispatch(checkAuthStatus());
+            router.replace('/dashboard');
+        } catch (err: any) {
+            console.error('❌ [GOOGLE ONBOARDING] Error:', err);
+            setError(err.message || 'Registration failed. Please try again.');
+            setLoading(false);
+        }
+    };
+
+    const renderStep = () => {
+        switch (currentStep) {
+            case 1:
+                return <LocationPhoneStep onNext={saveAndNext} />;
+
+            case 2:
+                return (
+                    <CurrentStatus
+                        onNext={saveAndNext}
+                        onBack={goBack}
+                    />
+                );
+
+            case 3:
+                return (
+                    <>
+                        {(formData.status === 'working' || formData.userType === 'working') && (
+                            <WorkingJobDetails onNext={handleComplete} onBack={goBack} />
+                        )}
+                        {(formData.status === 'student' || formData.userType === 'student') && (
+                            <StudentEducation onNext={handleComplete} onBack={goBack} />
+                        )}
+                        {(formData.status === 'fresher' || formData.userType === 'fresher') && (
+                            <FresherEducationRole onNext={handleComplete} onBack={goBack} />
+                        )}
+                    </>
+                );
+
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+            <div className="w-full max-w-md">
+                {/* Progress bar */}
+                <div className="flex gap-2 mb-8">
+                    {[1, 2, 3].map((step) => (
+                        <div
+                            key={step}
+                            className={`h-1.5 flex-1 rounded-full transition-all ${step <= currentStep ? 'bg-[#4a3728]' : 'bg-gray-200'
+                                }`}
+                        />
+                    ))}
+                </div>
+
+                {/* Error */}
+                {error && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+                        {error}
+                    </div>
+                )}
+
+                {renderStep()}
+
+                {/* Loading overlay */}
+                {loading && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div className="bg-white p-6 rounded-xl shadow-2xl flex items-center gap-4">
+                            <div className="w-8 h-8 border-4 border-[#4a3728] border-t-transparent rounded-full animate-spin" />
+                            <p className="font-semibold text-gray-900">Setting up your profile...</p>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
