@@ -1,11 +1,16 @@
-import { createSlice } from '@reduxjs/toolkit';
-import { UserDashboardResponse, StudyStatisticsResponse, PerformanceAnalyticsResponse, GroupResponse } from '@/lib/api/studyGroup.service';
+import { createSlice } from "@reduxjs/toolkit";
+import {
+  UserDashboardResponse,
+  StudyStatisticsResponse,
+  PerformanceAnalyticsResponse,
+  GroupResponse,
+} from "@/lib/api/studyGroup.service";
 import {
   fetchUserDashboardThunk,
   fetchStudyStatisticsThunk,
   fetchPerformanceAnalyticsThunk,
   fetchMyGroupsThunk,
-} from './dashboard.thunks';
+} from "./dashboard.thunks";
 
 interface DashboardState {
   userDashboard: UserDashboardResponse | null;
@@ -28,13 +33,14 @@ const initialState: DashboardState = {
 };
 
 const dashboardSlice = createSlice({
-  name: 'studyDashboard',
+  name: "studyDashboard",
   initialState,
   reducers: {
-    clearDashboardError: (state) => { state.error = null; },
+    clearDashboardError: (state) => {
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
-
     builder
       .addCase(fetchUserDashboardThunk.pending, (state) => {
         state.loading = true;
@@ -62,33 +68,58 @@ const dashboardSlice = createSlice({
         state.error = action.payload as string;
       });
 
+    // builder
+    //   .addCase(fetchPerformanceAnalyticsThunk.fulfilled, (state, action) => {
+    //     state.analytics = action.payload;
+    //   });
+
     builder
       .addCase(fetchPerformanceAnalyticsThunk.fulfilled, (state, action) => {
         state.analytics = action.payload;
+      })
+      .addCase(fetchPerformanceAnalyticsThunk.rejected, (state, action) => {
+        state.error = action.payload as string;
       });
+
+    // builder
+    //   .addCase(fetchMyGroupsThunk.fulfilled, (state, action) => {
+    //     state.myGroups = action.payload;
+    //   })
+    //   .addMatcher(
+    //     (action) => action.type.startsWith("dashboard/"),
+    //     (state, action) => {}
+    //   );
 
     builder
       .addCase(fetchMyGroupsThunk.fulfilled, (state, action) => {
-        state.myGroups = action.payload;
+        state.myGroups = Array.isArray(action.payload) ? action.payload : [];
+      })
+      .addCase(fetchMyGroupsThunk.rejected, (state, action) => {
+        state.error = action.payload as string;
       })
       .addMatcher(
-        (action) => action.type.startsWith('dashboard/'),
-        (state, action) => {
-        }
+        (action) => action.type.startsWith("dashboard/"),
+        () => {}
       );
-  }
-
+  },
 });
- 
+
 export const { clearDashboardError } = dashboardSlice.actions;
 
 // REPLACE all selectors
-export const selectUserDashboard = (state: any) => state?.studyDashboard?.userDashboard ?? null;
-export const selectDashboardStats = (state: any) => state?.studyDashboard?.userDashboard?.stats ?? null;
-export const selectDashboardUser = (state: any) => state?.studyDashboard?.userDashboard?.user ?? null;
-export const selectStudyStatistics = (state: any) => state?.studyDashboard?.statistics ?? null;
-export const selectPerformanceAnalytics = (state: any) => state?.studyDashboard?.analytics ?? null;
-export const selectDashboardMyGroups = (state: any) => state?.studyDashboard?.myGroups ?? [];
-export const selectDashboardLoading = (state: any) => state?.studyDashboard?.loading ?? false;
+export const selectUserDashboard = (state: any) =>
+  state?.studyDashboard?.userDashboard ?? null;
+export const selectDashboardStats = (state: any) =>
+  state?.studyDashboard?.userDashboard?.stats ?? null;
+export const selectDashboardUser = (state: any) =>
+  state?.studyDashboard?.userDashboard?.user ?? null;
+export const selectStudyStatistics = (state: any) =>
+  state?.studyDashboard?.statistics ?? null;
+export const selectPerformanceAnalytics = (state: any) =>
+  state?.studyDashboard?.analytics ?? null;
+export const selectDashboardMyGroups = (state: any) =>
+  state?.studyDashboard?.myGroups ?? [];
+export const selectDashboardLoading = (state: any) =>
+  state?.studyDashboard?.loading ?? false;
 
 export const dashboardReducer = dashboardSlice.reducer;

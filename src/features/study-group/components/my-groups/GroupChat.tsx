@@ -4,20 +4,100 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  ArrowLeft, Send, Paperclip, Download, Smile, Reply, Pin, Trash2, Edit3, MoreVertical, X, Check, CheckCheck, Image as ImageIcon, FileText, Users, HelpCircle, Search, Filter, ThumbsUp, ThumbsDown, MessageSquare, Link as LinkIcon, AlertCircle, CheckCircle, Star, Upload, AtSign, Tag, Video, File, Camera, Presentation
+  ArrowLeft,
+  Send,
+  Paperclip,
+  Download,
+  Smile,
+  Reply,
+  Pin,
+  Trash2,
+  Edit3,
+  MoreVertical,
+  X,
+  Check,
+  CheckCheck,
+  Image as ImageIcon,
+  FileText,
+  Users,
+  HelpCircle,
+  Search,
+  Filter,
+  ThumbsUp,
+  ThumbsDown,
+  MessageSquare,
+  Link as LinkIcon,
+  AlertCircle,
+  CheckCircle,
+  Star,
+  Upload,
+  AtSign,
+  Tag,
+  Video,
+  File,
+  Camera,
+  Presentation,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
-  addOptimisticMessage, removeOptimisticMessage, selectEditingMessage, selectMessagesByGroup, selectMessagesLoading, selectPinnedMessages, selectReplyingToMessage, selectSendLoading, selectTypingUserNames, setReplyingToMessage, setUploadProgress, selectFilesByGroup, selectPinnedFilesByGroup, selectFilesLoading, selectFileUploadLoading, selectFileDeleteLoading, selectFilePinLoading, selectDoubtsByGroup, selectDoubtsLoading, selectDoubtPostLoading, selectDoubtAnswers, selectAnswerPostLoading, selectAnswerVoteLoading,
-  } from "@/hooks/studyGroup/features/chats/chatSlice";
+  addOptimisticMessage,
+  removeOptimisticMessage,
+  selectEditingMessage,
+  selectMessagesByGroup,
+  selectMessagesLoading,
+  selectPinnedMessages,
+  selectReplyingToMessage,
+  selectSendLoading,
+  selectTypingUserNames,
+  setReplyingToMessage,
+  setUploadProgress,
+  selectFilesByGroup,
+  selectPinnedFilesByGroup,
+  selectFilesLoading,
+  selectFileUploadLoading,
+  selectFileDeleteLoading,
+  selectFilePinLoading,
+  selectDoubtsByGroup,
+  selectDoubtsLoading,
+  selectDoubtPostLoading,
+  selectDoubtAnswers,
+  selectAnswerPostLoading,
+  selectAnswerVoteLoading,
+} from "@/hooks/studyGroup/features/chats/chatSlice";
 import {
-  deleteMessageThunk, editMessageThunk, fetchMessagesThunk, fetchPinnedMessagesThunk, reactToMessageThunk, sendMessageThunk, togglePinMessageThunk, uploadChatFileThunk, fetchGroupFilesThunk, fetchGroupPinnedFilesThunk, uploadGroupFileThunk, deleteGroupFileThunk, togglePinGroupFileThunk, fetchGroupDoubtsThunk, postDoubtThunk, deleteDoubtThunk, markDoubtSolvedThunk, postAnswerThunk, fetchDoubtAnswersThunk, upvoteAnswerThunk, downvoteAnswerThunk, deleteAnswerThunk, updateAnswerThunk,
+  deleteMessageThunk,
+  editMessageThunk,
+  fetchMessagesThunk,
+  fetchPinnedMessagesThunk,
+  reactToMessageThunk,
+  sendMessageThunk,
+  togglePinMessageThunk,
+  uploadChatFileThunk,
+  fetchGroupFilesThunk,
+  fetchGroupPinnedFilesThunk,
+  uploadGroupFileThunk,
+  deleteGroupFileThunk,
+  togglePinGroupFileThunk,
+  fetchGroupDoubtsThunk,
+  postDoubtThunk,
+  deleteDoubtThunk,
+  markDoubtSolvedThunk,
+  postAnswerThunk,
+  fetchDoubtAnswersThunk,
+  upvoteAnswerThunk,
+  downvoteAnswerThunk,
+  deleteAnswerThunk,
+  updateAnswerThunk,
   markMessageReadThunk,
   fetchDoubtByIdThunk,
   upvoteDoubtThunk,
 } from "@/hooks/studyGroup/features/chats/chat.thunks";
-import { validateChatFile, validateGroupFile, getFileCategoryFromMime } from "@/features/study-group/validators/chat.validation";
+import {
+  validateChatFile,
+  validateGroupFile,
+  getFileCategoryFromMime,
+} from "@/features/study-group/validators/chat.validation";
 import { useChatSocket } from "@/core/realtime/useChatSocket";
 import { useGroupData } from "@/features/study-group/hooks/useGroupData";
 import { canEditMessage } from "@/shared/utils/studygroup.util";
@@ -45,7 +125,7 @@ interface Message {
   groupId: string;
   sender: string;
   content: string;
-  messageType: 'text' | 'image' | 'video' | 'file' | string;
+  messageType: "text" | "image" | "video" | "file" | string;
   fileUrl: string | null;
   fileName: string | null;
   fileSize: number | null;
@@ -120,67 +200,118 @@ interface GroupDetails {
   [key: string]: any;
 }
 
-const GroupChat = ({ groupId, groupDetails }: { groupId: string; groupDetails?: GroupDetails }) => {
+const GroupChat = ({
+  groupId,
+  groupDetails,
+}: {
+  groupId: string;
+  groupDetails?: GroupDetails;
+}) => {
   const params = useParams();
   const router = useRouter();
   // const { user } = useAuth();
   //   const currentUserId = user?.userId ?? '';
 
-  const { getUserInfoSync, fetchAllUsers, fetchGroupMembers, groupMembers } = useGroupData();
+  const { getUserInfoSync, fetchAllUsers, fetchGroupMembers, groupMembers } =
+    useGroupData();
 
   // Tab state
   const [activeTab, setActiveTab] = useState<string>("chat");
-const dispatch = useAppDispatch();
-  const messages = useAppSelector((state: any) => selectMessagesByGroup(groupId)(state.chat ?? {}));
-  const messagesLoading = useAppSelector((state: any) => selectMessagesLoading(state.chat ?? {}));
-  const sendLoading = useAppSelector((state: any) => selectSendLoading(state.chat ?? {}));
-  const editingMessageFromStore = useAppSelector((state: any) => selectEditingMessage(state.chat ?? {}));
-  const replyingToFromStore = useAppSelector((state: any) => selectReplyingToMessage(state.chat ?? {}));
-  const pinnedMessages = useAppSelector((state: any) => selectPinnedMessages(groupId)(state.chat ?? {}));
-  const typingUsers = useAppSelector((state: any) => selectTypingUserNames(groupId)(state.chat ?? {}));
+  const dispatch = useAppDispatch();
+  const messages = useAppSelector((state: any) =>
+    selectMessagesByGroup(groupId)(state)
+  );
+  const messagesLoading = useAppSelector((state: any) =>
+    selectMessagesLoading(state)
+  );
+  const sendLoading = useAppSelector((state: any) => selectSendLoading(state));
+  const editingMessageFromStore = useAppSelector((state: any) =>
+    selectEditingMessage(state)
+  );
+  const replyingToFromStore = useAppSelector((state: any) =>
+    selectReplyingToMessage(state)
+  );
+  const pinnedMessages = useAppSelector((state: any) =>
+    selectPinnedMessages(groupId)(state)
+  );
+  const typingUsers = useAppSelector((state: any) =>
+    selectTypingUserNames(groupId)(state)
+  );
 
   const { emitTyping, emitStopTyping } = useChatSocket(groupId);
-
 
   const [messageInput, setMessageInput] = useState<string>("");
   // const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   // const [selectedMessageMenu, setSelectedMessageMenu] = useState<number | null>(null);
-  const [selectedMessageMenu, setSelectedMessageMenu] = useState<string | number | null>(null);
+  const [selectedMessageMenu, setSelectedMessageMenu] = useState<
+    string | number | null
+  >(null);
   // const [showEmojiPicker, setShowEmojiPicker] = useState<number | null>(null);
-  const [showEmojiPicker, setShowEmojiPicker] = useState<string | number | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState<
+    string | number | null
+  >(null);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState<boolean>(false);
 
-// File states
-  const groupFiles = useAppSelector((state: any) => selectFilesByGroup(groupId)(state.chat ?? {}));
-  const pinnedGroupFiles = useAppSelector((state: any) => selectPinnedFilesByGroup(groupId)(state.chat ?? {}));
-  const filesLoading = useAppSelector((state: any) => selectFilesLoading(state.chat ?? {}));
-  const fileUploadLoading = useAppSelector((state: any) => selectFileUploadLoading(state.chat ?? {}));
-  const fileDeleteLoading = useAppSelector((state: any) => selectFileDeleteLoading(state.chat ?? {}));
-  const filePinLoading = useAppSelector((state: any) => selectFilePinLoading(state.chat ?? {}));
+  // File states
+  const groupFiles = useAppSelector((state: any) =>
+    selectFilesByGroup(groupId)(state)
+  );
+  const pinnedGroupFiles = useAppSelector((state: any) =>
+    selectPinnedFilesByGroup(groupId)(state)
+  );
+  const filesLoading = useAppSelector((state: any) =>
+    selectFilesLoading(state)
+  );
+  const fileUploadLoading = useAppSelector((state: any) =>
+    selectFileUploadLoading(state)
+  );
+  const fileDeleteLoading = useAppSelector((state: any) =>
+    selectFileDeleteLoading(state)
+  );
+  const filePinLoading = useAppSelector((state: any) =>
+    selectFilePinLoading(state)
+  );
   const [uploadedFiles, setUploadedFiles] = useState<FileAttachment[]>([]);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [fileSearchQuery, setFileSearchQuery] = useState<string>("");
-  const [selectedFileCategory, setSelectedFileCategory] = useState<string>("All");
+  const [selectedFileCategory, setSelectedFileCategory] =
+    useState<string>("All");
   const [copySuccess, setCopySuccess] = useState(false);
 
-// Doubt states
-  const doubts = useAppSelector((state: any) => selectDoubtsByGroup(groupId)(state.chat ?? {}));
+  // Doubt states
+  const doubts = useAppSelector((state: any) =>
+    selectDoubtsByGroup(groupId)(state)
+  );
   const [doubtFiles, setDoubtFiles] = useState<File[]>([]);
-  const doubtsLoading = useAppSelector((state: any) => selectDoubtsLoading(state.chat ?? {}));
-  const doubtPostLoading = useAppSelector((state: any) => selectDoubtPostLoading(state.chat ?? {}));
-  const answerPostLoading = useAppSelector((state: any) => selectAnswerPostLoading(state.chat ?? {}));
-  const [doubtInput, setDoubtInput] = useState({ title: "", description: "", category: "Mathematics", tags: [] as string[], isUrgent: false, difficulty: "Medium" });
+  const doubtsLoading = useAppSelector((state: any) =>
+    selectDoubtsLoading(state)
+  );
+  const doubtPostLoading = useAppSelector((state: any) =>
+    selectDoubtPostLoading(state)
+  );
+  const answerPostLoading = useAppSelector((state: any) =>
+    selectAnswerPostLoading(state)
+  );
+  const [doubtInput, setDoubtInput] = useState({
+    title: "",
+    description: "",
+    category: "Mathematics",
+    tags: [] as string[],
+    isUrgent: false,
+    difficulty: "Medium",
+  });
   const [selectedDoubt, setSelectedDoubt] = useState<any | null>(null);
   // Redux se live doubt data lo — selectedDoubt ID se match karke
   const liveSelectedDoubt = selectedDoubt
-    ? doubts.find((d: any) => d.doubtId === selectedDoubt.doubtId) ?? selectedDoubt
+    ? (doubts.find((d: any) => d.doubtId === selectedDoubt.doubtId) ??
+      selectedDoubt)
     : null;
   const [selectedDoubtAnswers, setSelectedDoubtAnswers] = useState<any[]>([]);
   // Live answers from Redux — auto-update hote hain
- const liveAnswers = useAppSelector((state: any) =>
-    selectDoubtAnswers(selectedDoubt?.doubtId ?? '')(state.chat ?? {})
+  const liveAnswers = useAppSelector((state: any) =>
+    selectDoubtAnswers(selectedDoubt?.doubtId ?? "")(state)
   );
   const [answerInput, setAnswerInput] = useState<string>("");
   const [doubtSearchQuery, setDoubtSearchQuery] = useState<string>("");
@@ -195,7 +326,8 @@ const dispatch = useAppDispatch();
   const [editingAnswerInput, setEditingAnswerInput] = useState<string>("");
   const [showMemberTag, setShowMemberTag] = useState<boolean>(false);
   const [newTag, setNewTag] = useState<string>("");
-  const [showAllPinnedMessages, setShowAllPinnedMessages] = useState<boolean>(false);
+  const [showAllPinnedMessages, setShowAllPinnedMessages] =
+    useState<boolean>(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -204,7 +336,7 @@ const dispatch = useAppDispatch();
 
   // const currentUserId = 1;
   const { user } = useAuth();
-  const currentUserId: string = user?.userId ?? '';
+  const currentUserId: string = user?.userId ?? "";
 
   const members: Member[] = [
     { id: 1, name: "You", avatar: "👨‍🎓" },
@@ -214,16 +346,28 @@ const dispatch = useAppDispatch();
     { id: 5, name: "Vikram Singh", avatar: "👨‍🔬" },
     { id: 6, name: "Sneha Patel", avatar: "👩‍🏫" },
     { id: 7, name: "Arjun Reddy", avatar: "👨‍⚕️" },
-    { id: 8, name: "Kavya Nair", avatar: "👩‍🎨" }
+    { id: 8, name: "Kavya Nair", avatar: "👩‍🎨" },
   ];
 
   const emojis: string[] = ["👍", "❤️", "😊", "👏", "✅"];
   // const doubtCategories: string[]. = ["Physics", "Chemistry", "Mathematics", "Biology", "General"];
   const doubtCategories: string[] = [
-    "Mathematics", "Physics", "Chemistry", "Biology",
-    "Computer Science", "English", "Programming", "Other"
+    "Mathematics",
+    "Physics",
+    "Chemistry",
+    "Biology",
+    "Computer Science",
+    "English",
+    "Programming",
+    "Other",
   ];
-  const fileCategories: string[] = ["All", "Notes", "Reference", "Assignments", "Previous Papers"];
+  const fileCategories: string[] = [
+    "All",
+    "Notes",
+    "Reference",
+    "Assignments",
+    "Previous Papers",
+  ];
 
   // Attachment types configuration
   const attachmentTypes: AttachmentType[] = [
@@ -232,50 +376,58 @@ const dispatch = useAppDispatch();
       name: "Photo",
       icon: <Camera size={20} />,
       accept: "image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif",
-      color: "bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 border border-blue-500/20"
+      color:
+        "bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 border border-blue-500/20",
     },
     {
       id: "video",
       name: "Video",
       icon: <Video size={20} />,
       accept: "video/mp4,video/webm,video/quicktime,video/x-msvideo",
-      color: "bg-purple-500/10 text-purple-600 hover:bg-purple-500/20 border border-purple-500/20"
+      color:
+        "bg-purple-500/10 text-purple-600 hover:bg-purple-500/20 border border-purple-500/20",
     },
     {
       id: "document",
       name: "Document",
       icon: <FileText size={20} />,
       accept: ".pdf,.doc,.docx,.txt",
-      color: "bg-green-500/10 text-green-600 hover:bg-green-500/20 border border-green-500/20"
+      color:
+        "bg-green-500/10 text-green-600 hover:bg-green-500/20 border border-green-500/20",
     },
     {
       id: "presentation",
       name: "PPT",
       icon: <Presentation size={20} />,
       accept: ".ppt,.pptx",
-      color: "bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 border border-orange-500/20"
+      color:
+        "bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 border border-orange-500/20",
     },
     {
       id: "file",
       name: "File",
       icon: <File size={20} />,
       accept: "*",
-      color: "bg-gray-500/10 text-gray-600 hover:bg-gray-500/20 border border-gray-500/20"
-    }
+      color:
+        "bg-gray-500/10 text-gray-600 hover:bg-gray-500/20 border border-gray-500/20",
+    },
   ];
 
   // ==========================
   // UTILITY FUNCTIONS
   // ==========================
 
-  const formatMessageTime = (date: Date | undefined | null | string): string => {
+  const formatMessageTime = (
+    date: Date | undefined | null | string
+  ): string => {
     if (!date) return "Unknown";
 
     // Convert string to Date if needed
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    const dateObj = typeof date === "string" ? new Date(date) : date;
 
     // Check if it's a valid Date object
-    if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return "Unknown";
+    if (!(dateObj instanceof Date) || isNaN(dateObj.getTime()))
+      return "Unknown";
 
     const hours = dateObj.getHours().toString().padStart(2, "0");
     const minutes = dateObj.getMinutes().toString().padStart(2, "0");
@@ -286,10 +438,11 @@ const dispatch = useAppDispatch();
     if (!date) return "Unknown";
 
     // Convert string to Date if needed
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    const dateObj = typeof date === "string" ? new Date(date) : date;
 
     // Check if it's a valid Date object
-    if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return "Unknown";
+    if (!(dateObj instanceof Date) || isNaN(dateObj.getTime()))
+      return "Unknown";
 
     const today = new Date();
     const yesterday = new Date(today);
@@ -310,7 +463,8 @@ const dispatch = useAppDispatch();
     if (type.startsWith("image/")) return <ImageIcon size={20} />;
     if (type.startsWith("video/")) return <Video size={20} />;
     if (type.startsWith("application/pdf")) return <FileText size={20} />;
-    if (type.includes("presentation") || type.includes("powerpoint")) return <Presentation size={20} />;
+    if (type.includes("presentation") || type.includes("powerpoint"))
+      return <Presentation size={20} />;
     return <File size={20} />;
   };
 
@@ -339,7 +493,7 @@ const dispatch = useAppDispatch();
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "application/vnd.ms-powerpoint",
       "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      "text/plain"
+      "text/plain",
     ];
     return allowedTypes.includes(file.type);
   };
@@ -355,12 +509,16 @@ const dispatch = useAppDispatch();
   // ==========================
 
   useEffect(() => {
-    fetchAllUsers().catch(err => console.error('Failed to fetch users:', err));
+    fetchAllUsers().catch((err) =>
+      console.error("Failed to fetch users:", err)
+    );
   }, [fetchAllUsers]);
 
   useEffect(() => {
     if (groupId) {
-      fetchGroupMembers(groupId).catch(err => console.error('Failed to fetch group members:', err));
+      fetchGroupMembers(groupId).catch((err) =>
+        console.error("Failed to fetch group members:", err)
+      );
     }
   }, [groupId, fetchGroupMembers]);
 
@@ -368,7 +526,9 @@ const dispatch = useAppDispatch();
     if (groupId) {
       dispatch(fetchMessagesThunk({ groupId, params: { page: 1, limit: 50 } }));
       dispatch(fetchPinnedMessagesThunk(groupId));
-      dispatch(fetchGroupFilesThunk({ groupId, params: { page: 1, limit: 20 } }));
+      dispatch(
+        fetchGroupFilesThunk({ groupId, params: { page: 1, limit: 20 } })
+      );
       dispatch(fetchGroupPinnedFilesThunk(groupId));
       dispatch(fetchGroupDoubtsThunk({ groupId })); // ADD THIS LINE
     }
@@ -395,27 +555,30 @@ const dispatch = useAppDispatch();
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('.menu-container')) {
+      if (!target.closest(".menu-container")) {
         setSelectedMessageMenu(null);
         setShowEmojiPicker(null);
       }
-      if (attachmentMenuRef.current && !attachmentMenuRef.current.contains(target)) {
+      if (
+        attachmentMenuRef.current &&
+        !attachmentMenuRef.current.contains(target)
+      ) {
         setShowAttachmentMenu(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (selectedDoubt) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     }
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     };
   }, [selectedDoubt]);
 
@@ -423,20 +586,25 @@ const dispatch = useAppDispatch();
     if (!messageInput.trim() && uploadedFiles.length === 0) return;
 
     const textToSend = messageInput;
-    setMessageInput('');
+    setMessageInput("");
 
     const optimisticId = `opt-${Date.now()}`;
     const optimisticMessage = {
       messageId: optimisticId,
       groupId,
       sender: currentUserId,
-      content: uploadedFiles.length > 0
-        ? (textToSend || uploadedFiles[0]?.name || 'File')
-        : textToSend,
-      messageType: uploadedFiles.length > 0
-        ? (uploadedFiles[0].type.startsWith('image/') ? 'image'
-          : uploadedFiles[0].type.startsWith('video/') ? 'video' : 'file')
-        : 'text',
+      content:
+        uploadedFiles.length > 0
+          ? textToSend || uploadedFiles[0]?.name || "File"
+          : textToSend,
+      messageType:
+        uploadedFiles.length > 0
+          ? uploadedFiles[0].type.startsWith("image/")
+            ? "image"
+            : uploadedFiles[0].type.startsWith("video/")
+              ? "video"
+              : "file"
+          : "text",
       fileUrl: uploadedFiles.length > 0 ? uploadedFiles[0].url : null,
       fileName: uploadedFiles.length > 0 ? uploadedFiles[0].name : null,
       fileSize: uploadedFiles.length > 0 ? uploadedFiles[0].size : null,
@@ -462,27 +630,34 @@ const dispatch = useAppDispatch();
       let result;
       if (filesToSend.length > 0) {
         const file = filesToSend[0];
-        result = await dispatch(sendMessageThunk({
-          groupId,
-          data: {
-            content: textToSend || file.name,
-            messageType: file.type.startsWith('image/') ? 'image'
-              : file.type.startsWith('video/') ? 'video' : 'file',
-            fileUrl: file.url,
-            fileName: file.name,
-            fileSize: file.size,
-            replyTo: replyingToFromStore?.messageId ?? null,
-          }
-        }));
+        result = await dispatch(
+          sendMessageThunk({
+            groupId,
+            data: {
+              content: textToSend || file.name,
+              messageType: file.type.startsWith("image/")
+                ? "image"
+                : file.type.startsWith("video/")
+                  ? "video"
+                  : "file",
+              fileUrl: file.url,
+              fileName: file.name,
+              fileSize: file.size,
+              replyTo: replyingToFromStore?.messageId ?? null,
+            },
+          })
+        );
       } else {
-        result = await dispatch(sendMessageThunk({
-          groupId,
-          data: {
-            content: textToSend,
-            messageType: 'text',
-            replyTo: replyingToFromStore?.messageId ?? null,
-          }
-        }));
+        result = await dispatch(
+          sendMessageThunk({
+            groupId,
+            data: {
+              content: textToSend,
+              messageType: "text",
+              replyTo: replyingToFromStore?.messageId ?? null,
+            },
+          })
+        );
       }
 
       // Agar API fail hua
@@ -490,41 +665,45 @@ const dispatch = useAppDispatch();
         dispatch(removeOptimisticMessage({ groupId, messageId: optimisticId }));
         setMessageInput(textToSend); // user ka likha wapas aao
         setUploadedFiles(filesToSend); // files bhi wapas
-        alert('Failed to send message. Please try again.');
+        alert("Failed to send message. Please try again.");
         return;
       }
 
       // Success — optimistic remove karo, socket real message laaega
       dispatch(removeOptimisticMessage({ groupId, messageId: optimisticId }));
-
     } catch (error) {
       dispatch(removeOptimisticMessage({ groupId, messageId: optimisticId }));
       setMessageInput(textToSend);
       setUploadedFiles(filesToSend);
-      alert('Failed to send message. Please try again.');
+      alert("Failed to send message. Please try again.");
     }
   };
 
   const handleSaveEdit = (): void => {
     if (!editingMessage || !messageInput.trim()) return;
-    dispatch(editMessageThunk({
-      messageId: editingMessage.messageId,
-      content: messageInput,
-    }));
-    setMessageInput('');
-    setEditingMessage(null);  // ADD this line
+    dispatch(
+      editMessageThunk({
+        messageId: editingMessage.messageId,
+        content: messageInput,
+      })
+    );
+    setMessageInput("");
+    setEditingMessage(null); // ADD this line
   };
 
   const handleEditMessage = (messageId: string): void => {
     const message = messages.find((m) => m.messageId === messageId);
     if (!message) return;
-   setEditingMessage({ ...message, deletedBy: message.deletedBy ?? undefined } as any);           // local — for banner display
+    setEditingMessage({
+      ...message,
+      deletedBy: message.deletedBy ?? undefined,
+    } as any); // local — for banner display
     setMessageInput(message.content);
     setSelectedMessageMenu(null);
   };
 
   const handleDeleteMessage = (messageId: string): void => {
-    if (window.confirm('Are you sure you want to delete this message?')) {
+    if (window.confirm("Are you sure you want to delete this message?")) {
       dispatch(deleteMessageThunk(messageId));
     }
   };
@@ -547,46 +726,60 @@ const dispatch = useAppDispatch();
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+  const handleFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ): Promise<void> => {
     const selectedFiles = Array.from(e.target.files || []);
 
     for (const file of selectedFiles) {
       const { valid, error } = validateGroupFile(file);
-      if (!valid) { alert(error); continue; }
+      if (!valid) {
+        alert(error);
+        continue;
+      }
 
-      if (activeTab === 'files') {
+      if (activeTab === "files") {
         // Files tab — upload directly to group
-        await dispatch(uploadGroupFileThunk({
-          groupId,
-          file,
-          onProgress: (percent) => dispatch(setUploadProgress(percent)),
-        })).unwrap().catch((err) => alert(err));
-      } else {
-        // Chat tab — upload then attach to message
-        try {
-          const result = await dispatch(uploadGroupFileThunk({
+        await dispatch(
+          uploadGroupFileThunk({
             groupId,
             file,
             onProgress: (percent) => dispatch(setUploadProgress(percent)),
-          })).unwrap();
+          })
+        )
+          .unwrap()
+          .catch((err) => alert(err));
+      } else {
+        // Chat tab — upload then attach to message
+        try {
+          const result = await dispatch(
+            uploadGroupFileThunk({
+              groupId,
+              file,
+              onProgress: (percent) => dispatch(setUploadProgress(percent)),
+            })
+          ).unwrap();
 
-          setUploadedFiles(prev => [...prev, {
-            id: Date.now(),
-            name: result.file.fileName,
-            size: result.file.fileSize,
-            type: result.file.mimeType,
-            url: result.file.fileUrl,
-            uploadedBy: 'You',
-            uploadedAt: new Date(),
-            isPinned: false,
-            category: getFileCategoryFromMime(result.file.mimeType),
-          }]);
+          setUploadedFiles((prev) => [
+            ...prev,
+            {
+              id: Date.now(),
+              name: result.file.fileName,
+              size: result.file.fileSize,
+              type: result.file.mimeType,
+              url: result.file.fileUrl,
+              uploadedBy: "You",
+              uploadedAt: new Date(),
+              isPinned: false,
+              category: getFileCategoryFromMime(result.file.mimeType),
+            },
+          ]);
         } catch (err: any) {
-          alert(err.message || 'Upload failed');
+          alert(err.message || "Upload failed");
         }
       }
     }
-    e.target.value = '';
+    e.target.value = "";
   };
 
   const handleRemoveFile = (fileId: number): void => {
@@ -594,7 +787,7 @@ const dispatch = useAppDispatch();
   };
 
   const handleDeleteFile = (fileId: string): void => {
-    if (window.confirm('Are you sure you want to delete this file?')) {
+    if (window.confirm("Are you sure you want to delete this file?")) {
       dispatch(deleteGroupFileThunk({ groupId, fileId }))
         .unwrap()
         .catch((err) => alert(err));
@@ -602,18 +795,21 @@ const dispatch = useAppDispatch();
     }
   };
 
-  const handleDownloadFile = async (file: { url: string; name: string }): Promise<void> => {
-    if (!file.url || file.url === '#') return;
+  const handleDownloadFile = async (file: {
+    url: string;
+    name: string;
+  }): Promise<void> => {
+    if (!file.url || file.url === "#") return;
 
     try {
       // Get file extension
-      const ext = file.name.includes('.')
-        ? '.' + file.name.split('.').pop()
-        : '';
-      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+      const ext = file.name.includes(".")
+        ? "." + file.name.split(".").pop()
+        : "";
+      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
 
       // Ask user for filename first
-      const customName = window.prompt('Save as:', nameWithoutExt);
+      const customName = window.prompt("Save as:", nameWithoutExt);
       if (customName === null) return; // user cancelled
 
       const finalName = customName.trim() ? customName.trim() + ext : file.name;
@@ -623,7 +819,7 @@ const dispatch = useAppDispatch();
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
 
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = blobUrl;
       link.download = finalName;
       document.body.appendChild(link);
@@ -632,26 +828,31 @@ const dispatch = useAppDispatch();
 
       // Clean up blob URL after download starts
       setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-
     } catch (error) {
-      alert('Download failed. Please try again.');
+      alert("Download failed. Please try again.");
     }
   };
 
-   const handleShareFileLink = (file: { fileId: string; fileUrl: string; fileName: string }): void => {
+  const handleShareFileLink = (file: {
+    fileId: string;
+    fileUrl: string;
+    fileName: string;
+  }): void => {
     // Use Cloudinary URL directly — it's already public
     const shareUrl = file.fileUrl;
 
     if (navigator.share) {
       // Native share sheet on mobile
-      navigator.share({
-        title: file.fileName,
-        text: `Check out this file: ${file.fileName}`,
-        url: shareUrl,
-      }).catch(() => {
-        // fallback to clipboard if share cancelled
-        copyToClipboard(shareUrl);
-      });
+      navigator
+        .share({
+          title: file.fileName,
+          text: `Check out this file: ${file.fileName}`,
+          url: shareUrl,
+        })
+        .catch(() => {
+          // fallback to clipboard if share cancelled
+          copyToClipboard(shareUrl);
+        });
     } else {
       copyToClipboard(shareUrl);
     }
@@ -660,13 +861,14 @@ const dispatch = useAppDispatch();
 
   // ADD this helper inside component
   const copyToClipboard = (text: string): void => {
-    navigator.clipboard.writeText(text)
+    navigator.clipboard
+      .writeText(text)
       .then(() => {
         // show toast instead of alert
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
       })
-      .catch(() => alert('Failed to copy link'));
+      .catch(() => alert("Failed to copy link"));
   };
 
   const handleToggleFilePin = (fileId: string): void => {
@@ -682,34 +884,43 @@ const dispatch = useAppDispatch();
       return;
     }
     try {
-      await dispatch(postDoubtThunk({
-        groupId,
-        data: {
-          title: doubtInput.title,
-          description: doubtInput.description,
-          category: doubtInput.category,
-          tags: doubtInput.tags,
-          isUrgent: doubtInput.isUrgent,
-          difficulty: doubtInput.difficulty,
-          taggedMembers,
-        }
-      })).unwrap();
-      setDoubtInput({ title: "", description: "", category: "Mathematics", tags: [], isUrgent: false, difficulty: "Medium" });
+      await dispatch(
+        postDoubtThunk({
+          groupId,
+          data: {
+            title: doubtInput.title,
+            description: doubtInput.description,
+            category: doubtInput.category,
+            tags: doubtInput.tags,
+            isUrgent: doubtInput.isUrgent,
+            difficulty: doubtInput.difficulty,
+            taggedMembers,
+          },
+        })
+      ).unwrap();
+      setDoubtInput({
+        title: "",
+        description: "",
+        category: "Mathematics",
+        tags: [],
+        isUrgent: false,
+        difficulty: "Medium",
+      });
       setTaggedMembers([]);
       setDoubtFiles([]);
       setShowDoubtForm(false);
       setShowMemberTag(false);
     } catch (err: any) {
-      alert(err || 'Failed to post doubt');
+      alert(err || "Failed to post doubt");
     }
   };
 
   const handleDeleteDoubt = async (doubtId: string): Promise<void> => {
-    if (!window.confirm('Are you sure you want to delete this doubt?')) return;
+    if (!window.confirm("Are you sure you want to delete this doubt?")) return;
     try {
       await dispatch(deleteDoubtThunk({ groupId, doubtId })).unwrap();
     } catch (err: any) {
-      alert(err || 'Failed to delete doubt');
+      alert(err || "Failed to delete doubt");
     }
   };
 
@@ -719,100 +930,135 @@ const dispatch = useAppDispatch();
     // Abhi sirf form band karo
     setEditingDoubt(null);
     setShowDoubtForm(false);
-    setDoubtInput({ title: "", description: "", category: "Mathematics", tags: [], isUrgent: false, difficulty: "Medium" });
+    setDoubtInput({
+      title: "",
+      description: "",
+      category: "Mathematics",
+      tags: [],
+      isUrgent: false,
+      difficulty: "Medium",
+    });
   };
 
   // REPLACE handleAnswerDoubt:
   const handleAnswerDoubt = async (): Promise<void> => {
     if (!answerInput.trim() || !selectedDoubt) return;
     try {
-      const result = await dispatch(postAnswerThunk({
-        groupId,
-        doubtId: selectedDoubt.doubtId,
-        data: { content: answerInput }
-      })).unwrap();
+      const result = await dispatch(
+        postAnswerThunk({
+          groupId,
+          doubtId: selectedDoubt.doubtId,
+          data: { content: answerInput },
+        })
+      ).unwrap();
       // setSelectedDoubtAnswers(prev => [...prev, result.answer]);
       setAnswerInput("");
     } catch (err: any) {
-      alert(err || 'Failed to post answer');
+      alert(err || "Failed to post answer");
     }
   };
 
   // REPLACE handleMarkDoubtSolved:
-  const handleMarkDoubtSolved = async (doubtId: string, bestAnswerId: string): Promise<void> => {
+  const handleMarkDoubtSolved = async (
+    doubtId: string,
+    bestAnswerId: string
+  ): Promise<void> => {
     try {
-      await dispatch(markDoubtSolvedThunk({ groupId, doubtId, bestAnswerId })).unwrap();
+      await dispatch(
+        markDoubtSolvedThunk({ groupId, doubtId, bestAnswerId })
+      ).unwrap();
       if (selectedDoubt?.doubtId === doubtId) {
         setSelectedDoubt((prev: any) => ({ ...prev, isSolved: true }));
       }
     } catch (err: any) {
-      alert(err || 'Failed to mark solved');
+      alert(err || "Failed to mark solved");
     }
   };
 
-  const handleVoteAnswer = async (doubtId: string, answerId: string, voteType: "up" | "down"): Promise<void> => {
+  const handleVoteAnswer = async (
+    doubtId: string,
+    answerId: string,
+    voteType: "up" | "down"
+  ): Promise<void> => {
     try {
-      if (voteType === 'up') {
-        await dispatch(upvoteAnswerThunk({ groupId, doubtId, answerId })).unwrap();
+      if (voteType === "up") {
+        await dispatch(
+          upvoteAnswerThunk({ groupId, doubtId, answerId })
+        ).unwrap();
       } else {
-        await dispatch(downvoteAnswerThunk({ groupId, doubtId, answerId })).unwrap();
+        await dispatch(
+          downvoteAnswerThunk({ groupId, doubtId, answerId })
+        ).unwrap();
       }
       // Redux state automatically update hoga — liveAnswers re-render karega
     } catch (err: any) {
-      alert(err || 'Failed to vote');
+      alert(err || "Failed to vote");
     }
   };
 
   // REPLACE handleUpvoteDoubt (doubt upvote — not in backend yet, keep local or remove):
   const handleUpvoteDoubt = async (doubtId: string): Promise<void> => {
-    const doubt = doubts.find(d => d.doubtId === doubtId);
+    const doubt = doubts.find((d) => d.doubtId === doubtId);
     if (!doubt) return;
 
-    const isCurrentlyUpvoted = doubt.upvotedBy?.includes(currentUserId) || doubt.isUpvoted || false;
+    const isCurrentlyUpvoted =
+      doubt.upvotedBy?.includes(currentUserId) || doubt.isUpvoted || false;
 
     try {
-      await dispatch(upvoteDoubtThunk({ groupId, doubtId, isUpvoted: isCurrentlyUpvoted })).unwrap();
+      await dispatch(
+        upvoteDoubtThunk({ groupId, doubtId, isUpvoted: isCurrentlyUpvoted })
+      ).unwrap();
     } catch (err: any) {
-      alert(err || 'Failed to upvote');
+      alert(err || "Failed to upvote");
     }
   };
 
   const handleDeleteAnswer = async (answerId: string): Promise<void> => {
-    if (!window.confirm('Are you sure you want to delete this answer?')) return;
+    if (!window.confirm("Are you sure you want to delete this answer?")) return;
     if (!selectedDoubt) return;
     try {
-      await dispatch(deleteAnswerThunk({ groupId, doubtId: selectedDoubt.doubtId, answerId })).unwrap();
+      await dispatch(
+        deleteAnswerThunk({ groupId, doubtId: selectedDoubt.doubtId, answerId })
+      ).unwrap();
       // Answers will be refetched automatically through Redux
     } catch (err: any) {
-      alert(err || 'Failed to delete answer');
+      alert(err || "Failed to delete answer");
     }
   };
 
   const handleUpdateAnswer = async (answerId: string): Promise<void> => {
     if (!editingAnswerInput.trim() || !selectedDoubt) return;
     try {
-      await dispatch(updateAnswerThunk({
-        groupId,
-        doubtId: selectedDoubt.doubtId,
-        answerId,
-        data: { content: editingAnswerInput }
-      })).unwrap();
+      await dispatch(
+        updateAnswerThunk({
+          groupId,
+          doubtId: selectedDoubt.doubtId,
+          answerId,
+          data: { content: editingAnswerInput },
+        })
+      ).unwrap();
       setEditingAnswer(null);
       setEditingAnswerInput("");
     } catch (err: any) {
-      alert(err || 'Failed to update answer');
+      alert(err || "Failed to update answer");
     }
   };
 
   const handleAddTag = (): void => {
     if (newTag.trim() && !doubtInput.tags.includes(newTag.trim())) {
-      setDoubtInput({ ...doubtInput, tags: [...doubtInput.tags, newTag.trim()] });
+      setDoubtInput({
+        ...doubtInput,
+        tags: [...doubtInput.tags, newTag.trim()],
+      });
       setNewTag("");
     }
   };
 
   const handleRemoveTag = (tag: string): void => {
-    setDoubtInput({ ...doubtInput, tags: doubtInput.tags.filter((t) => t !== tag) });
+    setDoubtInput({
+      ...doubtInput,
+      tags: doubtInput.tags.filter((t) => t !== tag),
+    });
   };
 
   const handleToggleTagMember = (memberId: string): void => {
@@ -825,8 +1071,12 @@ const dispatch = useAppDispatch();
   const filteredDoubts = doubts.filter((doubt) => {
     const matchesSearch =
       doubt.title?.toLowerCase().includes(doubtSearchQuery.toLowerCase()) ||
-      doubt.description?.toLowerCase().includes(doubtSearchQuery.toLowerCase()) ||
-      doubt.tags?.some((tag: string) => tag.toLowerCase().includes(doubtSearchQuery.toLowerCase()));
+      doubt.description
+        ?.toLowerCase()
+        .includes(doubtSearchQuery.toLowerCase()) ||
+      doubt.tags?.some((tag: string) =>
+        tag.toLowerCase().includes(doubtSearchQuery.toLowerCase())
+      );
 
     const matchesStatus =
       doubtFilter === "all" ||
@@ -836,29 +1086,41 @@ const dispatch = useAppDispatch();
     const matchesCategory =
       doubtCategoryFilter === "All" || doubt.category === doubtCategoryFilter;
 
-    const matchesMyDoubts = !showMyDoubtsOnly ||
-      (typeof doubt.postedBy === 'object' ? doubt.postedBy?.userId : doubt.postedBy) === currentUserId;
+    const matchesMyDoubts =
+      !showMyDoubtsOnly ||
+      (typeof doubt.postedBy === "object"
+        ? doubt.postedBy?.userId
+        : doubt.postedBy) === currentUserId;
 
     const matchesUrgent = !showUrgentOnly || doubt.isUrgent === true;
 
-    return matchesSearch && matchesStatus && matchesCategory && matchesMyDoubts && matchesUrgent;
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesCategory &&
+      matchesMyDoubts &&
+      matchesUrgent
+    );
   });
 
-  console.log("filter doubt s dir", filteredDoubts)
+  console.log("filter doubt s dir", filteredDoubts);
 
   // ADD — use Redux data
   const pinnedFiles = pinnedGroupFiles;
 
   const filteredFiles = groupFiles.filter((file) => {
-    const matchesSearch = file.fileName.toLowerCase().includes(fileSearchQuery.toLowerCase()) ||
+    const matchesSearch =
+      file.fileName.toLowerCase().includes(fileSearchQuery.toLowerCase()) ||
       file.originalName.toLowerCase().includes(fileSearchQuery.toLowerCase());
-    const matchesCategory = selectedFileCategory === 'All' ||
+    const matchesCategory =
+      selectedFileCategory === "All" ||
       getFileCategoryFromMime(file.mimeType) === selectedFileCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const filteredMessages = messages.filter((msg) => msg !== null && msg !== undefined);
-
+  const filteredMessages = messages.filter(
+    (msg) => msg !== null && msg !== undefined
+  );
 
   // ==========================
   // RENDER
@@ -866,11 +1128,20 @@ const dispatch = useAppDispatch();
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-gradient-to-br from-[#f6ede8] via-[#ede4db] to-[#e0d8cf]">
-
-      <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" multiple />
-      <input type="file" ref={filesTabInputRef} onChange={handleFileUpload} className="hidden" multiple />
-
-
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        className="hidden"
+        multiple
+      />
+      <input
+        type="file"
+        ref={filesTabInputRef}
+        onChange={handleFileUpload}
+        className="hidden"
+        multiple
+      />
 
       {/* Glassmorphism Header */}
       <div className="flex-shrink-0 backdrop-blur-xl bg-white/30 border-b border-white/40 shadow-lg">
@@ -908,16 +1179,25 @@ const dispatch = useAppDispatch();
           <div className="px-4 sm:px-6 lg:px-8 flex gap-2 min-w-max">
             {[
               { id: "chat", icon: MessageSquare, label: "Chat" },
-              { id: "files", icon: Paperclip, label: `Files (${groupFiles.length})` },
-              { id: "doubts", icon: HelpCircle, label: `Doubts (${doubts.filter((d) => !d.isSolved).length})` }
+              {
+                id: "files",
+                icon: Paperclip,
+                label: `Files (${groupFiles.length})`,
+              },
+              {
+                id: "doubts",
+                icon: HelpCircle,
+                label: `Doubts (${doubts.filter((d) => !d.isSolved).length})`,
+              },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-3 font-semibold transition-all duration-200 whitespace-nowrap text-sm rounded-t-xl relative ${activeTab === tab.id
-                  ? "text-[#8b7355] bg-white/50 backdrop-blur-sm border-t border-x border-white/40"
-                  : "text-[#6b5847]/70 hover:text-[#8b7355] hover:bg-white/30"
-                  }`}
+                className={`px-5 py-3 font-semibold transition-all duration-200 whitespace-nowrap text-sm rounded-t-xl relative ${
+                  activeTab === tab.id
+                    ? "text-[#8b7355] bg-white/50 backdrop-blur-sm border-t border-x border-white/40"
+                    : "text-[#6b5847]/70 hover:text-[#8b7355] hover:bg-white/30"
+                }`}
               >
                 <tab.icon size={16} className="inline mr-2" />
                 {tab.label}
@@ -943,19 +1223,32 @@ const dispatch = useAppDispatch();
                   </div>
                   {pinnedMessages.length > 2 && (
                     <button
-                      onClick={() => setShowAllPinnedMessages(!showAllPinnedMessages)}
+                      onClick={() =>
+                        setShowAllPinnedMessages(!showAllPinnedMessages)
+                      }
                       className="text-xs text-amber-700 hover:text-amber-900 font-medium hover:underline"
                     >
-                      {showAllPinnedMessages ? 'Show Less' : `Show All (${pinnedMessages.length})`}
+                      {showAllPinnedMessages
+                        ? "Show Less"
+                        : `Show All (${pinnedMessages.length})`}
                     </button>
                   )}
                 </div>
                 <div className="space-y-1.5">
-                  {(showAllPinnedMessages ? pinnedMessages : pinnedMessages.slice(-2)).map((msg) => {
+                  {(showAllPinnedMessages
+                    ? pinnedMessages
+                    : pinnedMessages.slice(-2)
+                  ).map((msg) => {
                     const userInfo = getUserInfoSync(msg.sender);
                     return (
-                      <div key={msg.messageId} className="text-sm text-amber-800 truncate backdrop-blur-sm bg-white/30 rounded-lg px-3 py-2 border border-white/40">
-                        <span className="font-semibold">{userInfo.name}:</span> {msg.content.length > 100 ? msg.content.substring(0, 100) + "..." : msg.content}
+                      <div
+                        key={msg.messageId}
+                        className="text-sm text-amber-800 truncate backdrop-blur-sm bg-white/30 rounded-lg px-3 py-2 border border-white/40"
+                      >
+                        <span className="font-semibold">{userInfo.name}:</span>{" "}
+                        {msg.content.length > 100
+                          ? msg.content.substring(0, 100) + "..."
+                          : msg.content}
                       </div>
                     );
                   })}
@@ -970,7 +1263,8 @@ const dispatch = useAppDispatch();
               {filteredMessages.map((msg, index) => {
                 const showDate =
                   index === 0 ||
-                  formatDate(msg.createdAt) !== formatDate(filteredMessages[index - 1].createdAt);
+                  formatDate(msg.createdAt) !==
+                    formatDate(filteredMessages[index - 1].createdAt);
 
                 // Fetch user info from hook cache
                 const userInfo = getUserInfoSync(msg.sender);
@@ -994,7 +1288,11 @@ const dispatch = useAppDispatch();
                       {msg.sender !== currentUserId && (
                         <div className="w-10 h-10 rounded-full border-2 border-[#8b7355]/30 backdrop-blur-sm bg-white/50 flex items-center justify-center text-xl flex-shrink-0 shadow-sm">
                           {userInfo.avatar ? (
-                            <img src={userInfo.avatar} alt={userInfo.name} className="w-full h-full rounded-full object-cover" />
+                            <img
+                              src={userInfo.avatar}
+                              alt={userInfo.name}
+                              className="w-full h-full rounded-full object-cover"
+                            />
                           ) : (
                             <span>{userInfo.name.charAt(0).toUpperCase()}</span>
                           )}
@@ -1009,65 +1307,107 @@ const dispatch = useAppDispatch();
                         )}
 
                         <div
-                          className={`relative group menu-container ${msg.sender === currentUserId
-                            ? "bg-gradient-to-br from-[#8b7355] to-[#6b5847] text-white shadow-lg"
-                            : "backdrop-blur-xl bg-white/80 border border-white/80 shadow-md"
-                            } rounded-2xl px-4 py-3 cursor-pointer transition-all duration-200 hover:shadow-xl`}
-                          onClick={() => setSelectedMessageMenu(selectedMessageMenu === msg.messageId ? null : msg.messageId)}
+                          className={`relative group menu-container ${
+                            msg.sender === currentUserId
+                              ? "bg-gradient-to-br from-[#8b7355] to-[#6b5847] text-white shadow-lg"
+                              : "backdrop-blur-xl bg-white/80 border border-white/80 shadow-md"
+                          } rounded-2xl px-4 py-3 cursor-pointer transition-all duration-200 hover:shadow-xl`}
+                          onClick={() =>
+                            setSelectedMessageMenu(
+                              selectedMessageMenu === msg.messageId
+                                ? null
+                                : msg.messageId
+                            )
+                          }
                         >
                           {msg.replyTo && (
                             <div
-                              className={`mb-2 pb-2 ${msg.sender === currentUserId ? "border-white/30 text-white/90" : "border-gray-400 text-gray-700"
-                                } border-b text-xs font-medium`}
+                              className={`mb-2 pb-2 ${
+                                msg.sender === currentUserId
+                                  ? "border-white/30 text-white/90"
+                                  : "border-gray-400 text-gray-700"
+                              } border-b text-xs font-medium`}
                             >
                               <Reply size={12} className="inline mr-1" />
                               Replying to:{" "}
-                              {filteredMessages.find((m) => m.messageId === msg.replyTo)?.content.substring(0, 30)}...
+                              {filteredMessages
+                                .find((m) => m.messageId === msg.replyTo)
+                                ?.content.substring(0, 30)}
+                              ...
                             </div>
                           )}
 
-                          <div className={`text-sm break-words leading-relaxed ${msg.sender === currentUserId
-                            ? "text-white"
-                            : "text-gray-800"
-                            }`}>{msg.content}</div>
+                          <div
+                            className={`text-sm break-words leading-relaxed ${
+                              msg.sender === currentUserId
+                                ? "text-white"
+                                : "text-gray-800"
+                            }`}
+                          >
+                            {msg.content}
+                          </div>
 
                           {msg.fileUrl && (
                             <div className="mt-3 space-y-2">
                               {(() => {
-                                const file = { id: msg.messageId, name: msg.fileName, size: msg.fileSize, type: msg.messageType, url: msg.fileUrl };
+                                const file = {
+                                  id: msg.messageId,
+                                  name: msg.fileName,
+                                  size: msg.fileSize,
+                                  type: msg.messageType,
+                                  url: msg.fileUrl,
+                                };
                                 return (
                                   <div
                                     key={file.id}
-                                    className={`backdrop-blur-sm rounded-xl p-3 flex items-center gap-3 border ${msg.sender === currentUserId
-                                      ? "bg-white/15 border-white/30"
-                                      : "bg-gray-200/40 border-gray-300/60"
-                                      }`}
+                                    className={`backdrop-blur-sm rounded-xl p-3 flex items-center gap-3 border ${
+                                      msg.sender === currentUserId
+                                        ? "bg-white/15 border-white/30"
+                                        : "bg-gray-200/40 border-gray-300/60"
+                                    }`}
                                   >
-                                    <div className={`p-2 rounded-lg ${msg.sender === currentUserId
-                                      ? "bg-white/25 text-white"
-                                      : "bg-gray-300/30 text-gray-700"
-                                      }`}>
+                                    <div
+                                      className={`p-2 rounded-lg ${
+                                        msg.sender === currentUserId
+                                          ? "bg-white/25 text-white"
+                                          : "bg-gray-300/30 text-gray-700"
+                                      }`}
+                                    >
                                       {getFileIcon(file.type)}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <div className={`text-xs font-semibold truncate ${msg.sender === currentUserId ? "text-white" : "text-gray-800"
-                                        }`}>
+                                      <div
+                                        className={`text-xs font-semibold truncate ${
+                                          msg.sender === currentUserId
+                                            ? "text-white"
+                                            : "text-gray-800"
+                                        }`}
+                                      >
                                         {file.name}
                                       </div>
-                                      <div className={`text-xs font-medium ${msg.sender === currentUserId ? "text-white/90" : "text-gray-700"
-                                        }`}>
+                                      <div
+                                        className={`text-xs font-medium ${
+                                          msg.sender === currentUserId
+                                            ? "text-white/90"
+                                            : "text-gray-700"
+                                        }`}
+                                      >
                                         {formatFileSize(file?.size || 0)}
                                       </div>
                                     </div>
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleDownloadFile({ url: file.url, name: file?.name || 'download' });
+                                        handleDownloadFile({
+                                          url: file.url,
+                                          name: file?.name || "download",
+                                        });
                                       }}
-                                      className={`rounded-lg p-2 flex-shrink-0 transition-all ${msg.sender === currentUserId
-                                        ? "hover:bg-white/30 text-white"
-                                        : "hover:bg-gray-300/40 text-gray-700"
-                                        }`}
+                                      className={`rounded-lg p-2 flex-shrink-0 transition-all ${
+                                        msg.sender === currentUserId
+                                          ? "hover:bg-white/30 text-white"
+                                          : "hover:bg-gray-300/40 text-gray-700"
+                                      }`}
                                     >
                                       <Download size={16} />
                                     </button>
@@ -1084,16 +1424,20 @@ const dispatch = useAppDispatch();
                                   key={reaction.emoji}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleAddReaction(msg.messageId, reaction.emoji);
+                                    handleAddReaction(
+                                      msg.messageId,
+                                      reaction.emoji
+                                    );
                                   }}
-                                  className={`text-xs px-2.5 py-1 rounded-full backdrop-blur-sm transition-all font-medium ${msg.sender === currentUserId
-                                    ? reaction.users.includes(currentUserId)
-                                      ? "bg-white/40 border border-white/60 text-white"
-                                      : "bg-white/20 border border-white/40 text-white hover:bg-white/30"
-                                    : reaction.users.includes(currentUserId)
-                                      ? "bg-blue-500/30 border border-blue-600/60 text-blue-900"
-                                      : "bg-gray-300/40 border border-gray-400/60 text-gray-800 hover:bg-gray-300/60"
-                                    }`}
+                                  className={`text-xs px-2.5 py-1 rounded-full backdrop-blur-sm transition-all font-medium ${
+                                    msg.sender === currentUserId
+                                      ? reaction.users.includes(currentUserId)
+                                        ? "bg-white/40 border border-white/60 text-white"
+                                        : "bg-white/20 border border-white/40 text-white hover:bg-white/30"
+                                      : reaction.users.includes(currentUserId)
+                                        ? "bg-blue-500/30 border border-blue-600/60 text-blue-900"
+                                        : "bg-gray-300/40 border border-gray-400/60 text-gray-800 hover:bg-gray-300/60"
+                                  }`}
                                 >
                                   {reaction.emoji} {reaction.users.length}
                                 </button>
@@ -1103,11 +1447,15 @@ const dispatch = useAppDispatch();
 
                           <div className="flex items-center justify-end gap-1.5 mt-1">
                             {msg.isEdited && (
-                              <span className={`text-[10px] italic ${msg.sender === currentUserId ? "text-white/60" : "text-gray-400"}`}>
+                              <span
+                                className={`text-[10px] italic ${msg.sender === currentUserId ? "text-white/60" : "text-gray-400"}`}
+                              >
                                 edited
                               </span>
                             )}
-                            <span className={`text-[10px] font-medium ${msg.sender === currentUserId ? "text-white/70" : "text-gray-400"}`}>
+                            <span
+                              className={`text-[10px] font-medium ${msg.sender === currentUserId ? "text-white/70" : "text-gray-400"}`}
+                            >
                               {formatMessageTime(msg.createdAt)}
                             </span>
                             {msg.sender === currentUserId && (
@@ -1115,7 +1463,10 @@ const dispatch = useAppDispatch();
                                 {msg.readBy.length === 1 ? (
                                   <Check size={11} className="text-white/70" />
                                 ) : (
-                                  <CheckCheck size={11} className="text-blue-200" />
+                                  <CheckCheck
+                                    size={11}
+                                    className="text-blue-200"
+                                  />
                                 )}
                               </>
                             )}
@@ -1123,12 +1474,12 @@ const dispatch = useAppDispatch();
 
                           {selectedMessageMenu === msg.messageId && (
                             <div
-                              className={`absolute ${msg.sender === currentUserId ? 'right-full mr-3' : 'left-full ml-3'} top-0 backdrop-blur-xl bg-white/90 shadow-2xl rounded-xl border border-white/60 py-2 z-[200] min-w-[160px]`}
+                              className={`absolute ${msg.sender === currentUserId ? "right-full mr-3" : "left-full ml-3"} top-0 backdrop-blur-xl bg-white/90 shadow-2xl rounded-xl border border-white/60 py-2 z-[200] min-w-[160px]`}
                               onClick={(e) => e.stopPropagation()}
                             >
                               <button
                                 onClick={() => {
-                                  dispatch(setReplyingToMessage(msg));  // set full message in Redux
+                                  dispatch(setReplyingToMessage(msg)); // set full message in Redux
                                   setSelectedMessageMenu(null);
                                 }}
                                 className="w-full px-4 py-2.5 hover:bg-gray-100/50 flex items-center gap-3 text-sm text-gray-700 font-medium transition-all"
@@ -1145,16 +1496,21 @@ const dispatch = useAppDispatch();
                                 <Smile size={16} /> React
                               </button>
                               <button
-                                onClick={() => handleToggleMessagePin(msg.messageId)}
+                                onClick={() =>
+                                  handleToggleMessagePin(msg.messageId)
+                                }
                                 className="w-full px-4 py-2.5 hover:bg-gray-100/50 flex items-center gap-3 text-sm text-gray-700 font-medium transition-all"
                               >
-                                <Pin size={16} /> {msg.isPinned ? "Unpin" : "Pin"}
+                                <Pin size={16} />{" "}
+                                {msg.isPinned ? "Unpin" : "Pin"}
                               </button>
                               {msg.sender === currentUserId && (
                                 <>
                                   {canEditMessage(msg.createdAt) && (
                                     <button
-                                      onClick={() => handleEditMessage(msg.messageId)}
+                                      onClick={() =>
+                                        handleEditMessage(msg.messageId)
+                                      }
                                       className="w-full px-4 py-2.5 hover:bg-gray-100/50 flex items-center gap-3 text-sm text-gray-700 font-medium transition-all"
                                     >
                                       <Edit3 size={16} /> Edit
@@ -1162,7 +1518,9 @@ const dispatch = useAppDispatch();
                                   )}
                                   <div className="border-t border-gray-200/50 my-1" />
                                   <button
-                                    onClick={() => handleDeleteMessage(msg.messageId)}
+                                    onClick={() =>
+                                      handleDeleteMessage(msg.messageId)
+                                    }
                                     className="w-full px-4 py-2.5 hover:bg-red-50 flex items-center gap-3 text-sm text-red-600 font-medium transition-all"
                                   >
                                     <Trash2 size={16} /> Delete
@@ -1174,14 +1532,16 @@ const dispatch = useAppDispatch();
 
                           {showEmojiPicker === msg.messageId && (
                             <div
-                              className={`absolute ${msg.sender === currentUserId ? 'right-full mr-3' : 'left-full ml-3'} top-0 backdrop-blur-xl bg-white/90 shadow-2xl rounded-xl border border-white/60 p-3 z-[200]`}
+                              className={`absolute ${msg.sender === currentUserId ? "right-full mr-3" : "left-full ml-3"} top-0 backdrop-blur-xl bg-white/90 shadow-2xl rounded-xl border border-white/60 p-3 z-[200]`}
                               onClick={(e) => e.stopPropagation()}
                             >
                               <div className="flex gap-2">
                                 {emojis.map((emoji) => (
                                   <button
                                     key={emoji}
-                                    onClick={() => handleAddReaction(msg.messageId, emoji)}
+                                    onClick={() =>
+                                      handleAddReaction(msg.messageId, emoji)
+                                    }
                                     className="hover:bg-gray-100/50 rounded-lg p-2 text-xl transition-all hover:scale-110"
                                   >
                                     {emoji}
@@ -1204,7 +1564,8 @@ const dispatch = useAppDispatch();
           {typingUsers.length > 0 && (
             <div className="flex-shrink-0 backdrop-blur-xl bg-white/50 border-t border-blue-200/50">
               <div className="px-4 sm:px-6 lg:px-8 py-3 text-sm font-semibold text-[#4a3728] italic">
-                {typingUsers.join(", ")} {typingUsers.length === 1 ? "is" : "are"} typing...
+                {typingUsers.join(", ")}{" "}
+                {typingUsers.length === 1 ? "is" : "are"} typing...
               </div>
             </div>
           )}
@@ -1216,7 +1577,8 @@ const dispatch = useAppDispatch();
                 <div className="text-sm flex-1 min-w-0 font-medium text-blue-900">
                   <Reply size={14} className="inline mr-2" />
                   <span className="truncate">
-                    Replying to: {replyingToFromStore.content.substring(0, 50)}...
+                    Replying to: {replyingToFromStore.content.substring(0, 50)}
+                    ...
                   </span>
                 </div>
                 <button
@@ -1254,7 +1616,9 @@ const dispatch = useAppDispatch();
           {uploadedFiles.length > 0 && (
             <div className="flex-shrink-0 backdrop-blur-xl bg-gray-100/40 border-t border-gray-200/50">
               <div className="px-4 sm:px-6 lg:px-8 py-3">
-                <div className="text-sm font-bold mb-3 text-[#4a3728]">Attached Files:</div>
+                <div className="text-sm font-bold mb-3 text-[#4a3728]">
+                  Attached Files:
+                </div>
                 <div className="space-y-2">
                   {uploadedFiles.map((file) => (
                     <div
@@ -1264,8 +1628,12 @@ const dispatch = useAppDispatch();
                       <div className="p-2 bg-white/50 rounded-lg">
                         {getFileIcon(file.type)}
                       </div>
-                      <div className="flex-1 truncate min-w-0 font-medium text-gray-900">{file.name}</div>
-                      <div className="text-gray-700 text-xs font-medium">{formatFileSize(file.size)}</div>
+                      <div className="flex-1 truncate min-w-0 font-medium text-gray-900">
+                        {file.name}
+                      </div>
+                      <div className="text-gray-700 text-xs font-medium">
+                        {formatFileSize(file.size)}
+                      </div>
                       <button
                         onClick={() => handleRemoveFile(file.id)}
                         className="flex-shrink-0 p-1.5 hover:bg-red-100/50 rounded-lg transition-all"
@@ -1283,7 +1651,6 @@ const dispatch = useAppDispatch();
           <div className="flex-shrink-0 backdrop-blur-xl bg-white/50 border-t border-white/60 shadow-2xl">
             <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
               <div className="flex gap-3 items-end">
-               
                 <div className="relative" ref={attachmentMenuRef}>
                   <button
                     onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
@@ -1291,7 +1658,10 @@ const dispatch = useAppDispatch();
                     className="p-3 hover:bg-white/60 rounded-xl transition-all duration-200 flex-shrink-0 backdrop-blur-sm border border-white/40"
                     title="Attach file"
                   >
-                    <Paperclip size={20} className={`text-[#6b5847] ${isUploading ? "animate-spin" : ""}`} />
+                    <Paperclip
+                      size={20}
+                      className={`text-[#6b5847] ${isUploading ? "animate-spin" : ""}`}
+                    />
                   </button>
 
                   {/* Attachment Type Menu */}
@@ -1333,15 +1703,15 @@ const dispatch = useAppDispatch();
                 <button
                   onClick={editingMessage ? handleSaveEdit : handleSendMessage}
                   disabled={!messageInput.trim() && uploadedFiles.length === 0}
-                  className={`p-3 text-white rounded-xl hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 border border-white/20 ${editingMessage
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500'
-                    : 'bg-gradient-to-r from-[#8b7355] to-[#6b5847]'
-                    }`}
+                  className={`p-3 text-white rounded-xl hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 border border-white/20 ${
+                    editingMessage
+                      ? "bg-gradient-to-r from-amber-500 to-orange-500"
+                      : "bg-gradient-to-r from-[#8b7355] to-[#6b5847]"
+                  }`}
                 >
                   {editingMessage ? <Edit3 size={20} /> : <Send size={20} />}
                 </button>
-
-                        </div>
+              </div>
             </div>
           </div>
         </>
@@ -1370,14 +1740,28 @@ const dispatch = useAppDispatch();
                         {getFileIcon(file.fileType)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold truncate">{file.fileName}</div>
+                        <div className="text-sm font-semibold truncate">
+                          {file.fileName}
+                        </div>
                         <div className="text-xs text-gray-600 mt-0.5">
-                          {formatFileSize(file.fileSize)} • {getUserInfoSync(typeof file.uploadedBy === 'object' ? file.uploadedBy.userId : file.uploadedBy).name}
+                          {formatFileSize(file.fileSize)} •{" "}
+                          {
+                            getUserInfoSync(
+                              typeof file.uploadedBy === "object"
+                                ? file.uploadedBy.userId
+                                : file.uploadedBy
+                            ).name
+                          }
                         </div>
                       </div>
                       <button
                         // onClick={() => handleDownloadFile(file)}
-                        onClick={() => handleDownloadFile({ url: file.fileUrl, name: file.fileName })}
+                        onClick={() =>
+                          handleDownloadFile({
+                            url: file.fileUrl,
+                            name: file.fileName,
+                          })
+                        }
                         className="p-2 hover:bg-amber-200/50 rounded-lg flex-shrink-0 transition-all"
                       >
                         <Download size={18} />
@@ -1417,18 +1801,16 @@ const dispatch = useAppDispatch();
                     </option>
                   ))}
                 </select>
-              
+
                 <button
                   onClick={() => {
-                  
                     filesTabInputRef.current?.click();
-
                   }}
                   disabled={fileUploadLoading}
                   className="px-5 py-3 bg-gradient-to-r from-[#8b7355] to-[#6b5847] text-white rounded-xl flex items-center justify-center gap-2 hover:shadow-lg transition-all font-semibold disabled:opacity-50 border border-white/20"
                 >
                   <Upload size={18} />
-                  {fileUploadLoading ? 'Uploading...' : 'Upload'}
+                  {fileUploadLoading ? "Uploading..." : "Upload"}
                 </button>
               </div>
 
@@ -1450,22 +1832,26 @@ const dispatch = useAppDispatch();
                           {getFileIcon(file.fileType)}
                         </div>
                         <div className="relative menu-container">
-                         
                           <button
                             onClick={() =>
                               setSelectedMessageMenu(
-                                selectedMessageMenu === file.fileId ? null : file.fileId
+                                selectedMessageMenu === file.fileId
+                                  ? null
+                                  : file.fileId
                               )
                             }
                             className="p-2 hover:bg-[#8b7355]/20 rounded-lg transition-all"
                           >
-                            <MoreVertical size={18} className="text-[#8b7355]" />
+                            <MoreVertical
+                              size={18}
+                              className="text-[#8b7355]"
+                            />
                           </button>
                           {selectedMessageMenu === file.fileId && (
                             <div className="absolute right-0 top-10 backdrop-blur-xl bg-white/90 shadow-2xl rounded-xl border border-white/60 py-2 z-[200] min-w-[160px]">
                               <button
                                 onClick={() => {
-                                  window.open(file.fileUrl, '_blank');
+                                  window.open(file.fileUrl, "_blank");
                                   setSelectedMessageMenu(null);
                                 }}
                                 className="w-full px-4 py-2.5 hover:bg-gray-100/50 flex items-center gap-3 text-sm text-gray-700 font-medium transition-all"
@@ -1474,14 +1860,17 @@ const dispatch = useAppDispatch();
                               </button>
                               <button
                                 onClick={() => {
-                                  handleDownloadFile({ url: file.fileUrl, name: file.fileName });
+                                  handleDownloadFile({
+                                    url: file.fileUrl,
+                                    name: file.fileName,
+                                  });
                                   setSelectedMessageMenu(null);
                                 }}
                                 className="w-full px-4 py-2.5 hover:bg-gray-100/50 flex items-center gap-3 text-sm text-gray-700 font-medium transition-all"
                               >
                                 <Download size={16} /> Download
                               </button>
-                              
+
                               <button
                                 onClick={() => {
                                   copyToClipboard(file.fileUrl);
@@ -1490,7 +1879,11 @@ const dispatch = useAppDispatch();
                                 className="w-full px-4 py-2.5 hover:bg-gray-100/50 flex items-center gap-3 text-sm text-gray-700 font-medium transition-all"
                               >
                                 <LinkIcon size={16} /> Copy Link
-                                {copySuccess && <span className="ml-auto text-xs text-green-600 font-semibold">Copied!</span>}
+                                {copySuccess && (
+                                  <span className="ml-auto text-xs text-green-600 font-semibold">
+                                    Copied!
+                                  </span>
+                                )}
                               </button>
                               <button
                                 onClick={() => {
@@ -1499,13 +1892,18 @@ const dispatch = useAppDispatch();
                                 }}
                                 className="w-full px-4 py-2.5 hover:bg-gray-100/50 flex items-center gap-3 text-sm text-gray-700 font-medium transition-all"
                               >
-                                <Pin size={16} /> {file.isPinned ? "Unpin" : "Pin"}
+                                <Pin size={16} />{" "}
+                                {file.isPinned ? "Unpin" : "Pin"}
                               </button>
-                              {(typeof file.uploadedBy === 'object' ? file.uploadedBy.userId : file.uploadedBy) === currentUserId && (
+                              {(typeof file.uploadedBy === "object"
+                                ? file.uploadedBy.userId
+                                : file.uploadedBy) === currentUserId && (
                                 <>
                                   <div className="border-t border-gray-200/50 my-1" />
                                   <button
-                                    onClick={() => handleDeleteFile(file.fileId)}
+                                    onClick={() =>
+                                      handleDeleteFile(file.fileId)
+                                    }
                                     className="w-full px-4 py-2.5 hover:bg-red-50 flex items-center gap-3 text-sm text-red-600 font-medium transition-all"
                                   >
                                     <Trash2 size={16} /> Delete
@@ -1516,15 +1914,28 @@ const dispatch = useAppDispatch();
                           )}
                         </div>
                       </div>
-                      <h3 className="font-bold text-sm mb-2 truncate text-gray-900" title={file.fileName}>
+                      <h3
+                        className="font-bold text-sm mb-2 truncate text-gray-900"
+                        title={file.fileName}
+                      >
                         {file.fileName}
                       </h3>
                       <p className="text-xs text-gray-700 font-medium mb-3">
                         {formatFileSize(file.fileSize)}
                       </p>
                       <div className="flex items-center justify-between text-xs text-gray-600 gap-2 mb-3">
-                        <span className="truncate font-medium">{getUserInfoSync(typeof file.uploadedBy === 'object' ? file.uploadedBy.userId : file.uploadedBy).name}</span>
-                        <span className="flex-shrink-0 font-medium">{formatDate(file.createdAt)}</span>
+                        <span className="truncate font-medium">
+                          {
+                            getUserInfoSync(
+                              typeof file.uploadedBy === "object"
+                                ? file.uploadedBy.userId
+                                : file.uploadedBy
+                            ).name
+                          }
+                        </span>
+                        <span className="flex-shrink-0 font-medium">
+                          {formatDate(file.createdAt)}
+                        </span>
                       </div>
                       <div>
                         <span className="text-xs px-3 py-1.5 bg-[#f6ede8] text-[#8b7355] rounded-full font-medium border border-[#8b7355]/20">
@@ -1584,38 +1995,43 @@ const dispatch = useAppDispatch();
                   <HelpCircle size={18} />
                   Ask Doubt
                 </button>
-
-
               </div>
 
               {/* Filter chips */}
               <div className="flex gap-2 flex-wrap mb-2">
                 <button
                   onClick={() => setShowMyDoubtsOnly(!showMyDoubtsOnly)}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all ${showMyDoubtsOnly
-                    ? 'bg-[#8b7355] text-white border-[#8b7355]'
-                    : 'bg-white/60 text-[#6b5847] border-white/60 hover:border-[#8b7355]/40'
-                    }`}
+                  className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all ${
+                    showMyDoubtsOnly
+                      ? "bg-[#8b7355] text-white border-[#8b7355]"
+                      : "bg-white/60 text-[#6b5847] border-white/60 hover:border-[#8b7355]/40"
+                  }`}
                 >
                   My Doubts
                 </button>
                 <button
                   onClick={() => setShowUrgentOnly(!showUrgentOnly)}
-                  className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all ${showUrgentOnly
-                    ? 'bg-orange-500 text-white border-orange-500'
-                    : 'bg-white/60 text-orange-600 border-white/60 hover:border-orange-400/40'
-                    }`}
+                  className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all ${
+                    showUrgentOnly
+                      ? "bg-orange-500 text-white border-orange-500"
+                      : "bg-white/60 text-orange-600 border-white/60 hover:border-orange-400/40"
+                  }`}
                 >
                   🔴 Urgent
                 </button>
-                {doubtCategories.map(cat => (
+                {doubtCategories.map((cat) => (
                   <button
                     key={cat}
-                    onClick={() => setDoubtCategoryFilter(doubtCategoryFilter === cat ? 'All' : cat)}
-                    className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all ${doubtCategoryFilter === cat
-                      ? 'bg-[#6b5847] text-white border-[#6b5847]'
-                      : 'bg-white/60 text-gray-600 border-white/60 hover:border-gray-400/40'
-                      }`}
+                    onClick={() =>
+                      setDoubtCategoryFilter(
+                        doubtCategoryFilter === cat ? "All" : cat
+                      )
+                    }
+                    className={`px-4 py-2 rounded-full text-xs font-semibold border transition-all ${
+                      doubtCategoryFilter === cat
+                        ? "bg-[#6b5847] text-white border-[#6b5847]"
+                        : "bg-white/60 text-gray-600 border-white/60 hover:border-gray-400/40"
+                    }`}
                   >
                     {cat}
                   </button>
@@ -1627,7 +2043,7 @@ const dispatch = useAppDispatch();
                 <div className="backdrop-blur-xl bg-white/70 border-2 border-white/60 rounded-2xl p-6 sm:p-8 mb-6 shadow-xl">
                   {/* <h3 className="text-xl font-bold text-[#4a3728] mb-6">Post a Doubt</h3> */}
                   <h3 className="text-xl font-bold text-[#4a3728] mb-6">
-                    {editingDoubt ? 'Edit Doubt' : 'Post a Doubt'}
+                    {editingDoubt ? "Edit Doubt" : "Post a Doubt"}
                   </h3>
 
                   <input
@@ -1647,7 +2063,12 @@ const dispatch = useAppDispatch();
                     // }
                     // placeholder="Describe your doubt in detail..."
                     value={doubtInput.description}
-                    onChange={(e) => setDoubtInput({ ...doubtInput, description: e.target.value })}
+                    onChange={(e) =>
+                      setDoubtInput({
+                        ...doubtInput,
+                        description: e.target.value,
+                      })
+                    }
                     placeholder="Describe your doubt in detail..."
                     rows={5}
                     className="w-full px-4 py-3 border-2 border-white/60 rounded-xl mb-4 focus:outline-none focus:border-[#8b7355]/50 resize-none backdrop-blur-sm bg-white/60 transition-all"
@@ -1718,16 +2139,27 @@ const dispatch = useAppDispatch();
                     <input
                       type="file"
                       multiple
-                      onChange={(e) => setDoubtFiles(Array.from(e.target.files || []))}
+                      onChange={(e) =>
+                        setDoubtFiles(Array.from(e.target.files || []))
+                      }
                       className="w-full px-4 py-3 border-2 border-dashed border-white/60 rounded-xl backdrop-blur-sm bg-white/40 text-sm text-gray-600 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#8b7355]/10 file:text-[#8b7355] hover:file:bg-[#8b7355]/20 transition-all cursor-pointer"
                     />
                     {doubtFiles.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {doubtFiles.map((f, i) => (
-                          <span key={i} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#f6ede8] text-[#8b7355] rounded-full text-xs font-medium border border-[#8b7355]/20">
+                          <span
+                            key={i}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#f6ede8] text-[#8b7355] rounded-full text-xs font-medium border border-[#8b7355]/20"
+                          >
                             <FileText size={12} />
                             {f.name}
-                            <button onClick={() => setDoubtFiles(prev => prev.filter((_, idx) => idx !== i))}>
+                            <button
+                              onClick={() =>
+                                setDoubtFiles((prev) =>
+                                  prev.filter((_, idx) => idx !== i)
+                                )
+                              }
+                            >
                               <X size={12} />
                             </button>
                           </span>
@@ -1743,13 +2175,13 @@ const dispatch = useAppDispatch();
                       className="text-sm font-semibold text-[#8b7355] mb-3 flex items-center gap-2 hover:underline"
                     >
                       <AtSign size={16} />
-                      Tag Members {taggedMembers.length > 0 && `(${taggedMembers.length})`}
+                      Tag Members{" "}
+                      {taggedMembers.length > 0 && `(${taggedMembers.length})`}
                     </button>
                     {showMemberTag && (
                       <div className="border-2 border-white/60 rounded-xl p-4 max-h-48 overflow-y-auto backdrop-blur-sm bg-white/40">
-                        
                         {groupMembers
-                          .filter(m => m.userId !== currentUserId) // apne aap ko exclude karo
+                          .filter((m) => m.userId !== currentUserId) // apne aap ko exclude karo
                           .map((member) => (
                             <label
                               key={member.userId}
@@ -1758,41 +2190,59 @@ const dispatch = useAppDispatch();
                               <input
                                 type="checkbox"
                                 checked={taggedMembers.includes(member.userId)}
-                                onChange={() => handleToggleTagMember(member.userId)}
+                                onChange={() =>
+                                  handleToggleTagMember(member.userId)
+                                }
                                 className="rounded"
                               />
                               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] flex items-center justify-center text-sm font-bold text-[#8b7355] flex-shrink-0 overflow-hidden">
-                                {member.avatar
-                                  ? <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
-                                  : member.name.charAt(0).toUpperCase()
-                                }
+                                {member.avatar ? (
+                                  <img
+                                    src={member.avatar}
+                                    alt={member.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  member.name.charAt(0).toUpperCase()
+                                )}
                               </div>
                               <div>
-                                <span className="text-sm font-medium block">{member.name}</span>
-                                {member.role !== 'member' && (
-                                  <span className="text-xs text-[#8b7355] font-medium">{member.role}</span>
+                                <span className="text-sm font-medium block">
+                                  {member.name}
+                                </span>
+                                {member.role !== "member" && (
+                                  <span className="text-xs text-[#8b7355] font-medium">
+                                    {member.role}
+                                  </span>
                                 )}
                               </div>
                             </label>
-                          ))
-                        }
+                          ))}
                       </div>
                     )}
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3">
-                   
                     <button
-                      onClick={editingDoubt ? handleUpdateDoubt : handlePostDoubt}
+                      onClick={
+                        editingDoubt ? handleUpdateDoubt : handlePostDoubt
+                      }
                       className="flex-1 px-6 py-3 bg-gradient-to-r from-[#8b7355] to-[#6b5847] text-white rounded-xl hover:shadow-lg transition-all font-semibold border border-white/20"
                     >
-                      {editingDoubt ? 'Update Doubt' : 'Post Doubt'}
+                      {editingDoubt ? "Update Doubt" : "Post Doubt"}
                     </button>
                     <button
                       onClick={() => {
                         setShowDoubtForm(false);
                         setEditingDoubt(null);
-                        setDoubtInput({ title: "", description: "", category: "Mathematics", tags: [], isUrgent: false, difficulty: "Medium" });
+                        setDoubtInput({
+                          title: "",
+                          description: "",
+                          category: "Mathematics",
+                          tags: [],
+                          isUrgent: false,
+                          difficulty: "Medium",
+                        });
                         setTaggedMembers([]);
                         setShowMemberTag(false);
                       }}
@@ -1811,17 +2261,19 @@ const dispatch = useAppDispatch();
                     <div
                       key={doubt.doubtId}
                       className="backdrop-blur-xl bg-white/70 border-2 border-white/60 rounded-2xl p-5 sm:p-6 hover:shadow-2xl transition-all duration-300 cursor-pointer group"
-                   
+
                       onClick={async () => {
                         setSelectedDoubt(doubt);
                         try {
                           // ViewCount increment + answers fetch parallel
                           await Promise.all([
                             dispatch(fetchDoubtByIdThunk(doubt.doubtId)),
-                            dispatch(fetchDoubtAnswersThunk({ doubtId: doubt.doubtId })),
+                            dispatch(
+                              fetchDoubtAnswersThunk({ doubtId: doubt.doubtId })
+                            ),
                           ]);
                         } catch (err) {
-                          console.error('Failed to fetch doubt details');
+                          console.error("Failed to fetch doubt details");
                         }
                       }}
                     >
@@ -1830,94 +2282,111 @@ const dispatch = useAppDispatch();
                           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] border-2 border-[#8b7355]/30 flex items-center justify-center text-xl font-bold text-[#8b7355] flex-shrink-0 shadow-sm">
                             {(() => {
                               const info = getUserInfoSync(
-                                typeof doubt.postedBy === 'object' ? doubt.postedBy?.userId : doubt.postedBy
+                                typeof doubt.postedBy === "object"
+                                  ? doubt.postedBy?.userId
+                                  : doubt.postedBy
                               );
-                              return info.avatar
-                                ? <img src={info.avatar} alt={info.name} className="w-full h-full rounded-full object-cover" />
-                                : info.name.charAt(0).toUpperCase();
+                              return info.avatar ? (
+                                <img
+                                  src={info.avatar}
+                                  alt={info.name}
+                                  className="w-full h-full rounded-full object-cover"
+                                />
+                              ) : (
+                                info.name.charAt(0).toUpperCase()
+                              );
                             })()}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <h3 className="font-bold text-[#4a3728] truncate text-base">{doubt.title}</h3>
+                            <h3 className="font-bold text-[#4a3728] truncate text-base">
+                              {doubt.title}
+                            </h3>
                             <p className="text-xs text-gray-600 mt-0.5">
                               {(() => {
                                 const info = getUserInfoSync(
-                                  typeof doubt.postedBy === 'object' ? doubt.postedBy?.userId : doubt.postedBy
+                                  typeof doubt.postedBy === "object"
+                                    ? doubt.postedBy?.userId
+                                    : doubt.postedBy
                                 );
                                 return info.name;
-                              })()} • {formatDate(doubt.createdAt)}
+                              })()}{" "}
+                              • {formatDate(doubt.createdAt)}
                             </p>
                           </div>
-                         
                         </div>
                         {doubt.isSolved ? (
                           <span className="px-3 py-1.5 bg-green-500/10 text-green-700 rounded-full text-xs flex items-center gap-1.5 flex-shrink-0 font-semibold border border-green-500/20">
                             <CheckCircle size={14} />
                             <span className="hidden sm:inline">Solved</span>
                           </span>
-
-
-                        )
-
-                          : (
-                            <span className="px-3 py-1.5 bg-orange-500/10 text-orange-700 rounded-full text-xs flex items-center gap-1.5 flex-shrink-0 font-semibold border border-orange-500/20">
-                              <AlertCircle size={14} />
-                              <span className="hidden sm:inline">Unsolved</span>
-                            </span>
-                          )}
+                        ) : (
+                          <span className="px-3 py-1.5 bg-orange-500/10 text-orange-700 rounded-full text-xs flex items-center gap-1.5 flex-shrink-0 font-semibold border border-orange-500/20">
+                            <AlertCircle size={14} />
+                            <span className="hidden sm:inline">Unsolved</span>
+                          </span>
+                        )}
 
                         {/* 3-dot menu — sirf doubt owner ko */}
-                        {(typeof doubt.postedBy === 'object'
+                        {(typeof doubt.postedBy === "object"
                           ? doubt.postedBy?.userId
                           : doubt.postedBy) === currentUserId && (
-                            <div className="relative menu-container flex-shrink-0">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedMessageMenu(selectedMessageMenu === `doubt-${doubt.doubtId}` ? null : `doubt-${doubt.doubtId}`);
-                                }}
-                                className="p-1.5 hover:bg-gray-100/50 rounded-lg transition-all"
+                          <div className="relative menu-container flex-shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedMessageMenu(
+                                  selectedMessageMenu ===
+                                    `doubt-${doubt.doubtId}`
+                                    ? null
+                                    : `doubt-${doubt.doubtId}`
+                                );
+                              }}
+                              className="p-1.5 hover:bg-gray-100/50 rounded-lg transition-all"
+                            >
+                              <MoreVertical
+                                size={16}
+                                className="text-gray-500"
+                              />
+                            </button>
+                            {selectedMessageMenu ===
+                              `doubt-${doubt.doubtId}` && (
+                              <div
+                                className="absolute right-0 top-8 backdrop-blur-xl bg-white/90 shadow-2xl rounded-xl border border-white/60 py-2 z-[200] min-w-[140px]"
+                                onClick={(e) => e.stopPropagation()}
                               >
-                                <MoreVertical size={16} className="text-gray-500" />
-                              </button>
-                              {selectedMessageMenu === `doubt-${doubt.doubtId}` && (
-                                <div
-                                  className="absolute right-0 top-8 backdrop-blur-xl bg-white/90 shadow-2xl rounded-xl border border-white/60 py-2 z-[200] min-w-[140px]"
-                                  onClick={(e) => e.stopPropagation()}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingDoubt(doubt);
+                                    setDoubtInput({
+                                      title: doubt.title,
+                                      description: doubt.description || "",
+                                      category: doubt.category || "Mathematics",
+                                      tags: doubt.tags || [],
+                                      isUrgent: doubt.isUrgent || false,
+                                      difficulty: doubt.difficulty || "Medium",
+                                    });
+                                    setShowDoubtForm(true);
+                                    setSelectedMessageMenu(null);
+                                  }}
+                                  className="w-full px-4 py-2.5 hover:bg-gray-100/50 flex items-center gap-3 text-sm text-gray-700 font-medium transition-all"
                                 >
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingDoubt(doubt);
-                                      setDoubtInput({
-                                        title: doubt.title,
-                                        description: doubt.description || '',
-                                        category: doubt.category || 'Mathematics',
-                                        tags: doubt.tags || [],
-                                        isUrgent: doubt.isUrgent || false,
-                                        difficulty: doubt.difficulty || 'Medium',
-                                      });
-                                      setShowDoubtForm(true);
-                                      setSelectedMessageMenu(null);
-                                    }}
-                                    className="w-full px-4 py-2.5 hover:bg-gray-100/50 flex items-center gap-3 text-sm text-gray-700 font-medium transition-all"
-                                  >
-                                    <Edit3 size={15} /> Edit
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteDoubt(doubt.doubtId);
-                                      setSelectedMessageMenu(null);
-                                    }}
-                                    className="w-full px-4 py-2.5 hover:bg-red-50 flex items-center gap-3 text-sm text-red-600 font-medium transition-all"
-                                  >
-                                    <Trash2 size={15} /> Delete
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                  <Edit3 size={15} /> Edit
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteDoubt(doubt.doubtId);
+                                    setSelectedMessageMenu(null);
+                                  }}
+                                  className="w-full px-4 py-2.5 hover:bg-red-50 flex items-center gap-3 text-sm text-red-600 font-medium transition-all"
+                                >
+                                  <Trash2 size={15} /> Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <p className="text-sm text-gray-800 mb-4 line-clamp-2 leading-relaxed">
@@ -1944,18 +2413,27 @@ const dispatch = useAppDispatch();
                           )}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-gray-600 flex-shrink-0">
-                         
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleUpvoteDoubt(doubt.doubtId);
                             }}
-                            className={`flex items-center gap-1.5 transition-all font-medium ${doubt.upvotedBy?.includes(currentUserId) || doubt.isUpvoted
-                              ? 'text-[#8b7355]'
-                              : 'hover:text-[#8b7355] text-gray-600'
-                              }`}
+                            className={`flex items-center gap-1.5 transition-all font-medium ${
+                              doubt.upvotedBy?.includes(currentUserId) ||
+                              doubt.isUpvoted
+                                ? "text-[#8b7355]"
+                                : "hover:text-[#8b7355] text-gray-600"
+                            }`}
                           >
-                            <ThumbsUp size={16} className={doubt.upvotedBy?.includes(currentUserId) || doubt.isUpvoted ? 'fill-current' : ''} />
+                            <ThumbsUp
+                              size={16}
+                              className={
+                                doubt.upvotedBy?.includes(currentUserId) ||
+                                doubt.isUpvoted
+                                  ? "fill-current"
+                                  : ""
+                              }
+                            />
                             <span>{doubt.upvotes ?? 0}</span>
                           </button>
                           <span className="flex items-center gap-1.5 font-medium">
@@ -1986,17 +2464,22 @@ const dispatch = useAppDispatch();
             <div className="sticky top-0 bg-gradient-to-br from-white/95 to-white/90 backdrop-blur-xl border-b-2 border-white/60 p-6 sm:p-8 flex items-start justify-between gap-4 rounded-t-3xl z-10">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-4 mb-4">
-                
                   <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] border-2 border-[#8b7355]/30 flex items-center justify-center text-xl font-bold text-[#8b7355] flex-shrink-0 shadow-sm">
                     {(() => {
                       const info = getUserInfoSync(
-                        typeof liveSelectedDoubt.postedBy === 'object'
+                        typeof liveSelectedDoubt.postedBy === "object"
                           ? liveSelectedDoubt.postedBy?.userId
                           : liveSelectedDoubt.postedBy
                       );
-                      return info.avatar
-                        ? <img src={info.avatar} alt={info.name} className="w-full h-full rounded-full object-cover" />
-                        : info.name.charAt(0).toUpperCase();
+                      return info.avatar ? (
+                        <img
+                          src={info.avatar}
+                          alt={info.name}
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        info.name.charAt(0).toUpperCase()
+                      );
                     })()}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -2006,12 +2489,13 @@ const dispatch = useAppDispatch();
                     <p className="text-sm text-gray-600 mt-1">
                       {(() => {
                         const info = getUserInfoSync(
-                          typeof liveSelectedDoubt.postedBy === 'object'
+                          typeof liveSelectedDoubt.postedBy === "object"
                             ? liveSelectedDoubt.postedBy?.userId
                             : liveSelectedDoubt.postedBy
                         );
                         return info.name;
-                      })()} • {formatDate(liveSelectedDoubt.createdAt)}
+                      })()}{" "}
+                      • {formatDate(liveSelectedDoubt.createdAt)}
                     </p>
                   </div>
                 </div>
@@ -2040,8 +2524,9 @@ const dispatch = useAppDispatch();
             <div className="max-h-[65vh] overflow-y-auto">
               {/* Question */}
               <div className="p-6 sm:p-8 border-b-2 border-white/60">
-             
-                <p className="text-gray-800 whitespace-pre-wrap break-words leading-relaxed">{liveSelectedDoubt.description}</p>
+                <p className="text-gray-800 whitespace-pre-wrap break-words leading-relaxed">
+                  {liveSelectedDoubt.description}
+                </p>
                 <div className="flex flex-wrap items-center gap-4 mt-5">
                   <button
                     onClick={() => handleUpvoteDoubt(liveSelectedDoubt.id)}
@@ -2050,11 +2535,18 @@ const dispatch = useAppDispatch();
                     <ThumbsUp size={18} />
                     {liveSelectedDoubt.upvotes} Upvotes
                   </button>
-                  {(typeof liveSelectedDoubt.postedBy === 'object'
+                  {(typeof liveSelectedDoubt.postedBy === "object"
                     ? liveSelectedDoubt.postedBy?.userId
-                    : liveSelectedDoubt.postedBy) === currentUserId && !liveSelectedDoubt.isSolved && (
+                    : liveSelectedDoubt.postedBy) === currentUserId &&
+                    !liveSelectedDoubt.isSolved && (
                       <button
-                        onClick={() => selectedDoubtAnswers[0] && handleMarkDoubtSolved(liveSelectedDoubt.doubtId, selectedDoubtAnswers[0].answerId)}
+                        onClick={() =>
+                          selectedDoubtAnswers[0] &&
+                          handleMarkDoubtSolved(
+                            liveSelectedDoubt.doubtId,
+                            selectedDoubtAnswers[0].answerId
+                          )
+                        }
                         className="px-4 py-2 bg-green-500/10 text-green-700 rounded-lg text-sm hover:bg-green-500/20 font-semibold transition-all border border-green-500/20"
                       >
                         Mark as Solved
@@ -2073,28 +2565,39 @@ const dispatch = useAppDispatch();
                   {liveAnswers.map((answer: any) => (
                     <div
                       key={answer.id}
-                      className={`border-2 rounded-2xl p-5 transition-all ${answer.isBestAnswer
-                        ? "border-green-400 bg-green-50/50 backdrop-blur-sm"
-                        : "border-white/60 backdrop-blur-sm bg-white/40"
-                        }`}
+                      className={`border-2 rounded-2xl p-5 transition-all ${
+                        answer.isBestAnswer
+                          ? "border-green-400 bg-green-50/50 backdrop-blur-sm"
+                          : "border-white/60 backdrop-blur-sm bg-white/40"
+                      }`}
                     >
                       <div className="flex items-start justify-between mb-4 gap-3">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] border-2 border-[#8b7355]/30 flex items-center justify-center text-sm font-bold text-[#8b7355] flex-shrink-0">
                             {(() => {
                               const info = getUserInfoSync(
-                                typeof answer.answeredBy === 'object' ? answer.answeredBy?.userId : answer.answeredBy
+                                typeof answer.answeredBy === "object"
+                                  ? answer.answeredBy?.userId
+                                  : answer.answeredBy
                               );
-                              return info.avatar
-                                ? <img src={info.avatar} alt={info.name} className="w-full h-full rounded-full object-cover" />
-                                : info.name.charAt(0).toUpperCase();
+                              return info.avatar ? (
+                                <img
+                                  src={info.avatar}
+                                  alt={info.name}
+                                  className="w-full h-full rounded-full object-cover"
+                                />
+                              ) : (
+                                info.name.charAt(0).toUpperCase()
+                              );
                             })()}
                           </div>
                           <div className="min-w-0">
                             <p className="font-bold text-sm">
                               {(() => {
                                 const info = getUserInfoSync(
-                                  typeof answer.answeredBy === 'object' ? answer.answeredBy?.userId : answer.answeredBy
+                                  typeof answer.answeredBy === "object"
+                                    ? answer.answeredBy?.userId
+                                    : answer.answeredBy
                                 );
                                 return info.name;
                               })()}
@@ -2111,18 +2614,29 @@ const dispatch = useAppDispatch();
                               Best Answer
                             </span>
                           )}
-                          {(typeof answer.answeredBy === 'object' ? answer.answeredBy?.userId : answer.answeredBy) === currentUserId && (
+                          {(typeof answer.answeredBy === "object"
+                            ? answer.answeredBy?.userId
+                            : answer.answeredBy) === currentUserId && (
                             <div className="relative menu-container flex-shrink-0">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setSelectedMessageMenu(selectedMessageMenu === `answer-${answer.answerId}` ? null : `answer-${answer.answerId}`);
+                                  setSelectedMessageMenu(
+                                    selectedMessageMenu ===
+                                      `answer-${answer.answerId}`
+                                      ? null
+                                      : `answer-${answer.answerId}`
+                                  );
                                 }}
                                 className="p-1.5 hover:bg-gray-100/50 rounded-lg transition-all"
                               >
-                                <MoreVertical size={16} className="text-gray-500" />
+                                <MoreVertical
+                                  size={16}
+                                  className="text-gray-500"
+                                />
                               </button>
-                              {selectedMessageMenu === `answer-${answer.answerId}` && (
+                              {selectedMessageMenu ===
+                                `answer-${answer.answerId}` && (
                                 <div
                                   className="absolute right-0 top-8 backdrop-blur-xl bg-white/90 shadow-2xl rounded-xl border border-white/60 py-2 z-[200] min-w-[140px]"
                                   onClick={(e) => e.stopPropagation()}
@@ -2158,13 +2672,17 @@ const dispatch = useAppDispatch();
                         <div className="mb-4">
                           <textarea
                             value={editingAnswerInput}
-                            onChange={(e) => setEditingAnswerInput(e.target.value)}
+                            onChange={(e) =>
+                              setEditingAnswerInput(e.target.value)
+                            }
                             className="w-full px-4 py-3 border-2 border-[#8b7355]/30 rounded-xl mb-3 focus:outline-none focus:border-[#8b7355]/60 resize-none backdrop-blur-sm bg-white/60 transition-all text-sm"
                             rows={4}
                           />
                           <div className="flex gap-3">
                             <button
-                              onClick={() => handleUpdateAnswer(answer.answerId)}
+                              onClick={() =>
+                                handleUpdateAnswer(answer.answerId)
+                              }
                               disabled={!editingAnswerInput.trim()}
                               className="px-4 py-2 bg-gradient-to-r from-[#8b7355] to-[#6b5847] text-white rounded-lg text-sm hover:shadow-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -2182,13 +2700,19 @@ const dispatch = useAppDispatch();
                           </div>
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-800 mb-4 break-words leading-relaxed">{answer.content}</p>
+                        <p className="text-sm text-gray-800 mb-4 break-words leading-relaxed">
+                          {answer.content}
+                        </p>
                       )}
                       <div className="flex flex-wrap items-center gap-4">
                         <button
                           onClick={() =>
                             // handleVoteAnswer(selectedDoubt.id, answer.id, "up")
-                            handleVoteAnswer(selectedDoubt.doubtId, answer.answerId, "up")
+                            handleVoteAnswer(
+                              selectedDoubt.doubtId,
+                              answer.answerId,
+                              "up"
+                            )
                           }
                           className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-green-600 font-medium transition-all"
                         >
@@ -2197,26 +2721,38 @@ const dispatch = useAppDispatch();
                         </button>
                         <button
                           onClick={() =>
-                            handleVoteAnswer(selectedDoubt.doubtId, answer.answerId, "down")
+                            handleVoteAnswer(
+                              selectedDoubt.doubtId,
+                              answer.answerId,
+                              "down"
+                            )
                           }
                           className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-red-600 font-medium transition-all"
                         >
                           <ThumbsDown size={16} />
                           {answer.downvotes}
                         </button>
-                                              {answer.isBestAnswer ? (
+                        {answer.isBestAnswer ? (
                           <span className="ml-auto px-4 py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5">
                             <Check size={13} /> Accepted
                           </span>
-                        ) : (typeof selectedDoubt.postedBy === 'object'
-                          ? selectedDoubt.postedBy?.userId
-                          : selectedDoubt.postedBy) === currentUserId && !selectedDoubt.isSolved && (
-                          <button
-                            onClick={() => handleMarkDoubtSolved(selectedDoubt.doubtId, answer.answerId)}
-                            className="ml-auto px-4 py-1.5 bg-green-500/10 text-green-700 rounded-lg text-xs hover:bg-green-500/20 font-semibold transition-all border border-green-500/20"
-                          >
-                            Accept Answer
-                          </button>
+                        ) : (
+                          (typeof selectedDoubt.postedBy === "object"
+                            ? selectedDoubt.postedBy?.userId
+                            : selectedDoubt.postedBy) === currentUserId &&
+                          !selectedDoubt.isSolved && (
+                            <button
+                              onClick={() =>
+                                handleMarkDoubtSolved(
+                                  selectedDoubt.doubtId,
+                                  answer.answerId
+                                )
+                              }
+                              className="ml-auto px-4 py-1.5 bg-green-500/10 text-green-700 rounded-lg text-xs hover:bg-green-500/20 font-semibold transition-all border border-green-500/20"
+                            >
+                              Accept Answer
+                            </button>
+                          )
                         )}
                       </div>
                     </div>

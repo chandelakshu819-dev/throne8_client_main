@@ -4,34 +4,57 @@
  * ====================================
  */
 
-import api from './api.intance';
-import axios from 'axios';
-import { CreateTaskInput, TaskQueryInput, UpdateTaskInput } from '../../features/study-group/validators/todo.validation';
-import config from '@/config/env.config';
+import api from "./api.intance";
+import axios from "axios";
+import {
+  CreateTaskInput,
+  TaskQueryInput,
+  UpdateTaskInput,
+} from "../../features/study-group/validators/todo.validation";
+import config from "@/config/env.config";
 
+// ==================== URL / PARAM HELPERS ====================
+
+/** Append `suffix` to an env base path unless the env value already ends with it. */
+const joinUrl = (base: string | undefined, suffix: string): string => {
+  const b = (base ?? "").replace(/\/+$/, "");
+  return b.endsWith(suffix) ? b : `${b}${suffix}`;
+};
+
+/** Remove undefined / null / empty-string params so backend Joi validators don't reject them. */
+const cleanParams = <T extends Record<string, any> | undefined>(
+  params: T
+): T => {
+  if (!params) return params;
+  return Object.fromEntries(
+    Object.entries(params).filter(
+      ([, v]) => v !== undefined && v !== null && v !== ""
+    )
+  ) as T;
+};
 // ==================== ENUMS ====================
 
 export enum GroupCategory {
-  JEE = 'JEE',
-  NEET = 'NEET',
-  COMPETITIVE = 'Competitive Examinations',
-  COLLEGE = 'College Students',
-  WORKING_PROFESSIONAL = 'Working Professionals',
-  LANGUAGE = 'Language Learning',
-  OTHER = 'Other',
+  JEE = "JEE",
+  NEET = "NEET",
+  COMPETITIVE = "Competitive Examinations",
+  COLLEGE = "College Students",
+  WORKING_PROFESSIONAL = "Working Professionals",
+  LANGUAGE = "Language Learning",
+  OTHER = "Other",
   // ADD in GroupCategory enum
-  PLACEMENT = 'Placement Preparation',
+  PLACEMENT = "Placement Preparation",
 }
 
 export enum GroupVisibility {
-  PUBLIC = 'public',
-  PRIVATE = 'private',
+  PUBLIC = "public",
+  PRIVATE = "private",
 }
 
 export enum MemberRole {
-  LEADER = 'leader',
-  ADMIN = 'admin',
-  MEMBER = 'member',
+  LEADER = "leader",
+  ADMIN = "admin",
+  MEMBER = "member",
 }
 
 // ==================== TYPES ====================
@@ -72,12 +95,13 @@ export interface GroupListQuery {
   category?: GroupCategory;
   visibility?: GroupVisibility;
   search?: string;
-  sortBy?: 'createdAt' | 'memberCount' | 'title';
-  sortOrder?: 'asc' | 'desc';
+  sortBy?: "createdAt" | "memberCount" | "title";
+  sortOrder?: "asc" | "desc";
 }
 
 export interface GroupResponse {
-  _id: string;
+  _id?: string;
+  id?: string;
   groupId: string;
   title: string;
   description?: string;
@@ -119,7 +143,8 @@ export interface GroupListResponse {
 
 // ADD this interface with your existing interfaces
 export interface TopRankedGroupResponse {
-  _id: string;
+  _id?: string;
+  id?: string;
   groupId: string;
   title: string;
   description?: string;
@@ -150,7 +175,13 @@ export interface SearchGroupsQuery {
   hasSpace?: boolean;
   minHours?: number;
   maxHours?: number;
-  sort?: 'newest' | 'oldest' | 'mostMembers' | 'leastMembers' | 'topRanked' | 'mostActive';
+  sort?:
+    | "newest"
+    | "oldest"
+    | "mostMembers"
+    | "leastMembers"
+    | "topRanked"
+    | "mostActive";
   page?: number;
   limit?: number;
 }
@@ -184,7 +215,7 @@ export interface StartTimerData {
 export interface TimerSessionResponse {
   sessionId: string;
   startTime: string;
-  status: 'active' | 'paused' | 'completed' | 'cancelled';
+  status: "active" | "paused" | "completed" | "cancelled";
   subject?: string;
   goal?: string | null;
   elapsedTime?: number;
@@ -310,8 +341,8 @@ export interface TaskResponse {
   groupId: string;
   title: string;
   description?: string | null;
-  status: 'pending' | 'in_progress' | 'completed' | 'overdue' | 'cancelled';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: "pending" | "in_progress" | "completed" | "overdue" | "cancelled";
+  priority: "low" | "medium" | "high" | "urgent";
   deadline?: string | null;
   completed: boolean;
   completedAt?: string | null;
@@ -343,8 +374,6 @@ export interface TaskStatsResponse {
   byPriority: Record<string, number>;
 }
 
-
-
 // ==================== JOIN REQUEST TYPES ====================
 
 export interface SendJoinRequestData {
@@ -354,7 +383,7 @@ export interface SendJoinRequestData {
 export interface JoinRequestResponse {
   joinRequestId: string;
   groupId: string;
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'expired';
+  status: "pending" | "approved" | "rejected" | "cancelled" | "expired";
   message?: string;
   expiresAt: string;
   createdAt: string;
@@ -363,7 +392,7 @@ export interface JoinRequestResponse {
 export interface JoinRequestStatusResponse {
   hasRequest: boolean;
   joinRequestId?: string;
-  status?: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'expired';
+  status?: "pending" | "approved" | "rejected" | "cancelled" | "expired";
   message?: string;
   expiresAt?: string;
   createdAt?: string;
@@ -375,7 +404,7 @@ export interface MyRequestsResponse {
   groupId: string;
   userId: string;
   message?: string;
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'expired';
+  status: "pending" | "approved" | "rejected" | "cancelled" | "expired";
   respondedAt?: string | null;
   respondedBy?: string | null;
   rejectionReason?: string | null;
@@ -401,7 +430,7 @@ export interface PendingRequestsResponse {
 }
 
 export interface RespondToRequestData {
-  action: 'approve' | 'reject';
+  action: "approve" | "reject";
   rejectionReason?: string;
 }
 
@@ -409,7 +438,7 @@ export interface RespondToRequestData {
 
 export interface SendMessageData {
   content: string;
-  messageType?: 'text' | 'image' | 'file' | 'voice' | 'video';
+  messageType?: "text" | "image" | "file" | "voice" | "video";
   fileUrl?: string;
   fileName?: string;
   fileSize?: number;
@@ -417,7 +446,7 @@ export interface SendMessageData {
 }
 
 export interface ReactionData {
-  emoji: '👍' | '❤️' | '😂' | '😮' | '😢' | '😡' | '🔥' | '👏' | '🎉' | '✅';
+  emoji: "👍" | "❤️" | "😂" | "😮" | "😢" | "😡" | "🔥" | "👏" | "🎉" | "✅";
 }
 
 export interface MessageResponse {
@@ -426,7 +455,7 @@ export interface MessageResponse {
   groupId: string;
   sender: string;
   content: string;
-  messageType: 'text' | 'image' | 'file' | 'voice' | 'video' | 'system';
+  messageType: "text" | "image" | "file" | "voice" | "video" | "system";
   fileUrl: string | null;
   fileName: string | null;
   fileSize: number | null;
@@ -487,7 +516,18 @@ export interface FileUploadResponse {
   };
   fileName: string;
   originalName: string;
-  fileType: 'image' | 'video' | 'audio' | 'pdf' | 'doc' | 'docx' | 'ppt' | 'pptx' | 'xls' | 'xlsx' | 'other';
+  fileType:
+    | "image"
+    | "video"
+    | "audio"
+    | "pdf"
+    | "doc"
+    | "docx"
+    | "ppt"
+    | "pptx"
+    | "xls"
+    | "xlsx"
+    | "other";
   mimeType: string;
   fileSize: number;
   fileUrl: string;
@@ -502,8 +542,8 @@ export interface GetFilesParams {
   limit?: number;
   fileType?: string;
   search?: string;
-  sortBy?: 'createdAt' | 'fileName' | 'fileSize' | 'downloadCount';
-  sortOrder?: 'asc' | 'desc';
+  sortBy?: "createdAt" | "fileName" | "fileSize" | "downloadCount";
+  sortOrder?: "asc" | "desc";
   pinnedOnly?: boolean;
 }
 
@@ -520,19 +560,19 @@ export interface AttendanceCheckInResponse {
   attendanceId: string;
   date: string;
   checkInTime: string;
-  status: 'present' | 'absent' | 'late';
+  status: "present" | "absent" | "late";
 }
 
 export interface AttendanceAutoMarkResponse {
   attendanceId: string;
   date: string;
-  status: 'present' | 'absent' | 'late';
+  status: "present" | "absent" | "late";
   wasAutoMarked: boolean;
-  autoMarkReason: 'study_session' | 'task_completion' | 'manual';
+  autoMarkReason: "study_session" | "task_completion" | "manual";
 }
 
 export interface AttendanceStatusResponse {
-  todayStatus: 'present' | 'absent' | 'late' | 'not_marked';
+  todayStatus: "present" | "absent" | "late" | "not_marked";
   hasCheckedInToday: boolean;
   checkInTime?: string;
   totalActiveTime: number;
@@ -552,7 +592,7 @@ export interface AttendancePercentageResponse {
 export interface AttendanceRecord {
   attendanceId: string;
   date: string;
-  status: 'present' | 'absent' | 'late';
+  status: "present" | "absent" | "late";
   checkInTime?: string;
   checkOutTime?: string;
   totalActiveTime: number;
@@ -579,7 +619,7 @@ export interface AttendanceCalendarDay {
   date: string;
   day: number;
   dayName: string;
-  status: 'present' | 'absent' | 'late' | 'not_marked';
+  status: "present" | "absent" | "late" | "not_marked";
   isToday: boolean;
   isFuture: boolean;
   studyHours: number;
@@ -662,11 +702,26 @@ export interface ValidateInviteResponse {
   groupId: string;
 }
 
-
 // ==================== SERVICE CLASS ====================
 
-class StudyGroupService {
+export interface GroupStreakEntry {
+  userId: string;
+  userName?: string;
+  userAvatar?: string;
+  currentStreak: number;
+  longestStreak: number;
+  rank: number;
+  isCurrentUser: boolean;
+}
 
+export interface GroupStreakLeaderboardResponse {
+  groupId: string;
+  leaderboard: GroupStreakEntry[];
+  myRank: number | null;
+  totalMembers: number;
+}
+
+class StudyGroupService {
   // =======================================================================================
   // ===========================GROUP ROUTES================================================
   // =======================================================================================
@@ -677,24 +732,31 @@ class StudyGroupService {
    */
   static async getGroups(params?: GroupListQuery): Promise<GroupListResponse> {
     try {
+      // const { data } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUPS_ENDPOINT! || process.env.NEXT_PUBLIC_STUDY_GROUPS_ENDPOINT}`,
+      //   { params }
+      // );
 
-      const { data } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUPS_ENDPOINT! || process.env.NEXT_PUBLIC_STUDY_GROUPS_ENDPOINT}`, { params });
+      const { data } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUPS_ENDPOINT! || process.env.NEXT_PUBLIC_STUDY_GROUPS_ENDPOINT}`,
+        { params: cleanParams(params) }
+      );
       return data.data;
-
     } catch (error: any) {
-
       if (axios.isAxiosError(error)) {
-        if (error.code === 'ERR_NETWORK') {
-          throw new Error('Unable to connect to server. Please check your internet connection.');
+        if (error.code === "ERR_NETWORK") {
+          throw new Error(
+            "Unable to connect to server. Please check your internet connection."
+          );
         }
         if (error.response?.status === 401) {
-          throw new Error('Authentication required. Please login again.');
+          throw new Error("Authentication required. Please login again.");
         }
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
 
-      throw new Error('Failed to fetch groups. Please try again.');
+      throw new Error("Failed to fetch groups. Please try again.");
     }
   }
 
@@ -704,24 +766,29 @@ class StudyGroupService {
    */
   static async getMyGroups(): Promise<GroupResponse[]> {
     try {
+      // const { data } = await api.get(
+      //   `${config.NEXT_PUBLIC_MY_STUDY_GROUPS_ENDPOINT || process.env.NEXT_PUBLIC_MY_STUDY_GROUPS_ENDPOINT}`
+      // );
 
-      const { data } = await api.get(`${config.NEXT_PUBLIC_MY_STUDY_GROUPS_ENDPOINT || process.env.NEXT_PUBLIC_MY_STUDY_GROUPS_ENDPOINT}`);
+      const { data } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_MY_STUDY_GROUPS_ENDPOINT || process.env.NEXT_PUBLIC_MY_STUDY_GROUPS_ENDPOINT, "/my-groups")}`
+      );
       return data.data;
-
     } catch (error: any) {
-
       if (axios.isAxiosError(error)) {
-        if (error.code === 'ERR_NETWORK') {
-          throw new Error('Unable to connect to server. Please check your internet connection.');
+        if (error.code === "ERR_NETWORK") {
+          throw new Error(
+            "Unable to connect to server. Please check your internet connection."
+          );
         }
         if (error.response?.status === 401) {
-          throw new Error('Authentication required. Please login again.');
+          throw new Error("Authentication required. Please login again.");
         }
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
 
-      throw new Error('Failed to fetch your groups. Please try again.');
+      throw new Error("Failed to fetch your groups. Please try again.");
     }
   }
 
@@ -731,43 +798,62 @@ class StudyGroupService {
    */
   static async createGroup(groupData: CreateGroupData): Promise<GroupResponse> {
     try {
-      const { data } = await api.post(`${config.NEXT_PUBLIC_CREATE_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_CREATE_STUDY_GROUP_ENDPOINT}`, groupData);
+      const { data } = await api.post(
+        `${config.NEXT_PUBLIC_CREATE_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_CREATE_STUDY_GROUP_ENDPOINT}`,
+        groupData
+      );
       return data.data;
-
     } catch (error: any) {
-
       if (axios.isAxiosError(error)) {
-        if (error.code === 'ERR_NETWORK') {
-          throw new Error('Unable to connect to server. Please check your internet connection.');
+        if (error.code === "ERR_NETWORK") {
+          throw new Error(
+            "Unable to connect to server. Please check your internet connection."
+          );
         }
         if (error.response?.status === 400) {
-          const errors = error.response?.data?.errors?.map((e: any) => e.message).join(', ');
-          throw new Error(errors || error.response?.data?.message || 'Validation failed');
+          const errors = error.response?.data?.errors
+            ?.map((e: any) => e.message)
+            .join(", ");
+          throw new Error(
+            errors || error.response?.data?.message || "Validation failed"
+          );
         }
         if (error.response?.status === 401) {
-          throw new Error('Session expired. Please login again.');
+          throw new Error("Session expired. Please login again.");
         }
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
 
-      throw new Error('Failed to create group. Please try again.');
+      throw new Error("Failed to create group. Please try again.");
     }
   }
 
   // ADD this method inside StudyGroupService class
-  static async getTopRankedGroups(limit: number = 3): Promise<TopRankedGroupResponse[]> {
+  static async getTopRankedGroups(
+    limit: number = 3
+  ): Promise<TopRankedGroupResponse[]> {
     try {
-      const { data } = await api.get(`${config.NEXT_PUBLIC_TOP_RANKED_STUDY_GROUPS_ENDPOINT || process.env.NEXT_PUBLIC_TOP_RANKED_STUDY_GROUPS_ENDPOINT}`, {
-        params: { limit }
-      });
+      // const { data } = await api.get(
+      //   `${config.NEXT_PUBLIC_TOP_RANKED_STUDY_GROUPS_ENDPOINT || process.env.NEXT_PUBLIC_TOP_RANKED_STUDY_GROUPS_ENDPOINT}`,
+      //   {
+      //     params: { limit },
+      //   }
+      // );
+
+      const { data } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT, "/top-ranked")}`,
+        {
+          params: { limit },
+        }
+      );
       return data.data.groups;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch top ranked groups.');
+      throw new Error("Failed to fetch top ranked groups.");
     }
   }
 
@@ -777,28 +863,33 @@ class StudyGroupService {
    */
   static async getGroupById(groupId: string): Promise<GroupResponse> {
     try {
-      const { data } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT}/${groupId}`);
+      const { data } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT}/${groupId}`
+      );
       return data.data;
-
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.code === 'ERR_NETWORK') {
-          throw new Error('Unable to connect to server. Please check your internet connection.');
+        if (error.code === "ERR_NETWORK") {
+          throw new Error(
+            "Unable to connect to server. Please check your internet connection."
+          );
         }
         if (error.response?.status === 401) {
-          throw new Error('Authentication required. Please login again.');
+          throw new Error("Authentication required. Please login again.");
         }
         if (error.response?.status === 403) {
-          throw new Error('This group is private. You need to be a member to view it.');
+          throw new Error(
+            "This group is private. You need to be a member to view it."
+          );
         }
         if (error.response?.status === 404) {
-          throw new Error('Group not found.');
+          throw new Error("Group not found.");
         }
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
 
-      throw new Error('Failed to fetch group. Please try again.');
+      throw new Error("Failed to fetch group. Please try again.");
     }
   }
 
@@ -807,33 +898,45 @@ class StudyGroupService {
    * PUT {studygroup base url}/groups/:groupId
    * Leader only
    */
-  static async updateGroup(groupId: string, updates: UpdateGroupData): Promise<GroupResponse> {
+  static async updateGroup(
+    groupId: string,
+    updates: UpdateGroupData
+  ): Promise<GroupResponse> {
     try {
-      const { data } = await api.put(`${config.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT}/${groupId}`, updates); return data.data;
-
+      const { data } = await api.put(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT}/${groupId}`,
+        updates
+      );
+      return data.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.code === 'ERR_NETWORK') {
-          throw new Error('Unable to connect to server. Please check your internet connection.');
+        if (error.code === "ERR_NETWORK") {
+          throw new Error(
+            "Unable to connect to server. Please check your internet connection."
+          );
         }
         if (error.response?.status === 400) {
-          const errors = error.response?.data?.errors?.map((e: any) => e.message).join(', ');
-          throw new Error(errors || error.response?.data?.message || 'Validation failed');
+          const errors = error.response?.data?.errors
+            ?.map((e: any) => e.message)
+            .join(", ");
+          throw new Error(
+            errors || error.response?.data?.message || "Validation failed"
+          );
         }
         if (error.response?.status === 401) {
-          throw new Error('Session expired. Please login again.');
+          throw new Error("Session expired. Please login again.");
         }
         if (error.response?.status === 403) {
-          throw new Error('Only the group leader can update the group.');
+          throw new Error("Only the group leader can update the group.");
         }
         if (error.response?.status === 404) {
-          throw new Error('Group not found.');
+          throw new Error("Group not found.");
         }
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
 
-      throw new Error('Failed to update group. Please try again.');
+      throw new Error("Failed to update group. Please try again.");
     }
   }
 
@@ -844,26 +947,30 @@ class StudyGroupService {
    */
   static async deleteGroup(groupId: string): Promise<void> {
     try {
-      await api.delete(`${config.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT}/${groupId}`);
+      await api.delete(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT}/${groupId}`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.code === 'ERR_NETWORK') {
-          throw new Error('Unable to connect to server. Please check your internet connection.');
+        if (error.code === "ERR_NETWORK") {
+          throw new Error(
+            "Unable to connect to server. Please check your internet connection."
+          );
         }
         if (error.response?.status === 401) {
-          throw new Error('Session expired. Please login again.');
+          throw new Error("Session expired. Please login again.");
         }
         if (error.response?.status === 403) {
-          throw new Error('Only the group leader can delete the group.');
+          throw new Error("Only the group leader can delete the group.");
         }
         if (error.response?.status === 404) {
-          throw new Error('Group not found.');
+          throw new Error("Group not found.");
         }
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
 
-      throw new Error('Failed to delete group. Please try again.');
+      throw new Error("Failed to delete group. Please try again.");
     }
   }
 
@@ -871,40 +978,49 @@ class StudyGroupService {
    * 🚪 JOIN GROUP
    * POST {studygroup base url}/groups/:groupId/join
    */
-  static async joinGroup(groupId: string, joinData?: JoinGroupData): Promise<GroupResponse> {
+  static async joinGroup(
+    groupId: string,
+    joinData?: JoinGroupData
+  ): Promise<GroupResponse> {
     try {
-      const { data } = await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT}/${groupId}/join`, joinData || {});
+      const { data } = await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT}/${groupId}/join`,
+        joinData || {}
+      );
       return data.data;
-
     } catch (error: any) {
-
       if (axios.isAxiosError(error)) {
-        if (error.code === 'ERR_NETWORK') {
-          throw new Error('Unable to connect to server. Please check your internet connection.');
+        if (error.code === "ERR_NETWORK") {
+          throw new Error(
+            "Unable to connect to server. Please check your internet connection."
+          );
         }
         if (error.response?.status === 400) {
-          throw new Error(error.response?.data?.message || 'Invalid join code.');
+          throw new Error(
+            error.response?.data?.message || "Invalid join code."
+          );
         }
         if (error.response?.status === 401) {
-          throw new Error('Session expired. Please login again.');
+          throw new Error("Session expired. Please login again.");
         }
         if (error.response?.status === 403) {
           const msg = error.response?.data?.message;
-          if (msg?.includes('banned')) throw new Error('You have been banned from this group.');
-          if (msg?.includes('full')) throw new Error('This group is full.');
-          throw new Error(msg || 'You cannot join this group.');
+          if (msg?.includes("banned"))
+            throw new Error("You have been banned from this group.");
+          if (msg?.includes("full")) throw new Error("This group is full.");
+          throw new Error(msg || "You cannot join this group.");
         }
         if (error.response?.status === 404) {
-          throw new Error('Group not found.');
+          throw new Error("Group not found.");
         }
         if (error.response?.status === 409) {
-          throw new Error('You are already a member of this group.');
+          throw new Error("You are already a member of this group.");
         }
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
 
-      throw new Error('Failed to join group. Please try again.');
+      throw new Error("Failed to join group. Please try again.");
     }
   }
 
@@ -916,74 +1032,83 @@ class StudyGroupService {
     try {
       // console.loglog('👋 [LEAVE_GROUP] Leaving group:', groupId);
 
-      await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT}/${groupId}/leave`);
+      await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT}/${groupId}/leave`
+      );
 
       // console.loglog('✅ [LEAVE_GROUP] Left group successfully');
-
     } catch (error: any) {
       // console.logerror('❌ [LEAVE_GROUP] Failed:', error);
 
       if (axios.isAxiosError(error)) {
-        if (error.code === 'ERR_NETWORK') {
-          throw new Error('Unable to connect to server. Please check your internet connection.');
+        if (error.code === "ERR_NETWORK") {
+          throw new Error(
+            "Unable to connect to server. Please check your internet connection."
+          );
         }
         if (error.response?.status === 400) {
-          throw new Error(error.response?.data?.message || 'Group leader cannot leave. Please delete or transfer leadership first.');
+          throw new Error(
+            error.response?.data?.message ||
+              "Group leader cannot leave. Please delete or transfer leadership first."
+          );
         }
         if (error.response?.status === 401) {
-          throw new Error('Session expired. Please login again.');
+          throw new Error("Session expired. Please login again.");
         }
         if (error.response?.status === 404) {
-          throw new Error('Group not found or you are not a member.');
+          throw new Error("Group not found or you are not a member.");
         }
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
 
-      throw new Error('Failed to leave group. Please try again.');
+      throw new Error("Failed to leave group. Please try again.");
     }
   }
-
-
 
   // =======================================================================================
   // ====================MEMBER ROUTES================================================
   // =======================================================================================
 
   /**
-     * 👥 GET GROUP MEMBERS
-     * GET {studygroup base url}/member/:groupId/members
-     */
-  static async getGroupMembers(groupId: string): Promise<{ total: number; members: GroupMember[] }> {
+   * 👥 GET GROUP MEMBERS
+   * GET {studygroup base url}/member/:groupId/members
+   */
+  static async getGroupMembers(
+    groupId: string
+  ): Promise<{ total: number; members: GroupMember[] }> {
     try {
       // console.loglog('👥 [GET_MEMBERS] Fetching members for group:', groupId);
 
-      const { data } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT}/${groupId}/members`);
+      const { data } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT}/${groupId}/members`
+      );
 
       // console.loglog('✅ [GET_MEMBERS] Members fetched:', data.data?.length);
       return data.data;
-
     } catch (error: any) {
       // console.logerror('❌ [GET_MEMBERS] Failed:', error);
 
       if (axios.isAxiosError(error)) {
-        if (error.code === 'ERR_NETWORK') {
-          throw new Error('Unable to connect to server. Please check your internet connection.');
+        if (error.code === "ERR_NETWORK") {
+          throw new Error(
+            "Unable to connect to server. Please check your internet connection."
+          );
         }
         if (error.response?.status === 401) {
-          throw new Error('Authentication required. Please login again.');
+          throw new Error("Authentication required. Please login again.");
         }
         if (error.response?.status === 403) {
-          throw new Error('You do not have access to view group members.');
+          throw new Error("You do not have access to view group members.");
         }
         if (error.response?.status === 404) {
-          throw new Error('Group not found.');
+          throw new Error("Group not found.");
         }
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
 
-      throw new Error('Failed to fetch group members. Please try again.');
+      throw new Error("Failed to fetch group members. Please try again.");
     }
   }
   /**
@@ -992,17 +1117,23 @@ class StudyGroupService {
    */
   static async addMember(groupId: string, userId: string): Promise<void> {
     try {
-      const { data } = await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT}/${groupId}/add-member`, { userId });
+      const { data } = await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT}/${groupId}/add-member`,
+        { userId }
+      );
       return data.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 409) throw new Error('User is already a member.');
-        if (error.response?.status === 403) throw new Error('You do not have permission to add members.');
-        if (error.response?.status === 404) throw new Error('Group or user not found.');
+        if (error.response?.status === 409)
+          throw new Error("User is already a member.");
+        if (error.response?.status === 403)
+          throw new Error("You do not have permission to add members.");
+        if (error.response?.status === 404)
+          throw new Error("Group or user not found.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to add member.');
+      throw new Error("Failed to add member.");
     }
   }
 
@@ -1012,15 +1143,19 @@ class StudyGroupService {
    */
   static async removeMember(groupId: string, userId: string): Promise<void> {
     try {
-      await api.delete(`${config.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT}/${groupId}/remove-member/${userId}`);
+      await api.delete(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT}/${groupId}/remove-member/${userId}`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('You do not have permission to remove members.');
-        if (error.response?.status === 404) throw new Error('Member not found.');
+        if (error.response?.status === 403)
+          throw new Error("You do not have permission to remove members.");
+        if (error.response?.status === 404)
+          throw new Error("Member not found.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to remove member.');
+      throw new Error("Failed to remove member.");
     }
   }
 
@@ -1035,14 +1170,16 @@ class StudyGroupService {
     availableSlots: number;
   }> {
     try {
-      const { data } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT}/${groupId}/member-count`);
+      const { data } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT}/${groupId}/member-count`
+      );
       return data.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch member count.');
+      throw new Error("Failed to fetch member count.");
     }
   }
 
@@ -1054,16 +1191,25 @@ class StudyGroupService {
    * 🔍 SEARCH GROUPS
    * GET {studygroup base url}/search/groups
    */
-  static async searchGroups(params?: SearchGroupsQuery): Promise<SearchGroupsResponse> {
+  static async searchGroups(
+    params?: SearchGroupsQuery
+  ): Promise<SearchGroupsResponse> {
     try {
-      const { data } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_GROUPS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_GROUPS_ENDPOINT}`, { params });
+      // const { data } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_GROUPS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_GROUPS_ENDPOINT}`,
+      //   { params }
+      // );
+      const { data } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_GROUPS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_GROUPS_ENDPOINT, "/groups")}`,
+        { params: cleanParams(params) }
+      );
       return data.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to search groups.');
+      throw new Error("Failed to search groups.");
     }
   }
 
@@ -1071,18 +1217,30 @@ class StudyGroupService {
    * 🔥 GET POPULAR GROUPS
    * GET {studygroup base url}/search/groups/popular
    */
-  static async getPopularGroups(limit?: number): Promise<PopularGroupsResponse> {
+  static async getPopularGroups(
+    limit?: number
+  ): Promise<PopularGroupsResponse> {
     try {
-      const { data } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_POPULAR_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_POPULAR_ENDPOINT}`, {
-        params: limit ? { limit } : undefined,
-      });
+      // const { data } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_POPULAR_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_POPULAR_ENDPOINT}`,
+      //   {
+      //     params: limit ? { limit } : undefined,
+      //   }
+      // );
+
+      const { data } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_POPULAR_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_POPULAR_ENDPOINT, "/groups/popular")}`,
+        {
+          params: limit ? { limit } : undefined,
+        }
+      );
       return data.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch popular groups.');
+      throw new Error("Failed to fetch popular groups.");
     }
   }
 
@@ -1090,18 +1248,30 @@ class StudyGroupService {
    * 📈 GET TRENDING GROUPS
    * GET {studygroup base url}/search/groups/trending
    */
-  static async getTrendingGroups(limit?: number): Promise<PopularGroupsResponse> {
+  static async getTrendingGroups(
+    limit?: number
+  ): Promise<PopularGroupsResponse> {
     try {
-      const { data } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_TRENDING_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_TRENDING_ENDPOINT}`, {
-        params: limit ? { limit } : undefined,
-      });
+      // const { data } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_TRENDING_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_TRENDING_ENDPOINT}`,
+      //   {
+      //     params: limit ? { limit } : undefined,
+      //   }
+      // );
+
+      const { data } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_TRENDING_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_TRENDING_ENDPOINT, "/groups/trending")}`,
+        {
+          params: limit ? { limit } : undefined,
+        }
+      );
       return data.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch trending groups.');
+      throw new Error("Failed to fetch trending groups.");
     }
   }
 
@@ -1114,14 +1284,21 @@ class StudyGroupService {
     limit?: number;
   }): Promise<PopularGroupsResponse> {
     try {
-      const { data } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_RECOMMENDED_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_RECOMMENDED_ENDPOINT}`, { params });
+      // const { data } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_RECOMMENDED_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_RECOMMENDED_ENDPOINT}`,
+      //   { params }
+      // );
+      const { data } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_RECOMMENDED_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_RECOMMENDED_ENDPOINT, "/groups/recommended")}`,
+        { params: cleanParams(params) }
+      );
       return data.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch recommended groups.');
+      throw new Error("Failed to fetch recommended groups.");
     }
   }
 
@@ -1134,18 +1311,23 @@ class StudyGroupService {
     params?: { page?: number; limit?: number; sort?: string }
   ): Promise<SearchGroupsResponse & { category: string }> {
     try {
+      // const { data } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_CATEGORY_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_CATEGORY_ENDPOINT}`,
+      //   { params: { ...params, category } }
+      // );
       const { data } = await api.get(
-       `${ config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_CATEGORY_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_CATEGORY_ENDPOINT}`,
-        { params: { ...params, category } }
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_CATEGORY_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_CATEGORY_ENDPOINT, "/groups/category")}/${encodeURIComponent(category)}`,
+        { params: cleanParams(params) }
       );
       return data.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 400) throw new Error('Invalid category.');
+        if (error.response?.status === 400)
+          throw new Error("Invalid category.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch groups by category.');
+      throw new Error("Failed to fetch groups by category.");
     }
   }
 
@@ -1158,14 +1340,22 @@ class StudyGroupService {
     limit?: number;
   }): Promise<SearchGroupsResponse> {
     try {
-      const { data } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_AVAILABLE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_AVAILABLE_ENDPOINT}`, { params });
+      // const { data } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_AVAILABLE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_AVAILABLE_ENDPOINT}`,
+      //   { params }
+      // );
+
+      const { data } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_AVAILABLE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_AVAILABLE_ENDPOINT, "/groups/available")}`,
+        { params: cleanParams(params) }
+      );
       return data.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch available groups.');
+      throw new Error("Failed to fetch available groups.");
     }
   }
 
@@ -1179,15 +1369,24 @@ class StudyGroupService {
     limit?: number;
   }): Promise<SearchGroupsResponse> {
     try {
-      const { data } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_TAGS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_TAGS_ENDPOINT}`, { params });
+      // const { data } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_TAGS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_TAGS_ENDPOINT}`,
+      //   { params }
+      // );
+
+      const { data } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_SEARCH_TAGS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SEARCH_TAGS_ENDPOINT, "/groups/tags")}`,
+        { params: cleanParams(params) }
+      );
       return data.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 400) throw new Error('Tags parameter is required.');
+        if (error.response?.status === 400)
+          throw new Error("Tags parameter is required.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to search groups by tags.');
+      throw new Error("Failed to search groups by tags.");
     }
   }
 
@@ -1199,78 +1398,117 @@ class StudyGroupService {
 
   static async startTimer(data: StartTimerData): Promise<TimerSessionResponse> {
     try {
-      const { data: res } = await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_START_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_START_ENDPOINT}`, data);
+      // const { data: res } = await api.post(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_START_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_START_ENDPOINT}`,
+      //   data
+      // );
+
+      const { data: res } = await api.post(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_TIMER_START_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_START_ENDPOINT, "/start")}`,
+        data
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to start timer.');
+      throw new Error("Failed to start timer.");
     }
   }
 
   static async pauseTimer(): Promise<TimerSessionResponse> {
     try {
-      const { data: res } = await api.patch(`${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_PAUSE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_PAUSE_ENDPOINT}`);
+      // const { data: res } = await api.patch(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_PAUSE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_PAUSE_ENDPOINT}`
+      // );
+
+      const { data: res } = await api.patch(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_TIMER_PAUSE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_PAUSE_ENDPOINT, "/pause")}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to pause timer.');
+      throw new Error("Failed to pause timer.");
     }
   }
 
   static async resumeTimer(): Promise<TimerSessionResponse> {
     try {
-      const { data: res } = await api.patch(`${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_RESUME_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_RESUME_ENDPOINT}`);
+      // const { data: res } = await api.patch(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_RESUME_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_RESUME_ENDPOINT}`
+      // );
+
+      const { data: res } = await api.patch(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_TIMER_RESUME_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_RESUME_ENDPOINT, "/resume")}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to resume timer.');
+      throw new Error("Failed to resume timer.");
     }
   }
 
   static async stopTimer(notes?: string): Promise<TimerSessionResponse> {
     try {
-      const { data: res } = await api.patch(`${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_STOP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_STOP_ENDPOINT}`, { notes });
+      // const { data: res } = await api.patch(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_STOP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_STOP_ENDPOINT}`,
+      //   { notes }
+      // );
+
+      const { data: res } = await api.patch(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_TIMER_STOP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_STOP_ENDPOINT, "/stop")}`,
+        { notes }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to stop timer.');
+      throw new Error("Failed to stop timer.");
     }
   }
 
   static async cancelTimer(): Promise<void> {
     try {
-      await api.delete(`${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_CANCEL_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_CANCEL_ENDPOINT}`);
+      // await api.delete(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_CANCEL_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_CANCEL_ENDPOINT}`
+      // );
+      await api.delete(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_TIMER_CANCEL_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_CANCEL_ENDPOINT, "/cancel")}`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to cancel timer.');
+      throw new Error("Failed to cancel timer.");
     }
   }
 
   static async getActiveTimer(): Promise<TimerSessionResponse | null> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_ACTIVE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_ACTIVE_ENDPOINT}`);
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_ACTIVE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_ACTIVE_ENDPOINT}`
+      // );
+
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_TIMER_ACTIVE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_ACTIVE_ENDPOINT, "/active")}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch active timer.');
+      throw new Error("Failed to fetch active timer.");
     }
   }
 
@@ -1283,60 +1521,97 @@ class StudyGroupService {
     sortOrder?: string;
   }): Promise<AllSessionsResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_ENDPOINT}`, { params });
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_ENDPOINT}`,
+        { params }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch sessions.');
+      throw new Error("Failed to fetch sessions.");
     }
   }
 
   static async getTodayTimerSessions(): Promise<TodaySessionsResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_TODAY_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_TODAY_ENDPOINT}`);
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_TODAY_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_TODAY_ENDPOINT}`
+      // );
+
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_TIMER_TODAY_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_TODAY_ENDPOINT, "/today")}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch today sessions.');
+      throw new Error("Failed to fetch today sessions.");
+    }
+  }
+
+  static async getGroupStreakLeaderboard(
+    groupId: string,
+    limit: number = 50
+  ): Promise<GroupStreakLeaderboardResponse> {
+    try {
+      const base =
+        process.env.NEXT_PUBLIC_STUDY_GROUP_STREAK_ENDPOINT ||
+        "/study-group/streak";
+      const { data: res } = await api.get(
+        `${joinUrl(base, "/group-leaderboard")}/${groupId}`,
+        { params: { limit } }
+      );
+      return res.data;
+    } catch (error: any) {
+      throw new Error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to fetch group streak leaderboard"
+      );
     }
   }
 
   static async getTimerStats(): Promise<TimerStatsResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_STATS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_STATS_ENDPOINT}`);
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_STATS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_STATS_ENDPOINT}`
+      // );
+
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_TIMER_STATS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_STATS_ENDPOINT, "/stats")}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch timer stats.');
+      throw new Error("Failed to fetch timer stats.");
     }
   }
 
   static async deleteTimerSession(sessionId: string): Promise<void> {
     try {
-      await api.delete(`${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_ENDPOINT}/${sessionId}`);
+      await api.delete(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_TIMER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TIMER_ENDPOINT}/${sessionId}`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to delete session.');
+      throw new Error("Failed to delete session.");
     }
   }
-
 
   // =======================================================================================
   // ====================GOAL ROUTES=======================================================
   // =======================================================================================
-
 
   // Class ke andar add karo — timer methods ke baad
   static async getAllGoals(params?: {
@@ -1346,95 +1621,121 @@ class StudyGroupService {
     limit?: number;
   }): Promise<{ data: GoalResponse[]; total: number; page: number }> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT}`, { params });
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT}`,
+        { params }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch goals.');
+      throw new Error("Failed to fetch goals.");
     }
   }
 
   static async getActiveGoals(): Promise<GoalResponse[]> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ACTIVE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ACTIVE_ENDPOINT}`);
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ACTIVE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ACTIVE_ENDPOINT}`
+      // );
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ACTIVE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ACTIVE_ENDPOINT, "/active")}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch active goals.');
+      throw new Error("Failed to fetch active goals.");
     }
   }
 
   static async createGoal(data: any): Promise<GoalResponse> {
     try {
-      const { data: res } = await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT}`, data);
+      const { data: res } = await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT}`,
+        data
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to create goal.');
+      throw new Error("Failed to create goal.");
     }
   }
 
   static async updateGoal(goalId: string, data: any): Promise<GoalResponse> {
     try {
-      const { data: res } = await api.put(`${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT}/${goalId}`, data);
+      const { data: res } = await api.put(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT}/${goalId}`,
+        data
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to update goal.');
+      throw new Error("Failed to update goal.");
     }
   }
 
   static async deleteGoal(goalId: string): Promise<void> {
     try {
-      await api.delete(`${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT}/${goalId}`);
+      await api.delete(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT}/${goalId}`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to delete goal.');
+      throw new Error("Failed to delete goal.");
     }
   }
 
   static async markGoalComplete(goalId: string): Promise<GoalResponse> {
     try {
-      const { data: res } = await api.patch(`${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT}/${goalId}/complete`);
+      const { data: res } = await api.patch(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT}/${goalId}/complete`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to mark goal complete.');
+      throw new Error("Failed to mark goal complete.");
     }
   }
 
   static async getGoalStats(): Promise<GoalStatsResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_STATS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_STATS_ENDPOINT}/stats`);
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_STATS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_STATS_ENDPOINT}/stats`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch goal stats.');
+      throw new Error("Failed to fetch goal stats.");
     }
   }
 
-  static async updateGoalProgress({ goalId, hoursToAdd }: { goalId: string; hoursToAdd: number }): Promise<{ goalId: string; hoursToAdd: number }> {
+  static async updateGoalProgress({
+    goalId,
+    hoursToAdd,
+  }: {
+    goalId: string;
+    hoursToAdd: number;
+  }): Promise<{ goalId: string; hoursToAdd: number }> {
     try {
       const { data: res } = await api.patch(
         `${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT}/${goalId}/progress`,
@@ -1446,219 +1747,293 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to update progress.');
+      throw new Error("Failed to update progress.");
     }
   }
 
   static async markGoalIncomplete(goalId: string): Promise<GoalResponse> {
     try {
-      const { data: res } = await api.patch(`${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT}/${goalId}/incomplete`);
+      const { data: res } = await api.patch(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_GOALS_ENDPOINT}/${goalId}/incomplete`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to mark goal incomplete.');
+      throw new Error("Failed to mark goal incomplete.");
     }
   }
-
 
   // =======================================================================================
   // ====================student dashboard ROUTES================================================
   // =======================================================================================
 
-
   // ADD methods — getGoalStats ke baad class ke andar
   static async getUserDashboard(): Promise<UserDashboardResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_USER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_USER_ENDPOINT}`);
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_USER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_USER_ENDPOINT}`
+      // );
+
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_USER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_USER_ENDPOINT, "/user")}`
+      );
       return res.data;
     } catch (error: any) {
-
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch user dashboard.');
+      throw new Error("Failed to fetch user dashboard.");
     }
   }
 
-  static async getStudyStatistics(period: '7days' | '30days' | '90days' = '7days'): Promise<StudyStatisticsResponse> {
+  static async getStudyStatistics(
+    period: "7days" | "30days" | "90days" = "7days"
+  ): Promise<StudyStatisticsResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_STATISTICS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_STATISTICS_ENDPOINT}`, {
-        params: { period }
-      });
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_STATISTICS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_STATISTICS_ENDPOINT}`,
+      //   {
+      //     params: { period },
+      //   }
+      // );
+
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_STATISTICS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_STATISTICS_ENDPOINT, "/statistics")}`,
+        {
+          params: { period },
+        }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch study statistics.');
+      throw new Error("Failed to fetch study statistics.");
     }
   }
 
   static async getPerformanceAnalytics(): Promise<PerformanceAnalyticsResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_ANALYTICS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_ANALYTICS_ENDPOINT}` );
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_ANALYTICS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_ANALYTICS_ENDPOINT}`
+      // );
+
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_ANALYTICS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DASHBOARD_ANALYTICS_ENDPOINT, "/analytics")}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch performance analytics.');
+      throw new Error("Failed to fetch performance analytics.");
     }
   }
 
   // =======================================================================================
   // ====================TODOS ROUTES================================================
   // =======================================================================================
-  
+
   static async createTask(data: CreateTaskInput): Promise<TaskResponse> {
     try {
-      const { data: res } = await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}`, data);
+      const { data: res } = await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}`,
+        data
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.code === 'ERR_NETWORK') throw new Error('No internet connection.');
-        if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
+        if (error.code === "ERR_NETWORK")
+          throw new Error("No internet connection.");
+        if (error.response?.status === 401)
+          throw new Error("Session expired. Please login again.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to create task.');
+      throw new Error("Failed to create task.");
     }
   }
 
-  static async getAllTasks(params?: Partial<TaskQueryInput>): Promise<TaskListResponse> {
+  static async getAllTasks(
+    params?: Partial<TaskQueryInput>
+  ): Promise<TaskListResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}`, { params });
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}`,
+        { params }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
+        if (error.response?.status === 401)
+          throw new Error("Session expired. Please login again.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch tasks.');
+      throw new Error("Failed to fetch tasks.");
     }
   }
 
   static async getTaskById(taskId: string): Promise<TaskResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}/${taskId}`);
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}/${taskId}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
+        if (error.response?.status === 401)
+          throw new Error("Session expired. Please login again.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch task.');
+      throw new Error("Failed to fetch task.");
     }
   }
 
-  static async updateTask(taskId: string, data: UpdateTaskInput): Promise<TaskResponse> {
+  static async updateTask(
+    taskId: string,
+    data: UpdateTaskInput
+  ): Promise<TaskResponse> {
     try {
-      const { data: res } = await api.put(`${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}/${taskId}`, data);
+      const { data: res } = await api.put(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}/${taskId}`,
+        data
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
-        if (error.response?.status === 403) throw new Error('Not authorized to update this task.');
+        if (error.response?.status === 401)
+          throw new Error("Session expired. Please login again.");
+        if (error.response?.status === 403)
+          throw new Error("Not authorized to update this task.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to update task.');
+      throw new Error("Failed to update task.");
     }
   }
 
   static async deleteTask(taskId: string): Promise<void> {
     try {
-      await api.delete(`${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}/${taskId}`);
+      await api.delete(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}/${taskId}`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
-        if (error.response?.status === 403) throw new Error('Not authorized to delete this task.');
+        if (error.response?.status === 401)
+          throw new Error("Session expired. Please login again.");
+        if (error.response?.status === 403)
+          throw new Error("Not authorized to delete this task.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to delete task.');
+      throw new Error("Failed to delete task.");
     }
   }
 
   static async markComplete(taskId: string): Promise<TaskResponse> {
     try {
-      const { data: res } = await api.patch(`${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}/${taskId}/complete`);
+      const { data: res } = await api.patch(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}/${taskId}/complete`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
+        if (error.response?.status === 401)
+          throw new Error("Session expired. Please login again.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to mark task complete.');
+      throw new Error("Failed to mark task complete.");
     }
   }
 
   static async markIncomplete(taskId: string): Promise<TaskResponse> {
     try {
-      const { data: res } = await api.patch(`${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}/${taskId}/incomplete`);
+      const { data: res } = await api.patch(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_ENDPOINT}/${taskId}/incomplete`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
+        if (error.response?.status === 401)
+          throw new Error("Session expired. Please login again.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to mark task incomplete.');
+      throw new Error("Failed to mark task incomplete.");
     }
   }
 
   static async getStats(): Promise<TaskStatsResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_STATS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_STATS_ENDPOINT}`);
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_STATS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_STATS_ENDPOINT}`
+      // );
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_TASKS_STATS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_STATS_ENDPOINT, "/stats")}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
+        if (error.response?.status === 401)
+          throw new Error("Session expired. Please login again.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch task stats.');
+      throw new Error("Failed to fetch task stats.");
     }
   }
 
   static async getOverdueTasks(): Promise<TaskResponse[]> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_OVERDUE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_OVERDUE_ENDPOINT}`);
-      return res.data;
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_OVERDUE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_OVERDUE_ENDPOINT}`
+      // );
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_TASKS_OVERDUE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_OVERDUE_ENDPOINT, "/overdue")}`
+      );
+      // return res.data;
+      return Array.isArray(res.data) ? res.data : (res.data?.tasks ?? []);
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
+        if (error.response?.status === 401)
+          throw new Error("Session expired. Please login again.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch overdue tasks.');
+      throw new Error("Failed to fetch overdue tasks.");
     }
   }
 
   static async getUpcomingTasks(days: number = 7): Promise<TaskResponse[]> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_UPCOMING_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_UPCOMING_ENDPOINT}`, { params: { days } });
-
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_TASKS_UPCOMING_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_UPCOMING_ENDPOINT}`,
+      //   { params: { days } }
+      // );
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_TASKS_UPCOMING_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_TASKS_UPCOMING_ENDPOINT, "/upcoming")}`,
+        { params: { days } }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
+        if (error.response?.status === 401)
+          throw new Error("Session expired. Please login again.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch upcoming tasks.');
+      throw new Error("Failed to fetch upcoming tasks.");
     }
   }
-
 
   // ==================== JOIN REQUEST METHODS ====================
 
@@ -1675,32 +2050,41 @@ class StudyGroupService {
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 409) throw new Error(error.response.data.message || 'Request already sent');
-        if (error.response?.status === 403) throw new Error(error.response.data.message || 'Cannot send request');
-        if (error.response?.status === 404) throw new Error('Group not found');
+        if (error.response?.status === 409)
+          throw new Error(
+            error.response.data.message || "Request already sent"
+          );
+        if (error.response?.status === 403)
+          throw new Error(error.response.data.message || "Cannot send request");
+        if (error.response?.status === 404) throw new Error("Group not found");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to send join request');
+      throw new Error("Failed to send join request");
     }
   }
 
   // Cancel own pending request
   static async cancelJoinRequest(groupId: string): Promise<void> {
     try {
-      await api.delete(`${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT}/${groupId}/cancel`);
+      await api.delete(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT}/${groupId}/cancel`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 404) throw new Error('No pending request found');
+        if (error.response?.status === 404)
+          throw new Error("No pending request found");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to cancel request');
+      throw new Error("Failed to cancel request");
     }
   }
 
   // Get request status for a group
-  static async getJoinRequestStatus(groupId: string): Promise<JoinRequestStatusResponse> {
+  static async getJoinRequestStatus(
+    groupId: string
+  ): Promise<JoinRequestStatusResponse> {
     try {
       const { data: res } = await api.get(
         `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT}/${groupId}/status`
@@ -1711,21 +2095,23 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to get request status');
+      throw new Error("Failed to get request status");
     }
   }
 
   // Get all my requests
   static async getMyJoinRequests(): Promise<MyRequestsResponse[]> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUESTS_MY_REQUESTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUESTS_MY_REQUESTS_ENDPOINT}/my-requests`);
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUESTS_MY_REQUESTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUESTS_MY_REQUESTS_ENDPOINT}/my-requests`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch your requests');
+      throw new Error("Failed to fetch your requests");
     }
   }
 
@@ -1744,12 +2130,13 @@ class StudyGroupService {
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('Not authorized to view requests');
-        if (error.response?.status === 404) throw new Error('Group not found');
+        if (error.response?.status === 403)
+          throw new Error("Not authorized to view requests");
+        if (error.response?.status === 404) throw new Error("Group not found");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch pending requests');
+      throw new Error("Failed to fetch pending requests");
     }
   }
 
@@ -1765,13 +2152,15 @@ class StudyGroupService {
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('Not authorized');
-        if (error.response?.status === 404) throw new Error('Request not found');
-        if (error.response?.status === 400) throw new Error(error.response.data.message || 'Invalid action');
+        if (error.response?.status === 403) throw new Error("Not authorized");
+        if (error.response?.status === 404)
+          throw new Error("Request not found");
+        if (error.response?.status === 400)
+          throw new Error(error.response.data.message || "Invalid action");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to respond to request');
+      throw new Error("Failed to respond to request");
     }
   }
 
@@ -1790,12 +2179,14 @@ class StudyGroupService {
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('You are not a member of this group.');
-        if (error.response?.status === 400) throw new Error(error.response.data.message || 'Validation failed.');
+        if (error.response?.status === 403)
+          throw new Error("You are not a member of this group.");
+        if (error.response?.status === 400)
+          throw new Error(error.response.data.message || "Validation failed.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to send message.');
+      throw new Error("Failed to send message.");
     }
   }
 
@@ -1811,11 +2202,12 @@ class StudyGroupService {
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('You are not a member of this group.');
+        if (error.response?.status === 403)
+          throw new Error("You are not a member of this group.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch messages.');
+      throw new Error("Failed to fetch messages.");
     }
   }
 
@@ -1830,7 +2222,7 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch pinned messages.');
+      throw new Error("Failed to fetch pinned messages.");
     }
   }
 
@@ -1850,7 +2242,7 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to search messages.');
+      throw new Error("Failed to search messages.");
     }
   }
 
@@ -1866,31 +2258,38 @@ class StudyGroupService {
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('You can only edit your own messages.');
-        if (error.response?.status === 400) throw new Error(error.response.data.message || 'Cannot edit this message.');
+        if (error.response?.status === 403)
+          throw new Error("You can only edit your own messages.");
+        if (error.response?.status === 400)
+          throw new Error(
+            error.response.data.message || "Cannot edit this message."
+          );
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to edit message.');
+      throw new Error("Failed to edit message.");
     }
   }
 
   static async deleteMessage(messageId: string): Promise<void> {
     try {
-      await api.delete(`${config.NEXT_PUBLIC_STUDY_GROUP_CHAT_MESSAGE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_CHAT_MESSAGE_ENDPOINT}/${messageId}`);
+      await api.delete(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_CHAT_MESSAGE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_CHAT_MESSAGE_ENDPOINT}/${messageId}`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('You can only delete your own messages.');
+        if (error.response?.status === 403)
+          throw new Error("You can only delete your own messages.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to delete message.');
+      throw new Error("Failed to delete message.");
     }
   }
 
   static async reactToMessage(
     messageId: string,
-    emoji: ReactionData['emoji']
+    emoji: ReactionData["emoji"]
   ): Promise<MessageResponse> {
     try {
       const { data: res } = await api.post(
@@ -1900,11 +2299,11 @@ class StudyGroupService {
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 400) throw new Error('Invalid emoji.');
+        if (error.response?.status === 400) throw new Error("Invalid emoji.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to react to message.');
+      throw new Error("Failed to react to message.");
     }
   }
 
@@ -1916,28 +2315,34 @@ class StudyGroupService {
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('Only group leader can pin messages.');
-        if (error.response?.status === 400) throw new Error(error.response.data.message || 'Cannot pin message.');
+        if (error.response?.status === 403)
+          throw new Error("Only group leader can pin messages.");
+        if (error.response?.status === 400)
+          throw new Error(error.response.data.message || "Cannot pin message.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to pin message.');
+      throw new Error("Failed to pin message.");
     }
   }
 
   static async markMessageAsRead(messageId: string): Promise<void> {
     try {
-      await api.patch(`${config.NEXT_PUBLIC_STUDY_GROUP_CHAT_MESSAGE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_CHAT_MESSAGE_ENDPOINT}/${messageId}/read`);
+      await api.patch(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_CHAT_MESSAGE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_CHAT_MESSAGE_ENDPOINT}/${messageId}/read`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to mark message as read.');
+      throw new Error("Failed to mark message as read.");
     }
   }
 
-  static async getMessageReadStatus(messageId: string): Promise<ReadStatusResponse> {
+  static async getMessageReadStatus(
+    messageId: string
+  ): Promise<ReadStatusResponse> {
     try {
       const { data: res } = await api.get(
         `${config.NEXT_PUBLIC_STUDY_GROUP_CHAT_MESSAGE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_CHAT_MESSAGE_ENDPOINT}/${messageId}/read-status`
@@ -1948,7 +2353,7 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch read status.');
+      throw new Error("Failed to fetch read status.");
     }
   }
 
@@ -1957,16 +2362,21 @@ class StudyGroupService {
   static async uploadFileToChat(
     file: File,
     onProgress?: (percent: number) => void
-  ): Promise<{ fileUrl: string; fileName: string; fileSize: number; messageType: 'image' | 'file' | 'video' }> {
+  ): Promise<{
+    fileUrl: string;
+    fileName: string;
+    fileSize: number;
+    messageType: "image" | "file" | "video";
+  }> {
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
 
       const { data: res } = await api.post(
         `${config.NEXT_PUBLIC_STUDY_GROUP_FILES_UPLOAD_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_FILES_UPLOAD_ENDPOINT}`,
         formData,
         {
-          headers: { 'Content-Type': 'multipart/form-data' },
+          headers: { "Content-Type": "multipart/form-data" },
           onUploadProgress: (progressEvent) => {
             if (onProgress && progressEvent.total) {
               const percent = Math.round(
@@ -1979,11 +2389,11 @@ class StudyGroupService {
       );
 
       const fileUrl: string = res.data.url;
-      const messageType = file.type.startsWith('image/')
-        ? 'image'
-        : file.type.startsWith('video/')
-          ? 'video'
-          : 'file';
+      const messageType = file.type.startsWith("image/")
+        ? "image"
+        : file.type.startsWith("video/")
+          ? "video"
+          : "file";
 
       return {
         fileUrl,
@@ -1993,11 +2403,12 @@ class StudyGroupService {
       };
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 400) throw new Error('Invalid file type or size.');
+        if (error.response?.status === 400)
+          throw new Error("Invalid file type or size.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to upload file.');
+      throw new Error("Failed to upload file.");
     }
   }
 
@@ -2011,13 +2422,12 @@ class StudyGroupService {
   ): Promise<FileUploadResponse> {
     try {
       const formData = new FormData();
-      formData.append('photo', file); // field name is 'photo' as per your multer config
-
+      formData.append("file", file); // group files route uses uploadSingle('file')
       const { data: res } = await api.post(
         `${config.NEXT_PUBLIC_STUDY_GROUP_FILES_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_FILES_ENDPOINT}/${groupId}/upload`,
         formData,
         {
-          headers: { 'Content-Type': 'multipart/form-data' },
+          headers: { "Content-Type": "multipart/form-data" },
           onUploadProgress: (progressEvent) => {
             if (onProgress && progressEvent.total) {
               const percent = Math.round(
@@ -2031,12 +2441,14 @@ class StudyGroupService {
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('You are not a member of this group.');
-        if (error.response?.status === 400) throw new Error(error.response.data.message || 'Invalid file.');
+        if (error.response?.status === 403)
+          throw new Error("You are not a member of this group.");
+        if (error.response?.status === 400)
+          throw new Error(error.response.data.message || "Invalid file.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to upload file.');
+      throw new Error("Failed to upload file.");
     }
   }
 
@@ -2055,7 +2467,7 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch files.');
+      throw new Error("Failed to fetch files.");
     }
   }
 
@@ -2070,7 +2482,7 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch pinned files.');
+      throw new Error("Failed to fetch pinned files.");
     }
   }
 
@@ -2082,29 +2494,34 @@ class StudyGroupService {
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 404) throw new Error('File not found.');
+        if (error.response?.status === 404) throw new Error("File not found.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch file.');
+      throw new Error("Failed to fetch file.");
     }
   }
 
   static async deleteGroupFile(fileId: string): Promise<void> {
     try {
-      await api.delete(`${config.NEXT_PUBLIC_STUDY_GROUP_FILES_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_FILES_ENDPOINT}/${fileId}`);
+      await api.delete(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_FILES_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_FILES_ENDPOINT}/${fileId}`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('You can only delete your own files.');
-        if (error.response?.status === 404) throw new Error('File not found.');
+        if (error.response?.status === 403)
+          throw new Error("You can only delete your own files.");
+        if (error.response?.status === 404) throw new Error("File not found.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to delete file.');
+      throw new Error("Failed to delete file.");
     }
   }
 
-  static async togglePinGroupFile(fileId: string): Promise<{ isPinned: boolean }> {
+  static async togglePinGroupFile(
+    fileId: string
+  ): Promise<{ isPinned: boolean }> {
     try {
       const { data: res } = await api.patch(
         `${config.NEXT_PUBLIC_STUDY_GROUP_FILES_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_FILES_ENDPOINT}/${fileId}/pin`
@@ -2112,12 +2529,14 @@ class StudyGroupService {
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('Only leaders and admins can pin files.');
-        if (error.response?.status === 400) throw new Error(error.response.data.message || 'Cannot pin file.');
+        if (error.response?.status === 403)
+          throw new Error("Only leaders and admins can pin files.");
+        if (error.response?.status === 400)
+          throw new Error(error.response.data.message || "Cannot pin file.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to pin file.');
+      throw new Error("Failed to pin file.");
     }
   }
 
@@ -2126,87 +2545,123 @@ class StudyGroupService {
       // increment download count and get redirect URL
       const { data: res } = await api.get(
         `${config.NEXT_PUBLIC_STUDY_GROUP_FILES_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_FILES_ENDPOINT}/${fileId}/download`,
-        { maxRedirects: 0 }  // don't follow redirect, get the URL
+        { maxRedirects: 0 } // don't follow redirect, get the URL
       );
-      return res.data?.fileUrl ?? '';
+      return res.data?.fileUrl ?? "";
     } catch (error: any) {
       // 302 redirect is expected — get fileUrl from file details instead
       if (axios.isAxiosError(error) && error.response?.status === 302) {
-        return error.response.headers?.location ?? '';
+        return error.response.headers?.location ?? "";
       }
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to download file.');
+      throw new Error("Failed to download file.");
     }
   }
   //===================================================================
   // ==================== DOUBT METHODS ===============================
   //===================================================================
 
-  static async getGroupDoubts(groupId: string, params?: {
-    page?: number; limit?: number; category?: string;
-    isSolved?: boolean; sort?: string; search?: string;
-  }): Promise<any> {
+  static async getGroupDoubts(
+    groupId: string,
+    params?: {
+      page?: number;
+      limit?: number;
+      category?: string;
+      isSolved?: boolean;
+      sort?: string;
+      search?: string;
+    }
+  ): Promise<any> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${groupId}/all`, { params });
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${groupId}/all`,
+        { params }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch doubts.');
+      throw new Error("Failed to fetch doubts.");
     }
   }
 
-  static async postDoubt(groupId: string, data: {
-    title: string; description?: string; category?: string;
-    subject?: string; tags?: string[]; isUrgent?: boolean;
-    difficulty?: string; taggedMembers?: string[];
-  }): Promise<any> {
+  static async postDoubt(
+    groupId: string,
+    data: {
+      title: string;
+      description?: string;
+      category?: string;
+      subject?: string;
+      tags?: string[];
+      isUrgent?: boolean;
+      difficulty?: string;
+      taggedMembers?: string[];
+    }
+  ): Promise<any> {
     try {
-      const { data: res } = await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${groupId}/post`, data);
+      const { data: res } = await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${groupId}/post`,
+        data
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to post doubt.');
+      throw new Error("Failed to post doubt.");
     }
   }
 
-  static async updateDoubt(doubtId: string, data: {
-    title?: string; description?: string; category?: string;
-    isUrgent?: boolean; difficulty?: string; tags?: string[];
-  }): Promise<any> {
+  static async updateDoubt(
+    doubtId: string,
+    data: {
+      title?: string;
+      description?: string;
+      category?: string;
+      isUrgent?: boolean;
+      difficulty?: string;
+      tags?: string[];
+    }
+  ): Promise<any> {
     try {
-      const { data: res } = await api.put(`${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}`, data);
+      const { data: res } = await api.put(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}`,
+        data
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to update doubt.');
+      throw new Error("Failed to update doubt.");
     }
   }
 
   static async deleteDoubt(doubtId: string): Promise<void> {
     try {
-      await api.delete(`${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}`);
+      await api.delete(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to delete doubt.');
+      throw new Error("Failed to delete doubt.");
     }
   }
 
-  static async markDoubtSolved(doubtId: string, bestAnswerId: string): Promise<any> {
+  static async markDoubtSolved(
+    doubtId: string,
+    bestAnswerId: string
+  ): Promise<any> {
     try {
       const { data: res } = await api.patch(
         `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}/mark-solved`,
@@ -2218,13 +2673,17 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to mark doubt as solved.');
+      throw new Error("Failed to mark doubt as solved.");
     }
   }
 
-  static async postAnswer(doubtId: string, data: {
-    content: string; links?: { url: string; title?: string }[];
-  }): Promise<any> {
+  static async postAnswer(
+    doubtId: string,
+    data: {
+      content: string;
+      links?: { url: string; title?: string }[];
+    }
+  ): Promise<any> {
     try {
       const { data: res } = await api.post(
         `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}/answer`,
@@ -2236,7 +2695,7 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to post answer.');
+      throw new Error("Failed to post answer.");
     }
   }
 
@@ -2251,7 +2710,7 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to upvote answer.');
+      throw new Error("Failed to upvote answer.");
     }
   }
 
@@ -2266,7 +2725,7 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to downvote answer.');
+      throw new Error("Failed to downvote answer.");
     }
   }
 
@@ -2282,25 +2741,29 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to search doubts.');
+      throw new Error("Failed to search doubts.");
     }
   }
 
   static async getSingleDoubt(doubtId: string): Promise<any> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}`);
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch doubt.');
+      throw new Error("Failed to fetch doubt.");
     }
   }
 
   static async getMyDoubts(params?: {
-    page?: number; limit?: number; isSolved?: boolean;
+    page?: number;
+    limit?: number;
+    isSolved?: boolean;
   }): Promise<any> {
     try {
       const { data: res } = await api.get(
@@ -2313,13 +2776,18 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch your doubts.');
+      throw new Error("Failed to fetch your doubts.");
     }
   }
 
-  static async getSolvedDoubts(groupId: string, params?: {
-    page?: number; limit?: number; sort?: string;
-  }): Promise<any> {
+  static async getSolvedDoubts(
+    groupId: string,
+    params?: {
+      page?: number;
+      limit?: number;
+      sort?: string;
+    }
+  ): Promise<any> {
     try {
       const { data: res } = await api.get(
         `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${groupId}/solved`,
@@ -2331,13 +2799,18 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch solved doubts.');
+      throw new Error("Failed to fetch solved doubts.");
     }
   }
 
-  static async getUnsolvedDoubts(groupId: string, params?: {
-    page?: number; limit?: number; sort?: string;
-  }): Promise<any> {
+  static async getUnsolvedDoubts(
+    groupId: string,
+    params?: {
+      page?: number;
+      limit?: number;
+      sort?: string;
+    }
+  ): Promise<any> {
     try {
       const { data: res } = await api.get(
         `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${groupId}/unsolved`,
@@ -2349,7 +2822,7 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch unsolved doubts.');
+      throw new Error("Failed to fetch unsolved doubts.");
     }
   }
 
@@ -2364,13 +2837,17 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch urgent doubts.');
+      throw new Error("Failed to fetch urgent doubts.");
     }
   }
 
-  static async getDoubtAnswers(doubtId: string, params?: {
-    page?: number; limit?: number;
-  }): Promise<any> {
+  static async getDoubtAnswers(
+    doubtId: string,
+    params?: {
+      page?: number;
+      limit?: number;
+    }
+  ): Promise<any> {
     try {
       const { data: res } = await api.get(
         `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}/answers`,
@@ -2382,13 +2859,17 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch answers.');
+      throw new Error("Failed to fetch answers.");
     }
   }
 
-  static async updateAnswer(answerId: string, data: {
-    content: string; links?: { url: string; title?: string }[];
-  }): Promise<any> {
+  static async updateAnswer(
+    answerId: string,
+    data: {
+      content: string;
+      links?: { url: string; title?: string }[];
+    }
+  ): Promise<any> {
     try {
       const { data: res } = await api.put(
         `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ANSWER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ANSWER_ENDPOINT}/${answerId}`,
@@ -2400,19 +2881,21 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to update answer.');
+      throw new Error("Failed to update answer.");
     }
   }
 
   static async deleteAnswer(answerId: string): Promise<void> {
     try {
-      await api.delete(`${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ANSWER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ANSWER_ENDPOINT}/${answerId}`);
+      await api.delete(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ANSWER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ANSWER_ENDPOINT}/${answerId}`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to delete answer.');
+      throw new Error("Failed to delete answer.");
     }
   }
 
@@ -2427,11 +2910,14 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to remove vote.');
+      throw new Error("Failed to remove vote.");
     }
   }
 
-  static async tagDoubtMembers(doubtId: string, memberIds: string[]): Promise<any> {
+  static async tagDoubtMembers(
+    doubtId: string,
+    memberIds: string[]
+  ): Promise<any> {
     try {
       const { data: res } = await api.post(
         `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}/tag-member`,
@@ -2443,7 +2929,7 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to tag members.');
+      throw new Error("Failed to tag members.");
     }
   }
 
@@ -2458,7 +2944,7 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch doubt stats.');
+      throw new Error("Failed to fetch doubt stats.");
     }
   }
 
@@ -2473,11 +2959,14 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch user doubt stats.');
+      throw new Error("Failed to fetch user doubt stats.");
     }
   }
 
-  static async getDoubtsByCategory(category: string, groupId?: string): Promise<any> {
+  static async getDoubtsByCategory(
+    category: string,
+    groupId?: string
+  ): Promise<any> {
     try {
       const { data: res } = await api.get(
         `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_CATEGORY_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_CATEGORY_ENDPOINT}/category/${category}`,
@@ -2489,13 +2978,14 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch doubts by category.');
+      throw new Error("Failed to fetch doubts by category.");
     }
   }
 
   static async getDoubt(doubtId: string) {
     try {
-      const res = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}`,
+      const res = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}`,
         { params: doubtId ? { doubtId } : undefined }
       );
       return res.data;
@@ -2504,14 +2994,17 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch doubt details.');
+      throw new Error("Failed to fetch doubt details.");
     }
-
   }
 
-  static async toggleDoubtUpvote(doubtId: string, action: 'upvote' | 'remove-upvote') {
+  static async toggleDoubtUpvote(
+    doubtId: string,
+    action: "upvote" | "remove-upvote"
+  ) {
     try {
-      const res = await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}/${action}`,
+      const res = await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${doubtId}/${action}`,
         { params: doubtId ? { doubtId } : undefined }
       );
       return res.data.data;
@@ -2520,7 +3013,7 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to toggle doubt upvote.');
+      throw new Error("Failed to toggle doubt upvote.");
     }
   }
 
@@ -2543,33 +3036,40 @@ class StudyGroupService {
     };
   }): Promise<any> {
     try {
-      const { data: res } = await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}`, data);
+      const { data: res } = await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}`,
+        data
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to create live room.');
+      throw new Error("Failed to create live room.");
     }
   }
 
   static async getLiveRoomByRoomId(roomId: string): Promise<any> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}`);
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch live room.');
+      throw new Error("Failed to fetch live room.");
     }
   }
 
   static async getGroupActiveLiveRoom(groupId: string): Promise<any> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_GROUP_ENDPOINT}/group/${groupId}/active`);
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_GROUP_ENDPOINT}/group/${groupId}/active`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
@@ -2577,121 +3077,151 @@ class StudyGroupService {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch active live room.');
+      throw new Error("Failed to fetch active live room.");
     }
   }
 
-  static async joinLiveRoom(roomId: string, options?: { cameraOn?: boolean; micOn?: boolean }): Promise<any> {
+  static async joinLiveRoom(
+    roomId: string,
+    options?: { cameraOn?: boolean; micOn?: boolean }
+  ): Promise<any> {
     try {
-      const { data: res } = await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/join`, options || {});
+      const { data: res } = await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/join`,
+        options || {}
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to join live room.');
+      throw new Error("Failed to join live room.");
     }
   }
 
   static async leaveLiveRoom(roomId: string): Promise<void> {
     try {
-      await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/leave`);
+      await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/leave`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to leave live room.');
+      throw new Error("Failed to leave live room.");
     }
   }
 
   static async endLiveRoom(roomId: string): Promise<any> {
     try {
-      const { data: res } = await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/end`);
+      const { data: res } = await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/end`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to end live room.');
+      throw new Error("Failed to end live room.");
     }
   }
 
-  static async updateLiveRoom(roomId: string, data: {
-    title?: string;
-    description?: string;
-    maxParticipants?: number;
-    settings?: {
-      allowCamera?: boolean;
-      allowMic?: boolean;
-      allowScreenShare?: boolean;
-      requireApproval?: boolean;
-      muteOnEntry?: boolean;
-    };
-  }): Promise<any> {
+  static async updateLiveRoom(
+    roomId: string,
+    data: {
+      title?: string;
+      description?: string;
+      maxParticipants?: number;
+      settings?: {
+        allowCamera?: boolean;
+        allowMic?: boolean;
+        allowScreenShare?: boolean;
+        requireApproval?: boolean;
+        muteOnEntry?: boolean;
+      };
+    }
+  ): Promise<any> {
     try {
-      const { data: res } = await api.put(`${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}`, data);
+      const { data: res } = await api.put(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}`,
+        data
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to update live room.');
+      throw new Error("Failed to update live room.");
     }
   }
 
   static async toggleCamera(roomId: string, cameraOn: boolean): Promise<any> {
     try {
-      const { data: res } = await api.patch(`${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/toggle-camera`, { cameraOn });
+      const { data: res } = await api.patch(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/toggle-camera`,
+        { cameraOn }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to toggle camera.');
+      throw new Error("Failed to toggle camera.");
     }
   }
 
   static async toggleMic(roomId: string, micOn: boolean): Promise<any> {
     try {
-      const { data: res } = await api.patch(`${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/toggle-mic`, { micOn });
+      const { data: res } = await api.patch(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/toggle-mic`,
+        { micOn }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to toggle mic.');
+      throw new Error("Failed to toggle mic.");
     }
   }
 
-  static async toggleScreenShare(roomId: string, sharing: boolean): Promise<any> {
+  static async toggleScreenShare(
+    roomId: string,
+    sharing: boolean
+  ): Promise<any> {
     try {
-      const { data: res } = await api.patch(`${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/toggle-screen-share`, { sharing });
+      const { data: res } = await api.patch(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/toggle-screen-share`,
+        { sharing }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to toggle screen share.');
+      throw new Error("Failed to toggle screen share.");
     }
   }
 
   static async getLiveRoomParticipants(roomId: string): Promise<any> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/participants`);
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT}/${roomId}/participants`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch participants.');
+      throw new Error("Failed to fetch participants.");
     }
   }
 
@@ -2699,63 +3229,98 @@ class StudyGroupService {
   // ==================== ATTENDANCE METHODS ==============================================
   // =======================================================================================
 
-  static async attendanceCheckIn(notes?: string): Promise<AttendanceCheckInResponse> {
+  static async attendanceCheckIn(
+    notes?: string
+  ): Promise<AttendanceCheckInResponse> {
     try {
-      const { data: res } = await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_CHECK_IN_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_CHECK_IN_ENDPOINT}`, { notes });
+      // const { data: res } = await api.post(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_CHECK_IN_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_CHECK_IN_ENDPOINT}`,
+      //   { notes }
+      // );
+
+      const { data: res } = await api.post(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_CHECK_IN_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_CHECK_IN_ENDPOINT, "/check-in")}`,
+        { notes }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 409) throw new Error('Already checked in for today.');
-        if (error.response?.status === 401) throw new Error('Session expired. Please login again.');
+        if (error.response?.status === 409)
+          throw new Error("Already checked in for today.");
+        if (error.response?.status === 401)
+          throw new Error("Session expired. Please login again.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to check in.');
+      throw new Error("Failed to check in.");
     }
   }
 
   static async attendanceAutoMark(
-    reason: 'study_session' | 'task_completion',
+    reason: "study_session" | "task_completion",
     studyHours?: number
   ): Promise<AttendanceAutoMarkResponse> {
     try {
-      const { data: res } = await api.patch(`${config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_AUTO_MARK_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_AUTO_MARK_ENDPOINT}`, {
-        reason,
-        studyHours,
-      });
+      // const { data: res } = await api.patch(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_AUTO_MARK_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_AUTO_MARK_ENDPOINT}`,
+      //   {
+      //     reason,
+      //     studyHours,
+      //   }
+      // );
+
+      const { data: res } = await api.patch(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_AUTO_MARK_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_AUTO_MARK_ENDPOINT, "/auto-mark")}`,
+        {
+          reason,
+          studyHours,
+        }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to auto-mark attendance.');
+      throw new Error("Failed to auto-mark attendance.");
     }
   }
 
   static async getAttendanceStatus(): Promise<AttendanceStatusResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_STATUS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_STATUS_ENDPOINT}`);
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_STATUS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_STATUS_ENDPOINT}`
+      // );
+
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_STATUS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_STATUS_ENDPOINT, "/status")}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch attendance status.');
+      throw new Error("Failed to fetch attendance status.");
     }
   }
 
   static async getAttendancePercentage(): Promise<AttendancePercentageResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_PERCENTAGE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_PERCENTAGE_ENDPOINT}`);
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_PERCENTAGE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_PERCENTAGE_ENDPOINT}`
+      // );
+
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_PERCENTAGE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_PERCENTAGE_ENDPOINT, "/percentage")}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch attendance percentage.');
+      throw new Error("Failed to fetch attendance percentage.");
     }
   }
 
@@ -2764,16 +3329,26 @@ class StudyGroupService {
     limit: number = 30
   ): Promise<AttendanceHistoryResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_HISTORY_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_HISTORY_ENDPOINT}`, {
-        params: { page, limit },
-      });
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_HISTORY_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_HISTORY_ENDPOINT}`,
+      //   {
+      //     params: { page, limit },
+      //   }
+      // );
+
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_HISTORY_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_HISTORY_ENDPOINT, "/history")}`,
+        {
+          params: { page, limit },
+        }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch attendance history.');
+      throw new Error("Failed to fetch attendance history.");
     }
   }
 
@@ -2782,16 +3357,26 @@ class StudyGroupService {
     year?: number
   ): Promise<AttendanceCalendarResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_CALENDAR_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_CALENDAR_ENDPOINT}`, {
-        params: { month, year },
-      });
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_CALENDAR_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_CALENDAR_ENDPOINT}`,
+      //   {
+      //     params: { month, year },
+      //   }
+      // );
+
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_CALENDAR_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ATTENDANCE_CALENDAR_ENDPOINT, "/calendar")}`,
+        {
+          params: { month, year },
+        }
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch attendance calendar.');
+      throw new Error("Failed to fetch attendance calendar.");
     }
   }
 
@@ -2811,114 +3396,147 @@ class StudyGroupService {
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('Only group leader can generate invite links.');
-        if (error.response?.status === 404) throw new Error('Group not found.');
-        if (error.response?.status === 400) throw new Error(error.response.data.message || 'Invalid options.');
+        if (error.response?.status === 403)
+          throw new Error("Only group leader can generate invite links.");
+        if (error.response?.status === 404) throw new Error("Group not found.");
+        if (error.response?.status === 400)
+          throw new Error(error.response.data.message || "Invalid options.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to generate invite link.');
+      throw new Error("Failed to generate invite link.");
     }
   }
 
   static async generateGroupQRCode(groupId: string): Promise<QRCodeResponse> {
     try {
-      const { data: res } = await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT}/${groupId}/generate-qr`);
+      const { data: res } = await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT}/${groupId}/generate-qr`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('Only group leader can generate QR codes.');
+        if (error.response?.status === 403)
+          throw new Error("Only group leader can generate QR codes.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to generate QR code.');
+      throw new Error("Failed to generate QR code.");
     }
   }
 
-  static async validateInviteCode(inviteCode: string): Promise<ValidateInviteResponse> {
+  static async validateInviteCode(
+    inviteCode: string
+  ): Promise<ValidateInviteResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_VALIDATE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_VALIDATE_ENDPOINT}/${inviteCode}`);
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_VALIDATE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_VALIDATE_ENDPOINT}/${inviteCode}`
+      // );
+
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_SHARE_VALIDATE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_VALIDATE_ENDPOINT, "/validate")}/${inviteCode}`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 400) throw new Error(error.response.data.message || 'Invalid invite code.');
+        if (error.response?.status === 400)
+          throw new Error(
+            error.response.data.message || "Invalid invite code."
+          );
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to validate invite code.');
+      throw new Error("Failed to validate invite code.");
     }
   }
 
-  static async getSocialShareLinks(groupId: string): Promise<SocialShareLinksResponse> {
+  static async getSocialShareLinks(
+    groupId: string
+  ): Promise<SocialShareLinksResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT}/${groupId}/social-links`);
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT}/${groupId}/social-links`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('Not authorized.');
+        if (error.response?.status === 403) throw new Error("Not authorized.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to get social share links.');
+      throw new Error("Failed to get social share links.");
     }
   }
 
-  static async getInviteAnalytics(groupId: string): Promise<InviteAnalyticsResponse> {
+  static async getInviteAnalytics(
+    groupId: string
+  ): Promise<InviteAnalyticsResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT}/${groupId}/analytics`);
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT}/${groupId}/analytics`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('Only group leader can view analytics.');
+        if (error.response?.status === 403)
+          throw new Error("Only group leader can view analytics.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch invite analytics.');
+      throw new Error("Failed to fetch invite analytics.");
     }
   }
 
-  static async getGroupInviteLinks(groupId: string): Promise<GroupInviteLinksResponse> {
+  static async getGroupInviteLinks(
+    groupId: string
+  ): Promise<GroupInviteLinksResponse> {
     try {
-      const { data: res } = await api.get(`${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT}/${groupId}/links`);
+      const { data: res } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT}/${groupId}/links`
+      );
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('Only group leader can view invite links.');
+        if (error.response?.status === 403)
+          throw new Error("Only group leader can view invite links.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to fetch invite links.');
+      throw new Error("Failed to fetch invite links.");
     }
   }
 
   static async revokeInviteLink(inviteCode: string): Promise<void> {
     try {
-      await api.delete(`${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT}/${inviteCode}/revoke`);
+      await api.delete(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT}/${inviteCode}/revoke`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) throw new Error('Not authorized to revoke this link.');
-        if (error.response?.status === 404) throw new Error('Invite link not found.');
+        if (error.response?.status === 403)
+          throw new Error("Not authorized to revoke this link.");
+        if (error.response?.status === 404)
+          throw new Error("Invite link not found.");
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to revoke invite link.');
+      throw new Error("Failed to revoke invite link.");
     }
   }
 
   static async trackInviteJoin(inviteCode: string): Promise<void> {
     try {
-      await api.post(`${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT}/${inviteCode}/track-join`);
+      await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_SHARE_ENDPOINT}/${inviteCode}/track-join`
+      );
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const msg = error.response?.data?.message;
         if (msg) throw new Error(msg);
       }
-      throw new Error('Failed to track join.');
+      throw new Error("Failed to track join.");
     }
   }
-
 }
 
 export default StudyGroupService;
-
-

@@ -1,39 +1,56 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import {
-  Users, Clock, Award, BookOpen, Target, Trophy,
-  GraduationCap, AlertCircle, TrendingUp, Flame,
-  CheckCircle, BarChart2
-} from 'lucide-react';
+  Users,
+  Clock,
+  Award,
+  BookOpen,
+  Target,
+  Trophy,
+  GraduationCap,
+  AlertCircle,
+  TrendingUp,
+  Flame,
+  CheckCircle,
+  BarChart2,
+} from "lucide-react";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, BarChart, Bar
-} from 'recharts';
-import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
-import {  fetchUserDashboardThunk,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from "recharts";
+import { useAppDispatch, useAppSelector } from "@/core/store/store.hooks";
+import {
+  fetchUserDashboardThunk,
   fetchStudyStatisticsThunk,
   fetchPerformanceAnalyticsThunk,
-  fetchMyGroupsThunk, } from '@/hooks/studyGroup/features/studentDashboard/dashboard.thunks';
-import { 
+  fetchMyGroupsThunk,
+} from "@/hooks/studyGroup/features/studentDashboard/dashboard.thunks";
+import {
   selectDashboardStats,
   selectStudyStatistics,
   selectPerformanceAnalytics,
   selectDashboardMyGroups,
   selectDashboardLoading,
   selectDashboardUser,
-} from '@/hooks/studyGroup/features/studentDashboard/dashboard.Slice';
-import SkeletonLoader from '@/app/loading';
-import { StatsPeriod, MainTab } from '@/features/studyGroup/types';
-import { useGroupData } from '@/features/study-group/hooks/useGroupData';
-
+} from "@/hooks/studyGroup/features/studentDashboard/dashboard.Slice";
+import SkeletonLoader from "@/app/loading";
+import { StatsPeriod, MainTab } from "@/features/studyGroup/types";
+import { useGroupData } from "@/features/study-group/hooks/useGroupData";
 
 export default function StudentDashboard() {
   const dispatch = useAppDispatch();
-      const { getUserInfo } = useGroupData();
-  const [mainTab, setMainTab] = useState<MainTab>('overview');
-  const [period, setPeriod] = useState<StatsPeriod>('7days');
+  const { getUserInfo } = useGroupData();
+  const [mainTab, setMainTab] = useState<MainTab>("overview");
+  const [period, setPeriod] = useState<StatsPeriod>("7days");
 
   const user = useAppSelector(selectDashboardUser);
   const stats = useAppSelector(selectDashboardStats);
@@ -41,44 +58,49 @@ export default function StudentDashboard() {
   const analytics = useAppSelector(selectPerformanceAnalytics);
   const myGroups = useAppSelector(selectDashboardMyGroups);
   const loading = useAppSelector(selectDashboardLoading);
+  const error = useAppSelector((state: any) => state?.studyDashboard?.error);
+  // useEffect(() => {
+  //   dispatch(fetchUserDashboardThunk()).then((result: any) => {});
+  // }, [dispatch]);
 
   useEffect(() => {
-  dispatch(fetchUserDashboardThunk()).then((result: any) => {
-  });
-}, [dispatch]);
+    dispatch(fetchUserDashboardThunk());
+    dispatch(fetchPerformanceAnalyticsThunk());
+    dispatch(fetchMyGroupsThunk());
+  }, [dispatch]);
 
-useEffect(() => {
-  dispatch(fetchUserDashboardThunk());
-  dispatch(fetchPerformanceAnalyticsThunk());
-  dispatch(fetchMyGroupsThunk());
-}, [dispatch]);
-
-useEffect(() => {
-  dispatch(fetchStudyStatisticsThunk(period));
-}, [period, dispatch]);
+  useEffect(() => {
+    dispatch(fetchStudyStatisticsThunk(period));
+  }, [period, dispatch]);
 
   if (loading && !user) {
     return <SkeletonLoader />;
   }
 
-  const chartData = statistics?.statistics?.map((s: any) => ({
-    date: s.date.slice(5),
-    sessions: s.sessions,
-    hours: s.hours,
-  })) ?? [];
+  const chartData =
+    statistics?.statistics?.map((s: any) => ({
+      // date: s.date.slice(5),
+      date: String(s.date).slice(5),
+      sessions: s.sessions,
+      hours: s.hours,
+    })) ?? [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#faf8f5] to-[#f5f1ea] p-3 md:p-4">
       <div className="max-w-7xl mx-auto">
-
+        {error && (
+          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+            Couldn't load some dashboard data: {error}
+          </div>
+        )}
         {/* Header */}
         <div className="mb-4 flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-gradient-to-r from-[#4a3728] to-[#8b6f47] flex items-center justify-center text-white font-black text-lg flex-shrink-0">
-            {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
+            {(user?.name || user?.email || "U").charAt(0).toUpperCase()}
           </div>
           <div>
             <h1 className="text-xl font-bold text-[#4a3728]">
-              {user?.name || user?.email?.split('@')[0] || 'Student'}
+              {user?.name || user?.email?.split("@")[0] || "Student"}
             </h1>
             <div className="flex items-center gap-2 text-xs text-[#8b6f47]">
               <span>{user?.email}</span>
@@ -94,23 +116,23 @@ useEffect(() => {
 
         {/* Main Tabs */}
         <div className="flex gap-2 mb-4">
-          {(['overview', 'study-groups'] as MainTab[]).map(tab => (
+          {(["overview", "study-groups"] as MainTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setMainTab(tab)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${
                 mainTab === tab
-                  ? 'bg-gradient-to-r from-[#4a3728] to-[#8b6f47] text-white shadow-sm'
-                  : 'bg-white text-[#8b6f47] border border-[#d4a574]/30 hover:bg-[#faf8f5]'
+                  ? "bg-gradient-to-r from-[#4a3728] to-[#8b6f47] text-white shadow-sm"
+                  : "bg-white text-[#8b6f47] border border-[#d4a574]/30 hover:bg-[#faf8f5]"
               }`}
             >
-              {tab === 'overview' ? 'Overview' : 'Study Groups'}
+              {tab === "overview" ? "Overview" : "Study Groups"}
             </button>
           ))}
         </div>
 
         {/* OVERVIEW TAB */}
-        {mainTab === 'overview' && (
+        {mainTab === "overview" && (
           <>
             {/* Stats grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -120,7 +142,7 @@ useEffect(() => {
                   <span className="text-xs text-[#8b6f47]">Today</span>
                 </div>
                 <p className="text-2xl font-bold text-[#4a3728]">
-                  {stats?.todayStudyHours?.toFixed(1) ?? '0'}h
+                  {stats?.todayStudyHours?.toFixed(1) ?? "0"}h
                 </p>
               </div>
 
@@ -201,19 +223,21 @@ useEffect(() => {
             {/* Study Statistics Chart */}
             <div className="bg-white rounded-lg p-4 border border-[#d4a574]/30 mb-4">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-bold text-[#4a3728]">Study Statistics</h2>
+                <h2 className="text-base font-bold text-[#4a3728]">
+                  Study Statistics
+                </h2>
                 <div className="flex gap-1">
-                  {(['7days', '30days', '90days'] as StatsPeriod[]).map(p => (
+                  {(["7days", "30days", "90days"] as StatsPeriod[]).map((p) => (
                     <button
                       key={p}
                       onClick={() => setPeriod(p)}
                       className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                         period === p
-                          ? 'bg-gradient-to-r from-[#4a3728] to-[#8b6f47] text-white'
-                          : 'bg-[#faf8f5] text-[#8b6f47] border border-[#d4a574]/30'
+                          ? "bg-gradient-to-r from-[#4a3728] to-[#8b6f47] text-white"
+                          : "bg-[#faf8f5] text-[#8b6f47] border border-[#d4a574]/30"
                       }`}
                     >
-                      {p === '7days' ? '7D' : p === '30days' ? '30D' : '90D'}
+                      {p === "7days" ? "7D" : p === "30days" ? "30D" : "90D"}
                     </button>
                   ))}
                 </div>
@@ -227,18 +251,31 @@ useEffect(() => {
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f5f1ea" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#8b6f47' }} />
-                    <YAxis tick={{ fontSize: 11, fill: '#8b6f47' }} />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11, fill: "#8b6f47" }}
+                    />
+                    <YAxis tick={{ fontSize: 11, fill: "#8b6f47" }} />
                     <Tooltip
                       contentStyle={{
-                        background: '#faf8f5',
-                        border: '1px solid #d4a574',
-                        borderRadius: '8px',
-                        fontSize: '12px'
+                        background: "#faf8f5",
+                        border: "1px solid #d4a574",
+                        borderRadius: "8px",
+                        fontSize: "12px",
                       }}
                     />
-                    <Bar dataKey="hours" fill="#8b6f47" radius={[4, 4, 0, 0]} name="Hours" />
-                    <Bar dataKey="sessions" fill="#d4a574" radius={[4, 4, 0, 0]} name="Sessions" />
+                    <Bar
+                      dataKey="hours"
+                      fill="#8b6f47"
+                      radius={[4, 4, 0, 0]}
+                      name="Hours"
+                    />
+                    <Bar
+                      dataKey="sessions"
+                      fill="#d4a574"
+                      radius={[4, 4, 0, 0]}
+                      name="Sessions"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -247,7 +284,7 @@ useEffect(() => {
         )}
 
         {/* STUDY GROUPS TAB */}
-        {mainTab === 'study-groups' && (
+        {mainTab === "study-groups" && (
           <>
             {/* Groups stats */}
             <div className="grid grid-cols-3 gap-3 mb-4 max-w-3xl">
@@ -256,7 +293,9 @@ useEffect(() => {
                   <Users className="w-4 h-4 text-[#8b6f47]" />
                   <span className="text-xs text-[#8b6f47]">Total Groups</span>
                 </div>
-                <p className="text-2xl font-bold text-[#4a3728]">{myGroups.length}</p>
+                <p className="text-2xl font-bold text-[#4a3728]">
+                  {myGroups.length}
+                </p>
               </div>
               <div className="bg-white rounded-lg p-3 border border-[#d4a574]/30">
                 <div className="flex items-center gap-2 mb-1">
@@ -273,7 +312,7 @@ useEffect(() => {
                   <span className="text-xs text-[#8b6f47]">Today Hours</span>
                 </div>
                 <p className="text-2xl font-bold text-[#4a3728]">
-                  {stats?.todayStudyHours?.toFixed(1) ?? '0'}h
+                  {stats?.todayStudyHours?.toFixed(1) ?? "0"}h
                 </p>
               </div>
             </div>
@@ -283,7 +322,9 @@ useEffect(() => {
               <div className="bg-white rounded-lg p-8 border border-[#d4a574]/30 text-center">
                 <Users className="w-10 h-10 text-[#d4a574] mx-auto mb-2" />
                 <p className="text-[#4a3728] font-semibold">No groups yet</p>
-                <p className="text-sm text-[#8b6f47] mt-1">Join a study group to get started</p>
+                <p className="text-sm text-[#8b6f47] mt-1">
+                  Join a study group to get started
+                </p>
                 <Link
                   href="/study/groups"
                   className="inline-block mt-3 px-4 py-2 bg-gradient-to-r from-[#4a3728] to-[#8b6f47] text-white text-sm rounded-lg"
@@ -293,7 +334,9 @@ useEffect(() => {
               </div>
             ) : (
               <div className="bg-white rounded-lg p-4 border border-[#d4a574]/30">
-                <h2 className="text-base font-bold text-[#4a3728] mb-3">My Study Groups</h2>
+                <h2 className="text-base font-bold text-[#4a3728] mb-3">
+                  My Study Groups
+                </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {myGroups.map((group: any) => (
                     <div
@@ -326,7 +369,9 @@ useEffect(() => {
 
                         <div className="grid grid-cols-2 gap-1.5 mb-3">
                           <div className="bg-[#faf8f5] rounded p-1.5 text-center">
-                            <p className="text-[10px] text-[#8b6f47]">Capacity</p>
+                            <p className="text-[10px] text-[#8b6f47]">
+                              Capacity
+                            </p>
                             <p className="text-xs font-bold text-[#4a3728]">
                               {group.currentMemberCount}/{group.capacity}
                             </p>
@@ -334,7 +379,7 @@ useEffect(() => {
                           <div className="bg-[#faf8f5] rounded p-1.5 text-center">
                             <p className="text-[10px] text-[#8b6f47]">Role</p>
                             <p className="text-xs font-bold text-[#4a3728] capitalize">
-                              {group.memberRole || 'member'}
+                              {group.memberRole || "member"}
                             </p>
                           </div>
                         </div>

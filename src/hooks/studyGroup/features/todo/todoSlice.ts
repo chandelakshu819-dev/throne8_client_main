@@ -1,12 +1,22 @@
 //src/hooks/studyGroup/features/todo/todoSlice.ts
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { TaskResponse, TaskListResponse, TaskStatsResponse } from '@/lib/api/studyGroup.service';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import type {
+  TaskResponse,
+  TaskListResponse,
+  TaskStatsResponse,
+} from "@/lib/api/studyGroup.service";
 import {
-  fetchAllTasksThunk, createTaskThunk, updateTaskThunk,
-  deleteTaskThunk, markCompleteThunk, markIncompleteThunk,
-  fetchStatsThunk, fetchUpcomingTasksThunk, fetchOverdueTasksThunk,
-} from './todo.thunks';
+  fetchAllTasksThunk,
+  createTaskThunk,
+  updateTaskThunk,
+  deleteTaskThunk,
+  markCompleteThunk,
+  markIncompleteThunk,
+  fetchStatsThunk,
+  fetchUpcomingTasksThunk,
+  fetchOverdueTasksThunk,
+} from "./todo.thunks";
 
 // ─── Legacy local type (MonthView/YearView ke liye preserve kiya) ───
 // export interface Todo {
@@ -28,13 +38,12 @@ export interface Todo {
   createdAt: string;
   // ✅ Naye optional fields
   description?: string;
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  priority?: "low" | "medium" | "high" | "urgent";
   deadline?: string;
   tags?: string[];
   reminderAt?: string;
   taskId?: string; // future API sync ke liye
 }
-
 
 export interface Todos {
   [dateStr: string]: Todo[];
@@ -98,7 +107,7 @@ const initialState: TodosState = {
 };
 
 const todoSlice = createSlice({
-  name: 'todos',
+  name: "todos",
   initialState,
   reducers: {
     // ✅ KEEP — local slice actions (MonthView/TodoModal use karta hai)
@@ -118,17 +127,29 @@ const todoSlice = createSlice({
     //   });
     // },
 
-    addTodo: (state, action: PayloadAction<{
-      dateStr: string;
-      text: string;
-      description?: string;
-      priority?: 'low' | 'medium' | 'high' | 'urgent';
-      deadline?: string;
-      tags?: string[];
-      reminderAt?: string;
-      taskId?: string;
-    }>) => {
-      const { dateStr, text, description, priority, deadline, tags, reminderAt, taskId } = action.payload;
+    addTodo: (
+      state,
+      action: PayloadAction<{
+        dateStr: string;
+        text: string;
+        description?: string;
+        priority?: "low" | "medium" | "high" | "urgent";
+        deadline?: string;
+        tags?: string[];
+        reminderAt?: string;
+        taskId?: string;
+      }>
+    ) => {
+      const {
+        dateStr,
+        text,
+        description,
+        priority,
+        deadline,
+        tags,
+        reminderAt,
+        taskId,
+      } = action.payload;
       if (!state.items[dateStr]) state.items[dateStr] = [];
       state.items[dateStr].push({
         id: state.nextId++,
@@ -144,31 +165,51 @@ const todoSlice = createSlice({
         ...(taskId && { taskId }),
       });
     },
-    toggleTodo: (state, action: PayloadAction<{ dateStr: string; todoId: number }>) => {
-      const todo = state.items[action.payload.dateStr]?.find(t => t.id === action.payload.todoId);
+    toggleTodo: (
+      state,
+      action: PayloadAction<{ dateStr: string; todoId: number }>
+    ) => {
+      const todo = state.items[action.payload.dateStr]?.find(
+        (t) => t.id === action.payload.todoId
+      );
       if (todo) todo.completed = !todo.completed;
     },
-    deleteTodo: (state, action: PayloadAction<{ dateStr: string; todoId: number }>) => {
+    deleteTodo: (
+      state,
+      action: PayloadAction<{ dateStr: string; todoId: number }>
+    ) => {
       const { dateStr, todoId } = action.payload;
       if (state.items[dateStr]) {
-        state.items[dateStr] = state.items[dateStr].filter(t => t.id !== todoId);
+        state.items[dateStr] = state.items[dateStr].filter(
+          (t) => t.id !== todoId
+        );
         if (state.items[dateStr].length === 0) delete state.items[dateStr];
       }
     },
-    updateTodo: (state, action: PayloadAction<{ dateStr: string; todoId: number; text: string }>) => {
-      const todo = state.items[action.payload.dateStr]?.find(t => t.id === action.payload.todoId);
+    updateTodo: (
+      state,
+      action: PayloadAction<{ dateStr: string; todoId: number; text: string }>
+    ) => {
+      const todo = state.items[action.payload.dateStr]?.find(
+        (t) => t.id === action.payload.todoId
+      );
       if (todo) todo.text = action.payload.text;
     },
     clearCompletedTodos: (state, action: PayloadAction<string>) => {
       if (state.items[action.payload]) {
-        state.items[action.payload] = state.items[action.payload].filter(t => !t.completed);
-        if (state.items[action.payload].length === 0) delete state.items[action.payload];
+        state.items[action.payload] = state.items[action.payload].filter(
+          (t) => !t.completed
+        );
+        if (state.items[action.payload].length === 0)
+          delete state.items[action.payload];
       }
     },
     importTodos: (state, action: PayloadAction<Todos>) => {
       state.items = action.payload;
     },
-    clearError: (state) => { state.error = null; },
+    clearError: (state) => {
+      state.error = null;
+    },
   },
 
   extraReducers: (builder) => {
@@ -221,7 +262,9 @@ const todoSlice = createSlice({
       })
       .addCase(updateTaskThunk.fulfilled, (state, action) => {
         state.loading.update = false;
-        const idx = state.apiTasks.findIndex(t => t.taskId === action.payload.taskId);
+        const idx = state.apiTasks.findIndex(
+          (t) => t.taskId === action.payload.taskId
+        );
         if (idx !== -1) state.apiTasks[idx] = action.payload;
       })
       .addCase(updateTaskThunk.rejected, (state, action) => {
@@ -237,7 +280,9 @@ const todoSlice = createSlice({
       })
       .addCase(deleteTaskThunk.fulfilled, (state, action) => {
         state.loading.delete = false;
-        state.apiTasks = state.apiTasks.filter(t => t.taskId !== action.payload);
+        state.apiTasks = state.apiTasks.filter(
+          (t) => t.taskId !== action.payload
+        );
         if (state.pagination) state.pagination.total -= 1;
       })
       .addCase(deleteTaskThunk.rejected, (state, action) => {
@@ -262,11 +307,12 @@ const todoSlice = createSlice({
       .addCase(markCompleteThunk.fulfilled, (state, action) => {
         const taskId = action.meta.arg;
         // Backend ne actual task return kiya toh use karo
-        const updatedTask = action.payload && (action.payload as any).taskId
-          ? action.payload as any
-          : null;
+        const updatedTask =
+          action.payload && (action.payload as any).taskId
+            ? (action.payload as any)
+            : null;
 
-        const task = state.apiTasks.find(t => t.taskId === taskId);
+        const task = state.apiTasks.find((t) => t.taskId === taskId);
         if (task) {
           if (updatedTask) {
             // Backend se aaya data directly assign karo
@@ -274,41 +320,42 @@ const todoSlice = createSlice({
           } else {
             // Fallback: manually update karo
             task.completed = true;
-            task.status = 'completed';
+            task.status = "completed";
             task.completedAt = new Date().toISOString();
             task.isOverdue = false;
           }
         }
-        const upTask = state.upcomingTasks.find(t => t.taskId === taskId);
+        const upTask = state.upcomingTasks.find((t) => t.taskId === taskId);
         if (upTask) {
           upTask.completed = true;
-          upTask.status = 'completed';
+          upTask.status = "completed";
         }
       })
 
       // markIncomplete bhi same pattern:
       .addCase(markIncompleteThunk.fulfilled, (state, action) => {
         const taskId = action.meta.arg;
-        const updatedTask = action.payload && (action.payload as any).taskId
-          ? action.payload as any
-          : null;
+        const updatedTask =
+          action.payload && (action.payload as any).taskId
+            ? (action.payload as any)
+            : null;
 
-        const task = state.apiTasks.find(t => t.taskId === taskId);
+        const task = state.apiTasks.find((t) => t.taskId === taskId);
         if (task) {
           if (updatedTask) {
             Object.assign(task, updatedTask);
           } else {
             task.completed = false;
-            task.status = 'pending';
+            task.status = "pending";
             task.completedAt = null;
           }
         }
-        const upTask = state.upcomingTasks.find(t => t.taskId === taskId);
+        const upTask = state.upcomingTasks.find((t) => t.taskId === taskId);
         if (upTask) {
           upTask.completed = false;
-          upTask.status = 'pending';
+          upTask.status = "pending";
         }
-      })
+      });
 
     // ── markIncomplete ──
     // builder
@@ -324,37 +371,78 @@ const todoSlice = createSlice({
 
     // ── stats ──
     builder
-      .addCase(fetchStatsThunk.pending, (state) => { state.loading.stats = true; })
+      .addCase(fetchStatsThunk.pending, (state) => {
+        state.loading.stats = true;
+      })
       .addCase(fetchStatsThunk.fulfilled, (state, action) => {
         state.loading.stats = false;
         state.stats = action.payload;
       })
-      .addCase(fetchStatsThunk.rejected, (state) => { state.loading.stats = false; });
+      .addCase(fetchStatsThunk.rejected, (state) => {
+        state.loading.stats = false;
+      });
+
+    // // ── upcoming ──
+    // builder
+    //   .addCase(fetchUpcomingTasksThunk.pending, (state) => { state.loading.upcoming = true; })
+    //   .addCase(fetchUpcomingTasksThunk.fulfilled, (state, action) => {
+    //     state.loading.upcoming = false;
+    //     // taskId:"false" wale filter karo (old bug)
+    //     state.upcomingTasks = action.payload.filter(t => t.taskId && t.taskId !== 'false');
+    //   })
+    //   .addCase(fetchUpcomingTasksThunk.rejected, (state) => { state.loading.upcoming = false; });
+
+    // // ── overdue ──
+    // builder
+    //   .addCase(fetchOverdueTasksThunk.pending, (state) => { state.loading.overdue = true; })
+    //   .addCase(fetchOverdueTasksThunk.fulfilled, (state, action) => {
+    //     state.loading.overdue = false;
+    //     state.overdueTasks = action.payload;
+    //   })
+    //   .addCase(fetchOverdueTasksThunk.rejected, (state) => { state.loading.overdue = false; });
 
     // ── upcoming ──
     builder
-      .addCase(fetchUpcomingTasksThunk.pending, (state) => { state.loading.upcoming = true; })
+      .addCase(fetchUpcomingTasksThunk.pending, (state) => {
+        state.loading.upcoming = true;
+      })
       .addCase(fetchUpcomingTasksThunk.fulfilled, (state, action) => {
         state.loading.upcoming = false;
+        const list = Array.isArray(action.payload) ? action.payload : [];
         // taskId:"false" wale filter karo (old bug)
-        state.upcomingTasks = action.payload.filter(t => t.taskId && t.taskId !== 'false');
+        state.upcomingTasks = list.filter(
+          (t) => t.taskId && t.taskId !== "false"
+        );
       })
-      .addCase(fetchUpcomingTasksThunk.rejected, (state) => { state.loading.upcoming = false; });
+      .addCase(fetchUpcomingTasksThunk.rejected, (state) => {
+        state.loading.upcoming = false;
+      });
 
     // ── overdue ──
     builder
-      .addCase(fetchOverdueTasksThunk.pending, (state) => { state.loading.overdue = true; })
+      .addCase(fetchOverdueTasksThunk.pending, (state) => {
+        state.loading.overdue = true;
+      })
       .addCase(fetchOverdueTasksThunk.fulfilled, (state, action) => {
         state.loading.overdue = false;
-        state.overdueTasks = action.payload;
+        state.overdueTasks = Array.isArray(action.payload)
+          ? action.payload
+          : [];
       })
-      .addCase(fetchOverdueTasksThunk.rejected, (state) => { state.loading.overdue = false; });
+      .addCase(fetchOverdueTasksThunk.rejected, (state) => {
+        state.loading.overdue = false;
+      });
   },
 });
 
 export const {
-  addTodo, toggleTodo, deleteTodo, updateTodo,
-  clearCompletedTodos, importTodos, clearError,
+  addTodo,
+  toggleTodo,
+  deleteTodo,
+  updateTodo,
+  clearCompletedTodos,
+  importTodos,
+  clearError,
 } = todoSlice.actions;
 
 export const todoReducer = todoSlice.reducer;

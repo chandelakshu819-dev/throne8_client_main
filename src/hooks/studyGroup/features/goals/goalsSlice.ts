@@ -1,19 +1,21 @@
-
 // src/hooks/studyGroup/features/goals/goalsSlice.ts
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { GoalResponse } from '@/lib/api/studyGroup.service';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { GoalResponse } from "@/lib/api/studyGroup.service";
 import {
-  fetchAllGoalsThunk, fetchActiveGoalsThunk,
-  createGoalThunk, updateGoalThunk,
-  deleteGoalThunk, markGoalCompleteThunk,
+  fetchAllGoalsThunk,
+  fetchActiveGoalsThunk,
+  createGoalThunk,
+  updateGoalThunk,
+  deleteGoalThunk,
+  markGoalCompleteThunk,
   fetchGoalStatsThunk,
   updateGoalProgressThunk,
   markGoalIncompleteThunk,
-} from './goals.thunks';
+} from "./goals.thunks";
 
 // Frontend-only fields ke liye extended type
 export interface GoalWithUI extends GoalResponse {
-  color: string;   // frontend only — assign by index
+  color: string; // frontend only — assign by index
 }
 
 // Weekly tracker ke liye local type — backend se sync nahi hota
@@ -36,8 +38,13 @@ export interface WeeklyGoals {
 
 // Color assign karne ke liye — goalId ke index se
 const GOAL_COLORS = [
-  '#3b82f6', '#10b981', '#8b5cf6',
-  '#ec4899', '#f97316', '#ef4444', '#14b8a6',
+  "#3b82f6",
+  "#10b981",
+  "#8b5cf6",
+  "#ec4899",
+  "#f97316",
+  "#ef4444",
+  "#14b8a6",
 ];
 
 interface GoalsState {
@@ -56,8 +63,13 @@ const initialState: GoalsState = {
   items: [],
   activeGoals: [],
   weeklyGoals: {
-    Monday: [], Tuesday: [], Wednesday: [],
-    Thursday: [], Friday: [], Saturday: [], Sunday: [],
+    Monday: [],
+    Tuesday: [],
+    Wednesday: [],
+    Thursday: [],
+    Friday: [],
+    Saturday: [],
+    Sunday: [],
   },
   stats: null,
   loading: false,
@@ -68,14 +80,19 @@ const initialState: GoalsState = {
 };
 
 const goalsSlice = createSlice({
-  name: 'goals',
+  name: "goals",
   initialState,
   reducers: {
     // Weekly tracker — local only (drag & drop)
-    addGoalToDay: (state, action: PayloadAction<{ goal: GoalWithUI; day: string }>) => {
+    addGoalToDay: (
+      state,
+      action: PayloadAction<{ goal: GoalWithUI; day: string }>
+    ) => {
       const dayKey = action.payload.day as keyof WeeklyGoals;
       if (state.weeklyGoals[dayKey]) {
-        const exists = state.weeklyGoals[dayKey].some(g => g.goalId === action.payload.goal.goalId);
+        const exists = state.weeklyGoals[dayKey].some(
+          (g) => g.goalId === action.payload.goal.goalId
+        );
         if (!exists) {
           state.weeklyGoals[dayKey].push({
             goalId: action.payload.goal.goalId,
@@ -87,29 +104,41 @@ const goalsSlice = createSlice({
       }
     },
 
-    toggleDayGoalCompletion: (state, action: PayloadAction<{ day: string; goalId: string }>) => {
+    toggleDayGoalCompletion: (
+      state,
+      action: PayloadAction<{ day: string; goalId: string }>
+    ) => {
       const dayKey = action.payload.day as keyof WeeklyGoals;
-      const goal = state.weeklyGoals[dayKey]?.find(g => g.goalId === action.payload.goalId);
+      const goal = state.weeklyGoals[dayKey]?.find(
+        (g) => g.goalId === action.payload.goalId
+      );
       if (goal) goal.completed = !goal.completed;
     },
 
-    removeGoalFromDay: (state, action: PayloadAction<{ day: string; goalId: string }>) => {
+    removeGoalFromDay: (
+      state,
+      action: PayloadAction<{ day: string; goalId: string }>
+    ) => {
       const dayKey = action.payload.day as keyof WeeklyGoals;
       if (state.weeklyGoals[dayKey]) {
         state.weeklyGoals[dayKey] = state.weeklyGoals[dayKey].filter(
-          g => g.goalId !== action.payload.goalId
+          (g) => g.goalId !== action.payload.goalId
         );
       }
     },
 
-    clearError: (state) => { state.error = null; },
+    clearError: (state) => {
+      state.error = null;
+    },
   },
 
   extraReducers: (builder) => {
-
     // Fetch All Goals
     builder
-      .addCase(fetchAllGoalsThunk.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(fetchAllGoalsThunk.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(fetchAllGoalsThunk.fulfilled, (state, action) => {
         state.loading = false;
         state.items = (action.payload.data ?? []).map((goal, index) => ({
@@ -123,14 +152,22 @@ const goalsSlice = createSlice({
       });
 
     // Fetch Active Goals
-    builder
-      .addCase(fetchActiveGoalsThunk.fulfilled, (state, action) => {
-        state.activeGoals = action.payload;
-      });
+    // builder
+    //   .addCase(fetchActiveGoalsThunk.fulfilled, (state, action) => {
+    //     state.activeGoals = action.payload;
+    //   });
+
+    // Fetch Active Goals
+    builder.addCase(fetchActiveGoalsThunk.fulfilled, (state, action) => {
+      state.activeGoals = Array.isArray(action.payload) ? action.payload : [];
+    });
 
     // Create Goal
     builder
-      .addCase(createGoalThunk.pending, (state) => { state.createLoading = true; state.error = null; })
+      .addCase(createGoalThunk.pending, (state) => {
+        state.createLoading = true;
+        state.error = null;
+      })
       .addCase(createGoalThunk.fulfilled, (state, action) => {
         state.createLoading = false;
         const newGoal: GoalWithUI = {
@@ -146,17 +183,24 @@ const goalsSlice = createSlice({
 
     // Update Goal
     builder
-      .addCase(updateGoalThunk.pending, (state) => { state.updateLoading = true; })
+      .addCase(updateGoalThunk.pending, (state) => {
+        state.updateLoading = true;
+      })
       .addCase(updateGoalThunk.fulfilled, (state, action) => {
         state.updateLoading = false;
-        const index = state.items.findIndex(g => g.goalId === action.payload.goalId);
+        const index = state.items.findIndex(
+          (g) => g.goalId === action.payload.goalId
+        );
         if (index !== -1) {
-          state.items[index] = { ...action.payload, color: state.items[index].color };
+          state.items[index] = {
+            ...action.payload,
+            color: state.items[index].color,
+          };
         }
         // Weekly goals mein bhi update karo
-        Object.keys(state.weeklyGoals).forEach(day => {
+        Object.keys(state.weeklyGoals).forEach((day) => {
           const dayKey = day as keyof WeeklyGoals;
-          state.weeklyGoals[dayKey] = state.weeklyGoals[dayKey].map(g =>
+          state.weeklyGoals[dayKey] = state.weeklyGoals[dayKey].map((g) =>
             g.goalId === action.payload.goalId
               ? { ...g, title: action.payload.title }
               : g
@@ -175,12 +219,12 @@ const goalsSlice = createSlice({
       })
       .addCase(deleteGoalThunk.fulfilled, (state, action) => {
         state.deleteLoading = null;
-        state.items = state.items.filter(g => g.goalId !== action.payload);
+        state.items = state.items.filter((g) => g.goalId !== action.payload);
         // Weekly goals se bhi hatao
-        Object.keys(state.weeklyGoals).forEach(day => {
+        Object.keys(state.weeklyGoals).forEach((day) => {
           const dayKey = day as keyof WeeklyGoals;
           state.weeklyGoals[dayKey] = state.weeklyGoals[dayKey].filter(
-            g => g.goalId !== action.payload
+            (g) => g.goalId !== action.payload
           );
         });
       })
@@ -198,36 +242,50 @@ const goalsSlice = createSlice({
     //     }
     //   });
 
-    builder
-      .addCase(updateGoalProgressThunk.fulfilled, (state, action) => {
-        const index = state.items.findIndex(g => g.goalId === action.payload.goalId);
-        if (index !== -1) {
-          state.items[index] = { ...state.items[index], ...action.payload, color: state.items[index].color };
-        }
-      });
+    builder.addCase(updateGoalProgressThunk.fulfilled, (state, action) => {
+      const index = state.items.findIndex(
+        (g) => g.goalId === action.payload.goalId
+      );
+      if (index !== -1) {
+        state.items[index] = {
+          ...state.items[index],
+          ...action.payload,
+          color: state.items[index].color,
+        };
+      }
+    });
 
-    builder
-      .addCase(markGoalIncompleteThunk.fulfilled, (state, action) => {
-        const index = state.items.findIndex(g => g.goalId === action.payload.goalId);
-        if (index !== -1) {
-          state.items[index] = { ...state.items[index], ...action.payload, color: state.items[index].color };
-        }
-      });
+    builder.addCase(markGoalIncompleteThunk.fulfilled, (state, action) => {
+      const index = state.items.findIndex(
+        (g) => g.goalId === action.payload.goalId
+      );
+      if (index !== -1) {
+        state.items[index] = {
+          ...state.items[index],
+          ...action.payload,
+          color: state.items[index].color,
+        };
+      }
+    });
 
     // Mark Complete
-    builder
-      .addCase(markGoalCompleteThunk.fulfilled, (state, action) => {
-        const index = state.items.findIndex(g => g.goalId === action.payload.goalId);
-        if (index !== -1) {
-          state.items[index] = { ...state.items[index], ...action.payload, color: state.items[index].color };
-        }
-      });
+    builder.addCase(markGoalCompleteThunk.fulfilled, (state, action) => {
+      const index = state.items.findIndex(
+        (g) => g.goalId === action.payload.goalId
+      );
+      if (index !== -1) {
+        state.items[index] = {
+          ...state.items[index],
+          ...action.payload,
+          color: state.items[index].color,
+        };
+      }
+    });
 
     // Goal Stats
-    builder
-      .addCase(fetchGoalStatsThunk.fulfilled, (state, action) => {
-        state.stats = action.payload;
-      });
+    builder.addCase(fetchGoalStatsThunk.fulfilled, (state, action) => {
+      state.stats = action.payload;
+    });
   },
 });
 
@@ -250,6 +308,3 @@ export const goalsReducer = goalsSlice.reducer;
 
 // Backward compat — purane components ke liye
 export type Goal = GoalWithUI;
-
-
-
