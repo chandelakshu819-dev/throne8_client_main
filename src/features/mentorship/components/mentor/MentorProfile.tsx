@@ -7,7 +7,6 @@ import type { BookingStep, Service, CalendarData, FormData as BookingFormData } 
 import MentorSidebar from "./MentorSidebar";
 import ServicesSection from "./ServicesSection";
 import ReviewsSection from "./ReviewsSection";
-import { ArrowLeft } from "lucide-react";
 
 import CalendarStep from "./CalendarStep";
 import QueryStep from "./QueryStep";
@@ -134,30 +133,11 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                 </div>
             )}
             <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "88px 16px 24px" }}>
-                <div style={{ marginBottom: "16px" }}>
-                    <button
-                        onClick={() => router.back()}
-                        style={{
-                            background: "transparent",
-                            border: `1px solid ${C.border}`,
-                            cursor: "pointer",
-                            color: C.dark,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            padding: "8px 16px",
-                            borderRadius: "8px",
-                        }}
-                    >
-                        <ArrowLeft size={18} /> Back
-                    </button>
-                </div>
                 <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
                     <MentorSidebar
                         mentorData={mentorData}
                         currentUserId={user?.userId}
+                        onBack={() => router.back()}
                         onEditClick={() => setEditModalOpen(true)}
                     />
                     <div>

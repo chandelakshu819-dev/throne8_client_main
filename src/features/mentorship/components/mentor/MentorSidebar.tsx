@@ -3,7 +3,9 @@
 /* eslint-disable @next/next/no-img-element */
 //src/features/mentorship/components/mentor/MentorSidebar.tsx
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Camera, Star, Briefcase, ArrowLeft } from "./Icons";
+import { Camera, Star, Briefcase } from "./Icons";
+import { ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { C } from "../../types/data";
 import MentorService from "@/lib/api/mentorship.service";
 
@@ -61,27 +63,52 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
 
     // Camera (change-photo) button sirf tab dikhega jab logged-in user hi is mentor ka owner ho
     const isOwner = !!currentUserId && !!mentorData?.userId && currentUserId === mentorData.userId;
+    const router = useRouter();
+    const [backHovered, setBackHovered] = useState<boolean>(false);
 
-    const backButton = onBack && (
+    const handleBack = () => {
+        if (onBack) {
+            onBack();
+        } else {
+            router.back();
+        }
+    };
+
+    const backButton = (
         <button
-            onClick={onBack}
-            aria-label="Go back"
+            type="button"
+            onClick={handleBack}
+            aria-label="Back"
+            onMouseEnter={() => setBackHovered(true)}
+            onMouseLeave={() => setBackHovered(false)}
+            className="transition-all duration-200 active:scale-95"
             style={{
                 position: "absolute",
-                top: "12px",
-                left: "12px",
-                padding: "8px",
-                borderRadius: "8px",
-                background: "rgba(251,247,243,0.9)",
-                border: `1px solid ${C.border}`,
-                cursor: "pointer",
-                display: "flex",
+                top: "16px",
+                left: "16px",
+                zIndex: 10,
+                display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                zIndex: 2,
+                gap: "8px",
+                minHeight: "40px",
+                minWidth: "40px",
+                padding: "8px 14px",
+                borderRadius: "8px",
+                background: backHovered ? "#ffffff" : "rgba(255, 255, 255, 0.9)",
+                border: "1px solid rgba(255, 255, 255, 0.6)",
+                boxShadow: backHovered ? "0 4px 12px rgba(0, 0, 0, 0.12)" : "0 2px 6px rgba(0, 0, 0, 0.08)",
+                color: C.dark,
+                fontSize: "14px",
+                fontWeight: 600,
+                cursor: "pointer",
+                backdropFilter: "blur(4px)",
+                WebkitBackdropFilter: "blur(4px)",
+                lineHeight: 1,
             }}
         >
-            <ArrowLeft />
+            <ArrowLeft size={18} />
+            <span></span>
         </button>
     );
 
@@ -126,11 +153,11 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
     const aboutClampStyle: React.CSSProperties = aboutExpanded
         ? {}
         : {
-              display: "-webkit-box",
-              WebkitLineClamp: ABOUT_LINES,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-          };
+            display: "-webkit-box",
+            WebkitLineClamp: ABOUT_LINES,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+        };
 
     const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>): void => {
         const file = e.target.files?.[0];
@@ -180,7 +207,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
 
     return (
         <div style={{ position: "sticky", top: "100px" }}>
-            <div style={{ borderRadius: "24px", overflow: "hidden", boxShadow: "0 20px 60px rgba(74,55,40,0.15)", border: `1px solid ${C.border}` }}>
+            <div style={{ position: "relative", borderRadius: "24px", overflow: "hidden", boxShadow: "0 20px 60px rgba(74,55,40,0.15)", border: `1px solid ${C.border}` }}>
 
                 <div style={{ position: "relative", height: "120px", background: backgroundImage ? `url(${backgroundImage}) center/cover` : C.grad }}>
                     {backButton}

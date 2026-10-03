@@ -85,6 +85,56 @@ const REQUEST_STATUS_META: Record<string, { label: string; bg: string; fg: strin
   rejected: { label: "Request Declined", bg: "#fee2e2", fg: "#dc2626" },
 };
 
+const getServiceImage = (item: any): string | null => {
+  if (!item) return null;
+  return item.thumbnailImage || item.thumbnail || item.image || item.imageUrl || item.coverImage || null;
+};
+
+interface ServiceImageBannerProps {
+  imageSrc: string | null;
+  alt: string;
+  icon?: React.ReactNode;
+}
+
+const ServiceImageBanner: React.FC<ServiceImageBannerProps> = ({ imageSrc, alt, icon }) => {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "150px",
+        borderRadius: "12px",
+        overflow: "hidden",
+        marginBottom: "12px",
+        position: "relative",
+      }}
+    >
+      {!imgFailed && imageSrc ? (
+        <img
+          src={imageSrc}
+          alt={alt}
+          onError={() => setImgFailed(true)}
+          style={{ width: "100%", height: "150px", objectFit: "cover", display: "block" }}
+        />
+      ) : (
+        <div
+          style={{
+            width: "100%",
+            height: "150px",
+            background: C.grad,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {icon || <Sparkles size={24} color="#ffffff" style={{ opacity: 0.6 }} />}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const formatGroupDate = (dateString?: string) => {
   if (!dateString) return "Date not available";
   try {
@@ -246,7 +296,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     setLoading(true);
 
     Promise.allSettled([
-      SessionService.getAllSessionsFromDB({ limit: 50 }),
+    SessionService.getMentorSessions(mentorId),
       fetchGroupSessions(),
     ]).then(([sessionsRes]) => {
       if (sessionsRes.status === "fulfilled") {
@@ -453,15 +503,11 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
               border: `1px solid ${C.border}`, position: "relative",
               boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
             }}>
-            {session.thumbnailImage && (
-              <div style={{ width: "100%", height: "120px", borderRadius: "12px", overflow: "hidden", marginBottom: "12px" }}>
-                <img
-                  src={session.thumbnailImage}
-                  alt={session.title}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              </div>
-            )}
+            <ServiceImageBanner
+              imageSrc={getServiceImage(session)}
+              alt={session.title}
+              icon={<Sparkles size={24} color="#ffffff" style={{ opacity: 0.6 }} />}
+            />
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
               <span>{getIcon(session.sessionType)}</span>
               <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "12px", background: C.border, color: C.dark }}>
@@ -606,6 +652,11 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 e.currentTarget.style.boxShadow = "0 2px 8px rgba(74,55,40,0.06)";
               }}
             >
+              <ServiceImageBanner
+                imageSrc={getServiceImage(group)}
+                alt={group.title}
+                icon={<Users size={24} color="#ffffff" style={{ opacity: 0.6 }} />}
+              />
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                 <span>👥</span>
                 <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "12px", background: C.border, color: C.dark }}>
@@ -864,9 +915,9 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
             padding: "20px 20px 12px 20px",
           }}
         >
-          {detailGroup.thumbnailImage ? (
+          {getServiceImage(detailGroup) ? (
             <div style={{ width: "100%", height: "140px", borderRadius: "14px", overflow: "hidden", marginBottom: "16px" }}>
-              <img src={detailGroup.thumbnailImage} alt={detailGroup.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <img src={getServiceImage(detailGroup)!} alt={detailGroup.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>

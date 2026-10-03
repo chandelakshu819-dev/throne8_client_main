@@ -1,7 +1,7 @@
 // app/mentorship/mentor-card/[mentorname]/[mentorid]/page.tsx
 import MentorProfile from '@/features/mentorship/components/mentor/MentorProfile';
 import { Metadata } from 'next';
-import React from 'react'
+import React, {Suspense} from 'react'
 
 interface PageProps {
   params: Promise<{
@@ -28,7 +28,9 @@ const page = async ({ params }: PageProps) => {
   const { mentorname, mentorid } = await params;
 
   return (
-    <MentorProfile mentorId={mentorid} />
+    <Suspense fallback={null}>
+      <MentorProfile mentorId={mentorid} />
+    </Suspense>
   )
 }
 

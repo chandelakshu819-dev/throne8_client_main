@@ -5,6 +5,8 @@ import { ArrowRight, Clock, Calendar } from "lucide-react";
 import SessionService from "@/lib/api/session.service";
 import MentorService from "@/lib/api/mentorship.service";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { buildMentorProfileUrl } from "@/shared/utils/mentor.util";
 
 interface MentorshipServicesSectionProps {
     mentorId?: string;
@@ -369,15 +371,11 @@ export default function MentorshipServicesSection({
                                 mentorImage ||
                                 "";
 
-                            const hostUserId =
-                                hostData?.mentorId ||
-                                hostData?.userId ||
-                                hostData?._id ||
-                                hostData?.user?.userId ||
-                                hostData?.user?.id ||
-                                hostData?.user?._id ||
-                                service.mentorId ||
-                                service.userId;
+                            const cardMentorId = hostData?.mentorId || service.mentorId || "";
+
+                            const mentorProfileUrl = cardMentorId
+                                ? buildMentorProfileUrl(hostName, cardMentorId)
+                                : null;
 
                             const isOnline =
                                 hostData?.isOnline ??
@@ -574,22 +572,29 @@ export default function MentorshipServicesSection({
 
                                             {/* ── 10. BUTTONS (Height 36-38px, compact & elegant) ── */}
                                             <div className="flex items-center gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (Math.abs(dragDistance.current) > 10) return;
-                                                        const targetId = hostUserId && hostUserId !== "undefined" ? hostUserId : "";
-                                                        if (targetId) {
-                                                            router.push(`/mentorship/${targetId}`);
-                                                        } else {
-                                                            router.push('/mentorship');
-                                                        }
-                                                    }}
-                                                    className="flex-1 py-1.5 sm:py-2 px-2.5 rounded-full border border-[#dcd4cb] hover:border-[#8b7355] bg-white hover:bg-[#FAF9F6] text-[#4a3728] font-bold text-xs text-center transition-all duration-200 shadow-xs"
-                                                >
-                                                    View Profile
-                                                </button>
+                                                {mentorProfileUrl ? (
+                                                    <Link
+                                                        href={mentorProfileUrl}
+                                                        prefetch={false}
+                                                        draggable={false}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (Math.abs(dragDistance.current) > 10) {
+                                                                e.preventDefault();
+                                                            }
+                                                        }}
+                                                        className="flex-1 py-1.5 sm:py-2 px-2.5 rounded-full border border-[#dcd4cb] hover:border-[#8b7355] bg-white hover:bg-[#FAF9F6] text-[#4a3728] font-bold text-xs text-center transition-all duration-200 shadow-xs"
+                                                    >
+                                                        View Profile
+                                                    </Link>
+                                                ) : (
+                                                    <span
+                                                        aria-disabled="true"
+                                                        className="flex-1 py-1.5 sm:py-2 px-2.5 rounded-full border border-[#dcd4cb] hover:border-[#8b7355] bg-white hover:bg-[#FAF9F6] text-[#4a3728] font-bold text-xs text-center transition-all duration-200 shadow-xs opacity-50 cursor-not-allowed"
+                                                    >
+                                                        View Profile
+                                                    </span>
+                                                )}
 
                                                 <button
                                                     type="button"

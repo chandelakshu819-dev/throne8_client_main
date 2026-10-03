@@ -43,7 +43,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     useEffect(() => {
         const serviceId = searchParams.get('serviceId');
         if (serviceId && !bookingStep) {
-            SessionService.getAllSessionsFromDB({ limit: 50 })
+            SessionService.getAllSessionsFromDB({ limit: 50, mentorId })
                 .then((res) => {
                     const allSessions = res?.data ?? [];
                     const mentorSessions = allSessions.filter((s: any) => s.mentorId === mentorId);

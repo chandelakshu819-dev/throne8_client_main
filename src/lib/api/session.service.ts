@@ -182,8 +182,10 @@ class SessionService {
     }
 
     // ── GET ALL SESSIONS FROM DB (admin only — no mentor/user filter) ──
-    static async getAllSessionsFromDB(filters: { page?: number; limit?: number } = {}): Promise<ApiResponse> {
-        try {
+    static async getAllSessionsFromDB(
+      filters: { page?: number; limit?: number; mentorId?: string } = {}
+      ): Promise<ApiResponse> {
+            try {
             const { data } = await api.get<ApiResponse>(
                 `${config.NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT}`,
                 { params: filters }
