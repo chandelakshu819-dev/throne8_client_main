@@ -2184,7 +2184,8 @@ const GroupChat = ({
                           .filter((m) => m.userId !== currentUserId) // apne aap ko exclude karo
                           .map((member) => (
                             <label
-                              key={member.userId}
+                 
+                            key={member.userId}
                               className="flex items-center gap-3 py-3 cursor-pointer hover:bg-white/50 rounded-lg px-3 transition-all"
                             >
                               <input
