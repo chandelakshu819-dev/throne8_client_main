@@ -109,6 +109,37 @@ interface GroupRoomProps {
   groupId: string;
 }
 
+const SelfVideo: React.FC<{ stream: MediaStream | null; className?: string }> = ({ stream, className }) => {
+  const ref = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    v.srcObject = stream;
+    if (stream) {
+      v.onloadedmetadata = () => {
+        v.play().catch((e) => console.error("play() failed:", e));
+      };
+    }
+    return () => {
+      v.onloadedmetadata = null;
+    };
+  }, [stream]);
+
+  return (
+    <video
+      ref={ref}
+      autoPlay
+      playsInline
+      muted
+      className={`${className ?? ""} scale-x-[-1]`}
+    />
+  );
+};
+
+
+
+
 const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const router = useRouter();
   const pendingJoinRef = useRef(false);
@@ -163,6 +194,44 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const isCameraOn = useAppSelector(selectLocalCameraOn);
   const isMicOn = useAppSelector(selectLocalMicOn);
   const isScreenSharing = useAppSelector(selectLocalScreenShareOn);
+
+  // ⬇️ YAHAN DAALEIN (Change 2, Hissa A)
+  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const previewStreamRef = useRef<MediaStream | null>(null);
+
+  const stopPreview = () => {
+    previewStreamRef.current?.getTracks().forEach((t) => t.stop());
+    previewStreamRef.current = null;
+    setPreviewStream(null);
+  };
+
+  const toggleLocalCamera = async () => {
+    if (isCameraOn) {
+      stopPreview();
+      dispatch(setLocalCamera(false));
+      return;
+    }
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: true });
+      previewStreamRef.current = s;
+      setPreviewStream(s);
+      dispatch(setLocalCamera(true));
+    } catch (e) {
+      console.error("Camera error:", e);
+      alert("Camera access failed");
+      dispatch(setLocalCamera(false));
+    }
+  };
+
+  // unmount par camera band + Redux reset
+  useEffect(() => {
+    dispatch(setLocalCamera(false));
+    return () => {
+      previewStreamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, [dispatch]);
+
+
   const [showLiveRoomModal, setShowLiveRoomModal] = useState(false);
   const [liveRoomTitle, setLiveRoomTitle] = useState("");
   const [liveRoomError, setLiveRoomError] = useState("");
@@ -182,18 +251,18 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const members =
     enrichedMembers.length > 0
       ? enrichedMembers.map((m: any, idx: number) => ({
-          id: idx + 1,
-          name: m.name ?? m.userId?.slice(0, 8) ?? "Member",
-          avatar: m.avatar ?? null,
-          isOnline: onlineMembers.includes(m.userId),
-          isSpeaking: false,
-          studyTime: 0,
-          rank: idx + 1,
-          videoEnabled: false,
-          audioEnabled: false,
-          userId: m.userId,
-          role: m.role,
-        }))
+        id: idx + 1,
+        name: m.name ?? m.userId?.slice(0, 8) ?? "Member",
+        avatar: m.avatar ?? null,
+        isOnline: onlineMembers.includes(m.userId),
+        isSpeaking: false,
+        studyTime: 0,
+        rank: idx + 1,
+        videoEnabled: false,
+        audioEnabled: false,
+        userId: m.userId,
+        role: m.role,
+      }))
       : [];
 
   const liveRoomId = activeLiveRoom?.roomId ?? "";
@@ -218,14 +287,19 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     roomId: liveRoomId,
     userId: currentUserId,
     userName: user?.name ?? user?.email ?? "User",
-    onPeerJoined: (peer) => {},
-    onPeerLeft: (socketId) => {},
+    onPeerJoined: (peer) => { },
+    onPeerLeft: (socketId) => { },
     onQualityChange: (socketId, quality) => {
       if (quality === "poor") {
         console.warn("[LiveRoom] Poor connection for socket:", socketId);
       }
     },
   });
+
+  const camOn = showLiveRoomView ? webrtcCameraOn : isCameraOn;
+  const micOn = showLiveRoomView ? webrtcMicOn : isMicOn;
+  const selfStream = showLiveRoomView ? localStream : previewStream;
+
 
   const formatTime = (seconds: number): string => {
     const hrs = Math.floor(seconds / 3600);
@@ -268,7 +342,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
               })
             )
               .unwrap()
-              .catch(() => {});
+              .catch(() => { });
           }
         } catch (err) {
           /* silent */
@@ -314,7 +388,10 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
         })
       ).unwrap();
 
+
+
       // 3. Media
+      stopPreview();
       const stream = await startLocalStream(true, true);
       if (!stream) return;
 
@@ -352,6 +429,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       ).unwrap();
 
       // 2. Media get karo
+      stopPreview();
       const stream = await startLocalStream(true, true);
       if (!stream) return;
 
@@ -614,11 +692,10 @@ ADD this block just before your main `return (` statement:
             <button
               onClick={handleToggleSession}
               disabled={timerApiLoading}
-              className={`px-4 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 text-sm shadow-lg disabled:opacity-60 disabled:cursor-not-allowed ${
-                isSessionActive
-                  ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
-                  : "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
-              }`}
+              className={`px-4 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 text-sm shadow-lg disabled:opacity-60 disabled:cursor-not-allowed ${isSessionActive
+                ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+                : "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
+                }`}
             >
               {isSessionActive ? (
                 <>
@@ -678,13 +755,13 @@ ADD this block just before your main `return (` statement:
               </button>
               {(activeLiveRoom.host === currentUserId ||
                 activeLiveRoom.host?._id === currentUserId) && (
-                <button
-                  onClick={handleEndOrLeaveLiveRoom}
-                  className="px-4 py-3 bg-red-500/10 text-red-600 rounded-2xl font-semibold text-sm border border-red-500/20 flex items-center justify-center gap-2"
-                >
-                  End
-                </button>
-              )}
+                  <button
+                    onClick={handleEndOrLeaveLiveRoom}
+                    className="px-4 py-3 bg-red-500/10 text-red-600 rounded-2xl font-semibold text-sm border border-red-500/20 flex items-center justify-center gap-2"
+                  >
+                    End
+                  </button>
+                )}
             </div>
           ) : (
             <button
@@ -735,9 +812,8 @@ ADD this block just before your main `return (` statement:
                 Session Time
               </div>
               <div
-                className={`text-2xl xl:text-3xl font-bold tabular-nums tracking-tight ${
-                  isSessionActive ? "text-green-600" : "text-[#4a3728]"
-                }`}
+                className={`text-2xl xl:text-3xl font-bold tabular-nums tracking-tight ${isSessionActive ? "text-green-600" : "text-[#4a3728]"
+                  }`}
               >
                 {formatTime(studyTime)}
               </div>
@@ -815,14 +891,14 @@ ADD this block just before your main `return (` statement:
                 </button>
                 {(activeLiveRoom.host === currentUserId ||
                   activeLiveRoom.host?._id === currentUserId) && (
-                  <button
-                    onClick={handleEndOrLeaveLiveRoom}
-                    disabled={liveRoomActionLoading}
-                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold disabled:opacity-50"
-                  >
-                    End Room
-                  </button>
-                )}
+                    <button
+                      onClick={handleEndOrLeaveLiveRoom}
+                      disabled={liveRoomActionLoading}
+                      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold disabled:opacity-50"
+                    >
+                      End Room
+                    </button>
+                  )}
               </div>
             ) : (
               <button
@@ -844,10 +920,9 @@ ADD this block just before your main `return (` statement:
               onClick={handleToggleSession}
               disabled={timerApiLoading}
               className={`px-5 py-2.5 rounded-lg font-bold transition-all text-sm shadow-sm disabled:opacity-60 disabled:cursor-not-allowed
-                ${
-                  isSessionActive
-                    ? "bg-amber-500 hover:bg-amber-600 text-white"
-                    : "bg-green-600 hover:bg-green-700 text-white"
+                ${isSessionActive
+                  ? "bg-amber-500 hover:bg-amber-600 text-white"
+                  : "bg-green-600 hover:bg-green-700 text-white"
                 }`}
             >
               {isSessionActive ? "Pause Session" : "Start Session"}
@@ -872,32 +947,34 @@ ADD this block just before your main `return (` statement:
             {/* Self Card */}
             <div className="bg-white/70 backdrop-blur-md rounded-xl p-3 shadow-lg border-2 border-[#8b7355]/50">
               <div className="flex flex-col items-center">
-                {
-                  // isCameraOn ?
-                  (activeLiveRoom ? webrtcCameraOn : isCameraOn) ? (
-                    <div className="w-full aspect-square bg-gradient-to-br from-[#8b7355] to-[#6b5847] rounded-lg mb-2 flex items-center justify-center">
+                {camOn ? (
+                  <div className="w-full aspect-square bg-gradient-to-br from-[#8b7355] to-[#6b5847] rounded-lg mb-2 flex items-center justify-center overflow-hidden">
+                    {selfStream ? (
+                      <SelfVideo
+                        stream={selfStream}
+                        className="absolute inset-0 w-full h-full object-cover" />
+
+                    ) : (
                       <div className="text-5xl">📹</div>
-                    </div>
-                  ) : (
-                    <div className="mb-2">
-                      {user?.avatar ? (
-                        <img
-                          src={user.avatar}
-                          alt="You"
-                          className="w-16 h-16 rounded-full object-cover border-2 border-white shadow"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#8b7355] to-[#6b5847] flex items-center justify-center border-2 border-white shadow">
-                          <span className="text-white font-bold text-lg">
-                            {(user?.name ?? user?.email ?? "Y")
-                              .slice(0, 2)
-                              .toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )
-                }
+                    )}
+                  </div>
+                ) : (
+                  <div className="mb-2">
+                    {user?.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt="You"
+                        className="w-16 h-16 rounded-full object-cover border-2 border-white shadow"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#8b7355] to-[#6b5847] flex items-center justify-center border-2 border-white shadow">
+                        <span className="text-white font-bold text-lg">
+                          {(user?.name ?? user?.email ?? "Y").slice(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="font-bold text-[#4a3728] text-sm mb-1">You</div>
                 <div className="text-base font-bold text-[#4a3728] mb-2 tabular-nums">
                   {formatTime(studyTime)}
@@ -938,9 +1015,8 @@ ADD this block just before your main `return (` statement:
               .map((member) => (
                 <div
                   key={member.id}
-                  className={`bg-white/70 backdrop-blur-md rounded-xl p-3 shadow-lg border-2 ${
-                    member.isSpeaking ? "border-green-500" : "border-white/40"
-                  }`}
+                  className={`bg-white/70 backdrop-blur-md rounded-xl p-3 shadow-lg border-2 ${member.isSpeaking ? "border-green-500" : "border-white/40"
+                    }`}
                 >
                   <div className="flex flex-col items-center">
                     {/* Avatar — real image ya emoji fallback */}
@@ -980,12 +1056,24 @@ ADD this block just before your main `return (` statement:
                       </span>
                     </div>
                     <div className="flex gap-1">
-                      <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                        <MicOff size={12} className="text-white" />
-                      </div>
-                      <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                        <VideoOff size={12} className="text-white" />
-                      </div>
+                      {micOn ? (
+                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                          <Mic size={12} className="text-white" />
+                        </div>
+                      ) : (
+                        <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                          <MicOff size={12} className="text-white" />
+                        </div>
+                      )}
+                      {camOn ? (
+                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                          <Video size={12} className="text-white" />
+                        </div>
+                      ) : (
+                        <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                          <VideoOff size={12} className="text-white" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -997,11 +1085,17 @@ ADD this block just before your main `return (` statement:
             {/* Self Video */}
             <div className="relative aspect-video bg-gradient-to-br from-[#8b7355] to-[#6b5847] rounded-xl overflow-hidden border-4 border-[#8b7355] shadow-xl">
               <div className="absolute inset-0 flex items-center justify-center">
-                {/* {isCameraOn ? ( */}
-                {(activeLiveRoom ? webrtcCameraOn : isCameraOn) ? (
-                  <div className="w-full h-full bg-gradient-to-br from-[#8b7355] to-[#6b5847] flex items-center justify-center">
-                    <div className="text-6xl">📹</div>
-                  </div>
+                {camOn ? (
+                  selfStream ? (
+                    <SelfVideo
+                      stream={selfStream}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="text-6xl">📹</div>
+                    </div>
+                  )
                 ) : (
                   <div className="text-center">
                     <div className="text-6xl mb-2">👤</div>
@@ -1021,8 +1115,7 @@ ADD this block just before your main `return (` statement:
                     </div>
                   </div>
                   <div className="flex gap-1">
-                    {/* {isMicOn ? ( */}
-                    {(activeLiveRoom ? webrtcMicOn : isMicOn) ? (
+                    {micOn ? (
                       <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                         <Mic size={14} className="text-white" />
                       </div>
@@ -1031,6 +1124,7 @@ ADD this block just before your main `return (` statement:
                         <MicOff size={14} className="text-white" />
                       </div>
                     )}
+
                   </div>
                 </div>
               </div>
@@ -1051,11 +1145,10 @@ ADD this block just before your main `return (` statement:
               .map((member) => (
                 <div
                   key={member.id}
-                  className={`relative aspect-video bg-gradient-to-br from-[#4a3728] to-[#6b5847] rounded-xl overflow-hidden shadow-lg ${
-                    member.isSpeaking
-                      ? "ring-4 ring-green-500"
-                      : "border-2 border-[#e0d8cf]"
-                  }`}
+                  className={`relative aspect-video bg-gradient-to-br from-[#4a3728] to-[#6b5847] rounded-xl overflow-hidden shadow-lg ${member.isSpeaking
+                    ? "ring-4 ring-green-500"
+                    : "border-2 border-[#e0d8cf]"
+                    }`}
                 >
                   <div className="absolute inset-0 flex items-center justify-center">
                     {member.avatar ? (
@@ -1091,8 +1184,8 @@ ADD this block just before your main `return (` statement:
                             {member.userId === currentUserId
                               ? formatTime(studyTime)
                               : formatTime(
-                                  memberSessionTimes[member.userId] ?? 0
-                                )}
+                                memberSessionTimes[member.userId] ?? 0
+                              )}
                           </div>
                           <div className="flex items-center gap-1">
                             {member.role === "leader"
@@ -1126,11 +1219,10 @@ ADD this block just before your main `return (` statement:
                   setShowChat(true);
                   setShowMembers(false);
                 }}
-                className={`flex-1 px-3 lg:px-4 py-2.5 lg:py-3 font-semibold text-xs lg:text-sm transition-all ${
-                  showChat && !showMembers
-                    ? "bg-[#f6ede8] text-[#4a3728] border-b-4 border-[#8b7355]"
-                    : "text-[#6b5847] hover:bg-[#f6ede8]"
-                }`}
+                className={`flex-1 px-3 lg:px-4 py-2.5 lg:py-3 font-semibold text-xs lg:text-sm transition-all ${showChat && !showMembers
+                  ? "bg-[#f6ede8] text-[#4a3728] border-b-4 border-[#8b7355]"
+                  : "text-[#6b5847] hover:bg-[#f6ede8]"
+                  }`}
               >
                 <MessageCircle size={14} className="inline mr-1.5 lg:mr-2" />
                 Chat
@@ -1140,11 +1232,10 @@ ADD this block just before your main `return (` statement:
                   setShowMembers(true);
                   setShowChat(false);
                 }}
-                className={`flex-1 px-3 lg:px-4 py-2.5 lg:py-3 font-semibold text-xs lg:text-sm transition-all ${
-                  showMembers && !showChat
-                    ? "bg-[#f6ede8] text-[#4a3728] border-b-4 border-[#8b7355]"
-                    : "text-[#6b5847] hover:bg-[#f6ede8]"
-                }`}
+                className={`flex-1 px-3 lg:px-4 py-2.5 lg:py-3 font-semibold text-xs lg:text-sm transition-all ${showMembers && !showChat
+                  ? "bg-[#f6ede8] text-[#4a3728] border-b-4 border-[#8b7355]"
+                  : "text-[#6b5847] hover:bg-[#f6ede8]"
+                  }`}
               >
                 <Users size={14} className="inline mr-1.5 lg:mr-2" />
                 Members ({groupData?.currentMemberCount ?? rawMembers.length})
@@ -1236,11 +1327,10 @@ ADD this block just before your main `return (` statement:
                   .map((member) => (
                     <div
                       key={member.id}
-                      className={`p-2.5 lg:p-3 rounded-lg transition-all ${
-                        member.isOnline
-                          ? "bg-[#f6ede8] hover:bg-[#e0d8cf]"
-                          : "bg-gray-100 opacity-60"
-                      }`}
+                      className={`p-2.5 lg:p-3 rounded-lg transition-all ${member.isOnline
+                        ? "bg-[#f6ede8] hover:bg-[#e0d8cf]"
+                        : "bg-gray-100 opacity-60"
+                        }`}
                     >
                       <div className="flex items-center gap-2.5 lg:gap-3">
                         <div className="relative flex-shrink-0">
@@ -1281,11 +1371,10 @@ ADD this block just before your main `return (` statement:
                             )}
                             {member.audioEnabled && (
                               <div
-                                className={`w-5 lg:w-6 h-5 lg:h-6 rounded-full flex items-center justify-center ${
-                                  member.isSpeaking
-                                    ? "bg-green-500 animate-pulse"
-                                    : "bg-green-500"
-                                }`}
+                                className={`w-5 lg:w-6 h-5 lg:h-6 rounded-full flex items-center justify-center ${member.isSpeaking
+                                  ? "bg-green-500 animate-pulse"
+                                  : "bg-green-500"
+                                  }`}
                               >
                                 <Mic
                                   size={10}
@@ -1324,11 +1413,10 @@ ADD this block just before your main `return (` statement:
                   setShowChat(true);
                   setShowMembers(false);
                 }}
-                className={`flex-1 px-4 py-3 font-semibold text-sm transition-all ${
-                  showChat && !showMembers
-                    ? "bg-[#f6ede8] text-[#4a3728] border-b-4 border-[#8b7355]"
-                    : "text-[#6b5847]"
-                }`}
+                className={`flex-1 px-4 py-3 font-semibold text-sm transition-all ${showChat && !showMembers
+                  ? "bg-[#f6ede8] text-[#4a3728] border-b-4 border-[#8b7355]"
+                  : "text-[#6b5847]"
+                  }`}
               >
                 <MessageCircle size={16} className="inline mr-2" />
                 Chat
@@ -1338,11 +1426,10 @@ ADD this block just before your main `return (` statement:
                   setShowMembers(true);
                   setShowChat(false);
                 }}
-                className={`flex-1 px-4 py-3 font-semibold text-sm transition-all ${
-                  showMembers && !showChat
-                    ? "bg-[#f6ede8] text-[#4a3728] border-b-4 border-[#8b7355]"
-                    : "text-[#6b5847]"
-                }`}
+                className={`flex-1 px-4 py-3 font-semibold text-sm transition-all ${showMembers && !showChat
+                  ? "bg-[#f6ede8] text-[#4a3728] border-b-4 border-[#8b7355]"
+                  : "text-[#6b5847]"
+                  }`}
               >
                 <Users size={16} className="inline mr-2" />
                 Members ({members.filter((m) => m.isOnline).length})
@@ -1405,11 +1492,10 @@ ADD this block just before your main `return (` statement:
                             </span>
                           </div>
                           <div
-                            className={`inline-block px-3 py-2 rounded-lg text-sm break-words max-w-[200px] ${
-                              isOwn
-                                ? "bg-[#8b7355] text-white rounded-tr-none"
-                                : "bg-[#f6ede8] text-[#4a3728] rounded-tl-none"
-                            }`}
+                            className={`inline-block px-3 py-2 rounded-lg text-sm break-words max-w-[200px] ${isOwn
+                              ? "bg-[#8b7355] text-white rounded-tr-none"
+                              : "bg-[#f6ede8] text-[#4a3728] rounded-tl-none"
+                              }`}
                           >
                             {msg.content}
                           </div>
@@ -1451,11 +1537,10 @@ ADD this block just before your main `return (` statement:
                   .map((member) => (
                     <div
                       key={member.id}
-                      className={`p-3 rounded-lg transition-all ${
-                        member.isOnline
-                          ? "bg-[#f6ede8]"
-                          : "bg-gray-100 opacity-60"
-                      }`}
+                      className={`p-3 rounded-lg transition-all ${member.isOnline
+                        ? "bg-[#f6ede8]"
+                        : "bg-gray-100 opacity-60"
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="relative flex-shrink-0">
@@ -1493,11 +1578,10 @@ ADD this block just before your main `return (` statement:
                             )}
                             {member.audioEnabled && (
                               <div
-                                className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                                  member.isSpeaking
-                                    ? "bg-green-500 animate-pulse"
-                                    : "bg-green-500"
-                                }`}
+                                className={`w-6 h-6 rounded-full flex items-center justify-center ${member.isSpeaking
+                                  ? "bg-green-500 animate-pulse"
+                                  : "bg-green-500"
+                                  }`}
                               >
                                 <Mic size={12} className="text-white" />
                               </div>
@@ -1517,26 +1601,25 @@ ADD this block just before your main `return (` statement:
       <div className="backdrop-blur-md bg-white/40 border-t border-[#d4c4b5] shadow-lg px-3 sm:px-4 md:px-6 py-3 sm:py-4 shrink-0 safe-area-bottom">
         <div className="flex items-center justify-center gap-2 sm:gap-3 md:gap-4">
           <button
-            onClick={async () => {
-              // WebRTC track toggle (immediate, no server round-trip)
-              toggleWebRTCMic();
-
-              const socket = getSocket();
-              socket?.emit("toggle-mic", {
-                roomId: activeLiveRoom?.roomId,
-                micOn: !webrtcMicOn,
-              });
-              // Update Redux local state for UI
-              dispatch(setLocalMic(!webrtcMicOn));
+            onClick={() => {
+              if (showLiveRoomView) {
+                toggleWebRTCMic();
+                getSocket()?.emit("toggle-mic", {
+                  roomId: activeLiveRoom?.roomId,
+                  micOn: !webrtcMicOn,
+                });
+                dispatch(setLocalMic(!webrtcMicOn));
+              } else {
+                dispatch(setLocalMic(!isMicOn));
+              }
             }}
-            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${
-              isMicOn
-                ? "bg-[#8b7355] hover:bg-[#6b5847] text-white"
-                : "bg-[#4a3728] hover:bg-[#4a3728] text-white"
-            }`}
-            title={(activeLiveRoom ? webrtcMicOn : isMicOn) ? "Mute" : "Unmute"}
+            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${micOn
+              ? "bg-[#8b7355] hover:bg-[#6b5847] text-white"
+              : "bg-[#4a3728] hover:bg-[#4a3728] text-white"
+              }`}
+            title={micOn ? "Mute" : "Unmute"}
           >
-            {(activeLiveRoom ? webrtcMicOn : isMicOn) ? (
+            {micOn ? (
               <Mic size={20} className="sm:w-6 sm:h-6" />
             ) : (
               <MicOff size={20} className="sm:w-6 sm:h-6" />
@@ -1545,27 +1628,24 @@ ADD this block just before your main `return (` statement:
 
           <button
             onClick={async () => {
-              await toggleWebRTCCamera();
-              const socket = getSocket();
-              socket?.emit("toggle-camera", {
-                roomId: activeLiveRoom?.roomId,
-                cameraOn: !webrtcCameraOn,
-              });
-              dispatch(setLocalCamera(!webrtcCameraOn));
+              if (showLiveRoomView) {
+                await toggleWebRTCCamera();
+                getSocket()?.emit("toggle-camera", {
+                  roomId: activeLiveRoom?.roomId,
+                  cameraOn: !webrtcCameraOn,
+                });
+                dispatch(setLocalCamera(!webrtcCameraOn));
+              } else {
+                await toggleLocalCamera();
+              }
             }}
-
-            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${
-              isCameraOn
-                ? "bg-[#8b7355] hover:bg-[#6b5847] text-white"
-                : "bg-[#4a3728] hover:bg-[#4a3728] text-white"
-            }`}
-            title={
-              (activeLiveRoom ? webrtcCameraOn : isCameraOn)
-                ? "Turn off camera"
-                : "Turn on camera"
-            }
+            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${camOn
+              ? "bg-[#8b7355] hover:bg-[#6b5847] text-white"
+              : "bg-[#4a3728] hover:bg-[#4a3728] text-white"
+              }`}
+            title={camOn ? "Turn off camera" : "Turn on camera"}
           >
-            {(activeLiveRoom ? webrtcCameraOn : isCameraOn) ? (
+            {camOn ? (
               <Video size={20} className="sm:w-6 sm:h-6" />
             ) : (
               <VideoOff size={20} className="sm:w-6 sm:h-6" />
@@ -1582,13 +1662,13 @@ ADD this block just before your main `return (` statement:
             {groupData.currentMemberCount -
               members.filter((m) => m.isOnline).length >
               0 && (
-              <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                <span className="text-[10px] font-bold text-white">
-                  {groupData.currentMemberCount -
-                    members.filter((m) => m.isOnline).length}
-                </span>
-              </div>
-            )}
+                <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                  <span className="text-[10px] font-bold text-white">
+                    {groupData.currentMemberCount -
+                      members.filter((m) => m.isOnline).length}
+                  </span>
+                </div>
+              )}
           </button>
 
           {/* Challenge Button - All devices */}
@@ -1607,11 +1687,10 @@ ADD this block just before your main `return (` statement:
                 setShowMembers(false);
               }
             }}
-            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${
-              showChat
-                ? "bg-[#8b7355] hover:bg-[#6b5847] text-white"
-                : "bg-[#4a3728] hover:bg-[#4a3728] text-white"
-            }`}
+            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${showChat
+              ? "bg-[#8b7355] hover:bg-[#6b5847] text-white"
+              : "bg-[#4a3728] hover:bg-[#4a3728] text-white"
+              }`}
             title="Toggle chat"
           >
             <MessageCircle size={20} className="sm:w-6 sm:h-6" />
@@ -1624,11 +1703,10 @@ ADD this block just before your main `return (` statement:
                 setShowChat(false);
               }
             }}
-            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${
-              showMembers
-                ? "bg-[#8b7355] hover:bg-[#6b5847] text-white"
-                : "bg-[#4a3728] hover:bg-[#4a3728] text-white"
-            }`}
+            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${showMembers
+              ? "bg-[#8b7355] hover:bg-[#6b5847] text-white"
+              : "bg-[#4a3728] hover:bg-[#4a3728] text-white"
+              }`}
             title="Toggle members"
           >
             <Users size={20} className="sm:w-6 sm:h-6" />
