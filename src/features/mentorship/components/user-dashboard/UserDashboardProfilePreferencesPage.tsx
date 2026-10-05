@@ -96,7 +96,10 @@ export default function UserDashboardProfilePreferencesPage({
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isAddSkillOpen, setIsAddSkillOpen] = useState(false);
   const [isAddExpOpen, setIsAddExpOpen] = useState(false);
+  const [expToEdit, setExpToEdit] = useState<any>(null);
   const [isRoleEditOpen, setIsRoleEditOpen] = useState(false);
+  const [isEditInterestsOpen, setIsEditInterestsOpen] = useState(false);
+  const [isEditGoalsOpen, setIsEditGoalsOpen] = useState(false);
 
   // Status banners & feedback
   const [feedback, setFeedback] = useState<{
@@ -290,6 +293,8 @@ export default function UserDashboardProfilePreferencesPage({
   const company = profile?.company || profile?.organization || profile?.onboarding?.workingProfile?.companyName || "";
   const education = profile?.education || (profile?.onboarding?.studentProfile ? `${profile.onboarding.studentProfile.degree || ""} ${profile.onboarding.studentProfile.fieldOfStudy ? "in " + profile.onboarding.studentProfile.fieldOfStudy : ""} - ${profile.onboarding.studentProfile.collegeName || ""}`.trim() : "");
   const userType = profile?.onboarding?.userType || profile?.role || "Student";
+  const careerInterests = profile?.preferences?.careerInterests || [];
+  const mentorshipGoals = profile?.preferences?.mentorshipGoals || [];
 
   // ==========================================
   // Loading skeleton state
@@ -922,6 +927,7 @@ export default function UserDashboardProfilePreferencesPage({
                 key={exp.experienceId || exp._id}
                 exp={exp}
                 readOnly={readOnly}
+                onEdit={() => setExpToEdit(exp)}
                 onDelete={async () => {
                   try {
                     await ProfileService.deleteExperience(exp.experienceId || exp._id);
@@ -939,80 +945,129 @@ export default function UserDashboardProfilePreferencesPage({
 
       {/* ======================================================== */}
       {/* SECTIONS 3 & 6: Career Interests & Mentorship Goals      */}
-      {/* Transparent handling of backend schema boundaries       */}
       {/* ======================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* SECTION 3: Career Interests */}
         <section
-          className="rounded-2xl p-6 border shadow-sm flex flex-col justify-between transition-all duration-200"
+          className="rounded-2xl p-6 border shadow-sm flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
           style={{
             backgroundColor: THEME.cardBg,
             borderColor: THEME.border,
           }}
         >
           <div>
-            <div className="flex items-center gap-2.5 mb-4">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ backgroundColor: THEME.tagBg }}
-              >
-                <Compass className="w-4 h-4" style={{ color: THEME.primary }} />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: THEME.tagBg }}
+                >
+                  <Compass className="w-4 h-4" style={{ color: THEME.primary }} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold" style={{ color: THEME.primary }}>
+                    Career Interests
+                  </h3>
+                  <p className="text-xs" style={{ color: THEME.textMuted }}>
+                    Target industries, domains & career transition topics
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-bold" style={{ color: THEME.primary }}>
-                  Career Interests
-                </h3>
-                <p className="text-xs" style={{ color: THEME.textMuted }}>
-                  Target industries, domains & career transition topics
-                </p>
-              </div>
+              {!readOnly && (
+                <button
+                  onClick={() => setIsEditInterestsOpen(true)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all duration-150 hover:bg-[#fbf7f3]"
+                  style={{ borderColor: THEME.border, color: THEME.primary }}
+                >
+                  Edit
+                </button>
+              )}
             </div>
 
-            <div
-              className="p-4 rounded-xl border space-y-2 mb-3 text-center"
-              style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}
-            >
-              <p className="text-xs font-medium" style={{ color: THEME.textMuted }}>
-                No career interests added yet.
-              </p>
-            </div>
+            {careerInterests.length === 0 ? (
+              <div
+                className="p-4 rounded-xl border space-y-2 mb-3 text-center"
+                style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}
+              >
+                <p className="text-xs font-medium" style={{ color: THEME.textMuted }}>
+                  No career interests added yet.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {careerInterests.map((interest: string, idx: number) => (
+                  <span
+                    key={idx}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm border"
+                    style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight, color: THEME.primary }}
+                  >
+                    {interest}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
         {/* SECTION 6: Mentorship & Career Goals */}
         <section
-          className="rounded-2xl p-6 border shadow-sm flex flex-col justify-between transition-all duration-200"
+          className="rounded-2xl p-6 border shadow-sm flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-md"
           style={{
             backgroundColor: THEME.cardBg,
             borderColor: THEME.border,
           }}
         >
           <div>
-            <div className="flex items-center gap-2.5 mb-4">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ backgroundColor: THEME.tagBg }}
-              >
-                <Target className="w-4 h-4" style={{ color: THEME.primary }} />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: THEME.tagBg }}
+                >
+                  <Target className="w-4 h-4" style={{ color: THEME.primary }} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold" style={{ color: THEME.primary }}>
+                    Mentorship Goals
+                  </h3>
+                  <p className="text-xs" style={{ color: THEME.textMuted }}>
+                    Your objectives for 1:1 mentorship sessions
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-bold" style={{ color: THEME.primary }}>
-                  Mentorship Goals
-                </h3>
-                <p className="text-xs" style={{ color: THEME.textMuted }}>
-                  Your objectives for 1:1 mentorship sessions
-                </p>
-              </div>
+              {!readOnly && (
+                <button
+                  onClick={() => setIsEditGoalsOpen(true)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all duration-150 hover:bg-[#fbf7f3]"
+                  style={{ borderColor: THEME.border, color: THEME.primary }}
+                >
+                  Edit
+                </button>
+              )}
             </div>
 
-            <div
-              className="p-4 rounded-xl border space-y-2 mb-3 text-center"
-              style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}
-            >
-              <p className="text-xs font-medium" style={{ color: THEME.textMuted }}>
-                No goals added yet.
-              </p>
-            </div>
+            {mentorshipGoals.length === 0 ? (
+              <div
+                className="p-4 rounded-xl border space-y-2 mb-3 text-center"
+                style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}
+              >
+                <p className="text-xs font-medium" style={{ color: THEME.textMuted }}>
+                  No goals added yet.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {mentorshipGoals.map((goal: string, idx: number) => (
+                  <span
+                    key={idx}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm border"
+                    style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight, color: THEME.primary }}
+                  >
+                    {goal}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </div>
@@ -1068,15 +1123,60 @@ export default function UserDashboardProfilePreferencesPage({
       )}
 
       {/* ======================================================== */}
-      {/* MODAL 4: Add Experience Modal                            */}
+      {/* MODAL 4: Add / Edit Experience Modal                     */}
       {/* ======================================================== */}
-      {isAddExpOpen && (
+      {(isAddExpOpen || expToEdit) && (
         <AddExperienceModal
-          isOpen={isAddExpOpen}
-          onClose={() => setIsAddExpOpen(false)}
+          isOpen={true}
+          initialData={expToEdit}
+          onClose={() => {
+            setIsAddExpOpen(false);
+            setExpToEdit(null);
+          }}
           onSuccess={() => {
             setIsAddExpOpen(false);
-            setFeedback({ type: "success", message: "Work experience added and saved to server!" });
+            setExpToEdit(null);
+            setFeedback({ type: "success", message: expToEdit ? "Work experience updated and saved!" : "Work experience added and saved to server!" });
+            fetchAllUserData(true);
+          }}
+        />
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 5: Edit Career Interests Modal                     */}
+      {/* ======================================================== */}
+      {isEditInterestsOpen && (
+        <EditListModal
+          isOpen={isEditInterestsOpen}
+          title="Career Interests"
+          description="Add industries, domains, and roles you are interested in."
+          initialList={careerInterests}
+          profile={profile}
+          preferenceKey="careerInterests"
+          onClose={() => setIsEditInterestsOpen(false)}
+          onSuccess={() => {
+            setIsEditInterestsOpen(false);
+            setFeedback({ type: "success", message: "Career interests updated!" });
+            fetchAllUserData(true);
+          }}
+        />
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 6: Edit Mentorship Goals Modal                     */}
+      {/* ======================================================== */}
+      {isEditGoalsOpen && (
+        <EditListModal
+          isOpen={isEditGoalsOpen}
+          title="Mentorship Goals"
+          description="What do you want to achieve through mentorship?"
+          initialList={mentorshipGoals}
+          profile={profile}
+          preferenceKey="mentorshipGoals"
+          onClose={() => setIsEditGoalsOpen(false)}
+          onSuccess={() => {
+            setIsEditGoalsOpen(false);
+            setFeedback({ type: "success", message: "Mentorship goals updated!" });
             fetchAllUserData(true);
           }}
         />
@@ -1155,7 +1255,7 @@ function SkillCard({ skill, onDelete, readOnly }: { skill: any; onDelete: () => 
 // ==========================================================
 // Subcomponent: Experience Row
 // ==========================================================
-function ExperienceRow({ exp, onDelete, readOnly }: { exp: any; onDelete: () => Promise<void>; readOnly?: boolean }) {
+function ExperienceRow({ exp, onDelete, onEdit, readOnly }: { exp: any; onDelete: () => Promise<void>; onEdit?: () => void; readOnly?: boolean }) {
   const [deleting, setDeleting] = useState(false);
 
   const formatDate = (d?: string) => {
@@ -1223,19 +1323,31 @@ function ExperienceRow({ exp, onDelete, readOnly }: { exp: any; onDelete: () => 
       </div>
 
       {!readOnly && (
-        <button
-          onClick={async () => {
-            if (!confirm(`Delete experience at ${exp.companyName}?`)) return;
-            setDeleting(true);
-            await onDelete();
-            setDeleting(false);
-          }}
-          disabled={deleting}
-          className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors self-end sm:self-start shrink-0"
-          title="Delete experience"
-        >
-          {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-        </button>
+        <div className="flex items-center gap-1 self-end sm:self-start shrink-0">
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              disabled={deleting}
+              className="p-2 rounded-lg text-gray-400 hover:text-[#4a3728] hover:bg-[#e0d8cf]/30 transition-colors"
+              title="Edit experience"
+            >
+              <Edit3 className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={async () => {
+              if (!confirm(`Delete experience at ${exp.companyName}?`)) return;
+              setDeleting(true);
+              await onDelete();
+              setDeleting(false);
+            }}
+            disabled={deleting}
+            className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+            title="Delete experience"
+          >
+            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -1735,24 +1847,37 @@ function AddSkillModal({
 }
 
 // ==========================================================
-// Modal: Add Experience
+// Modal: Add / Edit Experience
 // ==========================================================
 function AddExperienceModal({
   isOpen,
+  initialData,
   onClose,
   onSuccess,
 }: {
   isOpen: boolean;
+  initialData?: any;
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [currentPosition, setCurrentPosition] = useState("");
-  const [companyName, setCompanyName] = useState("");
-  const [description, setDescription] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [currentlyWorking, setCurrentlyWorking] = useState(false);
-  const [achievementsStr, setAchievementsStr] = useState("");
+  const formatDateForInput = (d?: string) => {
+    if (!d) return "";
+    try {
+      return new Date(d).toISOString().split('T')[0];
+    } catch {
+      return "";
+    }
+  };
+
+  const [currentPosition, setCurrentPosition] = useState(initialData?.currentPosition || "");
+  const [companyName, setCompanyName] = useState(initialData?.companyName || "");
+  const [description, setDescription] = useState(initialData?.description || "");
+  const [startDate, setStartDate] = useState(formatDateForInput(initialData?.startDate));
+  const [endDate, setEndDate] = useState(formatDateForInput(initialData?.endDate));
+  const [currentlyWorking, setCurrentlyWorking] = useState(initialData?.currentlyWorking || false);
+  const [achievementsStr, setAchievementsStr] = useState(
+    Array.isArray(initialData?.keyAchievements) ? initialData.keyAchievements.join(", ") : ""
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1786,7 +1911,7 @@ function AddExperienceModal({
         .map((a) => a.trim())
         .filter((a) => a.length >= 3);
 
-      await ProfileService.createExperience({
+      const payload = {
         currentPosition: currentPosition.trim(),
         companyName: companyName.trim(),
         description: description.trim(),
@@ -1794,11 +1919,18 @@ function AddExperienceModal({
         endDate: currentlyWorking ? undefined : endDate || undefined,
         currentlyWorking,
         keyAchievements: achievements.length > 0 ? achievements : undefined,
-      });
+      };
+
+      if (initialData && (initialData.experienceId || initialData._id)) {
+        await ProfileService.updateExperience(initialData.experienceId || initialData._id, payload);
+      } else {
+        await ProfileService.createExperience(payload);
+      }
+      
       onSuccess();
     } catch (err: any) {
-      console.error("Failed to add experience:", err);
-      setError(err?.message || "Failed to create experience record.");
+      console.error("Failed to save experience:", err);
+      setError(err?.message || "Failed to save experience record.");
     } finally {
       setSaving(false);
     }
@@ -1812,7 +1944,7 @@ function AddExperienceModal({
       >
         <div className="flex items-center justify-between pb-3 mb-4 border-b" style={{ borderColor: THEME.borderLight }}>
           <h3 className="text-base font-bold" style={{ color: THEME.primary }}>
-            Add Professional Experience
+            {initialData ? "Edit Professional Experience" : "Add Professional Experience"}
           </h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-500">
             <X className="w-5 h-5" />
@@ -1948,10 +2080,174 @@ function AddExperienceModal({
               style={{ backgroundColor: THEME.primary }}
             >
               {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {saving ? "Saving..." : "Add Experience"}
+              {saving ? "Saving..." : initialData ? "Save Changes" : "Add Experience"}
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================================
+// Modal: Edit List (For Career Interests & Mentorship Goals)
+// ==========================================================
+function EditListModal({
+  isOpen,
+  title,
+  description,
+  initialList,
+  profile,
+  preferenceKey,
+  onClose,
+  onSuccess,
+}: {
+  isOpen: boolean;
+  title: string;
+  description: string;
+  initialList: string[];
+  profile: any;
+  preferenceKey: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [list, setList] = useState<string[]>(initialList || []);
+  const [inputValue, setInputValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = inputValue.trim();
+    if (!trimmed) return;
+    if (list.includes(trimmed)) {
+      setError("Item already added.");
+      return;
+    }
+    setList([...list, trimmed]);
+    setInputValue("");
+    setError(null);
+  };
+
+  const handleRemove = (indexToRemove: number) => {
+    setList(list.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const updatedPreferences = {
+        ...profile?.preferences,
+        [preferenceKey]: list,
+      };
+
+      await AuthService.updateUserProfile({
+        preferences: updatedPreferences,
+      });
+
+      onSuccess();
+    } catch (err: any) {
+      console.error(`Failed to update ${preferenceKey}:`, err);
+      setError(err?.message || `Failed to update ${title.toLowerCase()}.`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+      <div
+        className="w-full max-w-md rounded-2xl p-6 border shadow-xl flex flex-col max-h-[90vh]"
+        style={{ backgroundColor: THEME.cardBg, borderColor: THEME.border }}
+      >
+        <div className="flex items-center justify-between pb-3 mb-4 border-b shrink-0" style={{ borderColor: THEME.borderLight }}>
+          <div>
+            <h3 className="text-base font-bold" style={{ color: THEME.primary }}>
+              {title}
+            </h3>
+            <p className="text-xs mt-1" style={{ color: THEME.textMuted }}>
+              {description}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 self-start">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-medium shrink-0">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleAdd} className="flex gap-2 mb-4 shrink-0">
+          <input
+            type="text"
+            placeholder="Type and press Enter to add..."
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            className="flex-1 px-3 py-2 rounded-xl border focus:outline-none focus:ring-1 focus:ring-[#4a3728] text-xs"
+            style={{ borderColor: THEME.border }}
+          />
+          <button
+            type="submit"
+            className="px-4 py-2 rounded-xl font-bold text-white flex items-center justify-center text-xs transition-colors hover:opacity-90"
+            style={{ backgroundColor: THEME.primary }}
+          >
+            Add
+          </button>
+        </form>
+
+        <div className="flex-1 overflow-y-auto min-h-[100px] mb-4 pr-2 space-y-2">
+          {list.length === 0 ? (
+            <p className="text-xs text-center italic py-4" style={{ color: THEME.textMuted }}>
+              No items added yet.
+            </p>
+          ) : (
+            list.map((item, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between p-2.5 rounded-xl border shadow-sm"
+                style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}
+              >
+                <span className="text-xs font-semibold" style={{ color: THEME.primary }}>
+                  {item}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleRemove(idx)}
+                  className="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="pt-3 flex justify-end gap-2 border-t shrink-0" style={{ borderColor: THEME.borderLight }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border font-bold text-gray-600 hover:bg-gray-50 text-xs"
+            style={{ borderColor: THEME.border }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="px-5 py-2 rounded-xl font-bold text-white flex items-center gap-2 text-xs"
+            style={{ backgroundColor: THEME.primary }}
+          >
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
       </div>
     </div>
   );
