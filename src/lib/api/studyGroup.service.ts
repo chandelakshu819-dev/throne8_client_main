@@ -2176,7 +2176,7 @@ class StudyGroupService {
         `${config.NEXT_PUBLIC_STUDY_GROUP_CHAT_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_CHAT_ENDPOINT}/${groupId}/send`,
         data
       );
-      return res.data;
+      return res.data?.data || res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 403)

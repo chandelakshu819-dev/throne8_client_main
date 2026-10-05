@@ -57,9 +57,15 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const activeSession = useAppSelector(selectActiveSession);
   const timerApiLoading = useAppSelector(selectTimerApiLoading);
   const activeSessionLoading = useAppSelector((state: any) => state.timer.activeSessionLoading);
-  const timerStats = useAppSelector(selectTimerStats);
-  const roomMessages = useAppSelector((state: any) => state.chat.messages?.[groupId] ?? []);
-  const sendLoading = useAppSelector((state: any) => state.chat.sendLoading?.[groupId] ?? false);
+  const roomMessages = useAppSelector(selectMessagesByGroup(groupId));
+  const sendLoading = useAppSelector(selectSendLoading);
+  const chatBottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (roomMessages.length > 0) {
+      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [roomMessages.length]);
   const activeLiveRoom = useAppSelector(selectActiveLiveRoom);
   const activeLiveRoomLoading = useAppSelector(selectActiveLiveRoomLoading);
   const liveRoomActionLoading = useAppSelector(selectLiveRoomActionLoading);
@@ -143,6 +149,9 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
         groupId,
         data: { content: textToSend, messageType: 'text' }
       })).unwrap();
+      // WORKAROUND: Refetch messages because backend POST /chat/:groupId/send returns { "data": { "data": null } }.
+      // This workaround can be removed once the backend returns the saved message in the send response.
+      dispatch(fetchMessagesThunk({ groupId, params: { page: 1, limit: 30 } }));
     } catch (err) {
       setMessage(textToSend);
     }
@@ -1012,6 +1021,7 @@ ADD this block just before your main `return (` statement:
                       </div>
                     );
                   })}
+                  <div ref={chatBottomRef} />
                 </div>
                 <div className="p-3 lg:p-4 border-t border-[#e0d8cf] shrink-0">
                   <div className="flex gap-2">

@@ -137,9 +137,17 @@ const chatSlice = createSlice({
     socketMessageReceived: (state, action: PayloadAction<{ groupId: string; message: MessageResponse }>) => {
       const { groupId, message } = action.payload;
       if (!state.messagesByGroup[groupId]) state.messagesByGroup[groupId] = [];
+      const msgId = message.messageId || (message as any)._id;
       // avoid duplicate
-      const exists = state.messagesByGroup[groupId].some(m => m && m.messageId === message.messageId);
-      if (!exists) state.messagesByGroup[groupId].push(message);
+      const exists = state.messagesByGroup[groupId].some(
+        m => m && (m.messageId === msgId || (m as any)._id === msgId)
+      );
+      if (!exists) {
+        state.messagesByGroup[groupId].push({
+          ...message,
+          messageId: msgId,
+        });
+      }
     },
     // Socket: message edited
     socketMessageEdited: (state, action: PayloadAction<MessageResponse>) => {
@@ -262,13 +270,24 @@ const chatSlice = createSlice({
       .addCase(fetchMessagesThunk.fulfilled, (state, action) => {
         state.messagesLoading = false;
         const { groupId, messages, hasMore, currentPage } = action.payload;
-        // page 1 = replace, page 2+ = prepend (load more)
+        // page 1 = update latest messages preserving older pages, page 2+ = prepend (load more)
         if (currentPage === 1) {
-          state.messagesByGroup[groupId] = messages;
+          const existing = state.messagesByGroup[groupId] ?? [];
+          if (existing.length === 0) {
+            state.messagesByGroup[groupId] = messages;
+          } else {
+            // Keep older messages loaded from higher pages, replace/append latest page 1 messages without duplicate or flicker
+            const incomingIds = new Set(messages.map((m: any) => m.messageId || m._id));
+            const olderKept = existing.filter((m: any) => !incomingIds.has(m.messageId || m._id));
+            state.messagesByGroup[groupId] = [...olderKept, ...messages];
+          }
         } else {
+          const existing = state.messagesByGroup[groupId] ?? [];
+          const existingIds = new Set(existing.map((m: any) => m.messageId || m._id));
+          const olderNewMsgs = messages.filter((m: any) => !existingIds.has(m.messageId || m._id));
           state.messagesByGroup[groupId] = [
-            ...messages,
-            ...(state.messagesByGroup[groupId] ?? [])
+            ...olderNewMsgs,
+            ...existing
           ];
         }
         state.hasMoreByGroup[groupId] = hasMore;
@@ -282,26 +301,24 @@ const chatSlice = createSlice({
     // send message
     builder
       .addCase(sendMessageThunk.pending, (state) => { state.sendLoading = true; })
-      // .addCase(sendMessageThunk.fulfilled, (state, action) => {
-      //   state.sendLoading = false;
-      //   const { groupId, message } = action.payload;
-      //   if (!state.messagesByGroup[groupId]) state.messagesByGroup[groupId] = [];
-      //   // avoid duplicate if socket already added it
-      //   const exists = state.messagesByGroup[groupId].some(m => m && m.messageId === message.messageId);
-      //   if (!exists) state.messagesByGroup[groupId].push(message);
-      //   state.replyingToMessage = null;
-      // })
-
       .addCase(sendMessageThunk.fulfilled, (state, action) => {
         state.sendLoading = false;
         state.replyingToMessage = null;
-        // Real message comes via socket — optimistic already showing
-        // Only add if socket is not connected (fallback)
-        if (action.payload?.message?.messageId) {
-          const { groupId, message } = action.payload;
+        const rawMessage = action.payload?.message;
+        const message = rawMessage?.data || rawMessage;
+        const messageId = message?.messageId || message?._id;
+        if (messageId) {
+          const { groupId } = action.payload;
           if (!state.messagesByGroup[groupId]) state.messagesByGroup[groupId] = [];
-          const exists = state.messagesByGroup[groupId].some(m => m.messageId === message.messageId);
-          if (!exists) state.messagesByGroup[groupId].push(message);
+          const exists = state.messagesByGroup[groupId].some(
+            m => m && (m.messageId === messageId || (m as any)._id === messageId)
+          );
+          if (!exists) {
+            state.messagesByGroup[groupId].push({
+              ...message,
+              messageId,
+            });
+          }
         }
       })
       // .addCase(sendMessageThunk.rejected, (state, action) => {
