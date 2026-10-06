@@ -13,6 +13,10 @@ export interface PublicStreakData {
 }
 
 export const streakService = {
+  getCurrentStreak: async (): Promise<{ currentStreak: number; longestStreak?: number; isActive?: boolean }> => {
+    const response = await api.get('/study-group/streak/current');
+    return response.data.data;
+  },
   getByUserId: async (userId: string): Promise<PublicStreakData> => {
     const response = await api.get(`/study-group/streak/public/${userId}`);
     return response.data.data;

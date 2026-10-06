@@ -4,7 +4,7 @@
 import { Group, GroupTabType, PublicGroup } from '@/app/studyGroup/study/groups/types';
 import { createSlice, createSelector, PayloadAction } from '@reduxjs/toolkit';
 import { ApiGroup, PaginationResult } from './groups.types';
-import { addMemberThunk, attendanceAutoMarkThunk, attendanceCheckInThunk, cancelJoinRequestThunk, createGroupThunk, createLiveRoomThunk, deleteGroupThunk, endLiveRoomThunk, fetchAllUsersThunk, fetchAttendanceCalendarThunk, fetchAttendanceHistoryThunk, fetchAttendancePercentageThunk, fetchAttendanceStatusThunk, fetchAvailableGroupsThunk, fetchGroupActiveLiveRoomThunk, fetchGroupByIdThunk, fetchGroupInviteLinksThunk, fetchGroupMembersThunk, fetchGroupsByCategoryThunk, fetchGroupsThunk, fetchInviteAnalyticsThunk, fetchMyGroupsThunk, fetchPlacementGroupsThunk, fetchPopularGroupsThunk, fetchPublicGroupsThunk, fetchRecommendedGroupsThunk, fetchSocialShareLinksThunk, fetchTopRankedGroupsThunk, fetchTrendingGroupsThunk, fetchUniversityGroupsThunk, generateInviteLinkThunk, generateQRCodeThunk, getGroupPendingRequestsThunk, getJoinRequestStatusThunk, getMemberCountThunk, getMyJoinRequestsThunk, joinGroupThunk, joinLiveRoomThunk, leaveGroupThunk, leaveLiveRoomThunk, removeMemberThunk, respondToJoinRequestThunk, revokeInviteLinkThunk, searchGroupsByTagsThunk, searchGroupsThunk, sendJoinRequestThunk, toggleCameraThunk, toggleMicThunk, toggleScreenShareThunk, updateGroupThunk, validateInviteCodeThunk } from './group.thunks';
+import { addMemberThunk, attendanceAutoMarkThunk, attendanceCheckInThunk, cancelJoinRequestThunk, createGroupThunk, createLiveRoomThunk, deleteGroupThunk, endLiveRoomThunk, fetchAllUsersThunk, fetchAttendanceCalendarThunk, fetchAttendanceHistoryThunk, fetchAttendancePercentageThunk, fetchAttendanceStatusThunk, fetchAvailableGroupsThunk, fetchGroupActiveLiveRoomThunk, fetchGroupByIdThunk, fetchGroupInviteLinksThunk, fetchGroupMembersThunk, fetchGroupsByCategoryThunk, fetchGroupsThunk, fetchInviteAnalyticsThunk, fetchMyGroupsThunk, fetchPlacementGroupsThunk, fetchPopularGroupsThunk, fetchPublicGroupsThunk, fetchRecommendedGroupsThunk, fetchSocialShareLinksThunk, fetchTopRankedGroupsThunk, fetchTrendingGroupsThunk, fetchUniversityGroupsThunk, fetchUserStreakThunk, generateInviteLinkThunk, generateQRCodeThunk, getGroupPendingRequestsThunk, getJoinRequestStatusThunk, getMemberCountThunk, getMyJoinRequestsThunk, joinGroupThunk, joinLiveRoomThunk, leaveGroupThunk, leaveLiveRoomThunk, removeMemberThunk, respondToJoinRequestThunk, revokeInviteLinkThunk, searchGroupsByTagsThunk, searchGroupsThunk, sendJoinRequestThunk, toggleCameraThunk, toggleMicThunk, toggleScreenShareThunk, updateGroupThunk, validateInviteCodeThunk } from './group.thunks';
 import { AttendanceCalendarResponse, AttendanceHistoryResponse, AttendancePercentageResponse, AttendanceStatusResponse, GroupMember, GroupResponse, InviteAnalyticsResponse, InviteLinkDetail, InviteLinkResponse, JoinRequestStatusResponse, MyRequestsResponse, PendingJoinRequest, QRCodeResponse, SocialShareLinksResponse, TopRankedGroupResponse } from '@/lib/api/studyGroup.service';
 // import type { Group, GroupTabType, PublicGroup } from '../../types';
 
@@ -138,6 +138,10 @@ interface GroupsState {
   attendanceCalendarLoading: boolean;
   attendanceError: string | null;
 
+  // ── Streak ──
+  userStreak: number;
+  userStreakLoading: boolean;
+
   // ── Share ──
   shareInviteLink: (InviteLinkResponse & { groupId: string }) | null;
   shareInviteLinkLoading: boolean;
@@ -269,6 +273,8 @@ const initialState: GroupsState = {
   attendanceCalendar: null,
   attendanceCalendarLoading: false,
   attendanceError: null,
+  userStreak: 0,
+  userStreakLoading: false,
 
   // Share
   shareInviteLink: null,
@@ -388,7 +394,7 @@ const groupsSlice = createSlice({
       .addCase(fetchAllUsersThunk.pending, (state) => { state.allUsersLoading = true; })
       .addCase(fetchAllUsersThunk.fulfilled, (state, action) => {
         state.allUsersLoading = false;
-        state.allUsers = Array.isArray(action.payload) ? action.payload : action.payload?.users ?? [];
+        state.allUsers = Array.isArray(action.payload) ? action.payload : (action.payload as any)?.users ?? [];
       })
       .addCase(fetchAllUsersThunk.rejected, (state) => { state.allUsersLoading = false; });
 
@@ -962,6 +968,9 @@ const groupsSlice = createSlice({
           totalActiveTime: 0,
           isActive: true,
         };
+        if (state.userStreak === 0) {
+          state.userStreak = 1;
+        }
       })
       .addCase(attendanceCheckInThunk.rejected, (state, action) => {
         state.attendanceCheckInLoading = false;
@@ -979,11 +988,35 @@ const groupsSlice = createSlice({
         if (state.attendanceStatus) {
           state.attendanceStatus.todayStatus = action.payload.status;
           state.attendanceStatus.hasCheckedInToday = true;
+        } else {
+          state.attendanceStatus = {
+            todayStatus: action.payload.status,
+            hasCheckedInToday: true,
+            checkInTime: new Date().toISOString(),
+            totalActiveTime: 0,
+            isActive: true,
+          };
+        }
+        if (state.userStreak === 0) {
+          state.userStreak = 1;
         }
       })
       .addCase(attendanceAutoMarkThunk.rejected, (state, action) => {
         state.attendanceAutoMarkLoading = false;
         state.attendanceError = action.payload as string;
+      });
+
+    // ── User Streak ──
+    builder
+      .addCase(fetchUserStreakThunk.pending, (state) => {
+        state.userStreakLoading = true;
+      })
+      .addCase(fetchUserStreakThunk.fulfilled, (state, action) => {
+        state.userStreakLoading = false;
+        state.userStreak = action.payload?.currentStreak ?? 0;
+      })
+      .addCase(fetchUserStreakThunk.rejected, (state) => {
+        state.userStreakLoading = false;
       });
 
     // ── Attendance Status ──
@@ -1347,6 +1380,8 @@ export const selectAttendanceHistoryLoading = (state: StateWithGroups) => state.
 export const selectAttendanceCalendar = (state: StateWithGroups) => state.groups.attendanceCalendar;
 export const selectAttendanceCalendarLoading = (state: StateWithGroups) => state.groups.attendanceCalendarLoading;
 export const selectAttendanceError = (state: StateWithGroups) => state.groups.attendanceError;
+export const selectUserStreak = (state: StateWithGroups) => state.groups.userStreak ?? 0;
+export const selectUserStreakLoading = (state: StateWithGroups) => state.groups.userStreakLoading;
 
 // ── Share Selectors ──
 export const selectShareInviteLink = (state: StateWithGroups) => state.groups.shareInviteLink;

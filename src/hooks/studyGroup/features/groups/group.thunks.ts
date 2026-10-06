@@ -9,6 +9,20 @@ import StudyGroupService, {
   UpdateGroupData,
 } from "@/lib/api/studyGroup.service";
 import AuthService from "@/lib/api/auth.service";
+import { streakService } from "@/lib/api/streak.service";
+
+export const fetchUserStreakThunk = createAsyncThunk(
+  "groups/fetchUserStreak",
+  async (_, { rejectWithValue }) => {
+    try {
+      return await streakService.getCurrentStreak();
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || error.message || "Failed to fetch streak"
+      );
+    }
+  }
+);
 
 export const fetchAllUsersThunk = createAsyncThunk(
   "groups/fetchAllUsers",

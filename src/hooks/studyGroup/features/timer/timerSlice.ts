@@ -541,7 +541,7 @@ const timerSlice = createSlice({
                 : state.customMinutes * 60;
 
           if (raw.elapsedTime) {
-            const elapsedSeconds = Math.floor(raw.elapsedTime / 1000);
+            const elapsedSeconds = Math.floor(raw.elapsedTime);
             const remaining = Math.max(total - elapsedSeconds, 0);
             state.minutes = Math.floor(remaining / 60);
             state.seconds = remaining % 60;

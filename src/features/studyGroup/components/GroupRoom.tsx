@@ -1,7 +1,7 @@
 //src/app/(studyGroup)/study/my-groups/components/GroupRoom.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users,
@@ -46,6 +46,7 @@ import {
   attendanceAutoMarkThunk,
   fetchAttendanceStatusThunk,
   attendanceCheckInThunk,
+  fetchUserStreakThunk,
 } from "@/hooks/studyGroup/features/groups/group.thunks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
@@ -66,6 +67,7 @@ import {
   clearActiveLiveRoom,
   selectAttendanceStatus,
   selectAttendanceCheckInLoading,
+  selectUserStreak,
 } from "@/hooks/studyGroup/features/groups/groupsSlice";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 // import { useGroupData } from "@/hooks/studyGroup/useGroupData";
@@ -94,6 +96,8 @@ import {
 import {
   selectMessagesByGroup,
   selectOnlineMembers,
+  selectMemberSessionTimes,
+  selectActiveSessionMemberIds,
   selectSendLoading,
 } from "@/hooks/studyGroup/features/chats/chatSlice";
 import {
@@ -157,11 +161,19 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     isLoadingGroupMembers,
     getUserInfoSync,
   } = useGroupData();
+  const fetchGroupMembersRef = useRef(fetchGroupMembers);
+  useEffect(() => {
+    fetchGroupMembersRef.current = fetchGroupMembers;
+  }, [fetchGroupMembers]);
+
+  const leaveWebRTCRoomRef = useRef<() => void>(() => {});
+
   const [showChat, setShowChat] = useState<boolean>(false);
   const [showMembers, setShowMembers] = useState<boolean>(false);
   const [message, setMessage] = useState<string>("");
   const [studyTime, setStudyTime] = useState<number>(0);
   const [isSessionActive, setIsSessionActive] = useState<boolean>(false);
+  const timerAnchorRef = useRef<{ baseSeconds: number; anchorTimestamp: number } | null>(null);
   const [showNotificationPopup, setShowNotificationPopup] =
     useState<boolean>(false);
   const [showChallengeModal, setShowChallengeModal] = useState<boolean>(false);
@@ -223,11 +235,17 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     }
   };
 
-  // unmount par camera band + Redux reset
+  // unmount par camera band + Redux reset + WebRTC cleanup
   useEffect(() => {
     dispatch(setLocalCamera(false));
+    dispatch(setLocalMic(false));
     return () => {
       previewStreamRef.current?.getTracks().forEach((t) => t.stop());
+      try {
+        leaveWebRTCRoomRef.current?.();
+      } catch {
+        /* silent */
+      }
     };
   }, [dispatch]);
 
@@ -242,27 +260,54 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       (p: any) => (p.userId ?? p.user) === currentUserId
     ) ??
       false);
-  const onlineMembers = useAppSelector(
-    (state: any) => state.chat.onlineMembers?.[groupId] ?? []
-  );
-  const memberSessionTimes = useAppSelector(
-    (state: any) => state.chat.memberSessionTimes?.[groupId] ?? {}
-  );
+  const rawOnlineMembers = useAppSelector(selectOnlineMembers(groupId));
+  const onlineMembers = useMemo(() => {
+    if (currentUserId && !rawOnlineMembers.includes(currentUserId)) {
+      return [...rawOnlineMembers, currentUserId];
+    }
+    return rawOnlineMembers;
+  }, [rawOnlineMembers, currentUserId]);
+
+  const activeSessionMemberIds = useAppSelector(selectActiveSessionMemberIds(groupId));
+  const activeCount = useMemo(() => {
+    const others = activeSessionMemberIds.filter((id) => String(id) !== String(currentUserId));
+    return others.length + (isSessionActive ? 1 : 0);
+  }, [activeSessionMemberIds, currentUserId, isSessionActive]);
+
+  const userStreak = useAppSelector(selectUserStreak);
+  const lastBroadcastRef = useRef<number>(0);
+  const studyTimeRef = useRef<number>(studyTime);
+  useEffect(() => {
+    studyTimeRef.current = studyTime;
+  }, [studyTime]);
+
+  const memberSessionTimes = useAppSelector(selectMemberSessionTimes(groupId));
+  const membersSource = enrichedMembers.length > 0 ? enrichedMembers : (rawMembers as any[]);
   const members =
-    enrichedMembers.length > 0
-      ? enrichedMembers.map((m: any, idx: number) => ({
-        id: idx + 1,
-        name: m.name ?? m.userId?.slice(0, 8) ?? "Member",
-        avatar: m.avatar ?? null,
-        isOnline: onlineMembers.includes(m.userId),
-        isSpeaking: false,
-        studyTime: 0,
-        rank: idx + 1,
-        videoEnabled: false,
-        audioEnabled: false,
-        userId: m.userId,
-        role: m.role,
-      }))
+    membersSource.length > 0
+      ? membersSource.map((m: any, idx: number) => {
+          const mUserId =
+            typeof m.userId === "string"
+              ? m.userId
+              : (m.userId?._id || m.userId?.id || m.userId?.userId || m._id || m.id || "");
+          const isOnline = onlineMembers.some(
+            (onlineId) => String(onlineId) === String(mUserId)
+          );
+          const cachedUser = getUserInfoSync(mUserId);
+          return {
+            id: idx + 1,
+            name: m.name ?? cachedUser?.name ?? (mUserId ? mUserId.slice(0, 8) : "Member"),
+            avatar: m.avatar ?? cachedUser?.avatar ?? null,
+            isOnline,
+            isSpeaking: false,
+            studyTime: 0,
+            rank: idx + 1,
+            videoEnabled: false,
+            audioEnabled: false,
+            userId: mUserId,
+            role: m.role,
+          };
+        })
       : [];
 
   const liveRoomId = activeLiveRoom?.roomId ?? "";
@@ -295,6 +340,10 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       }
     },
   });
+
+  useEffect(() => {
+    leaveWebRTCRoomRef.current = leaveWebRTCRoom;
+  }, [leaveWebRTCRoom]);
 
   const camOn = showLiveRoomView ? webrtcCameraOn : isCameraOn;
   const micOn = showLiveRoomView ? webrtcMicOn : isMicOn;
@@ -332,6 +381,10 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       if (isSessionActive && activeSession?.sessionId) {
         try {
           await dispatch(stopTimerThunk(undefined)).unwrap();
+          const socket = getSocket();
+          if (socket?.connected) {
+            socket.emit("session-paused", { groupId });
+          }
           const hoursStudied = studyTime / 3600;
           if (hoursStudied > 0.1) {
             // only mark if studied > 6 mins
@@ -343,6 +396,8 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
             )
               .unwrap()
               .catch(() => { });
+            dispatch(fetchAttendanceStatusThunk());
+            dispatch(fetchUserStreakThunk());
           }
         } catch (err) {
           /* silent */
@@ -380,19 +435,20 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       setLiveRoomTitle("");
       setLiveRoomError("");
 
+      const userCam = isCameraOn;
+      const userMic = isMicOn;
+
       // 2. HTTP join
       await dispatch(
         joinLiveRoomThunk({
           roomId,
-          options: { cameraOn: true, micOn: true },
+          options: { cameraOn: userCam, micOn: userMic },
         })
       ).unwrap();
 
-
-
       // 3. Media
       stopPreview();
-      const stream = await startLocalStream(true, true);
+      const stream = await startLocalStream(userCam, userMic);
       if (!stream) return;
 
       // 4. Socket join — direct, stale hook bypass
@@ -419,18 +475,21 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     if (!activeLiveRoom?.roomId) return;
     const roomId = activeLiveRoom.roomId;
 
+    const userCam = isCameraOn;
+    const userMic = isMicOn;
+
     try {
       // 1. HTTP join
       await dispatch(
         joinLiveRoomThunk({
           roomId,
-          options: { cameraOn: true, micOn: true },
+          options: { cameraOn: userCam, micOn: userMic },
         })
       ).unwrap();
 
       // 2. Media get karo
       stopPreview();
-      const stream = await startLocalStream(true, true);
+      const stream = await startLocalStream(userCam, userMic);
       if (!stream) return;
 
       // 3. Socket se directly join karo — stale hook bypass
@@ -479,9 +538,14 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       if (!isSessionActive) {
         if (activeSession?.status === "paused") {
           const result = await dispatch(resumeTimerThunk()).unwrap();
-          if (result?.elapsedTime) {
-            setStudyTime(Math.floor(result.elapsedTime / 1000));
-          }
+          const resumedSeconds = Math.floor(
+            result?.elapsedTime ?? activeSession?.elapsedTime ?? studyTime
+          );
+          setStudyTime(resumedSeconds);
+          timerAnchorRef.current = {
+            baseSeconds: resumedSeconds,
+            anchorTimestamp: Date.now(),
+          };
           setIsSessionActive(true);
         } else {
           await dispatch(
@@ -490,19 +554,31 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
               notes: `Group: ${groupData?.title ?? groupId}`,
             })
           ).unwrap();
+          setStudyTime(0);
+          timerAnchorRef.current = {
+            baseSeconds: 0,
+            anchorTimestamp: Date.now(),
+          };
+          setIsSessionActive(true);
         }
-        setIsSessionActive(true);
         // Auto-mark attendance when session starts
         try {
           await dispatch(
             attendanceAutoMarkThunk({ reason: "study_session", studyHours: 0 })
           ).unwrap();
+          dispatch(fetchAttendanceStatusThunk());
+          dispatch(fetchUserStreakThunk());
         } catch {
           /* silent */
         }
       } else {
         await dispatch(pauseTimerThunk()).unwrap();
+        timerAnchorRef.current = null;
         setIsSessionActive(false);
+        const socket = getSocket();
+        if (socket?.connected) {
+          socket.emit("session-paused", { groupId });
+        }
       }
     } catch (err: any) {
       console.error("Timer error:", err);
@@ -522,26 +598,68 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
 
-    if (isSessionActive) {
-      timer = setInterval(() => {
-        setStudyTime((prev) => {
-          const newTime = prev + 1;
-          if (newTime % 5 === 0) {
-            const socket = getSocket();
-            if (socket?.connected) {
-              socket.emit("broadcast-session-time", {
-                groupId,
-                elapsedTime: newTime,
-              });
-            }
-          }
-          return newTime;
+    const broadcastCurrentTime = (forcedTime?: number) => {
+      if (!timerAnchorRef.current) return;
+      const elapsedSinceAnchor = Math.floor(
+        (Date.now() - timerAnchorRef.current.anchorTimestamp) / 1000
+      );
+      const currentStudyTime = forcedTime ?? (timerAnchorRef.current.baseSeconds + elapsedSinceAnchor);
+      lastBroadcastRef.current = Date.now();
+      const socket = getSocket();
+      if (socket?.connected) {
+        socket.emit("broadcast-session-time", {
+          groupId,
+          elapsedTime: currentStudyTime,
         });
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && timerAnchorRef.current) {
+        const elapsedSinceAnchor = Math.floor(
+          (Date.now() - timerAnchorRef.current.anchorTimestamp) / 1000
+        );
+        const currentStudyTime = timerAnchorRef.current.baseSeconds + elapsedSinceAnchor;
+        setStudyTime(currentStudyTime);
+        broadcastCurrentTime(currentStudyTime);
+        const socket = getSocket();
+        if (socket?.connected) {
+          socket.emit("get-active-members", { groupId });
+        }
+      }
+    };
+
+    if (isSessionActive) {
+      if (!timerAnchorRef.current) {
+        timerAnchorRef.current = {
+          baseSeconds: studyTimeRef.current,
+          anchorTimestamp: Date.now(),
+        };
+      }
+
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+
+      timer = setInterval(() => {
+        if (!timerAnchorRef.current) return;
+        const elapsedSinceAnchor = Math.floor(
+          (Date.now() - timerAnchorRef.current.anchorTimestamp) / 1000
+        );
+        const currentStudyTime = timerAnchorRef.current.baseSeconds + elapsedSinceAnchor;
+        setStudyTime(currentStudyTime);
+
+        // Safe broadcast check using wall-clock delta
+        const now = Date.now();
+        if (now - lastBroadcastRef.current >= 5000) {
+          broadcastCurrentTime(currentStudyTime);
+        }
       }, 1000);
+    } else {
+      timerAnchorRef.current = null;
     }
 
     return () => {
       if (timer) clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [isSessionActive, groupId]);
 
@@ -550,9 +668,10 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       dispatch(fetchGroupByIdThunk(groupId));
       dispatch(fetchGroupMembersThunk(groupId));
       dispatch(fetchAllUsersThunk()).then(() => {
-        fetchGroupMembers(groupId);
+        fetchGroupMembersRef.current?.(groupId);
       });
       dispatch(fetchAttendanceStatusThunk());
+      dispatch(fetchUserStreakThunk());
 
       dispatch(getActiveTimerThunk());
       dispatch(getTimerStatsThunk());
@@ -568,16 +687,24 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   useEffect(() => {
     if (activeSession?.status === "active") {
       setIsSessionActive(true);
-      if (activeSession.elapsedTime) {
-        setStudyTime(Math.floor(activeSession.elapsedTime / 1000));
+      if (activeSession.elapsedTime !== undefined && activeSession.elapsedTime !== null) {
+        const serverSeconds = Math.floor(activeSession.elapsedTime);
+        setStudyTime(serverSeconds);
+        timerAnchorRef.current = {
+          baseSeconds: serverSeconds,
+          anchorTimestamp: Date.now(),
+        };
       }
     } else if (activeSession?.status === "paused") {
       setIsSessionActive(false);
-      if (activeSession.elapsedTime) {
-        setStudyTime(Math.floor(activeSession.elapsedTime / 1000));
+      timerAnchorRef.current = null;
+      if (activeSession.elapsedTime !== undefined && activeSession.elapsedTime !== null) {
+        setStudyTime(Math.floor(activeSession.elapsedTime));
       }
     } else if (!activeSession) {
       setIsSessionActive(false);
+      timerAnchorRef.current = null;
+      setStudyTime(0);
     }
   }, [activeSession]);
 
@@ -729,30 +856,39 @@ ADD this block just before your main `return (` statement:
           </button>
 
           {/* Attendance Check-in */}
-          {attendanceStatus && !attendanceStatus.hasCheckedInToday && (
-            <button
-              onClick={() => dispatch(attendanceCheckInThunk(undefined))}
-              disabled={attendanceCheckInLoading}
-              className="w-full px-4 py-3 bg-green-500/10 text-green-700 rounded-2xl font-semibold text-sm border border-green-500/20 flex items-center justify-center gap-2"
-            >
-              ✅ Mark Today's Attendance
-            </button>
-          )}
-          {attendanceStatus?.hasCheckedInToday && (
+          {attendanceStatus?.hasCheckedInToday ? (
             <div className="w-full px-4 py-3 bg-green-100 text-green-700 rounded-2xl text-sm text-center font-semibold">
               ✅ Attendance marked for today
             </div>
+          ) : (
+            <button
+              onClick={async () => {
+                try {
+                  await dispatch(attendanceCheckInThunk(undefined)).unwrap();
+                  dispatch(fetchAttendanceStatusThunk());
+                  dispatch(fetchUserStreakThunk());
+                } catch (err) {
+                  console.error("Check-in error:", err);
+                }
+              }}
+              disabled={attendanceCheckInLoading}
+              className="w-full px-4 py-3 bg-green-500/10 text-green-700 rounded-2xl font-semibold text-sm border border-green-500/20 flex items-center justify-center gap-2"
+            >
+              {attendanceCheckInLoading ? "Checking in..." : "✅ Mark Today's Attendance"}
+            </button>
           )}
 
           {activeLiveRoom ? (
             <div className="flex gap-2">
-              <button
-                onClick={handleJoinLiveRoom}
-                className="flex-1 px-4 py-3 bg-green-500/10 text-green-700 rounded-2xl font-semibold text-sm border border-green-500/20 flex items-center justify-center gap-2"
-              >
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                Enter Live Room
-              </button>
+              {!isUserInLiveRoom && (
+                <button
+                  onClick={handleJoinLiveRoom}
+                  className="flex-1 px-4 py-3 bg-green-500/10 text-green-700 rounded-2xl font-semibold text-sm border border-green-500/20 flex items-center justify-center gap-2"
+                >
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                  Enter Live Room
+                </button>
+              )}
               {(activeLiveRoom.host === currentUserId ||
                 activeLiveRoom.host?._id === currentUserId) && (
                   <button
@@ -827,10 +963,8 @@ ADD this block just before your main `return (` statement:
                 Active Now
               </div>
 
-              {/* {members.length} */}
-
               <div className="text-2xl xl:text-3xl font-bold text-[#4a3728] tabular-nums">
-                {onlineMembers.length}
+                {activeCount}
                 <span className="text-lg text-[#6b5847] ml-1">
                   / {groupData.currentMemberCount}
                 </span>
@@ -845,8 +979,7 @@ ADD this block just before your main `return (` statement:
                 Day Streak
               </div>
               <div className="text-2xl xl:text-3xl font-bold text-[#8b7355] tabular-nums">
-                {/* {groupData.currentStreak ? groupData.currentStreak : 0} */}
-                {(groupData as any).currentStreak ?? 0}
+                {userStreak ?? 0}
               </div>
             </div>
           </div>
@@ -860,20 +993,30 @@ ADD this block just before your main `return (` statement:
               Announcements
             </button>
 
-            {/* Desktop header ke actions section mein add karo */}
-            {attendanceStatus && !attendanceStatus.hasCheckedInToday && (
+            {/* Desktop header check-in */}
+            {attendanceStatus?.hasCheckedInToday ? (
               <button
-                onClick={() => dispatch(attendanceCheckInThunk(undefined))}
-                disabled={attendanceCheckInLoading}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold disabled:opacity-50"
+                disabled
+                className="px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-semibold opacity-90 cursor-default flex items-center gap-1.5"
               >
-                ✅ Check In
+                ✅ Checked In
               </button>
-            )}
-            {attendanceStatus?.hasCheckedInToday && (
-              <span className="px-3 py-2 bg-green-100 text-green-700 rounded-lg text-xs font-semibold">
-                ✅ Attended
-              </span>
+            ) : (
+              <button
+                onClick={async () => {
+                  try {
+                    await dispatch(attendanceCheckInThunk(undefined)).unwrap();
+                    dispatch(fetchAttendanceStatusThunk());
+                    dispatch(fetchUserStreakThunk());
+                  } catch (err) {
+                    console.error("Check-in error:", err);
+                  }
+                }}
+                disabled={attendanceCheckInLoading}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold disabled:opacity-50 transition-all shadow-sm"
+              >
+                {attendanceCheckInLoading ? "Checking In..." : "✅ Check In"}
+              </button>
             )}
 
             {activeLiveRoom ? (
@@ -882,19 +1025,21 @@ ADD this block just before your main `return (` statement:
                   <span className="w-2 h-2 bg-red-500 rounded-full"></span>
                   Live
                 </span>
-                <button
-                  onClick={handleJoinLiveRoom}
-                  disabled={liveRoomActionLoading}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold disabled:opacity-50"
-                >
-                  Enter Room
-                </button>
+                {!isUserInLiveRoom && (
+                  <button
+                    onClick={handleJoinLiveRoom}
+                    disabled={liveRoomActionLoading}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold disabled:opacity-50 transition-all shadow-sm"
+                  >
+                    Enter Room
+                  </button>
+                )}
                 {(activeLiveRoom.host === currentUserId ||
                   activeLiveRoom.host?._id === currentUserId) && (
                     <button
                       onClick={handleEndOrLeaveLiveRoom}
                       disabled={liveRoomActionLoading}
-                      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold disabled:opacity-50"
+                      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold disabled:opacity-50 transition-all shadow-sm"
                     >
                       End Room
                     </button>
@@ -904,7 +1049,7 @@ ADD this block just before your main `return (` statement:
               <button
                 onClick={() => setShowLiveRoomModal(true)}
                 disabled={liveRoomActionLoading || activeLiveRoomLoading}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-bold disabled:opacity-50"
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-bold disabled:opacity-50 transition-all shadow-sm"
               >
                 Start Live Room
               </button>
@@ -925,7 +1070,11 @@ ADD this block just before your main `return (` statement:
                   : "bg-green-600 hover:bg-green-700 text-white"
                 }`}
             >
-              {isSessionActive ? "Pause Session" : "Start Session"}
+              {isSessionActive
+                ? "Pause Session"
+                : activeSession?.status === "paused"
+                ? "Resume Session"
+                : "Start Session"}
             </button>
 
             <button
@@ -980,8 +1129,7 @@ ADD this block just before your main `return (` statement:
                   {formatTime(studyTime)}
                 </div>
                 <div className="flex gap-1">
-                  {/* {isMicOn ? ( */}
-                  {(activeLiveRoom ? webrtcMicOn : isMicOn) ? (
+                  {micOn ? (
                     <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                       <Mic size={12} className="text-white" />
                     </div>
@@ -990,7 +1138,7 @@ ADD this block just before your main `return (` statement:
                       <MicOff size={12} className="text-white" />
                     </div>
                   )}
-                  {(activeLiveRoom ? webrtcCameraOn : isCameraOn) ? (
+                  {camOn ? (
                     <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                       <Video size={12} className="text-white" />
                     </div>
@@ -1743,8 +1891,8 @@ ADD this block just before your main `return (` statement:
                 <span className="font-semibold">Message to send:</span>
               </p>
               <p className="text-sm text-[#6b5847] italic">
-                "Hey study buddy! 📚 Your group is in session right now. Join us
-                and let's crush our goals together! 💪"
+                &ldquo;Hey study buddy! 📚 Your group is in session right now. Join us
+                and let&apos;s crush our goals together! 💪&rdquo;
               </p>
             </div>
 
@@ -1907,11 +2055,11 @@ ADD this block just before your main `return (` statement:
                   <span className="text-xs text-[#6b5847]">2 hours ago</span>
                 </div>
                 <p className="text-sm text-[#4a3728] font-medium mb-1">
-                  📚 Important: Today's Focus
+                  📚 Important: Today&apos;s Focus
                 </p>
                 <p className="text-sm text-[#6b5847]">
-                  Let's aim for 6+ hours today! Remember to take breaks every 90
-                  minutes. We're almost at our group goal! 💪
+                  Let&apos;s aim for 6+ hours today! Remember to take breaks every 90
+                  minutes. We&apos;re almost at our group goal! 💪
                 </p>
               </div>
 
@@ -1930,7 +2078,7 @@ ADD this block just before your main `return (` statement:
                   🎉 Milestone Achieved!
                 </p>
                 <p className="text-sm text-[#6b5847]">
-                  Congrats everyone! We've completed 15 days streak as a group.
+                  Congrats everyone! We&apos;ve completed 15 days streak as a group.
                   Keep up the amazing work!
                 </p>
               </div>
@@ -2069,7 +2217,7 @@ ADD this block just before your main `return (` statement:
                 Mark Your Attendance
               </h3>
               <p className="text-sm text-[#6b5847] mt-1">
-                You've been studying for 5 minutes. Mark today's attendance?
+                You&apos;ve been studying for 5 minutes. Mark today&apos;s attendance?
               </p>
             </div>
             <div className="flex gap-3">

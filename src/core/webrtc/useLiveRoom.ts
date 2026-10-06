@@ -504,7 +504,10 @@ export function useLiveRoom({
             : false,
         };
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const stream =
+          !camera && !mic
+            ? new MediaStream()
+            : await navigator.mediaDevices.getUserMedia(constraints);
         console.log('[LiveRoom] getUserMedia success', stream.getTracks().map(t => t.kind));
         localStreamRef.current = stream;
         setLocalStream(stream);
@@ -635,10 +638,14 @@ const toggleCamera = useCallback(async () => {
         const newTrack = newStream.getVideoTracks()[0];
         stream.addTrack(newTrack);
 
-        // Replace track in all senders
+        // Replace or add track in all senders
         for (const pc of peerConnections.current.values()) {
           const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-          if (sender) await sender.replaceTrack(newTrack);
+          if (sender) {
+            await sender.replaceTrack(newTrack);
+          } else {
+            pc.addTrack(newTrack, stream);
+          }
         }
         setIsCameraOn(true);
       } catch (err) {
@@ -669,9 +676,43 @@ const toggleMic = useCallback(async () => {
   const stream = localStreamRef.current;
   if (!stream) return;
   const audioTrack = stream.getAudioTracks()[0];
-  if (!audioTrack) return;
-  audioTrack.enabled = !isMicOn;
-  setIsMicOn(!isMicOn);
+
+  if (isMicOn) {
+    if (audioTrack) audioTrack.enabled = false;
+    setIsMicOn(false);
+  } else {
+    if (audioTrack) {
+      audioTrack.enabled = true;
+      setIsMicOn(true);
+    } else {
+      // Track was not acquired on join — request audio track
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000,
+          },
+        });
+        const newTrack = newStream.getAudioTracks()[0];
+        if (newTrack) {
+          stream.addTrack(newTrack);
+          for (const pc of peerConnections.current.values()) {
+            const sender = pc.getSenders().find((s) => s.track?.kind === 'audio');
+            if (sender) {
+              await sender.replaceTrack(newTrack);
+            } else {
+              pc.addTrack(newTrack, stream);
+            }
+          }
+          setIsMicOn(true);
+        }
+      } catch (err) {
+        setError('Could not enable microphone.');
+      }
+    }
+  }
 }, [startLocalStream, isCameraOn, isMicOn]);
 
   // ── Screen share ──────────────────────────────────────────

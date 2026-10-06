@@ -2,6 +2,7 @@
 //src/hooks/studyGroup/features/chats/chatSlice.ts
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { RootState } from '@/core/store/store';
 import { FileUploadResponse, MessageResponse } from '@/lib/api/studyGroup.service';
 import {
   fetchMessagesThunk, sendMessageThunk, editMessageThunk, deleteMessageThunk, reactToMessageThunk, togglePinMessageThunk, fetchPinnedMessagesThunk, markMessageReadThunk, uploadChatFileThunk, fetchGroupFilesThunk, fetchGroupPinnedFilesThunk, uploadGroupFileThunk, deleteGroupFileThunk, togglePinGroupFileThunk, fetchGroupDoubtsThunk, postDoubtThunk, deleteDoubtThunk, markDoubtSolvedThunk, postAnswerThunk, fetchDoubtAnswersThunk, upvoteAnswerThunk, downvoteAnswerThunk, deleteAnswerThunk, updateAnswerThunk, removeAnswerVoteThunk,
@@ -73,6 +74,7 @@ interface ChatState {
   answerVoteLoading: boolean;
 
   memberSessionTimes: Record<string, Record<string, number>>,
+  activeSessionMembersByGroup: Record<string, Record<string, { elapsedTime: number; lastUpdated: number }>>,
 
   error: string | null;
 }
@@ -115,9 +117,8 @@ const initialState: ChatState = {
   answerVoteLoading: false,
 
   memberSessionTimes: {},
+  activeSessionMembersByGroup: {},
   error: null,
-
-
 };
 
 const chatSlice = createSlice({
@@ -229,6 +230,10 @@ const chatSlice = createSlice({
         );
       }
     },
+    setOnlineMembers: (state, action: PayloadAction<{ groupId: string; userIds: string[] }>) => {
+      const { groupId, userIds } = action.payload;
+      state.onlineMembersByGroup[groupId] = Array.from(new Set(userIds));
+    },
     clearGroupChat: (state, action: PayloadAction<string>) => {
       const groupId = action.payload;
       delete state.messagesByGroup[groupId];
@@ -255,12 +260,62 @@ const chatSlice = createSlice({
       }
     },
 
+    setActiveSessionMembers: (
+      state,
+      action: PayloadAction<{ groupId: string; members: { userId: string; elapsedTime: number }[] }>
+    ) => {
+      const { groupId, members } = action.payload;
+      if (!state.activeSessionMembersByGroup[groupId]) {
+        state.activeSessionMembersByGroup[groupId] = {};
+      }
+      if (!state.memberSessionTimes[groupId]) {
+        state.memberSessionTimes[groupId] = {};
+      }
+      const now = Date.now();
+      state.activeSessionMembersByGroup[groupId] = {};
+      members.forEach((m) => {
+        state.activeSessionMembersByGroup[groupId][m.userId] = {
+          elapsedTime: m.elapsedTime,
+          lastUpdated: now,
+        };
+        state.memberSessionTimes[groupId][m.userId] = m.elapsedTime;
+      });
+    },
+
     socketMemberSessionUpdate: (state, action) => {
-      const { groupId, userId, elapsedTime } = action.payload;
+      const { groupId, userId, elapsedTime, timestamp } = action.payload;
       if (!state.memberSessionTimes[groupId]) {
         state.memberSessionTimes[groupId] = {};
       }
       state.memberSessionTimes[groupId][userId] = elapsedTime;
+
+      if (!state.activeSessionMembersByGroup[groupId]) {
+        state.activeSessionMembersByGroup[groupId] = {};
+      }
+      state.activeSessionMembersByGroup[groupId][userId] = {
+        elapsedTime,
+        lastUpdated: timestamp || Date.now(),
+      };
+    },
+
+    socketMemberSessionEnded: (state, action: PayloadAction<{ groupId: string; userId: string }>) => {
+      const { groupId, userId } = action.payload;
+      if (state.activeSessionMembersByGroup[groupId]) {
+        delete state.activeSessionMembersByGroup[groupId][userId];
+      }
+    },
+
+    pruneStaleActiveMembers: (state, action: PayloadAction<{ groupId: string; maxAgeMs: number }>) => {
+      const { groupId, maxAgeMs } = action.payload;
+      const groupSessions = state.activeSessionMembersByGroup[groupId];
+      if (groupSessions) {
+        const now = Date.now();
+        Object.keys(groupSessions).forEach((uId) => {
+          if (now - groupSessions[uId].lastUpdated > maxAgeMs) {
+            delete groupSessions[uId];
+          }
+        });
+      }
     },
   },
   extraReducers: (builder) => {
@@ -305,7 +360,7 @@ const chatSlice = createSlice({
         state.sendLoading = false;
         state.replyingToMessage = null;
         const rawMessage = action.payload?.message;
-        const message = rawMessage?.data || rawMessage;
+        const message = (rawMessage as any)?.data || rawMessage;
         const messageId = message?.messageId || message?._id;
         if (messageId) {
           const { groupId } = action.payload;
@@ -725,11 +780,14 @@ export const {
   setActiveGroupId, setEditingMessage, setReplyingToMessage,
   socketMessageReceived, socketMessageEdited, socketMessageDeleted,
   socketReactionUpdated, socketUserTyping, socketUserStoppedTyping,
-  socketUserOnline, socketUserOffline, clearGroupChat,
+  socketUserOnline, socketUserOffline, setOnlineMembers, clearGroupChat,
   setUploadProgress,
   addOptimisticMessage,
   removeOptimisticMessage,
   socketMemberSessionUpdate,
+  setActiveSessionMembers,
+  socketMemberSessionEnded,
+  pruneStaleActiveMembers,
 } = chatSlice.actions;
 
 
@@ -755,11 +813,18 @@ export const selectUploadProgress = (state: StateWithChat) => state.chat.uploadP
 export const selectTypingUsers = (groupId: string) => (state: StateWithChat) =>
   state.chat.typingUsersByGroup[groupId] ?? [];
 
+const EMPTY_ARRAY: string[] = [];
+const EMPTY_RECORD: Record<string, number> = {};
+
 // New selector — sirf names chahiye UI ke liye
 export const selectTypingUserNames = (groupId: string) => (state: StateWithChat) =>
   (state.chat.typingUsersByGroup[groupId] ?? []).map(u => u.name);
-export const selectOnlineMembers = (groupId: string) => (state: StateWithChat) =>
-  state.chat.onlineMembersByGroup[groupId] ?? [];
+export const selectOnlineMembers = (groupId: string) => (state: RootState) =>
+  state.chat.onlineMembersByGroup?.[groupId] ?? EMPTY_ARRAY;
+export const selectMemberSessionTimes = (groupId: string) => (state: RootState) =>
+  state.chat.memberSessionTimes?.[groupId] ?? EMPTY_RECORD;
+export const selectActiveSessionMemberIds = (groupId: string) => (state: RootState) =>
+  Object.keys(state.chat.activeSessionMembersByGroup?.[groupId] ?? EMPTY_RECORD);
 
 export const selectFilesByGroup = (groupId: string) => (state: StateWithChat) =>
   state.chat.filesByGroup[groupId] ?? [];

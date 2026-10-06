@@ -1,7 +1,7 @@
 //src/app/(studyGroup)/study/my-groups/components/GroupRoom.tsx
 'use client';
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users, Camera, Mic, MicOff, Video, VideoOff, Settings, LogOut, MessageCircle, UserPlus, Crown, Clock, Target, Award, TrendingUp, MoreVertical, X, Send, ChevronLeft, Info, Play, Pause, Menu, Bell, Zap, Megaphone
@@ -17,7 +17,7 @@ import { startTimerThunk, pauseTimerThunk, resumeTimerThunk, stopTimerThunk } fr
 import { selectActiveSession, selectTimerApiLoading, selectTimerStats } from "@/hooks/studyGroup/features/timer/timerSlice";
 import { getTimerStatsThunk, getActiveTimerThunk } from "@/hooks/studyGroup/features/timer/timer.thunks";
 import { fetchMessagesThunk, sendMessageThunk } from "@/hooks/studyGroup/features/chats/chat.thunks";
-import { selectMessagesByGroup, selectOnlineMembers, selectSendLoading } from "@/hooks/studyGroup/features/chats/chatSlice";
+import { selectMessagesByGroup, selectOnlineMembers, selectMemberSessionTimes, selectSendLoading } from "@/hooks/studyGroup/features/chats/chatSlice";
 import { createLiveRoomSchema, type CreateLiveRoomInput } from "@/features/study-group/validators/liveroom.validation";
 import { getSocket } from "@/core/realtime/socket.client";
 import { useLiveRoom } from "@/core/webrtc/useLiveRoom";
@@ -45,6 +45,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const [message, setMessage] = useState<string>("");
   const [studyTime, setStudyTime] = useState<number>(0);
   const [isSessionActive, setIsSessionActive] = useState<boolean>(false);
+  const timerAnchorRef = useRef<{ baseSeconds: number; anchorTimestamp: number } | null>(null);
   const [showNotificationPopup, setShowNotificationPopup] = useState<boolean>(false);
   const [showChallengeModal, setShowChallengeModal] = useState<boolean>(false);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState<boolean>(false);
@@ -81,24 +82,42 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     (activeLiveRoom?.participants?.some(
       (p: any) => (p.userId ?? p.user) === currentUserId
     ) ?? false);
-  const onlineMembers = useAppSelector((state: any) => state.chat.onlineMembers?.[groupId] ?? []);
-  const memberSessionTimes = useAppSelector(
-    (state: any) => state.chat.memberSessionTimes?.[groupId] ?? {}
-  );
-  const members = enrichedMembers.length > 0
-    ? enrichedMembers.map((m: any, idx: number) => ({
-      id: idx + 1,
-      name: m.name ?? m.userId?.slice(0, 8) ?? 'Member',
-      avatar: m.avatar ?? null,
-      isOnline: onlineMembers.includes(m.userId),
-      isSpeaking: false,
-      studyTime: 0,
-      rank: idx + 1,
-      videoEnabled: false,
-      audioEnabled: false,
-      userId: m.userId,
-      role: m.role,
-    })) : [];
+  const rawOnlineMembers = useAppSelector(selectOnlineMembers(groupId));
+  const onlineMembers = useMemo(() => {
+    if (currentUserId && !rawOnlineMembers.includes(currentUserId)) {
+      return [...rawOnlineMembers, currentUserId];
+    }
+    return rawOnlineMembers;
+  }, [rawOnlineMembers, currentUserId]);
+
+  const memberSessionTimes = useAppSelector(selectMemberSessionTimes(groupId));
+  const membersSource = enrichedMembers.length > 0 ? enrichedMembers : (rawMembers as any[]);
+  const members =
+    membersSource.length > 0
+      ? membersSource.map((m: any, idx: number) => {
+          const mUserId =
+            typeof m.userId === "string"
+              ? m.userId
+              : (m.userId?._id || m.userId?.id || m.userId?.userId || m._id || m.id || "");
+          const isOnline = onlineMembers.some(
+            (onlineId) => String(onlineId) === String(mUserId)
+          );
+          const cachedUser = getUserInfoSync(mUserId);
+          return {
+            id: idx + 1,
+            name: m.name ?? cachedUser?.name ?? (mUserId ? mUserId.slice(0, 8) : "Member"),
+            avatar: m.avatar ?? cachedUser?.avatar ?? null,
+            isOnline,
+            isSpeaking: false,
+            studyTime: 0,
+            rank: idx + 1,
+            videoEnabled: false,
+            audioEnabled: false,
+            userId: mUserId,
+            role: m.role,
+          };
+        })
+      : [];
 
   const liveRoomId = activeLiveRoom?.roomId ?? '';
 
@@ -290,23 +309,34 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       if (!isSessionActive) {
         if (activeSession?.status === 'paused') {
           const result = await dispatch(resumeTimerThunk()).unwrap();
-          if (result?.elapsedTime) {
-            setStudyTime(Math.floor(result.elapsedTime / 1000));
-          }
+          const resumedSeconds = Math.floor(
+            result?.elapsedTime ?? activeSession?.elapsedTime ?? studyTime
+          );
+          setStudyTime(resumedSeconds);
+          timerAnchorRef.current = {
+            baseSeconds: resumedSeconds,
+            anchorTimestamp: Date.now(),
+          };
           setIsSessionActive(true);
         } else {
           await dispatch(startTimerThunk({
             subject: groupData?.category ?? 'Study Session',
             notes: `Group: ${groupData?.title ?? groupId}`,
           })).unwrap();
+          setStudyTime(0);
+          timerAnchorRef.current = {
+            baseSeconds: 0,
+            anchorTimestamp: Date.now(),
+          };
+          setIsSessionActive(true);
         }
-        setIsSessionActive(true);
         // Auto-mark attendance when session starts
         try {
           await dispatch(attendanceAutoMarkThunk({ reason: 'study_session', studyHours: 0 })).unwrap();
         } catch { /* silent */ }
       } else {
         await dispatch(pauseTimerThunk()).unwrap();
+        timerAnchorRef.current = null;
         setIsSessionActive(false);
       }
     } catch (err: any) {
@@ -329,21 +359,33 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     let timer: NodeJS.Timeout | null = null;
 
     if (isSessionActive) {
+      if (!timerAnchorRef.current) {
+        timerAnchorRef.current = {
+          baseSeconds: studyTime,
+          anchorTimestamp: Date.now(),
+        };
+      }
+
       timer = setInterval(() => {
-        setStudyTime(prev => {
-          const newTime = prev + 1;
-          if (newTime % 5 === 0) {
-            const socket = getSocket();
-            if (socket?.connected) {
-              socket.emit('broadcast-session-time', {
-                groupId,
-                elapsedTime: newTime,
-              });
-            }
+        if (!timerAnchorRef.current) return;
+        const elapsedSinceAnchor = Math.floor(
+          (Date.now() - timerAnchorRef.current.anchorTimestamp) / 1000
+        );
+        const currentStudyTime = timerAnchorRef.current.baseSeconds + elapsedSinceAnchor;
+        setStudyTime(currentStudyTime);
+
+        if (currentStudyTime > 0 && currentStudyTime % 5 === 0) {
+          const socket = getSocket();
+          if (socket?.connected) {
+            socket.emit('broadcast-session-time', {
+              groupId,
+              elapsedTime: currentStudyTime,
+            });
           }
-          return newTime;
-        });
+        }
       }, 1000);
+    } else {
+      timerAnchorRef.current = null;
     }
 
     return () => {
@@ -376,16 +418,24 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   useEffect(() => {
     if (activeSession?.status === 'active') {
       setIsSessionActive(true);
-      if (activeSession.elapsedTime) {
-        setStudyTime(Math.floor(activeSession.elapsedTime / 1000));
+      if (activeSession.elapsedTime !== undefined && activeSession.elapsedTime !== null) {
+        const serverSeconds = Math.floor(activeSession.elapsedTime);
+        setStudyTime(serverSeconds);
+        timerAnchorRef.current = {
+          baseSeconds: serverSeconds,
+          anchorTimestamp: Date.now(),
+        };
       }
     } else if (activeSession?.status === 'paused') {
       setIsSessionActive(false);
-      if (activeSession.elapsedTime) {
-        setStudyTime(Math.floor(activeSession.elapsedTime / 1000));
+      timerAnchorRef.current = null;
+      if (activeSession.elapsedTime !== undefined && activeSession.elapsedTime !== null) {
+        setStudyTime(Math.floor(activeSession.elapsedTime));
       }
     } else if (!activeSession) {
       setIsSessionActive(false);
+      timerAnchorRef.current = null;
+      setStudyTime(0);
     }
   }, [activeSession]);
 
