@@ -2423,6 +2423,7 @@ class StudyGroupService {
     try {
       const formData = new FormData();
       formData.append("file", file); // group files route uses uploadSingle('file')
+
       const { data: res } = await api.post(
         `${config.NEXT_PUBLIC_STUDY_GROUP_FILES_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_FILES_ENDPOINT}/${groupId}/upload`,
         formData,
