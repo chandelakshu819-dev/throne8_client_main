@@ -62,7 +62,7 @@ const PublicGroupCard: React.FC<PublicGroupCardProps> = ({ title, isMember, memb
         }
         !isMember && onJoin(groupId, visibility)
       }}
-      disabled={isMember || isJoinLoading}
+      disabled={isJoinLoading}
       className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg hover:shadow-xl border border-white/20 bg-gradient-to-r from-[#8b7355] to-[#6b5847] hover:from-[#6b5847] hover:to-[#4a3728] text-white'
         `}
     >

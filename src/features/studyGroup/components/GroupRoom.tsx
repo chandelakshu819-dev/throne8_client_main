@@ -254,12 +254,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const [liveRoomTitle, setLiveRoomTitle] = useState("");
   const [liveRoomError, setLiveRoomError] = useState("");
   const [showLiveRoomView, setShowLiveRoomView] = useState(false);
-  const isUserInLiveRoom =
-    showLiveRoomView ||
-    (activeLiveRoom?.participants?.some(
-      (p: any) => (p.userId ?? p.user) === currentUserId
-    ) ??
-      false);
+  const isUserInLiveRoom = showLiveRoomView;
   const rawOnlineMembers = useAppSelector(selectOnlineMembers(groupId));
   const onlineMembers = useMemo(() => {
     if (currentUserId && !rawOnlineMembers.includes(currentUserId)) {
@@ -681,6 +676,20 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     return () => {
       dispatch(clearSelectedGroup());
       dispatch(clearActiveLiveRoom());
+    };
+  }, [groupId, dispatch]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    const handleUserJoined = () => {
+      dispatch(fetchGroupMembersThunk(groupId));
+      fetchGroupMembersRef.current?.(groupId);
+      dispatch(fetchGroupByIdThunk(groupId));
+    };
+    socket.on("user-joined-group", handleUserJoined);
+    return () => {
+      socket.off("user-joined-group", handleUserJoined);
     };
   }, [groupId, dispatch]);
 
