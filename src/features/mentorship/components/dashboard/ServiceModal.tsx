@@ -428,6 +428,28 @@ export default function ServiceModal({
                         </div>
                     )}
 
+                    {/* Google Meet Link — required for Group Sessions */}
+                    {formData?.serviceType === 'group_session' && (
+                        <div>
+                            <FieldLabel icon={Video}>Google Meet link</FieldLabel>
+                            <input
+                                type="url"
+                                placeholder="https://meet.google.com/abc-defg-hij"
+                                className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                style={inputStyle(fieldErrors?.meetingUrl)}
+                                value={formData?.meetingUrl || ''}
+                                onChange={(e) => setFormData({ ...formData, meetingUrl: e.target.value })}
+                                disabled={isSaving}
+                            />
+                            <p className="text-xs mt-1" style={{ color: '#8a7a6a' }}>
+                                Create one at <a href="https://meet.new" target="_blank" rel="noopener noreferrer" className="underline font-semibold" style={{ color: '#7a5c3e' }}>meet.new</a> and paste the link here
+                            </p>
+                            {fieldErrors?.meetingUrl && (
+                                <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.meetingUrl}</p>
+                            )}
+                        </div>
+                    )}
+
 
                    
                    

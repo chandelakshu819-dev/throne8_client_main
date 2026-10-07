@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { getSocket } from '@/core/realtime/socket.client';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { navigateToUpcomingSessions } from '@/features/mentorship/services/sessionJoin.service';
+import MentorService from '@/lib/api/mentorship.service';
 
 interface IncomingSessionPayload {
   sessionId: string;
@@ -22,9 +23,15 @@ export default function MentorshipCallProvider({ children }: { children: React.R
   const { user, isAuthenticated } = useAuth();
 
   const [incoming, setIncoming] = useState<IncomingSessionPayload | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const ringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSessionIdRef = useRef<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
 
   // ── Ringtone (Web Audio beep — no external audio file needed) ──────────
   const startRing = useCallback(() => {
@@ -73,7 +80,7 @@ export default function MentorshipCallProvider({ children }: { children: React.R
 
       // ✅ De-dupe: backend emits BOTH 'session:started' and
       // 'mentorship:session:started' for the same event — only show once.
-      const key = `${payload.sessionId}:${payload.bookingId}`;
+      const key = `${payload.sessionId}:${payload.bookingId || payload.sessionId}`;
       if (lastSessionIdRef.current === key) return;
       lastSessionIdRef.current = key;
 
@@ -98,12 +105,41 @@ export default function MentorshipCallProvider({ children }: { children: React.R
     };
   }, [isAuthenticated, user?.userId, pathname, startRing]);
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     if (!incoming) return;
     stopRing();
     const { sessionId, bookingId } = incoming;
     setIncoming(null);
     lastSessionIdRef.current = null;
+
+    // Determine if this is a group session:
+    // In group sessions, bookingId is either equal to sessionId or absent.
+    const isGroupSession = !bookingId || bookingId === sessionId;
+
+    if (isGroupSession) {
+      try {
+        await MentorService.markGroupAttendance(sessionId).catch(() => {});
+        const res: any = await MentorService.getGroupSessionById(sessionId);
+        const groupData = res?.data || res?.session || res;
+
+        if (groupData?.status !== 'in_progress') {
+          showToast("Session has ended");
+          return;
+        }
+
+        const meetUrl = groupData?.meeting?.meetingUrl || groupData?.meetingUrl;
+        if (meetUrl) {
+          window.open(meetUrl, '_blank', 'noopener,noreferrer');
+        } else {
+          showToast("Session has not started yet");
+        }
+      } catch (err: any) {
+        showToast(err.message || "Session has ended");
+      }
+      return;
+    }
+
+    // 1:1 session-started handling (untouched)
     const uid = user?.userId || (user as any)?.id || (user as any)?._id;
     if (uid) {
       navigateToUpcomingSessions({
@@ -124,6 +160,27 @@ export default function MentorshipCallProvider({ children }: { children: React.R
   return (
     <>
       {children}
+
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 24,
+            right: 24,
+            zIndex: 999999,
+            padding: '12px 20px',
+            borderRadius: 12,
+            fontSize: 13,
+            fontWeight: 600,
+            boxShadow: '0 10px 25px rgba(0,0,0,0.12)',
+            background: '#fee2e2',
+            color: '#dc2626',
+            border: '1px solid #fca5a5',
+          }}
+        >
+          {toastMessage}
+        </div>
+      )}
 
       {incoming && (
         <div

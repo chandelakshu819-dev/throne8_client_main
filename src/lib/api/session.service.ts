@@ -452,6 +452,19 @@ class SessionService {
         }
     }
 
+    // ── ATTEND a group session (accepted mentee while in_progress) ──
+    static async markGroupAttendance(sessionId: string): Promise<ApiResponse> {
+        try {
+            const { data } = await api.post<ApiResponse>(
+                `${SessionService.GROUP_SESSIONS_ENDPOINT}/${sessionId}/attend`
+            );
+            return data;
+        } catch (error: any) {
+            console.error("[MARK_GROUP_ATTENDANCE] Failed", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to mark attendance.");
+        }
+    }
+
     // ── CANCEL a group session (mentor only) ────────────────
     static async cancelGroupSession(sessionId: string, reason: string): Promise<ApiResponse> {
         try {

@@ -63,6 +63,7 @@ const getDefaultFormData = (serviceType: string = '') => ({
   portfolioUrl: '',
   thumbnailImage: '',
   responseTime: '',
+  meetingUrl: '',
   // ✅ CHANGED: group_session ab hamesha availability-based hai — koi
   // Fixed Date & Time option nahi bacha, isliye isTemplate hamesha true.
   isTemplate: true,
@@ -285,6 +286,7 @@ export default function ServicesPage({
         maxParticipants: raw.maxParticipants ?? '',
         portfolioUrl: raw.portfolioUrl || '',
         thumbnailImage: raw.thumbnailImage || raw.image || raw.thumbnailUrl || '',
+        meetingUrl: raw.meeting?.meetingUrl || raw.meetingUrl || '',
       });
 
 
@@ -380,6 +382,7 @@ export default function ServicesPage({
           const groupUpdatePayload: Record<string, any> = {
             title: formData.serviceName,
             description: formData.description || "",
+            ...(formData.meetingUrl ? { meetingUrl: formData.meetingUrl } : {}),
           };
           await MentorService.updateGroupSession(editingSession.sessionId, groupUpdatePayload);
         } else {
@@ -456,6 +459,7 @@ export default function ServicesPage({
           },
           thumbnailImage: formData.thumbnailImage,
           isTemplate: isGroupTemplateMode,
+          meetingUrl: formData.meetingUrl,
           ...(isGroupTemplateMode ? {} : { scheduledAt: scheduledAtISO }),
         };
         await MentorService.createGroupSession(groupSessionInput);

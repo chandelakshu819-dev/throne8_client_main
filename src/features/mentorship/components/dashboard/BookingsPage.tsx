@@ -52,13 +52,17 @@ type MentorBookingRow = {
     | "rescheduled"
     | "in_progress"
     | "completed"
-    | "cancelled";
+    | "cancelled"
+    | "open"
+    | "full";
   // ✅ NEW: present only on grouped (accepted) group-session rows — one
   // row per session, carrying the full accepted-participant list instead
   // of the table spawning a duplicate row per student.
   enrolledCount?: number;
   maxParticipants?: number;
   participants?: GroupParticipant[];
+  isTemplate?: boolean;
+  meetingUrl?: string;
 };
 
 type BookingTab =
@@ -93,6 +97,8 @@ const statusBadge: Record<
   rescheduled: { bg: "#fed7aa", fg: "#c2410c", label: "Rescheduled" },
   pending: { bg: "#fef3c7", fg: "#b45309", label: "Pending" },
   confirmed: { bg: "#dcfce7", fg: "#15803d", label: "Upcoming" },
+  open: { bg: "#dcfce7", fg: "#15803d", label: "Open" },
+  full: { bg: "#fef3c7", fg: "#b45309", label: "Full" },
   in_progress: { bg: "#dbeafe", fg: "#1d4ed8", label: "In Progress" },
   completed: { bg: "#f3e8ff", fg: "#7c3aed", label: "Completed" },
   cancelled: { bg: "#fee2e2", fg: "#dc2626", label: "Cancelled" },
@@ -236,6 +242,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
           enrolledCount: g.enrolledCount,
           maxParticipants: g.maxParticipants,
           participants: g.participants || [],
+          isTemplate: !!g.isTemplate,
+          meetingUrl: g.meetingUrl,
         }));
 
         // Still-pending group join requests stay one row per request —
@@ -322,7 +330,12 @@ export default function BookingsPage({ mentorData }: BookingProps) {
 
   // Booking categories
   const pendingBookings = allBookings.filter((b) => b.status === "pending");
-  const upcomingBookings = allBookings.filter((b) => b.status === "confirmed" || b.status === "rescheduled");
+  const upcomingBookings = allBookings.filter(
+    (b) =>
+      b.status === "confirmed" ||
+      b.status === "rescheduled" ||
+      (b.isGroupSession && (b.status === "open" || b.status === "full"))
+  );
   const inProgressBookings = allBookings.filter((b) => b.status === "in_progress");
   const completedBookings = allBookings.filter((b) => b.status === "completed");
 
@@ -435,20 +448,18 @@ export default function BookingsPage({ mentorData }: BookingProps) {
 
     try {
       if (isGroupSession) {
-        await SessionService.startGroupSession(sessionId);
+        const res: any = await SessionService.startGroupSession(sessionId);
+        const meetUrl = res?.data?.meeting?.meetingUrl || res?.data?.meetingUrl || startModalBooking.meetingUrl;
         showToast("Group session started", "success");
         setShowStartModal(false);
         setStartModalBooking(null);
+        await fetchSessions();
 
-        // ✅ FIX: pehle yahan sirf toast + list refresh hota tha — mentor
-        // kahin navigate hi nahi hota tha, isliye "start" click karne ke
-        // baad kuch hota hua nahi dikhta tha. 1:1 session ki tarah mentor
-        // ko live room me le jao. roomId = sessionId (group session me
-        // alag bookingId nahi hota — backend bhi isi convention se
-        // 'session:started' event emit karta hai students ko).
-        router.push(
-          `/mentorship/session-room/${encodeURIComponent(sessionId)}`
-        );
+        if (meetUrl) {
+          window.open(meetUrl, '_blank', 'noopener,noreferrer');
+        } else {
+          showToast("Session started, but no Google Meet link found", "error");
+        }
         return;
       }
 
@@ -548,7 +559,13 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       const bookingRow = allBookings.find((b) => b.sessionId === sessionId && b.bookingId === bookingId);
 
       if (bookingRow?.isGroupSession) {
+        let durationMinutes: number | undefined = undefined;
+        if (bookingRow.scheduledAt) {
+          const elapsed = Math.round((Date.now() - new Date(bookingRow.scheduledAt).getTime()) / 60000);
+          durationMinutes = Math.max(1, elapsed);
+        }
         await SessionService.completeGroupSession(sessionId, {
+          actualDuration: durationMinutes,
           wasSuccessful: true,
           ...(attendees ? { attendees } : {}),
         });
@@ -946,17 +963,55 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                           )}
 
                           {/* Upcoming */}
-                          {bookingTab === "upcoming" && (
+                          {(bookingTab === "upcoming" ||
+                            (bookingTab === "all" &&
+                              (booking.status === "confirmed" ||
+                                booking.status === "rescheduled" ||
+                                (booking.isGroupSession &&
+                                  (booking.status === "open" || booking.status === "full"))))) && (
                             <>
-                              <button
-                                onClick={() => openStartModal(booking)}
-                                disabled={actionLoading === booking.sessionId}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
-                              >
-                                <Play className="w-3.5 h-3.5" />
-                                Start
-                              </button>
+                              {booking.isGroupSession ? (
+                                (booking.status === "open" ||
+                                  booking.status === "full" ||
+                                  booking.status === "confirmed") &&
+                                !(booking.isTemplate || !booking.scheduledAt) && (() => {
+                                  const scheduledTime = booking.scheduledAt ? new Date(booking.scheduledAt).getTime() : 0;
+                                  const now = Date.now();
+                                  const isTooEarly = now < scheduledTime - 5 * 60 * 1000;
+                                  const isTooLate = now > scheduledTime + 10 * 60 * 1000;
+                                  const isWithinWindow = !isTooEarly && !isTooLate;
+
+                                  return (
+                                    <div className="flex flex-col items-start gap-0.5">
+                                      <button
+                                        onClick={() => openStartModal(booking)}
+                                        disabled={actionLoading === booking.sessionId || !isWithinWindow}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                        style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
+                                        title={isTooEarly ? "Available 5 minutes before scheduled start" : isTooLate ? "Window passed (10 min after scheduled start)" : undefined}
+                                      >
+                                        <Play className="w-3.5 h-3.5" />
+                                        Start
+                                      </button>
+                                      {!isWithinWindow && (
+                                        <span className="text-[10px] text-amber-700 whitespace-nowrap">
+                                          {isTooEarly ? "Starts 5m before scheduled time" : "Start window closed (+10m)"}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })()
+                              ) : (
+                                <button
+                                  onClick={() => openStartModal(booking)}
+                                  disabled={actionLoading === booking.sessionId}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                  style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
+                                >
+                                  <Play className="w-3.5 h-3.5" />
+                                  Start
+                                </button>
+                              )}
 
                               {/* Reschedule not supported for group sessions yet */}
                               {!booking.isGroupSession && (
@@ -992,16 +1047,28 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                           )}
 
                           {/* In Progress */}
-                          {bookingTab === "in_progress" && (
-                            <button
-                              onClick={() => handleEndSessionClick(booking)}
-                              disabled={actionLoading === booking.sessionId}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                              style={{ backgroundColor: "#f3e8ff", color: "#7c3aed" }}
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              {actionLoading === booking.sessionId ? "..." : "End Session"}
-                            </button>
+                          {(bookingTab === "in_progress" || (bookingTab === "all" && booking.status === "in_progress")) && (
+                            <div className="flex items-center gap-1.5">
+                              {booking.isGroupSession && booking.meetingUrl && (
+                                <button
+                                  onClick={() => window.open(booking.meetingUrl, '_blank', 'noopener,noreferrer')}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
+                                  style={{ backgroundColor: "#22c55e", color: "#ffffff" }}
+                                >
+                                  <Play className="w-3.5 h-3.5" />
+                                  Open Meet
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleEndSessionClick(booking)}
+                                disabled={actionLoading === booking.sessionId}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                style={{ backgroundColor: "#f3e8ff", color: "#7c3aed" }}
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                {actionLoading === booking.sessionId ? "..." : "End Session"}
+                              </button>
+                            </div>
                           )}
 
                           {/* Completed */}
@@ -1228,30 +1295,57 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                 </div>
               )}
 
-              <div className="flex justify-end gap-3">
-                <button
-                  className="px-4 py-2 rounded-lg text-sm font-semibold"
-                  style={{ backgroundColor: "#fbf7f3", color: "#7a5c3e", border: "1px solid #e0d8cf" }}
-                  onClick={() => {
-                    setShowStartModal(false);
-                    setStartModalBooking(null);
-                    setStartError(null);
-                  }}
-                  disabled={actionLoading === startModalBooking.sessionId}
-                >
-                  Cancel
-                </button>
+              {(() => {
+                const isGroup = startModalBooking.isGroupSession;
+                const isTemplate = !!startModalBooking.isTemplate || !startModalBooking.scheduledAt;
+                let isWithinWindow = true;
+                let windowHint = "";
+                if (isGroup && startModalBooking.scheduledAt) {
+                  const scheduledTime = new Date(startModalBooking.scheduledAt).getTime();
+                  const now = Date.now();
+                  const isTooEarly = now < scheduledTime - 5 * 60 * 1000;
+                  const isTooLate = now > scheduledTime + 10 * 60 * 1000;
+                  isWithinWindow = !isTooEarly && !isTooLate;
+                  if (isTooEarly) windowHint = "Starts 5m before scheduled time";
+                  if (isTooLate) windowHint = "Start window closed (+10m)";
+                }
 
-                <button
-                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
-                  style={{ backgroundColor: "#1d4ed8", opacity: actionLoading === startModalBooking.sessionId ? 0.6 : 1 }}
-                  onClick={confirmStartSession}
-                  disabled={actionLoading === startModalBooking.sessionId}
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  {actionLoading === startModalBooking.sessionId ? "Starting..." : "Start Session"}
-                </button>
-              </div>
+                const canStartSession = !isGroup || (!isTemplate && isWithinWindow);
+
+                return (
+                  <>
+                    {windowHint && (
+                      <div className="text-xs font-semibold rounded-lg px-3 py-2 mb-4" style={{ backgroundColor: "#fef3c7", color: "#b45309" }}>
+                        {windowHint}
+                      </div>
+                    )}
+                    <div className="flex justify-end gap-3">
+                      <button
+                        className="px-4 py-2 rounded-lg text-sm font-semibold"
+                        style={{ backgroundColor: "#fbf7f3", color: "#7a5c3e", border: "1px solid #e0d8cf" }}
+                        onClick={() => {
+                          setShowStartModal(false);
+                          setStartModalBooking(null);
+                          setStartError(null);
+                        }}
+                        disabled={actionLoading === startModalBooking.sessionId}
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        className="px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
+                        style={{ backgroundColor: "#1d4ed8", opacity: (actionLoading === startModalBooking.sessionId || !canStartSession) ? 0.6 : 1 }}
+                        onClick={confirmStartSession}
+                        disabled={actionLoading === startModalBooking.sessionId || !canStartSession}
+                      >
+                        <Play className="w-3.5 h-3.5" />
+                        {actionLoading === startModalBooking.sessionId ? "Starting..." : "Start Session"}
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>,
           document.body

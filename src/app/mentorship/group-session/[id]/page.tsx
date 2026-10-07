@@ -1,9 +1,9 @@
 "use client";
 //src/app/mentorship/group-session/[id]/page.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import MentorService from "@/lib/api/mentorship.service";
-import { ArrowLeft, Calendar, Clock, Users, Video, Tag } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Users, Tag } from "lucide-react";
 import { GlobalStyles, Navigation } from "@/features/index";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 
@@ -17,19 +17,32 @@ export default function GroupSessionDetailsPage() {
     const [mentor, setMentor] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+
+    const showToast = (msg: string, type: "success" | "error" = "success") => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 4000);
+    };
+
+    const fetchSession = useCallback(async () => {
+        if (!sessionId) return null;
+        try {
+            const res: any = await MentorService.getGroupSessionById(sessionId);
+            const data = res?.data || res?.session || res;
+            setSession(data);
+            return data;
+        } catch (err: any) {
+            setError(err.message || "Failed to load group session details");
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    }, [sessionId]);
 
     useEffect(() => {
-        if (!sessionId) return;
-        MentorService.getGroupSessionById(sessionId)
-            .then((res: any) => {
-                setSession(res.data || res.session || res);
-                setLoading(false);
-            })
-            .catch((err) => {
-                setError(err.message || "Failed to load group session details");
-                setLoading(false);
-            });
-    }, [sessionId]);
+        fetchSession();
+    }, [fetchSession]);
 
     useEffect(() => {
         if (session?.mentorId) {
@@ -43,10 +56,152 @@ export default function GroupSessionDetailsPage() {
         }
     }, [session?.mentorId]);
 
-    const handleJoinSession = () => {
+    const myId = user?.userId ?? user?.id;
+    const myParticipant = (session?.participants || []).find(
+        (p: any) => p.menteeId === myId || p.menteeId?.toString() === myId
+    );
+    const myStatus = myParticipant?.requestStatus;
+    const isMentorOwner = Boolean(
+        myId && (mentor?.userId === myId || mentor?.id === myId || session?.mentorId === myId)
+    );
+    const currentParticipants = session?.currentParticipants ?? (session?.participantsCount ?? 0);
+    const maxParticipants = session?.maxParticipants ?? 0;
+    const isFull = session?.status === 'full' || (maxParticipants > 0 && currentParticipants >= maxParticipants);
+    const isInProgress = session?.status === 'in_progress';
+
+    const handleJoinMeet = async () => {
+        setActionLoading(true);
+        try {
+            await MentorService.markGroupAttendance(sessionId).catch(() => {
+                // Ignore failure
+            });
+            const freshRes: any = await MentorService.getGroupSessionById(sessionId);
+            const freshSession = freshRes?.data || freshRes?.session || freshRes;
+            setSession(freshSession);
+
+            const meetUrl = freshSession?.meeting?.meetingUrl || freshSession?.meetingUrl;
+            if (freshSession?.status === 'in_progress' && meetUrl) {
+                window.open(meetUrl, '_blank', 'noopener,noreferrer');
+            } else {
+                showToast("Session has not started yet", "error");
+            }
+        } catch (err: any) {
+            showToast(err.message || "Failed to join session", "error");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleRequestJoin = async () => {
+        setActionLoading(true);
+        try {
+            const res = await MentorService.requestToJoinGroupSession(sessionId);
+            showToast(res?.message || "Join request sent successfully.", "success");
+            await fetchSession();
+        } catch (err: any) {
+            showToast(err.message || "Failed to send join request.", "error");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleTemplateRedirect = () => {
         if (!mentor) return;
         const nameSlug = [mentor.user?.firstName, mentor.user?.lastName].filter(Boolean).join('-').toLowerCase().replace(/[^a-z0-9]+/g, '-');
         router.push(`/mentorship/mentor-card/${nameSlug}/${mentor.mentorId}?serviceId=${sessionId}`);
+    };
+
+    const renderActionButton = () => {
+        // 1. isMentorOwner, or (no scheduledAt and not template): hide the button
+        if (isMentorOwner || (!session.scheduledAt && !session.isTemplate)) {
+            return null;
+        }
+
+        // 2. session.isTemplate: button "Choose Date & Time" that keeps EXISTING redirect
+        if (session.isTemplate) {
+            return (
+                <button
+                    onClick={handleTemplateRedirect}
+                    disabled={actionLoading}
+                    className="w-full py-4 bg-[#4a3728] text-white rounded-2xl text-xs font-black uppercase tracking-[3px] hover:bg-[#8b7355] transition-all duration-300 shadow-xl shadow-[#4a3728]/20 disabled:opacity-50"
+                >
+                    Choose Date & Time
+                </button>
+            );
+        }
+
+        // 3. accepted AND in_progress: "Join Meet"
+        if (myStatus === 'accepted' && isInProgress) {
+            return (
+                <button
+                    onClick={handleJoinMeet}
+                    disabled={actionLoading}
+                    className="w-full py-4 bg-[#15803d] text-white rounded-2xl text-xs font-black uppercase tracking-[3px] hover:bg-[#166534] transition-all duration-300 shadow-xl shadow-green-900/20 disabled:opacity-50"
+                >
+                    {actionLoading ? "Joining..." : "Join Meet"}
+                </button>
+            );
+        }
+
+        // 4. accepted (not in_progress): disabled "Confirmed - Meet opens when mentor starts"
+        if (myStatus === 'accepted' && !isInProgress) {
+            return (
+                <button
+                    disabled
+                    className="w-full py-4 bg-[#dcfce7] text-[#15803d] border border-[#86efac] rounded-2xl text-xs font-bold uppercase tracking-[2px] cursor-not-allowed opacity-90"
+                >
+                    Confirmed - Meet opens when mentor starts
+                </button>
+            );
+        }
+
+        // 5. pending: disabled "Request Pending"
+        if (myStatus === 'pending') {
+            return (
+                <button
+                    disabled
+                    className="w-full py-4 bg-[#fef3c7] text-[#b45309] border border-[#fde68a] rounded-2xl text-xs font-bold uppercase tracking-[2px] cursor-not-allowed opacity-90"
+                >
+                    Request Pending
+                </button>
+            );
+        }
+
+        // 6. rejected and not full: "Request Again"
+        if (myStatus === 'rejected' && !isFull) {
+            return (
+                <button
+                    onClick={handleRequestJoin}
+                    disabled={actionLoading}
+                    className="w-full py-4 bg-[#4a3728] text-white rounded-2xl text-xs font-black uppercase tracking-[3px] hover:bg-[#8b7355] transition-all duration-300 shadow-xl shadow-[#4a3728]/20 disabled:opacity-50"
+                >
+                    {actionLoading ? "Sending Request..." : "Request Again"}
+                </button>
+            );
+        }
+
+        // 7. full: disabled "Session Full"
+        if (isFull) {
+            return (
+                <button
+                    disabled
+                    className="w-full py-4 bg-[#e0d8cf] text-[#8a7a6a] rounded-2xl text-xs font-bold uppercase tracking-[2px] cursor-not-allowed opacity-80"
+                >
+                    Session Full
+                </button>
+            );
+        }
+
+        // 8. otherwise: "Join Session"
+        return (
+            <button
+                onClick={handleRequestJoin}
+                disabled={actionLoading}
+                className="w-full py-4 bg-[#4a3728] text-white rounded-2xl text-xs font-black uppercase tracking-[3px] hover:bg-[#8b7355] transition-all duration-300 shadow-xl shadow-[#4a3728]/20 disabled:opacity-50"
+            >
+                {actionLoading ? "Sending Request..." : "Join Session"}
+            </button>
+        );
     };
 
     if (loading) {
@@ -71,14 +226,39 @@ export default function GroupSessionDetailsPage() {
         );
     }
 
-    const scheduledDate = new Date(session.scheduledAt);
-    const formattedDate = scheduledDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-    const formattedTime = scheduledDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const scheduledDate = session.scheduledAt ? new Date(session.scheduledAt) : null;
+    const formattedDate = scheduledDate && !isNaN(scheduledDate.getTime())
+        ? scheduledDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+        : 'Date not set';
+    const formattedTime = scheduledDate && !isNaN(scheduledDate.getTime())
+        ? scheduledDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        : 'Time not set';
 
     return (
         <div className="min-h-screen bg-[#FAF9F6] text-[#4a3728] font-sans selection:bg-[#4a3728] selection:text-white pb-20">
             <GlobalStyles />
             <Navigation currentUserId={user?.userId} activeTimezone="IST (UTC+5:30)" />
+
+            {toast && (
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 24,
+                        right: 24,
+                        zIndex: 99999,
+                        padding: "12px 20px",
+                        borderRadius: 12,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
+                        background: toast.type === "success" ? "#dcfce7" : "#fee2e2",
+                        color: toast.type === "success" ? "#15803d" : "#dc2626",
+                        border: `1px solid ${toast.type === "success" ? "#86efac" : "#fca5a5"}`,
+                    }}
+                >
+                    {toast.msg}
+                </div>
+            )}
 
             <main className="max-w-4xl mx-auto px-6 pt-24">
                 <button 
@@ -200,12 +380,7 @@ export default function GroupSessionDetailsPage() {
                                         </span>
                                     </div>
                                     
-                                    <button 
-                                        onClick={handleJoinSession}
-                                        className="w-full py-4 bg-[#4a3728] text-white rounded-2xl text-xs font-black uppercase tracking-[3px] hover:bg-[#8b7355] transition-all duration-300 shadow-xl shadow-[#4a3728]/20"
-                                    >
-                                        Join Session
-                                    </button>
+                                    {renderActionButton()}
                                 </div>
                             </div>
                         </div>
