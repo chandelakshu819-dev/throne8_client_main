@@ -1,15 +1,15 @@
-// src/profile/components/ProfileNavbar.tsx
+// src/features/profile/components/home/ProfileNavbar.tsx
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Crown, Search as SearchIcon } from 'lucide-react';
+import { Crown } from 'lucide-react';
 import AuthService from '@/lib/api/auth.service';
 import SearchBar from './SearchBar';
 import ProfileSidePanel from './ProfileSidePanel';
 import { useRouter, usePathname } from 'next/navigation';
 import { MessageNotificationBadge } from './MessageNotificationBadge';
 import { NetworkNotificationBadge } from '@/features/networks/components/notifications/NetworkNotificationBadge';
-import DefaultAvatar from '@/shared/uiComponents/DefaultAvatar';
 import { capitalizeName } from '@/shared/utils/format';
+import { HOME_PATH, isFeatureEnabled, FeatureKey } from '@/config/launch';
 
 interface ProfileNavbarProps {
     profileImage: string;
@@ -20,10 +20,36 @@ interface ProfileNavbarProps {
     onOpenLeftPanel?: () => void;
 }
 
-// Nav items config — sab items ab consistent icon+label pattern follow karte hain
-const NAV_ITEMS = ['Home', 'Network', 'Jobs', 'Study Group', 'Messaging', 'Notifications', 'Mentorship'];
+// Saare nav items. Launch mode me jo feature band hai, wo niche filter ho jata hai.
+const ALL_NAV_ITEMS = ['Home', 'Network', 'Jobs', 'Study Group', 'Messaging', 'Notifications', 'Mentorship'];
 
-// Route prefixes — active state detect karne ke liye (currentUserId ke saath bhi match ho jaye)
+const NAV_FEATURE: Record<string, FeatureKey> = {
+    'Home': 'dashboard',
+    'Network': 'network',
+    'Jobs': 'jobs',
+    'Study Group': 'study',
+    'Messaging': 'messaging',
+    'Notifications': 'notifications',
+    'Mentorship': 'mentorship',
+};
+
+const NAV_ITEMS = ALL_NAV_ITEMS.filter((item) => isFeatureEnabled(NAV_FEATURE[item]));
+
+// Company menu items sirf tab dikhein jab company feature on ho
+const SHOW_COMPANY_MENU = isFeatureEnabled('company');
+
+// SearchBar auth (getAllUsers) API use karta hai, network flag pe depend nahi karta.
+const SHOW_SEARCH = true;
+
+const PROFILE_MENU_ITEMS = [
+    'View Profile',
+    'Update Profile',
+    ...(SHOW_COMPANY_MENU ? ['Company Page', 'Create Company Page'] : []),
+    'Settings',
+    'Sign Out',
+];
+
+// Route prefixes — active state detect karne ke liye
 const ROUTE_PREFIX: Record<string, string> = {
     'Home': '/dashboard',
     'Network': '/profile/network',
@@ -34,7 +60,7 @@ const ROUTE_PREFIX: Record<string, string> = {
     'Mentorship': '/mentorship',
 };
 
-const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, currentUserId, companyId, userRole, onOpenLeftPanel }) => {
+const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, currentUserId, userRole, onOpenLeftPanel }) => {
     const router = useRouter();
     const pathname = usePathname();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -83,8 +109,9 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
         }
     };
 
+    // Logo / Home click: launch mode me /mentorship, full mode me /dashboard
     const handleHomePage = () => {
-        router.push('/dashboard');
+        router.push(HOME_PATH);
     };
 
     const handleNavigation = (item: string) => {
@@ -107,7 +134,7 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
             case 'Notifications':
                 router.push(`/notifications/${currentUserId}`);
                 break;
-           case 'Mentorship':
+            case 'Mentorship':
                 if (userRole === 'admin') {
                     router.push('/mentorship/admin');
                 } else if (currentUserId && currentUserId !== 'undefined') {
@@ -135,7 +162,7 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
         return paths[item] || '';
     };
 
-    // Netflix jaisi short label — "Study Group" wraps awkwardly, "Notifications" bhi lambi hai
+    // Short labels: "Study Group" wrap hota hai, "Notifications" lambi hai
     const getShortLabel = (item: string): string => {
         const short: Record<string, string> = {
             'Study Group': 'Study',
@@ -177,7 +204,7 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                             </div>
                         </div>
 
-                        {/* Middle Section: Desktop Navigation — consistent icon-over-label, pill active/hover state */}
+                        {/* Middle Section: Desktop Navigation */}
                         <div className="hidden lg:flex items-center justify-center gap-1 flex-1 min-w-0 h-16">
                             {NAV_ITEMS.map((item) => {
                                 const active = isActive(item);
@@ -214,20 +241,24 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
 
                         {/* Right Section: Search Bar + Profile Icon */}
                         <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-                            <div className="hidden sm:flex items-center flex-shrink-0 w-40 xl:w-64 rounded-full bg-white border border-[#E5D9CE] focus-within:border-[#4a3728] transition-colors px-1">
-                                <SearchBar currentUserId={currentUserId} />
-                            </div>
+                            {SHOW_SEARCH && (
+                                <div className="hidden sm:flex items-center flex-shrink-0 w-40 xl:w-64 rounded-full bg-white border border-[#E5D9CE] focus-within:border-[#4a3728] transition-colors px-1">
+                                    <SearchBar currentUserId={currentUserId} />
+                                </div>
+                            )}
 
-                            <button
-                                onClick={() => setIsSearchOpen(!isSearchOpen)}
-                                className="sm:hidden text-[#4a3728] hover:bg-[#EFE3D8] rounded-lg p-2 transition-colors duration-200"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                            </button>
+                            {SHOW_SEARCH && (
+                                <button
+                                    onClick={() => setIsSearchOpen(!isSearchOpen)}
+                                    className="sm:hidden text-[#4a3728] hover:bg-[#EFE3D8] rounded-lg p-2 transition-colors duration-200"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </button>
+                            )}
 
-                            <div className="h-8 w-px bg-[#E5D9CE] mx-1 hidden md:block" />
+                            {SHOW_SEARCH && <div className="h-8 w-px bg-[#E5D9CE] mx-1 hidden md:block" />}
 
                             <div className="relative">
                                 <button
@@ -262,21 +293,20 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                 </button>
                                 {isDropdownOpen && (
                                     <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-lg py-1.5 border border-[#E5D9CE] z-50 overflow-hidden">
-                                        {['View Profile', 'Update Profile', 'Company Page', 'Create Company Page', 'Settings', 'Sign Out']
-                                            .map((item, idx) => (
-                                                <button
-                                                    key={`${item}-${idx}`}
-                                                    onClick={() => handleMenuClick(item)}
-                                                    disabled={item === 'Sign Out' && isLoggingOut}
-                                                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed ${
-                                                        item === 'Sign Out'
-                                                            ? 'text-[#B4442E] hover:bg-[#FBEAE6]'
-                                                            : 'text-[#4a3728] hover:bg-[#F6EDE8]'
-                                                    }`}
-                                                >
-                                                    {item === 'Sign Out' && isLoggingOut ? 'Signing out...' : item}
-                                                </button>
-                                            ))}
+                                        {PROFILE_MENU_ITEMS.map((item, idx) => (
+                                            <button
+                                                key={`${item}-${idx}`}
+                                                onClick={() => handleMenuClick(item)}
+                                                disabled={item === 'Sign Out' && isLoggingOut}
+                                                className={`w-full text-left px-4 py-2.5 text-sm transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                                    item === 'Sign Out'
+                                                        ? 'text-[#B4442E] hover:bg-[#FBEAE6]'
+                                                        : 'text-[#4a3728] hover:bg-[#F6EDE8]'
+                                                }`}
+                                            >
+                                                {item === 'Sign Out' && isLoggingOut ? 'Signing out...' : item}
+                                            </button>
+                                        ))}
                                     </div>
                                 )}
                             </div>
@@ -284,7 +314,7 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                     </div>
 
                     {/* Mobile Search Section */}
-                    {isSearchOpen && (
+                    {SHOW_SEARCH && isSearchOpen && (
                         <div className="sm:hidden border-t border-[#E5D9CE] bg-[#F6EDE8] -mx-3 px-3 py-4">
                             <SearchBar currentUserId={currentUserId} />
                         </div>

@@ -1,4 +1,4 @@
-// src/profile/components/SearchBar.tsx
+// src/features/profile/components/home/SearchBar.tsx
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -8,6 +8,7 @@ import AuthService from '@/lib/api/auth.service';
 import AnalyticsService from '@/lib/api/analytics.service';
 import CompanyService from '@/lib/api/company.service';
 import ProfileService from '@/lib/api/profile.service';
+import { isFeatureEnabled } from '@/config/launch';
 
 interface UserSearchResult {
     userId: string;
@@ -30,6 +31,12 @@ interface EnrichedUser extends UserSearchResult {
 
 const SESSION_IDLE_MS = 1500;   // typing rukne ke kitni der baad "final" maana jaaye
 const MIN_QUERY_LENGTH = 3;     // "h", "n" jaise 1-2 letter wale track nahi honge
+
+// Company feature band ho to company fetch, search aur tracking, teeno skip hote hain.
+const COMPANY_ENABLED = isFeatureEnabled('company');
+
+const FALLBACK_AVATAR =
+    'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s';
 
 interface CompanySearchResult {
     companyId: string;
@@ -60,7 +67,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
     const router = useRouter();
     const pathname = usePathname();
     const trackedCompanyIdsRef = useRef<Set<string>>(new Set());
-    const trackedQueryKeysRef = useRef<Set<string>>(new Set()); // 🔧 FIX #2: naya ref add kiya
+    const trackedQueryKeysRef = useRef<Set<string>>(new Set());
     const latestStateRef = useRef<{
         query: string;
         users: EnrichedUser[];
@@ -84,11 +91,13 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
 
     useEffect(() => {
         fetchAllUsers();
-        fetchAllCompanies();
+        if (COMPANY_ENABLED) {
+            fetchAllCompanies();
+        }
     }, []);
 
-    // 🔧 FIX: Route change hote hi search state reset karo,
-    // taaki dusre page (jaise Payment) pe purana dropdown "automatically" na dikhe
+    // Route change hote hi search state reset karo,
+    // taaki dusre page pe purana dropdown "automatically" na dikhe
     useEffect(() => {
         setSearchQuery('');
         setShowResults(false);
@@ -120,8 +129,9 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
 
         const timeoutId = setTimeout(() => {
 
+            const query = searchQuery.toLowerCase();
+
             const filtered = allUsers.filter(user => {
-                const query = searchQuery.toLowerCase();
                 return (
                     user.fullName.toLowerCase().includes(query) ||
                     user.firstName.toLowerCase().includes(query) ||
@@ -131,14 +141,15 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                 );
             });
 
-            const filteredComps = allCompanies.filter(company => {
-                const query = searchQuery.toLowerCase();
-                return (
-                    company.companyName.toLowerCase().includes(query) ||
-                    company.industry.toLowerCase().includes(query) ||
-                    company.headquarters?.city?.toLowerCase().includes(query)
-                );
-            });
+            const filteredComps = COMPANY_ENABLED
+                ? allCompanies.filter(company => {
+                    return (
+                        company.companyName.toLowerCase().includes(query) ||
+                        company.industry.toLowerCase().includes(query) ||
+                        company.headquarters?.city?.toLowerCase().includes(query)
+                    );
+                })
+                : [];
 
             setFilteredUsers(filtered);
             setFilteredCompanies(filteredComps);
@@ -157,9 +168,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                 finalizeSearchSession();
             }, SESSION_IDLE_MS);
 
-            // 🔧 FIX #1: Dono purane duplicate/buggy company-tracking blocks yahan se
-            // HATA diye gaye hain. Ab company tracking SIRF finalizeSearchSession() ke
-            // andar hoti hai — idle timer / click-outside / user-click pe, har keystroke pe nahi.
+            // Tracking sirf finalizeSearchSession() me hoti hai (idle timer /
+            // click-outside / user-click pe), har keystroke pe nahi.
 
         }, 500);
 
@@ -179,8 +189,6 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                 (user: UserSearchResult) => user.userId !== currentUserId
             );
 
-            console.log('✅ [SEARCH] Loaded users:', users);
-
             const profilePhotoIds = users
                 .map((user: UserSearchResult) => user.profilePhotoId)
                 .filter(Boolean);
@@ -195,33 +203,33 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                     }, {});
 
                 } catch (error) {
-                    console.warn('⚠️ Failed to fetch profile photos:', error);
+                    console.warn('[SEARCH] Failed to fetch profile photos:', error);
                 }
             }
 
             const enrichedUsers: EnrichedUser[] = users.map((user: any) => ({
                 ...user,
                 profileImageUrl: user.profilePhotoId
-                    ? profilePhotosMap[user.profilePhotoId] || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s'
-                    : 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s'
+                    ? profilePhotosMap[user.profilePhotoId] || FALLBACK_AVATAR
+                    : FALLBACK_AVATAR,
             }));
 
             setAllUsers(enrichedUsers);
 
         } catch (error: any) {
-            console.error('❌ [SEARCH] Failed to fetch users:', error);
+            console.error('[SEARCH] Failed to fetch users:', error);
         } finally {
             setIsLoading(false);
         }
     };
 
     const fetchAllCompanies = async () => {
+        if (!COMPANY_ENABLED) return;
         try {
             const response = await CompanyService.getAllCompanies({ pageSize: 100 });
-            console.log('Fetched all companies:', response.data.response);
             setAllCompanies(response.data.response || []);
         } catch (error) {
-            console.error('❌ [SEARCH] Failed to fetch companies:', error);
+            console.error('[SEARCH] Failed to fetch companies:', error);
         }
     };
 
@@ -235,7 +243,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
             trackSearchAppearances(users, query);
         }
 
-        if (companies.length > 0) {
+        if (COMPANY_ENABLED && companies.length > 0) {
             companies.forEach((company) => {
                 const companyTrackKey = `company:${query}:${company.companyId}`;
                 if (!trackedCompanyIdsRef.current.has(companyTrackKey)) {
@@ -267,7 +275,6 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
     const trackSearchAppearances = async (users: UserSearchResult[], query: string) => {
         const trackingKey = `search:${query}`;
 
-        // 🔧 FIX #2: trackedCompanyIdsRef ki jagah ab trackedQueryKeysRef use ho raha hai
         if (trackedQueryKeysRef.current.has(trackingKey)) {
             return;
         }
@@ -281,7 +288,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                 false,
                 index + 1
             ).catch(err => {
-                console.warn('⚠️ [TRACKING] Failed to track appearance:', err);
+                console.warn('[TRACKING] Failed to track appearance:', err);
             });
         });
     };
@@ -299,7 +306,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
             );
 
         } catch (error) {
-            console.warn('⚠️ [TRACKING] Failed to track click:', error);
+            console.warn('[TRACKING] Failed to track click:', error);
         }
 
         setShowResults(false);
@@ -331,8 +338,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onFocus={() => searchQuery && setShowResults(true)}
                     onBlur={() => {
-                        // 🔧 FIX: input focus hatte hi dropdown band karo (chhoti delay
-                        // taaki result button ka onClick pehle process ho jaye)
+                        // Input focus hatte hi dropdown band karo (chhoti delay
+                        // taaki result button ka onMouseDown pehle process ho jaye)
                         setTimeout(() => setShowResults(false), 150);
                     }}
                     placeholder="Search users..."
@@ -354,16 +361,15 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                             <button
                                 key={user.userId}
                                 onMouseDown={() => handleUserClick(user.userId, user.fullName, index + 1)}
-                                
                                 className="w-full flex items-center gap-3 px-3 py-3 hover:bg-[#e0d8cf] rounded-lg transition-colors duration-200 text-left"
                             >
                                 <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#e0d8cf] flex-shrink-0">
                                     <img
-                                        src={user.profileImageUrl || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s'}
+                                        src={user.profileImageUrl || FALLBACK_AVATAR}
                                         alt={user.fullName}
                                         className="w-full h-full object-cover"
                                         onError={(e) => {
-                                            e.currentTarget.src = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s';
+                                            e.currentTarget.src = FALLBACK_AVATAR;
                                         }}
                                     />
                                 </div>
@@ -378,7 +384,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                                 <User className="w-4 h-4 text-[#7a5c3e] flex-shrink-0" />
                             </button>
                         ))}
-                        {filteredCompanies.length > 0 && (
+                        {COMPANY_ENABLED && filteredCompanies.length > 0 && (
                             <>
                                 <p className="text-xs text-[#7a5c3e] px-3 py-2 font-medium border-t border-[#e0d8cf] mt-1">
                                     Companies ({filteredCompanies.length})
@@ -391,11 +397,11 @@ const SearchBar: React.FC<SearchBarProps> = ({ currentUserId }) => {
                                     >
                                         <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-[#e0d8cf] flex-shrink-0 bg-white">
                                             <img
-                                                src={company.media?.logo?.url || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s'}
+                                                src={company.media?.logo?.url || FALLBACK_AVATAR}
                                                 alt={company.companyName}
                                                 className="w-full h-full object-cover"
                                                 onError={(e) => {
-                                                    e.currentTarget.src = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSdYRNQDghH1JvFXro2Yz3iWNmmFAubFZ-RGQ&s';
+                                                    e.currentTarget.src = FALLBACK_AVATAR;
                                                 }}
                                             />
                                         </div>
