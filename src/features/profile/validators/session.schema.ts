@@ -144,6 +144,12 @@ export const validateSessionForm = (data: any): Record<string, string> => {
     if (minP && maxP && minP > maxP) {
       errors.minParticipants = "Min participants cannot exceed Max participants";
     }
+    const MEET_REGEX = /^https:\/\/meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3}|lookup\/[A-Za-z0-9]+)(\?.*)?$/;
+    if (!data.meetingUrl || !data.meetingUrl.trim()) {
+      errors.meetingUrl = "Google Meet link is required";
+    } else if (!MEET_REGEX.test(data.meetingUrl.trim())) {
+      errors.meetingUrl = "Must be a valid Google Meet link (e.g. https://meet.google.com/abc-defg-hij)";
+    }
   }
 
   return errors;

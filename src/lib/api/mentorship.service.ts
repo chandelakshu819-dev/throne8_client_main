@@ -24,6 +24,7 @@ export interface CreateGroupSessionInput {
     periodDays: number;
   };
   isTemplate?: boolean;   // ✅ NEW
+  meetingUrl?: string;
 }
 
 
@@ -543,6 +544,30 @@ class MentorService {
 
       throw new Error(
         'Failed to start group session.'
+      );
+    }
+  }
+
+  static async markGroupAttendance(
+    id: string
+  ): Promise<any> {
+    try {
+      const { data } = await api.post(
+        `/mentorship/group-sessions/${id}/attend`
+      );
+
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+
+        if (apiError?.message) {
+          throw new Error(apiError.message);
+        }
+      }
+
+      throw new Error(
+        error?.response?.data?.message || 'Failed to mark attendance.'
       );
     }
   }

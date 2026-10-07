@@ -117,13 +117,40 @@ const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
         setIsStarting(true);
         setStartError(null);
         try {
-            await MentorService.startGroupSession(session.sessionId);
+            const res: any = await MentorService.startGroupSession(session.sessionId);
+            const meetUrl = res?.data?.meeting?.meetingUrl || res?.data?.meetingUrl || session?.meeting?.meetingUrl || session?.meetingUrl;
+            if (meetUrl) {
+                window.open(meetUrl, '_blank', 'noopener,noreferrer');
+            }
             onRefresh?.();
             onClose();
         } catch (err: any) {
             setStartError(err.message || 'Failed to start session.');
         } finally {
             setIsStarting(false);
+        }
+    };
+
+    const [isEnding, setIsEnding] = useState(false);
+    const handleEndGroupSession = async () => {
+        setIsEnding(true);
+        setStartError(null);
+        try {
+            let durationMinutes: number | undefined = undefined;
+            if (session.scheduledAt) {
+                const elapsed = Math.round((Date.now() - new Date(session.scheduledAt).getTime()) / 60000);
+                durationMinutes = Math.max(1, elapsed);
+            }
+            await SessionService.completeGroupSession(session.sessionId, {
+                actualDuration: durationMinutes,
+                wasSuccessful: true,
+            });
+            onRefresh?.();
+            onClose();
+        } catch (err: any) {
+            setStartError(err.message || 'Failed to complete session.');
+        } finally {
+            setIsEnding(false);
         }
     };
 
@@ -158,7 +185,16 @@ const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
             rescheduled: { bg: '#fed7aa', color: '#c2410c' },
         }[groupStatus] ?? { bg: '#f3f4f6', color: '#6b7280' };
 
-        const canStart = groupStatus === 'open' || groupStatus === 'full';
+        const isTemplate = !!session.isTemplate || !session.scheduledAt;
+        const canStart = (groupStatus === 'open' || groupStatus === 'full') && !isTemplate;
+        const isInProgress = groupStatus === 'in_progress';
+
+        const scheduledTime = session.scheduledAt ? new Date(session.scheduledAt).getTime() : 0;
+        const now = Date.now();
+        const isTooEarly = now < scheduledTime - 5 * 60 * 1000;
+        const isTooLate = now > scheduledTime + 10 * 60 * 1000;
+        const isWithinWindow = !isTooEarly && !isTooLate;
+
         const pricePerPerson = session.pricing?.pricePerPerson ?? session.pricePerPerson ?? 0;
 
         return (
@@ -334,15 +370,46 @@ const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
                                 Close
                             </button>
                             {canStart && (
-                                <button
-                                    onClick={handleStartGroupSession}
-                                    disabled={isStarting}
-                                    className="flex-1 py-3 rounded-xl font-semibold text-white transition-all flex items-center justify-center gap-2"
-                                    style={{ backgroundColor: '#1d4ed8', opacity: isStarting ? 0.6 : 1 }}
-                                >
-                                    <Play className="w-4 h-4" />
-                                    {isStarting ? 'Starting...' : 'Start Session'}
-                                </button>
+                                <div className="flex-1 flex flex-col items-stretch gap-1">
+                                    <button
+                                        onClick={handleStartGroupSession}
+                                        disabled={isStarting || !isWithinWindow}
+                                        className="w-full py-3 rounded-xl font-semibold text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                        style={{ backgroundColor: '#1d4ed8', opacity: isStarting || !isWithinWindow ? 0.6 : 1 }}
+                                        title={isTooEarly ? "Available 5 minutes before scheduled start" : isTooLate ? "Window passed (10 min after scheduled start)" : undefined}
+                                    >
+                                        <Play className="w-4 h-4" />
+                                        {isStarting ? 'Starting...' : 'Start Session'}
+                                    </button>
+                                    {!isWithinWindow && (
+                                        <span className="text-[11px] text-amber-700 text-center font-medium">
+                                          {isTooEarly ? "Starts 5m before scheduled time" : "Start window closed (+10m)"}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                            {isInProgress && (
+                                <>
+                                    {(session.meeting?.meetingUrl || session.meetingUrl) && (
+                                        <button
+                                            onClick={() => window.open(session.meeting?.meetingUrl || session.meetingUrl, '_blank', 'noopener,noreferrer')}
+                                            className="flex-1 py-3 rounded-xl font-semibold text-white transition-all flex items-center justify-center gap-2 hover:opacity-90"
+                                            style={{ backgroundColor: '#22c55e' }}
+                                        >
+                                            <Play className="w-4 h-4" />
+                                            Open Meet
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={handleEndGroupSession}
+                                        disabled={isEnding}
+                                        className="flex-1 py-3 rounded-xl font-semibold text-white transition-all flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50"
+                                        style={{ backgroundColor: '#7c3aed' }}
+                                    >
+                                        <CheckCircle className="w-4 h-4" />
+                                        {isEnding ? 'Ending...' : 'End Session'}
+                                    </button>
+                                </>
                             )}
                         </div>
                     </div>

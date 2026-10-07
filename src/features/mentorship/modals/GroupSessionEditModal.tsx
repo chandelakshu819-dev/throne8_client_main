@@ -1,7 +1,7 @@
 'use client';
 // src/features/mentorship/modals/GroupSessionEditModal.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, DollarSign, Image as ImageIcon, Upload, FileText, Briefcase, Clock, Users } from 'lucide-react';
+import { X, DollarSign, Image as ImageIcon, Upload, FileText, Briefcase, Clock, Users, Video } from 'lucide-react';
 import MentorService from '@/lib/api/mentorship.service';
 
 const followUpAllowedOptions = [
@@ -43,6 +43,7 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [meetUrlError, setMeetUrlError] = useState<string | null>(null);
   const [canonicalSession, setCanonicalSession] = useState<any>(null);
 
   const [formData, setFormData] = useState<Record<string, any>>({});
@@ -97,6 +98,7 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
             followUpPeriod: dbSession.settings?.followUp?.periodDays !== undefined ? String(dbSession.settings.followUp.periodDays) : '0',
             bufferTime: String(dbSession.settings?.bufferTimeMinutes ?? 0),
             thumbnailImage: dbSession.thumbnailImage || null,
+            meetingUrl: dbSession.meeting?.meetingUrl || dbSession.meetingUrl || '',
         });
 
       } catch (err: any) {
@@ -117,6 +119,19 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
     try {
       setIsSaving(true);
       setSaveError(null);
+      setMeetUrlError(null);
+
+      const MEET_REGEX = /^https:\/\/meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3}|lookup\/[A-Za-z0-9]+)(\?.*)?$/;
+      if (!formData.meetingUrl || !formData.meetingUrl.trim()) {
+        setMeetUrlError('Google Meet link is required');
+        setIsSaving(false);
+        return;
+      }
+      if (!MEET_REGEX.test(formData.meetingUrl.trim())) {
+        setMeetUrlError('Must be a valid Google Meet link (e.g. https://meet.google.com/abc-defg-hij)');
+        setIsSaving(false);
+        return;
+      }
 
       // Group Session Flat API Map (as parsed in Joi backend validation)
       const changes: any = {
@@ -130,6 +145,7 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
         paymentMethod: formData.paymentMethod,
         status: formData.status,
         bufferTimeMinutes: Number(formData.bufferTime) || 0,
+        meetingUrl: formData.meetingUrl.trim(),
       };
 
       if (formData.scheduledAt) {
@@ -280,6 +296,35 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
                   disabled={isSaving}
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
+                <Video className="w-5 h-5 inline mr-2" />
+                Google Meet link
+              </label>
+              <input
+                type="url"
+                placeholder="https://meet.google.com/abc-defg-hij"
+                className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
+                style={{
+                  borderColor: meetUrlError ? '#dc2626' : '#e0d8cf',
+                  backgroundColor: '#fbf7f3',
+                  color: '#4a3728'
+                }}
+                value={formData.meetingUrl || ''}
+                onChange={(e) => {
+                  setFormData({ ...formData, meetingUrl: e.target.value });
+                  if (meetUrlError) setMeetUrlError(null);
+                }}
+                disabled={isSaving}
+              />
+              <p className="text-sm mt-1.5" style={{ color: '#8a7a6a' }}>
+                Create one at <a href="https://meet.new" target="_blank" rel="noopener noreferrer" className="underline font-bold" style={{ color: '#7a5c3e' }}>meet.new</a> and paste the link here
+              </p>
+              {meetUrlError && (
+                <p className="text-sm mt-1.5 font-bold" style={{ color: '#dc2626' }}>{meetUrlError}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-6">
