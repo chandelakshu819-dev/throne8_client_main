@@ -1,7 +1,7 @@
 /**
  * src/config/launch.ts
- * Launch mode config. NEXT_PUBLIC_LAUNCH_MODE=mentorship => sirf Auth + Mentorship + Profile + Notifications.
- * Value build time pe inline hoti hai, change ke baad Vercel redeploy zaroori hai.
+ * NEXT_PUBLIC_LAUNCH_MODE=mentorship => sirf Auth + Mentorship.
+ * Value build time pe inline hoti hai, change ke baad dev server restart / redeploy zaroori hai.
  */
 
 export type FeatureKey =
@@ -26,8 +26,6 @@ export const HOME_PATH = IS_MENTORSHIP_MODE ? '/mentorship' : '/dashboard';
 
 const MENTORSHIP_MODE_FEATURES: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
   'mentorship',
-  'profile',
-  'notifications',
 ]);
 
 /** Navbar/sidebar links filter karne ke liye: isFeatureEnabled('jobs') */
@@ -43,17 +41,7 @@ const ALLOWED_PREFIXES = [
   '/auth',
   '/onboarding',
   '/mentorship',
-  '/profile',
-  '/notifications',
   '/api',
-];
-
-// Allowed prefix ke andar bhi ye sub-paths band hain
-const BLOCKED_PREFIXES = [
-  '/profile/network',
-  '/profile/saved-posts',
-  '/profile/hidden-posts',
-  '/profile/analytics',
 ];
 
 const matches = (pathname: string, prefix: string): boolean =>
@@ -62,6 +50,5 @@ const matches = (pathname: string, prefix: string): boolean =>
 export function isPathAllowedInLaunchMode(pathname: string): boolean {
   if (!IS_MENTORSHIP_MODE) return true;
   if (pathname === '/') return true;
-  if (BLOCKED_PREFIXES.some((p) => matches(pathname, p))) return false;
   return ALLOWED_PREFIXES.some((p) => matches(pathname, p));
 }

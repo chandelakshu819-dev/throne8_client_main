@@ -1,23 +1,18 @@
 'use client';
-
+// src/features/auth/components/LoginForm.tsx
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import AuthService from '@/lib/api/auth.service';
-import { AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLogin } from '../hooks/useLogin';
 import { LoginFormData, loginSchema } from '../schema';
-
-
-
+import { HOME_PATH } from '@/config/launch';
 
 export default function LoginForm() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-
 
   const {
     login,
@@ -25,7 +20,7 @@ export default function LoginForm() {
     error: apiError,
     rememberMe,
     updateRememberMe,
-    clearLoginError
+    clearLoginError,
   } = useLogin();
 
   const {
@@ -39,37 +34,30 @@ export default function LoginForm() {
 
   const onSubmit = async (data: LoginFormData) => {
     try {
-      clearLoginError(); // Clear previous errors
+      clearLoginError();
 
-      // console.log('🚀 [FORM] Login attempt:', data.email);
-
-      // ✅ Call Redux login thunk
+      // Redux login thunk
       await login({
         email: data.email,
         password: data.password,
         rememberMe,
       });
 
-      // console.log('✅ [FORM] Login successful, redirecting...');
+      // Small delay for localStorage/cookie write
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Small delay for localStorage write
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Refresh and navigate
       router.refresh();
-      await new Promise(resolve => setTimeout(resolve, 50));
-      router.push('/dashboard');
-
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      router.push(HOME_PATH);
     } catch (error: any) {
-      // Error is already in Redux state, no need to set manually
-      console.error('❌ [FORM] Login failed:', error);
+      // Error already Redux state me hai
+      console.error('[FORM] Login failed:', error);
     }
   };
 
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-5 md:space-y-6">
-      {/* ==================== API ERROR MESSAGE ==================== */}
+      {/* API ERROR MESSAGE */}
       {apiError && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm">
           <p className="font-medium">{apiError}</p>
@@ -104,7 +92,6 @@ export default function LoginForm() {
           placeholder="••••••••"
           className="w-full px-3 sm:px-4 md:px-5 py-2.5 sm:py-3 md:py-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border border-[#4a3728] bg-white text-black placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#4a3728] focus:border-transparent transition"
         />
-        {/* Eye Toggle Button */}
         <button
           type="button"
           onClick={() => setShowPassword(!showPassword)}
@@ -146,9 +133,6 @@ export default function LoginForm() {
       >
         {loading ? 'Signing In...' : 'Sign In'}
       </button>
-
-      {/* Helpful message */}
-      {/* {!rememberMe} */}
     </form>
   );
 }

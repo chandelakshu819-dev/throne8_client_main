@@ -1,14 +1,14 @@
 "use client";
-
+//src/features/mentorship/components/layout/Navigation.tsx
 import React, { useEffect, useState } from "react";
 import { Crown, Globe, User } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import SearchBar from "@/features/profile/components/home/SearchBar";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfileData } from "@/features/profile/hooks/useProfileData";
-import { formatUserDisplayName, capitalizeName } from "@/shared/utils/format";
+import { formatUserDisplayName } from "@/shared/utils/format";
 import { transformToProfileData } from "@/shared/utils/profileTransformers";
-import AuthService from "@/lib/api/auth.service";
+import { HOME_PATH, isFeatureEnabled, type FeatureKey } from "@/config/launch";
 
 interface NavigationProps {
     activeTimezone?: string;
@@ -17,7 +17,20 @@ interface NavigationProps {
     mentorUserId?: string;
 }
 
-const NAV_ITEMS = ['Home', 'Network', 'Jobs', 'Study Group', 'Messaging', 'Notifications', 'Mentorship'];
+const ALL_NAV_ITEMS = ['Home', 'Network', 'Jobs', 'Study Group', 'Messaging', 'Notifications', 'Mentorship'];
+
+const NAV_FEATURE: Record<string, FeatureKey> = {
+    'Home': 'dashboard',
+    'Network': 'network',
+    'Jobs': 'jobs',
+    'Study Group': 'study',
+    'Messaging': 'messaging',
+    'Notifications': 'notifications',
+    'Mentorship': 'mentorship',
+};
+
+// Launch mode ke hisaab se sirf enabled tabs
+const NAV_ITEMS = ALL_NAV_ITEMS.filter((item) => isFeatureEnabled(NAV_FEATURE[item]));
 
 const ROUTE_PREFIX: Record<string, string> = {
     'Home': '/dashboard',
@@ -39,8 +52,6 @@ export default function Navigation({
     const pathname = usePathname();
     const { user } = useAuth();
     const { userProfileData, profileImageUrl, fetchUserProfile } = useProfileData();
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [imgError, setImgError] = useState(false);
 
     const targetUserId = currentUserId || user?.userId || user?.id || (user as any)?._id;
 
@@ -106,17 +117,17 @@ export default function Navigation({
 
     const isActive = (item: string): boolean => {
         const prefix = ROUTE_PREFIX[item];
-        return prefix ? pathname?.startsWith(prefix) : false;
+        return prefix ? !!pathname?.startsWith(prefix) : false;
     };
 
     return (
         <nav className="fixed top-0 left-0 w-full bg-[#F6EDE8] text-[#4a3728] border-b border-[#E5D9CE] shadow-sm z-50">
             <div className="w-full px-3 sm:px-6 lg:px-8">
                 <div className="flex items-center h-16 gap-2 w-full justify-between">
-                    
+
                     {/* Left: Throne8 Logo */}
                     <div className="flex items-center gap-2 flex-shrink-0">
-                        <button onClick={() => router.push('/dashboard')} className="flex items-center gap-2 whitespace-nowrap group">
+                        <button onClick={() => router.push(HOME_PATH)} className="flex items-center gap-2 whitespace-nowrap group">
                             <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#4a3728] shrink-0 transition-transform duration-200 group-hover:scale-105">
                                 <Crown size={16} className="text-[#F6EDE8]" strokeWidth={2} />
                             </span>
@@ -151,12 +162,14 @@ export default function Navigation({
                         })}
                     </div>
 
-                    {/* Right: Search Bar + Timezone Badge + MY DASHBOARD Button + Profile */}
+                    {/* Right: Search Bar + Timezone Badge + MY DASHBOARD Button */}
                     <div className="flex items-center gap-2.5 flex-shrink-0 ml-auto">
-                        {/* Active Search Bar */}
-                        <div className="hidden sm:flex items-center flex-shrink-0 w-36 xl:w-52 rounded-full bg-white border border-[#E5D9CE] focus-within:border-[#4a3728] transition-colors px-1">
-                            <SearchBar currentUserId={targetUserId} />
-                        </div>
+                        {/* Search sirf tab jab profile feature on ho (search result profile page kholta hai) */}
+                        {isFeatureEnabled('profile') && (
+                            <div className="hidden sm:flex items-center flex-shrink-0 w-36 xl:w-52 rounded-full bg-white border border-[#E5D9CE] focus-within:border-[#4a3728] transition-colors px-1">
+                                <SearchBar currentUserId={targetUserId} />
+                            </div>
+                        )}
 
                         {/* Timezone Badge */}
                         <div className="hidden xl:flex items-center gap-1.5 text-[10px] font-bold text-[#8b7355] bg-[#f8f6f4] px-3 py-1.5 rounded-full border border-[#ece7e2] shrink-0">
@@ -178,7 +191,6 @@ export default function Navigation({
                             MY DASHBOARD
                             <User className="w-3.5 h-3.5" />
                         </button>
-
                     </div>
                 </div>
             </div>

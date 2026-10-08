@@ -1,10 +1,11 @@
-﻿'use client'
+﻿'use client';
 // src/app/page.tsx
-import { useAuth } from "@/features/auth/hooks/useAuth";
-import { useEducation } from "@/features/profile/hooks/useEducation";
-import { useProfile } from "@/features/profile/hooks/useProfile";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useEducation } from '@/features/profile/hooks/useEducation';
+import { useProfile } from '@/features/profile/hooks/useProfile';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { HOME_PATH, IS_MENTORSHIP_MODE } from '@/config/launch';
 
 export default function Home() {
   const router = useRouter();
@@ -17,11 +18,13 @@ export default function Home() {
 
     if (user) {
       loadProfile();
-      loadPosts();
-      loadEducation();
-      router.replace("/dashboard");
+      if (!IS_MENTORSHIP_MODE) {
+        loadPosts();
+        loadEducation();
+      }
+      router.replace(HOME_PATH);
     } else {
-      router.replace("/login");
+      router.replace('/login');
     }
   }, [user, isLoading]);
 
