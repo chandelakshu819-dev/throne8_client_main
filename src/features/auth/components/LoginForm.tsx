@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLogin } from '../hooks/useLogin';
@@ -13,6 +13,12 @@ import { HOME_PATH } from '@/config/launch';
 export default function LoginForm() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  // Hydration se pehle submit rokne ke liye (warna credentials URL me chale jaate hain)
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const {
     login,
@@ -36,7 +42,6 @@ export default function LoginForm() {
     try {
       clearLoginError();
 
-      // Redux login thunk
       await login({
         email: data.email,
         password: data.password,
@@ -50,13 +55,16 @@ export default function LoginForm() {
       await new Promise((resolve) => setTimeout(resolve, 50));
       router.push(HOME_PATH);
     } catch (error: any) {
-      // Error already Redux state me hai
       console.error('[FORM] Login failed:', error);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-5 md:space-y-6">
+    <form
+      method="post"
+      onSubmit={handleSubmit(onSubmit)}
+      className="space-y-4 sm:space-y-5 md:space-y-6"
+    >
       {/* API ERROR MESSAGE */}
       {apiError && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-3 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm">
@@ -122,13 +130,13 @@ export default function LoginForm() {
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || !mounted}
         className={`w-full py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-semibold transition shadow-lg text-sm sm:text-base
             ${rememberMe
             ? 'bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white hover:opacity-90'
             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }
-    ${loading ? 'opacity-70' : ''}
+    ${loading || !mounted ? 'opacity-70' : ''}
   `}
       >
         {loading ? 'Signing In...' : 'Sign In'}
