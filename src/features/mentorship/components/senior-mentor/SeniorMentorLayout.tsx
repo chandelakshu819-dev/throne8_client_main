@@ -6,10 +6,12 @@ import MentorService from "@/lib/api/mentorship.service";
 import SeniorMentorSidebar from "./SeniorMentorSidebar";
 import SeniorProfilePage from "./SeniorProfilePage";
 import SeniorMentorServicesPage from "./SeniorMentorServicesPage";
+import SeniorBookingsPage from "./SeniorBookingsPage";
+import SeniorAnalyticsPage from "./SeniorAnalyticsPage";
 import AvailabilityPage from "../dashboard/AvailabilityPage";
 import { useRouter } from "next/navigation";
 
-export default function SeniorMentorLayout({ userId, activeTab = 'profile' }: { userId: string, activeTab?: 'profile' | 'services' | 'availability' }) {
+export default function SeniorMentorLayout({ userId, activeTab = 'profile' }: { userId: string, activeTab?: 'profile' | 'services' | 'availability' | 'bookings' | 'analytics' }) {
   const router = useRouter();
   const [application, setApplication] = useState<SeniorMentorApplication | null>(null);
   const [mentorProfile, setMentorProfile] = useState<any>(null);
@@ -87,6 +89,8 @@ export default function SeniorMentorLayout({ userId, activeTab = 'profile' }: { 
           <div className="px-4 md:px-6 py-8 max-w-[1600px] mx-auto">
             {activeTab === 'profile' && <SeniorProfilePage seniorData={application} />}
             {activeTab === 'services' && <SeniorMentorServicesPage seniorData={application} />}
+            {activeTab === 'bookings' && <SeniorBookingsPage seniorData={application} />}
+            {activeTab === 'analytics' && <SeniorAnalyticsPage seniorData={application} />}
             {activeTab === 'availability' && !showAvailabilityError && <AvailabilityPage mentorData={mentorProfile} />}
             {showAvailabilityError && (
               <div className="flex flex-col items-center justify-center p-6 text-center mt-20">

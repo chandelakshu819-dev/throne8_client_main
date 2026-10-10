@@ -16,7 +16,7 @@ interface SeniorPaymentStepProps {
     formData: BookingFormData;
     mentorId: string;
     onBack: () => void;
-    onBookingSuccess: () => void;
+    onBookingSuccess: (response: any) => void;
 }
 
 const BANKS: string[] = [
@@ -61,7 +61,7 @@ const SeniorPaymentStep: React.FC<SeniorPaymentStepProps> = ({
             ).toISOString();
 
             // ISOLATED SENIOR API — does NOT call SessionService.bookSession
-            await SeniorSessionService.bookSession(sessionId, {
+            const response = await SeniorSessionService.bookSession(sessionId, {
                 slotTime,
                 scheduledAt,
                 paymentMethod: paymentMethodMap[paymentMethod] || "razorpay",
@@ -72,7 +72,8 @@ const SeniorPaymentStep: React.FC<SeniorPaymentStepProps> = ({
                 },
             });
 
-            onBookingSuccess();
+            setBooking(false);
+            onBookingSuccess(response);
         } catch (error: any) {
             console.error("Senior booking failed:", error);
             const backendError = error?.response?.data?.message || error.message || "Failed to book session (Unknown Error)";

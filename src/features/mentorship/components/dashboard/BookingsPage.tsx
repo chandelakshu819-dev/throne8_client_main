@@ -853,7 +853,9 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Date</th>
                   <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Time</th>
                   <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Status</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Actions</th>
+                  {bookingTab !== "all" && (
+                     <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Actions</th>
+                  )}
                 </tr>
               </thead>
 
@@ -931,6 +933,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                       </td>
 
                       {/* Actions */}
+                      {bookingTab !== "all" && (
                       <td className="px-5 py-3.5">
                         <div className="flex gap-1.5">
                           {/* Pending — only real pending join-request rows land here */}
@@ -1109,6 +1112,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                           )}
                         </div>
                       </td>
+                      )}
                     </tr>
                   );
                 })}

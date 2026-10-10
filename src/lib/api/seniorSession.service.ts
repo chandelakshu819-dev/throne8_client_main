@@ -118,9 +118,6 @@ class SeniorSessionService {
         }
     }
 
-    /**
-     * Delete an existing Senior Mentor session.
-     */
     static async deleteSession(sessionId: string): Promise<any> {
         try {
             console.log(`📅 [DELETE_SENIOR_SESSION] Deleting ${sessionId}...`);
@@ -133,6 +130,86 @@ class SeniorSessionService {
                 throw new Error(error.response.data.message);
             }
             throw new Error("Failed to delete senior mentor service. Please try again.");
+        }
+    }
+
+    /**
+     * Confirm a pending booking
+     */
+    static async confirmBooking(sessionId: string, bookingId: string): Promise<any> {
+        try {
+            const { data } = await api.post(`/mentorship/senior-sessions/${sessionId}/bookings/${bookingId}/confirm`);
+            return data;
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.message || "Failed to confirm booking.");
+        }
+    }
+
+    /**
+     * Cancel a booking
+     */
+    static async cancelBooking(sessionId: string, bookingId: string, reason?: string): Promise<any> {
+        try {
+            const { data } = await api.post(`/mentorship/senior-sessions/${sessionId}/bookings/${bookingId}/cancel`, { reason });
+            return data;
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.message || "Failed to cancel booking.");
+        }
+    }
+
+    /**
+     * Reschedule a booking
+     */
+    static async rescheduleBooking(sessionId: string, bookingId: string, scheduledAt: string, reason: string): Promise<any> {
+        try {
+            const { data } = await api.post(`/mentorship/senior-sessions/${sessionId}/bookings/${bookingId}/reschedule`, { newScheduledAt: scheduledAt, reason });
+            return data;
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.message || "Failed to reschedule booking.");
+        }
+    }
+
+    /**
+     * Start a confirmed booking
+     */
+    static async startBooking(sessionId: string, bookingId: string): Promise<any> {
+        try {
+            const { data } = await api.post(`/mentorship/senior-sessions/${sessionId}/bookings/${bookingId}/start`);
+            return data;
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.message || "Failed to start booking.");
+        }
+    }
+
+    /**
+     * Complete an in-progress booking
+     */
+    static async completeBooking(sessionId: string, bookingId: string): Promise<any> {
+        try {
+            const { data } = await api.post(`/mentorship/senior-sessions/${sessionId}/bookings/${bookingId}/complete`);
+            return data;
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.message || "Failed to complete booking.");
+        }
+    }
+    /**
+     * Get analytics dashboard stats for the Senior Mentor
+     */
+    static async getAnalytics(): Promise<any> {
+        try {
+            const { data } = await api.get(`/mentorship/senior-sessions/analytics`);
+            // Unwrap ResponseHandler envelope: { success, message, data: {...} }
+            const payload = data?.data ?? data;
+            // Validate the expected top-level shape exists
+            if (!payload || typeof payload !== 'object' || !payload.profileViews) {
+                throw new Error("Invalid analytics response from server.");
+            }
+            return payload;
+        } catch (error: any) {
+            if (error?.response?.data?.message) {
+                throw new Error(error.response.data.message);
+            }
+            throw error;
         }
     }
 }

@@ -79,6 +79,19 @@ class SeniorAvailabilityService {
         }
     }
 
+    // ── GET MONTHLY AVAILABILITY ──────────────────────────────
+    static async getMonthlyAvailability(mentorId: string, startDate: string, endDate: string, duration: number = 60): Promise<Array<{date: string, slots: {startTime: string, endTime: string}[]}>> {
+        try {
+            console.log("📅 [SENIOR_AVAILABILITY] Fetching monthly dynamic slots...", { mentorId, startDate, endDate, duration });
+            const { data } = await api.get<SeniorAvailabilityResponse>(
+                `/mentorship/senior-availability/monthly-slots?mentorId=${mentorId}&startDate=${startDate}&endDate=${endDate}&duration=${duration}`
+            );
+            return data.data || [];
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.message || "Failed to fetch monthly availability.");
+        }
+    }
+
     // ── ADD BLOCKED TIME ───────────────────────────────────────
     static async addBlockedTime(date: string, startTime: string, endTime: string, reason?: string): Promise<SeniorAvailabilityResponse> {
         try {

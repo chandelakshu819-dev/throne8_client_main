@@ -9,12 +9,15 @@ import { TIME_SLOTS, MONTHS, DAYS, C, btnPrimary, formatTimeAMPM, formatSlotRang
 import type { Service, CalendarData } from "../../types/types";
 import AvailabilityService from "@/lib/api/availability.service";
 import MentorService from "@/lib/api/mentorship.service";
+import SeniorAvailabilityService from "@/lib/api/seniorAvailability.service";
 
 interface CalendarStepProps {
     selectedService: Service | null;
     onBack: () => void;
     onContinue: (data: CalendarData) => void;
     mentorId: string;
+    seniorBookedSlots?: { slotTime: string, dateStr: string }[];
+    isSeniorService?: boolean;
 }
 
 
@@ -42,7 +45,7 @@ const getServiceDuration = (service: any): number => {
 };
 
 // Continuous windows se service duration ke slots banao, aur booked/blocked ranges mark karo
-const buildSlotsForDuration = (daySlots: any[], duration: number): BookableSlot[] => {
+const buildSlotsForDuration = (daySlots: any[], duration: number, seniorBookedSlots?: { slotTime: string, dateStr: string }[], currentSelectedDateStr?: string): BookableSlot[] => {
     if (!daySlots || daySlots.length === 0) return [];
 
     const sorted = [...daySlots].sort((a, b) => toMinutes(a.startTime) - toMinutes(b.startTime));
@@ -69,6 +72,22 @@ const buildSlotsForDuration = (daySlots: any[], duration: number): BookableSlot[
             isBlocked: !!s.isBlocked,
         }));
 
+    if (seniorBookedSlots && currentSelectedDateStr) {
+        seniorBookedSlots.forEach(bk => {
+            if (bk.dateStr === currentSelectedDateStr && bk.slotTime) {
+                const parts = bk.slotTime.split(" - ");
+                if (parts.length === 2 && parts[0] && parts[1]) {
+                    busyRanges.push({
+                        start: toMinutes(parts[0].trim()),
+                        end: toMinutes(parts[1].trim()),
+                        isBooked: true,
+                        isBlocked: false
+                    });
+                }
+            }
+        });
+    }
+
     const effDuration = duration > 0 ? duration : 30;
     const result: BookableSlot[] = [];
 
@@ -94,7 +113,7 @@ const buildSlotsForDuration = (daySlots: any[], duration: number): BookableSlot[
     return result;
 };
 
-const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, onContinue, mentorId }) => {
+const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, onContinue, mentorId, seniorBookedSlots, isSeniorService }) => {
     const router = useRouter();
     const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
     const [selectedDate, setSelectedDate] = useState<number | null>(null);
@@ -126,8 +145,14 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                 status: s.status || (s.spotsRemaining === 0 ? 'full' : 'available'),
             }));
         }
-        return buildSlotsForDuration(daySlots, serviceDuration);
-    }, [isGroupTemplate, groupSlots, daySlots, serviceDuration]);
+
+        const y2 = year;
+        const m2 = String(month + 1).padStart(2, "0");
+        const d2 = String(selectedDate || 0).padStart(2, "0");
+        const curDateStr = `${y2}-${m2}-${d2}`;
+
+        return buildSlotsForDuration(daySlots, serviceDuration, seniorBookedSlots, curDateStr);
+    }, [isGroupTemplate, groupSlots, daySlots, serviceDuration, seniorBookedSlots, selectedDate, year, month]);
 
     const availableSlotsCount = useMemo(() => {
         return allGeneratedSlots.filter((s) => !s.isBooked && !s.isBlocked && s.status !== 'full').length;
@@ -161,18 +186,28 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
         const startDate = `${y}-${m}-01`;
         const endDate = `${y}-${m}-${String(lastDay).padStart(2, "0")}`;
 
-        // Use getMentorAvailability — the same endpoint the Availability dashboard uses.
-        // This correctly scopes results to THIS mentor and THIS month.
-        // getAllAvailabilityFromDB is a global endpoint (limit:100 across ALL mentors)
-        // and cannot guarantee this mentor's records are included.
-        AvailabilityService.getMentorAvailability(mentorId, { startDate, endDate })
-            .then((res: any) => {
-                // Response shape: { data: { availabilities: [...] } }
-                const avails = res?.data?.availabilities ?? [];
-                setAvailability(avails);
-            })
-            .catch(() => setAvailability([]));
-    }, [mentorId, currentMonth, isGroupTemplate]);
+        if (isSeniorService) {
+            const serviceDuration = getServiceDuration(selectedService);
+            SeniorAvailabilityService.getMonthlyAvailability(mentorId, startDate, endDate, serviceDuration)
+                .then((res: any) => {
+                    // Response is directly the array of monthly slot objects
+                    setAvailability(res || []);
+                })
+                .catch(() => setAvailability([]));
+        } else {
+            // Use getMentorAvailability — the same endpoint the Availability dashboard uses.
+            // This correctly scopes results to THIS mentor and THIS month.
+            // getAllAvailabilityFromDB is a global endpoint (limit:100 across ALL mentors)
+            // and cannot guarantee this mentor's records are included.
+            AvailabilityService.getMentorAvailability(mentorId, { startDate, endDate })
+                .then((res: any) => {
+                    // Response shape: { data: { availabilities: [...] } }
+                    const avails = res?.data?.availabilities ?? [];
+                    setAvailability(avails);
+                })
+                .catch(() => setAvailability([]));
+        }
+    }, [mentorId, currentMonth, isGroupTemplate, isSeniorService, selectedService]);
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);

@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { User, Briefcase, Calendar } from "lucide-react";
+import { User, Briefcase, Calendar, BarChart3 } from "lucide-react";
 import type { SeniorMentorApplication } from "@/lib/api/seniorMentorApplication.service";
 import { useAppSelector } from "@/core/store/store.hooks";
 import { useRouter } from "next/navigation";
 
 interface SeniorMentorSidebarProps {
   application: SeniorMentorApplication;
-  activeTab?: 'profile' | 'services' | 'availability';
+  activeTab?: 'profile' | 'services' | 'availability' | 'bookings' | 'analytics';
 }
 
 export default function SeniorMentorSidebar({ application, activeTab = 'profile' }: SeniorMentorSidebarProps) {
@@ -110,6 +110,41 @@ export default function SeniorMentorSidebar({ application, activeTab = 'profile'
             </span>
             <span className="flex-1 text-left">Availability</span>
             {activeTab === 'availability' && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+            </button>
+
+            <button
+            onClick={() => router.push(`/mentorship/senior-mentor-profile/${application.userId}/bookings`)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-150"
+            style={{
+                backgroundColor: activeTab === 'bookings' ? '#4a3728' : 'transparent',
+                color: activeTab === 'bookings' ? '#fff' : '#8a7a6a',
+            }}
+            >
+            <span
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 relative transition-colors"
+                style={{ backgroundColor: activeTab === 'bookings' ? 'rgba(255,255,255,0.15)' : 'rgba(138,122,106,0.1)' }}
+            >
+                <Calendar className="w-4 h-4" style={{ color: activeTab === 'bookings' ? '#fff' : '#8a7a6a' }} />
+            </span>
+            <span className="flex-1 text-left">Bookings</span>
+            {activeTab === 'bookings' && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+            </button>
+            <button
+            onClick={() => router.push(`/mentorship/senior-mentor-profile/${application.userId}/analytics`)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-150"
+            style={{
+                backgroundColor: activeTab === 'analytics' ? '#4a3728' : 'transparent',
+                color: activeTab === 'analytics' ? '#fff' : '#8a7a6a',
+            }}
+            >
+            <span
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 relative transition-colors"
+                style={{ backgroundColor: activeTab === 'analytics' ? 'rgba(255,255,255,0.15)' : 'rgba(138,122,106,0.1)' }}
+            >
+                <BarChart3 className="w-4 h-4" style={{ color: activeTab === 'analytics' ? '#fff' : '#8a7a6a' }} />
+            </span>
+            <span className="flex-1 text-left">Analytics</span>
+            {activeTab === 'analytics' && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
             </button>
         </div>
       </nav>

@@ -12,6 +12,7 @@ import CalendarStep from "@/features/mentorship/components/mentor/CalendarStep";
 import DetailsStep from "@/features/mentorship/components/mentor/DetailsStep";
 import ConfirmationStep from "@/features/mentorship/components/mentor/ConfirmationStep";
 import SeniorPaymentStep from "@/features/mentorship/components/senior/SeniorPaymentStep";
+import Toast from "@/shared/uiComponents/Toast";
 
 import type { BookingStep, Service, CalendarData, FormData as BookingFormData } from "@/features/mentorship/types/types";
 
@@ -26,9 +27,12 @@ export default function SeniorServiceBookingPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const [toastMsg, setToastMsg] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
     const [bookingStep, setBookingStep] = useState<BookingStep>("calendar");
     const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
     const [formData, setFormData] = useState<BookingFormData | null>(null);
+    const [bookingResponse, setBookingResponse] = useState<any>(null);
 
     useEffect(() => {
         if (!sessionId) return;
@@ -82,15 +86,34 @@ export default function SeniorServiceBookingPage() {
     // DO NOT pass the full `service` object into these generic generic steps 
     // to shield the application from architectural mismatches.
     const presentationServiceAdapter = {
+        id: service.sessionId || service._id,
         title: service.title,
         price: service.pricing?.basePrice || "Free",
-        type: "1:1 Call"
+        type: "1:1 Call",
+        duration: service.duration,
+        durationMinutes: service.duration
     } as Service;
+
+    const activeSeniorBookings = (service?.bookings || [])
+        .filter((b: any) => ['pending', 'upcoming', 'confirmed', 'in_progress'].includes(b.status))
+        .map((b: any) => {
+            const d = new Date(b.scheduledAt);
+            d.setMinutes(d.getMinutes() + 330); 
+            const y = d.getUTCFullYear();
+            const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+            const day = String(d.getUTCDate()).padStart(2, "0");
+            
+            return {
+                slotTime: b.slotTime, 
+                dateStr: `${y}-${m}-${day}`
+            };
+        });
 
     const resetBooking = (): void => {
         setBookingStep(null);
         setCalendarData(null);
         setFormData(null);
+        setBookingResponse(null);
         router.push(`/mentorship/senior-service/${sessionId}`);
     };
 
@@ -105,6 +128,8 @@ export default function SeniorServiceBookingPage() {
                     <CalendarStep 
                         mentorId={effectiveMentorId} 
                         selectedService={presentationServiceAdapter} 
+                        seniorBookedSlots={activeSeniorBookings}
+                        isSeniorService={true}
                         onBack={() => router.push(`/mentorship/senior-service/${sessionId}`)} 
                         onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }} 
                     />
@@ -127,7 +152,11 @@ export default function SeniorServiceBookingPage() {
                          formData={formData!}
                          mentorId={effectiveMentorId}
                          onBack={() => setBookingStep("details")}
-                         onBookingSuccess={() => setBookingStep("confirmation")}
+                         onBookingSuccess={(response) => {
+                             setBookingResponse(response);
+                             setToastMsg({ message: "Session request sent successfully", type: "success" });
+                             setBookingStep("confirmation");
+                         }}
                      />
                 )}
                 
@@ -136,10 +165,17 @@ export default function SeniorServiceBookingPage() {
                         selectedService={presentationServiceAdapter} 
                         calendarData={calendarData} 
                         formData={formData} 
+                        bookingResponse={bookingResponse}
                         onReset={resetBooking} 
                     />
                 )}
 
+                {toastMsg && (
+                    <Toast 
+                        message={toastMsg.message} 
+                        onClose={() => setToastMsg(null)} 
+                    />
+                )}
             </main>
         </div>
     );
