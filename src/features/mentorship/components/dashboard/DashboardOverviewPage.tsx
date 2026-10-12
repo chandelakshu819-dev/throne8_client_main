@@ -38,7 +38,6 @@ type Session = {
   menteeId?: string
   menteeName?: string
   bookedMenteeName?: string
-  menteeProfilePhoto?: string
   title?: string
   sessionType?: string
   scheduledAt?: string
@@ -121,31 +120,6 @@ function initialsFrom(name: string) {
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase()
 }
 
-function MenteeAvatar({ photo, name }: { photo?: string | null; name: string }) {
-  const [imgError, setImgError] = useState(false)
-
-  if (photo && !imgError) {
-    return (
-      <img
-        src={photo}
-        alt={name}
-        onError={() => setImgError(true)}
-        className="w-9 h-9 rounded-full object-cover shrink-0"
-        style={{ border: `1px solid ${COLORS.hairline}` }}
-      />
-    )
-  }
-
-  return (
-    <div
-      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white"
-      style={{ backgroundColor: COLORS.ink }}
-    >
-      {initialsFrom(name)}
-    </div>
-  )
-}
-
 export default function DashboardOverviewPage({
   mentorData,
   dashboardData,
@@ -215,7 +189,7 @@ export default function DashboardOverviewPage({
   const trustScore = dashboardData?.stats?.trustScore ?? mentorData?.trustScore?.score ?? mentorData?.stats?.trustScore ?? null
   const isVerified = dashboardData?.isVerified ?? Boolean(mentorData?.verification?.isVerified || mentorData?.isVerified)
 
-  const [filterTab, setFilterTab] = useState<"all" | "today" | "tomorrow" | "later">("all")
+  const [filterTab, setFilterTab] = useState<"all" | "today" | "tomorrow" | "later">("today")
 
   // Source of upcoming sessions
   const rawUpcomingList: Session[] =
@@ -363,77 +337,44 @@ export default function DashboardOverviewPage({
         {/* Filter Tabs: All, Today, Tomorrow, Later */}
         {upcoming.length > 0 && (
           <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#f6ede8] border border-[#e0d8cf] mb-4 w-fit overflow-x-auto max-w-full">
-            <button
-              type="button"
-              onClick={() => setFilterTab("all")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all shrink-0 ${
-                filterTab === "all"
-                  ? "bg-white text-[#4a3728] shadow-sm font-bold"
-                  : "text-[#8a7a6a] hover:text-[#4a3728]"
-              }`}
-            >
-              All ({upcoming.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterTab("today")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all shrink-0 flex items-center gap-1.5 ${
-                filterTab === "today"
-                  ? "bg-[#4a3728] text-white shadow-sm font-bold"
-                  : todaySessions.length > 0
-                  ? "text-emerald-800 bg-emerald-100 hover:bg-emerald-200"
-                  : "text-[#8a7a6a] hover:text-[#4a3728]"
-              }`}
-            >
-              {todaySessions.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-              <span>Today</span>
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                  filterTab === "today"
-                    ? "bg-white/20 text-white"
-                    : todaySessions.length > 0
-                    ? "bg-emerald-200 text-emerald-900"
-                    : "bg-[#e0d8cf] text-[#4a3728]"
-                }`}
-              >
-                {todaySessions.length}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterTab("tomorrow")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all shrink-0 flex items-center gap-1.5 ${
-                filterTab === "tomorrow"
-                  ? "bg-[#7a5c3e] text-white shadow-sm font-bold"
-                  : tomorrowSessions.length > 0
-                  ? "text-[#7a5c3e] bg-[#f3ece4] hover:bg-[#eae0d5]"
-                  : "text-[#8a7a6a] hover:text-[#4a3728]"
-              }`}
-            >
-              <span>Tomorrow</span>
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                  filterTab === "tomorrow"
-                    ? "bg-white/20 text-white"
-                    : tomorrowSessions.length > 0
-                    ? "bg-[#e0d8cf] text-[#4a3728]"
-                    : "bg-[#e0d8cf] text-[#8a7a6a]"
-                }`}
-              >
-                {tomorrowSessions.length}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterTab("later")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all shrink-0 ${
-                filterTab === "later"
-                  ? "bg-white text-[#4a3728] shadow-sm font-bold"
-                  : "text-[#8a7a6a] hover:text-[#4a3728]"
-              }`}
-            >
-              Later ({laterSessions.length})
-            </button>
+            {(
+              [
+                { key: "all", label: "All", count: upcoming.length },
+                { key: "today", label: "Today", count: todaySessions.length, hasDot: todaySessions.length > 0 },
+                { key: "tomorrow", label: "Tomorrow", count: tomorrowSessions.length },
+                { key: "later", label: "Later", count: laterSessions.length },
+              ] as const
+            ).map((tab) => {
+              const isActive = filterTab === tab.key
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setFilterTab(tab.key)}
+                  className={`px-3 py-1.5 text-xs rounded-lg transition-all shrink-0 flex items-center gap-1.5 ${
+                    isActive
+                      ? "bg-[#7a5c3e] text-white shadow-sm font-bold"
+                      : "text-[#8a7a6a] hover:text-[#4a3728]"
+                  }`}
+                >
+                  {tab.hasDot && (
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        isActive ? "bg-emerald-300" : "bg-emerald-500"
+                      } animate-pulse`}
+                    />
+                  )}
+                  <span>{tab.label}</span>
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                      isActive ? "bg-white/20 text-white" : "bg-[#e0d8cf] text-[#4a3728]"
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         )}
 
@@ -482,7 +423,6 @@ export default function DashboardOverviewPage({
           <div className="space-y-3">
             {displayedSessions.map((s, idx) => {
               const name = s.menteeName || s.bookedMenteeName || "Student"
-              const photo = s.menteeProfilePhoto
               const menteeId = s.menteeId
               const isClickable = Boolean(menteeId)
               const sessionDateInfo = formatSessionDate(s.startTime || s.scheduledAt)
@@ -526,7 +466,12 @@ export default function DashboardOverviewPage({
                       isClickable ? "cursor-pointer group" : ""
                     }`}
                   >
-                    <MenteeAvatar photo={photo} name={name} />
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white"
+                      style={{ backgroundColor: COLORS.ink }}
+                    >
+                      {initialsFrom(name)}
+                    </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p
