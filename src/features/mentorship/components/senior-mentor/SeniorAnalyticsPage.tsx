@@ -68,6 +68,7 @@ interface AnalyticsPageProps {
 }
 
 const SERVICE_ICON_MAP: Record<string, { icon: React.ElementType; color: string }> = {
+  "one_to_one": { icon: Users, color: "#4a3728" },
   "one-on-one": { icon: Users, color: "#4a3728" },
   "code-review": { icon: Code2, color: "#8a6a4a" },
   "group": { icon: Users, color: "#7a5c3e" },
@@ -299,7 +300,7 @@ export default function SeniorAnalyticsPage({ seniorData }: AnalyticsPageProps) 
       color: FALLBACK_COLORS[idx % FALLBACK_COLORS.length],
     }
     return {
-      name: s.sessionType,
+      name: s.sessionType.replace(/[-_]/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
       bookings: s.bookings,
       revenue: s.revenue || 0,
       percentage: totalServiceBookings ? Math.round((s.bookings / totalServiceBookings) * 100) : 0,

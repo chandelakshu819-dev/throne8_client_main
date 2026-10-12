@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Calendar, Clock, FileText, User, Image as ImageIcon } from 'lucide-react';
+import { X, Clock, FileText, User, Image as ImageIcon } from 'lucide-react';
 import SeniorSessionService from '@/lib/api/seniorSession.service';
 
 
@@ -16,7 +16,6 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
     const isEdit = !!editSession;
 
     const [title, setTitle] = useState('');
-    const [scheduledAt, setScheduledAt] = useState('');
     const [duration, setDuration] = useState(60);
     const [description, setDescription] = useState('');
     const [image, setImage] = useState<File | null>(null);
@@ -34,17 +33,10 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
     const isCustom = category === 'Custom Mentoring';
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
 
-    const toLocalDatetimeString = (date: Date) => {
-        const pad = (n: number) => String(n).padStart(2, '0');
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    };
-
     React.useEffect(() => {
         if (editSession) {
             setTitle(editSession.title);
             setDescription(editSession.description);
-            const dt = new Date(editSession.scheduledAt);
-            setScheduledAt(toLocalDatetimeString(dt));
             setDuration(editSession.duration);
             setEditCategory(editSession.category);
         }
@@ -61,7 +53,7 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
     const handleSubmit = async () => {
         const finalCategory = isEdit ? editCategory.trim() : (isCustom ? customCategory.trim() : category);
 
-        if (!title || !description || !scheduledAt || !duration || !finalCategory) {
+        if (!title || !description || !duration || !finalCategory) {
             showToast("Please fill in all required fields", "error");
             return;
         }
@@ -71,7 +63,6 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
             const formData = new FormData();
             formData.append("title", title);
             formData.append("description", description);
-            formData.append("scheduledAt", scheduledAt);
             formData.append("duration", duration.toString());
             formData.append("category", finalCategory);
             
@@ -221,42 +212,23 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
                         />
                     </div>
                     
-                    {/* Schedule & Duration */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="flex items-center gap-2 text-sm font-bold text-[#4a3728] mb-2">
-                                <Calendar className="w-4 h-4 text-[#7a5c3e]" />
-                                Scheduled At
-                            </label>
-                            <input 
-                                type="datetime-local"
-                                value={scheduledAt}
-                                onChange={(e) => setScheduledAt(e.target.value)}
-                                min={toLocalDatetimeString(new Date(Date.now() + 10 * 60 * 1000))}
-                                className="w-full px-4 py-3 bg-[#f3ece4] border-2 border-[#e0d8cf] focus:border-[#4a3728] rounded-[10px] outline-none text-[#4a3728] font-bold transition-colors" 
-                            />
-                        </div>
-                        <div>
-                            <label className="flex items-center gap-2 text-sm font-bold text-[#4a3728] mb-2">
-                                <Clock className="w-4 h-4 text-[#7a5c3e]" />
-                                Duration
-                            </label>
-                            <select 
-                                value={duration}
-                                onChange={(e) => setDuration(Number(e.target.value))}
-                                className="w-full px-4 py-3 bg-[#f3ece4] border-2 border-[#e0d8cf] focus:border-[#4a3728] rounded-[10px] outline-none text-[#4a3728] font-bold transition-colors cursor-pointer"
-                            >
-                                <option value={30}>30 Minutes</option>
-                                <option value={45}>45 Minutes</option>
-                                <option value={60}>60 Minutes</option>
-                                <option value={90}>90 Minutes</option>
-                                <option value={120}>120 Minutes</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div className="text-left -mt-2">
-                        <span className="text-xs text-[#8a7a6a] font-medium">Timezone: {timezone}</span>
+                    {/* Duration */}
+                    <div>
+                        <label className="flex items-center gap-2 text-sm font-bold text-[#4a3728] mb-2">
+                            <Clock className="w-4 h-4 text-[#7a5c3e]" />
+                            Duration
+                        </label>
+                        <select 
+                            value={duration}
+                            onChange={(e) => setDuration(Number(e.target.value))}
+                            className="w-full px-4 py-3 bg-[#f3ece4] border-2 border-[#e0d8cf] focus:border-[#4a3728] rounded-[10px] outline-none text-[#4a3728] font-bold transition-colors cursor-pointer"
+                        >
+                            <option value={30}>30 Minutes</option>
+                            <option value={45}>45 Minutes</option>
+                            <option value={60}>60 Minutes</option>
+                            <option value={90}>90 Minutes</option>
+                            <option value={120}>120 Minutes</option>
+                        </select>
                     </div>
 
                     {/* What students get */}

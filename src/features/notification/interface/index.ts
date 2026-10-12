@@ -16,13 +16,16 @@ export interface Notification {
     | "pymk_suggestion"
     | "connection_birthday"
     | "comment_liked"
-    | "comment_replied";
+    | "comment_replied"
+    | string;
     entityId: string;
     entityIds?: string[];            // populated for pymk_suggestion (all suggested userIds)
-    entityType: "post" | "connection" | "user" | "comment";
+    entityType?: "post" | "connection" | "user" | "comment" | string;
     message: string;
     isRead: boolean;
     createdAt: string;
+    actionUrl?: string;
+    data?: any;
     // UI helpers
     engagement?: "viral" | "hot" | "trending";
     reactions?: number;

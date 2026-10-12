@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { CalendarClock, Star, CreditCard, Bell, MessageSquare, CheckCheck, BellRing, User as UserIcon } from "lucide-react"
 
 const COLORS = {
@@ -203,6 +204,7 @@ export default function NotificationPage({
   onMarkAllRead,
   onMarkRead,
 }: NotificationPageProps) {
+  const router = useRouter()
   const groups = useMemo(() => groupByRecency(notifications), [notifications])
   const unreadCount = notifications.filter((n) => !n.isRead).length
 
@@ -295,11 +297,19 @@ export default function NotificationPage({
                   key={item._id ?? idx}
                   role="button"
                   tabIndex={0}
-                  onClick={() => item._id && onMarkRead?.(item._id)}
+                  onClick={() => {
+                    if (item._id) onMarkRead?.(item._id)
+                    if (item.data?.actionUrl) {
+                      router.push(item.data.actionUrl)
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault()
-                      item._id && onMarkRead?.(item._id)
+                      if (item._id) onMarkRead?.(item._id)
+                      if (item.data?.actionUrl) {
+                        router.push(item.data.actionUrl)
+                      }
                     }
                   }}
                   className="w-full flex items-start gap-3.5 p-3.5 rounded-xl text-left transition-colors hover:border-[#c9baa9] cursor-pointer"
@@ -340,6 +350,16 @@ export default function NotificationPage({
                     <p className="text-sm mt-0.5 line-clamp-2" style={{ color: COLORS.muted }}>
                       <RenderTextWithMenteeLink text={item.message} menteeId={menteeId} menteeName={menteeName} />
                     </p>
+                    {item.data?.actionUrl && (
+                      <div className="mt-2">
+                        <span
+                          className="inline-flex items-center text-xs font-semibold hover:underline"
+                          style={{ color: COLORS.accent }}
+                        >
+                          View Details →
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <span className="text-xs shrink-0 mt-0.5 font-medium" style={{ color: COLORS.muted }}>

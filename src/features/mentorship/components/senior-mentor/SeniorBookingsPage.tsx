@@ -322,7 +322,7 @@ export default function SeniorBookingsPage({ seniorData }: BookingProps) {
       await fetchSessions();
     } catch (err: any) {
       console.error(err);
-      showToast(err.response?.data?.message || "Failed to confirm booking", "error");
+      showToast(err?.response?.data?.message || err?.message || "Failed to confirm booking", "error");
     } finally {
       setActionLoading(null);
     }
@@ -345,7 +345,7 @@ export default function SeniorBookingsPage({ seniorData }: BookingProps) {
       setShowCancelModal(false);
     } catch (err: any) {
       console.error(err);
-      showToast(err.response?.data?.message || "Failed to cancel booking", "error");
+      showToast(err?.response?.data?.message || err?.message || "Failed to cancel booking", "error");
     } finally {
       setActionLoading(null);
     }
@@ -674,15 +674,29 @@ export default function SeniorBookingsPage({ seniorData }: BookingProps) {
                               </>
                            )}
                            {booking.status === "in_progress" && (
-                              <button
-                                onClick={() => handleComplete(booking.sessionId, booking.bookingId)}
-                                disabled={isActionLoading}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                style={{ backgroundColor: "#f3e8ff", color: "#7c3aed" }}
-                              >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                {isActionLoading ? "..." : "End Session"}
-                              </button>
+                              <>
+                                <button
+                                  onClick={() =>
+                                    router.push(
+                                      `/mentorship/session-room/${encodeURIComponent(booking.sessionId)}?bookingId=${encodeURIComponent(booking.bookingId)}`
+                                    )
+                                  }
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 text-white"
+                                  style={{ backgroundColor: "#7c3aed" }}
+                                >
+                                  <Play className="w-3.5 h-3.5" />
+                                  Enter Call
+                                </button>
+                                <button
+                                  onClick={() => handleComplete(booking.sessionId, booking.bookingId)}
+                                  disabled={isActionLoading}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                  style={{ backgroundColor: "#f3e8ff", color: "#7c3aed" }}
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  {isActionLoading ? "..." : "End Session"}
+                                </button>
+                              </>
                            )}
                            {booking.status === "completed" && (
                               <>

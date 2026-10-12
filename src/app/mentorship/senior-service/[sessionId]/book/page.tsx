@@ -77,10 +77,9 @@ export default function SeniorServiceBookingPage() {
         );
     }
 
-    // Safely extract the normalized real Mentor.mentorId for Availability lookups.
-    // mentor.mentorId is the correct UUID from MentorResponse.data.
-    // Fallback to service.mentorId handles cases where mentor fetch failed.
-    const effectiveMentorId: string = mentor?.mentorId || service?.mentorId || "";
+    // Resolve effective Senior Mentor identifier preferring the service's canonical owner ID (userId)
+    // to match SeniorAvailability.mentorId, falling back to mentor.userId or mentor.mentorId.
+    const effectiveMentorId: string = service?.mentorId || mentor?.userId || mentor?.mentorId || "";
 
     // Minimum Presentational Adapter for reused steps.
     // DO NOT pass the full `service` object into these generic generic steps 
@@ -91,8 +90,7 @@ export default function SeniorServiceBookingPage() {
         price: service.pricing?.basePrice || "Free",
         type: "1:1 Call",
         duration: service.duration,
-        durationMinutes: service.duration
-    } as Service;
+    } as unknown as Service;
 
     const activeSeniorBookings = (service?.bookings || [])
         .filter((b: any) => ['pending', 'upcoming', 'confirmed', 'in_progress'].includes(b.status))

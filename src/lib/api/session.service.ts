@@ -1,5 +1,6 @@
 import config from "@/config/env.config";
 import api from "./api.intance";
+import SeniorSessionService from "./seniorSession.service";
 
 // ── Types ──────────────────────────────────────────────────
 export interface CreateSessionInput {
@@ -240,8 +241,19 @@ class SessionService {
             );
             return data;
         } catch (error: any) {
+            // If standard session is not found, check if it is a Senior Mentor session
+            if (error?.response?.status === 404) {
+                try {
+                    const seniorRes = await SeniorSessionService.getSessionById(sessionId);
+                    if (seniorRes) {
+                        return seniorRes;
+                    }
+                } catch {
+                    // Fall through to throw standard not found error
+                }
+                throw new Error("Session not found.");
+            }
             console.error("[GET_SESSION] Failed", error?.response?.data || error?.message);
-            if (error?.response?.status === 404) throw new Error("Session not found.");
             if (error?.response?.status === 403) throw new Error("Not authorized to view this session.");
             if (error?.code === "ERR_NETWORK") throw new Error("Unable to connect to server.");
             throw new Error(error?.response?.data?.message || "Failed to fetch session.");

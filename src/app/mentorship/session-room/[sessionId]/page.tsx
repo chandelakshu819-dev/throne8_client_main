@@ -7,6 +7,7 @@ import { useLiveRoom } from '@/core/webrtc/useLiveRoom';
 import { getSocket, initializeSocket } from '@/core/realtime/socket.client';
 import SessionService from '@/lib/api/session.service';
 import MentorService from '@/lib/api/mentorship.service';
+import SeniorSessionService from '@/lib/api/seniorSession.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 
 type CallStatus = 'active' | 'reconnecting' | 'left' | 'dropped';
@@ -117,11 +118,24 @@ export default function SessionRoomPage() {
             throw oneOnOneErr;
           }
           console.warn('[SessionRoom] 1:1 session fetch failed, trying group session:', oneOnOneErr.message);
-          const groupRes = await MentorService.getGroupSessionById(sessionId);
-          const groupSession = groupRes?.data ?? groupRes;
-          // Normalize group session shape to what this page expects
-          // (title, scheduledAt, duration, status already match).
-          normalized = groupSession;
+          try {
+            const groupRes = await MentorService.getGroupSessionById(sessionId);
+            normalized = groupRes?.data ?? groupRes;
+          } catch (groupErr: any) {
+            console.warn('[SessionRoom] Group session fetch failed, trying senior session:', groupErr.message);
+            const seniorRes = await SeniorSessionService.getSessionById(sessionId);
+            const seniorData = seniorRes?.data ?? seniorRes;
+            const matchedBooking = (seniorData.bookings || []).find(
+              (b: any) => b._id === bookingId || b.id === bookingId
+            );
+            normalized = {
+              ...seniorData,
+              status: matchedBooking?.status || seniorData.status,
+              scheduledAt: matchedBooking?.scheduledAt || seniorData.scheduledAt,
+              slotTime: matchedBooking?.slotTime || seniorData.slotTime,
+              booking: matchedBooking,
+            };
+          }
         }
 
         console.log('[SessionRoom] normalized sessionData:', normalized);
@@ -208,13 +222,27 @@ export default function SessionRoomPage() {
         const res = await SessionService.getSessionById(sessionId);
         data = res?.data ?? res;
       } catch {
-        const groupRes = await MentorService.getGroupSessionById(sessionId);
-        data = groupRes?.data ?? groupRes;
+        try {
+          const groupRes = await MentorService.getGroupSessionById(sessionId);
+          data = groupRes?.data ?? groupRes;
+        } catch {
+          const seniorRes = await SeniorSessionService.getSessionById(sessionId);
+          data = seniorRes?.data ?? seniorRes;
+        }
       }
       if (!data) return false;
 
       const OVER = ['completed', 'cancelled', 'no_show', 'refunded'];
       const norm = (s: any) => String(s ?? '').toLowerCase();
+
+      if (bookingId) {
+        const matched = (data.bookings || []).find(
+          (b: any) => b._id === bookingId || b.id === bookingId
+        );
+        if (matched) {
+          return OVER.includes(norm(matched.status));
+        }
+      }
 
       if (OVER.includes(norm(data.status))) return true;
       const myBooking = (data.bookings || []).find(
@@ -224,7 +252,7 @@ export default function SessionRoomPage() {
     } catch {
       return false; // check fail ho to rejoin try hone do
     }
-  }, [sessionId, currentUserId]);
+  }, [sessionId, currentUserId, bookingId]);
 
   const attemptRejoin = useCallback(async () => {
     if (rejoinInFlightRef.current) return 'busy' as const;

@@ -1059,6 +1059,21 @@ const NotificationsPage = () => {
     </div>
 )}
 
+{/* Action link for mentorship or other deep-link notifications */}
+{(notification.actionUrl || notification.data?.actionUrl) && (
+    <div className={`px-4 pb-3`}>
+        <button
+            onClick={() => {
+                markAsRead(notification.notificationId);
+                router.push(notification.actionUrl || notification.data?.actionUrl);
+            }}
+            className="text-xs text-[#4a3728] hover:text-[#6a5748] hover:underline transition-colors font-semibold flex items-center gap-1"
+        >
+            View Details →
+        </button>
+    </div>
+)}
+
 
 
 

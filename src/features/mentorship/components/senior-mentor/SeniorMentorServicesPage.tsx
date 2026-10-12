@@ -18,7 +18,7 @@ export interface ISeniorSession {
   mentorId: string;
   sessionType: "one_to_one";
   status: string;
-  scheduledAt: string;
+  scheduledAt?: string;
   duration: number;
   timezone: string;
   title: string;
@@ -32,7 +32,8 @@ export interface ISeniorSession {
 
 // --- Components ---
 
-function formatDateLocal(isoString: string, timezone?: string) {
+function formatDateLocal(isoString?: string, timezone?: string) {
+  if (!isoString) return "";
   try {
     return new Date(isoString).toLocaleString('en-US', {
       weekday: 'short',
@@ -122,10 +123,17 @@ function SessionCard({ session, onEdit, onDeleteClick }: { session: ISeniorSessi
         {/* BOTTOM METADATA & ACTIONS */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-t border-[#e0d8cf]/60 pt-4 mt-auto gap-4 sm:gap-0">
            <div className="flex flex-wrap items-center gap-4 md:gap-5">
-             <div className="flex items-center gap-1.5 text-[13px] text-[#7a5c3e] font-bold whitespace-nowrap">
-               <Calendar className="w-[14px] h-[14px] text-[#4a3728]" />
-               <span>{formatDateLocal(session.scheduledAt, session.timezone)}</span>
-             </div>
+             {session.scheduledAt ? (
+               <div className="flex items-center gap-1.5 text-[13px] text-[#7a5c3e] font-bold whitespace-nowrap">
+                 <Calendar className="w-[14px] h-[14px] text-[#4a3728]" />
+                 <span>{formatDateLocal(session.scheduledAt, session.timezone)}</span>
+               </div>
+             ) : (
+               <div className="flex items-center gap-1.5 text-[13px] text-[#7a5c3e] font-bold whitespace-nowrap">
+                 <Calendar className="w-[14px] h-[14px] text-[#4a3728]" />
+                 <span>Flexible Schedule</span>
+               </div>
+             )}
              <div className="flex items-center gap-1.5 text-[13px] text-[#7a5c3e] font-bold whitespace-nowrap">
                <Clock className="w-[14px] h-[14px] text-[#4a3728]" />
                <span>{session.duration} min</span>

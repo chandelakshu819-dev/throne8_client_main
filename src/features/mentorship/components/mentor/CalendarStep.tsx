@@ -393,14 +393,14 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px", marginBottom: "24px" }}>
                                 {allGeneratedSlots.map((slot) => {
                                     const time = `${slot.startTime} - ${slot.endTime}`;
-                                    const isDisabled = slot.isBooked || slot.isBlocked || slot.status === 'full' || slot.status === 'booked';
+                                    const isDisabled = slot.isBooked || slot.isBlocked || slot.status === 'full' || slot.status === 'booked' || slot.status === 'past';
                                     const sel = selectedTime === time;
 
                                     return (
                                         <button
                                             key={time}
                                             disabled={isDisabled}
-                                            title={isDisabled ? "Slot is Already Booked" : ""}
+                                            title={isDisabled ? (slot.status === 'past' ? "Time Has Passed" : slot.isBlocked ? "Slot is Blocked" : "Slot is Already Booked") : ""}
                                             onClick={() => !isDisabled && setSelectedTime(time)}
                                             style={{
                                                 padding: "10px 8px",
@@ -431,7 +431,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                                             <span>{formatTimeAMPM(slot.startTime)}</span>
                                             {isDisabled && (
                                                 <span style={{ fontSize: "10px", fontWeight: "bold", color: "#8c7a6b", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                                                    • BOOKED
+                                                    {slot.status === 'past' ? '• PAST' : (slot.isBlocked || slot.status === 'blocked') ? '• UNAVAILABLE' : '• BOOKED'}
                                                 </span>
                                             )}
                                         </button>

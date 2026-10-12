@@ -1,15 +1,20 @@
 import React, { useState } from "react";
-import { User, Briefcase, Calendar, BarChart3 } from "lucide-react";
+import { User, Briefcase, Calendar, BarChart3, Bell } from "lucide-react";
 import type { SeniorMentorApplication } from "@/lib/api/seniorMentorApplication.service";
 import { useAppSelector } from "@/core/store/store.hooks";
 import { useRouter } from "next/navigation";
 
 interface SeniorMentorSidebarProps {
   application: SeniorMentorApplication;
-  activeTab?: 'profile' | 'services' | 'availability' | 'bookings' | 'analytics';
+  activeTab?: 'profile' | 'services' | 'availability' | 'bookings' | 'analytics' | 'notifications';
+  unreadNotificationCount?: number;
 }
 
-export default function SeniorMentorSidebar({ application, activeTab = 'profile' }: SeniorMentorSidebarProps) {
+export default function SeniorMentorSidebar({
+  application,
+  activeTab = 'profile',
+  unreadNotificationCount = 0,
+}: SeniorMentorSidebarProps) {
   const router = useRouter();
   const { fullName, profilePhoto, currentRole, primaryExpertise } = application;
   const initials = fullName ? fullName[0] : "S";
@@ -145,6 +150,42 @@ export default function SeniorMentorSidebar({ application, activeTab = 'profile'
             </span>
             <span className="flex-1 text-left">Analytics</span>
             {activeTab === 'analytics' && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+            </button>
+
+            <button
+            onClick={() => {
+              if (application?.userId) {
+                router.push(`/mentorship/senior-mentor-profile/${application.userId}/notifications`);
+              }
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-150"
+            style={{
+                backgroundColor: activeTab === 'notifications' ? '#4a3728' : 'transparent',
+                color: activeTab === 'notifications' ? '#fff' : '#8a7a6a',
+            }}
+            >
+            <span
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 relative transition-colors"
+                style={{ backgroundColor: activeTab === 'notifications' ? 'rgba(255,255,255,0.15)' : 'rgba(138,122,106,0.1)' }}
+            >
+                <Bell className="w-4 h-4" style={{ color: activeTab === 'notifications' ? '#fff' : '#8a7a6a' }} />
+                {unreadNotificationCount > 0 && activeTab !== 'notifications' && (
+                  <span
+                    className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-white"
+                    style={{ backgroundColor: "#b91c1c" }}
+                  />
+                )}
+            </span>
+            <span className="flex-1 text-left">Notifications</span>
+            {unreadNotificationCount > 0 && activeTab !== 'notifications' && (
+              <span
+                className="px-2 py-0.5 rounded-full text-xs font-bold text-white shrink-0"
+                style={{ backgroundColor: "#b91c1c" }}
+              >
+                {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+              </span>
+            )}
+            {activeTab === 'notifications' && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
             </button>
         </div>
       </nav>

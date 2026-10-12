@@ -269,9 +269,12 @@ export default function UserDashboardNotificationsPage({
                     if (isInteractive) {
                       onMarkRead?.(item._id!);
                     }
+                    if (item.data?.actionUrl) {
+                      router.push(item.data.actionUrl);
+                    }
                   }}
                   className={`group w-full flex items-start gap-4 p-4 rounded-2xl text-left transition-all duration-200 motion-reduce:transition-none hover:-translate-y-1 hover:shadow-md ${
-                    isInteractive
+                    isInteractive || item.data?.actionUrl
                       ? 'hover:border-[#c9baa9] cursor-pointer'
                       : 'cursor-default'
                   }`}
@@ -363,6 +366,17 @@ export default function UserDashboardNotificationsPage({
                       }
                       return null;
                     })()}
+
+                    {item.data?.actionUrl && (
+                      <div className="mt-2">
+                        <span
+                          className="inline-flex items-center text-xs font-semibold hover:underline"
+                          style={{ color: COLORS.accent }}
+                        >
+                          View Details →
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col items-end shrink-0 gap-2">
