@@ -1,4 +1,5 @@
-﻿import type { Metadata } from "next";
+﻿//src/app/layout.tsx
+import type { Metadata } from "next";
 import "./globals.css";
 import 'remixicon/fonts/remixicon.css';
 import ReduxProvider from "@/store/providers/ReduxProvider";

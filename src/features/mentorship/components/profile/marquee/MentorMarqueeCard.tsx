@@ -1,4 +1,4 @@
-// components/marquee/MentorMarqueeCard.tsx
+// components/profile/marquee/MentorMarqueeCard.tsx
 import React from "react";
 import { Star, Award } from "lucide-react";
 

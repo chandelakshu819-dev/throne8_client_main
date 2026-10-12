@@ -15,6 +15,12 @@ import {
 } from "lucide-react";
 import Sidebar from "../layout/Sidebar";
 import MentorService from "@/lib/api/mentorship.service";
+import {
+    parseRoleCompany,
+    formatRoleCompany,
+    getRatingDisplay,
+    getExperienceLabel,
+} from "@/shared/utils/mentorFormat";
 
 interface MentorDiscoverySectionProps {
     toggleCompare: (id: number) => void;
@@ -23,7 +29,7 @@ interface MentorDiscoverySectionProps {
 
 interface MentorData {
     id: string | number;
-     userId?: string;
+    userId?: string;
     name: string;
     role: string;
     company: string;
@@ -42,7 +48,7 @@ interface MentorData {
 
 export default function MentorDiscoverySection({ toggleCompare, compareList }: MentorDiscoverySectionProps) {
     const router = useRouter();
-     const { user } = useAuth();
+    const { user } = useAuth();
     const [allMentors, setAllMentors] = useState<MentorData[]>([]);
     const [filteredMentors, setFilteredMentors] = useState<MentorData[]>([]);
     const [loading, setLoading] = useState(true);
@@ -63,30 +69,20 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     useEffect(() => {
         MentorService.getAllMentors({ page: 1, limit: 50 })
             .then((res) => {
-                const list = Array.isArray(res.data) ? res.data : [];
+                const rawList = Array.isArray(res.data) ? res.data : [];
+                // Duplicate mentorId hata do
+                const list = rawList.filter(
+                    (m: any, idx: number, arr: any[]) =>
+                        arr.findIndex((x) => x.mentorId === m.mentorId) === idx
+                );
+
                 const mapped: MentorData[] = list.map((m: any) => {
                     const rawRole = m.experience?.currentRole ?? "";
                     const rawTitle = m.title ?? "";
                     const totalExp = Number(m.experience?.total) || 0;
 
-                    // Parse role and company safely
-                    let role = rawRole;
-                    let company = "";
-                    if (rawRole.includes(" @ ")) {
-                        const parts = rawRole.split(" @ ");
-                        role = parts[0];
-                        company = parts[1] || "";
-                    } else if (rawRole.includes(" at ")) {
-                        const parts = rawRole.split(" at ");
-                        role = parts[0];
-                        company = parts[1] || "";
-                    } else if (rawRole) {
-                        role = rawRole;
-                        company = m.company ?? "";
-                    } else {
-                        role = rawTitle || "Mentor";
-                        company = m.company ?? "";
-                    }
+                    // Role + company ek hi helper se parse hota hai
+                    const { role, company } = parseRoleCompany(rawRole, rawTitle, m.company);
 
                     // TODO: Replace this heuristic with a proper verification.isVerified or SeniorMentorApplication-based check once that data is joined into the getAllMentors() API response.
                     const seniorKeywords = ["senior", "lead", "principal", "director", "head", "vp", "founder", "ceo", "cto"];
@@ -98,9 +94,10 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                         id: m.mentorId,
                         userId: m.userId,
                         name: `${m.user?.firstName ?? ""} ${m.user?.lastName ?? ""}`.trim() || m.user?.name || "Mentor",
-                        role: role.trim() || "Mentor",
-                        company: company.trim(),
-                        rating: Number(m.stats?.averageRating) || 4.9,
+                        role,
+                        company,
+                        // Fake 4.9 default hata diya: rating nahi hai to 0 (UI "New" dikhayegi)
+                        rating: Number(m.stats?.averageRating) || 0,
                         sessions: m.stats?.totalSessions || m.trustScore?.metrics?.totalCompletedSessions || 0,
                         price: Number(m.pricing?.quickCall) || 0,
                         image: m.profilePic ?? "",
@@ -193,47 +190,68 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
 
     // Split into Senior and Regular mentors
     const seniorMentors = filteredMentors.filter((m) => m.isSenior);
-    const baseRegularMentors = filteredMentors.filter((m) => !m.isSenior);
-
-       // Real mentors only — no dummy/placeholder cards
-    const regularMentors = baseRegularMentors;
+    // Real mentors only — no dummy/placeholder cards
+    const regularMentors = filteredMentors.filter((m) => !m.isSenior);
 
     // Sliced lists for initial view
-    const visibleSeniorMentors = showAllSeniorMentors 
-        ? seniorMentors 
+    const visibleSeniorMentors = showAllSeniorMentors
+        ? seniorMentors
         : seniorMentors.slice(0, SENIOR_LIMIT);
 
-    const visibleRegularMentors = showAllRegularMentors 
-        ? regularMentors 
+    const visibleRegularMentors = showAllRegularMentors
+        ? regularMentors
         : regularMentors.slice(0, REGULAR_LIMIT);
 
-    // Format experience label with proper singular/plural grammar
-    const getExperienceLabel = (totalYears: number) => {
-        if (!totalYears || totalYears <= 0) return "0-1 Yrs Experience";
-        if (totalYears === 1) return "1 Yr Experience";
-        return `${totalYears}+ Yrs Experience`;
+    const handleNavigate = (mentor: MentorData) => {
+        if (mentor.isDummy) return;
+
+        // Agar mentor khud apni hi profile pe click kar raha hai
+        if (user?.userId && mentor.userId && user.userId === mentor.userId) {
+            router.push(`/mentorship/user-dashboard/${user.userId}`);
+            return;
+        }
+
+        const slugName = (mentor.name || "mentor").toLowerCase().replace(/\s+/g, "-");
+        router.push(`/mentorship/mentor-card/${slugName}/${mentor.id}`);
     };
 
-    const handleNavigate = (mentor: MentorData) => {
-    if (mentor.isDummy) return;
+    // Rating block: "New" + "4 sessions" wala contradiction yahan fix hai
+    const renderRating = (mentor: MentorData) => {
+        if (mentor.isDummy) {
+            return (
+                <div className="flex items-center justify-center gap-1.5 text-[#b5a799]">
+                    <Star className="w-3.5 h-3.5 text-[#d9cbbe]" />
+                    <span className="font-medium text-[#a39282]">Joining Soon</span>
+                </div>
+            );
+        }
 
-    // Agar mentor khud apni hi profile pe click kar raha hai
-    if (user?.userId && mentor.userId && user.userId === mentor.userId) {
-        router.push(`/mentorship/user-dashboard/${user.userId}`);
-        return;
-    }
-
-    const slugName = (mentor.name || "mentor").toLowerCase().replace(/\s+/g, "-");
-    router.push(`/mentorship/mentor-card/${slugName}/${mentor.id}`);
-};
+        const rd = getRatingDisplay(mentor.rating, mentor.sessions);
+        return (
+            <>
+                <Star
+                    className={`w-3.5 h-3.5 ${
+                        rd.hasRating ? "fill-[#d99b26] text-[#d99b26]" : "text-[#d9cbbe]"
+                    }`}
+                />
+                <span className="font-bold text-[#2d2015]">{rd.ratingLabel}</span>
+                {rd.sessionsLabel && (
+                    <>
+                        <span className="text-[#c4b5a5]">·</span>
+                        <span className="text-[11px] text-[#8b7355]">{rd.sessionsLabel}</span>
+                    </>
+                )}
+            </>
+        );
+    };
 
     // Render individual mentor card
     const renderCard = (mentor: MentorData, isSeniorCard: boolean) => (
         <div
             key={mentor.id}
             className={`rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 relative group ${
-                mentor.isDummy 
-                    ? "bg-[#fcfaf7] border border-dashed border-[#dcd1c7] opacity-75 shadow-none cursor-default select-none" 
+                mentor.isDummy
+                    ? "bg-[#fcfaf7] border border-dashed border-[#dcd1c7] opacity-75 shadow-none cursor-default select-none"
                     : "bg-white border border-[#e8ded5] hover:border-[#cfbeaf] shadow-sm hover:shadow-md"
             }`}
         >
@@ -273,7 +291,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                             />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-[#4a3728] text-lg font-bold">
-                                {mentor.isDummy ? <Users className="w-6 h-6 text-[#b5a799]" /> : (mentor.name?.[0] ?? "M")}
+                                {mentor.isDummy ? <Users className="w-6 h-6 text-[#b5a799]" /> : (mentor.name?.[0]?.toUpperCase() ?? "M")}
                             </div>
                         )}
                     </div>
@@ -284,26 +302,14 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                     {mentor.name}
                 </h4>
 
-                {/* Role & Company */}
+                {/* Role & Company (company blank ho to "@" nahi dikhega) */}
                 <p className="text-[11px] text-[#8b7355] text-center font-medium truncate mb-2 px-1">
-                    {mentor.role}{mentor.company ? ` @ ${mentor.company}` : ""}
+                    {formatRoleCompany(mentor.role, mentor.company)}
                 </p>
 
                 {/* Rating & Sessions */}
                 <div className="flex items-center justify-center gap-1.5 text-xs mb-2.5">
-                    {mentor.isDummy ? (
-                        <div className="flex items-center justify-center gap-1.5 text-[#b5a799]">
-                            <Star className="w-3.5 h-3.5 text-[#d9cbbe]" />
-                            <span className="font-medium text-[#a39282]">Joining Soon</span>
-                        </div>
-                    ) : (
-                        <>
-                            <Star className="w-3.5 h-3.5 fill-[#d99b26] text-[#d99b26]" />
-                            <span className="font-bold text-[#2d2015]">{mentor.rating ? Number(mentor.rating).toFixed(1) : "4.9"}</span>
-                            <span className="text-[#c4b5a5]">·</span>
-                            <span className="text-[11px] text-[#8b7355]">{mentor.sessions || 0} sessions</span>
-                        </>
-                    )}
+                    {renderRating(mentor)}
                 </div>
 
                 {/* Expertise Tags */}
@@ -325,7 +331,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                 {/* Experience */}
                 <div className="flex items-center justify-center gap-1.5 text-[11px] text-[#786352] font-medium mb-4">
                     <Briefcase className="w-3.5 h-3.5 text-[#a67c52]" />
-                    <span>{getExperienceLabel(mentor.expTotal)}</span>
+                    <span>{getExperienceLabel(mentor.expTotal)} Experience</span>
                 </div>
             </div>
 
