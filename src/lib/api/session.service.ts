@@ -232,10 +232,11 @@ class SessionService {
     }
 
     // ── GET SESSION BY ID ──────────────────────────────────
-    static async getSessionById(sessionId: string): Promise<ApiResponse> {
+    static async getSessionById(sessionId: string, intent?: string): Promise<ApiResponse> {
         try {
             const { data } = await api.get<ApiResponse>(
-                `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}`
+                `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}`,
+                { params: intent ? { intent } : {} }
             );
             return data;
         } catch (error: any) {

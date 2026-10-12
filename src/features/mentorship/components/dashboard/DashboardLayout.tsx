@@ -193,6 +193,8 @@ export default function MentorDashboard(
             sessionType: s.sessionType || "1-on-1 Mentorship",
             scheduledAt: b.scheduledAt || s.scheduledAt || s.startTime,
             startTime: b.scheduledAt || s.scheduledAt || s.startTime,
+            endTime: b.endTime || s.endTime || (b.scheduledAt || s.scheduledAt ? new Date(new Date(b.scheduledAt || s.scheduledAt).getTime() + (b.slotDuration || s.duration || 60) * 60000).toISOString() : null),
+            durationMinutes: b.slotDuration || s.duration || s.durationMinutes || 60,
             status: b.status || s.status || "confirmed",
             isGroupSession: false,
           });
@@ -213,6 +215,8 @@ export default function MentorDashboard(
           sessionType: s.sessionType || "Session",
           scheduledAt: s.scheduledAt || s.startTime || new Date().toISOString(),
           startTime: s.scheduledAt || s.startTime || new Date().toISOString(),
+          endTime: s.endTime || (s.scheduledAt || s.startTime ? new Date(new Date(s.scheduledAt || s.startTime).getTime() + (s.duration || 60) * 60000).toISOString() : null),
+          durationMinutes: s.duration || s.durationMinutes || 60,
           status: s.status || "confirmed",
           isGroupSession: Boolean(s.isGroupSession),
         });

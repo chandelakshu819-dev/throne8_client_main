@@ -104,9 +104,13 @@ export default function SessionRoomPage() {
         // query param / route change for existing 1:1 links.
         let normalized: any;
         try {
-          const res = await SessionService.getSessionById(sessionId);
+          const res = await SessionService.getSessionById(sessionId, 'join');
           normalized = res?.data ?? res;
         } catch (oneOnOneErr: any) {
+          const msg = oneOnOneErr?.message || '';
+          if (msg.includes('not started yet') || msg.includes('has ended')) {
+            throw oneOnOneErr;
+          }
           console.warn('[SessionRoom] 1:1 session fetch failed, trying group session:', oneOnOneErr.message);
           const groupRes = await MentorService.getGroupSessionById(sessionId);
           const groupSession = groupRes?.data ?? groupRes;

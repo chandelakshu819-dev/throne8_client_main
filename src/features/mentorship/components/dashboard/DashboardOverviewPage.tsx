@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
   CalendarClock,
@@ -18,6 +18,11 @@ import {
   Video,
   ChevronRight,
 } from "lucide-react"
+import {
+  getJoinState,
+  getJoinWindow,
+  useNow,
+} from "@/features/mentorship/utils/sessionJoin"
 
 const COLORS = {
   ink: "#4a3728",
@@ -42,6 +47,9 @@ type Session = {
   sessionType?: string
   scheduledAt?: string
   startTime?: string
+  endTime?: string
+  durationMinutes?: number
+  duration?: number
   status?: string
   isGroupSession?: boolean
   enrolledCount?: number
@@ -197,11 +205,26 @@ export default function DashboardOverviewPage({
       ? dashboardData.upcomingSessions
       : sessions || []
 
-  const now = Date.now()
+  // Clock skew correction & auto-ticking timer (updates every 15s)
+  const serverNowIso = dashboardData?.serverNow
+  const serverOffsetMs = useMemo(() => {
+    if (!serverNowIso) return 0
+    const serverMs = Date.parse(serverNowIso)
+    if (isNaN(serverMs)) return 0
+    return serverMs - Date.now()
+  }, [serverNowIso])
+
+  const rawNow = useNow(15000)
+  const now = rawNow + serverOffsetMs
+
   const upcoming: Session[] = [...rawUpcomingList]
     .filter((s) => {
-      const t = new Date(s.startTime || s.scheduledAt || 0).getTime()
-      return t >= now && s.status !== "cancelled" && s.status !== "completed"
+      const status = (s.status || "").toLowerCase()
+      if (status === "cancelled" || status === "completed" || status === "no_show" || status === "refunded") {
+        return false
+      }
+      const { joinClosesAt } = getJoinWindow(s)
+      return isNaN(joinClosesAt) || now <= joinClosesAt || status === "in_progress"
     })
     .sort(
       (a, b) =>
@@ -429,6 +452,7 @@ export default function DashboardOverviewPage({
               const isToday = sessionDateInfo.category === "today"
               const isTomorrow = sessionDateInfo.category === "tomorrow"
               const sessionId = s.sessionId || s._id
+              const joinInfo = getJoinState(s, now, 0)
 
               const handleMenteeClick = (e: React.MouseEvent | React.KeyboardEvent) => {
                 if (!menteeId) return
@@ -516,16 +540,45 @@ export default function DashboardOverviewPage({
                       </span>
                     )}
 
-                    {/* Quick Join button for Today's sessions */}
-                    {isToday && sessionId && (
-                      <button
-                        type="button"
-                        onClick={handleJoinSession}
-                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition-colors shadow-xs"
-                      >
-                        <Video className="w-3.5 h-3.5" />
-                        <span>Join</span>
-                      </button>
+                    {/* Time-aware Join button across all tabs */}
+                    {sessionId && joinInfo.state !== "hidden" && (
+                      <div className="flex flex-col items-end">
+                        {joinInfo.state === "active" ? (
+                          <button
+                            type="button"
+                            onClick={handleJoinSession}
+                            title="Session is active — click to join"
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition-colors shadow-xs cursor-pointer"
+                          >
+                            <Video className="w-3.5 h-3.5" />
+                            <span>Join</span>
+                          </button>
+                        ) : joinInfo.state === "ended" ? (
+                          <button
+                            type="button"
+                            disabled
+                            title="Session has ended"
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#ece4dc] text-[#a08070] cursor-not-allowed border border-[#e0d8cf]"
+                          >
+                            <span>Ended</span>
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              disabled
+                              title="Available 5 minutes before scheduled start"
+                              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-[#e8e0d5] text-[#8a7a6a] cursor-not-allowed border border-[#e0d8cf]"
+                            >
+                              <Video className="w-3.5 h-3.5 opacity-60" />
+                              <span>Join</span>
+                            </button>
+                            <span className="text-[10px] text-[#8a7a6a] mt-0.5 whitespace-nowrap font-medium">
+                              {joinInfo.subtext}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
