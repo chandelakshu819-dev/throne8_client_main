@@ -13,6 +13,10 @@ import {
   BarChart3,
   AlertCircle,
   RotateCcw,
+  Calendar,
+  Clock,
+  Video,
+  ChevronRight,
 } from "lucide-react"
 
 const COLORS = {
@@ -40,6 +44,9 @@ type Session = {
   scheduledAt?: string
   startTime?: string
   status?: string
+  isGroupSession?: boolean
+  enrolledCount?: number
+  meetingUrl?: string
 }
 
 interface DashboardOverviewPageProps {
@@ -52,15 +59,60 @@ interface DashboardOverviewPageProps {
   setActivePage?: (page: string) => void
 }
 
-function formatWhen(iso?: string) {
-  if (!iso) return "Time not set"
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return "Time not set"
-  const today = new Date()
-  const isToday = d.toDateString() === today.toDateString()
+type DayCategory = "today" | "tomorrow" | "later"
+
+function getDayCategory(dateInput?: string): DayCategory {
+  if (!dateInput) return "later"
+  const d = new Date(dateInput)
+  if (isNaN(d.getTime())) return "later"
+
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const tomorrowStart = todayStart + 86400000
+  const targetStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+
+  if (targetStart === todayStart) return "today"
+  if (targetStart === tomorrowStart) return "tomorrow"
+  return "later"
+}
+
+function formatSessionDate(dateInput?: string) {
+  if (!dateInput) {
+    return { label: "Time not set", time: "", badge: "Upcoming", category: "later" as DayCategory }
+  }
+  const d = new Date(dateInput)
+  if (isNaN(d.getTime())) {
+    return { label: "Time not set", time: "", badge: "Upcoming", category: "later" as DayCategory }
+  }
+
+  const category = getDayCategory(dateInput)
   const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })
-  if (isToday) return `Today · ${time}`
-  return `${d.toLocaleDateString([], { day: "numeric", month: "short" })} · ${time}`
+
+  if (category === "today") {
+    return {
+      label: `Today · ${time}`,
+      time,
+      badge: "Today",
+      category,
+    }
+  }
+
+  if (category === "tomorrow") {
+    return {
+      label: `Tomorrow · ${time}`,
+      time,
+      badge: "Tomorrow",
+      category,
+    }
+  }
+
+  const dateStr = d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })
+  return {
+    label: `${dateStr} · ${time}`,
+    time,
+    badge: d.toLocaleDateString([], { day: "numeric", month: "short" }),
+    category,
+  }
 }
 
 function initialsFrom(name: string) {
@@ -163,22 +215,38 @@ export default function DashboardOverviewPage({
   const trustScore = dashboardData?.stats?.trustScore ?? mentorData?.trustScore?.score ?? mentorData?.stats?.trustScore ?? null
   const isVerified = dashboardData?.isVerified ?? Boolean(mentorData?.verification?.isVerified || mentorData?.isVerified)
 
-  // Use pre-computed upcomingSessions from unified API if available, else filter raw sessions
-  const upcomingRaw: Session[] = dashboardData?.upcomingSessions ?? sessions
+  const [filterTab, setFilterTab] = useState<"all" | "today" | "tomorrow" | "later">("all")
+
+  // Source of upcoming sessions
+  const rawUpcomingList: Session[] =
+    dashboardData?.upcomingSessions && Array.isArray(dashboardData.upcomingSessions) && dashboardData.upcomingSessions.length > 0
+      ? dashboardData.upcomingSessions
+      : sessions || []
+
   const now = Date.now()
-  const upcoming = dashboardData?.upcomingSessions
-    ? dashboardData.upcomingSessions
-    : [...upcomingRaw]
-        .filter((s) => {
-          const t = new Date(s.startTime || s.scheduledAt || 0).getTime()
-          return t >= now && s.status !== "cancelled"
-        })
-        .sort(
-          (a, b) =>
-            new Date(a.startTime || a.scheduledAt || 0).getTime() -
-            new Date(b.startTime || b.scheduledAt || 0).getTime()
-        )
-        .slice(0, 4)
+  const upcoming: Session[] = [...rawUpcomingList]
+    .filter((s) => {
+      const t = new Date(s.startTime || s.scheduledAt || 0).getTime()
+      return t >= now && s.status !== "cancelled" && s.status !== "completed"
+    })
+    .sort(
+      (a, b) =>
+        new Date(a.startTime || a.scheduledAt || 0).getTime() -
+        new Date(b.startTime || b.scheduledAt || 0).getTime()
+    )
+
+  const todaySessions = upcoming.filter((s) => getDayCategory(s.startTime || s.scheduledAt) === "today")
+  const tomorrowSessions = upcoming.filter((s) => getDayCategory(s.startTime || s.scheduledAt) === "tomorrow")
+  const laterSessions = upcoming.filter((s) => getDayCategory(s.startTime || s.scheduledAt) === "later")
+
+  const displayedSessions =
+    filterTab === "today"
+      ? todaySessions
+      : filterTab === "tomorrow"
+      ? tomorrowSessions
+      : filterTab === "later"
+      ? laterSessions
+      : upcoming
 
   const upcomingCount = dashboardData?.stats?.upcoming ?? upcoming.length
 
@@ -265,39 +333,162 @@ export default function DashboardOverviewPage({
 
       {/* Upcoming sessions */}
       <div className="bg-white p-6 rounded-2xl" style={{ border: `1px solid ${COLORS.hairline}` }}>
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: COLORS.ink }}>
-            <CalendarClock className="w-4 h-4" style={{ color: COLORS.accent }} />
-            Upcoming sessions
-          </h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#f3ece4]">
+              <CalendarClock className="w-4.5 h-4.5" style={{ color: COLORS.accent }} />
+            </div>
+            <div>
+              <h3 className="text-base font-bold flex items-center gap-2" style={{ color: COLORS.ink }}>
+                Upcoming sessions
+                {upcoming.length > 0 && (
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#f3ece4] text-[#7a5c3e]">
+                    {upcoming.length}
+                  </span>
+                )}
+              </h3>
+            </div>
+          </div>
+
           <button
             onClick={() => setActivePage?.("booking")}
-            className="text-sm font-semibold hover:underline"
+            className="text-xs font-semibold hover:underline flex items-center gap-1 self-start sm:self-auto"
             style={{ color: COLORS.accent }}
           >
-            View all
+            <span>View all bookings</span>
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
+        {/* Filter Tabs: All, Today, Tomorrow, Later */}
+        {upcoming.length > 0 && (
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#f6ede8] border border-[#e0d8cf] mb-4 w-fit overflow-x-auto max-w-full">
+            <button
+              type="button"
+              onClick={() => setFilterTab("all")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all shrink-0 ${
+                filterTab === "all"
+                  ? "bg-white text-[#4a3728] shadow-sm font-bold"
+                  : "text-[#8a7a6a] hover:text-[#4a3728]"
+              }`}
+            >
+              All ({upcoming.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterTab("today")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all shrink-0 flex items-center gap-1.5 ${
+                filterTab === "today"
+                  ? "bg-[#4a3728] text-white shadow-sm font-bold"
+                  : todaySessions.length > 0
+                  ? "text-emerald-800 bg-emerald-100 hover:bg-emerald-200"
+                  : "text-[#8a7a6a] hover:text-[#4a3728]"
+              }`}
+            >
+              {todaySessions.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+              <span>Today</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  filterTab === "today"
+                    ? "bg-white/20 text-white"
+                    : todaySessions.length > 0
+                    ? "bg-emerald-200 text-emerald-900"
+                    : "bg-[#e0d8cf] text-[#4a3728]"
+                }`}
+              >
+                {todaySessions.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterTab("tomorrow")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all shrink-0 flex items-center gap-1.5 ${
+                filterTab === "tomorrow"
+                  ? "bg-[#7a5c3e] text-white shadow-sm font-bold"
+                  : tomorrowSessions.length > 0
+                  ? "text-[#7a5c3e] bg-[#f3ece4] hover:bg-[#eae0d5]"
+                  : "text-[#8a7a6a] hover:text-[#4a3728]"
+              }`}
+            >
+              <span>Tomorrow</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  filterTab === "tomorrow"
+                    ? "bg-white/20 text-white"
+                    : tomorrowSessions.length > 0
+                    ? "bg-[#e0d8cf] text-[#4a3728]"
+                    : "bg-[#e0d8cf] text-[#8a7a6a]"
+                }`}
+              >
+                {tomorrowSessions.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterTab("later")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all shrink-0 ${
+                filterTab === "later"
+                  ? "bg-white text-[#4a3728] shadow-sm font-bold"
+                  : "text-[#8a7a6a] hover:text-[#4a3728]"
+              }`}
+            >
+              Later ({laterSessions.length})
+            </button>
+          </div>
+        )}
+
+        {/* Sessions List */}
         {upcoming.length === 0 ? (
           <div
-            className="flex flex-col items-center justify-center gap-2 py-10 rounded-xl text-center"
+            className="flex flex-col items-center justify-center gap-3 py-10 rounded-xl text-center"
             style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
           >
-            <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.chip }}>
-              <CalendarClock className="w-5 h-5" style={{ color: COLORS.accent }} />
+            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.chip }}>
+              <CalendarClock className="w-6 h-6" style={{ color: COLORS.accent }} />
             </div>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: COLORS.ink }}>
+                No upcoming sessions booked yet.
+              </p>
+              <p className="text-xs mt-1" style={{ color: COLORS.muted }}>
+                Sessions booked for today, tomorrow, or later will appear here.
+              </p>
+            </div>
+            <button
+              onClick={() => setActivePage?.("availability")}
+              className="mt-1 px-4 py-1.5 rounded-full text-xs font-semibold transition-colors hover:border-[#7a5c3e]"
+              style={{ backgroundColor: COLORS.wash, color: COLORS.accent, border: `1px solid ${COLORS.hairline}` }}
+            >
+              Set availability slots →
+            </button>
+          </div>
+        ) : displayedSessions.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center gap-2 py-8 rounded-xl text-center"
+            style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
+          >
             <p className="text-sm font-medium" style={{ color: COLORS.muted }}>
-              No upcoming sessions booked yet.
+              No sessions scheduled for {filterTab === "today" ? "today" : filterTab === "tomorrow" ? "tomorrow" : "later dates"}.
             </p>
+            <button
+              onClick={() => setFilterTab("all")}
+              className="text-xs font-semibold hover:underline"
+              style={{ color: COLORS.accent }}
+            >
+              Show all upcoming sessions ({upcoming.length})
+            </button>
           </div>
         ) : (
           <div className="space-y-3">
-            {upcoming.map((s, idx) => {
+            {displayedSessions.map((s, idx) => {
               const name = s.menteeName || s.bookedMenteeName || "Student"
               const photo = s.menteeProfilePhoto
               const menteeId = s.menteeId
               const isClickable = Boolean(menteeId)
+              const sessionDateInfo = formatSessionDate(s.startTime || s.scheduledAt)
+              const isToday = sessionDateInfo.category === "today"
+              const isTomorrow = sessionDateInfo.category === "tomorrow"
+              const sessionId = s.sessionId || s._id
 
               const handleMenteeClick = (e: React.MouseEvent | React.KeyboardEvent) => {
                 if (!menteeId) return
@@ -307,10 +498,19 @@ export default function DashboardOverviewPage({
                 router.push(`/mentorship/menteeProfile/${menteeId}`)
               }
 
+              const handleJoinSession = (e: React.MouseEvent) => {
+                e.stopPropagation()
+                if (sessionId) {
+                  router.push(`/mentorship/session-room/${encodeURIComponent(sessionId)}`)
+                } else {
+                  setActivePage?.("booking")
+                }
+              }
+
               return (
                 <div
                   key={s.sessionId ?? s._id ?? idx}
-                  className="flex items-center justify-between gap-4 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9]"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl transition-all hover:border-[#c9baa9] hover:shadow-xs"
                   style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
                 >
                   <div
@@ -328,25 +528,61 @@ export default function DashboardOverviewPage({
                   >
                     <MenteeAvatar photo={photo} name={name} />
                     <div className="min-w-0">
-                      <p
-                        className={`text-sm font-semibold truncate ${
-                          isClickable ? "group-hover:underline" : ""
-                        }`}
-                        style={{ color: COLORS.ink }}
-                      >
-                        {name}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p
+                          className={`text-sm font-semibold truncate ${
+                            isClickable ? "group-hover:underline" : ""
+                          }`}
+                          style={{ color: COLORS.ink }}
+                        >
+                          {name}
+                        </p>
+                        {s.isGroupSession && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                            Group Session
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs mt-0.5 truncate" style={{ color: COLORS.muted }}>
-                        {s.title || s.sessionType || "Session"}
+                        {s.title || s.sessionType || "1-on-1 Mentorship"}
                       </p>
                     </div>
                   </div>
-                  <span
-                    className="text-xs font-semibold shrink-0 px-2.5 py-1 rounded-full"
-                    style={{ backgroundColor: COLORS.chip, color: COLORS.accent }}
-                  >
-                    {formatWhen(s.startTime || s.scheduledAt)}
-                  </span>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    {/* Date/Time badge with distinct styling for Today and Tomorrow */}
+                    {isToday ? (
+                      <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                        <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                        Today · {sessionDateInfo.time}
+                      </span>
+                    ) : isTomorrow ? (
+                      <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                        <Clock className="w-3.5 h-3.5 text-amber-700" />
+                        Tomorrow · {sessionDateInfo.time}
+                      </span>
+                    ) : (
+                      <span
+                        className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                        style={{ backgroundColor: COLORS.chip, color: COLORS.accent, border: `1px solid ${COLORS.hairline}` }}
+                      >
+                        <Calendar className="w-3.5 h-3.5" />
+                        {sessionDateInfo.label}
+                      </span>
+                    )}
+
+                    {/* Quick Join button for Today's sessions */}
+                    {isToday && sessionId && (
+                      <button
+                        type="button"
+                        onClick={handleJoinSession}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition-colors shadow-xs"
+                      >
+                        <Video className="w-3.5 h-3.5" />
+                        <span>Join</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               )
             })}

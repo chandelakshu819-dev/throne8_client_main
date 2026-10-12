@@ -174,29 +174,70 @@ export default function MentorDashboard(
       console.warn("[DashboardLayout] Unified endpoint not reachable or returned 404:", err?.message);
     }
 
-    if (fetchedData && typeof fetchedData === 'object' && Object.keys(fetchedData).length > 0) {
+    // Graceful fallback sessions list extraction
+    const fallbackUpcoming: any[] = [];
+    (sessions || []).forEach((s: any) => {
+      if (Array.isArray(s.bookings) && s.bookings.length > 0) {
+        s.bookings.forEach((b: any) => {
+          fallbackUpcoming.push({
+            _id: b._id || s._id,
+            sessionId: s.sessionId || String(s._id),
+            menteeId: b.menteeId || b.bookedBy || s.menteeId || null,
+            menteeName:
+              b.mentee?.fullName ||
+              (b.mentee?.firstName ? `${b.mentee.firstName} ${b.mentee.lastName || ""}`.trim() : null) ||
+              s.bookedMenteeName ||
+              "Student",
+            menteeProfilePhoto: b.mentee?.profilePic || s.menteeProfilePhoto || null,
+            title: s.title || s.sessionType || "1-on-1 Mentorship",
+            sessionType: s.sessionType || "1-on-1 Mentorship",
+            scheduledAt: b.scheduledAt || s.scheduledAt || s.startTime,
+            startTime: b.scheduledAt || s.scheduledAt || s.startTime,
+            status: b.status || s.status || "confirmed",
+            isGroupSession: false,
+          });
+        });
+      } else {
+        fallbackUpcoming.push({
+          _id: s._id || s.sessionId,
+          sessionId: s.sessionId || String(s._id),
+          menteeId: s.menteeId || s.bookedBy || s.mentee?.userId || null,
+          menteeName:
+            s.menteeName ||
+            s.bookedMenteeName ||
+            s.mentee?.fullName ||
+            (s.mentee?.firstName ? `${s.mentee.firstName} ${s.mentee.lastName || ""}`.trim() : null) ||
+            "Student",
+          menteeProfilePhoto: s.menteeProfilePhoto || s.mentee?.profilePic || null,
+          title: s.title || s.sessionType || "Session",
+          sessionType: s.sessionType || "Session",
+          scheduledAt: s.scheduledAt || s.startTime || new Date().toISOString(),
+          startTime: s.scheduledAt || s.startTime || new Date().toISOString(),
+          status: s.status || "confirmed",
+          isGroupSession: Boolean(s.isGroupSession),
+        });
+      }
+    });
+
+    if (fetchedData && typeof fetchedData === "object" && Object.keys(fetchedData).length > 0) {
+      const hasUpcoming = Array.isArray(fetchedData.upcomingSessions) && fetchedData.upcomingSessions.length > 0;
+      if (!hasUpcoming && fallbackUpcoming.length > 0) {
+        fetchedData.upcomingSessions = fallbackUpcoming;
+        if (fetchedData.stats) {
+          fetchedData.stats.upcoming = fallbackUpcoming.filter(
+            (s: any) => new Date(s.scheduledAt).getTime() >= Date.now()
+          ).length;
+        }
+      }
       setDashboardData(fetchedData);
       setDashboardError(null);
     } else if (mentorData) {
-      // Graceful fallback if backend endpoint is not yet deployed/reachable
-      const fallbackUpcoming = (sessions || []).map((s: any) => ({
-        _id: s._id || s.sessionId,
-        sessionId: s.sessionId || String(s._id),
-        menteeId: s.menteeId || s.bookedBy || s.mentee?.userId || (Array.isArray(s.bookings) && s.bookings[0]?.bookedBy) || null,
-        menteeName: s.menteeName || s.bookedMenteeName || s.mentee?.fullName || (s.mentee?.firstName ? `${s.mentee.firstName} ${s.mentee.lastName || ''}`.trim() : null) || "Student",
-        menteeProfilePhoto: s.menteeProfilePhoto || s.mentee?.profilePic || s.mentee?.profilePhotoUrl || null,
-        title: s.title || s.sessionType || "Session",
-        sessionType: s.sessionType || "Session",
-        scheduledAt: s.scheduledAt || s.startTime || new Date().toISOString(),
-        status: s.status || "pending",
-      }));
-
       setDashboardData({
         mentorId: mentorData?.mentorId,
         userId: mentorData?.userId,
         user: mentorData?.user,
         profilePic: mentorData?.profilePic,
-        category: (Array.isArray(mentorData?.domains) && mentorData?.domains[0]) || mentorData?.title || 'Web Development',
+        category: (Array.isArray(mentorData?.domains) && mentorData?.domains[0]) || mentorData?.title || "Web Development",
         rating: mentorData?.stats?.averageRating ?? 0,
         totalReviews: mentorData?.stats?.totalReviews ?? 0,
         stats: {
@@ -312,10 +353,40 @@ export default function MentorDashboard(
 
   useEffect(() => {
     if (!userId) return;
-    SessionService.getUpcomingSessions({ role: "mentor", limit: 10 })
-      .then((res) => setSessions(res.data || []))
-      .catch(console.error);
-  }, [userId]);
+    SessionService.getUpcomingSessions({ role: "mentor", limit: 20 })
+      .then((res) => {
+        const list = res?.data || [];
+        if (Array.isArray(list) && list.length > 0) {
+          setSessions(list);
+        } else if (mentorData?.mentorId) {
+          SessionService.getMentorSessions(mentorData.mentorId)
+            .then((mRes) => {
+              const mList = (mRes?.data || []).filter(
+                (s: any) =>
+                  (s.bookings?.length ?? 0) > 0 ||
+                  (s.scheduledAt && new Date(s.scheduledAt).getTime() >= Date.now())
+              );
+              if (mList.length > 0) setSessions(mList);
+            })
+            .catch(() => {});
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch upcoming sessions:", err);
+        if (mentorData?.mentorId) {
+          SessionService.getMentorSessions(mentorData.mentorId)
+            .then((mRes) => {
+              const mList = (mRes?.data || []).filter(
+                (s: any) =>
+                  (s.bookings?.length ?? 0) > 0 ||
+                  (s.scheduledAt && new Date(s.scheduledAt).getTime() >= Date.now())
+              );
+              if (mList.length > 0) setSessions(mList);
+            })
+            .catch(() => {});
+        }
+      });
+  }, [userId, mentorData?.mentorId]);
 
   const [showServiceForm, setShowServiceForm] = useState(false);
   const [selectedServiceType, setSelectedServiceType] = useState<ServiceType | null>(null);
