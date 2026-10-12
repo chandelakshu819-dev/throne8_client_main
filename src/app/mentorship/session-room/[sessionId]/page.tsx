@@ -107,8 +107,13 @@ export default function SessionRoomPage() {
           const res = await SessionService.getSessionById(sessionId, 'join');
           normalized = res?.data ?? res;
         } catch (oneOnOneErr: any) {
-          const msg = oneOnOneErr?.message || '';
-          if (msg.includes('not started yet') || msg.includes('has ended')) {
+          const msg = (oneOnOneErr?.message || '').toLowerCase();
+          if (
+            msg.includes('not started yet') ||
+            msg.includes('too early') ||
+            msg.includes('has ended') ||
+            msg.includes('expired')
+          ) {
             throw oneOnOneErr;
           }
           console.warn('[SessionRoom] 1:1 session fetch failed, trying group session:', oneOnOneErr.message);
