@@ -1,7 +1,7 @@
 //src/features/mentorship/components/mentor/MentorProfile.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { C } from "../../types/data";
 import type { BookingStep, Service, CalendarData, FormData as BookingFormData } from "../../types/types";
 import MentorSidebar from "./MentorSidebar";
@@ -16,6 +16,7 @@ import ConfirmationStep from "./ConfirmationStep";
 import UpdateProfileModal from "../modal/Updateprofilemodal";
 
 import MentorService from "@/lib/api/mentorship.service";
+import SessionService from "@/lib/api/session.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -25,6 +26,17 @@ interface MentorProfileProps {
     mentorId: string;
 }
 
+// Session type ko Service.type label me map karo (ServicesSection jaisa hi)
+const SESSION_TYPE_LABEL: Record<string, string> = {
+    quick_call: "1:1 Call",
+    mock_interview: "1:1 Call",
+    resume_review: "1:1 Call",
+    career_planning: "1:1 Call",
+    deep_dive: "1:1 Call",
+    portfolio_review: "1:1 Call",
+    ask_query: "Query",
+};
+
 const MentorProfile: React.FC<MentorProfileProps> = ({
     mentorId
 }) => {
@@ -32,6 +44,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     const router = useRouter();
     const searchParams = useSearchParams();
     const deepLinkServiceId = searchParams.get("serviceId") || undefined;
+    const deepLinkBook = searchParams.get("book") === "true";
 
     const [bookingStep, setBookingStep] = useState<LocalBookingStep>(null);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -44,13 +57,19 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     const [bookingSuccessMsg, setBookingSuccessMsg] = useState<string | null>(null);
     const [editModalOpen, setEditModalOpen] = useState(false);
 
+    // Service page se "Book Session" dabake aaye hain (?serviceId=...&book=true)
+    // to profile flash na ho, isliye jab tak session fetch ho raha hai loader dikhao.
+    const [autoBooking, setAutoBooking] = useState<boolean>(
+        deepLinkBook && !!deepLinkServiceId
+    );
+    const [cameFromServicePage, setCameFromServicePage] = useState(false);
+    const autoBookHandled = useRef(false);
+
     const fetchMentor = () => {
-    MentorService.getMentorById(mentorId)
-        .then((res) => setMentorData(res?.data ?? res ?? null))
-        .catch(() => setMentorData(null));
-};
-
-
+        MentorService.getMentorById(mentorId)
+            .then((res) => setMentorData(res?.data ?? res ?? null))
+            .catch(() => setMentorData(null));
+    };
 
     useEffect(() => {
         fetchMentor();
@@ -78,21 +97,93 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
+    // ✅ NEW: ?book=true&serviceId=<id> aane par seedha calendar step kholo
+    useEffect(() => {
+        if (!deepLinkBook || !deepLinkServiceId || autoBookHandled.current) return;
+        autoBookHandled.current = true;
+
+        const matchesId = (s: any) =>
+            String(s?.sessionId || s?._id || s?.id || "") === String(deepLinkServiceId);
+
+        // 1) Pehle isi mentor ke sessions me dhoondo (ServicesSection wahi source use karta hai,
+        //    isliye ye sabse reliable hai). 2) Na mile to getSessionById try karo.
+        const loadSession = async (): Promise<any | null> => {
+            try {
+                const listRes: any = await SessionService.getMentorSessions(mentorId);
+                const list = Array.isArray(listRes) ? listRes : listRes?.data ?? [];
+                const found = Array.isArray(list) ? list.find(matchesId) : null;
+                if (found) return found;
+            } catch (e) {
+                console.warn("[MentorProfile] getMentorSessions failed", e);
+            }
+            try {
+                const res: any = await SessionService.getSessionById(deepLinkServiceId);
+                return res?.data || res?.session || res || null;
+            } catch (e) {
+                console.warn("[MentorProfile] getSessionById failed", e);
+                return null;
+            }
+        };
+
+        loadSession()
+            .then((session: any) => {
+                const sessionId = session?.sessionId || session?._id || session?.id;
+
+                // Group session ko is flow se book nahi karte; wo ServicesSection ke
+                // detail modal wale deep-link se hi handle hota hai.
+                if (!session || !sessionId || session.sessionType === "group_session") {
+                    console.warn("[MentorProfile] auto-book skipped: session not found or group", session);
+                    setAutoBooking(false);
+                    return;
+                }
+
+                const basePrice = session.pricing?.basePrice;
+                const service: Service = {
+                    id: sessionId,
+                    type: SESSION_TYPE_LABEL[session.sessionType] || "1:1 Call",
+                    title: session.title,
+                    duration: `${session.duration} Min`,
+                    originalPrice: null,
+                    price: basePrice === 0 ? "Free" : basePrice,
+                    popular: false,
+                } as Service;
+
+                setCameFromServicePage(true);
+                handleServiceClick(service);
+                setAutoBooking(false);
+            })
+            .catch(() => setAutoBooking(false));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [deepLinkBook, deepLinkServiceId, mentorId]);
+
     const resetBooking = (): void => {
         setBookingStep(null); setSelectedService(null);
         setCalendarData(null); setFormData(null);
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
+    if (autoBooking) {
+        return (
+            <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <style>{`@keyframes mp-spin { to { transform: rotate(360deg); } }`}</style>
+                <div style={{ width: "36px", height: "36px", border: `3px solid ${C.border}`, borderTop: `3px solid ${C.dark}`, borderRadius: "50%", animation: "mp-spin 0.8s linear infinite" }} />
+            </div>
+        );
+    }
+
     if (bookingStep === "query") return <QueryStep mentorId={mentorId} selectedService={selectedService} onBack={resetBooking} onSubmitted={resetBooking} />;
     if (bookingStep === "calendar") {
         return (
-            <CalendarStep
-                mentorId={mentorId}
-                selectedService={selectedService}
-                onBack={() => setBookingStep(null)}
-                onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }}
-            />
+            // Navbar fixed hai, isliye calendar ko neeche push kiya (paddingTop)
+            <div style={{ background: C.bg, paddingTop: "72px" }}>
+                <CalendarStep
+                    mentorId={mentorId}
+                    selectedService={selectedService}
+                    // Service page se aaye the to Back wapas service page pe jaye
+                    onBack={() => (cameFromServicePage ? router.back() : setBookingStep(null))}
+                    onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }}
+                />
+            </div>
         );
     }
     if (bookingStep === "details") return <DetailsStep selectedService={selectedService} calendarData={calendarData!} onBack={() => setBookingStep("calendar")} onContinue={(d: BookingFormData) => { setFormData(d); setBookingStep("payment"); }} />;
