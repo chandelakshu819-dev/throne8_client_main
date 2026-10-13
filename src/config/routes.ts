@@ -1,4 +1,4 @@
-﻿// src/config/routes.ts
+// src/config/routes.ts
 export const routes = {
   home: "/",
   feed: "/feed",
@@ -13,4 +13,34 @@ export const routes = {
   mentorEditProfile: (userId: string) => `/mentorship/mentorProfile/${userId}`,
   login: "/login",
   signup: "/signup",
+
+  // ── Mentorship workspace routes ──────────────────────────────────────────────
+
+  /** Mentee dashboard */
+  menteeDashboard: (userId: string) => `/mentorship/user-dashboard/${userId}`,
+
+  /**
+   * Senior Mentor dashboard — the /mentorship/[userid] page.
+   * "Senior Mentor" is the rename of the old "Student Mentor" role.
+   * Backed by the Mentor collection ("Become Mentor" flow).
+   */
+  seniorMentorDashboard: (userId: string) => `/mentorship/${userId}`,
+
+  /**
+   * Industry Mentor dashboard — /mentorship/senior-mentor-profile/[userId].
+   * Backed by SeniorMentorApplication ("Become Senior Mentor" flow).
+   */
+  industryMentorDashboard: (userId: string) => `/mentorship/senior-mentor-profile/${userId}`,
+
+  /** Navigate to the landing page; ?openMentorForm=true auto-opens BecomeMentorModal */
+  applySeniorMentor: (userId: string) => `/mentorship/${userId}?openMentorForm=true`,
+
+  /** Apply as Industry Mentor */
+  applyIndustryMentor: "/mentorship/senior-mentor-application",
+
+  // ── Kept for backward-compat (aliased) ───────────────────────────────────────
+  /** @deprecated use seniorMentorDashboard */
+  studentMentorDashboard: (userId: string) => `/mentorship/${userId}`,
+  /** @deprecated use applySeniorMentor */
+  applyStudentMentor: (userId: string) => `/mentorship/${userId}?openMentorForm=true`,
 } as const;

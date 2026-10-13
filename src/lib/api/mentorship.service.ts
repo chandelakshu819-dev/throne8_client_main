@@ -3,7 +3,20 @@ import api from "./api.intance";
 import { MentorResponse } from '@/features/mentorship/types/mentorship.types';
 import config from '@/config/env.config';
 
+// ── My-Roles types (used by ProfileDropdown) ─────────────────────────────────
+export type RoleStatus = 'approved' | 'pending' | 'rejected' | 'none';
+
+export interface MyRolesResponse {
+  mentee: RoleStatus;
+  seniorMentor: RoleStatus;       // Mentor collection ("Become Mentor" flow)
+  industryMentor: RoleStatus;     // SeniorMentorApplication ("Become Senior Mentor" flow)
+  seniorMentorId?: string;        // mentorId from Mentor doc
+  industryMentorId?: string;      // seniorMentorId from SeniorMentorApplication doc
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface CreateGroupSessionInput {
+
   title: string;
   description: string;
   topic: string;
@@ -1651,6 +1664,36 @@ class MentorService {
       throw MentorService.waitlistError(error, 'Failed to update auto-offer setting.');
     }
   }
+  // ── Workspace Role Status ───────────────────────────────────────────────────
+  /**
+   * GET /mentorship/mentors/me/roles
+   * Single cached call that returns the logged-in user’s approval status across
+   * all three workspace roles. Cache is busted by calling invalidateRolesCache().
+   */
+  static async getMyRoles(): Promise<MyRolesResponse> {
+    if (_rolesCache) return _rolesCache;
+    try {
+      const { data } = await api.get('/mentorship/mentors/me/roles');
+      const result: MyRolesResponse = data?.data ?? {
+        mentee: 'approved',
+        seniorMentor: 'none',
+        industryMentor: 'none',
+      };
+      _rolesCache = result;
+      return result;
+    } catch (error: any) {
+      console.error('❌ [MENTOR_SERVICE] getMyRoles failed:', error?.message);
+      return { mentee: 'approved', seniorMentor: 'none', industryMentor: 'none' };
+    }
+  }
+
+  /** Call after the user applies for a role so the next render re-fetches. */
+  static invalidateRolesCache(): void {
+    _rolesCache = null;
+  }
 }
+
+/** Module-level cache so the navbar doesn’t refetch on every re-render. */
+let _rolesCache: MyRolesResponse | null = null;
 
 export default MentorService;

@@ -1,7 +1,7 @@
 "use client";
 //src/features/mentorship/components/layout/Navigation.tsx
 import React, { useEffect, useState } from "react";
-import { Crown, Globe, User } from "lucide-react";
+import { Crown, Globe } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import SearchBar from "@/features/profile/components/home/SearchBar";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -9,6 +9,7 @@ import { useProfileData } from "@/features/profile/hooks/useProfileData";
 import { formatUserDisplayName } from "@/shared/utils/format";
 import { transformToProfileData } from "@/shared/utils/profileTransformers";
 import { HOME_PATH, isFeatureEnabled, type FeatureKey } from "@/config/launch";
+import ProfileDropdown from "@/features/mentorship/components/shared/ProfileDropdown";
 
 interface NavigationProps {
     activeTimezone?: string;
@@ -177,20 +178,13 @@ export default function Navigation({
                             {activeTimezone}
                         </div>
 
-                        {/* MY DASHBOARD Button */}
-                        <button
-                            onClick={() => {
-                                if (isMentor && mentorUserId) {
-                                    router.push(`/mentorship/mentorProfile/${mentorUserId}`);
-                                } else {
-                                    router.push(`/mentorship/user-dashboard/${targetUserId}`);
-                                }
-                            }}
-                            className="bg-[#4a3728] text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-[1.5px] shadow-md hover:bg-[#8b7355] transition-all flex items-center gap-1.5 shrink-0"
-                        >
-                            MY DASHBOARD
-                            <User className="w-3.5 h-3.5" />
-                        </button>
+                        {/* MY DASHBOARD → ProfileDropdown */}
+                        <ProfileDropdown
+                            user={user}
+                            isAuthenticated={!!user}
+                            profileImageUrl={profileImageUrl}
+                            fullName={fullName || undefined}
+                        />
                     </div>
                 </div>
             </div>

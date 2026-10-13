@@ -1,31 +1,51 @@
 "use client";
 // src/features/mentorship/components/MentorshipDashboardRouter.tsx
-import { useState } from "react";
+//
+// Single entry point for /mentorship/[userid].
+// Now uses useMyRoles() instead of a plain isMentor boolean so that:
+//   1. Users who haven't been approved as a Student Mentor are
+//      redirected to the "apply" flow instead of seeing the dashboard.
+//   2. The "switch role" mechanism is URL-driven (via ProfileDropdown)
+//      rather than managed by a useState inside this file.
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import UserDashboardLayout from "./user-dashboard/UserDashboardLayout";
 import MentorDashboard from "./dashboard/DashboardLayout";
-import { useMentorRole, MentorshipRole } from "../hooks/useMentorRole";
+import { useMyRoles } from "../hooks/useMentorRole";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { routes } from "@/config/routes";
 
 interface MentorshipDashboardRouterProps {
   userId: string;
-  defaultRole?: MentorshipRole;
+  /** Which dashboard to render — still accepted for backward compat,
+   *  but now validated against the user's actual approval status. */
+  defaultRole?: "mentee" | "mentor";
   initialPage?: string;
 }
 
-/**
- * Single entry point for the mentorship dashboard route.
- * Checks if this user also has a mentor profile — if yes, both
- * dashboards pass down a switch link inside their sidebar profile
- * card ("Switch to Mentor view →" / "Switch to Mentee view →")
- * instead of a floating button.
- */
 export default function MentorshipDashboardRouter({
   userId,
   defaultRole = "mentee",
   initialPage,
 }: MentorshipDashboardRouterProps) {
-  const { isMentor, loading } = useMentorRole(userId);
-  const [activeRole, setActiveRole] = useState<MentorshipRole>(defaultRole);
+  const router = useRouter();
+  const { user, isAuthenticated } = useAuth();
+  const { roles, loading } = useMyRoles(isAuthenticated);
 
+  // ── Role guard ────────────────────────────────────────────────────────────
+  // If someone navigates to /mentorship/[userId] intending the Student Mentor
+  // dashboard but they're not approved, redirect them to the apply page.
+  useEffect(() => {
+    if (loading || !roles) return;
+    if (defaultRole === "mentor" && roles.studentMentor !== "approved") {
+      // Not approved yet — send to the landing page where BecomeMentorModal lives
+      const target = userId ? routes.applyStudentMentor(userId) : "/mentorship";
+      router.replace(target);
+    }
+  }, [loading, roles, defaultRole, userId, router]);
+
+  // ── Loading state ─────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#f6ede8]">
@@ -34,18 +54,25 @@ export default function MentorshipDashboardRouter({
     );
   }
 
-  const switchToMentor = () => setActiveRole("mentor");
-  const switchToMentee = () => setActiveRole("mentee");
+  // ── Render correct dashboard ──────────────────────────────────────────────
+  const isMentor = roles?.studentMentor === "approved";
 
-  if (activeRole === "mentor" && isMentor) {
-    return <MentorDashboard userId={userId} onSwitchRole={switchToMentee} />;
+  if (defaultRole === "mentor" && isMentor) {
+    return (
+      <MentorDashboard
+        userId={userId}
+        // Switching back to Mentee is now done via the ProfileDropdown in the navbar.
+        // Pass a no-op so the MentorDashboard's internal "Switch" link still compiles.
+        onSwitchRole={() => router.push(routes.menteeDashboard(userId))}
+      />
+    );
   }
 
   return (
     <UserDashboardLayout
       userId={userId}
       isMentor={isMentor}
-      onSwitchRole={switchToMentor}
+      onSwitchRole={() => router.push(routes.studentMentorDashboard(userId))}
       initialPage={initialPage}
     />
   );
