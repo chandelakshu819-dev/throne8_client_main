@@ -2,10 +2,17 @@ import axios from 'axios';
 import api from "./api.intance";
 
 export interface AdminPaginatedResponse<T = any> {
-    status: string;
+    status?: string;
+    success?: boolean;
     message: string;
     data: T;
-    pagination: {
+    pagination?: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+    };
+    meta?: {
         page: number;
         limit: number;
         total: number;
@@ -94,6 +101,9 @@ class AdminService {
         limit?: number;
         status?: string;
         sessionType?: string;
+        kind?: string;
+        from?: string;
+        to?: string;
     } = {}): Promise<AdminPaginatedResponse<any[]>> {
         try {
             const { data } = await api.get<AdminPaginatedResponse<any[]>>(`${BASE}/sessions`, { params });
@@ -113,6 +123,7 @@ class AdminService {
         limit?: number;
         reported?: boolean;
         rating?: number;
+        status?: 'all' | 'public' | 'hidden' | 'deleted' | string;
     } = {}): Promise<AdminPaginatedResponse<any[]>> {
         try {
             const { data } = await api.get<AdminPaginatedResponse<any[]>>(`${BASE}/reviews`, { params });
@@ -144,9 +155,11 @@ class AdminService {
         }
     }
 
-    static async moderateReview(reviewId: string, action: 'approve' | 'hide' | 'delete', reason?: string): Promise<AdminApiResponse<any>> {
+    static async moderateReview(reviewId: string, action: 'approve' | 'delete', reason?: string): Promise<AdminApiResponse<any>> {
         try {
-            const { data } = await api.post<AdminApiResponse<any>>(`${BASE}/reviews/${reviewId}/moderate`, { action, reason });
+            // Backend accepts 'keep' | 'delete'; frontend uses 'approve' for clarity.
+            const backendAction = action === 'approve' ? 'keep' : action;
+            const { data } = await api.post<AdminApiResponse<any>>(`${BASE}/reviews/${reviewId}/moderate`, { action: backendAction, reason });
             return data;
         } catch (error: any) {
             if (axios.isAxiosError(error)) {

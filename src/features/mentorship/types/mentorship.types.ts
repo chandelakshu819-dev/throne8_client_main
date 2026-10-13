@@ -66,6 +66,8 @@ export interface MentorResponse {
     featured: { isFeatured: boolean };
     profileCompleteness: number;
     createdAt: string;
+    college?: string;
+    degree?: string;
     user: {
       userId: string;
       email: string;

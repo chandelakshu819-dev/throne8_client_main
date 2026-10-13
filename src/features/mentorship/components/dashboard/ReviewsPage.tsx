@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react"
-import { Star, ThumbsUp, ThumbsDown, Loader2, MessageSquare, Edit2, Trash2, Send, X } from "lucide-react"
+import { Star, ThumbsUp, ThumbsDown, Loader2, MessageSquare, Edit2, Trash2, Send, X, Flag } from "lucide-react"
 import ReviewService, { MentorReview, ReviewStats } from "@/lib/api/review.service"
 import TokenStorage from "@/lib/store/token.storage"
+import ReportReviewModal from "./ReportReviewModal"
 
 const COLORS = {
   ink: "#4a3728",
@@ -114,6 +115,14 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
   const [replyText, setReplyText] = useState<string>("")
   const [isSubmittingReply, setIsSubmittingReply] = useState<boolean>(false)
   const [deletingReplyReviewId, setDeletingReplyReviewId] = useState<string | null>(null)
+
+  // Report review state
+  const [reportingReview, setReportingReview] = useState<MentorReview | null>(null)
+  const [reportedReviewIds, setReportedReviewIds] = useState<Set<string>>(new Set())
+
+  const handleReported = useCallback((rId: string) => {
+    setReportedReviewIds((prev) => new Set(prev).add(rId))
+  }, [])
 
   const loggedInUserId = useMemo(() => {
     if (typeof window === "undefined") return null
@@ -438,6 +447,7 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
               const sessionTitle = review.session?.title || "Mentorship Session"
               const rMenteeUserId = typeof review.menteeId === "object" ? review.menteeId?.userId : review.menteeId
               const isOwnReview = Boolean(loggedInUserId && String(rMenteeUserId) === String(loggedInUserId))
+              const isReported = Boolean(review.reportedPending || (reviewId && reportedReviewIds.has(reviewId)))
 
               return (
                 <div
@@ -558,6 +568,34 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
                           <ThumbsDown className="w-3.5 h-3.5" style={{ fill: myReactions[reviewId] === "dislike" ? COLORS.danger : "none" }} />
                           <span>Dislike {(review.notHelpfulCount || 0) > 0 ? `(${review.notHelpfulCount})` : "(0)"}</span>
                         </button>
+
+                        {/* Report Button (Mentor-only on own reviews) */}
+                        {isMentorOwner && (
+                          isReported ? (
+                            <span
+                              className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border text-amber-800 bg-amber-50 border-amber-200"
+                              title="Reported — pending admin decision"
+                            >
+                              <Flag className="w-3.5 h-3.5 text-amber-600 fill-amber-600" />
+                              <span>Reported</span>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setReportingReview(review)}
+                              aria-label="Report review"
+                              className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors hover:bg-[#f6ede8]"
+                              style={{
+                                color: COLORS.muted,
+                                backgroundColor: "transparent",
+                                border: `1px solid ${COLORS.hairline}`,
+                              }}
+                              title="Report review"
+                            >
+                              <Flag className="w-3.5 h-3.5" />
+                              <span>Report</span>
+                            </button>
+                          )
+                        )}
                       </div>
 
                       {/* Mentor Reply Button */}
@@ -685,6 +723,17 @@ export default function ReviewsPage({ mentorData }: ReviewsPageProps) {
             </div>
           )}
         </>
+      )}
+
+      {/* Report Review Modal */}
+      {reportingReview && (
+        <ReportReviewModal
+          reviewId={reportingReview.reviewId || reportingReview._id || reportingReview.id || ""}
+          reviewerName={getMenteeName(reportingReview)}
+          onClose={() => setReportingReview(null)}
+          onSuccess={handleReported}
+          onReported={handleReported}
+        />
       )}
     </div>
   )

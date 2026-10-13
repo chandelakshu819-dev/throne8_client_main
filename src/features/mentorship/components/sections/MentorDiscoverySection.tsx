@@ -8,7 +8,8 @@ import {
     Crown,
     Users,
     Star,
-    Briefcase,
+    Landmark,
+    FileText,
     Eye,
     Calendar,
     ArrowRight
@@ -17,9 +18,7 @@ import Sidebar from "../layout/Sidebar";
 import MentorService from "@/lib/api/mentorship.service";
 import {
     parseRoleCompany,
-    formatRoleCompany,
     getRatingDisplay,
-    getExperienceLabel,
 } from "@/shared/utils/mentorFormat";
 
 interface MentorDiscoverySectionProps {
@@ -33,6 +32,8 @@ interface MentorData {
     name: string;
     role: string;
     company: string;
+    college?: string;
+    degree?: string;
     rating: number;
     sessions: number;
     price: number;
@@ -82,7 +83,12 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                     const totalExp = Number(m.experience?.total) || 0;
 
                     // Role + company ek hi helper se parse hota hai
-                    const { role, company } = parseRoleCompany(rawRole, rawTitle, m.company);
+                    const parsed = parseRoleCompany(rawRole, rawTitle, m.company);
+
+                    // Company priority: backend company field -> helper (currentRole parser) -> empty
+                    const backendCompany = typeof m.company === "string" ? m.company.trim() : "";
+                    const role = parsed.role;
+                    const company = backendCompany || parsed.company || "";
 
                     // TODO: Replace this heuristic with a proper verification.isVerified or SeniorMentorApplication-based check once that data is joined into the getAllMentors() API response.
                     const seniorKeywords = ["senior", "lead", "principal", "director", "head", "vp", "founder", "ceo", "cto"];
@@ -90,12 +96,17 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                     const hasSeniorKeyword = seniorKeywords.some((kw) => textToCheck.includes(kw));
                     const isSenior = totalExp >= 5 || hasSeniorKeyword;
 
+                    const college = typeof m.college === "string" ? m.college.trim() : undefined;
+                    const degree = typeof m.degree === "string" ? m.degree.trim() : undefined;
+
                     return {
                         id: m.mentorId,
                         userId: m.userId,
                         name: `${m.user?.firstName ?? ""} ${m.user?.lastName ?? ""}`.trim() || m.user?.name || "Mentor",
                         role,
                         company,
+                        college: college || undefined,
+                        degree: degree || undefined,
                         // Fake 4.9 default hata diya: rating nahi hai to 0 (UI "New" dikhayegi)
                         rating: Number(m.stats?.averageRating) || 0,
                         sessions: m.stats?.totalSessions || m.trustScore?.metrics?.totalCompletedSessions || 0,
@@ -202,6 +213,14 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         ? regularMentors
         : regularMentors.slice(0, REGULAR_LIMIT);
 
+    // Display-only role formatter: "product-manager" → "Product Manager"
+    const formatDisplayRole = (role: string | undefined | null): string => {
+        if (!role) return "Mentor";
+        return role
+            .replace(/[-_]/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+    };
+
     const handleNavigate = (mentor: MentorData) => {
         if (mentor.isDummy) return;
 
@@ -230,9 +249,8 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         return (
             <>
                 <Star
-                    className={`w-3.5 h-3.5 ${
-                        rd.hasRating ? "fill-[#d99b26] text-[#d99b26]" : "text-[#d9cbbe]"
-                    }`}
+                    className={`w-3.5 h-3.5 ${rd.hasRating ? "fill-[#d99b26] text-[#d99b26]" : "text-[#d9cbbe]"
+                        }`}
                 />
                 <span className="font-bold text-[#2d2015]">{rd.ratingLabel}</span>
                 {rd.sessionsLabel && (
@@ -246,125 +264,157 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     };
 
     // Render individual mentor card
-    const renderCard = (mentor: MentorData, isSeniorCard: boolean) => (
-        <div
-            key={mentor.id}
-            className={`rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 relative group ${
-                mentor.isDummy
+    // isSeniorCard = true  -> Industry Mentor card (company + role)
+    // isSeniorCard = false -> College Mentor card (College / Degree box)
+    const renderCard = (mentor: MentorData, isSeniorCard: boolean) => {
+        const college = mentor.college?.trim();
+        const degree = mentor.degree?.trim();
+        const hasCollege = Boolean(college);
+        const hasDegree = Boolean(degree);
+        const hasEducation = hasCollege || hasDegree;
+
+        return (
+            <div
+                key={mentor.id}
+                className={`rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 relative group ${mentor.isDummy
                     ? "bg-[#fcfaf7] border border-dashed border-[#dcd1c7] opacity-75 shadow-none cursor-default select-none"
                     : "bg-white border border-[#e8ded5] hover:border-[#cfbeaf] shadow-sm hover:shadow-md"
-            }`}
-        >
-            <div>
-                {/* Card Top Row: Badge (Senior) + Online indicator */}
-                <div className="flex items-center justify-between min-h-[26px] mb-2.5">
-                    {isSeniorCard ? (
-                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#faeedd] text-[#8b5e3c] border border-[#ecd5bf] text-[10px] font-bold uppercase tracking-wider">
-                            <Crown className="w-3 h-3 text-[#b47a3e]" />
-                            <span>SENIOR MENTOR</span>
+                    }`}
+            >
+                <div>
+                    {/* Avatar */}
+                    <div className="flex justify-center mb-2.5">
+                        <div className={`w-16 h-16 rounded-full overflow-hidden border-2 shadow-sm ring-1 ring-[#e4d8ce] flex items-center justify-center ${mentor.isDummy ? "border-dashed border-[#d5c6ba] bg-[#f3ece3]" : "border-white bg-[#f5ede5]"}`}>
+                            {mentor.image ? (
+                                <img
+                                    src={mentor.image}
+                                    alt={mentor.name}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-[#4a3728] text-lg font-bold">
+                                    {mentor.isDummy ? <Users className="w-6 h-6 text-[#b5a799]" /> : (mentor.name?.[0] ?? "M")}
+                                </div>
+                            )}
                         </div>
-                    ) : (
-                        <div />
-                    )}
-
-                    {mentor.isDummy ? (
-                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-stone-400 ml-auto">
-                            <span className="w-2 h-2 rounded-full bg-stone-300" />
-                            <span>Joining Soon</span>
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 ml-auto">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>Online</span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Avatar */}
-                <div className="flex justify-center mb-2.5">
-                    <div className={`w-16 h-16 rounded-full overflow-hidden border-2 shadow-sm ring-1 ring-[#e4d8ce] flex items-center justify-center ${mentor.isDummy ? "border-dashed border-[#d5c6ba] bg-[#f3ece3]" : "border-white bg-[#f5ede5]"}`}>
-                        {mentor.image ? (
-                            <img
-                                src={mentor.image}
-                                alt={mentor.name}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-[#4a3728] text-lg font-bold">
-                                {mentor.isDummy ? <Users className="w-6 h-6 text-[#b5a799]" /> : (mentor.name?.[0]?.toUpperCase() ?? "M")}
-                            </div>
-                        )}
                     </div>
-                </div>
 
-                {/* Name */}
-                <h4 className={`font-bold text-sm text-center truncate px-1 ${mentor.isDummy ? "text-[#8b7355]" : "text-[#2d2015]"}`}>
-                    {mentor.name}
-                </h4>
+                    {/* Name */}
+                    <h4 className={`font-bold text-sm text-center truncate px-1 ${mentor.isDummy ? "text-[#8b7355]" : "text-[#2d2015]"}`}>
+                        {mentor.name}
+                    </h4>
 
-                {/* Role & Company (company blank ho to "@" nahi dikhega) */}
-                <p className="text-[11px] text-[#8b7355] text-center font-medium truncate mb-2 px-1">
-                    {formatRoleCompany(mentor.role, mentor.company)}
-                </p>
+                    {/* Company — Industry (senior) cards only; hidden when empty */}
+                    {isSeniorCard && mentor.company ? (
+                        <div className="flex items-center justify-center gap-1.5 mb-1 px-1">
+                            <div className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center bg-[#f5ede5] text-[#4a3728] text-[9px] font-bold border border-[#e4d8ce]">
+                                {mentor.company[0].toUpperCase()}
+                            </div>
+                            <span className="text-[11px] text-[#6b5643] font-medium truncate">
+                                {mentor.company}
+                            </span>
+                        </div>
+                    ) : null}
 
-                {/* Rating & Sessions */}
-                <div className="flex items-center justify-center gap-1.5 text-xs mb-2.5">
-                    {renderRating(mentor)}
-                </div>
+                    {/* Role — Industry (senior) cards only; removed on College Mentor cards */}
+                    {isSeniorCard && (
+                        <p className="text-[11px] text-[#8b7355] text-center font-medium truncate mb-2 px-1">
+                            {formatDisplayRole(mentor.role)}
+                        </p>
+                    )}
 
-                {/* Expertise Tags */}
-                <div className="flex items-center justify-center gap-1.5 flex-wrap mb-2.5 min-h-[24px]">
-                    {mentor.tags.map((tag: string, idx: number) => (
-                        <span
-                            key={idx}
-                            className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full ${
-                                mentor.isDummy
+                    {/* Rating & Sessions */}
+                    <div className="flex items-center justify-center gap-1.5 text-xs mb-2.5">
+                        {renderRating(mentor)}
+                    </div>
+
+                    {/* Expertise Tags */}
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap mb-2.5 min-h-[24px]">
+                        {mentor.tags.map((tag: string, idx: number) => (
+                            <span
+                                key={idx}
+                                className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full ${mentor.isDummy
                                     ? "bg-[#f5ede5] text-[#a39282] border border-dashed border-[#e4d6c8]"
                                     : "bg-[#f6efe8] text-[#6b5643] border border-[#ebdcd0]"
-                            }`}
+                                    }`}
+                            >
+                                {tag}
+                            </span>
+                        ))}
+                    </div>
+
+                    {/* College & Degree Section — College Mentor cards only; hidden when no data */}
+                    {!isSeniorCard && hasEducation && (
+                        <div className="w-full mb-3">
+                            <div className="border-t border-[#e8ded5] mb-2.5" />
+                            <div className="flex items-stretch gap-3 text-left py-3">
+                                {hasCollege && (
+                                    <div className={`min-w-0 ${hasDegree ? "flex-1" : "w-full"}`}>
+                                        <div className="flex items-center gap-1 text-[#8b7355] mb-1">
+                                            <Landmark className="w-4 h-4 flex-shrink-0 text-[#8b5e3c]" />
+                                            <span className="text-[11px] font-medium uppercase tracking-wider">College</span>
+                                        </div>
+                                        <p
+                                            className="text-[14px] font-semibold text-[#2d2015] line-clamp-2 leading-snug"
+                                            title={college}
+                                        >
+                                            {college}
+                                        </p>
+                                    </div>
+                                )}
+                                {hasCollege && hasDegree && (
+                                    <div className="w-px bg-[#e8ded5] self-stretch flex-shrink-0" />
+                                )}
+                                {hasDegree && (
+                                    <div className={`min-w-0 ${hasCollege ? "flex-1" : "w-full"}`}>
+                                        <div className="flex items-center gap-1 text-[#8b7355] mb-1">
+                                            <FileText className="w-4 h-4 flex-shrink-0 text-[#8b5e3c]" />
+                                            <span className="text-[11px] font-medium uppercase tracking-wider">Degree</span>
+                                        </div>
+                                        <p
+                                            className="text-[14px] font-semibold text-[#2d2015] truncate"
+                                            title={degree}
+                                        >
+                                            {degree}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Action Buttons */}
+                <div>
+                    {mentor.isDummy ? (
+                        <button
+                            disabled
+                            className="w-full py-2 px-3 bg-[#f2eae1] text-[#a39282] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed border border-[#e5dcd3]"
                         >
-                            {tag}
-                        </span>
-                    ))}
-                </div>
-
-                {/* Experience */}
-                <div className="flex items-center justify-center gap-1.5 text-[11px] text-[#786352] font-medium mb-4">
-                    <Briefcase className="w-3.5 h-3.5 text-[#a67c52]" />
-                    <span>{getExperienceLabel(mentor.expTotal)} Experience</span>
+                            <span>Not Available Yet</span>
+                        </button>
+                    ) : mentor.acceptsBooking ? (
+                        <button
+                            onClick={() => handleNavigate(mentor)}
+                            className="w-full py-2 px-3 bg-[#3a2a1e] hover:bg-[#251910] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                        >
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>Book Session</span>
+                            <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => handleNavigate(mentor)}
+                            className="w-full py-2 px-3 border border-[#cfc2b6] hover:border-[#8b7355] hover:bg-[#faf6f1] text-[#3a2a1e] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View Profile</span>
+                        </button>
+                    )}
                 </div>
             </div>
-
-            {/* Action Buttons */}
-            <div>
-                {mentor.isDummy ? (
-                    <button
-                        disabled
-                        className="w-full py-2 px-3 bg-[#f2eae1] text-[#a39282] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed border border-[#e5dcd3]"
-                    >
-                        <span>Not Available Yet</span>
-                    </button>
-                ) : mentor.acceptsBooking ? (
-                    <button
-                        onClick={() => handleNavigate(mentor)}
-                        className="w-full py-2 px-3 bg-[#3a2a1e] hover:bg-[#251910] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-                    >
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>Book Session</span>
-                        <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
-                    </button>
-                ) : (
-                    <button
-                        onClick={() => handleNavigate(mentor)}
-                        className="w-full py-2 px-3 border border-[#cfc2b6] hover:border-[#8b7355] hover:bg-[#faf6f1] text-[#3a2a1e] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>View Profile</span>
-                    </button>
-                )}
-            </div>
-        </div>
-    );
+        );
+    };
 
     // Skeleton loader grid
     const renderSkeletonGrid = (count: number = 4) => (
@@ -423,7 +473,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                     </div>
                 ) : (
                     <>
-                        {/* SECTION 1 — Professional Mentors (Senior) */}
+                        {/* SECTION 1 — Industry Mentors (Senior) */}
                         {seniorMentors.length > 0 && (
                             <section>
                                 <div className="flex items-center gap-3 mb-5">
@@ -432,7 +482,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                                     </div>
                                     <div>
                                         <h2 className="text-xl font-bold text-[#2d2015] tracking-tight">
-                                            Professional Mentor
+                                            Industry Mentor
                                         </h2>
                                         <p className="text-xs text-[#8b7355] mt-0.5">
                                             Learn from experienced industry professionals.
@@ -452,7 +502,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                                         >
                                             <span className="absolute inset-0 bg-[#f4ede6] scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out" />
                                             <span className="relative z-10 tracking-wide">
-                                                {showAllSeniorMentors ? "Show less" : `Show more (${seniorMentors.length - SENIOR_LIMIT} more)`}
+                                                {showAllSeniorMentors ? "Show less" : "Show more"}
                                             </span>
                                             <ArrowRight className={`relative z-10 w-4 h-4 text-[#8b7355] transition-transform duration-300 ${showAllSeniorMentors ? "-rotate-90" : "group-hover:translate-x-1.5 group-hover:text-[#4a3728]"}`} />
                                         </button>
@@ -461,7 +511,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                             </section>
                         )}
 
-                        {/* SECTION 2 — OUR Mentor (Regular) */}
+                        {/* SECTION 2 — College Mentor (Regular) */}
                         {regularMentors.length > 0 && (
                             <section>
                                 <div className="flex items-center gap-3 mb-5">
@@ -470,7 +520,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                                     </div>
                                     <div>
                                         <h2 className="text-xl font-bold text-[#2d2015] tracking-tight">
-                                            OUR Mentor
+                                            College Mentor
                                         </h2>
                                         <p className="text-xs text-[#8b7355] mt-0.5">
                                             Connect with skilled professionals and peers.
@@ -490,7 +540,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                                         >
                                             <span className="absolute inset-0 bg-[#f4ede6] scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out" />
                                             <span className="relative z-10 tracking-wide">
-                                                {showAllRegularMentors ? "Show less" : `Show more (${regularMentors.length - REGULAR_LIMIT} more)`}
+                                                {showAllRegularMentors ? "Show less" : "Show more"}
                                             </span>
                                             <ArrowRight className={`relative z-10 w-4 h-4 text-[#8b7355] transition-transform duration-300 ${showAllRegularMentors ? "-rotate-90" : "group-hover:translate-x-1.5 group-hover:text-[#4a3728]"}`} />
                                         </button>

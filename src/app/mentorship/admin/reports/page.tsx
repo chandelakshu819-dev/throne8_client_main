@@ -9,10 +9,10 @@ import AdminLayout from "@/features/mentorship/components/admin/AdminLayout";
 import CommunityReportsView from "@/features/mentorship/components/admin/CommunityReportsView";
 
 export default function CommunityReportsAdminPage() {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
   const [activePage, setActivePage] = useState("community-reports");
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#faf6f1]">
         <div className="text-sm font-semibold text-[#7a5c3e]">Checking authorization...</div>

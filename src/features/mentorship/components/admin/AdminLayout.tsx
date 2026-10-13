@@ -8,6 +8,7 @@ interface AdminLayoutProps {
   setActivePage: (page: string) => void;
   pendingMentorCount?: number;
   reportedReviewCount?: number;
+  communityReportCount?: number;
   pageTitle: string;
   pageSubtitle?: string;
   children: ReactNode;
@@ -18,6 +19,7 @@ export default function AdminLayout({
   setActivePage,
   pendingMentorCount = 0,
   reportedReviewCount = 0,
+  communityReportCount = 0,
   pageTitle,
   pageSubtitle,
   children,
@@ -32,6 +34,7 @@ export default function AdminLayout({
         setActivePage={setActivePage}
         pendingMentorCount={pendingMentorCount}
         reportedReviewCount={reportedReviewCount}
+        communityReportCount={communityReportCount}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">

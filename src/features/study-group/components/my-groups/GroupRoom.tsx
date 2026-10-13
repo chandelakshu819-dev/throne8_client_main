@@ -22,7 +22,7 @@ import { createLiveRoomSchema, type CreateLiveRoomInput } from "@/features/study
 import { getSocket } from "@/core/realtime/socket.client";
 import { useLiveRoom } from "@/core/webrtc/useLiveRoom";
 import LiveRoomView from "./LiveRoomView";
- 
+
 
 
 
@@ -95,33 +95,33 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const members =
     membersSource.length > 0
       ? membersSource.map((m: any, idx: number) => {
-          const mUserId =
-            typeof m.userId === "string"
-              ? m.userId
-              : (m.userId?._id || m.userId?.id || m.userId?.userId || m._id || m.id || "");
-          const isOnline = onlineMembers.some(
-            (onlineId) => String(onlineId) === String(mUserId)
-          );
-          const cachedUser = getUserInfoSync(mUserId);
-          return {
-            id: idx + 1,
-            name: m.name ?? cachedUser?.name ?? (mUserId ? mUserId.slice(0, 8) : "Member"),
-            avatar: m.avatar ?? cachedUser?.avatar ?? null,
-            isOnline,
-            isSpeaking: false,
-            studyTime: 0,
-            rank: idx + 1,
-            videoEnabled: false,
-            audioEnabled: false,
-            userId: mUserId,
-            role: m.role,
-          };
-        })
+        const mUserId =
+          typeof m.userId === "string"
+            ? m.userId
+            : (m.userId?._id || m.userId?.id || m.userId?.userId || m._id || m.id || "");
+        const isOnline = onlineMembers.some(
+          (onlineId) => String(onlineId) === String(mUserId)
+        );
+        const cachedUser = getUserInfoSync(mUserId);
+        return {
+          id: idx + 1,
+          name: m.name ?? cachedUser?.name ?? (mUserId ? mUserId.slice(0, 8) : "Member"),
+          avatar: m.avatar ?? cachedUser?.avatar ?? null,
+          isOnline,
+          isSpeaking: false,
+          studyTime: 0,
+          rank: idx + 1,
+          videoEnabled: false,
+          audioEnabled: false,
+          userId: mUserId,
+          role: m.role,
+        };
+      })
       : [];
 
   const liveRoomId = activeLiveRoom?.roomId ?? '';
 
- // REPLACE WITH:
+  // REPLACE WITH:
   const {
     localStream,
     peers: webrtcPeers,
@@ -1330,10 +1330,10 @@ ADD this block just before your main `return (` statement:
       <div className="backdrop-blur-md bg-white/40 border-t border-[#d4c4b5] shadow-lg px-3 sm:px-4 md:px-6 py-3 sm:py-4 shrink-0 safe-area-bottom">
         <div className="flex items-center justify-center gap-2 sm:gap-3 md:gap-4">
           <button
-                   onClick={async () => {
+            onClick={async () => {
               // WebRTC track toggle (immediate, no server round-trip)
               toggleWebRTCMic();
-             
+
               const socket = getSocket();
               socket?.emit('toggle-mic', {
                 roomId: activeLiveRoom?.roomId,
@@ -1652,7 +1652,7 @@ ADD this block just before your main `return (` statement:
 
       {showLiveRoomView && activeLiveRoom && (
         <div className="fixed inset-0 z-[100] bg-black">
-         
+
 
           // ✅ GroupRoom.tsx mein yeh already sahi hai, bas prop names check karo:
           <LiveRoomView
@@ -1685,8 +1685,8 @@ ADD this block just before your main `return (` statement:
               socket?.emit('toggle-screen-share', { roomId: activeLiveRoom.roomId, sharing: !webrtcScreenSharing });
               dispatch(setLocalScreenShare(!webrtcScreenSharing));
             }}
-          onLeave={handleEndOrLeaveLiveRoom}
-/>
+            onLeave={handleEndOrLeaveLiveRoom}
+          />
 
         </div>
       )}

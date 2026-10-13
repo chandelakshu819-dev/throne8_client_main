@@ -30,6 +30,22 @@ export function useAuth(): UseAuthReturn {
             const isAuth = AuthService.isAuthenticated();
 
             setUser(isAuth ? userData : null);
+
+            // Light refresh in background: sync fresh role from DB if changed
+            if (isAuth && userData) {
+                AuthService.getUserProfile()
+                    .then((profileRes) => {
+                        const dbUser = profileRes?.data?.user || profileRes?.data || profileRes?.user;
+                        if (dbUser?.role && dbUser.role !== userData.role) {
+                            const updated = { ...userData, role: dbUser.role };
+                            TokenStorage.updateUserData(updated);
+                            setUser(updated);
+                        }
+                    })
+                    .catch(() => {
+                        // Background check silent fail, keep local auth state
+                    });
+            }
         } catch (error) {
             console.error('❌ [useAuth] Error checking auth:', error);
             setUser(null);

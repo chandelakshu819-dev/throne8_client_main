@@ -5,6 +5,7 @@ import {
   CalendarClock,
   Star,
   Flag,
+  MessageSquareWarning,
   Receipt,
   ChevronRight,
 } from "lucide-react";
@@ -14,6 +15,7 @@ interface AdminSidebarProps {
   setActivePage: (page: string) => void;
   pendingMentorCount?: number;
   reportedReviewCount?: number;
+  communityReportCount?: number;
 }
 
 const ADMIN_MENU_ITEMS = [
@@ -21,9 +23,9 @@ const ADMIN_MENU_ITEMS = [
   { id: "pending-mentors", label: "Pending Mentors", icon: UserCheck },
   { id: "all-mentors", label: "All Mentors", icon: Users },
   { id: "sessions", label: "Sessions", icon: CalendarClock },
-  { id: "reviews", label: "All Reviews", icon: Star },
+  { id: "all-reviews", label: "All Reviews", icon: Star },
   { id: "reported-reviews", label: "Reported Reviews", icon: Flag },
-  { id: "community-reports", label: "Community Reports", icon: Flag },
+  { id: "community-reports", label: "Community Reports", icon: MessageSquareWarning },
   { id: "payments", label: "Payment Logs", icon: Receipt },
 ];
 
@@ -33,6 +35,7 @@ export default function AdminSidebar({
   setActivePage,
   pendingMentorCount = 0,
   reportedReviewCount = 0,
+  communityReportCount = 0,
 }: AdminSidebarProps) {
   return (
     <aside className="w-72 flex flex-col" style={{ backgroundColor: '#fff', borderRight: '1px solid #ece4db' }}>
@@ -55,7 +58,8 @@ export default function AdminSidebar({
             const isActive = activePage === item.id;
             const badgeCount =
               item.id === "pending-mentors" ? pendingMentorCount :
-              item.id === "reported-reviews" ? reportedReviewCount : 0;
+              item.id === "reported-reviews" ? reportedReviewCount :
+              item.id === "community-reports" ? communityReportCount : 0;
 
             return (
               <button

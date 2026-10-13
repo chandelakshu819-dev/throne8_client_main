@@ -15,6 +15,7 @@ export interface MentorReview {
   helpfulCount?: number;
   notHelpfulCount?: number;
   isVerified?: boolean;
+  reportedPending?: boolean;
   tags?: string[];
   mentorResponse?: { comment: string; respondedAt: string };
   createdAt?: string;
@@ -156,8 +157,8 @@ const ReviewService = {
   // alias used by the dashboard ReviewsPage component — same endpoint, different name
   deleteMentorResponse: (reviewId: string) => ReviewService.deleteReviewReply(reviewId),
 
-  reportReview: (reviewId: string, reason: string) =>
-    api.post<{ message: string; success: boolean }>(`/mentorship/reviews/${reviewId}/report`, { reason }).then((res) => res.data),
+  reportReview: (reviewId: string, reason: string, note?: string) =>
+    api.post<{ message: string; success: boolean }>(`/mentorship/reviews/${reviewId}/report`, { reason, note: note ? note.trim() : undefined }).then((res) => res.data),
 
   // NEW: fetches all reviews the logged-in mentee has submitted, so we can
   // cross-reference against `sessions` by sessionId and know which sessions

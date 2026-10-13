@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Users,
   UserCheck,
@@ -12,7 +13,21 @@ import {
 } from "lucide-react";
 import AdminLayout from "./AdminLayout";
 import AdminService from "@/lib/api/admin.service";
+import CommunityService from "@/lib/api/community.service";
 import CommunityReportsView from "./CommunityReportsView";
+import PendingMentorsView from "./PendingMentorsView";
+import AllMentorsView from "./AllMentorsView";
+import ReportedReviewsView from "./ReportedReviewsView";
+import AllReviewsView from "./AllReviewsView";
+import SessionsView from "./SessionsView";
+
+const inrFormatter = new Intl.NumberFormat("en-IN", {
+  maximumFractionDigits: 2,
+});
+
+function formatINR(val: number): string {
+  return `₹${inrFormatter.format(val)}`;
+}
 
 const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Mentorship module overview" },
@@ -20,6 +35,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   "all-mentors": { title: "All Mentors", subtitle: "Manage active and suspended mentors" },
   sessions: { title: "Sessions", subtitle: "All booked mentorship sessions" },
   reviews: { title: "All Reviews", subtitle: "Every review submitted by mentees" },
+  "all-reviews": { title: "All Reviews", subtitle: "Every review submitted by mentees" },
   "reported-reviews": { title: "Reported Reviews", subtitle: "Reviews flagged for moderation" },
   "community-reports": { title: "Community Reports", subtitle: "Review and moderate flagged forum threads and replies" },
   payments: { title: "Payment Logs", subtitle: "Transaction history across the module" },
@@ -98,10 +114,13 @@ function DashboardOverview({ stats, loading }: { stats: DashboardStats | null; l
     );
   }
 
+  // stats == null means the dashboard call failed: show "—", never a fake 0.
+  const show = (v: number | undefined): string | number => (stats == null ? "—" : v ?? 0);
+
   const cards: StatCardConfig[] = [
     {
       label: "Total Mentors",
-      value: stats?.totalMentors ?? 0,
+      value: show(stats?.totalMentors),
       icon: Users,
       accent: "#4a3728",
       iconBg: "#f3ece4",
@@ -109,7 +128,7 @@ function DashboardOverview({ stats, loading }: { stats: DashboardStats | null; l
     },
     {
       label: "Active Mentors",
-      value: stats?.activeMentors ?? 0,
+      value: show(stats?.activeMentors),
       icon: UserCheck,
       accent: "#2f7d5c",
       iconBg: "#e4f3ec",
@@ -117,7 +136,7 @@ function DashboardOverview({ stats, loading }: { stats: DashboardStats | null; l
     },
     {
       label: "Pending Mentors",
-      value: stats?.pendingMentors ?? 0,
+      value: show(stats?.pendingMentors),
       icon: Clock,
       accent: "#b8860b",
       iconBg: "#fbf1dc",
@@ -125,7 +144,7 @@ function DashboardOverview({ stats, loading }: { stats: DashboardStats | null; l
     },
     {
       label: "Total Sessions",
-      value: stats?.totalSessions ?? 0,
+      value: show(stats?.totalSessions),
       icon: CalendarClock,
       accent: "#2563eb",
       iconBg: "#e6edfc",
@@ -133,7 +152,7 @@ function DashboardOverview({ stats, loading }: { stats: DashboardStats | null; l
     },
     {
       label: "Total Reviews",
-      value: stats?.totalReviews ?? 0,
+      value: show(stats?.totalReviews),
       icon: Star,
       accent: "#a855f7",
       iconBg: "#f4e9fd",
@@ -141,7 +160,7 @@ function DashboardOverview({ stats, loading }: { stats: DashboardStats | null; l
     },
     {
       label: "Reported Reviews",
-      value: stats?.reportedReviews ?? 0,
+      value: show(stats?.reportedReviews),
       icon: Flag,
       accent: "#b91c1c",
       iconBg: "#fdecea",
@@ -150,9 +169,11 @@ function DashboardOverview({ stats, loading }: { stats: DashboardStats | null; l
     {
       label: "Total Revenue",
       value:
-        stats?.totalRevenue != null
-          ? `₹${stats.totalRevenue.toLocaleString("en-IN")}`
-          : "₹0",
+        stats == null
+          ? "—"
+          : stats.totalRevenue != null
+            ? formatINR(stats.totalRevenue)
+            : "₹0",
       icon: IndianRupee,
       accent: "#0f766e",
       iconBg: "#e2f5f3",
@@ -170,67 +191,174 @@ function DashboardOverview({ stats, loading }: { stats: DashboardStats | null; l
 }
 
 export default function MentorshipAdminPage() {
-  const [activePage, setActivePage] = useState("dashboard");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const tabParam = searchParams.get("tab") || "dashboard";
+  const activePage = tabParam in PAGE_META ? tabParam : "dashboard";
+
+  const handleSetActivePage = useCallback(
+    (page: string) => {
+      const validPage = page in PAGE_META ? page : "dashboard";
+      const targetUrl =
+        validPage === "dashboard"
+          ? "/mentorship/admin"
+          : `/mentorship/admin?tab=${encodeURIComponent(validPage)}`;
+      router.replace(targetUrl);
+    },
+    [router]
+  );
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pendingMentorCount, setPendingMentorCount] = useState(0);
-  const [reportedReviewCount, setReportedReviewCount] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  // null = not loaded / failed to load (no badge shown)
+  const [pendingMentorCount, setPendingMentorCount] = useState<number | null>(null);
+  const [reportedReviewCount, setReportedReviewCount] = useState<number | null>(null);
+  const [communityReportCount, setCommunityReportCount] = useState<number | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
+  const isMountedRef = useRef(true);
+  const inFlightRef = useRef(false);
+
+  const loadCounts = useCallback(async () => {
+    if (inFlightRef.current) return; // guard against double fetch (Retry spam / StrictMode)
+    inFlightRef.current = true;
+    setErrors([]);
+    setLoading(true);
+
+    const reasonText = (reason: unknown) =>
+      reason instanceof Error ? reason.message : String(reason);
+
+    try {
+      const [dashboardRes, pendingRes, reportedRes, communityRes] = await Promise.allSettled([
+        AdminService.getDashboardStats(),
+        AdminService.getPendingMentors({ page: 1, limit: 1 }),
+        AdminService.getReportedReviews({ page: 1, limit: 1 }),
+        CommunityService.listCommunityReports({ page: 1, limit: 1, status: "pending" }),
+      ]);
+
+      if (!isMountedRef.current) return;
+      const failures: string[] = [];
+
+      if (dashboardRes.status === "fulfilled") {
+        setStats(dashboardRes.value.data);
+      } else {
+        setStats(null);
+        failures.push(`Could not load dashboard stats: ${reasonText(dashboardRes.reason)}`);
+      }
+
+      if (pendingRes.status === "fulfilled") {
+        setPendingMentorCount(pendingRes.value.meta?.total ?? 0);
+      } else {
+        setPendingMentorCount(null);
+        failures.push(`Could not load pending mentor count: ${reasonText(pendingRes.reason)}`);
+      }
+
+      if (reportedRes.status === "fulfilled") {
+        setReportedReviewCount(reportedRes.value.meta?.total ?? 0);
+      } else {
+        setReportedReviewCount(null);
+        failures.push(`Could not load reported review count: ${reasonText(reportedRes.reason)}`);
+      }
+
+      if (communityRes.status === "fulfilled") {
+        setCommunityReportCount(communityRes.value.total ?? 0);
+      } else {
+        setCommunityReportCount(null);
+        failures.push(`Could not load community report count: ${reasonText(communityRes.reason)}`);
+      }
+
+      setErrors(failures);
+    } finally {
+      inFlightRef.current = false;
+      if (isMountedRef.current) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadCounts() {
-      try {
-        const [dashboardRes, pendingRes, reportedRes] = await Promise.all([
-          AdminService.getDashboardStats(),
-          AdminService.getPendingMentors({ page: 1, limit: 1 }),
-          AdminService.getReportedReviews({ page: 1, limit: 1 }),
-        ]);
-
-        if (!isMounted) return;
-        setStats(dashboardRes.data);
-        setPendingMentorCount(pendingRes.pagination?.total ?? 0);
-        setReportedReviewCount(reportedRes.pagination?.total ?? 0);
-      } catch (err: any) {
-        if (isMounted) setError(err.message || "Failed to load admin data.");
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    }
-
+    isMountedRef.current = true;
     loadCounts();
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
     };
-  }, []);
+  }, [loadCounts]);
 
   const meta = PAGE_META[activePage] ?? PAGE_META.dashboard;
 
   return (
     <AdminLayout
       activePage={activePage}
-      setActivePage={setActivePage}
-      pendingMentorCount={pendingMentorCount}
-      reportedReviewCount={reportedReviewCount}
+      setActivePage={handleSetActivePage}
+      pendingMentorCount={pendingMentorCount ?? undefined}
+      reportedReviewCount={reportedReviewCount ?? undefined}
+      communityReportCount={communityReportCount ?? undefined}
       pageTitle={meta.title}
       pageSubtitle={meta.subtitle}
     >
-      {error && (
-        <div className="mb-4 p-3 rounded-lg text-sm" style={{ backgroundColor: "#fdecea", color: "#b91c1c" }}>
-          {error}
+      {errors.length > 0 && (
+        <div
+          className="mb-4 p-3 rounded-lg text-sm flex items-start justify-between gap-3"
+          style={{ backgroundColor: "#fdecea", color: "#b91c1c" }}
+        >
+          <ul className="space-y-0.5">
+            {errors.map((msg) => (
+              <li key={msg}>{msg}</li>
+            ))}
+          </ul>
+          <button
+            id="admin-dashboard-retry"
+            type="button"
+            onClick={() => {
+              void loadCounts();
+            }}
+            disabled={loading}
+            className="shrink-0 px-2.5 py-1 rounded-md text-xs font-semibold disabled:opacity-50"
+            style={{ backgroundColor: "#fff", color: "#b91c1c", border: "1px solid #b91c1c" }}
+          >
+            Retry
+          </button>
         </div>
       )}
 
       {activePage === "dashboard" && <DashboardOverview stats={stats} loading={loading} />}
 
-      {activePage === "community-reports" && <CommunityReportsView />}
-
-      {activePage !== "dashboard" && activePage !== "community-reports" && (
-        <p style={{ color: "#8a7a6a" }}>
-          {PAGE_META[activePage]?.title} page — agla step mein banega.
-        </p>
+      {activePage === "pending-mentors" && (
+        <PendingMentorsView
+          onCountChange={(count) => setPendingMentorCount(count)}
+        />
       )}
+
+      {activePage === "all-mentors" && <AllMentorsView />}
+
+      {activePage === "community-reports" && (
+        <CommunityReportsView
+          onReportCountChange={(count) => setCommunityReportCount(count)}
+        />
+      )}
+
+      {activePage === "reported-reviews" && (
+        <ReportedReviewsView
+          onCountChange={(count) => setReportedReviewCount(count)}
+        />
+      )}
+
+      {(activePage === "all-reviews" || activePage === "reviews") && (
+        <AllReviewsView />
+      )}
+
+      {activePage === "sessions" && <SessionsView />}
+
+      {activePage !== "dashboard" &&
+        activePage !== "pending-mentors" &&
+        activePage !== "all-mentors" &&
+        activePage !== "community-reports" &&
+        activePage !== "reported-reviews" &&
+        activePage !== "all-reviews" &&
+        activePage !== "reviews" &&
+        activePage !== "sessions" && (
+          <p style={{ color: "#8a7a6a" }}>
+            {PAGE_META[activePage]?.title} page — agla step mein banega.
+          </p>
+        )}
     </AdminLayout>
   );
 }

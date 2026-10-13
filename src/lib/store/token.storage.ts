@@ -136,6 +136,18 @@ class TokenStorage {
     }
 
     /**
+     * 👤 Update user data in storage
+     */
+    static updateUserData(userData: UserData): void {
+        if (typeof window === 'undefined') return;
+        try {
+            localStorage.setItem(this.USER_DATA_KEY, JSON.stringify(userData));
+        } catch (error) {
+            console.error('❌ [TokenStorage] Error updating user data:', error);
+        }
+    }
+
+    /**
      * ⏰ Check if access token is expired
      */
     static isTokenExpired(): boolean {
