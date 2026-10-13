@@ -2,8 +2,9 @@
 // src/features/mentorship/components/shared/ProfileDropdown.tsx
 //
 // "Switch Workspace" dropdown in the mentorship navbar.
-// Three roles: Mentee / Senior Mentor / Industry Mentor
-// Each has: approved (unlocked) | pending (under review) | none/rejected (locked).
+// Roles: Mentee / College Mentor (seniorMentor) / Industry Mentor
+// Visibility is driven by getVisibleRoles() in constants/roleVisibility.ts.
+// Each visible role has: approved (open) | pending (under review) | none/rejected (locked).
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -12,13 +13,17 @@ import {
   GraduationCap,
   Users,
   Briefcase,
-  CheckCircle,
+  Check,
   Lock,
-  Clock,
   LogIn,
 } from "lucide-react";
 import { useMyRoles, RoleStatus, UNLOCK_WHEN_PENDING } from "@/features/mentorship/hooks/useMentorRole";
 import { routes } from "@/config/routes";
+import {
+  FrontendRoleKey,
+  RoleOption,
+  getVisibleRoles,
+} from "@/features/mentorship/constants/roleVisibility";
 
 // ── Colours ──────────────────────────────────────────────────────────────────
 const BROWN_DARK  = "#3b2417";
@@ -43,15 +48,12 @@ export interface ProfileDropdownProps {
   onOpenBecomeMentorModal?: () => void;
 }
 
-// WorkspaceKey matches the MY_ROLES response keys (renamed from studentMentor)
-type WorkspaceKey = "mentee" | "seniorMentor" | "industryMentor";
+// WorkspaceKey matches FrontendRoleKey from roleVisibility.ts
+type WorkspaceKey = FrontendRoleKey;
 
-interface WorkspaceOption {
-  key: WorkspaceKey;
-  label: string;
-  subLabel: string;
+// Internal extension of RoleOption: adds icon + href helpers for navigation.
+interface WorkspaceOption extends RoleOption {
   Icon: React.FC<{ size?: number; className?: string }>;
-  status: RoleStatus;
   dashboardHref: (userId: string) => string;
   applyHref: (userId: string) => string;
 }
@@ -87,6 +89,7 @@ function detectActiveRole(pathname: string): WorkspaceKey {
   if (!pathname) return "mentee";
 
   if (pathname.startsWith("/mentorship/user-dashboard")) return "mentee";
+  // /mentorship/senior-mentor-profile/* -> industryMentor dashboard
   if (pathname.startsWith("/mentorship/senior-mentor-profile")) return "industryMentor";
 
   // /mentorship/<segment>[/...] — check if <segment> is a static page
@@ -94,13 +97,15 @@ function detectActiveRole(pathname: string): WorkspaceKey {
   if (match) {
     const segment = match[1];
     if (!MENTORSHIP_STATIC_SEGMENTS.has(segment)) {
-      // If segment has UUID-like chars (hex + dashes) it's a userId slug
       // UUID: 8-4-4-4-12 pattern, or Mongo ObjectId (24 hex chars)
       const looksLikeId = /^[0-9a-f-]{8,}$/i.test(segment);
+      // /mentorship/<userId> is the Senior Mentor dashboard (API: seniorMentor)
       if (looksLikeId) return "seniorMentor";
     }
   }
 
+  // Not a role-specific dashboard URL — return null so the caller
+  // can fall back to the highest approved role
   return "mentee";
 }
 
@@ -146,8 +151,32 @@ export default function ProfileDropdown({
   const userId = user?.userId || user?.id || (user as any)?._id || "";
   const detectedRole: WorkspaceKey = detectActiveRole(pathname ?? "");
 
-  // If the detected role isn't approved for this user, fall back to mentee
+  // Whether the URL maps to a real role-specific dashboard path
+  const isOnRoleDashboard = (
+    (pathname ?? "").startsWith("/mentorship/user-dashboard") ||
+    (pathname ?? "").startsWith("/mentorship/senior-mentor-profile") ||
+    (() => {
+      const m = (pathname ?? "").match(/^\/mentorship\/([^/]+)/);
+      if (!m) return false;
+      const seg = m[1];
+      return !MENTORSHIP_STATIC_SEGMENTS.has(seg) && /^[0-9a-f-]{8,}$/i.test(seg);
+    })()
+  );
+
+  // Highest approved role — used as trigger label on non-dashboard pages
+  // Priority: industryMentor > seniorMentor > mentee
+  const highestApprovedRole: WorkspaceKey = (() => {
+    if (roles?.industryMentor === "approved") return "industryMentor";
+    if (roles?.seniorMentor   === "approved") return "seniorMentor";
+    return "mentee";
+  })();
+
+  // Active role for the trigger label:
+  //  • On a known dashboard URL: the URL-detected role if it's approved, else mentee
+  //  • On any other page: highest approved role (so e.g. /mentorship landing shows
+  //    "Industry Mentor" in the trigger for Shivam, not "Mentee")
   const activeRole: WorkspaceKey = (() => {
+    if (!isOnRoleDashboard) return highestApprovedRole;
     if (detectedRole === "mentee") return "mentee";
     if (detectedRole === "seniorMentor"   && roles?.seniorMentor   === "approved") return "seniorMentor";
     if (detectedRole === "industryMentor" && roles?.industryMentor === "approved") return "industryMentor";
@@ -160,36 +189,37 @@ export default function ProfileDropdown({
     user?.email?.split("@")[0] ||
     "You";
 
-  // ── Workspace options (all three always shown) ───────────────────────────
-  const workspaceOptions: WorkspaceOption[] = [
-    {
-      key: "mentee",
-      label: "Mentee",
-      subLabel: "Learn and get guidance",
-      Icon: GraduationCap,
-      status: "approved",
-      dashboardHref: (uid) => routes.menteeDashboard(uid),
-      applyHref:     (uid) => routes.menteeDashboard(uid),
-    },
-    {
-      key: "seniorMentor",
-      label: "Senior Mentor",        // ← renamed from "Student Mentor"
-      subLabel: "Guide your juniors",
-      Icon: Users,
-      status: roles?.seniorMentor ?? "none",
-      dashboardHref: (uid) => routes.seniorMentorDashboard(uid),
-      applyHref:     (uid) => routes.applySeniorMentor(uid),
-    },
-    {
-      key: "industryMentor",
-      label: "Industry Mentor",
-      subLabel: "Share professional experience",
-      Icon: Briefcase,
-      status: roles?.industryMentor ?? "none",
-      dashboardHref: (uid) => routes.industryMentorDashboard(uid),
-      applyHref:     ()    => routes.applyIndustryMentor,
-    },
-  ];
+  // ── Icon lookup (keys match FrontendRoleKey) ─────────────────────────────
+  const ROLE_ICONS: Record<WorkspaceKey, React.FC<{ size?: number; className?: string }>> = {
+    mentee:         GraduationCap,
+    seniorMentor:   Users,
+    industryMentor: Briefcase,
+  };
+
+  // ── Nav-href helpers per role ─────────────────────────────────────────────
+  const ROLE_DASHBOARD_HREF: Record<WorkspaceKey, (uid: string) => string> = {
+    mentee:         (uid) => routes.menteeDashboard(uid),
+    seniorMentor:   (uid) => routes.seniorMentorDashboard(uid),
+    industryMentor: (uid) => routes.industryMentorDashboard(uid),
+  };
+
+  const ROLE_APPLY_HREF: Record<WorkspaceKey, (uid: string) => string> = {
+    mentee:         (uid)  => routes.menteeDashboard(uid),
+    seniorMentor:   (uid)  => routes.applySeniorMentor(uid),
+    industryMentor: (_uid) => routes.applyIndustryMentor,
+  };
+
+  // ── Visible options (driven by getVisibleRoles) ───────────────────────────
+  // roles may still be null while loading; default to mentee-only structure.
+  const baseRoles = roles ?? { mentee: "approved" as RoleStatus, seniorMentor: "none" as RoleStatus, industryMentor: "none" as RoleStatus };
+  const visibleRoleOptions = getVisibleRoles(baseRoles, activeRole !== "mentee" ? activeRole : undefined);
+
+  const workspaceOptions: WorkspaceOption[] = visibleRoleOptions.map((opt) => ({
+    ...opt,
+    Icon:          ROLE_ICONS[opt.key],
+    dashboardHref: ROLE_DASHBOARD_HREF[opt.key],
+    applyHref:     ROLE_APPLY_HREF[opt.key],
+  }));
 
   const activeOption = workspaceOptions.find((o) => o.key === activeRole) ?? workspaceOptions[0];
   const ActiveIcon   = activeOption.Icon;
@@ -217,22 +247,22 @@ export default function ProfileDropdown({
 
       const isApproved = opt.status === "approved";
       const isPending  = opt.status === "pending";
-      const isLocked   = !isApproved && (!isPending || !UNLOCK_WHEN_PENDING);
 
       if (opt.key === "mentee" || isApproved || (isPending && UNLOCK_WHEN_PENDING)) {
         router.push(opt.dashboardHref(userId));
         return;
       }
 
+      // Locked (none / rejected) → go to apply flow
+      const isLocked = !isApproved && !isPending;
       if (isLocked) {
-        // Senior Mentor apply: prefer the modal callback if provided
         if (opt.key === "seniorMentor" && onOpenBecomeMentorModal) {
           onOpenBecomeMentorModal();
         } else {
           router.push(opt.applyHref(userId));
         }
       }
-      // pending + UNLOCK_WHEN_PENDING=false → disabled, do nothing
+      // isPending && UNLOCK_WHEN_PENDING=false → disabled, do nothing
     },
     [userId, router, onOpenBecomeMentorModal]
   );
@@ -313,41 +343,51 @@ export default function ProfileDropdown({
           </p>
         </div>
 
-        {/* Role rows — always show all three, never hide */}
+        {/* Role rows — only show roles returned by getVisibleRoles() */}
         <ul className="py-2">
           {workspaceOptions.map((opt) => {
             const Icon       = opt.Icon;
             const isActive   = opt.key === activeRole;
             const isApproved = opt.status === "approved";
             const isPending  = opt.status === "pending";
-            const isLocked   = !isApproved && (!isPending || !UNLOCK_WHEN_PENDING);
-            // Pending is disabled when UNLOCK_WHEN_PENDING = false
+            // Locked = not approved and not pending (none / rejected)
+            const isLocked   = !isApproved && !isPending;
+            // Only pending rows are non-clickable; locked rows click -> apply flow
             const isDisabled = isPending && !UNLOCK_WHEN_PENDING;
 
             let subText = opt.subLabel;
-            if (isPending) subText = "Under review";
-            if (isLocked && !isPending) subText = "Apply to unlock";
+            if (isLocked)   subText = "Apply to unlock";
+            if (isPending)  subText = "Under review";
 
             return (
               <li key={opt.key} role="none">
                 <button
                   role="menuitem"
-                  aria-disabled={isDisabled}
+                  aria-current={isActive ? "true" : undefined}
+                  aria-disabled={isDisabled || undefined}
                   onClick={() => !isDisabled && handleOptionClick(opt)}
                   className="flex items-center gap-3 w-full px-5 py-3 text-left transition-colors"
                   style={{
-                    cursor: isDisabled ? "not-allowed" : "pointer",
+                    // Locked rows stay pointer (they navigate to apply flow)
+                    cursor:  isDisabled ? "not-allowed" : "pointer",
                     opacity: isDisabled ? 0.6 : 1,
-                    background: isActive ? CREAM : "transparent",
+                    // Fixed min-height so all rows are equal regardless of indicator
+                    minHeight: 56,
+                    background: isActive ? "#f7efe6" : "transparent",
                   }}
                   onMouseEnter={(e) => {
-                    if (!isDisabled) (e.currentTarget as HTMLElement).style.background = CREAM;
+                    if (!isDisabled)
+                      (e.currentTarget as HTMLElement).style.background = isActive
+                        ? "#f7efe6"
+                        : "rgba(247,239,230,0.7)";
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = isActive ? CREAM : "transparent";
+                    (e.currentTarget as HTMLElement).style.background = isActive
+                      ? "#f7efe6"
+                      : "transparent";
                   }}
                 >
-                  {/* Icon box */}
+                  {/* Left icon box */}
                   <div
                     className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: isActive ? BROWN_MID : CREAM_DARK }}
@@ -369,17 +409,36 @@ export default function ProfileDropdown({
                     </p>
                   </div>
 
-                  {/* Right indicator */}
-                  <div className="ml-auto flex-shrink-0">
-                    {isActive && isApproved ? (
-                      <CheckCircle size={18} style={{ color: BROWN_DARK }} className="fill-current" />
-                    ) : isPending ? (
-                      <Clock size={15} style={{ color: BROWN_LIGHT }} />
+                  {/* Right indicator — single rule, one indicator per row:
+                      1. Active   → dark circle with white Check
+                      2. Locked   → Lock icon (muted)
+                      3. Pending  → "Under review" pill
+                      4. Other unlocked → nothing
+                  */}
+                  <div className="ml-auto flex-shrink-0 w-6 flex items-center justify-center">
+                    {isActive ? (
+                      // Bug 1 fix: use stroke-only Check inside a circle div,
+                      // NOT CheckCircle with fill-current (which hides the tick)
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center"
+                        style={{ background: BROWN_MID }}
+                      >
+                        <Check
+                          className="w-3.5 h-3.5"
+                          strokeWidth={3}
+                          style={{ color: "white" }}
+                        />
+                      </div>
                     ) : isLocked ? (
                       <Lock size={14} style={{ color: BROWN_LIGHT }} />
-                    ) : isApproved ? (
-                      <ChevronDown size={13} className="-rotate-90" style={{ color: BROWN_LIGHT }} />
-                    ) : null}
+                    ) : isPending ? (
+                      <span
+                        className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                        style={{ background: CREAM_DARK, color: BROWN_LIGHT }}
+                      >
+                        Under review
+                      </span>
+                    ) : null /* other approved rows: no indicator */}
                   </div>
                 </button>
               </li>
@@ -387,13 +446,17 @@ export default function ProfileDropdown({
           })}
         </ul>
 
-        {/* Footer */}
-        <div
-          className="px-5 py-3 text-[9px]"
-          style={{ borderTop: `1px solid ${CREAM_DARK}`, color: BROWN_LIGHT }}
-        >
-          Locked roles can be unlocked by applying.
-        </div>
+        {/* Footer — only render when at least one visible option is locked */}
+        {workspaceOptions.some(
+          (o) => o.status !== "approved" && o.status !== "pending"
+        ) && (
+          <div
+            className="px-5 py-3 text-[9px]"
+            style={{ borderTop: `1px solid ${CREAM_DARK}`, color: BROWN_LIGHT }}
+          >
+            Locked roles can be unlocked by applying.
+          </div>
+        )}
       </div>
 
       <style>{`
