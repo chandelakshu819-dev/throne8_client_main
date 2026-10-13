@@ -43,6 +43,7 @@ type Session = {
   menteeId?: string
   menteeName?: string
   bookedMenteeName?: string
+  menteeProfilePhoto?: string | null
   title?: string
   sessionType?: string
   scheduledAt?: string
@@ -126,6 +127,47 @@ function initialsFrom(name: string) {
   const parts = name.trim().split(" ").filter(Boolean)
   if (parts.length === 0) return "S"
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase()
+}
+
+function MenteeAvatar({
+  photo,
+  name,
+  className = "w-9 h-9",
+}: {
+  photo?: string | null
+  name: string
+  className?: string
+}) {
+  const [imgError, setImgError] = useState(false)
+  const initials = initialsFrom(name)
+  const isValidUrl = Boolean(
+    photo &&
+      typeof photo === "string" &&
+      photo.trim().length > 0 &&
+      (photo.startsWith("http://") || photo.startsWith("https://") || photo.startsWith("/"))
+  )
+
+  if (isValidUrl && !imgError) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={photo!}
+        alt={name || "User profile"}
+        onError={() => setImgError(true)}
+        className={`${className} rounded-full object-cover shrink-0`}
+        style={{ border: `1px solid ${COLORS.hairline}` }}
+      />
+    )
+  }
+
+  return (
+    <div
+      className={`${className} rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white`}
+      style={{ backgroundColor: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}
+    >
+      {initials}
+    </div>
+  )
 }
 
 export default function DashboardOverviewPage({
@@ -245,7 +287,7 @@ export default function DashboardOverviewPage({
       ? laterSessions
       : upcoming
 
-  const upcomingCount = dashboardData?.stats?.upcoming ?? upcoming.length
+  const upcomingCount = upcoming.length
 
   const stats = [
     { label: "Total sessions", value: String(totalSessions), muted: false, icon: ClipboardList },
@@ -490,12 +532,7 @@ export default function DashboardOverviewPage({
                       isClickable ? "cursor-pointer group" : ""
                     }`}
                   >
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white"
-                      style={{ backgroundColor: COLORS.ink }}
-                    >
-                      {initialsFrom(name)}
-                    </div>
+                    <MenteeAvatar photo={s.menteeProfilePhoto} name={name} />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p

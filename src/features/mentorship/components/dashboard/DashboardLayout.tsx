@@ -188,7 +188,11 @@ export default function MentorDashboard(
               (b.mentee?.firstName ? `${b.mentee.firstName} ${b.mentee.lastName || ""}`.trim() : null) ||
               s.bookedMenteeName ||
               "Student",
-            menteeProfilePhoto: b.mentee?.profilePic || s.menteeProfilePhoto || null,
+            menteeProfilePhoto:
+              (typeof b.menteeProfilePhoto === "string" && b.menteeProfilePhoto) ||
+              (typeof s.menteeProfilePhoto === "string" && s.menteeProfilePhoto) ||
+              (typeof b.mentee?.profilePic === "string" && b.mentee.profilePic.startsWith("http") ? b.mentee.profilePic : null) ||
+              null,
             title: s.title || s.sessionType || "1-on-1 Mentorship",
             sessionType: s.sessionType || "1-on-1 Mentorship",
             scheduledAt: b.scheduledAt || s.scheduledAt || s.startTime,
@@ -210,7 +214,10 @@ export default function MentorDashboard(
             s.mentee?.fullName ||
             (s.mentee?.firstName ? `${s.mentee.firstName} ${s.mentee.lastName || ""}`.trim() : null) ||
             "Student",
-          menteeProfilePhoto: s.menteeProfilePhoto || s.mentee?.profilePic || null,
+          menteeProfilePhoto:
+            (typeof s.menteeProfilePhoto === "string" && s.menteeProfilePhoto) ||
+            (typeof s.mentee?.profilePic === "string" && s.mentee.profilePic.startsWith("http") ? s.mentee.profilePic : null) ||
+            null,
           title: s.title || s.sessionType || "Session",
           sessionType: s.sessionType || "Session",
           scheduledAt: s.scheduledAt || s.startTime || new Date().toISOString(),
