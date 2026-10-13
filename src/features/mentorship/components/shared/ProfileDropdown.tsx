@@ -16,8 +16,9 @@ import {
   Check,
   Lock,
   LogIn,
+  type LucideIcon,
 } from "lucide-react";
-import { useMyRoles, RoleStatus, UNLOCK_WHEN_PENDING } from "@/features/mentorship/hooks/useMentorRole";
+import { useMyRoles, UNLOCK_WHEN_PENDING, type MyRolesResponse } from "@/features/mentorship/hooks/useMentorRole";
 import { routes } from "@/config/routes";
 import {
   FrontendRoleKey,
@@ -53,60 +54,22 @@ type WorkspaceKey = FrontendRoleKey;
 
 // Internal extension of RoleOption: adds icon + href helpers for navigation.
 interface WorkspaceOption extends RoleOption {
-  Icon: React.FC<{ size?: number; className?: string }>;
+  Icon: LucideIcon;
   dashboardHref: (userId: string) => string;
   applyHref: (userId: string) => string;
 }
 
-// ── Static segments that exist under /mentorship/ but are NOT userId slugs ───
-const MENTORSHIP_STATIC_SEGMENTS = new Set([
-  "admin",
-  "group-session",
-  "group-sessions",
-  "mentor-card",
-  "mentor-session",
-  "mentorProfile",
-  "senior-mentor-application",
-  "service",
-  "services",
-  "session-room",
-  "user-dashboard",
-  "senior-mentor-profile",
-]);
-
 /**
- * Detect the active workspace from the current URL — NOT from useState.
- * Falls back to "mentee" for anything that isn't a known role-specific URL.
- *
- * Rules (in priority order):
- *  1. /mentorship/user-dashboard/*         → mentee
- *  2. /mentorship/senior-mentor-profile/*  → industryMentor
- *  3. /mentorship/<segment> where <segment> is NOT a static route
- *     AND looks like a UUID or similar non-word slug  → seniorMentor
- *  4. Everything else                                  → mentee
+ * Detect the active workspace from the URL. Returns null on any page that is
+ * not a role-specific dashboard (landing page, services, etc.) so the caller
+ * can fall back to the highest approved role.
  */
-function detectActiveRole(pathname: string): WorkspaceKey {
-  if (!pathname) return "mentee";
-
+function detectActiveRole(pathname: string): WorkspaceKey | null {
+  if (!pathname) return null;
   if (pathname.startsWith("/mentorship/user-dashboard")) return "mentee";
-  // /mentorship/senior-mentor-profile/* -> industryMentor dashboard
+  if (pathname.startsWith("/mentorship/mentorProfile")) return "seniorMentor";
   if (pathname.startsWith("/mentorship/senior-mentor-profile")) return "industryMentor";
-
-  // /mentorship/<segment>[/...] — check if <segment> is a static page
-  const match = pathname.match(/^\/mentorship\/([^/]+)/);
-  if (match) {
-    const segment = match[1];
-    if (!MENTORSHIP_STATIC_SEGMENTS.has(segment)) {
-      // UUID: 8-4-4-4-12 pattern, or Mongo ObjectId (24 hex chars)
-      const looksLikeId = /^[0-9a-f-]{8,}$/i.test(segment);
-      // /mentorship/<userId> is the Senior Mentor dashboard (API: seniorMentor)
-      if (looksLikeId) return "seniorMentor";
-    }
-  }
-
-  // Not a role-specific dashboard URL — return null so the caller
-  // can fall back to the highest approved role
-  return "mentee";
+  return null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -146,42 +109,27 @@ export default function ProfileDropdown({
   const [open, setOpen]   = useState(false);
   const containerRef      = useRef<HTMLDivElement>(null);
 
-  const { roles, loading: rolesLoading } = useMyRoles(isAuthenticated);
+  const { roles, loading: rolesLoading, error: rolesError } = useMyRoles(isAuthenticated);
 
-  const userId = user?.userId || user?.id || (user as any)?._id || "";
-  const detectedRole: WorkspaceKey = detectActiveRole(pathname ?? "");
+  const userId = user?.userId || user?.id || user?._id || "";
+  const detectedRole: WorkspaceKey | null = detectActiveRole(pathname ?? "");
 
-  // Whether the URL maps to a real role-specific dashboard path
-  const isOnRoleDashboard = (
-    (pathname ?? "").startsWith("/mentorship/user-dashboard") ||
-    (pathname ?? "").startsWith("/mentorship/senior-mentor-profile") ||
-    (() => {
-      const m = (pathname ?? "").match(/^\/mentorship\/([^/]+)/);
-      if (!m) return false;
-      const seg = m[1];
-      return !MENTORSHIP_STATIC_SEGMENTS.has(seg) && /^[0-9a-f-]{8,}$/i.test(seg);
-    })()
-  );
-
-  // Highest approved role — used as trigger label on non-dashboard pages
-  // Priority: industryMentor > seniorMentor > mentee
+  // Highest approved role — used for the header label on non-dashboard pages
   const highestApprovedRole: WorkspaceKey = (() => {
     if (roles?.industryMentor === "approved") return "industryMentor";
     if (roles?.seniorMentor   === "approved") return "seniorMentor";
     return "mentee";
   })();
 
-  // Active role for the trigger label:
-  //  • On a known dashboard URL: the URL-detected role if it's approved, else mentee
-  //  • On any other page: highest approved role (so e.g. /mentorship landing shows
-  //    "Industry Mentor" in the trigger for Shivam, not "Mentee")
   const activeRole: WorkspaceKey = (() => {
-    if (!isOnRoleDashboard) return highestApprovedRole;
-    if (detectedRole === "mentee") return "mentee";
+    if (detectedRole === null) return highestApprovedRole;
     if (detectedRole === "seniorMentor"   && roles?.seniorMentor   === "approved") return "seniorMentor";
     if (detectedRole === "industryMentor" && roles?.industryMentor === "approved") return "industryMentor";
     return "mentee";
   })();
+
+
+
 
   const firstName =
     user?.firstName ||
@@ -190,7 +138,7 @@ export default function ProfileDropdown({
     "You";
 
   // ── Icon lookup (keys match FrontendRoleKey) ─────────────────────────────
-  const ROLE_ICONS: Record<WorkspaceKey, React.FC<{ size?: number; className?: string }>> = {
+  const ROLE_ICONS: Record<WorkspaceKey, LucideIcon> = {
     mentee:         GraduationCap,
     seniorMentor:   Users,
     industryMentor: Briefcase,
@@ -211,8 +159,12 @@ export default function ProfileDropdown({
 
   // ── Visible options (driven by getVisibleRoles) ───────────────────────────
   // roles may still be null while loading; default to mentee-only structure.
-  const baseRoles = roles ?? { mentee: "approved" as RoleStatus, seniorMentor: "none" as RoleStatus, industryMentor: "none" as RoleStatus };
-  const visibleRoleOptions = getVisibleRoles(baseRoles, activeRole !== "mentee" ? activeRole : undefined);
+  const baseRoles: MyRolesResponse = roles ?? { mentee: "approved", seniorMentor: "none", industryMentor: "none" };
+  // /me/roles failed -> show only Mentee
+  const visibleRoleOptions = rolesError
+    ? getVisibleRoles(baseRoles).filter((o) => o.key === "mentee")
+    : getVisibleRoles(baseRoles, activeRole !== "mentee" ? activeRole : undefined);
+
 
   const workspaceOptions: WorkspaceOption[] = visibleRoleOptions.map((opt) => ({
     ...opt,
@@ -222,7 +174,6 @@ export default function ProfileDropdown({
   }));
 
   const activeOption = workspaceOptions.find((o) => o.key === activeRole) ?? workspaceOptions[0];
-  const ActiveIcon   = activeOption.Icon;
 
   // ── Outside click + Escape ────────────────────────────────────────────────
   useEffect(() => {
@@ -249,7 +200,8 @@ export default function ProfileDropdown({
       const isPending  = opt.status === "pending";
 
       if (opt.key === "mentee" || isApproved || (isPending && UNLOCK_WHEN_PENDING)) {
-        router.push(opt.dashboardHref(userId));
+        const target = opt.dashboardHref(userId);
+        if (pathname !== target) router.push(target);
         return;
       }
 
@@ -264,7 +216,7 @@ export default function ProfileDropdown({
       }
       // isPending && UNLOCK_WHEN_PENDING=false → disabled, do nothing
     },
-    [userId, router, onOpenBecomeMentorModal]
+    [userId, router, pathname, onOpenBecomeMentorModal]
   );
 
   // ── Unauthenticated ───────────────────────────────────────────────────────
@@ -353,7 +305,7 @@ export default function ProfileDropdown({
             // Locked = not approved and not pending (none / rejected)
             const isLocked   = !isApproved && !isPending;
             // Only pending rows are non-clickable; locked rows click -> apply flow
-            const isDisabled = isPending && !UNLOCK_WHEN_PENDING;
+            const isDisabled = !userId || (isPending && !UNLOCK_WHEN_PENDING);
 
             let subText = opt.subLabel;
             if (isLocked)   subText = "Apply to unlock";

@@ -278,6 +278,7 @@ export default function BecomeMentorModal({
                 profilePic: formData.profilePic,
             });
 
+            MentorService.invalidateRolesCache();
             const userId = response.data.userId;
             setIsRedirecting(true);
             router.push(`/mentorship/mentorProfile/${userId}`);

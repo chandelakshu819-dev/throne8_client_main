@@ -1683,7 +1683,7 @@ class MentorService {
       return result;
     } catch (error: any) {
       console.error('❌ [MENTOR_SERVICE] getMyRoles failed:', error?.message);
-      return { mentee: 'approved', seniorMentor: 'none', industryMentor: 'none' };
+      throw error;
     }
   }
 

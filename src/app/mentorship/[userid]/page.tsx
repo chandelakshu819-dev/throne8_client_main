@@ -25,7 +25,7 @@ import SeniorMentorshipServicesSection from "@/features/mentorship/components/se
 import GroupSessionsSection from "@/features/mentorship/components/sections/GroupSessionsSection";
 import MentorshipFooter from "@/features/mentorship/components/layout/MentorshipFooter";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, usePathname } from "next/navigation";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 import MentorService from "@/lib/api/mentorship.service";
 import FindMentorModal from "@/features/mentorship/components/sections/FindMentorModal";
@@ -42,6 +42,7 @@ export default function ThroneUltraPremium() {
 
     const params = useParams();
     const searchParams = useSearchParams();
+    const pathname = usePathname();
     const rawUserId = (params?.userid || (params as any)?.userId) as string;
     const userId = rawUserId && rawUserId !== "undefined" ? rawUserId : "";
     const [findMentorOpen, setFindMentorOpen] = useState(false);
@@ -254,7 +255,13 @@ export default function ThroneUltraPremium() {
                 profileImage={profileImageUrl}
                 currentUserId={user?.userId}
                 isOpen={showMentorForm}
-                onClose={() => setShowMentorForm(false)}
+                onClose={() => {
+                    setShowMentorForm(false);
+                    // clear ?openMentorForm so the next "Apply to unlock" click re-triggers the effect
+                    if (searchParams?.get("openMentorForm") && pathname) {
+                        window.history.replaceState(null, "", pathname);
+                    }
+                }}
                 formStep={formStep}
                 setFormStep={setFormStep}
             />

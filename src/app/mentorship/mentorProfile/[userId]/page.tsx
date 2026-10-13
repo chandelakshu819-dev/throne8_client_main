@@ -5,7 +5,8 @@ import MentorshipDashboardRouter from "@/features/mentorship/components/Mentorsh
 
 export default function MentorLanding() {
   const params = useParams();
-  const userId = params.userId as string;
+  const userId = typeof params?.userId === "string" ? params.userId : "";
 
+  
   return <MentorshipDashboardRouter userId={userId} defaultRole="mentor" />;
 }

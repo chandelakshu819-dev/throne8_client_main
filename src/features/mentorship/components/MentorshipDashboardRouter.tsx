@@ -38,10 +38,8 @@ export default function MentorshipDashboardRouter({
   // dashboard but they're not approved, redirect them to the apply page.
   useEffect(() => {
     if (loading || !roles) return;
-    if (defaultRole === "mentor" && roles.studentMentor !== "approved") {
-      // Not approved yet — send to the landing page where BecomeMentorModal lives
-      const target = userId ? routes.applyStudentMentor(userId) : "/mentorship";
-      router.replace(target);
+    if (defaultRole === "mentor" && roles.seniorMentor !== "approved") {
+      router.replace("/mentorship");
     }
   }, [loading, roles, defaultRole, userId, router]);
 
@@ -55,7 +53,12 @@ export default function MentorshipDashboardRouter({
   }
 
   // ── Render correct dashboard ──────────────────────────────────────────────
-  const isMentor = roles?.studentMentor === "approved";
+  const isMentor = roles?.seniorMentor === "approved";
+
+  // Mentor URL without the role: render nothing while the redirect above runs
+  // (avoids flashing the mentee dashboard)
+  if (defaultRole === "mentor" && !isMentor) return null;
+
 
   if (defaultRole === "mentor" && isMentor) {
     return (
@@ -72,7 +75,7 @@ export default function MentorshipDashboardRouter({
     <UserDashboardLayout
       userId={userId}
       isMentor={isMentor}
-      onSwitchRole={() => router.push(routes.studentMentorDashboard(userId))}
+      onSwitchRole={() => router.push(routes.seniorMentorDashboard(userId))}
       initialPage={initialPage}
     />
   );

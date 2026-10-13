@@ -19,12 +19,12 @@ export const routes = {
   /** Mentee dashboard */
   menteeDashboard: (userId: string) => `/mentorship/user-dashboard/${userId}`,
 
-  /**
-   * Senior Mentor dashboard — the /mentorship/[userid] page.
-   * "Senior Mentor" is the rename of the old "Student Mentor" role.
-   * Backed by the Mentor collection ("Become Mentor" flow).
+    /**
+   * Dashboard for the `seniorMentor` role key (Mentor collection, "Become Mentor" flow).
+   * NOTE: /mentorship/[userid] is the landing page, NOT the dashboard.
    */
-  seniorMentorDashboard: (userId: string) => `/mentorship/${userId}`,
+    seniorMentorDashboard: (userId: string) => `/mentorship/mentorProfile/${userId}`,
+
 
   /**
    * Industry Mentor dashboard — /mentorship/senior-mentor-profile/[userId].
@@ -40,7 +40,7 @@ export const routes = {
 
   // ── Kept for backward-compat (aliased) ───────────────────────────────────────
   /** @deprecated use seniorMentorDashboard */
-  studentMentorDashboard: (userId: string) => `/mentorship/${userId}`,
+  studentMentorDashboard: (userId: string) => `/mentorship/mentorProfile/${userId}`,
   /** @deprecated use applySeniorMentor */
   applyStudentMentor: (userId: string) => `/mentorship/${userId}?openMentorForm=true`,
 } as const;
