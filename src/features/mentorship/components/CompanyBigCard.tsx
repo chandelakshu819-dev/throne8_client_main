@@ -4,7 +4,9 @@ interface CompanyBigCardProps {
   company: {
     name: string;
     color: string;
-    svg: string;
+    svg?: string;
+    logoUrl?: string;
+    count?: number;
   };
 }
 
@@ -94,10 +96,23 @@ export default function CompanyBigCard({ company }: CompanyBigCardProps) {
             group-hover/card:scale-110
           "
           style={{ color: company.color }}
-          dangerouslySetInnerHTML={{
-            __html: company.svg,
-          }}
-        />
+          {...(company.svg ? { dangerouslySetInnerHTML: { __html: company.svg } } : {})}
+        >
+          {company.svg ? null : company.logoUrl ? (
+            <img
+              src={company.logoUrl}
+              alt={company.name}
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <span
+              className="w-full h-full rounded-full flex items-center justify-center text-xl font-black text-white"
+              style={{ backgroundColor: company.color }}
+            >
+              {company.name.charAt(0).toUpperCase()}
+            </span>
+          )}
+        </div>
 
         {/* Company Name */}
         <p
@@ -118,8 +133,14 @@ export default function CompanyBigCard({ company }: CompanyBigCardProps) {
           "
           title={company.name}
         >
-          {company.name}
+                {company.name}
         </p>
+
+        {typeof company.count === "number" && company.count > 0 && (
+          <p className="relative z-10 text-[10px] font-semibold text-[#8B7355] mt-0.5">
+            {company.count} {company.count === 1 ? "mentor" : "mentors"}
+          </p>
+        )}
 
         {/* Small Gold Horizontal Underline */}
         <div

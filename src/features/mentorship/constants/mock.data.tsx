@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { Mentor, SessionType, Masterclass, UpcomingMasterclass, Company, FAQ, GradientColor } from "../types";
 
+
+
 export const MENTORS: Mentor[] = [
     {
         id: 1,
@@ -270,8 +272,8 @@ export const TOP_COMPANIES_ROW2: Company[] = [
         svg: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.9 2H22l-8.1 19.3L13.9 2zM10.1 2H2l8.1 19.3L10.1 2zM12 7.3l4.3 10.3h-8.6L12 7.3z"/></svg>`,
     },
 ];
-
 export const GRADIENT_COLORS: GradientColor[] = [
+
     { start: "#e8dfd6", end: "#d4c4b5" },
     { start: "#f5e6d8", end: "#e8d4c1" },
     { start: "#e0d5ca", end: "#cbbfb0" },

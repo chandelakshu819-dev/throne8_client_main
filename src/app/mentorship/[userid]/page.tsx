@@ -274,8 +274,8 @@ export default function ThroneUltraPremium() {
                 toggleCompare={toggleCompare}
                 compareList={compareList}
             />
-            {/* Company Logos */}
-            <CompanyLogosSection />
+                        {/* Company Logos (real mentors' companies) */}
+                        <CompanyLogosSection mentors={mentorsRaw} />
 
             {/* 1-to-1 Mentorship Services */}
             <MentorshipServicesSection
