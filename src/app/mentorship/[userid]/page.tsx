@@ -9,7 +9,6 @@ import {
     MentorMarqueeSection,
     MentorDiscoverySection,
     CompanyLogosSection,
-    SlotPickerSection,
     OurImpactSection,
     UnstoppableAdvantageSection,
     FAQSection,
@@ -33,7 +32,6 @@ import { parseRoleCompany } from "@/shared/utils/mentorFormat";
 
 export default function ThroneUltraPremium() {
     const [compareList, setCompareList] = useState<number[]>([]);
-    const [selectedDate, setSelectedDate] = useState(0);
     const [activeTimezone] = useState("IST (UTC+5:30)");
     const [openFaq, setOpenFaq] = useState<number | null>(null);
     const [showMentorForm, setShowMentorForm] = useState(false);
@@ -276,15 +274,8 @@ export default function ThroneUltraPremium() {
                 toggleCompare={toggleCompare}
                 compareList={compareList}
             />
-
             {/* Company Logos */}
             <CompanyLogosSection />
-
-            {/* Slot Picker */}
-            <SlotPickerSection
-                selectedDate={selectedDate}
-                setSelectedDate={setSelectedDate}
-            />
 
             {/* 1-to-1 Mentorship Services */}
             <MentorshipServicesSection
