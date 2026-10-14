@@ -183,19 +183,23 @@ export default function MentorshipServicesSection({
                                 const durationMinutes = service.duration || 60;
                                 const priceDisplay = formatPrice(service.pricing?.basePrice);
 
-                                // Tags (category + skills)
+                                // Tags: sirf service ke apne tags. Category (upar badge mein hai) aur
+                                // mentor ke skills (galat "JAVA" tag) ab nahi aayenge.
                                 const tags: string[] = [];
                                 const addTag = (t?: string) => {
-                                    if (t && !tags.some((x) => x.toLowerCase() === t.toLowerCase())) tags.push(t);
+                                    const v = typeof t === "string" ? t.trim() : "";
+                                    if (!v) return;
+                                    if (v.toUpperCase() === topCategory) return; // badge ka duplicate
+                                    if (tags.some((x) => x.toLowerCase() === v.toLowerCase())) return;
+                                    tags.push(v);
                                 };
-                                addTag(service.category || service.sessionType?.replace(/_/g, " "));
+                                if (Array.isArray(service.tags)) service.tags.forEach(addTag);
                                 if (Array.isArray(service.skills)) service.skills.forEach(addTag);
                                 else if (service.skill) addTag(service.skill);
-                                else if (service.topic) addTag(service.topic);
-                                else if (Array.isArray(hostData?.skills)) hostData.skills.forEach(addTag);
+                                if (service.topic) addTag(service.topic);
                                 const displayTags = tags.slice(0, 2);
 
-                                // Rating sirf real data se (fake 5.0 default hata diya)
+                                // Rating sirf real data se
                                 const rawRating =
                                     hostData?.stats?.averageRating ?? hostData?.rating ?? service.rating;
                                 const rawSessions =
@@ -204,13 +208,18 @@ export default function MentorshipServicesSection({
                                     service.sessionCount;
                                 const rating = getRatingDisplay(rawRating, rawSessions);
 
+                                // Default description repeat hoti thi, ab khali ho to hide
+                                const description = isMeaningfulText(service.description)
+                                    ? cleanText(service.description, "")
+                                    : "";
+
                                 const thumbnail = service.thumbnailImage || service.thumbnail;
 
                                 return (
                                     <div
                                         key={uniqueKey}
                                         style={{ width: `${cardWidthPercent}%` }}
-                                        className="flex-shrink-0 px-2 sm:px-2.5"
+                                        className="flex flex-shrink-0 px-2 sm:px-2.5"
                                         onClick={(e) => {
                                             if (wasDragged()) {
                                                 e.stopPropagation();
@@ -219,7 +228,7 @@ export default function MentorshipServicesSection({
                                             handleServiceClick(serviceId);
                                         }}
                                     >
-                                        <div className="group flex flex-col bg-white hover:bg-[#FDFBF7] rounded-[20px] sm:rounded-[22px] overflow-hidden border border-[#ece7e2] hover:border-[#8b7355]/40 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-xl transition-all duration-300 hover:-translate-y-1 h-full pointer-events-auto cursor-pointer">
+                                        <div className="group flex flex-col w-full bg-white hover:bg-[#FDFBF7] rounded-[20px] sm:rounded-[22px] overflow-hidden border border-[#ece7e2] hover:border-[#8b7355]/40 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-xl transition-all duration-300 hover:-translate-y-1 h-full pointer-events-auto cursor-pointer">
                                             <div className="relative w-full h-[130px] sm:h-[138px] bg-[#f4ece1] overflow-hidden flex-shrink-0">
                                                 <ServiceThumbnail
                                                     src={thumbnail}
@@ -292,12 +301,11 @@ export default function MentorshipServicesSection({
                                                     {cleanText(service.title, "Mentorship Session")}
                                                 </h3>
 
-                                                <p className="text-[11px] sm:text-xs text-[#8e847c] line-clamp-2 leading-relaxed mb-3">
-                                                    {cleanText(
-                                                        service.description,
-                                                        "A personalized 1-to-1 session designed to help you achieve your specific goals."
-                                                    )}
-                                                </p>
+                                                {description && (
+                                                    <p className="text-[11px] sm:text-xs text-[#8e847c] line-clamp-2 leading-relaxed mb-3">
+                                                        {description}
+                                                    </p>
+                                                )}
 
                                                 <div className="mt-auto pt-2.5 mb-3 flex items-center gap-2 text-[11px] sm:text-xs text-[#5a4a3e] border-t border-[#f2ede8]">
                                                     <div className="flex items-center gap-1 font-semibold text-[#5a4a3e]">

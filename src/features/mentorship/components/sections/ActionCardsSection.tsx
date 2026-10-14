@@ -28,18 +28,25 @@ interface ActionCardsSectionProps {
     mentorCount?: number;
 }
 
+// Senior Mentor = college ke 3rd/4th year students jo juniors ko guide karte hain
 const DEFAULT_SENIOR_DESC =
-    "Share your industry experience, guide aspiring professionals, and help shape the next generation of talent.";
+    "Guide your juniors on college life, placements and skills. Build your profile and start mentoring early.";
 
-// ─────────────────────────────────────────────────────────────
+const SENIOR_AUDIENCE = "For 3rd and 4th year college students";
+
+// Mentor = industry professionals
+const MENTOR_AUDIENCE = "For working industry professionals";
+const MENTOR_DESC =
+    "Share your industry experience with students and early talent. Build your personal brand and earn.";
+
 // Senior Mentor card content (application status ke hisaab se)
-// ─────────────────────────────────────────────────────────────
 function resolveCardContent(application: SeniorMentorApplication | null, isLoading: boolean) {
     if (isLoading) {
         return {
             title: "Become Senior Mentor",
-            description: "Checking your application status…",
-            cta: "Loading…",
+            audience: SENIOR_AUDIENCE,
+            description: "Checking your application status...",
+            cta: "Loading...",
             statusIcon: null as React.ReactNode,
         };
     }
@@ -47,6 +54,7 @@ function resolveCardContent(application: SeniorMentorApplication | null, isLoadi
     if (!application) {
         return {
             title: "Become Senior Mentor",
+            audience: SENIOR_AUDIENCE,
             description: DEFAULT_SENIOR_DESC,
             cta: "Apply Now",
             statusIcon: null as React.ReactNode,
@@ -57,6 +65,7 @@ function resolveCardContent(application: SeniorMentorApplication | null, isLoadi
         case ApplicationStatus.PENDING:
             return {
                 title: "Senior Mentor Application",
+                audience: "Your application",
                 description: "Your application has been submitted and is awaiting review.",
                 cta: "View Application",
                 statusIcon: <Clock className="w-3.5 h-3.5 text-amber-300" />,
@@ -64,13 +73,15 @@ function resolveCardContent(application: SeniorMentorApplication | null, isLoadi
         case ApplicationStatus.UNDER_REVIEW:
             return {
                 title: "Senior Mentor Application",
-                description: "Great news — your application is currently under review by our team.",
+                audience: "Your application",
+                description: "Great news, your application is currently under review by our team.",
                 cta: "View Status",
                 statusIcon: <Clock className="w-3.5 h-3.5 text-blue-300" />,
             };
         case ApplicationStatus.REJECTED:
             return {
                 title: "Senior Mentor Application",
+                audience: "Your application",
                 description: application.rejectionReason
                     ? `Your application needs attention: ${application.rejectionReason}`
                     : "Your previous application needs attention. Please update and resubmit.",
@@ -80,6 +91,7 @@ function resolveCardContent(application: SeniorMentorApplication | null, isLoadi
         case ApplicationStatus.VERIFIED:
             return {
                 title: "Senior Mentor",
+                audience: "Verified",
                 description:
                     "Congratulations! Your application has been verified. Welcome to the Senior Mentor community.",
                 cta: "View Profile",
@@ -88,6 +100,7 @@ function resolveCardContent(application: SeniorMentorApplication | null, isLoadi
         default:
             return {
                 title: "Become Senior Mentor",
+                audience: SENIOR_AUDIENCE,
                 description: DEFAULT_SENIOR_DESC,
                 cta: "Apply Now",
                 statusIcon: null as React.ReactNode,
@@ -95,19 +108,18 @@ function resolveCardContent(application: SeniorMentorApplication | null, isLoadi
     }
 }
 
-// ─────────────────────────────────────────────────────────────
 // Reusable Action Card
-// ─────────────────────────────────────────────────────────────
 interface ActionCardProps {
     onClick: () => void;
     icon: React.ReactNode;
+    audience?: React.ReactNode;
     title: React.ReactNode;
     description: React.ReactNode;
     cta: React.ReactNode;
     disabled?: boolean;
 }
 
-function ActionCard({ onClick, icon, title, description, cta, disabled }: ActionCardProps) {
+function ActionCard({ onClick, icon, audience, title, description, cta, disabled }: ActionCardProps) {
     const handle = () => {
         if (!disabled) onClick();
     };
@@ -119,7 +131,7 @@ function ActionCard({ onClick, icon, title, description, cta, disabled }: Action
             aria-disabled={disabled}
             onClick={handle}
             onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handle()}
-            className={`group relative h-[220px] w-full cursor-pointer overflow-hidden rounded-[24px] border border-[#e8ddd4] bg-white p-5 shadow-[0_4px_12px_rgba(74,55,40,0.06)] transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(74,55,40,0.14)] ${
+            className={`group relative h-full min-h-[250px] w-full cursor-pointer overflow-hidden rounded-[24px] border border-[#e8ddd4] bg-white p-5 shadow-[0_4px_12px_rgba(74,55,40,0.06)] transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(74,55,40,0.14)] ${
                 disabled ? "cursor-wait opacity-80" : ""
             }`}
         >
@@ -156,6 +168,13 @@ function ActionCard({ onClick, icon, title, description, cta, disabled }: Action
                     </div>
                 </div>
 
+                {/* Audience line */}
+                {audience && (
+                    <div className="mb-1 text-[10.5px] font-bold uppercase tracking-[1.2px] text-[#a08568] transition-colors duration-300 group-hover:text-white/60">
+                        {audience}
+                    </div>
+                )}
+
                 {/* Title */}
                 <div className="mb-1">
                     <h3 className="text-[18px] font-black leading-tight text-[#4a3728] transition-colors duration-300 group-hover:text-white">
@@ -168,10 +187,12 @@ function ActionCard({ onClick, icon, title, description, cta, disabled }: Action
                     {description}
                 </div>
 
-                {/* CTA */}
-                <div className="mt-auto inline-flex w-fit items-center gap-2 rounded-full border border-[#e8ddd4] bg-[#f5ede3] px-4 py-2 text-[11px] font-black uppercase tracking-wide text-[#4a3728] transition-all duration-300 group-hover:border-white/25 group-hover:bg-white/10 group-hover:text-white">
-                    {cta}
-                    <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+                {/* CTA: mt-auto + pt-4 se buttons ek line me neeche align honge */}
+                <div className="mt-auto pt-4">
+                    <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#e8ddd4] bg-[#f5ede3] px-4 py-2 text-[11px] font-black uppercase tracking-wide text-[#4a3728] transition-all duration-300 group-hover:border-white/25 group-hover:bg-white/10 group-hover:text-white">
+                        {cta}
+                        <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+                    </div>
                 </div>
             </div>
         </div>
@@ -180,9 +201,7 @@ function ActionCard({ onClick, icon, title, description, cta, disabled }: Action
 
 const ICON_CLASS = "h-6 w-6 text-white transition-colors duration-300 group-hover:text-[#c4963a]";
 
-// ─────────────────────────────────────────────────────────────
 // Main Section
-// ─────────────────────────────────────────────────────────────
 export default function ActionCardsSection({
     onBecomeMentorClick,
     onFindMentorClick,
@@ -228,15 +247,16 @@ export default function ActionCardsSection({
         router.push("/mentorship/senior-mentor-application");
     };
 
-    const { title, description, cta, statusIcon } = resolveCardContent(
+    const { title, audience, description, cta, statusIcon } = resolveCardContent(
         seniorLoading ? null : seniorApplication,
         seniorLoading
     );
 
+    // Ab mentors me college seniors bhi hain, isliye "industry" word hata diya
     const countLabel = formatCountLabel(mentorCount);
     const findMentorDescription = countLabel
-        ? `Connect with ${countLabel} industry mentors. Get personalized 1:1 guidance.`
-        : "Connect with industry mentors. Get personalized 1:1 guidance.";
+        ? `Connect with ${countLabel} mentors from college and industry. Get personalized 1:1 guidance.`
+        : "Connect with mentors from college and industry. Get personalized 1:1 guidance.";
 
     const gridCols = isMentor
         ? "grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto"
@@ -245,32 +265,36 @@ export default function ActionCardsSection({
     return (
         <section className="w-full px-6 pb-10">
             <div className="mx-auto w-full max-w-[1160px]">
-                <div className={`grid gap-5 ${gridCols}`}>
+                <div className={`grid items-stretch gap-5 ${gridCols}`}>
                     {/* FIND MENTOR */}
+                    {/* Hero ke "Explore Mentors" se alag dikhe isliye CTA "Get Matched" */}
                     <ActionCard
                         onClick={onFindMentorClick}
                         icon={<Search className={ICON_CLASS} />}
+                        audience="For learners at every stage"
                         title="Find Mentor"
                         description={findMentorDescription}
-                        cta="Explore Mentors"
+                        cta="Get Matched"
                     />
 
-                    {/* BECOME MENTOR */}
+                    {/* BECOME MENTOR (industry professionals) */}
                     {!isMentor && (
                         <ActionCard
                             onClick={onBecomeMentorClick}
                             icon={<Users className={ICON_CLASS} />}
+                            audience={MENTOR_AUDIENCE}
                             title="Become Mentor"
-                            description="Share your expertise with aspiring professionals. Build your personal brand and earn."
+                            description={MENTOR_DESC}
                             cta="Apply Now"
                         />
                     )}
 
-                    {/* BECOME SENIOR MENTOR */}
+                    {/* BECOME SENIOR MENTOR (college 3rd/4th year students) */}
                     <ActionCard
                         onClick={handleSeniorMentorClick}
                         disabled={seniorLoading}
                         icon={<Star className={ICON_CLASS} />}
+                        audience={audience}
                         title={
                             <span className="flex items-center gap-1.5">
                                 {title}
@@ -289,7 +313,7 @@ export default function ActionCardsSection({
                                 description
                             )
                         }
-                        cta={seniorLoading ? "Loading…" : cta}
+                        cta={seniorLoading ? "Loading..." : cta}
                     />
                 </div>
             </div>

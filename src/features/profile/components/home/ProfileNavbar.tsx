@@ -1,7 +1,6 @@
 // src/features/profile/components/home/ProfileNavbar.tsx
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Crown } from 'lucide-react';
 import AuthService from '@/lib/api/auth.service';
 import SearchBar from './SearchBar';
 import ProfileSidePanel from './ProfileSidePanel';
@@ -10,6 +9,7 @@ import { MessageNotificationBadge } from './MessageNotificationBadge';
 import { NetworkNotificationBadge } from '@/features/networks/components/notifications/NetworkNotificationBadge';
 import { capitalizeName } from '@/shared/utils/format';
 import { HOME_PATH, isFeatureEnabled, FeatureKey } from '@/config/launch';
+import BrandWordmark from '@/shared/uiComponents/BrandWordmark';
 
 interface ProfileNavbarProps {
     profileImage: string;
@@ -49,7 +49,7 @@ const PROFILE_MENU_ITEMS = [
     'Sign Out',
 ];
 
-// Route prefixes — active state detect karne ke liye
+// Route prefixes: active state detect karne ke liye
 const ROUTE_PREFIX: Record<string, string> = {
     'Home': '/dashboard',
     'Network': '/profile/network',
@@ -109,7 +109,7 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
         }
     };
 
-    // Logo / Home click: launch mode me /mentorship, full mode me /dashboard
+    // Home click: launch mode me /mentorship, full mode me /dashboard
     const handleHomePage = () => {
         router.push(HOME_PATH);
     };
@@ -182,12 +182,13 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                 <div className="w-full px-3 sm:px-6 lg:px-8">
                     <div className="flex items-center h-16 gap-2 w-full">
 
-                        {/* Left Section: Mobile Menu Button + Logo */}
+                        {/* Left Section: Mobile Menu Button + Wordmark */}
                         <div className="flex items-center gap-2 flex-shrink-0">
                             <div className="lg:hidden">
                                 <button
                                     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                                     className="text-[#4a3728] hover:bg-[#EFE3D8] rounded-lg p-2 transition-colors duration-200"
+                                    aria-label="Toggle menu"
                                 >
                                     <svg className={`w-6 h-6 transition-transform duration-300 ${isMobileMenuOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isMobileMenuOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 6h16M4 12h16m-7 6h7'} />
@@ -195,12 +196,7 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                 </button>
                             </div>
                             <div className="flex-shrink-0">
-                                <button onClick={handleHomePage} className="flex items-center gap-2 whitespace-nowrap group">
-                                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#4a3728] shrink-0 transition-transform duration-200 group-hover:scale-105">
-                                        <Crown size={16} className="text-[#F6EDE8]" strokeWidth={2} />
-                                    </span>
-                                    <span className="text-xl font-bold text-[#4a3728] tracking-tight">Throne8</span>
-                                </button>
+                                <BrandWordmark href={HOME_PATH} />
                             </div>
                         </div>
 
@@ -251,6 +247,7 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                 <button
                                     onClick={() => setIsSearchOpen(!isSearchOpen)}
                                     className="sm:hidden text-[#4a3728] hover:bg-[#EFE3D8] rounded-lg p-2 transition-colors duration-200"
+                                    aria-label="Search"
                                 >
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

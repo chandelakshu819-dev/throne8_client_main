@@ -37,6 +37,9 @@ const isSeniorMentor = (m: any) => {
     return exp >= 5 || SENIOR_KEYWORDS.some((k) => text.includes(k));
 };
 
+// Brand spelling safe rakhne ke liye: "Throne 8" / "throne8" sab "Throne8" ban jayega
+const normalizeBrand = (value: string) => (value || "").replace(/throne\s*8/gi, "Throne8");
+
 export default function HeroSection(_props: HeroSectionProps) {
     const router = useRouter();
     const [mentor, setMentor] = useState<DisplayMentor | null>(null);
@@ -80,8 +83,8 @@ export default function HeroSection(_props: HeroSectionProps) {
                         `${picked.user?.firstName ?? ""} ${picked.user?.lastName ?? ""}`.trim() ||
                         picked.user?.name ||
                         "Mentor",
-                    role,
-                    company,
+                    role: normalizeBrand(role),
+                    company: normalizeBrand(company),
                     image: picked.profilePic || "",
                     rating: Number(picked.stats?.averageRating) || 0,
                     sessions:
@@ -147,7 +150,7 @@ export default function HeroSection(_props: HeroSectionProps) {
                     </h1>
 
                     <p className="text-sm sm:text-base text-[#705d4f] font-medium leading-relaxed max-w-lg mb-5 sm:mb-6">
-                        Direct access to the world&apos;s most successful tech leaders.
+                        Learn from experienced industry mentors.
                         <br className="hidden sm:inline" /> Built for serious builders.
                     </p>
 
@@ -229,16 +232,16 @@ export default function HeroSection(_props: HeroSectionProps) {
 
                                         {!loading && mentor && rating && (
                                             <div className="flex items-center gap-1.5 text-[13px] font-semibold text-[#e2cdb2] mt-2">
-                                                <span className="flex items-center gap-1 text-[15px] text-[#f1d49a] font-extrabold">
-                                                    <Star
-                                                        className={`w-4 h-4 ${
-                                                            rating.hasRating
-                                                                ? "fill-[#D4AF37] text-[#D4AF37]"
-                                                                : "text-[#a98a68]"
-                                                        }`}
-                                                    />
-                                                    {rating.ratingLabel}
-                                                </span>
+                                                {rating.hasRating ? (
+                                                    <span className="flex items-center gap-1 text-[15px] text-[#f1d49a] font-extrabold">
+                                                        <Star className="w-4 h-4 fill-[#D4AF37] text-[#D4AF37]" />
+                                                        {rating.ratingLabel}
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center rounded-full bg-[#c4963a]/20 border border-[#c4963a]/40 px-2 py-0.5 text-[11px] font-bold text-[#f1d49a]">
+                                                        New mentor
+                                                    </span>
+                                                )}
                                                 {rating.sessionsLabel && (
                                                     <>
                                                         <span className="text-[#a98a68]">·</span>
