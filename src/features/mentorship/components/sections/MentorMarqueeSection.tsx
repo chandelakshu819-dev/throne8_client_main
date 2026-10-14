@@ -44,7 +44,7 @@ export default function MentorMarqueeSection() {
             rating: Number(m.stats?.averageRating) || 0,
             sessions: m.stats?.totalSessions || m.trustScore?.metrics?.totalCompletedSessions || 0,
             price: m.pricing?.quickCall || 0,
-            match: 90,
+           
             image: m.profilePic ?? "",
             tags: m.skills?.slice(0, 2) ?? [],
             exp: getExperienceLabel(m.experience?.total),

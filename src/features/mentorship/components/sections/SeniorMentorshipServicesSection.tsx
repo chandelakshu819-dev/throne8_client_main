@@ -7,7 +7,7 @@ import MentorService from "@/lib/api/mentorship.service";
 import { useRouter } from "next/navigation";
 import { getRatingDisplay } from "@/shared/utils/mentorFormat";
 import { cleanText, isMeaningfulText } from "@/shared/utils/textSanitize";
-import { formatPrice, resolveHostInfo } from "@/features/mentorship/utils/sessionCard";
+import { resolveHostInfo } from "@/features/mentorship/utils/sessionCard";
 import { useInfiniteCarousel } from "@/features/mentorship/hooks/useInfiniteCarousel";
 import ServiceThumbnail from "@/features/mentorship/components/shared/ServiceThumbnail";
 
@@ -165,8 +165,6 @@ export default function SeniorMentorshipServicesSection() {
                             ).toUpperCase();
 
                             const durationMinutes = service.duration || 60;
-                            const priceDisplay = formatPrice(service.pricing?.basePrice);
-
                             const tags: string[] = [];
                             const addTag = (t?: string) => {
                                 if (t && !tags.some((x) => x.toLowerCase() === t.toLowerCase())) tags.push(t);
@@ -281,10 +279,6 @@ export default function SeniorMentorshipServicesSection() {
                                                     <Calendar className="w-3 h-3 text-[#3a5266]" />
                                                     <span>{durationMinutes} mins</span>
                                                 </div>
-
-                                                <span className="text-[#e2dcd5]">|</span>
-
-                                                <span className="font-bold text-[#2d2116]">{priceDisplay}</span>
 
                                                 {rating.hasRating && (
                                                     <>

@@ -1,7 +1,7 @@
 "use client";
 //src/features/mentorship/components/layout/Navigation.tsx
-import React, { useEffect, useState } from "react";
-import { Crown, Globe } from "lucide-react";
+import React, { useEffect } from "react";
+import { Globe } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import SearchBar from "@/features/profile/components/home/SearchBar";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -12,8 +12,7 @@ import { HOME_PATH, isFeatureEnabled, type FeatureKey } from "@/config/launch";
 import ProfileDropdown from "@/features/mentorship/components/shared/ProfileDropdown";
 import { useMyRoles } from "@/features/mentorship/hooks/useMentorRole";
 import { routes } from "@/config/routes";
-
-
+import BrandWordmark from "@/shared/uiComponents/BrandWordmark";
 
 interface NavigationProps {
     activeTimezone?: string;
@@ -56,7 +55,7 @@ export default function Navigation({
     const router = useRouter();
     const pathname = usePathname();
     const { user } = useAuth();
-    const { roles } = useMyRoles(!!user);    
+    const { roles } = useMyRoles(!!user);
     const { userProfileData, profileImageUrl, fetchUserProfile } = useProfileData();
 
     const targetUserId = currentUserId || user?.userId || user?.id || (user as any)?._id;
@@ -90,20 +89,20 @@ export default function Navigation({
             case 'Notifications':
                 router.push(`/notifications/${targetUserId}`);
                 break;
-                case 'Mentorship':
-                    if (targetUserId && targetUserId !== 'undefined') {
-                        // Approved mentor ko seedha uske dashboard par bhejo
-                        if (roles?.industryMentor === 'approved') {
-                            router.push(routes.industryMentorDashboard(targetUserId));
-                        } else if (roles?.seniorMentor === 'approved') {
-                            router.push(routes.seniorMentorDashboard(targetUserId));
-                        } else {
-                            router.push(`/mentorship/${targetUserId}`);
-                        }
+            case 'Mentorship':
+                if (targetUserId && targetUserId !== 'undefined') {
+                    // Approved mentor ko seedha uske dashboard par bhejo
+                    if (roles?.industryMentor === 'approved') {
+                        router.push(routes.industryMentorDashboard(targetUserId));
+                    } else if (roles?.seniorMentor === 'approved') {
+                        router.push(routes.seniorMentorDashboard(targetUserId));
                     } else {
-                        router.push('/mentorship');
+                        router.push(`/mentorship/${targetUserId}`);
                     }
-                    break;
+                } else {
+                    router.push('/mentorship');
+                }
+                break;
             default:
                 break;
         }
@@ -138,14 +137,9 @@ export default function Navigation({
             <div className="w-full px-3 sm:px-6 lg:px-8">
                 <div className="flex items-center h-16 gap-2 w-full justify-between">
 
-                    {/* Left: Throne8 Logo */}
+                    {/* Left: Throne8 Wordmark */}
                     <div className="flex items-center gap-2 flex-shrink-0">
-                        <button onClick={() => router.push(HOME_PATH)} className="flex items-center gap-2 whitespace-nowrap group">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#4a3728] shrink-0 transition-transform duration-200 group-hover:scale-105">
-                                <Crown size={16} className="text-[#F6EDE8]" strokeWidth={2} />
-                            </span>
-                            <span className="text-xl font-bold text-[#4a3728] tracking-tight">Throne8</span>
-                        </button>
+                        <BrandWordmark href={HOME_PATH} />
                     </div>
 
                     {/* Middle: Navigation Items */}
@@ -175,7 +169,7 @@ export default function Navigation({
                         })}
                     </div>
 
-                    {/* Right: Search Bar + Timezone Badge + MY DASHBOARD Button */}
+                    {/* Right: Search Bar + Timezone Badge + Profile Dropdown */}
                     <div className="flex items-center gap-2.5 flex-shrink-0 ml-auto">
                         {/* Search sirf tab jab profile feature on ho (search result profile page kholta hai) */}
                         {isFeatureEnabled('profile') && (
@@ -190,7 +184,7 @@ export default function Navigation({
                             {activeTimezone}
                         </div>
 
-                        {/* MY DASHBOARD → ProfileDropdown */}
+                        {/* Profile Dropdown */}
                         <ProfileDropdown
                             user={user}
                             isAuthenticated={!!user}

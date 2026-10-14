@@ -9,9 +9,8 @@ import SeniorSessionService from "@/lib/api/seniorSession.service";
 import MentorService from "@/lib/api/mentorship.service";
 
 import CalendarStep from "@/features/mentorship/components/mentor/CalendarStep";
-import DetailsStep from "@/features/mentorship/components/mentor/DetailsStep";
 import ConfirmationStep from "@/features/mentorship/components/mentor/ConfirmationStep";
-import SeniorPaymentStep from "@/features/mentorship/components/senior/SeniorPaymentStep";
+import SeniorBookingDetailsStep from "@/features/mentorship/components/senior/SeniorBookingDetailsStep";
 import Toast from "@/shared/uiComponents/Toast";
 
 import type { BookingStep, Service, CalendarData, FormData as BookingFormData } from "@/features/mentorship/types/types";
@@ -33,6 +32,7 @@ export default function SeniorServiceBookingPage() {
     const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
     const [formData, setFormData] = useState<BookingFormData | null>(null);
     const [bookingResponse, setBookingResponse] = useState<any>(null);
+    const [isBooking, setIsBooking] = useState(false);
 
     useEffect(() => {
         if (!sessionId) return;
@@ -87,7 +87,7 @@ export default function SeniorServiceBookingPage() {
     const presentationServiceAdapter = {
         id: service.sessionId || service._id,
         title: service.title,
-        price: service.pricing?.basePrice || "Free",
+        price: "Free",
         type: "1:1 Call",
         duration: service.duration,
     } as unknown as Service;
@@ -115,6 +115,36 @@ export default function SeniorServiceBookingPage() {
         router.push(`/mentorship/senior-service/${sessionId}`);
     };
 
+    const bookSeniorSession = async (details: BookingFormData): Promise<void> => {
+        if (!calendarData) {
+            setToastMsg({ message: "Select a session time before booking.", type: "error" });
+            return;
+        }
+
+        setFormData(details);
+        setIsBooking(true);
+        try {
+            const { selectedDate, currentMonth, slotTime } = calendarData;
+            const year = currentMonth.getFullYear();
+            const month = String(currentMonth.getMonth() + 1).padStart(2, "0");
+            const day = String(selectedDate).padStart(2, "0");
+            const startTime = slotTime.split(" - ")[0];
+            const scheduledAt = new Date(`${year}-${month}-${day}T${startTime}:00+05:30`).toISOString();
+            const response = await SeniorSessionService.bookSession(sessionId, { slotTime, scheduledAt });
+
+            setBookingResponse(response);
+            setToastMsg({ message: "Session request sent successfully", type: "success" });
+            setBookingStep("confirmation");
+        } catch (error) {
+            setToastMsg({
+                message: error instanceof Error ? error.message : "Failed to book the session.",
+                type: "error",
+            });
+        } finally {
+            setIsBooking(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#FAF9F6] text-[#4a3728] font-sans pb-20">
             <GlobalStyles />
@@ -133,29 +163,14 @@ export default function SeniorServiceBookingPage() {
                     />
                 )}
                 
-                {bookingStep === "details" && (
-                    <DetailsStep 
-                        selectedService={presentationServiceAdapter} 
-                        calendarData={calendarData!} 
-                        onBack={() => setBookingStep("calendar")} 
-                        onContinue={(d: BookingFormData) => { setFormData(d); setBookingStep("payment"); }} 
+                {bookingStep === "details" && calendarData && (
+                    <SeniorBookingDetailsStep
+                        serviceTitle={service.title}
+                        calendarData={calendarData}
+                        isSubmitting={isBooking}
+                        onBack={() => setBookingStep("calendar")}
+                        onContinue={bookSeniorSession}
                     />
-                )}
-                
-                {bookingStep === "payment" && (
-                     <SeniorPaymentStep
-                         sessionId={sessionId}
-                         basePrice={service.pricing?.basePrice || 0}
-                         calendarData={calendarData!}
-                         formData={formData!}
-                         mentorId={effectiveMentorId}
-                         onBack={() => setBookingStep("details")}
-                         onBookingSuccess={(response) => {
-                             setBookingResponse(response);
-                             setToastMsg({ message: "Session request sent successfully", type: "success" });
-                             setBookingStep("confirmation");
-                         }}
-                     />
                 )}
                 
                 {bookingStep === "confirmation" && (

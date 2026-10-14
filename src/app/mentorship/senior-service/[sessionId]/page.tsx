@@ -41,11 +41,6 @@ const getInitials = (name: string) =>
 
 const getSessionId = (s: any): string => String(s?.sessionId || s?._id || s?.id || "");
 
-const getPrice = (s: any): number | null => {
-    const p = s?.pricing?.basePrice ?? s?.pricing?.totalAmount ?? s?.price;
-    return typeof p === "number" ? p : null;
-};
-
 export default function SeniorServiceDetailsPage() {
 
     const params = useParams();
@@ -57,15 +52,14 @@ export default function SeniorServiceDetailsPage() {
     const [mentor, setMentor] = useState<any>(null);
     const [similarSessions, setSimilarSessions] = useState<any[]>([]);
     const carouselRef = useRef<HTMLDivElement>(null);
-    
-    
+
     // Status states
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!sessionId) return;
-        
+
         SeniorSessionService.getSessionById(sessionId)
             .then(res => {
                 const data = res?.data || res?.session || res;
@@ -88,38 +82,38 @@ export default function SeniorServiceDetailsPage() {
             });
     }, [sessionId]);
 
-        // Similar senior sessions
-        useEffect(() => {
-            SeniorSessionService.getAllDiscoverySessions()
-                .then((res: any) => {
-                    const all = Array.isArray(res?.data)
-                        ? res.data
-                        : Array.isArray(res?.data?.sessions)
-                        ? res.data.sessions
-                        : [];
-                    setSimilarSessions(all.filter((s: any) => getSessionId(s) !== sessionId));
-                })
-                .catch(() => setSimilarSessions([]));
-        }, [sessionId]);
-    
-        const displaySimilar = useMemo(() => {
-            if (!service) return [];
-            const cat = service.category || service.sessionType;
-            const same = similarSessions.filter((s) => (s.category || s.sessionType) === cat);
-            const rest = similarSessions.filter((s) => (s.category || s.sessionType) !== cat);
-            return [...same, ...rest].slice(0, 10);
-        }, [similarSessions, service]);
-    
-        const scrollCarousel = (direction: "left" | "right") => {
-            carouselRef.current?.scrollBy({
-                left: direction === "left" ? -320 : 320,
-                behavior: "smooth",
-            });
-        };
-    
-        if (loading) {
-            return (
-                <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center">
+    // Similar senior sessions
+    useEffect(() => {
+        SeniorSessionService.getAllDiscoverySessions()
+            .then((res: any) => {
+                const all = Array.isArray(res?.data)
+                    ? res.data
+                    : Array.isArray(res?.data?.sessions)
+                    ? res.data.sessions
+                    : [];
+                setSimilarSessions(all.filter((s: any) => getSessionId(s) !== sessionId));
+            })
+            .catch(() => setSimilarSessions([]));
+    }, [sessionId]);
+
+    const displaySimilar = useMemo(() => {
+        if (!service) return [];
+        const cat = service.category || service.sessionType;
+        const same = similarSessions.filter((s) => (s.category || s.sessionType) === cat);
+        const rest = similarSessions.filter((s) => (s.category || s.sessionType) !== cat);
+        return [...same, ...rest].slice(0, 10);
+    }, [similarSessions, service]);
+
+    const scrollCarousel = (direction: "left" | "right") => {
+        carouselRef.current?.scrollBy({
+            left: direction === "left" ? -320 : 320,
+            behavior: "smooth",
+        });
+    };
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-10 h-10 rounded-full border-4 border-[#e2d5c8] border-t-[#8b7355] animate-spin" />
                     <p className="text-[#8e847c] font-medium text-sm">Loading senior service details...</p>
@@ -142,7 +136,7 @@ export default function SeniorServiceDetailsPage() {
         );
     }
 
-        // ─── Derived data ──────────────────────────────────────────────────────
+    // ─── Derived data ──────────────────────────────────────────────────────
     const title = (service.title || "Mentorship Session").toUpperCase();
     const category = (service.category || service.sessionType || "").replace(/_/g, " ").toUpperCase();
     const duration: number | null = service.duration ?? null;
@@ -158,9 +152,6 @@ export default function SeniorServiceDetailsPage() {
             ? toArray(service.learning_outcomes)
             : toArray(service.learningOutcomes);
     const prerequisites = toArray(service.prerequisites);
-
-    const price = getPrice(service);
-    const priceDisplay = price && price > 0 ? `₹${price}` : "Free";
 
     const mentorName =
         `${mentor?.user?.firstName || ""} ${mentor?.user?.lastName || ""}`.trim() || mentor?.name || "";
@@ -375,9 +366,8 @@ export default function SeniorServiceDetailsPage() {
                                         const sTitle = item.title || "Mentorship Session";
                                         const sMentor = item.mentorId === service.mentorId ? mentorName : "";
                                         const sDur = item.duration ? `${item.duration} mins` : "";
-                                        const sPriceNum = getPrice(item);
-                                        const sPrice = sPriceNum && sPriceNum > 0 ? `₹${sPriceNum}` : "Free";
-                                        const meta = [sDur, sPrice].filter(Boolean);
+                                        // Senior sessions are free: no price is looked up or shown
+                                        const meta = [sDur, "Free"].filter(Boolean);
 
                                         return (
                                             <div
@@ -449,7 +439,7 @@ export default function SeniorServiceDetailsPage() {
                                     <span className="text-sm text-[#8e847c] font-medium">Price</span>
                                     <div className="text-right">
                                         <span className="text-3xl sm:text-[34px] font-black text-[#2d2116] leading-none">
-                                            {priceDisplay}
+                                            Free
                                         </span>
                                         {duration !== null && (
                                             <p className="text-xs text-[#8e847c] mt-1">{duration} mins · 1-to-1</p>

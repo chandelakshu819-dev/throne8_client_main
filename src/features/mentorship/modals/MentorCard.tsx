@@ -1,5 +1,5 @@
 "use client";
-
+// src/features/mentorship/modals/MentorCard.tsx
 import React, { useState } from "react";
 import { Star, Award } from "lucide-react";
 import { Mentor } from "@/features/index";
@@ -86,11 +86,19 @@ export default function MentorCard({ mentor }: MentorCardProps) {
                     </div>
 
                     {/* Attendance Badge */}
-                    <div className="flex justify-center mb-4">
-                        <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-[#4a3728]/10 text-[#4a3728] border border-[#4a3728]/15">
-                            ✓ {(mentor as any)?.stats?.completionRate ?? (mentor as any)?.completionRate ?? 100}% Attendance
-                        </span>
-                    </div>
+                    {(() => {
+                        const completionRate = (mentor as any)?.stats?.completionRate ?? (mentor as any)?.completionRate;
+                        const totalSessions = Number((mentor as any)?.stats?.totalSessions ?? (mentor as any)?.sessions ?? 0);
+                        const hasAttendance = typeof completionRate === "number" && !Number.isNaN(completionRate) && totalSessions > 0;
+                        if (!hasAttendance) return null;
+                        return (
+                            <div className="flex justify-center mb-4">
+                                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-[#4a3728]/10 text-[#4a3728] border border-[#4a3728]/15">
+                                    ✓ {completionRate}% Attendance
+                                </span>
+                            </div>
+                        );
+                    })()}
 
                     {/* Expertise Tags */}
                     <div className="flex gap-2 justify-center flex-wrap mb-4">

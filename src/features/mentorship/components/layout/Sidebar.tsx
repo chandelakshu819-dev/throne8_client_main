@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Filter, Search, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { Filter, Search, ChevronDown, ChevronUp } from "lucide-react";
 
 interface SidebarProps {
     companySearch: string;
@@ -128,18 +128,6 @@ export default function Sidebar({
                     </div>
                 </div>
 
-                {/* AI Card */}
-                <div className="bg-gradient-to-br from-[#4a3728] to-[#634a36] rounded-[32px] p-5 text-white shadow-xl relative overflow-hidden group">
-                    <div className="absolute top-[-20px] right-[-20px] w-24 h-24 bg-white/5 rounded-full blur-3xl group-hover:scale-150 transition-all duration-700" />
-                    <Sparkles className="w-5 h-5 text-[#8b7355] mb-3" />
-                    <p className="text-[10px] font-black uppercase tracking-[3px] mb-1.5">AI Matcher</p>
-                    <p className="text-[10px] text-white/70 leading-relaxed mb-4 font-medium">
-                        Matching your profile with 500+ global mentors...
-                    </p>
-                    <button className="w-full py-2.5 bg-white/10 hover:bg-white text-white hover:text-[#4a3728] rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all backdrop-blur-md">
-                        Start Quiz
-                    </button>
-                </div>
             </aside>
         </>
     );

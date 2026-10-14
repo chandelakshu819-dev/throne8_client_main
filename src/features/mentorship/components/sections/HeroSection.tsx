@@ -2,7 +2,7 @@
 //src/features/mentorship/components/sections/HeroSection.tsx
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ArrowRight, Star, Crown, CheckCircle2 } from "lucide-react";
+import { Search, ArrowRight, Star, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import MentorService from "@/lib/api/mentorship.service";
 import {
@@ -29,7 +29,6 @@ interface DisplayMentor {
     rating: number;
     sessions: number;
     tags: string[];
-    isSenior: boolean;
 }
 
 const isSeniorMentor = (m: any) => {
@@ -37,6 +36,9 @@ const isSeniorMentor = (m: any) => {
     const text = `${m.experience?.currentRole ?? ""} ${m.title ?? ""}`.toLowerCase();
     return exp >= 5 || SENIOR_KEYWORDS.some((k) => text.includes(k));
 };
+
+// Brand spelling safe rakhne ke liye: "Throne 8" / "throne8" sab "Throne8" ban jayega
+const normalizeBrand = (value: string) => (value || "").replace(/throne\s*8/gi, "Throne8");
 
 export default function HeroSection(_props: HeroSectionProps) {
     const router = useRouter();
@@ -81,8 +83,8 @@ export default function HeroSection(_props: HeroSectionProps) {
                         `${picked.user?.firstName ?? ""} ${picked.user?.lastName ?? ""}`.trim() ||
                         picked.user?.name ||
                         "Mentor",
-                    role,
-                    company,
+                    role: normalizeBrand(role),
+                    company: normalizeBrand(company),
                     image: picked.profilePic || "",
                     rating: Number(picked.stats?.averageRating) || 0,
                     sessions:
@@ -91,7 +93,6 @@ export default function HeroSection(_props: HeroSectionProps) {
                         Number(picked.trustScore?.metrics?.totalCompletedSessions) ||
                         0,
                     tags: Array.isArray(picked.skills) ? picked.skills.slice(0, 2) : [],
-                    isSenior: isSeniorMentor(picked),
                 });
             } catch (error) {
                 console.error("Failed to load featured mentor:", error);
@@ -149,7 +150,7 @@ export default function HeroSection(_props: HeroSectionProps) {
                     </h1>
 
                     <p className="text-sm sm:text-base text-[#705d4f] font-medium leading-relaxed max-w-lg mb-5 sm:mb-6">
-                        Direct access to the world&apos;s most successful tech leaders.
+                        Learn from experienced industry mentors.
                         <br className="hidden sm:inline" /> Built for serious builders.
                     </p>
 
@@ -193,16 +194,6 @@ export default function HeroSection(_props: HeroSectionProps) {
                                 <div className="absolute -bottom-20 right-[-40px] w-64 h-40 rounded-full bg-[#c4963a]/10 blur-3xl pointer-events-none" />
                                 <div className="absolute left-0 top-0 bottom-0 w-[6px] bg-gradient-to-b from-[#e0b84c] via-[#c4963a] to-[#9f722d]" />
 
-                                {/* Badge */}
-                                <div className="flex items-start justify-between mb-3 min-h-[26px]">
-                                    {mentor?.isSenior && (
-                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#f4e3cc] text-[#4a3020] border border-[#e4caa8] text-[9px] font-black uppercase tracking-wider">
-                                            <Crown className="w-3 h-3 text-[#b47a3e]" />
-                                            <span>Senior Mentor</span>
-                                        </div>
-                                    )}
-                                </div>
-
                                 {/* Details */}
                                 <div className="flex items-center gap-3.5 mb-3">
                                     <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden border-2 border-[#c4963a] bg-[#2d1c13] shrink-0 shadow-[0_5px_15px_rgba(0,0,0,0.25)]">
@@ -241,16 +232,16 @@ export default function HeroSection(_props: HeroSectionProps) {
 
                                         {!loading && mentor && rating && (
                                             <div className="flex items-center gap-1.5 text-[13px] font-semibold text-[#e2cdb2] mt-2">
-                                                <span className="flex items-center gap-1 text-[15px] text-[#f1d49a] font-extrabold">
-                                                    <Star
-                                                        className={`w-4 h-4 ${
-                                                            rating.hasRating
-                                                                ? "fill-[#D4AF37] text-[#D4AF37]"
-                                                                : "text-[#a98a68]"
-                                                        }`}
-                                                    />
-                                                    {rating.ratingLabel}
-                                                </span>
+                                                {rating.hasRating ? (
+                                                    <span className="flex items-center gap-1 text-[15px] text-[#f1d49a] font-extrabold">
+                                                        <Star className="w-4 h-4 fill-[#D4AF37] text-[#D4AF37]" />
+                                                        {rating.ratingLabel}
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center rounded-full bg-[#c4963a]/20 border border-[#c4963a]/40 px-2 py-0.5 text-[11px] font-bold text-[#f1d49a]">
+                                                        New mentor
+                                                    </span>
+                                                )}
                                                 {rating.sessionsLabel && (
                                                     <>
                                                         <span className="text-[#a98a68]">·</span>

@@ -1,5 +1,18 @@
 import api from "./api.intance";
 
+export interface SeniorDiscoverySession {
+    sessionId: string;
+    mentorId: string;
+    sessionType: string;
+    status: string;
+    title: string;
+    description?: string;
+    duration: number;
+    category?: string;
+    thumbnailImage?: string;
+    createdAt?: string;
+}
+
 class SeniorSessionService {
     /**
      * Create a new Senior Mentor 1-to-1 or Group service.
@@ -57,6 +70,21 @@ class SeniorSessionService {
         } catch (error: any) {
             console.error("❌ [GET_DISCOVERY_SESSIONS] Failed", error);
             throw new Error(error?.response?.data?.message || "Failed to fetch senior sessions.");
+        }
+    }
+
+    static async getDiscoverySessionsByMentor(mentorId: string): Promise<SeniorDiscoverySession[]> {
+        try {
+            const { data } = await api.get<{ data: SeniorDiscoverySession[] }>(
+                '/mentorship/senior-sessions',
+                { params: { mentorId } }
+            );
+            return data.data;
+        } catch (error: unknown) {
+            if (error instanceof Error && error.message) {
+                throw error;
+            }
+            throw new Error("Failed to fetch this mentor's senior sessions.");
         }
     }
 

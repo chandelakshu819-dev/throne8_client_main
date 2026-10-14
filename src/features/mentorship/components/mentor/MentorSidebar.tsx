@@ -130,17 +130,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
     const about = mentorData?.bio || "No bio added yet.";
     const image = mentorData?.profilePic || "";
     const verified = mentorData?.verification?.isVerified ?? false;
-    const totalSessions = mentorData?.stats?.totalSessions ?? 0;
-    const completionRate = mentorData?.stats?.completionRate != null ? `${mentorData.stats.completionRate}%` : "N/A";
-
-    const responseTime =
-        mentorData?.stats?.responseTime == null
-            ? "N/A"
-            : mentorData.stats.responseTime === 0
-                ? "Under 1 hr"
-                : `< ${mentorData.stats.responseTime} hr${mentorData.stats.responseTime > 1 ? "s" : ""}`;
-
-    const successRate = mentorData?.stats?.successRate != null ? `${mentorData.stats.successRate}%` : "N/A";
+    const totalSessions = mentorData?.stats?.totalSessions;
 
     const currentRole = mentorData?.experience?.currentRole || "Not specified";
     const experience = mentorData?.experience?.total != null ? `${mentorData.experience.total} years of Experience` : "Experience not specified";
@@ -246,19 +236,14 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                         <Briefcase /> {experience}
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "18px" }}>
-                        {([
-                            ["Total Sessions", totalSessions],
-                            ["Completion Rate", completionRate],
-                            ["Response Time", responseTime],
-                            ["Success Rate", successRate],
-                        ] as [string, string | number][]).map(([label, val]) => (
-                            <div key={label} style={{ borderRadius: "12px", padding: "12px", background: C.surface, border: `1px solid ${C.border}` }}>
-                                <div style={{ fontSize: "15px", fontWeight: "bold", color: C.dark }}>{val}</div>
-                                <div style={{ fontSize: "11px", color: C.mid }}>{label}</div>
+                    {typeof totalSessions === "number" && (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "10px", marginBottom: "18px" }}>
+                            <div style={{ borderRadius: "12px", padding: "12px", background: C.surface, border: `1px solid ${C.border}` }}>
+                                <div style={{ fontSize: "15px", fontWeight: "bold", color: C.dark }}>{totalSessions}</div>
+                                <div style={{ fontSize: "11px", color: C.mid }}>Total Sessions</div>
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    )}
 
                     {isOwner && (
                         <div style={{ marginBottom: "16px" }}>

@@ -2,17 +2,17 @@
 // src/app/mentorship/mentor-session/page.tsx
 'use client';
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useLiveRoom, RemotePeer, RoomEndedInfo } from "@/core/webrtc/useLiveRoom";
 import { useRingtone } from "@/shared/hooks/useRingtone";
 import SessionService from "@/lib/api/session.service";
+import QueryService, { QueryItem } from "@/lib/api/query.service";
 import { getSocket } from "@/core/realtime/socket.client";
 import { useAuth } from "@/features/auth/hooks/useAuth"; // ⚠️ adjust import/shape if different
 import {
-    ToastProps, ReminderModalProps, StatCardProps, ProgressBarProps,
-    OneOnOneTabProps, QueriesTabProps, ResourcesTabProps,
-    UpcomingSession, ModalState, Tab, SessionHistory, Resource, Query, BookableSession,
+    ToastProps,
+    ModalState, Tab,
 } from "@/features/mentorship/interface";
 import { TabId } from "@/features/mentorship/types";
 
@@ -507,293 +507,127 @@ function SessionEndedCard({
     );
 }
 
-function OneOnOneTab({ onReminder }: OneOnOneTabProps) {
-        const [remindersSet, setRemindersSet] = useState<Record<string, boolean>>({ r2: false, r3: false });
-
-    const upcoming: UpcomingSession[] = [
-        { id: "r1", name: "Career Roadmap Discussion", date: "Kal, 4:00 PM • 45 min • Rahul Sharma", set: true },
-        { id: "r2", name: "DSA Mock Interview", date: "5 April, 11:00 AM • 60 min • Priya Gupta", set: false },
-        { id: "r3", name: "Resume Review", date: "8 April, 3:00 PM • 30 min • Amit Verma", set: false },
-    ];
-
-    const bookable: BookableSession[] = [
-        { icon: "🎯", name: "Career Growth Session", mentor: "Rahul Sharma", match: 92 },
-        { icon: "💻", name: "System Design Prep", mentor: "Priya Gupta", match: 85 },
-    ];
-
-    return (
-        <div>
-            <SectionTitle>Upcoming Sessions</SectionTitle>
-            <div className="flex flex-col gap-0 mb-8">
-                {upcoming.map((s, i) => {
-                    const isSet = s.set || remindersSet[s.id];
-                    return (
-                        <div key={s.id} className="flex gap-4">
-                            <div className="flex flex-col items-center w-10 flex-shrink-0">
-                                <div
-                                    className="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 z-10"
-                                    style={{ background: C.warn, boxShadow: `0 0 0 3px rgba(201,124,74,0.2)` }}
-                                />
-                                {i < upcoming.length - 1 && <div className="flex-1 w-0.5 my-1" style={{ background: C.border }} />}
-                            </div>
-                            <div
-                                className="flex-1 rounded-xl border p-4 mb-4 flex items-center justify-between gap-4 transition-all hover:shadow-md"
-                                style={{ background: C.card, borderColor: C.border }}
-                            >
-                                <div>
-                                    <div className="text-sm font-semibold mb-1" style={{ color: C.primary }}>{s.name}</div>
-                                    <div className="text-xs" style={{ color: C.muted }}>📅 {s.date}</div>
-                                </div>
-                                <button
-                                    onClick={() =>
-                                        isSet ? undefined : onReminder(s.name, () => setRemindersSet((p) => ({ ...p, [s.id]: true })))
-                                    }
-                                    className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all"
-                                    style={{
-                                        borderColor: isSet ? "rgba(107,143,110,0.3)" : C.border,
-                                        background: isSet ? "rgba(107,143,110,0.08)" : "transparent",
-                                        color: isSet ? C.success : C.secondary,
-                                        cursor: isSet ? "default" : "pointer",
-                                    }}
-                                >
-                                    {isSet ? "✅ Reminder Set" : "🔔 Reminder Set Karein"}
-                                </button>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-
-            <SectionTitle>Completed Session</SectionTitle>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {bookable.map((b) => (
-                    <div
-                        key={b.name}
-                        className="rounded-2xl border p-5 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5"
-                        style={{ background: C.card, borderColor: C.border }}
-                    >
-                        <div className="flex items-start justify-between mb-4">
-                            <div
-                                className="w-11 h-11 rounded-xl flex items-center justify-center text-xl"
-                                style={{ background: "rgba(74,55,40,0.09)" }}
-                            >
-                                {b.icon}
-                            </div>
-                            <span
-                                className="text-xs font-bold px-2.5 py-1 rounded-full"
-                                style={{ background: "rgba(74,55,40,0.08)", color: C.secondary }}
-                            >
-                                Completed
-                            </span>
-                        </div>
-                        <div className="text-base font-bold mb-1" style={{ color: C.primary, fontFamily: "Georgia, serif" }}>
-                            {b.name}
-                        </div>
-                        <div className="text-xs mb-4" style={{ color: C.muted }}>{b.mentor} • Available</div>
-                        <ProgressBar value={b.match} label="Profile Match" />
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => onReminder(b.name, () => {})}
-                                className="flex-1 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
-                                style={{ background: C.btn }}
-                            >
-                                Review
-                            </button>
-                            <button
-                                className="px-4 py-2 rounded-xl border text-xs font-medium transition-all hover:opacity-80"
-                                style={{ borderColor: C.border, color: C.secondary }}
-                            >
-                                Profile
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
+interface SessionListItem {
+    _id?: string;
+    sessionId?: string;
+    title?: string;
+    scheduledAt?: string;
+    duration?: number;
 }
 
-// ─── QUERIES TAB (unchanged) ───────────────────────────────────────────────────
-function QueriesTab({ toast }: QueriesTabProps) {
-    const queries: Query[] = [
-        {
-            initials: "RS", name: "Rahul Sharma", time: "2 ghante pehle",
-            text: "DSA mein Dynamic Programming ke saath main bohot struggle kar raha hoon. Kya aap kuch practice problems suggest kar sakte hain jo beginner level se start ho?",
-            tags: ["DSA", "Dynamic Programming"], answered: false,
-        },
-        {
-            initials: "PG", name: "Priya Gupta", time: "1 din pehle",
-            text: "Mujhe system design interview ki preparation ke liye kahan se start karna chahiye? Koi roadmap denge?",
-            tags: ["System Design", "Interview"], answered: false,
-        },
-        {
-            initials: "AV", name: "Amit Verma", time: "3 din pehle",
-            text: "Resume mein projects section kaise improve karein? Kya STAR method yahan bhi kaam karta hai?",
-            tags: ["Resume"], answered: true,
-        },
-    ];
+function SessionListTab({ role, past }: { role: "mentor" | "mentee"; past: boolean }) {
+    const [sessions, setSessions] = useState<SessionListItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
+    const loadSessions = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const response = past
+                ? await SessionService.getPastSessions({ role })
+                : await SessionService.getUpcomingSessions({ role });
+            setSessions(Array.isArray(response.data) ? response.data : []);
+        } catch (loadError) {
+            setError(loadError instanceof Error ? loadError.message : "Failed to load sessions.");
+        } finally {
+            setLoading(false);
+        }
+    }, [past, role]);
+
+    useEffect(() => {
+        void loadSessions();
+    }, [loadSessions]);
+
+    const heading = past ? "Completed Sessions" : "Upcoming Sessions";
     return (
         <div>
-            <div className="flex items-center justify-between mb-5">
-                <SectionTitle inline>Aapki Queries</SectionTitle>
-                <button
-                    onClick={() => toast("✏️ New query form khul raha hai...")}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
-                    style={{ background: C.btn }}
-                >
-                    + Nayi Query
-                </button>
-            </div>
-            <div className="flex flex-col gap-4">
-                {queries.map((q) => (
-                    <div
-                        key={q.name}
-                        className="rounded-2xl border p-5 flex gap-4 transition-all hover:shadow-md"
-                        style={{ background: C.card, borderColor: C.border }}
-                    >
-                        <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                            style={{ background: `linear-gradient(135deg, ${C.secondary}, ${C.accent})` }}
+            <SectionTitle>{heading}</SectionTitle>
+            {loading ? (
+                <p className="py-8 text-sm" style={{ color: C.muted }}>Loading sessions...</p>
+            ) : error ? (
+                <div className="py-8 text-sm" style={{ color: C.warn }}>
+                    <p>{error}</p>
+                    <button onClick={() => void loadSessions()} className="mt-3 underline">Retry</button>
+                </div>
+            ) : sessions.length === 0 ? (
+                <p className="py-8 text-sm" style={{ color: C.muted }}>
+                    {past ? "No completed sessions." : "No upcoming sessions."}
+                </p>
+            ) : (
+                <div className="flex flex-col gap-3">
+                    {sessions.map((session, index) => (
+                        <article
+                            key={session._id || session.sessionId || `${session.scheduledAt || "session"}-${index}`}
+                            className="rounded-xl border p-4"
+                            style={{ background: C.card, borderColor: C.border }}
                         >
-                            {q.initials}
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex justify-between items-start mb-2">
-                                <span className="text-sm font-semibold" style={{ color: C.primary }}>{q.name}</span>
-                                <span className="text-xs" style={{ color: C.muted }}>{q.time}</span>
-                            </div>
-                            <p className="text-sm leading-relaxed mb-3" style={{ color: C.secondary }}>{q.text}</p>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                {q.tags.map((t) => (
-                                    <span
-                                        key={t}
-                                        className="text-xs px-2.5 py-0.5 rounded-full font-medium"
-                                        style={{ background: "rgba(74,55,40,0.07)", color: C.secondary }}
-                                    >
-                                        {t}
-                                    </span>
-                                ))}
-                                {q.answered ? (
-                                    <span
-                                        className="text-xs px-2.5 py-0.5 rounded-full font-medium"
-                                        style={{ background: "rgba(107,143,110,0.12)", color: C.success }}
-                                    >
-                                        ✅ Answered
-                                    </span>
-                                ) : (
-                                    <button
-                                        onClick={() => toast("💬 Reply box khul raha hai...")}
-                                        className="text-xs px-3 py-1 rounded-lg border font-medium transition-all hover:opacity-80 ml-1"
-                                        style={{ borderColor: C.border, color: C.secondary }}
-                                    >
-                                        Reply
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                            {session.title && <div className="text-sm font-semibold" style={{ color: C.primary }}>{session.title}</div>}
+                            {session.scheduledAt && (
+                                <time className="mt-1 block text-xs" style={{ color: C.muted }} dateTime={session.scheduledAt}>
+                                    {new Date(session.scheduledAt).toLocaleString()}
+                                </time>
+                            )}
+                            {typeof session.duration === "number" && (
+                                <div className="mt-1 text-xs" style={{ color: C.muted }}>{session.duration} min</div>
+                            )}
+                        </article>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
 
-// ─── RESOURCES TAB (unchanged) ──────────────────────────────────────────────────
-function ResourcesTab({ toast }: ResourcesTabProps) {
-    const resources: Resource[] = [
-        { icon: "📄", type: "PDF", name: "DSA Cheat Sheet — Top 100 Problems", meta: "2.4 MB • Rahul Sharma", btn: "⬇", action: "⬇️ Download ho raha hai..." },
-        { icon: "🎥", type: "VIDEO", name: "System Design Interview — Complete Guide", meta: "45 min • Priya Gupta", btn: "▶", action: "▶️ Video play ho rahi hai..." },
-        { icon: "📊", type: "SHEET", name: "6-Month Study Plan — Software Engineering", meta: "180 KB • Amit Verma", btn: "⬇", action: "⬇️ Download ho raha hai..." },
-        { icon: "🔗", type: "LINK", name: "LeetCode Top 150 Interview Questions List", meta: "External • Rahul Sharma", btn: "↗", action: "🔗 Link khul raha hai..." },
-        { icon: "📝", type: "NOTES", name: "Resume Writing Tips — ATS Friendly Format", meta: "32 KB • Amit Verma", btn: "⬇", action: "⬇️ Download ho raha hai..." },
-        { icon: "🎤", type: "RECORDING", name: "Mock Interview Session Recording — March 22", meta: "28 min • Priya Gupta", btn: "▶", action: "▶️ Recording play ho rahi hai..." },
-    ];
+function QueriesTab() {
+    const [queries, setQueries] = useState<QueryItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const loadQueries = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await QueryService.getPendingQueries();
+            setQueries(Array.isArray(response.data) ? response.data : []);
+        } catch (loadError) {
+            setError(loadError instanceof Error ? loadError.message : "Failed to load queries.");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadQueries();
+    }, [loadQueries]);
 
     return (
         <div>
-            <div className="flex items-center justify-between mb-5">
-                <SectionTitle inline>Shared Resources</SectionTitle>
-                <button
-                    onClick={() => toast("📎 File upload ho raha hai...")}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
-                    style={{ background: C.btn }}
-                >
-                    + Upload
-                </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {resources.map((r) => (
-                    <div
-                        key={r.name}
-                        className="rounded-2xl border p-5 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5"
-                        style={{ background: C.card, borderColor: C.border }}
-                    >
-                        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4" style={{ background: "rgba(74,55,40,0.08)" }}>
-                            {r.icon}
-                        </div>
-                        <div className="text-xs font-bold tracking-wider mb-1" style={{ color: C.muted }}>{r.type}</div>
-                        <div className="text-sm font-semibold mb-4 leading-snug" style={{ color: C.primary }}>{r.name}</div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs" style={{ color: C.muted }}>{r.meta}</span>
-                            <button
-                                onClick={() => toast(r.action)}
-                                className="w-8 h-8 rounded-lg text-white flex items-center justify-center text-sm transition-all hover:scale-105 hover:opacity-90"
-                                style={{ background: C.primary }}
-                            >
-                                {r.btn}
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-// ─── HISTORY TAB (unchanged) ────────────────────────────────────────────────────
-function HistoryTab() {
-    const sessions: SessionHistory[] = [
-        { name: "Career Goals Planning", date: "28 March 2026 • Rahul Sharma • 45 min", stars: 5 },
-        { name: "DSA Mock Interview — Round 1", date: "21 March 2026 • Priya Gupta • 60 min", stars: 4 },
-        { name: "Resume Review & Feedback", date: "15 March 2026 • Amit Verma • 30 min", stars: 5 },
-        { name: "System Design Basics", date: "8 March 2026 • Priya Gupta • 45 min", stars: 4 },
-        { name: "Intro Session — Goals Discussion", date: "1 March 2026 • Rahul Sharma • 30 min", stars: 5 },
-        { name: "LinkedIn Profile Optimization", date: "22 Feb 2026 • Amit Verma • 30 min", stars: 4 },
-        { name: "Behavioral Interview Prep", date: "14 Feb 2026 • Priya Gupta • 45 min", stars: 5 },
-        { name: "OOP Concepts Deep Dive", date: "5 Feb 2026 • Rahul Sharma • 60 min", stars: 4 },
-    ];
-
-    return (
-        <div>
-            <SectionTitle>Completed Sessions</SectionTitle>
-            <div className="flex flex-col gap-3">
-                {sessions.map((s) => (
-                    <div
-                        key={s.name}
-                        className="rounded-xl border p-4 flex items-center gap-4 transition-all hover:shadow-md hover:translate-x-1"
-                        style={{ background: C.card, borderColor: C.border }}
-                    >
-                        <div
-                            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-                            style={{ background: "rgba(107,143,110,0.12)", color: C.success, fontSize: "1rem" }}
-                        >
-                            ✓
-                        </div>
-                        <div className="flex-1">
-                            <div className="text-sm font-semibold mb-0.5" style={{ color: C.primary }}>{s.name}</div>
-                            <div className="text-xs" style={{ color: C.muted }}>📅 {s.date}</div>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                            <div className="text-sm mb-0.5" style={{ color: C.accent }}>
-                                {"★".repeat(s.stars)}
-                                {"☆".repeat(5 - s.stars)}
-                            </div>
-                            <div className="text-xs" style={{ color: C.success }}>Completed</div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+            <SectionTitle inline>Aapki Queries</SectionTitle>
+            {loading ? (
+                <p className="py-8 text-sm" style={{ color: C.muted }}>Loading queries...</p>
+            ) : error ? (
+                <div className="py-8 text-sm" style={{ color: C.warn }}>
+                    <p>{error}</p>
+                    <button onClick={() => void loadQueries()} className="mt-3 underline">Retry</button>
+                </div>
+            ) : queries.length === 0 ? (
+                <p className="py-8 text-sm" style={{ color: C.muted }}>No pending queries.</p>
+            ) : (
+                <div className="flex flex-col gap-4">
+                    {queries.map((query) => (
+                        <article key={query.queryId} className="rounded-2xl border p-5" style={{ background: C.card, borderColor: C.border }}>
+                            {query.category && <div className="mb-2 text-xs font-semibold" style={{ color: C.muted }}>{query.category}</div>}
+                            <p className="text-sm leading-relaxed" style={{ color: C.secondary }}>{query.question}</p>
+                            {query.createdAt && (
+                                <time className="mt-3 block text-xs" style={{ color: C.muted }} dateTime={query.createdAt}>
+                                    {new Date(query.createdAt).toLocaleString()}
+                                </time>
+                            )}
+                        </article>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
@@ -814,7 +648,6 @@ export default function MentorDashboard() {
 
 
     const [activeTab, setActiveTab] = useState<TabId>("one-on-one");
-    const [modal, setModal] = useState<ModalState>({ open: false, session: "", onSave: null });
     const [toastMsg, setToastMsg] = useState<string>("");
     const [toastVisible, setToastVisible] = useState<boolean>(false);
     const [endingSession, setEndingSession] = useState<boolean>(false);
@@ -825,16 +658,6 @@ export default function MentorDashboard() {
         setToastMsg(msg);
         setToastVisible(true);
         setTimeout(() => setToastVisible(false), 3000);
-    };
-
-    const openReminder = (sessionName: string, onSave: () => void): void => {
-        setModal({ open: true, session: sessionName, onSave });
-    };
-
-    const handleSaveReminder = (time: string): void => {
-        modal.onSave?.();
-        setModal({ open: false, session: "", onSave: null });
-        showToast("✅ Reminder set ho gaya! Aapko samay par notification milegi.");
     };
 
     // ✅ NEW: mentor/mentee jab is room me join kare, to doosre party ko
@@ -878,11 +701,14 @@ export default function MentorDashboard() {
     };
 
     const tabs: Tab[] = [
-        { id: "one-on-one", label: "👤 1:1 Session" },
+        { id: "one-on-one", label: "Upcoming Sessions" },
         { id: "queries", label: "❓ Queries" },
-        { id: "resources", label: "📚 Resources" },
         { id: "history", label: "📋 History" },
     ];
+    const userInitials = `${typeof user?.firstName === "string" ? user.firstName[0] || "" : ""}${typeof user?.lastName === "string" ? user.lastName[0] || "" : ""}`.toUpperCase();
+    const userDisplayName = [user?.firstName, user?.lastName]
+        .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+        .join(" ");
 
     return (
         <div className="min-h-screen" style={{ background: C.bg, fontFamily: "'DM Sans', sans-serif" }}>
@@ -899,23 +725,15 @@ export default function MentorDashboard() {
                     </span>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => showToast("🔔 2 upcoming sessions this week!")}
-                        className="relative w-9 h-9 rounded-full border flex items-center justify-center transition-all hover:opacity-80"
-                        style={{ borderColor: C.border, color: C.secondary }}
-                    >
-                        🔔
-                        <span
-                            className="absolute top-1 right-1 w-2 h-2 rounded-full border-2"
-                            style={{ background: C.warn, borderColor: C.card }}
-                        />
-                    </button>
+                    {userInitials && (
                     <div
                         className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold text-white cursor-pointer"
                         style={{ background: `linear-gradient(135deg, ${C.secondary}, ${C.accent})` }}
+                        aria-label={userDisplayName || undefined}
                     >
-                        RK
+                        {userInitials}
                     </div>
+                    )}
                 </div>
             </header>
 
@@ -925,7 +743,7 @@ export default function MentorDashboard() {
                         Mentor Session
                     </h1>
                     <p className="text-sm font-light" style={{ color: C.muted }}>
-                        Live call, queries, resources aur history — sab ek jagah.
+                        Live call and your session activity.
                     </p>
                 </div>
 
@@ -964,13 +782,6 @@ export default function MentorDashboard() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                    <StatCard num="12" label="Total Sessions" />
-                    <StatCard num="8" label="Completed" />
-                    <StatCard num="3" label="Upcoming" />
-                    <StatCard num="24h" label="Total Time" />
-                </div>
-
                 <div
                     className="flex flex-wrap gap-1 p-1.5 rounded-xl border mb-6 w-fit"
                     style={{ background: C.card, borderColor: C.border }}
@@ -991,19 +802,10 @@ export default function MentorDashboard() {
                     ))}
                 </div>
 
-                {activeTab === "one-on-one" && <OneOnOneTab onReminder={openReminder} />}
-                {activeTab === "queries" && <QueriesTab toast={showToast} />}
-                {activeTab === "resources" && <ResourcesTab toast={showToast} />}
-                {activeTab === "history" && <HistoryTab />}
+                {activeTab === "one-on-one" && <SessionListTab role={isMentor ? "mentor" : "mentee"} past={false} />}
+                {activeTab === "queries" && <QueriesTab />}
+                {activeTab === "history" && <SessionListTab role={isMentor ? "mentor" : "mentee"} past />}
             </main>
-
-            {modal.open && (
-                <ReminderModal
-                    sessionName={modal.session}
-                    onClose={() => setModal({ open: false, session: "", onSave: null })}
-                    onSave={handleSaveReminder}
-                />
-            )}
 
             <Toast msg={toastMsg} visible={toastVisible} />
         </div>
