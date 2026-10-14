@@ -213,7 +213,7 @@ export default function HeroSection(_props: HeroSectionProps) {
                                                 src={mentor.image}
                                                 alt={mentor.name}
                                                 onError={() => setImageFailed(true)}
-                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                                className="w-full h-full object-cover"
                                             />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center font-black text-lg text-[#38281e] bg-[#eddcd0]">
@@ -270,14 +270,13 @@ export default function HeroSection(_props: HeroSectionProps) {
                                         {(mentor?.tags ?? []).map((tag) => (
                                             <span
                                                 key={tag}
-                                                className="text-[10px] font-bold bg-white/5 text-[#f3dfc5] px-3 py-1 rounded-full border border-[#a98059] transition-all duration-300 group-hover:bg-[#f1dfc5] group-hover:text-[#4a3020]"
+                                                className="text-[10px] font-bold bg-white/5 text-[#f3dfc5] px-3 py-1 rounded-full border border-[#a98059]"
                                             >
                                                 {tag}
                                             </span>
                                         ))}
                                     </div>
-
-                                    <div className="w-8 h-8 rounded-full bg-[#f5e3ca] text-[#4a3020] flex items-center justify-center shadow-md transition-all duration-300 group-hover:scale-110 group-hover:bg-[#c4963a] group-hover:text-white ml-auto">
+                                    <div className="w-8 h-8 rounded-full bg-[#f5e3ca] text-[#4a3020] flex items-center justify-center shadow-md ml-auto">
                                         <ArrowRight className="w-4 h-4" />
                                     </div>
                                 </div>
