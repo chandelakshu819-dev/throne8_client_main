@@ -181,7 +181,7 @@ export default function SeniorServiceDetailsPage() {
             <GlobalStyles />
             <Navigation currentUserId={user?.userId} activeTimezone="IST (UTC+5:30)" />
 
-            <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-24">
+            <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-24">
                 <button
                     onClick={() => router.back()}
                     className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#6e5849] hover:text-[#4a3426] mb-4 transition-colors cursor-pointer group"
