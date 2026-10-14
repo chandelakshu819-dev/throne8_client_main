@@ -7,16 +7,19 @@ import AuthHeader from '@/shared/uiComponents/AuthHeader';
 import SocialButtons from '@/shared/uiComponents/SocialButtons';
 
 export default function LoginPage() {
-  
   return (
-    <AuthLayout>     
+    <AuthLayout>
       <AuthRightContainer>
         <AuthHeader />
         <LoginForm />
         <SocialButtons />
-        <p className="text-center text-gray-600">
-          Don't have an account?{' '}
-          <Link href="/signup" className="text-[#4a3728] font-semibold hover:underline">
+        <p className="relative z-20 pointer-events-auto text-center text-gray-600">
+          Don&apos;t have an account?{' '}
+          <Link
+            href="/signup"
+            prefetch={false}
+            className="text-[#4a3728] font-semibold hover:underline cursor-pointer"
+          >
             Create a New Account
           </Link>
         </p>

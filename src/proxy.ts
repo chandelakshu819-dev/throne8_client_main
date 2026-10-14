@@ -50,6 +50,12 @@ export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
     const isLoggedIn = request.cookies.get(AUTH_COOKIE_NAME)?.value === '1';
 
+    // Case -1: Root "/" -> server par hi redirect (blank navbar flash nahi aayega)
+    if (pathname === '/') {
+        const target = isLoggedIn ? HOME_PATH : '/login';
+        return NextResponse.redirect(new URL(target, request.url));
+    }
+
     // Case 0: Launch mode me band kiye hue pages -> redirect
     if (IS_MENTORSHIP_MODE && !isPathAllowedInLaunchMode(pathname)) {
         const target = isLoggedIn ? HOME_PATH : '/login';

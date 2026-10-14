@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { currentJobSchema, CurrentJobFormData } from '../schema';
+import SearchableCombobox from './SearchableCombobox';
+import CompanyLogo from './CompanyLogo';
+import { COMPANIES, JOB_TITLES } from '../data/jobData';
 
 interface Props {
   onNext: (data: any) => void;
@@ -16,6 +19,7 @@ export default function CurrentJob({ onNext, onBack }: Props) {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isValid },
     watch,
     setValue,
@@ -59,57 +63,63 @@ export default function CurrentJob({ onNext, onBack }: Props) {
         </h2>
 
         <div className="space-y-6">
-          {/* Job Title Dropdown */}
+          {/* Job Title (searchable) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Job Title *</label>
-            <select
-              {...register('jobTitle')}
-              className={`w-full px-5 py-4 rounded-xl border ${errors.jobTitle ? 'border-red-500' : 'border-[#4a3728]'
-                } bg-white text-black focus:outline-none focus:ring-2 ${errors.jobTitle ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
-                } transition appearance-none cursor-pointer`}
-            >
-              <option value="">Select Job Title</option>
-              <option value="software-engineer">Software Engineer</option>
-              <option value="product-manager">Product Manager</option>
-              <option value="data-scientist">Data Scientist</option>
-              <option value="ux-designer">UX/UI Designer</option>
-              <option value="devops-engineer">DevOps Engineer</option>
-              <option value="fullstack-developer">Full Stack Developer</option>
-              <option value="frontend-developer">Frontend Developer</option>
-              <option value="backend-developer">Backend Developer</option>
-              <option value="mobile-developer">Mobile Developer</option>
-              <option value="qa-engineer">QA Engineer</option>
-              <option value="other">Other</option>
-            </select>
+            <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-700 mb-2">Job Title *</label>
+            <Controller
+              name="jobTitle"
+              control={control}
+              defaultValue=""
+              render={({ field }) => (
+                <SearchableCombobox
+                  id="jobTitle"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  options={JOB_TITLES}
+                  placeholder="e.g. Software Engineer"
+                  className={`w-full px-5 py-4 rounded-xl border ${errors.jobTitle ? 'border-red-500' : 'border-[#4a3728]'
+                    } bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 ${errors.jobTitle ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
+                    } transition`}
+                />
+              )}
+            />
             {errors.jobTitle && (
               <p className="text-red-500 text-sm mt-2">• {errors.jobTitle.message}</p>
             )}
           </div>
 
-          {/* Company Name Dropdown */}
+          {/* Company Name (searchable + logo) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Company Name *</label>
-            <select
-              {...register('companyName')}
-              className={`w-full px-5 py-4 rounded-xl border ${errors.companyName ? 'border-red-500' : 'border-[#4a3728]'
-                } bg-white text-black focus:outline-none focus:ring-2 ${errors.companyName ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
-                } transition appearance-none cursor-pointer`}
-            >
-              <option value="">Select Company</option>
-              <option value="Google">Google</option>
-              <option value="Microsoft">Microsoft</option>
-              <option value="Amazon">Amazon</option>
-              <option value="Meta">Meta</option>
-              <option value="Apple">Apple</option>
-              <option value="Netflix">Netflix</option>
-              <option value="TCS">TCS</option>
-              <option value="Infosys">Infosys</option>
-              <option value="Wipro">Wipro</option>
-              <option value="Accenture">Accenture</option>
-              <option value="Startup">Startup</option>
-              <option value="Freelance">Freelance</option>
-              <option value="Other">Other</option>
-            </select>
+            <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-2">Company Name *</label>
+            <Controller
+              name="companyName"
+              control={control}
+              defaultValue=""
+              render={({ field }) => (
+                <SearchableCombobox
+                  id="companyName"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  options={COMPANIES}
+                  placeholder="e.g. TCS, Infosys, Google"
+                  leading={
+                    field.value?.trim() ? <CompanyLogo name={field.value} size={26} /> : null
+                  }
+                  renderOption={(o) => (
+                    <>
+                      <CompanyLogo name={o} size={24} />
+                      <span>{o}</span>
+                    </>
+                  )}
+                  className={`w-full py-4 pr-5 rounded-xl border ${field.value?.trim() ? 'pl-14' : 'pl-5'
+                    } ${errors.companyName ? 'border-red-500' : 'border-[#4a3728]'
+                    } bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 ${errors.companyName ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
+                    } transition`}
+                />
+              )}
+            />
             {errors.companyName && (
               <p className="text-red-500 text-sm mt-2">• {errors.companyName.message}</p>
             )}

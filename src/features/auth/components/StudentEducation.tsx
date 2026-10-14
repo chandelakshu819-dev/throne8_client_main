@@ -1,16 +1,79 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { studentEducationSchema, StudentEducationFormData } from '../schema';
 import PickerModal from './PickerModal';
+import CollegeAutocomplete from './CollegeAutocomplete';
 
 const VALID_DEGREES = [
-  'B.Tech', 'B.E', 'B.Sc', 'BCA', 'B.Com', 'B.A', 'M.Tech', 'M.E', 'M.Sc', 'MCA', 'M.Com', 'M.A', 'MBA', 'PhD', 'Diploma', 'Other'
+  'B.Tech', 'B.E', 'B.Sc', 'BCA', 'B.Com', 'B.A', 'BBA', 'B.Pharm', 'B.Arch', 'LLB', 'MBBS',
+  'M.Tech', 'M.E', 'M.Sc', 'MCA', 'M.Com', 'M.A', 'MBA', 'M.Pharm', 'LLM', 'PhD', 'Diploma', 'Other'
 ];
 
 const VALID_FIELDS = [
-  'Computer Science', 'Information Technology', 'Electronics', 'Electrical', 'Mechanical', 'Civil', 'Chemical', 'Biotechnology', 'Aerospace', 'Automobile', 'Data Science', 'Artificial Intelligence', 'Machine Learning', 'Cyber Security', 'Business Administration', 'Finance', 'Marketing', 'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Other'
+  // B.Tech / B.E branches
+  'Computer Science and Engineering',
+  'Computer Science',
+  'Information Technology',
+  'Artificial Intelligence and Data Science',
+  'Artificial Intelligence and Machine Learning',
+  'Artificial Intelligence',
+  'Machine Learning',
+  'Data Science',
+  'Cyber Security',
+  'Internet of Things (IoT)',
+  'Cloud Computing',
+  'Blockchain Technology',
+  'Software Engineering',
+  'Computer Engineering',
+  'Computer Science and Business Systems',
+  'Electronics and Communication Engineering',
+  'Electronics and Instrumentation Engineering',
+  'Electronics and Telecommunication Engineering',
+  'Electronics',
+  'Electrical Engineering',
+  'Electrical and Electronics Engineering',
+  'Instrumentation and Control Engineering',
+  'Mechanical Engineering',
+  'Mechatronics',
+  'Robotics and Automation',
+  'Automobile Engineering',
+  'Production Engineering',
+  'Industrial Engineering',
+  'Civil Engineering',
+  'Structural Engineering',
+  'Construction Technology',
+  'Environmental Engineering',
+  'Chemical Engineering',
+  'Petroleum Engineering',
+  'Mining Engineering',
+  'Metallurgical Engineering',
+  'Aerospace Engineering',
+  'Aeronautical Engineering',
+  'Biotechnology',
+  'Biomedical Engineering',
+  'Food Technology',
+  'Agricultural Engineering',
+  'Textile Engineering',
+  'Marine Engineering',
+  'Architecture',
+  // Others
+  'Business Administration',
+  'Finance',
+  'Marketing',
+  'Human Resources',
+  'Commerce',
+  'Economics',
+  'Mathematics',
+  'Statistics',
+  'Physics',
+  'Chemistry',
+  'Biology',
+  'Pharmacy',
+  'Law',
+  'Medicine',
+  'Other',
 ];
 
 interface Props {
@@ -24,6 +87,7 @@ export default function StudentEducation({ onNext, onBack }: Props) {
     handleSubmit,
     setValue,
     watch,
+    control,
     formState: { errors, isValid },
   } = useForm<StudentEducationFormData>({
     resolver: zodResolver(studentEducationSchema),
@@ -56,14 +120,26 @@ export default function StudentEducation({ onNext, onBack }: Props) {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">College/School Name</label>
-            <input
-              {...register('collegeName')}
-              type="text"
-              placeholder="e.g. IIT Bombay, Delhi University"
-              className={`w-full text-black px-5 py-4 rounded-xl border ${errors.collegeName ? 'border-red-500' : 'border-[#4a3728]'
-                } focus:outline-none focus:ring-2 ${errors.collegeName ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
-                } transition`}
+            <label htmlFor="collegeName" className="block text-sm font-medium text-gray-700 mb-2">
+              College/School Name
+            </label>
+            <Controller
+              name="collegeName"
+              control={control}
+              defaultValue=""
+              render={({ field }) => (
+                <CollegeAutocomplete
+                  id="collegeName"
+                  name={field.name}
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  placeholder="e.g. IIT Bombay, LNCT Bhopal, MANIT"
+                  className={`w-full text-black px-5 py-4 rounded-xl border ${errors.collegeName ? 'border-red-500' : 'border-[#4a3728]'
+                    } focus:outline-none focus:ring-2 ${errors.collegeName ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
+                    } transition`}
+                />
+              )}
             />
             {errors.collegeName && (
               <p className="text-red-500 text-sm mt-2">• {errors.collegeName.message}</p>
