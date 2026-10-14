@@ -2,6 +2,7 @@ import axios from 'axios';
 import api from "./api.intance";
 import { MentorResponse } from '@/features/mentorship/types/mentorship.types';
 import config from '@/config/env.config';
+import SeniorMentorApplicationService from './seniorMentorApplication.service';
 
 // ── My-Roles types (used by ProfileDropdown) ─────────────────────────────────
 export type RoleStatus = 'approved' | 'pending' | 'rejected' | 'none';
@@ -1750,8 +1751,23 @@ class MentorService {
         seniorMentor: 'none',
         industryMentor: 'none',
       };
-      _rolesCache = result;
-      return result;
+            // Fallback: if the application is verified but /me/roles didn't say approved
+            if (result.industryMentor !== 'approved') {
+              try {
+                const app = await SeniorMentorApplicationService.getMyApplication();
+                const status = String(app?.verificationStatus ?? '').toLowerCase();
+                if (status === 'verified' || status === 'approved' || status === 'active') {
+                  result.industryMentor = 'approved';
+                  result.industryMentorId =
+                    result.industryMentorId ?? (app as any)?.seniorMentorId;
+                }
+              } catch {
+                /* ignore, keep backend value */
+              }
+            }
+      
+            _rolesCache = result;
+            return result;
     } catch (error: any) {
       console.error('❌ [MENTOR_SERVICE] getMyRoles failed:', error?.message);
       throw error;

@@ -18,6 +18,8 @@ import SeniorMentorApplicationService, {
     SeniorMentorApplication,
 } from "@/lib/api/seniorMentorApplication.service";
 import { formatCountLabel } from "@/shared/utils/mentorFormat";
+import { useMyRoles } from "@/features/mentorship/hooks/useMentorRole";
+
 
 interface ActionCardsSectionProps {
     onBecomeMentorClick: () => void;
@@ -210,6 +212,7 @@ export default function ActionCardsSection({
     mentorCount,
 }: ActionCardsSectionProps) {
     const router = useRouter();
+    const { roles } = useMyRoles(!!userId);
 
     const [seniorApplication, setSeniorApplication] = useState<SeniorMentorApplication | null>(null);
     const [seniorLoading, setSeniorLoading] = useState(false);
@@ -258,9 +261,22 @@ export default function ActionCardsSection({
         ? `Connect with ${countLabel} mentors from college and industry. Get personalized 1:1 guidance.`
         : "Connect with mentors from college and industry. Get personalized 1:1 guidance.";
 
-    const gridCols = isMentor
-        ? "grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto"
-        : "grid-cols-1 md:grid-cols-3";
+        // Already Senior Mentor (verified application / approved role) -> card hide
+        const isSeniorMentorApproved =
+        roles?.industryMentor === "approved" ||
+
+        ["verified", "approved", "active"].includes(
+            String(seniorApplication?.verificationStatus ?? "").toLowerCase()
+        );
+        
+    const cardCount = 1 + (isMentor ? 0 : 1) + (isSeniorMentorApproved ? 0 : 1);
+    const gridCols =
+        cardCount >= 3
+            ? "grid-cols-1 md:grid-cols-3"
+            : cardCount === 2
+            ? "grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto"
+            : "grid-cols-1 max-w-md mx-auto";
+
 
     return (
         <section className="w-full px-6 pb-10">
@@ -290,6 +306,7 @@ export default function ActionCardsSection({
                     )}
 
                     {/* BECOME SENIOR MENTOR (college 3rd/4th year students) */}
+                    {!isSeniorMentorApproved && (
                     <ActionCard
                         onClick={handleSeniorMentorClick}
                         disabled={seniorLoading}
@@ -314,7 +331,8 @@ export default function ActionCardsSection({
                             )
                         }
                         cta={seniorLoading ? "Loading..." : cta}
-                    />
+                        />
+                        )}
                 </div>
             </div>
         </section>
