@@ -9,9 +9,9 @@ interface TrustedCompaniesProps {
 
 // ---------- Extra partner companies (logo ke saath) ----------
 const logoUrl = (domain: string) =>
-  `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+  `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`;
+const PARTNERS: { name: string; domain: string; color: string; letters: string; src?: string }[] = [
 
-const PARTNERS = [
   { name: "Netlink Software", domain: "netlink.com", color: "#1E88E5", letters: "NS" },
   { name: "We Win Limited", domain: "wewinlimited.com", color: "#D32F2F", letters: "WW" },
   { name: "TechStalwarts", domain: "techstalwarts.com", color: "#00796B", letters: "TS" },
@@ -30,18 +30,18 @@ const PARTNERS = [
 ];
 
 // Logo image; load na ho to letter wala badge dikhega
-const buildSvg = (domain: string, letters: string) =>
-  `<img src="${logoUrl(domain)}" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:contain;border-radius:8px" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" /><svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" style="display:none"><circle cx="24" cy="24" r="22" fill="currentColor"/><text x="24" y="24" text-anchor="middle" dominant-baseline="central" font-family="Arial, sans-serif" font-size="${letters.length > 2 ? 15 : 19}" font-weight="700" fill="#ffffff">${letters}</text></svg>`;
+const buildSvg = (src: string, letters: string) =>
+  `<img src="${src}" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:contain;border-radius:8px" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" /><svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" style="display:none"><circle cx="24" cy="24" r="22" fill="currentColor"/><text x="24" y="24" text-anchor="middle" dominant-baseline="central" font-family="Arial, sans-serif" font-size="${letters.length > 2 ? 15 : 19}" font-weight="700" fill="#ffffff">${letters}</text></svg>`;
 
 // Alag-alag field naam daale hain taaki tumhara CompanyBigCard jo bhi field padhe, logo mil jaye
 const EXTRA_COMPANIES = PARTNERS.map((p) => ({
   name: p.name,
   color: p.color,
-  svg: buildSvg(p.domain, p.letters),
-  logo: logoUrl(p.domain),
-  logoUrl: logoUrl(p.domain),
-  image: logoUrl(p.domain),
-  imageUrl: logoUrl(p.domain),
+  svg: buildSvg(p.src || logoUrl(p.domain), p.letters),
+  logo: p.src || logoUrl(p.domain),
+  logoUrl: p.src || logoUrl(p.domain),
+  image: p.src || logoUrl(p.domain),
+  imageUrl: p.src || logoUrl(p.domain),
 }));
 
 
