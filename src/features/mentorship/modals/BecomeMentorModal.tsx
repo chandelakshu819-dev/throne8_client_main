@@ -17,6 +17,7 @@ import {
     step2Schema,
 } from "@/features/mentorship/validators/mentor.validation";
 import MentorService from "@/lib/api/mentorship.service";
+import { useScrollLock } from "@/hooks/useScrollLock";
 import { DOMAINS, DOMAIN_LABELS, EXPERIENCE_OPTIONS } from "@/features/mentorship/constants/mentorship";
 import { CreateMentorFormData } from "@/features/mentorship/types/mentorship.types";
 import { useProfileData } from "@/features/profile/hooks/useProfileData";
@@ -233,9 +234,13 @@ export default function BecomeMentorModal({
         currentRole         // experience/role hai
     );
 
-    if (!isOpen) return null;
+       // Modal khula ho to background page scroll na ho
+       useScrollLock(isOpen);
 
-    const handleClose = () => {
+       if (!isOpen) return null;
+   
+       const handleClose = () => {
+        
         onClose();
         setFormStep(1);
     };

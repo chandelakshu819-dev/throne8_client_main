@@ -3,6 +3,22 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
+import SessionService from "@/lib/api/session.service";
+import { useScrollLock } from "@/hooks/useScrollLock";
+
+const SERVICE_LABELS: Record<string, string> = {
+    quick_call: "Quick Call",
+    deep_dive: "Deep Dive",
+    resume_review: "Resume Review",
+    mock_interview: "Mock Interview",
+    career_planning: "Career Planning",
+    portfolio_review: "Portfolio Review",
+    ask_query: "Ask a Query",
+    group_session: "Group Session",
+};
+
+// mentorId -> uski services (jaise ["quick_call", "deep_dive"])
+const servicesCache = new Map<string, string[]>();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface MentorItem {
@@ -28,12 +44,7 @@ interface FindMentorModalProps {
 
 type FilterType = "all" | "free" | "paid";
 
-// ─── Quick Filters ─────────────────────────────────────────────────────────────
-const quickFilters: string[] = [
-    "Get Job Referral", "Resume Review", "Mock Interview", "Switch Careers",
-    "LinkedIn Optimization", "Startup Guidance", "Tech Interview Prep",
-    "Portfolio Review", "Salary Negotiation", "Side Business Ideas",
-];
+
 
 const INITIAL_SHOW = 6;
 
@@ -227,13 +238,55 @@ export default function FindMentorModal({
 }: FindMentorModalProps) {
     const [query, setQuery] = useState<string>("");
     const [activeFilter, setActiveFilter] = useState<FilterType>("all");
-    const [activeQuick, setActiveQuick] = useState<string | null>(null);
     const [showAll, setShowAll] = useState<boolean>(false);
     const [mounted, setMounted] = useState<boolean>(false);
+    const [serviceFilter, setServiceFilter] = useState<string>("all");
+    const [servicesMap, setServicesMap] = useState<Record<string, string[]>>({});
+
+     // Modal khula ho to background page scroll na ho (Esc dabane par modal band)
+     useScrollLock(isOpen, onClose);
+     
 
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    useEffect(() => {
+        if (!isOpen || mentors.length === 0) return;
+
+        const cached: Record<string, string[]> = {};
+        mentors.forEach((m) => {
+            const c = servicesCache.get(m.id);
+            if (c) cached[m.id] = c;
+        });
+        setServicesMap((prev) => ({ ...prev, ...cached }));
+
+        const queue = mentors.filter((m) => m.id && !servicesCache.has(m.id));
+        const worker = async () => {
+            while (queue.length > 0) {
+                const m = queue.shift()!;
+                try {
+                    const res: any = await SessionService.getMentorSessions(m.id);
+                    const list = Array.isArray(res) ? res : res?.data ?? [];
+                    const types = Array.from(
+                        new Set(
+                            (Array.isArray(list) ? list : [])
+                                .filter((s: any) => s?.status !== "cancelled" && s?.status !== "deleted")
+                                .map((s: any) => String(s?.sessionType || ""))
+                                .filter(Boolean)
+                        )
+                    ) as string[];
+                    servicesCache.set(m.id, types);
+                } catch {
+                    servicesCache.set(m.id, []);
+                }
+                setServicesMap((prev) => ({ ...prev, [m.id]: servicesCache.get(m.id) ?? [] }));
+            }
+        };
+        Promise.all([worker(), worker(), worker(), worker()]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, mentors.length]);
+
 
     if (!isOpen || !mounted) return null;
 
@@ -248,7 +301,9 @@ export default function FindMentorModal({
             m.role?.toLowerCase().includes(query.toLowerCase()) ||
             m.company?.toLowerCase().includes(query.toLowerCase()) ||
             m.tags?.some((t: string) => t.toLowerCase().includes(query.toLowerCase()));
-        return matchFilter && matchQuery;
+            const matchService =
+            serviceFilter === "all" || (servicesMap[m.id] ?? []).includes(serviceFilter);
+        return matchFilter && matchQuery && matchService;
     });
 
     const visible = showAll ? filtered : filtered.slice(0, INITIAL_SHOW);
@@ -312,20 +367,22 @@ export default function FindMentorModal({
                             </button>
                         </div>
 
-                        {/* Quick Filters */}
-                        <div className="flex flex-wrap justify-center gap-2">
-                            {quickFilters.map((f) => (
+                                              {/* Service filter chips */}
+                                              <div className="flex flex-wrap justify-center gap-2">
+                            {["all", ...Object.keys(SERVICE_LABELS).filter((k) =>
+                                Object.values(servicesMap).some((types) => types.includes(k))
+                            )].map((key) => (
                                 <button
-                                    key={f}
-                                    onClick={() => setActiveQuick(activeQuick === f ? null : f)}
+                                    key={key}
+                                    onClick={() => { setServiceFilter(key); setShowAll(false); }}
                                     className="px-3 py-1.5 rounded-full text-xs font-medium border transition-all"
                                     style={{
-                                        borderColor: activeQuick === f ? "#7a5c3e" : "#d8cec4",
-                                        backgroundColor: activeQuick === f ? "#7a5c3e18" : "#f6ede8",
-                                        color: activeQuick === f ? "#4a3728" : "#8a7a6a",
+                                        borderColor: serviceFilter === key ? "#7a5c3e" : "#d8cec4",
+                                        backgroundColor: serviceFilter === key ? "#4a3728" : "#f6ede8",
+                                        color: serviceFilter === key ? "#f6ede8" : "#8a7a6a",
                                     }}
                                 >
-                                    {f}
+                                    {key === "all" ? "All Services" : SERVICE_LABELS[key]}
                                 </button>
                             ))}
                         </div>
@@ -365,7 +422,9 @@ export default function FindMentorModal({
                             </div>
                         </div>
 
-                        {/* Cards */}
+
+                                               {/* Cards */}
+
                         {loading ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                                 {Array(6).fill(0).map((_, i) => <SkeletonCard key={i} />)}
