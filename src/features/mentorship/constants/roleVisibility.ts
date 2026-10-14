@@ -46,13 +46,15 @@ export const ROLE_CONFIG: Record<
     label: "Mentee",
     subLabel: "Learn and get guidance",
   },
-  seniorMentor: {
-    label: "Senior Mentor",
-    subLabel: "Guide your juniors",
-  },
-  industryMentor: {
+   // key `seniorMentor` = Mentor collection ("Become Mentor" form) -> shown as "Industry Mentor"
+   seniorMentor: {
     label: "Industry Mentor",
     subLabel: "Share professional experience",
+  },
+  // key `industryMentor` = SeniorMentorApplication ("Become Senior Mentor" form) -> shown as "Senior Mentor"
+  industryMentor: {
+    label: "Senior Mentor",
+    subLabel: "Guide your juniors",
   },
 };
 

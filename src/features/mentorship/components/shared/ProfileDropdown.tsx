@@ -14,7 +14,6 @@ import {
   Users,
   Briefcase,
   Check,
-  Lock,
   LogIn,
   type LucideIcon,
 } from "lucide-react";
@@ -111,22 +110,23 @@ export default function ProfileDropdown({
 
   const { roles, loading: rolesLoading, error: rolesError } = useMyRoles(isAuthenticated);
 
+  // Clicked role par tick turant shift ho, page load hone ka wait na kare
+  const [pendingRole, setPendingRole] = useState<WorkspaceKey | null>(null);
+  useEffect(() => { setPendingRole(null); }, [pathname]);
+
   const userId = user?.userId || user?.id || user?._id || "";
   const detectedRole: WorkspaceKey | null = detectActiveRole(pathname ?? "");
 
-  // Highest approved role — used for the header label on non-dashboard pages
-  const highestApprovedRole: WorkspaceKey = (() => {
-    if (roles?.industryMentor === "approved") return "industryMentor";
-    if (roles?.seniorMentor   === "approved") return "seniorMentor";
-    return "mentee";
-  })();
-
-  const activeRole: WorkspaceKey = (() => {
-    if (detectedRole === null) return highestApprovedRole;
-    if (detectedRole === "seniorMentor"   && roles?.seniorMentor   === "approved") return "seniorMentor";
-    if (detectedRole === "industryMentor" && roles?.industryMentor === "approved") return "industryMentor";
-    return "mentee";
-  })();
+    // Role implied by the current URL. Non-dashboard pages (landing, etc.) default to Mentee.
+    const routeRole: WorkspaceKey = (() => {
+      if (detectedRole === null) return "mentee";
+      if (detectedRole === "seniorMentor"   && roles?.seniorMentor   === "approved") return "seniorMentor";
+      if (detectedRole === "industryMentor" && roles?.industryMentor === "approved") return "industryMentor";
+      return "mentee";
+    })();
+  
+    // pendingRole makes the tick move instantly on click, before the page loads
+    const activeRole: WorkspaceKey = pendingRole ?? routeRole;
 
 
 
@@ -140,8 +140,8 @@ export default function ProfileDropdown({
   // ── Icon lookup (keys match FrontendRoleKey) ─────────────────────────────
   const ROLE_ICONS: Record<WorkspaceKey, LucideIcon> = {
     mentee:         GraduationCap,
-    seniorMentor:   Users,
-    industryMentor: Briefcase,
+    seniorMentor:   Briefcase,
+    industryMentor: Users,
   };
 
   // ── Nav-href helpers per role ─────────────────────────────────────────────
@@ -201,7 +201,10 @@ export default function ProfileDropdown({
 
       if (opt.key === "mentee" || isApproved || (isPending && UNLOCK_WHEN_PENDING)) {
         const target = opt.dashboardHref(userId);
-        if (pathname !== target) router.push(target);
+        if (pathname !== target) {
+          setPendingRole(opt.key);
+          router.push(target);
+        }
         return;
       }
 
@@ -308,7 +311,7 @@ export default function ProfileDropdown({
             const isDisabled = !userId || (isPending && !UNLOCK_WHEN_PENDING);
 
             let subText = opt.subLabel;
-            if (isLocked)   subText = "Apply to unlock";
+            if (isLocked)   subText = "Apply now";
             if (isPending)  subText = "Under review";
 
             return (
@@ -381,9 +384,7 @@ export default function ProfileDropdown({
                           style={{ color: "white" }}
                         />
                       </div>
-                    ) : isLocked ? (
-                      <Lock size={14} style={{ color: BROWN_LIGHT }} />
-                    ) : isPending ? (
+                                        ) : isPending ? (
                       <span
                         className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                         style={{ background: CREAM_DARK, color: BROWN_LIGHT }}
@@ -398,17 +399,7 @@ export default function ProfileDropdown({
           })}
         </ul>
 
-        {/* Footer — only render when at least one visible option is locked */}
-        {workspaceOptions.some(
-          (o) => o.status !== "approved" && o.status !== "pending"
-        ) && (
-          <div
-            className="px-5 py-3 text-[9px]"
-            style={{ borderTop: `1px solid ${CREAM_DARK}`, color: BROWN_LIGHT }}
-          >
-            Locked roles can be unlocked by applying.
-          </div>
-        )}
+        
       </div>
 
       <style>{`

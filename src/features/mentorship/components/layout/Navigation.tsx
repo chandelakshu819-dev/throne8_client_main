@@ -10,6 +10,10 @@ import { formatUserDisplayName } from "@/shared/utils/format";
 import { transformToProfileData } from "@/shared/utils/profileTransformers";
 import { HOME_PATH, isFeatureEnabled, type FeatureKey } from "@/config/launch";
 import ProfileDropdown from "@/features/mentorship/components/shared/ProfileDropdown";
+import { useMyRoles } from "@/features/mentorship/hooks/useMentorRole";
+import { routes } from "@/config/routes";
+
+
 
 interface NavigationProps {
     activeTimezone?: string;
@@ -52,6 +56,7 @@ export default function Navigation({
     const router = useRouter();
     const pathname = usePathname();
     const { user } = useAuth();
+    const { roles } = useMyRoles(!!user);    
     const { userProfileData, profileImageUrl, fetchUserProfile } = useProfileData();
 
     const targetUserId = currentUserId || user?.userId || user?.id || (user as any)?._id;
@@ -85,13 +90,20 @@ export default function Navigation({
             case 'Notifications':
                 router.push(`/notifications/${targetUserId}`);
                 break;
-            case 'Mentorship':
-                if (targetUserId && targetUserId !== 'undefined') {
-                    router.push(`/mentorship/${targetUserId}`);
-                } else {
-                    router.push('/mentorship');
-                }
-                break;
+                case 'Mentorship':
+                    if (targetUserId && targetUserId !== 'undefined') {
+                        // Approved mentor ko seedha uske dashboard par bhejo
+                        if (roles?.industryMentor === 'approved') {
+                            router.push(routes.industryMentorDashboard(targetUserId));
+                        } else if (roles?.seniorMentor === 'approved') {
+                            router.push(routes.seniorMentorDashboard(targetUserId));
+                        } else {
+                            router.push(`/mentorship/${targetUserId}`);
+                        }
+                    } else {
+                        router.push('/mentorship');
+                    }
+                    break;
             default:
                 break;
         }
