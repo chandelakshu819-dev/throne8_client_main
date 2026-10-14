@@ -18,6 +18,10 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
     const [title, setTitle] = useState('');
     const [duration, setDuration] = useState(60);
     const [description, setDescription] = useState('');
+    const [shortDescription, setShortDescription] = useState('');
+    const [tagsText, setTagsText] = useState('');
+    const [outcomesText, setOutcomesText] = useState('');
+    const [prereqText, setPrereqText] = useState('');
     const [image, setImage] = useState<File | null>(null);
     const [customCategory, setCustomCategory] = useState('');
     const [editCategory, setEditCategory] = useState('');
@@ -39,6 +43,11 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
             setDescription(editSession.description);
             setDuration(editSession.duration);
             setEditCategory(editSession.category);
+            const es: any = editSession;
+            setShortDescription(es.shortDescription || '');
+            setTagsText((es.tags || []).join(', '));
+            setOutcomesText((es.learningOutcomes || []).join('\n'));
+            setPrereqText((es.prerequisites || []).join('\n'));
         }
     }, [editSession]);
 
@@ -64,7 +73,15 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
             formData.append("title", title);
             formData.append("description", description);
             formData.append("duration", duration.toString());
+
             formData.append("category", finalCategory);
+
+            const lines = (t: string) => t.split('\n').map(s => s.trim()).filter(Boolean);
+            formData.append("shortDescription", shortDescription.trim());
+            formData.append("tags", JSON.stringify(tagsText.split(',').map(s => s.trim()).filter(Boolean)));
+            formData.append("learningOutcomes", JSON.stringify(lines(outcomesText)));
+            formData.append("prerequisites", JSON.stringify(lines(prereqText)));
+            
             
             // Only attach sessionType if creating (edit preserves non-editables natively)
             if (!isEdit) formData.append("sessionType", "one_to_one");
@@ -229,6 +246,53 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
                             <option value={90}>90 Minutes</option>
                             <option value={120}>120 Minutes</option>
                         </select>
+                    </div>
+
+
+                    {/* Short description */}
+                    <div>
+                        <label className="text-sm font-bold text-[#4a3728] mb-2 block">Short Description (Optional)</label>
+                        <input
+                            value={shortDescription}
+                            maxLength={200}
+                            onChange={(e) => setShortDescription(e.target.value)}
+                            className="w-full px-4 py-3 bg-[#f3ece4] border-2 border-[#e0d8cf] focus:border-[#4a3728] rounded-xl outline-none text-[#4a3728] font-medium transition-colors"
+                            placeholder="One line shown on the service banner"
+                        />
+                    </div>
+
+                    {/* Tags */}
+                    <div>
+                        <label className="text-sm font-bold text-[#4a3728] mb-2 block">Tags (Optional)</label>
+                        <input
+                            value={tagsText}
+                            onChange={(e) => setTagsText(e.target.value)}
+                            className="w-full px-4 py-3 bg-[#f3ece4] border-2 border-[#e0d8cf] focus:border-[#4a3728] rounded-xl outline-none text-[#4a3728] font-medium transition-colors"
+                            placeholder="JavaScript, Frontend, Beginners Friendly"
+                        />
+                        <p className="text-xs font-medium text-[#8a7a6a] mt-1.5 ml-1">Comma separated.</p>
+                    </div>
+
+                    {/* What you'll learn */}
+                    <div>
+                        <label className="text-sm font-bold text-[#4a3728] mb-2 block">What students will learn (Optional)</label>
+                        <textarea
+                            value={outcomesText}
+                            onChange={(e) => setOutcomesText(e.target.value)}
+                            className="w-full px-4 py-3 bg-[#f3ece4] border-2 border-[#e0d8cf] focus:border-[#4a3728] rounded-xl outline-none text-[#4a3728] min-h-[90px] resize-none font-medium transition-colors"
+                            placeholder={"One point per line\nReal-world examples\nBest practices"}
+                        />
+                    </div>
+
+                    {/* Prerequisites */}
+                    <div>
+                        <label className="text-sm font-bold text-[#4a3728] mb-2 block">Prerequisites (Optional)</label>
+                        <textarea
+                            value={prereqText}
+                            onChange={(e) => setPrereqText(e.target.value)}
+                            className="w-full px-4 py-3 bg-[#f3ece4] border-2 border-[#e0d8cf] focus:border-[#4a3728] rounded-xl outline-none text-[#4a3728] min-h-[70px] resize-none font-medium transition-colors"
+                            placeholder={"One point per line\nBasic knowledge of JavaScript"}
+                        />
                     </div>
 
                     {/* What students get */}
