@@ -234,12 +234,12 @@ export default function ThroneUltraPremium() {
             <HeroSection mentorData={pageMentorData} />
 
             <ActionCardsSection
-    onBecomeMentorClick={() => setShowMentorForm(true)}
-    onFindMentorClick={() => setFindMentorOpen(true)}
-    isMentor={isMentor}
-    userId={user?.userId}
-    mentorCount={mentorsLoading ? undefined : impactStats.mentors}
-/>
+                onBecomeMentorClick={() => setShowMentorForm(true)}
+                onFindMentorClick={() => setFindMentorOpen(true)}
+                isMentor={isMentor}
+                userId={user?.userId}
+                mentorCount={mentorsLoading ? undefined : impactStats.mentors}
+            />
 
             <FindMentorModal
                 isOpen={findMentorOpen}
@@ -303,7 +303,7 @@ export default function ThroneUltraPremium() {
             <UnstoppableAdvantageSection />
 
             {/* CTA Section */}
-            <CTASection />
+            <CTASection stats={mentorsLoading ? undefined : impactStats} />
 
             {/* FAQs */}
             <FAQSection openFaq={openFaq} setOpenFaq={setOpenFaq} />
