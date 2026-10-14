@@ -26,7 +26,12 @@ export default function Home() {
     } else {
       router.replace('/login');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isLoading]);
 
-  return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#fffdfa]">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#4a3728] border-t-transparent" />
+    </div>
+  );
 }
