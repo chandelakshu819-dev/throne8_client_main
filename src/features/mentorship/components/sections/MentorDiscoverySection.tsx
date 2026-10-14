@@ -2,7 +2,7 @@
 "use client";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
     Crown,
@@ -15,7 +15,7 @@ import {
     ArrowRight
 } from "lucide-react";
 import Sidebar from "../layout/Sidebar";
-import MentorService from "@/lib/api/mentorship.service";
+import MentorService, { PublicSeniorMentor } from "@/lib/api/mentorship.service";
 import {
     parseRoleCompany,
     getRatingDisplay,
@@ -23,113 +23,156 @@ import {
 
 interface MentorDiscoverySectionProps {
     toggleCompare: (id: number) => void;
+
     compareList: number[];
 }
 
 interface MentorData {
-    id: string | number;
+    id: string;
     userId?: string;
     name: string;
     role: string;
     company: string;
     college?: string;
     degree?: string;
-    rating: number;
+    rating?: number;
     sessions: number;
-    price: number;
     image: string;
     tags: string[];
-    exp: string;
     expTotal: number;
     domains: string[];
-    isSenior: boolean;
     acceptsBooking: boolean;
-    isDummy?: boolean;
+    sessionId?: string | null;
 }
+
+function MentorAvatar({ image, name }: { image: string; name: string }) {
+    const [imageFailed, setImageFailed] = useState(false);
+    const initials = name
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase() || "M";
+
+    if (!image || imageFailed) {
+        return (
+            <div className="w-full h-full flex items-center justify-center text-[#4a3728] text-lg font-bold">
+                {initials}
+            </div>
+        );
+    }
+
+    return (
+        <img
+            src={image}
+            alt={name}
+            onError={() => setImageFailed(true)}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        />
+    );
+}
+
+const formatDisplaySkill = (skill: string): string =>
+    skill
+        .replace(/[_-]+/g, " ")
+        .replace(/\b\w/g, (character) => character.toUpperCase());
 
 export default function MentorDiscoverySection({ toggleCompare, compareList }: MentorDiscoverySectionProps) {
     const router = useRouter();
     const { user } = useAuth();
-    const [allMentors, setAllMentors] = useState<MentorData[]>([]);
-    const [filteredMentors, setFilteredMentors] = useState<MentorData[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [industryMentors, setIndustryMentors] = useState<MentorData[]>([]);
+    const [filteredIndustryMentors, setFilteredIndustryMentors] = useState<MentorData[]>([]);
+    const [collegeMentors, setCollegeMentors] = useState<PublicSeniorMentor[]>([]);
+    const [filteredCollegeMentors, setFilteredCollegeMentors] = useState<PublicSeniorMentor[]>([]);
+    const [industryStatus, setIndustryStatus] = useState<"loading" | "success" | "error">("loading");
+    const [collegeStatus, setCollegeStatus] = useState<"loading" | "success" | "error">("loading");
+    const [industryError, setIndustryError] = useState("");
+    const [collegeError, setCollegeError] = useState("");
     const [filtering, setFiltering] = useState(false);
 
     // Show more / pagination states for each section
-    const [showAllSeniorMentors, setShowAllSeniorMentors] = useState(false);
-    const [showAllRegularMentors, setShowAllRegularMentors] = useState(false);
+    const [showAllCollegeMentors, setShowAllCollegeMentors] = useState(false);
+    const [showAllIndustryMentors, setShowAllIndustryMentors] = useState(false);
 
-    const SENIOR_LIMIT = 4;
-    const REGULAR_LIMIT = 4;
+    const COLLEGE_LIMIT = 4;
+    const INDUSTRY_LIMIT = 4;
 
     // Filter states
     const [companySearch, setCompanySearch] = useState("");
     const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
     const [selectedExps, setSelectedExps] = useState<string[]>([]);
 
-    useEffect(() => {
-        MentorService.getAllMentors({ page: 1, limit: 50 })
-            .then((res) => {
-                const rawList = Array.isArray(res.data) ? res.data : [];
-                // Duplicate mentorId hata do
-                const list = rawList.filter(
-                    (m: any, idx: number, arr: any[]) =>
-                        arr.findIndex((x) => x.mentorId === m.mentorId) === idx
-                );
+    const loadIndustryMentors = useCallback(async () => {
+        setIndustryStatus("loading");
+        setIndustryError("");
+        try {
+            const response = await MentorService.getAllMentors({ page: 1, limit: 50 });
+            if (!Array.isArray(response.data)) {
+                throw new Error("Mentor list response was invalid.");
+            }
+            const rawList = response.data;
+            const list = rawList.filter(
+                (mentor: any, index: number, mentors: any[]) =>
+                    mentors.findIndex((item) => item.mentorId === mentor.mentorId) === index
+            );
+            const mapped: MentorData[] = list.map((mentor: any) => {
+                const rawRole = mentor.experience?.currentRole ?? "";
+                const rawTitle = mentor.title ?? "";
+                const totalExp = Number(mentor.experience?.total) || 0;
+                const parsed = parseRoleCompany(rawRole, rawTitle, mentor.company);
+                const backendCompany = typeof mentor.company === "string" ? mentor.company.trim() : "";
+                const college = typeof mentor.college === "string" ? mentor.college.trim() : undefined;
+                const degree = typeof mentor.degree === "string" ? mentor.degree.trim() : undefined;
 
-                const mapped: MentorData[] = list.map((m: any) => {
-                    const rawRole = m.experience?.currentRole ?? "";
-                    const rawTitle = m.title ?? "";
-                    const totalExp = Number(m.experience?.total) || 0;
-
-                    // Role + company ek hi helper se parse hota hai
-                    const parsed = parseRoleCompany(rawRole, rawTitle, m.company);
-
-                    // Company priority: backend company field -> helper (currentRole parser) -> empty
-                    const backendCompany = typeof m.company === "string" ? m.company.trim() : "";
-                    const role = parsed.role;
-                    const company = backendCompany || parsed.company || "";
-
-                    // TODO: Replace this heuristic with a proper verification.isVerified or SeniorMentorApplication-based check once that data is joined into the getAllMentors() API response.
-                    const seniorKeywords = ["senior", "lead", "principal", "director", "head", "vp", "founder", "ceo", "cto"];
-                    const textToCheck = `${rawRole} ${rawTitle}`.toLowerCase();
-                    const hasSeniorKeyword = seniorKeywords.some((kw) => textToCheck.includes(kw));
-                    const isSenior = totalExp >= 5 || hasSeniorKeyword;
-
-                    const college = typeof m.college === "string" ? m.college.trim() : undefined;
-                    const degree = typeof m.degree === "string" ? m.degree.trim() : undefined;
-
-                    return {
-                        id: m.mentorId,
-                        userId: m.userId,
-                        name: `${m.user?.firstName ?? ""} ${m.user?.lastName ?? ""}`.trim() || m.user?.name || "Mentor",
-                        role,
-                        company,
-                        college: college || undefined,
-                        degree: degree || undefined,
-                        // Fake 4.9 default hata diya: rating nahi hai to 0 (UI "New" dikhayegi)
-                        rating: Number(m.stats?.averageRating) || 0,
-                        sessions: m.stats?.totalSessions || m.trustScore?.metrics?.totalCompletedSessions || 0,
-                        price: Number(m.pricing?.quickCall) || 0,
-                        image: m.profilePic ?? "",
-                        tags: Array.isArray(m.skills) && m.skills.length > 0 ? m.skills.slice(0, 2) : ["Mentorship", "Career"],
-                        exp: `${totalExp} Yrs`,
-                        expTotal: totalExp,
-                        domains: Array.isArray(m.domains) ? m.domains : [],
-                        isSenior,
-                        acceptsBooking: Boolean(m.pricing?.quickCall || m.availability?.autoAcceptBookings || (m.availability?.daysAvailable && m.availability.daysAvailable.length > 0)),
-                        isDummy: false,
-                    };
-                });
-                setAllMentors(mapped);
-                setFilteredMentors(mapped);
-            })
-            .catch(() => {
-                setAllMentors([]);
-                setFilteredMentors([]);
-            })
-            .finally(() => setLoading(false));
+                return {
+                    id: String(mentor.mentorId),
+                    userId: mentor.userId,
+                    name: `${mentor.user?.firstName ?? ""} ${mentor.user?.lastName ?? ""}`.trim() || mentor.user?.name || "Mentor",
+                    role: parsed.role,
+                    company: backendCompany || parsed.company || "",
+                    college: college || undefined,
+                    degree: degree || undefined,
+                    rating: Number(mentor.stats?.averageRating) || 0,
+                    sessions: Number(mentor.stats?.totalSessions || mentor.trustScore?.metrics?.totalCompletedSessions) || 0,
+                    image: mentor.profilePic ?? "",
+                    tags: Array.isArray(mentor.skills) ? mentor.skills.slice(0, 2) : [],
+                    expTotal: totalExp,
+                    domains: Array.isArray(mentor.domains) ? mentor.domains : [],
+                    acceptsBooking: Boolean(mentor.pricing?.quickCall || mentor.availability?.autoAcceptBookings || mentor.availability?.daysAvailable?.length),
+                };
+            });
+            setIndustryMentors(mapped);
+            setFilteredIndustryMentors(mapped);
+            setIndustryStatus("success");
+        } catch (error) {
+            setIndustryError(error instanceof Error ? error.message : "Failed to load industry mentors.");
+            setIndustryStatus("error");
+        }
     }, []);
+
+    const loadCollegeMentors = useCallback(async () => {
+        setCollegeStatus("loading");
+        setCollegeError("");
+        try {
+            const response = await MentorService.getPublicSeniorMentors({ page: 1, limit: 50 });
+            if (!Array.isArray(response.data)) {
+                throw new Error("College mentor list response was invalid.");
+            }
+            setCollegeMentors(response.data);
+            setFilteredCollegeMentors(response.data);
+            setCollegeStatus("success");
+        } catch (error) {
+            setCollegeError(error instanceof Error ? error.message : "Failed to load college mentors.");
+            setCollegeStatus("error");
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadIndustryMentors();
+        void loadCollegeMentors();
+    }, [loadIndustryMentors, loadCollegeMentors]);
 
     // Domain mapping — sidebar labels → API domain values
     const DOMAIN_MAP: Record<string, string[]> = {
@@ -150,32 +193,37 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     const handleApplyFilters = () => {
         setFiltering(true);
         // Reset show-more states when filters are re-applied
-        setShowAllSeniorMentors(false);
-        setShowAllRegularMentors(false);
+        setShowAllCollegeMentors(false);
+        setShowAllIndustryMentors(false);
 
         setTimeout(() => {
-            let result = [...allMentors];
+            let industryResult = [...industryMentors];
+            let collegeResult = [...collegeMentors];
 
             // Company search filter
             if (companySearch.trim()) {
                 const searchLower = companySearch.toLowerCase();
-                result = result.filter(m =>
+                industryResult = industryResult.filter(m =>
                     m.company?.toLowerCase().includes(searchLower) ||
                     m.name?.toLowerCase().includes(searchLower)
+                );
+                collegeResult = collegeResult.filter((mentor) =>
+                    mentor.displayName.toLowerCase().includes(searchLower) ||
+                    mentor.college.toLowerCase().includes(searchLower)
                 );
             }
 
             // Domain filter
             if (selectedDomains.length > 0) {
                 const apiDomains = selectedDomains.flatMap(d => DOMAIN_MAP[d] ?? []);
-                result = result.filter(m =>
+                industryResult = industryResult.filter(m =>
                     m.domains.some((d: string) => apiDomains.includes(d))
                 );
             }
 
             // Experience filter
             if (selectedExps.length > 0) {
-                result = result.filter(m =>
+                industryResult = industryResult.filter(m =>
                     selectedExps.some(exp => {
                         const [min, max] = EXP_MAP[exp];
                         return m.expTotal >= min && m.expTotal <= max;
@@ -183,7 +231,8 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                 );
             }
 
-            setFilteredMentors(result);
+            setFilteredIndustryMentors(industryResult);
+            setFilteredCollegeMentors(collegeResult);
             setFiltering(false);
         }, 400);
     };
@@ -192,26 +241,22 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         setCompanySearch("");
         setSelectedDomains([]);
         setSelectedExps([]);
-        setShowAllSeniorMentors(false);
-        setShowAllRegularMentors(false);
-        setFilteredMentors(allMentors);
+        setShowAllCollegeMentors(false);
+        setShowAllIndustryMentors(false);
+        setFilteredIndustryMentors(industryMentors);
+        setFilteredCollegeMentors(collegeMentors);
     };
 
     const isFiltered = Boolean(companySearch || selectedDomains.length > 0 || selectedExps.length > 0);
 
-    // Split into Senior and Regular mentors
-    const seniorMentors = filteredMentors.filter((m) => m.isSenior);
-    // Real mentors only — no dummy/placeholder cards
-    const regularMentors = filteredMentors.filter((m) => !m.isSenior);
-
     // Sliced lists for initial view
-    const visibleSeniorMentors = showAllSeniorMentors
-        ? seniorMentors
-        : seniorMentors.slice(0, SENIOR_LIMIT);
+    const visibleCollegeMentors = showAllCollegeMentors
+        ? filteredCollegeMentors
+        : filteredCollegeMentors.slice(0, COLLEGE_LIMIT);
 
-    const visibleRegularMentors = showAllRegularMentors
-        ? regularMentors
-        : regularMentors.slice(0, REGULAR_LIMIT);
+    const visibleIndustryMentors = showAllIndustryMentors
+        ? filteredIndustryMentors
+        : filteredIndustryMentors.slice(0, INDUSTRY_LIMIT);
 
     // Display-only role formatter: "product-manager" → "Product Manager"
     const formatDisplayRole = (role: string | undefined | null): string => {
@@ -222,8 +267,6 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     };
 
     const handleNavigate = (mentor: MentorData) => {
-        if (mentor.isDummy) return;
-
         // Agar mentor khud apni hi profile pe click kar raha hai
         if (user?.userId && mentor.userId && user.userId === mentor.userId) {
             router.push(`/mentorship/user-dashboard/${user.userId}`);
@@ -235,17 +278,25 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     };
 
     // Rating block: "New" + "4 sessions" wala contradiction yahan fix hai
-    const renderRating = (mentor: MentorData) => {
-        if (mentor.isDummy) {
+    const renderRating = (mentor: MentorData, isIndustryCard: boolean) => {
+        if (!isIndustryCard) {
+            const hasRating = typeof mentor.rating === "number" && mentor.rating > 0;
             return (
-                <div className="flex items-center justify-center gap-1.5 text-[#b5a799]">
-                    <Star className="w-3.5 h-3.5 text-[#d9cbbe]" />
-                    <span className="font-medium text-[#a39282]">Joining Soon</span>
-                </div>
+                <>
+                    {hasRating && (
+                        <>
+                            <Star className="w-3.5 h-3.5 fill-[#d99b26] text-[#d99b26]" />
+                            <span className="font-bold text-[#2d2015]">{mentor.rating?.toFixed(1)}</span>
+                        </>
+                    )}
+                    {mentor.sessions > 0 && (
+                        <span className="text-[11px] text-[#8b7355]">{mentor.sessions} sessions</span>
+                    )}
+                </>
             );
         }
 
-        const rd = getRatingDisplay(mentor.rating, mentor.sessions);
+        const rd = getRatingDisplay(mentor.rating ?? 0, mentor.sessions);
         return (
             <>
                 <Star
@@ -263,10 +314,8 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         );
     };
 
-    // Render individual mentor card
-    // isSeniorCard = true  -> Industry Mentor card (company + role)
-    // isSeniorCard = false -> College Mentor card (College / Degree box)
-    const renderCard = (mentor: MentorData, isSeniorCard: boolean) => {
+    // Render Industry cards from Mentor records and College cards from approved applications.
+    const renderCard = (mentor: MentorData, isIndustryCard: boolean) => {
         const college = mentor.college?.trim();
         const degree = mentor.degree?.trim();
         const hasCollege = Boolean(college);
@@ -276,36 +325,23 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         return (
             <div
                 key={mentor.id}
-                className={`rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 relative group ${mentor.isDummy
-                    ? "bg-[#fcfaf7] border border-dashed border-[#dcd1c7] opacity-75 shadow-none cursor-default select-none"
-                    : "bg-white border border-[#e8ded5] hover:border-[#cfbeaf] shadow-sm hover:shadow-md"
-                    }`}
+                className="rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 relative group bg-white border border-[#e8ded5] hover:border-[#cfbeaf] shadow-sm hover:shadow-md"
             >
                 <div>
                     {/* Avatar */}
                     <div className="flex justify-center mb-2.5">
-                        <div className={`w-16 h-16 rounded-full overflow-hidden border-2 shadow-sm ring-1 ring-[#e4d8ce] flex items-center justify-center ${mentor.isDummy ? "border-dashed border-[#d5c6ba] bg-[#f3ece3]" : "border-white bg-[#f5ede5]"}`}>
-                            {mentor.image ? (
-                                <img
-                                    src={mentor.image}
-                                    alt={mentor.name}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-[#4a3728] text-lg font-bold">
-                                    {mentor.isDummy ? <Users className="w-6 h-6 text-[#b5a799]" /> : (mentor.name?.[0] ?? "M")}
-                                </div>
-                            )}
+                        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-sm ring-1 ring-[#e4d8ce] flex items-center justify-center bg-[#f5ede5]">
+                            <MentorAvatar image={mentor.image} name={mentor.name} />
                         </div>
                     </div>
 
                     {/* Name */}
-                    <h4 className={`font-bold text-sm text-center truncate px-1 ${mentor.isDummy ? "text-[#8b7355]" : "text-[#2d2015]"}`}>
+                    <h4 className="font-bold text-sm text-center truncate px-1 text-[#2d2015]">
                         {mentor.name}
                     </h4>
 
                     {/* Company — Industry (senior) cards only; hidden when empty */}
-                    {isSeniorCard && mentor.company ? (
+                    {isIndustryCard && mentor.company ? (
                         <div className="flex items-center justify-center gap-1.5 mb-1 px-1">
                             <div className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center bg-[#f5ede5] text-[#4a3728] text-[9px] font-bold border border-[#e4d8ce]">
                                 {mentor.company[0].toUpperCase()}
@@ -317,34 +353,35 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                     ) : null}
 
                     {/* Role — Industry (senior) cards only; removed on College Mentor cards */}
-                    {isSeniorCard && (
+                    {isIndustryCard && (
                         <p className="text-[11px] text-[#8b7355] text-center font-medium truncate mb-2 px-1">
                             {formatDisplayRole(mentor.role)}
                         </p>
                     )}
 
                     {/* Rating & Sessions */}
-                    <div className="flex items-center justify-center gap-1.5 text-xs mb-2.5">
-                        {renderRating(mentor)}
-                    </div>
+                    {(isIndustryCard || (mentor.rating && mentor.rating > 0) || mentor.sessions > 0) && (
+                        <div className="flex items-center justify-center gap-1.5 text-xs mb-2.5">
+                            {renderRating(mentor, isIndustryCard)}
+                        </div>
+                    )}
 
-                    {/* Expertise Tags */}
-                    <div className="flex items-center justify-center gap-1.5 flex-wrap mb-2.5 min-h-[24px]">
-                        {mentor.tags.map((tag: string, idx: number) => (
-                            <span
-                                key={idx}
-                                className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full ${mentor.isDummy
-                                    ? "bg-[#f5ede5] text-[#a39282] border border-dashed border-[#e4d6c8]"
-                                    : "bg-[#f6efe8] text-[#6b5643] border border-[#ebdcd0]"
-                                    }`}
-                            >
-                                {tag}
-                            </span>
-                        ))}
-                    </div>
+                    {/* Expertise Tags — hidden entirely when the mentor has no skills */}
+                    {mentor.tags.length > 0 && (
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap mb-2.5">
+                            {mentor.tags.map((tag: string, idx: number) => (
+                                <span
+                                    key={idx}
+                                    className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-[#f6efe8] text-[#6b5643] border border-[#ebdcd0]"
+                                >
+                                    {isIndustryCard ? tag : formatDisplaySkill(tag)}
+                                </span>
+                            ))}
+                        </div>
+                    )}
 
                     {/* College & Degree Section — College Mentor cards only; hidden when no data */}
-                    {!isSeniorCard && hasEducation && (
+                    {!isIndustryCard && hasEducation && (
                         <div className="w-full mb-3">
                             <div className="border-t border-[#e8ded5] mb-2.5" />
                             <div className="flex items-stretch gap-3 text-left py-3">
@@ -386,12 +423,14 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
 
                 {/* Action Buttons */}
                 <div>
-                    {mentor.isDummy ? (
+                    {!isIndustryCard ? (
                         <button
-                            disabled
-                            className="w-full py-2 px-3 bg-[#f2eae1] text-[#a39282] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed border border-[#e5dcd3]"
+                            onClick={() => router.push(`/mentorship/senior-mentor/${mentor.id}`)}
+                            className="w-full py-2 px-3 bg-[#3a2a1e] hover:bg-[#251910] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                         >
-                            <span>Not Available Yet</span>
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>{mentor.sessionId ? "Book Free Session" : "View Profile"}</span>
+                            <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
                         </button>
                     ) : mentor.acceptsBooking ? (
                         <button
@@ -425,6 +464,36 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         </div>
     );
 
+    const renderSectionLoadState = (
+        status: "loading" | "success" | "error",
+        error: string,
+        retry: () => void,
+        empty: boolean
+    ) => {
+        if (filtering || status === "loading") return renderSkeletonGrid();
+        if (status === "error") {
+            return (
+                <div className="rounded-2xl border border-red-200 bg-white p-6 text-center">
+                    <p className="text-sm text-red-700">{error}</p>
+                    <button
+                        onClick={retry}
+                        className="mt-4 rounded-xl bg-[#4a3728] px-5 py-2 text-sm font-bold text-white hover:bg-[#38291e]"
+                    >
+                        Retry
+                    </button>
+                </div>
+            );
+        }
+        if (empty) {
+            return (
+                <div className="rounded-2xl border border-[#e8ded5] bg-white p-8 text-center text-sm text-slate-500">
+                    {isFiltered ? "No mentors match these filters." : "No mentors yet."}
+                </div>
+            );
+        }
+        return null;
+    };
+
     return (
         <section className="py-12 px-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-10">
             {/* LEFT COLUMN: Sidebar (Untouched) */}
@@ -439,116 +508,86 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                 onClear={handleClearFilters}
             />
 
-            {/* RIGHT COLUMN: Senior Mentors + Mentors */}
+            {/* RIGHT COLUMN: Industry and College Mentors */}
             <div className="flex flex-col gap-10">
-                {(loading || filtering) ? (
-                    <div className="flex flex-col gap-10">
-                        <div>
-                            <div className="h-8 w-48 bg-[#eee5dd] rounded-lg animate-pulse mb-2" />
-                            <div className="h-4 w-72 bg-[#eee5dd] rounded-lg animate-pulse mb-6" />
-                            {renderSkeletonGrid(4)}
+                {(industryStatus !== "success" || industryMentors.length > 0) && (
+                    <section>
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="w-10 h-10 rounded-full border border-[#4a3728]/20 bg-[#faf6f1] flex items-center justify-center text-[#4a3728] shadow-sm flex-shrink-0">
+                                <Crown className="w-5 h-5 text-[#8b5e3c]" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-[#2d2015] tracking-tight">Industry Mentor</h2>
+                                <p className="text-xs text-[#8b7355] mt-0.5">Learn from experienced industry professionals.</p>
+                            </div>
                         </div>
-                        <div>
-                            <div className="h-8 w-40 bg-[#eee5dd] rounded-lg animate-pulse mb-2" />
-                            <div className="h-4 w-64 bg-[#eee5dd] rounded-lg animate-pulse mb-6" />
-                            {renderSkeletonGrid(4)}
-                        </div>
-                    </div>
-                ) : filteredMentors.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-24 text-center bg-white border border-[#e8ded5] rounded-3xl p-8">
-                        <p className="text-2xl font-black text-[#8b7355]">
-                            {isFiltered ? "No Mentors Found" : "No Mentors Yet"}
-                        </p>
-                        <p className="text-slate-400 text-sm mt-2">
-                            {isFiltered ? "Try different filters" : "Be the first to join as a mentor!"}
-                        </p>
-                        {isFiltered && (
-                            <button
-                                onClick={handleClearFilters}
-                                className="mt-4 px-6 py-2 bg-[#4a3728] text-white rounded-2xl text-sm font-bold shadow-sm hover:bg-[#38291e] transition-colors"
-                            >
-                                Clear Filters
-                            </button>
-                        )}
-                    </div>
-                ) : (
-                    <>
-                        {/* SECTION 1 — Industry Mentors (Senior) */}
-                        {seniorMentors.length > 0 && (
-                            <section>
-                                <div className="flex items-center gap-3 mb-5">
-                                    <div className="w-10 h-10 rounded-full border border-[#4a3728]/20 bg-[#faf6f1] flex items-center justify-center text-[#4a3728] shadow-sm flex-shrink-0">
-                                        <Crown className="w-5 h-5 text-[#8b5e3c]" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold text-[#2d2015] tracking-tight">
-                                            Industry Mentor
-                                        </h2>
-                                        <p className="text-xs text-[#8b7355] mt-0.5">
-                                            Learn from experienced industry professionals.
-                                        </p>
-                                    </div>
-                                </div>
-
+                        {renderSectionLoadState(industryStatus, industryError, loadIndustryMentors, filteredIndustryMentors.length === 0) ?? (
+                            <>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {visibleSeniorMentors.map((mentor) => renderCard(mentor, true))}
+                                    {visibleIndustryMentors.map((mentor) => renderCard(mentor, true))}
                                 </div>
-
-                                {seniorMentors.length > SENIOR_LIMIT && (
+                                {filteredIndustryMentors.length > INDUSTRY_LIMIT && (
                                     <div className="mt-6">
                                         <button
-                                            onClick={() => setShowAllSeniorMentors((prev) => !prev)}
-                                            className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden"
+                                            onClick={() => setShowAllIndustryMentors((previous) => !previous)}
+                                            className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] transition-all flex items-center justify-center gap-2"
                                         >
-                                            <span className="absolute inset-0 bg-[#f4ede6] scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out" />
-                                            <span className="relative z-10 tracking-wide">
-                                                {showAllSeniorMentors ? "Show less" : "Show more"}
-                                            </span>
-                                            <ArrowRight className={`relative z-10 w-4 h-4 text-[#8b7355] transition-transform duration-300 ${showAllSeniorMentors ? "-rotate-90" : "group-hover:translate-x-1.5 group-hover:text-[#4a3728]"}`} />
+                                            <span>{showAllIndustryMentors ? "Show less" : "Show more"}</span>
+                                            <ArrowRight className={`w-4 h-4 ${showAllIndustryMentors ? "-rotate-90" : ""}`} />
                                         </button>
                                     </div>
                                 )}
-                            </section>
+                            </>
                         )}
+                    </section>
+                )}
 
-                        {/* SECTION 2 — College Mentor (Regular) */}
-                        {regularMentors.length > 0 && (
-                            <section>
-                                <div className="flex items-center gap-3 mb-5">
-                                    <div className="w-10 h-10 rounded-full border border-[#4a3728]/20 bg-[#faf6f1] flex items-center justify-center text-[#4a3728] shadow-sm flex-shrink-0">
-                                        <Users className="w-5 h-5 text-[#4a3728]" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-xl font-bold text-[#2d2015] tracking-tight">
-                                            College Mentor
-                                        </h2>
-                                        <p className="text-xs text-[#8b7355] mt-0.5">
-                                            Connect with skilled professionals and peers.
-                                        </p>
-                                    </div>
-                                </div>
-
+                {(collegeStatus !== "success" || collegeMentors.length > 0) && (
+                    <section>
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="w-10 h-10 rounded-full border border-[#4a3728]/20 bg-[#faf6f1] flex items-center justify-center text-[#4a3728] shadow-sm flex-shrink-0">
+                                <Users className="w-5 h-5 text-[#4a3728]" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-[#2d2015] tracking-tight">College Mentor</h2>
+                                <p className="text-xs text-[#8b7355] mt-0.5">Connect with verified college mentors.</p>
+                            </div>
+                        </div>
+                        {renderSectionLoadState(collegeStatus, collegeError, loadCollegeMentors, filteredCollegeMentors.length === 0) ?? (
+                            <>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {visibleRegularMentors.map((mentor) => renderCard(mentor, false))}
+                                    {visibleCollegeMentors.map((mentor) =>
+                                        renderCard({
+                                            id: mentor.id,
+                                            name: mentor.displayName,
+                                            role: "",
+                                            company: "",
+                                            college: mentor.college,
+                                            degree: mentor.degree,
+                                            sessions: mentor.sessionsCount,
+                                            image: mentor.profilePic ?? "",
+                                            tags: mentor.skills.slice(0, 2),
+                                            expTotal: 0,
+                                            domains: [],
+                                            acceptsBooking: mentor.sessionId !== null,
+                                            sessionId: mentor.sessionId,
+                                        }, false)
+                                    )}
                                 </div>
-
-                                {regularMentors.length > REGULAR_LIMIT && (
+                                {filteredCollegeMentors.length > COLLEGE_LIMIT && (
                                     <div className="mt-6">
                                         <button
-                                            onClick={() => setShowAllRegularMentors((prev) => !prev)}
-                                            className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden"
+                                            onClick={() => setShowAllCollegeMentors((previous) => !previous)}
+                                            className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] transition-all flex items-center justify-center gap-2"
                                         >
-                                            <span className="absolute inset-0 bg-[#f4ede6] scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 ease-out" />
-                                            <span className="relative z-10 tracking-wide">
-                                                {showAllRegularMentors ? "Show less" : "Show more"}
-                                            </span>
-                                            <ArrowRight className={`relative z-10 w-4 h-4 text-[#8b7355] transition-transform duration-300 ${showAllRegularMentors ? "-rotate-90" : "group-hover:translate-x-1.5 group-hover:text-[#4a3728]"}`} />
+                                            <span>{showAllCollegeMentors ? "Show less" : "Show more"}</span>
+                                            <ArrowRight className={`w-4 h-4 ${showAllCollegeMentors ? "-rotate-90" : ""}`} />
                                         </button>
                                     </div>
                                 )}
-                            </section>
+                            </>
                         )}
-                    </>
+                    </section>
                 )}
             </div>
         </section>

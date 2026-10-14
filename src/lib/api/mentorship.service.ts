@@ -15,6 +15,36 @@ export interface MyRolesResponse {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface PublicSeniorMentor {
+  id: string;
+  displayName: string;
+  profilePic?: string;
+  college: string;
+  degree: string;
+  fieldOfStudy: string;
+  skills: string[];
+  sessionsCount: number;
+  sessionId: string | null;
+}
+
+export interface PublicSeniorMentorsResponse {
+  success: boolean;
+  message: string;
+  data: PublicSeniorMentor[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface PublicSeniorMentorResponse {
+  success: boolean;
+  message: string;
+  data: PublicSeniorMentor;
+}
+
 export interface CreateGroupSessionInput {
 
   title: string;
@@ -399,6 +429,47 @@ class MentorService {
       );
     }
   }
+
+  static async getPublicSeniorMentors(params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<PublicSeniorMentorsResponse> {
+    try {
+     const endpoint =
+       config.NEXT_PUBLIC_SENIOR_MENTORS_ENDPOINT ||
+       process.env.NEXT_PUBLIC_SENIOR_MENTORS_ENDPOINT ||
+       "/mentorship/senior-mentors";
+     const { data } = await api.get<PublicSeniorMentorsResponse>(endpoint, { params });
+     return data;
+    } catch (error: unknown) {
+     if (axios.isAxiosError<{ message?: string }>(error) && error.response?.data?.message) {
+       throw new Error(error.response.data.message);
+     }
+     throw new Error("Failed to fetch college mentors. Please try again.");
+    }
+  }
+
+  static async getPublicSeniorMentor(mentorId: string): Promise<PublicSeniorMentor | null> {
+    try {
+      const endpoint =
+        config.NEXT_PUBLIC_SENIOR_MENTORS_ENDPOINT ||
+        process.env.NEXT_PUBLIC_SENIOR_MENTORS_ENDPOINT ||
+        "/mentorship/senior-mentors";
+      const { data } = await api.get<PublicSeniorMentorResponse>(
+        `${endpoint}/${encodeURIComponent(mentorId)}`
+      );
+      return data.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return null;
+      }
+      if (axios.isAxiosError<{ message?: string }>(error) && error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw new Error("Failed to fetch college mentor profile. Please try again.");
+    }
+  }
+
     static async getMentorById(mentorId: string): Promise<any> {
     try {
       const base =

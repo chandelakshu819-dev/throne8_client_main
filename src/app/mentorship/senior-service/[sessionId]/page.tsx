@@ -71,7 +71,6 @@ export default function SeniorServiceDetailsPage() {
         );
     }
 
-    const priceDisplay = service.pricing?.basePrice === 0 || !service.pricing?.basePrice ? "Free" : `₹${service.pricing.basePrice}`;
     const categoryTag = (service.category || service.sessionType || "CAREER PLANNING").replace(/_/g, ' ').toUpperCase();
 
     return (
@@ -163,11 +162,6 @@ export default function SeniorServiceDetailsPage() {
                     <div className="lg:col-span-4 space-y-6">
                         <div className="bg-white p-6 md:p-8 rounded-[32px] border border-[#ece7e2] shadow-sm sticky top-28">
                             
-                            <div className="flex items-baseline justify-between mb-8 pb-6 border-b border-[#ece7e2]">
-                                <span className="text-[#8e847c] font-bold uppercase tracking-wider text-xs">Total Price</span>
-                                <span className="text-3xl font-black text-[#4a3728]">{priceDisplay}</span>
-                            </div>
-
                             <div className="space-y-6 mb-10">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-full bg-[#f4ece1] flex items-center justify-center shrink-0">

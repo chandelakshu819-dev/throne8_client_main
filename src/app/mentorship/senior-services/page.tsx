@@ -18,7 +18,6 @@ export default function SeniorServicesMarketplace() {
     const [selectedMentor, setSelectedMentor] = useState("All Senior Mentors");
     const [selectedCategory, setSelectedCategory] = useState("All Categories");
     const [selectedDuration, setSelectedDuration] = useState("All Durations");
-    const [selectedPrice, setSelectedPrice] = useState("All Prices");
     const [sortBy, setSortBy] = useState("Recommended");
     const [showFiltersMobile, setShowFiltersMobile] = useState(false);
 
@@ -88,10 +87,6 @@ export default function SeniorServicesMarketplace() {
         return ["All Durations", ...unique.map(d => `${d} mins`)];
     }, [services]);
 
-    const hasAnyPricingData = useMemo(() => {
-        return services.some(s => s.pricing && typeof s.pricing.basePrice === 'number');
-    }, [services]);
-
     // Apply Client-Side Filtering
     const filteredServices = useMemo(() => {
         return services.filter(service => {
@@ -123,32 +118,20 @@ export default function SeniorServicesMarketplace() {
                 if (service.duration !== durMatch) return false;
             }
 
-            // Price Filter
-            if (selectedPrice !== "All Prices" && hasAnyPricingData) {
-                const price = service.pricing?.basePrice ?? 0;
-                if (selectedPrice === "Free" && price > 0) return false;
-                if (selectedPrice === "Under ₹500" && (price === 0 || price >= 500)) return false;
-                if (selectedPrice === "₹500 - ₹1000" && (price < 500 || price > 1000)) return false;
-                if (selectedPrice === "₹1000+" && price <= 1000) return false;
-            }
-
             return true;
         }).sort((a, b) => {
-            if (sortBy === "Price: Low to High") return (a.pricing?.basePrice ?? 0) - (b.pricing?.basePrice ?? 0);
-            if (sortBy === "Price: High to Low") return (b.pricing?.basePrice ?? 0) - (a.pricing?.basePrice ?? 0);
             if (sortBy === "Duration: Short to Long") return (a.duration || 0) - (b.duration || 0);
             if (sortBy === "Duration: Long to Short") return (b.duration || 0) - (a.duration || 0);
             if (sortBy === "Newest") return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
             return 0; // "Recommended"
         });
-    }, [services, mentorMap, searchQuery, selectedMentor, selectedCategory, selectedDuration, selectedPrice, sortBy, hasAnyPricingData]);
+    }, [services, mentorMap, searchQuery, selectedMentor, selectedCategory, selectedDuration, sortBy]);
 
     const resetFilters = () => {
         setSearchQuery("");
         setSelectedMentor("All Senior Mentors");
         setSelectedCategory("All Categories");
         setSelectedDuration("All Durations");
-        setSelectedPrice("All Prices");
         setSortBy("Recommended");
     };
 
@@ -244,23 +227,6 @@ export default function SeniorServicesMarketplace() {
                             </select>
                         </div>
 
-                        {hasAnyPricingData && (
-                            <div>
-                                <label className="block text-xs font-bold text-[#8e847c] uppercase tracking-wider mb-2">Price</label>
-                                <select 
-                                    value={selectedPrice} 
-                                    onChange={(e) => setSelectedPrice(e.target.value)}
-                                    className="w-full bg-[#fdfbf9] border border-[#ece7e2] rounded-xl px-3 py-2.5 text-sm font-bold text-[#2d2116] focus:outline-none focus:border-[#3a5266]"
-                                >
-                                    <option>All Prices</option>
-                                    <option>Free</option>
-                                    <option>Under ₹500</option>
-                                    <option>₹500 - ₹1000</option>
-                                    <option>₹1000+</option>
-                                </select>
-                            </div>
-                        )}
-
                         <div className="mt-2 pt-5 border-t border-[#ece7e2]">
                             <label className="block text-xs font-bold text-[#8e847c] uppercase tracking-wider mb-2">Sort By</label>
                             <select 
@@ -270,12 +236,6 @@ export default function SeniorServicesMarketplace() {
                             >
                                 <option>Recommended</option>
                                 <option>Newest</option>
-                                {hasAnyPricingData && (
-                                    <>
-                                        <option>Price: Low to High</option>
-                                        <option>Price: High to Low</option>
-                                    </>
-                                )}
                                 <option>Duration: Short to Long</option>
                                 <option>Duration: Long to Short</option>
                             </select>
@@ -383,9 +343,6 @@ export default function SeniorServicesMarketplace() {
                                                         <Clock className="w-4 h-4 text-[#3a5266]" />
                                                         <span className="text-xs font-bold text-[#2d2116]">{service.duration} mins</span>
                                                     </div>
-                                                    <span className="text-sm font-black text-[#2d2116]">
-                                                        {service.pricing?.basePrice === 0 || !service.pricing?.basePrice ? "Free" : `₹${service.pricing?.basePrice}`}
-                                                    </span>
                                                 </div>
 
                                                 <div className="mt-auto border-t border-[#ece7e2] pt-5">

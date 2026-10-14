@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   Eye,
   Clock,
-  Rocket,
   AlertTriangle,
   ArrowRight,
   X,
@@ -89,7 +88,7 @@ export default function ProfilePage({
     identity: false,
     professional: false,
   });
-  const [approvalStatus, setApprovalStatus] = useState<'idle' | 'pending' | 'approved' | 'submitting'>('idle');
+  const [approvalStatus, setApprovalStatus] = useState<'idle' | 'pending' | 'approved'>('idle');
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -122,20 +121,6 @@ export default function ProfilePage({
   useEffect(() => {
     setIsVerified(badgeVerified);
   }, [badgeVerified]);
-
-  const handleRequestApproval = async () => {
-    if (!allVerified || !agreedToCode) return;
-
-    setApprovalStatus('submitting');
-    try {
-      // Ye API call sirf "request submitted" state set karta hai
-      // Actual approval admin karega
-      await new Promise(r => setTimeout(r, 800)); // brief loading
-      setApprovalStatus('pending');
-    } catch (e) {
-      setApprovalStatus('idle');
-    }
-  };
 
   useEffect(() => {
     const fetchStatuses = async () => {
@@ -425,7 +410,7 @@ export default function ProfilePage({
                     Platform Rules & Terms Acceptance *
                   </label>
                   <p className="text-xs mt-1" style={{ color: '#8a7a6a' }}>
-                    I accept the platform's terms of service, privacy policy, payment terms, and agree to
+                    I accept the platform&apos;s terms of service, privacy policy, payment terms, and agree to
                     follow all community guidelines and platform rules.
                   </p>
                   <button
@@ -443,47 +428,6 @@ export default function ProfilePage({
                 </div>
               </div>
             </div>
-
-            {(agreedToCode || approvalStatus === 'pending' || approvalStatus === 'approved') && (
-              <button
-                onClick={handleRequestApproval}
-                disabled={!allVerified || approvalStatus === 'pending' || approvalStatus === 'approved' || approvalStatus === 'submitting'}
-                className={`mt-4 w-full px-6 py-3 rounded-xl text-white text-sm font-semibold transition-opacity flex items-center justify-center gap-2 ${approvalStatus === 'pending' || approvalStatus === 'approved' || !allVerified
-                  ? 'opacity-60 cursor-not-allowed'
-                  : 'hover:opacity-90'
-                  }`}
-                style={{
-                  backgroundColor:
-                    approvalStatus === 'approved' ? '#15803d' :
-                      approvalStatus === 'pending' ? '#7a5c3e' :
-                        allVerified ? '#4a3728' : '#a89080'
-                }}
-              >
-                {approvalStatus === 'submitting' ? (
-                  <>
-                    <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Submitting Request...
-                  </>
-                ) : approvalStatus === 'approved' ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    Mentor Account Approved
-                  </>
-                ) : approvalStatus === 'pending' ? (
-                  <>
-                    <Clock className="w-4 h-4" />
-                    Approval Request Submitted
-                  </>
-                ) : !allVerified ? (
-                  'Complete All Verifications First'
-                ) : (
-                  <>
-                    <Rocket className="w-4 h-4" />
-                    Get Approval for Mentor
-                  </>
-                )}
-              </button>
-            )}
 
             {approvalStatus === 'pending' && (
               <div className="mt-4 rounded-xl overflow-hidden" style={{ border: '1px solid #bbf7d0' }}>

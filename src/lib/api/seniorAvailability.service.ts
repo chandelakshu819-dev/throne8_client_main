@@ -7,6 +7,22 @@ interface SeniorAvailabilityResponse {
     data: any;
 }
 
+export interface SeniorMonthlyAvailabilityDay {
+  date: string;
+  isDateBlocked: boolean;
+  totalSlots: number;
+  availableSlots: number;
+  bookedSlots: number;
+  blockedSlots: number;
+  slots: Array<{
+    startTime: string;
+    endTime: string;
+    status: 'available' | 'booked' | 'blocked' | 'past';
+    isBooked: boolean;
+    isBlocked: boolean;
+  }>;
+}
+
 interface SeniorTimeRange {
   startTime: string;
   endTime: string;
@@ -80,7 +96,7 @@ class SeniorAvailabilityService {
     }
 
     // ── GET MONTHLY AVAILABILITY ──────────────────────────────
-    static async getMonthlyAvailability(mentorId: string, startDate: string, endDate: string, duration: number = 60): Promise<Array<{date: string, slots: {startTime: string, endTime: string}[]}>> {
+    static async getMonthlyAvailability(mentorId: string, startDate: string, endDate: string, duration: number = 60): Promise<SeniorMonthlyAvailabilityDay[]> {
         try {
             console.log("📅 [SENIOR_AVAILABILITY] Fetching monthly dynamic slots...", { mentorId, startDate, endDate, duration });
             const { data } = await api.get<SeniorAvailabilityResponse>(

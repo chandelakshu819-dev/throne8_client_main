@@ -2,7 +2,7 @@
 //src/features/mentorship/components/sections/HeroSection.tsx
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ArrowRight, Star, Crown, CheckCircle2 } from "lucide-react";
+import { Search, ArrowRight, Star, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import MentorService from "@/lib/api/mentorship.service";
 import {
@@ -29,7 +29,6 @@ interface DisplayMentor {
     rating: number;
     sessions: number;
     tags: string[];
-    isSenior: boolean;
 }
 
 const isSeniorMentor = (m: any) => {
@@ -91,7 +90,6 @@ export default function HeroSection(_props: HeroSectionProps) {
                         Number(picked.trustScore?.metrics?.totalCompletedSessions) ||
                         0,
                     tags: Array.isArray(picked.skills) ? picked.skills.slice(0, 2) : [],
-                    isSenior: isSeniorMentor(picked),
                 });
             } catch (error) {
                 console.error("Failed to load featured mentor:", error);
@@ -192,16 +190,6 @@ export default function HeroSection(_props: HeroSectionProps) {
                                 <div className="absolute -bottom-20 right-[-40px] w-48 h-48 rounded-full border border-[#c4963a]/20 pointer-events-none" />
                                 <div className="absolute -bottom-20 right-[-40px] w-64 h-40 rounded-full bg-[#c4963a]/10 blur-3xl pointer-events-none" />
                                 <div className="absolute left-0 top-0 bottom-0 w-[6px] bg-gradient-to-b from-[#e0b84c] via-[#c4963a] to-[#9f722d]" />
-
-                                {/* Badge */}
-                                <div className="flex items-start justify-between mb-3 min-h-[26px]">
-                                    {mentor?.isSenior && (
-                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#f4e3cc] text-[#4a3020] border border-[#e4caa8] text-[9px] font-black uppercase tracking-wider">
-                                            <Crown className="w-3 h-3 text-[#b47a3e]" />
-                                            <span>Senior Mentor</span>
-                                        </div>
-                                    )}
-                                </div>
 
                                 {/* Details */}
                                 <div className="flex items-center gap-3.5 mb-3">
