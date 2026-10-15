@@ -54,9 +54,8 @@ const _config = {
     // ============================================================
     // 1. CORE API CONFIG
     // ============================================================
-    NEXT_PUBLIC_API_BASE_URL: requireEnv(process.env.NEXT_PUBLIC_API_BASE_URL, 'https://throne8-servers-production-ced6.up.railway.app/api/v1', 'NEXT_PUBLIC_API_BASE_URL'),
-    NEXT_PUBLIC_WS_URL: requireEnv(process.env.NEXT_PUBLIC_WS_URL, 'https://throne8-servers-production-ced6.up.railway.app', 'NEXT_PUBLIC_WS_URL'),
-    NEXT_PUBLIC_API_VERSION: optionalEnv(process.env.NEXT_PUBLIC_API_VERSION),
+      NEXT_PUBLIC_API_BASE_URL: requireEnv(process.env.NEXT_PUBLIC_API_BASE_URL, 'https://throne8-servers-production-9034.up.railway.app/api/v1', 'NEXT_PUBLIC_API_BASE_URL'),
+               NEXT_PUBLIC_WS_URL: requireEnv(process.env.NEXT_PUBLIC_WS_URL, 'wss://throne8-servers-production-9034.up.railway.app', 'NEXT_PUBLIC_WS_URL'),    NEXT_PUBLIC_API_VERSION: optionalEnv(process.env.NEXT_PUBLIC_API_VERSION),
     NEXT_PUBLIC_API_TIMEOUT: numberEnv(process.env.NEXT_PUBLIC_API_TIMEOUT, 30000),
 
     // ============================================================
@@ -295,7 +294,7 @@ NEXT_PUBLIC_COMPANY_EMPLOYEE_ADVOCACY_ENDPOINT: optionalEnv(process.env.NEXT_PUB
     // ============================================================
     // 8. APP CONFIG
     // ============================================================
-    NEXT_PUBLIC_APP_URL: requireEnv(process.env.NEXT_PUBLIC_APP_URL, 'https://throne8-servers-production-ced6.up.railway.app', 'NEXT_PUBLIC_APP_URL'),
+    NEXT_PUBLIC_APP_URL: requireEnv(process.env.NEXT_PUBLIC_APP_URL, 'https://www.throne8.com', 'NEXT_PUBLIC_APP_URL'),
     NEXT_PUBLIC_APP_NAME: requireEnv(process.env.NEXT_PUBLIC_APP_NAME, 'Throne8', 'NEXT_PUBLIC_APP_NAME'),
     NEXT_PUBLIC_APP_ENV: requireEnv(process.env.NEXT_PUBLIC_APP_ENV, 'production', 'NEXT_PUBLIC_APP_ENV'),
 
@@ -338,7 +337,7 @@ NEXT_PUBLIC_COMPANY_EMPLOYEE_ADVOCACY_ENDPOINT: optionalEnv(process.env.NEXT_PUB
     // 14. OAUTH CLIENT IDs
     // ============================================================
 
-    NEXT_PUBLIC_GOOGLE_CLIENT_ID: requireEnv(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID, '707035991312-1b9cebhvfojdp04p0f8vogmiuai42m84.apps.googleusercontent.com', 'NEXT_PUBLIC_GOOGLE_CLIENT_ID'),
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID: requireEnv(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID, '351484362622-nf3160ilcec25ja3dk4mch9m7ooko0ho.apps.googleusercontent.com', 'NEXT_PUBLIC_GOOGLE_CLIENT_ID'),
     NEXT_PUBLIC_LINKEDIN_CLIENT_ID: optionalEnv(process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID),
 
 
