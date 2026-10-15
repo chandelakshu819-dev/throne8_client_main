@@ -1,4 +1,12 @@
 // lib/store/token.storage.ts
+//
+// 🍪 Cookie-session version.
+// The access/refresh tokens now live ONLY in httpOnly cookies set by the backend —
+// JavaScript can never read them, so nothing sensitive is kept in localStorage anymore.
+// This class only keeps NON-SENSITIVE data:
+//   - the basic user info (userId / email / role) for the UI
+//   - a "logged in" flag cookie (throne8_auth=1) that the Next.js proxy/middleware
+//     (src/proxy.ts) can read on the Edge runtime
 
 interface UserData {
     userId: string;
@@ -6,32 +14,25 @@ interface UserData {
     role: string;
 }
 
-interface TokenData {
-    accessToken: string;
-    refreshToken: string;
-    expiresIn: string | number; // ✅ Accept both string and number
-}
-
-// ✅ Naam jo middleware.ts mein bhi use hoga — dono jagah EXACT match hona chahiye
+// ✅ Naam jo proxy.ts mein bhi use hota hai — dono jagah EXACT match hona chahiye
 const AUTH_COOKIE_NAME = 'throne8_auth';
 
-class TokenStorage {
-    private static readonly ACCESS_TOKEN_KEY = 'throne8_access_token';
-    private static readonly REFRESH_TOKEN_KEY = 'throne8_refresh_token';
-    private static readonly USER_DATA_KEY = 'throne8_user_data';
-    private static readonly TOKEN_EXPIRY_KEY = 'throne8_token_expiry';
+// Flag cookie lifetime = refresh cookie lifetime (30 days)
+const AUTH_FLAG_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
-    // ==================== 🆕 COOKIE HELPERS (for middleware) ====================
-    // Middleware Edge runtime par chalta hai — usko localStorage nahi dikhta.
-    // Isliye ek lightweight, non-sensitive "logged in hai ya nahi" flag
-    // cookie mein bhi rakhte hain. Actual tokens sirf localStorage mein hi
-    // rehte hain — security posture wahi purana hai.
+// Keys used by the old localStorage-token implementation
+const LEGACY_ACCESS_TOKEN_KEY = 'throne8_access_token';
+const LEGACY_REFRESH_TOKEN_KEY = 'throne8_refresh_token';
+const LEGACY_TOKEN_EXPIRY_KEY = 'throne8_token_expiry';
+
+class TokenStorage {
+    private static readonly USER_DATA_KEY = 'throne8_user_data';
+
+    // ==================== FLAG COOKIE (for proxy.ts) ====================
 
     private static setAuthCookie(): void {
         if (typeof document === 'undefined') return;
-        // 7 din ki cookie — refresh token jitni hi lambi rakho (adjust as needed)
-        const maxAgeSeconds = 7 * 24 * 60 * 60;
-        document.cookie = `${AUTH_COOKIE_NAME}=1; path=/; max-age=${maxAgeSeconds}; SameSite=Lax`;
+        document.cookie = `${AUTH_COOKIE_NAME}=1; path=/; max-age=${AUTH_FLAG_MAX_AGE_SECONDS}; SameSite=Lax`;
     }
 
     private static clearAuthCookie(): void {
@@ -39,46 +40,26 @@ class TokenStorage {
         document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
     }
 
+    private static hasAuthCookie(): boolean {
+        if (typeof document === 'undefined') return false;
+        return document.cookie.split(';').some((c) => c.trim() === `${AUTH_COOKIE_NAME}=1`);
+    }
+
+    // ==================== SESSION ====================
+
     /**
-     * 💾 Store tokens and user data after successful login
+     * 💾 Remember the logged-in user (tokens are NOT stored — the backend set them as cookies)
      */
-    static setAuthData(tokens: TokenData, user: UserData): void {
+    static setAuthData(user: UserData): void {
         try {
             if (typeof window === 'undefined') {
                 console.warn('⚠️ Not in browser environment, skipping storage');
                 return;
             }
 
-            // Store tokens
-            localStorage.setItem(this.ACCESS_TOKEN_KEY, tokens.accessToken);
-            localStorage.setItem(this.REFRESH_TOKEN_KEY, tokens.refreshToken);
             localStorage.setItem(this.USER_DATA_KEY, JSON.stringify(user));
-
-            // ✅ Handle both string ("15m") and number (900) formats
-            let expiryMinutes: number;
-
-            if (typeof tokens.expiresIn === 'string') {
-                // String format: "15m" or "900"
-                expiryMinutes = parseInt(tokens.expiresIn.replace(/\D/g, '')) || 15;
-            } else {
-                // Number format: 900 (seconds)
-                expiryMinutes = Math.floor(tokens.expiresIn / 60) || 15;
-            }
-
-            const expiryTime = Date.now() + (expiryMinutes * 60 * 1000);
-            localStorage.setItem(this.TOKEN_EXPIRY_KEY, expiryTime.toString());
-
-            // 🆕 Set the middleware-visible cookie
             this.setAuthCookie();
-
-            console.log('✅ [TokenStorage] Auth data stored successfully', {
-                userId: user.userId,
-                email: user.email,
-                expiresIn: tokens.expiresIn,
-                expiryMinutes,
-                expiryTime: new Date(expiryTime).toLocaleString()
-            });
-
+            this.purgeLegacyTokens();
         } catch (error) {
             console.error('❌ [TokenStorage] Failed to store auth data:', error);
             throw new Error('Failed to store authentication data');
@@ -86,34 +67,10 @@ class TokenStorage {
     }
 
     /**
-     * 🔑 Get access token
+     * 🔄 A refresh just succeeded, so the session is alive — keep the flag cookie alive too
      */
-    static getAccessToken(): string | null {
-        if (typeof window === 'undefined') return null;
-        return localStorage.getItem(this.ACCESS_TOKEN_KEY);
-    }
-
-    static updateRefreshToken(refreshToken: string): void {
-        if (typeof window === 'undefined') return;
-        localStorage.setItem(this.REFRESH_TOKEN_KEY, refreshToken);
-    }
-
-    /**
-     * 🔄 Get refresh token
-     */
-    static getRefreshToken(): string | null {
-        if (typeof window === 'undefined') return null;
-
-        try {
-            const token = localStorage.getItem(this.REFRESH_TOKEN_KEY);
-            if (!token) {
-                console.log('ℹ️ [TokenStorage] No refresh token found');
-            }
-            return token;
-        } catch (error) {
-            console.error('❌ [TokenStorage] Error getting refresh token:', error);
-            return null;
-        }
+    static markSessionActive(): void {
+        this.setAuthCookie();
     }
 
     /**
@@ -124,10 +81,7 @@ class TokenStorage {
 
         try {
             const userData = localStorage.getItem(this.USER_DATA_KEY);
-            if (!userData) {
-                console.log('ℹ️ [TokenStorage] No user data found');
-                return null;
-            }
+            if (!userData) return null;
             return JSON.parse(userData) as UserData;
         } catch (error) {
             console.error('❌ [TokenStorage] Error parsing user data:', error);
@@ -136,118 +90,69 @@ class TokenStorage {
     }
 
     /**
-     * 👤 Update user data in storage
-     */
-    static updateUserData(userData: UserData): void {
-        if (typeof window === 'undefined') return;
-        try {
-            localStorage.setItem(this.USER_DATA_KEY, JSON.stringify(userData));
-        } catch (error) {
-            console.error('❌ [TokenStorage] Error updating user data:', error);
-        }
-    }
-
-    /**
-     * ⏰ Check if access token is expired
-     */
-    static isTokenExpired(): boolean {
-        if (typeof window === 'undefined') return true;
-
-        try {
-            const expiryTime = localStorage.getItem(this.TOKEN_EXPIRY_KEY);
-            if (!expiryTime) return true;
-
-            const isExpired = Date.now() >= parseInt(expiryTime);
-            if (isExpired) {
-                console.warn('⚠️ [TokenStorage] Token has expired');
-            }
-            return isExpired;
-        } catch (error) {
-            console.error('❌ [TokenStorage] Error checking token expiry:', error);
-            return true;
-        }
-    }
-
-    /**
-     * ✅ Check if user is authenticated
+     * ✅ Does the browser believe it has a session?
+     * (The real check is the backend cookie — if it is gone, the next API call returns 401,
+     *  the interceptor tries one refresh, and on failure logs the user out.)
      */
     static isAuthenticated(): boolean {
         if (typeof window === 'undefined') return false;
-        const refreshToken = this.getRefreshToken();
-        const userData = this.getUserData();
-        return !!(refreshToken && userData);
-    }
-
-    static needsTokenRefresh(): boolean {
-        if (typeof window === 'undefined') return false;
-        const refreshToken = this.getRefreshToken();
-        if (!refreshToken) return false;
-        return this.isTokenExpired();
+        return this.hasAuthCookie() && !!this.getUserData();
     }
 
     /**
-     * 🗑️ Clear all authentication data
+     * 🗑️ Clear the local session state (the backend clears its own cookies on /auth/logout)
      */
     static clearAuthData(): void {
         if (typeof window === 'undefined') return;
 
         try {
-            localStorage.removeItem(this.ACCESS_TOKEN_KEY);
-            localStorage.removeItem(this.REFRESH_TOKEN_KEY);
             localStorage.removeItem(this.USER_DATA_KEY);
-            localStorage.removeItem(this.TOKEN_EXPIRY_KEY);
-
-            // 🆕 Clear the middleware-visible cookie too
+            this.purgeLegacyTokens();
             this.clearAuthCookie();
-
-            console.log('✅ [TokenStorage] All auth data cleared');
         } catch (error) {
             console.error('❌ [TokenStorage] Error clearing auth data:', error);
         }
     }
 
+    // ==================== MIGRATION (old localStorage sessions) ====================
+
     /**
-     * 🔄 Update only access token
+     * Sessions created before cookie auth only have a refresh token in localStorage.
+     * The API layer sends it ONCE to /auth/refresh-token so the backend can turn it into cookies.
      */
-    static updateAccessToken(accessToken: string, expiresIn: string | number): void {
-        if (typeof window === 'undefined') return;
-
+    static getLegacyRefreshToken(): string | null {
+        if (typeof window === 'undefined') return null;
         try {
-            localStorage.setItem(this.ACCESS_TOKEN_KEY, accessToken);
-
-            // Handle both formats
-            let expiryMinutes: number;
-            if (typeof expiresIn === 'string') {
-                expiryMinutes = parseInt(expiresIn.replace(/\D/g, '')) || 15;
-            } else {
-                expiryMinutes = Math.floor(expiresIn / 60) || 15;
-            }
-
-            const expiryTime = Date.now() + (expiryMinutes * 60 * 1000);
-            localStorage.setItem(this.TOKEN_EXPIRY_KEY, expiryTime.toString());
-
-            // 🆕 Refresh worked, so user is still logged in — keep cookie alive
-            this.setAuthCookie();
-
-            console.log('✅ [TokenStorage] Access token updated');
-        } catch (error) {
-            console.error('❌ [TokenStorage] Error updating access token:', error);
+            return localStorage.getItem(LEGACY_REFRESH_TOKEN_KEY);
+        } catch {
+            return null;
         }
     }
 
     /**
-     * 📊 Get auth summary
+     * Remove tokens left in localStorage by the old implementation
+     */
+    static purgeLegacyTokens(): void {
+        if (typeof window === 'undefined') return;
+        try {
+            localStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
+            localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
+            localStorage.removeItem(LEGACY_TOKEN_EXPIRY_KEY);
+        } catch {
+            /* storage unavailable */
+        }
+    }
+
+    /**
+     * 📊 Get auth summary (for debugging)
      */
     static getAuthSummary() {
         return {
             isAuthenticated: this.isAuthenticated(),
-            hasAccessToken: !!this.getAccessToken(),
-            hasRefreshToken: !!this.getRefreshToken(),
             userData: this.getUserData(),
-            tokenExpired: this.isTokenExpired(),
         };
     }
 }
 
 export default TokenStorage;
-export type { UserData, TokenData };
+export type { UserData };

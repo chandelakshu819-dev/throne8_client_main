@@ -17,11 +17,8 @@ export const registerUser = createAsyncThunk(
             // Call AuthService
             const response = await AuthService.register(registrationData);
 
-            // Store tokens (AuthService already does this)
-            TokenStorage.setAuthData(
-                response.data.tokens,
-                response.data.user
-            );
+            // 🍪 Session cookies were set by the backend; remember the user for the UI
+            TokenStorage.setAuthData(response.data.user);
 
             // console.log('✅ [THUNK] Registration successful:', response.data.user.email);
 

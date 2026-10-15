@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthService from '@/lib/api/auth.service';
 import TokenStorage from '@/lib/store/token.storage';
-import api from '@/lib/api/api.intance';
 
 interface UseAuthReturn {
     user: {
@@ -89,29 +88,15 @@ export function useProtectedRoute() {
         const checkAuth = async () => {
             await new Promise(resolve => setTimeout(resolve, 50));
 
-            // ✅ refreshToken check karo, accessToken nahi
-            const hasRefreshToken = !!TokenStorage.getRefreshToken();
-            const hasUserData = !!TokenStorage.getUserData();
-            const hasSession = hasRefreshToken && hasUserData;
-
-           if (!hasSession) {
-    TokenStorage.clearAuthData(); // cookie bhi clear karega, loop tootega
-    setIsChecking(false);
-    router.replace('/login');
-    return;
-}
-
-            // ✅ AccessToken expire hua? Ek authenticated call karo —
-            // agar 401 aaya to api.instance.ts ka interceptor khud refresh
-            // handle karega (shared isRefreshing lock use hoga,
-            // isse duplicate refresh-token call nahi hoga)
-            if (TokenStorage.needsTokenRefresh()) {
-                try {
-                    await api.get('/auth/profile');
-                } catch {
-                    // Network/auth error — session valid maano, mat redirect karo
-                    // (agar refresh bhi fail hua to interceptor khud /login pe bhej dega)
-                }
+            // 🍪 Tokens are httpOnly cookies, so check the local session marker
+            // (flag cookie + stored user). If the cookie session has really expired,
+            // the first API call gets a 401 and api.instance.ts refreshes it once
+            // (or sends the user to /login if that fails).
+            if (!TokenStorage.isAuthenticated()) {
+                TokenStorage.clearAuthData(); // flag cookie bhi clear karega, loop tootega
+                setIsChecking(false);
+                router.replace('/login');
+                return;
             }
 
             setIsChecking(false);
