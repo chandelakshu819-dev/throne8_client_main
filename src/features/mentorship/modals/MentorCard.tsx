@@ -36,14 +36,17 @@ export default function MentorCard({ mentor }: MentorCardProps) {
             )}
             <div
                 onClick={handleClick}
-                className="flex-shrink-0 w-[280px] p-6 bg-[#f5f0ea] border border-[#ddd0c4] rounded-[32px] hover:border-[#3a2a1e] transition-all duration-500 group shadow-lg hover:shadow-2xl hover:-translate-y-2 relative overflow-hidden cursor-pointer">
+                className="flex flex-col flex-shrink-0 w-[280px] p-6 bg-[#f5f0ea] border border-[#ddd0c4] rounded-[32px] hover:border-[#3a2a1e] transition-all duration-500 group shadow-lg hover:shadow-2xl hover:-translate-y-2 relative overflow-hidden cursor-pointer">
                 {/* Hover gradient overlay */}
                 <div className="absolute inset-0 bg-gradient-to-br from-[#3a2a1e]/0 to-[#3a2a1e]/8 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 {/* Glow orb */}
                 <div className="absolute top-0 right-0 w-24 h-24 bg-[#c4963a]/15 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-all duration-700" />
 
-                <div className="relative z-10">
-                    {/* Mentor Photo */}
+                <div className="relative z-10 flex flex-col flex-1">
+    {/* Mentor Photo */}
+
+
+
                     <div className="flex justify-center mb-4">
                         <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-[#f5f0ea] shadow-lg group-hover:scale-110 group-hover:border-[#c4963a] transition-all duration-500">
                             {mentor.image ? (
@@ -113,7 +116,7 @@ export default function MentorCard({ mentor }: MentorCardProps) {
                     </div>
 
                     {/* Experience Badge */}
-                    <div className="flex items-center justify-center gap-2 pt-3 border-t border-[#ddd0c4]">
+                    <div className="mt-auto flex items-center justify-center gap-2 pt-3 border-t border-[#ddd0c4]">
                         <Award className="w-4 h-4 text-[#c4963a]" />
                         <span className="text-xs font-bold text-[#4a3728]">
                             {mentor.exp} Experience
