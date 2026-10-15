@@ -79,6 +79,25 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
         setImgError(false);
     }, [profileImage]);
 
+    // Prevent background scrolling when mobile menu is open
+    useEffect(() => {
+        if (isMobileMenuOpen) {
+            const originalOverflow = document.body.style.overflow;
+            const originalTouchAction = document.body.style.touchAction;
+            document.body.style.overflow = 'hidden';
+            document.body.style.touchAction = 'none';
+            return () => {
+                document.body.style.overflow = originalOverflow;
+                document.body.style.touchAction = originalTouchAction;
+            };
+        }
+    }, [isMobileMenuOpen]);
+
+    // Close mobile menu on navigation
+    useEffect(() => {
+        setIsMobileMenuOpen(false);
+    }, [pathname]);
+
     const handleMenuClick = async (item: string) => {
         setIsMobileMenuOpen(false);
         setIsDropdownOpen(false);
@@ -362,8 +381,22 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
 
                     {/* Mobile Navigation Menu */}
                     {isMobileMenuOpen && (
-                        <div className="lg:hidden border-t border-[#E5D9CE] bg-[#F6EDE8] -mx-3 sm:-mx-6 max-h-[calc(100vh-4.5rem)] overflow-y-auto shadow-2xl">
-                            <div className="px-3 sm:px-6 py-4 space-y-1">
+                        <>
+                            {/* Backdrop: clicking outside menu closes it */}
+                            <div
+                                className="fixed inset-0 top-16 bg-black/30 backdrop-blur-[2px] z-40 lg:hidden"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                aria-hidden="true"
+                            />
+                            <div
+                                className="relative z-50 lg:hidden border-t border-[#E5D9CE] bg-[#F6EDE8] -mx-3 sm:-mx-6 overflow-y-auto overscroll-contain shadow-2xl"
+                                style={{
+                                    maxHeight: 'calc(100dvh - 4rem - 4.25rem - env(safe-area-inset-bottom, 0px))',
+                                    WebkitOverflowScrolling: 'touch',
+                                    touchAction: 'pan-y',
+                                }}
+                            >
+                                <div className="px-3 sm:px-6 pt-3 pb-8 space-y-1">
                                 {/* Profile Card Header */}
                                 <button
                                     onClick={() => handleMenuClick('View Profile')}
@@ -450,6 +483,7 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                 </button>
                             </div>
                         </div>
+                        </>
                     )}
                 </div>
             </nav>
