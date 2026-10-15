@@ -1,17 +1,20 @@
 "use client";
 //src/features/mentorship/components/layout/Navigation.tsx
-import React, { useEffect } from "react";
-import { Globe } from "lucide-react";
+
+import React, { useEffect, useState } from "react";
+import { LogOut } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import SearchBar from "@/features/profile/components/home/SearchBar";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfileData } from "@/features/profile/hooks/useProfileData";
+import { useNavbarData } from "@/features/profile/components/home/NavbarProvider";
 import { formatUserDisplayName } from "@/shared/utils/format";
 import { transformToProfileData } from "@/shared/utils/profileTransformers";
 import { HOME_PATH, isFeatureEnabled, type FeatureKey } from "@/config/launch";
 import ProfileDropdown from "@/features/mentorship/components/shared/ProfileDropdown";
 import { useMyRoles } from "@/features/mentorship/hooks/useMentorRole";
 import { routes } from "@/config/routes";
+import AuthService from "@/lib/api/auth.service";
 import BrandWordmark from "@/shared/uiComponents/BrandWordmark";
 
 interface NavigationProps {
@@ -56,7 +59,17 @@ export default function Navigation({
     const pathname = usePathname();
     const { user } = useAuth();
     const { roles } = useMyRoles(!!user);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+    const handleSignOut = async () => {
+        if (isLoggingOut) return;
+        setIsLoggingOut(true);
+        await AuthService.logout(); // token clear + /login redirect ye khud karta hai
+    };    
+
     const { userProfileData, profileImageUrl, fetchUserProfile } = useProfileData();
+    // NavbarProvider ki photo (mentor photo override ke sath) — dashboard me badalte hi yahan bhi badle
+    const { profileData: navbarProfileData } = useNavbarData();
 
     const targetUserId = currentUserId || user?.userId || user?.id || (user as any)?._id;
 
@@ -178,19 +191,26 @@ export default function Navigation({
                             </div>
                         )}
 
-                        {/* Timezone Badge */}
-                        <div className="hidden xl:flex items-center gap-1.5 text-[10px] font-bold text-[#8b7355] bg-[#f8f6f4] px-3 py-1.5 rounded-full border border-[#ece7e2] shrink-0">
-                            <Globe className="w-3.5 h-3.5" />
-                            {activeTimezone}
-                        </div>
+                        
 
                         {/* Profile Dropdown */}
                         <ProfileDropdown
                             user={user}
                             isAuthenticated={!!user}
-                            profileImageUrl={profileImageUrl}
+                            profileImageUrl={navbarProfileData?.profileImage || profileImageUrl}
                             fullName={fullName || undefined}
                         />
+
+                        {/* Sign Out — dropdown ke side me */}
+                        <button
+                            onClick={handleSignOut}
+                            disabled={isLoggingOut}
+                            title="Sign Out"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-[#E5D9CE] bg-white text-[#B4442E] text-xs font-semibold hover:bg-[#FBEAE6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            <span className="hidden sm:inline">{isLoggingOut ? "Signing out..." : "Sign Out"}</span>
+                        </button>
                     </div>
                 </div>
             </div>

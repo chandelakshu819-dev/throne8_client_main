@@ -30,6 +30,9 @@ import {
 } from "lucide-react";
 import AuthService from "@/lib/api/auth.service";
 import ProfileService from "@/lib/api/profile.service";
+import MentorService from "@/lib/api/mentorship.service";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useNavbarProfileImage } from "@/features/profile/components/home/NavbarProvider";
 import TokenStorage from "@/lib/store/token.storage";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 
@@ -69,6 +72,9 @@ export default function UserDashboardProfilePreferencesPage({
   onBack,
 }: UserDashboardProfilePreferencesPageProps) {
   const { loadProfile } = useProfile();
+  const { user: syncAuthUser } = useAuth();
+  const setNavbarProfileImage = useNavbarProfileImage();
+
 
   // ==========================================
   // Core State
@@ -234,6 +240,20 @@ export default function UserDashboardProfilePreferencesPage({
       if (newUrl) {
         setProfilePhotoUrl(newUrl);
         setFeedback({ type: "success", message: "Profile photo updated successfully!" });
+
+        // ✅ Header avatar turant update
+        setNavbarProfileImage(newUrl);
+
+        // ✅ Same account ka mentor profile ho to uski photo bhi sync karo (mentor nahi hai to chup-chap skip)
+        const syncUserId = (syncAuthUser as any)?.userId || (syncAuthUser as any)?.id;
+        if (syncUserId) {
+          MentorService.getMentorByUserId(syncUserId)
+            .then((mRes: any) => {
+              const mid = mRes?.data?.mentorId;
+              return mid ? MentorService.updateProfilePhoto(mid, file) : null;
+            })
+            .catch(() => { /* user mentor nahi hai */ });
+        }
         fetchAllUserData(true);
         if (typeof loadProfile === "function") {
           loadProfile();

@@ -22,8 +22,12 @@ export default function SeniorMentorSidebar({
   const globalProfile = useAppSelector((state) => state.login.profile);
   
   const getPhotoForLevel = (level: number): string | null => {
-    if (level === 0 && profilePhoto) return profilePhoto;
-    if (level <= 1 && (globalProfile?.profilePic || globalProfile?.profilePhoto)) return globalProfile?.profilePic || globalProfile?.profilePhoto;
+
+       // Account photo (state.login.profile) pehle: ek hi photo sab roles me dikhe
+       const accountPhoto = globalProfile?.profilePic || globalProfile?.profilePhoto;
+       if (level === 0 && accountPhoto) return accountPhoto;
+       if (level <= 1 && profilePhoto) return profilePhoto;
+       
     return null;
   };
   const currentPhoto = getPhotoForLevel(imgFallbackLevel);
