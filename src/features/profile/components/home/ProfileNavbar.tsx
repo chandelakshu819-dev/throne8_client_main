@@ -11,6 +11,8 @@ import { NetworkNotificationBadge } from '@/features/networks/components/notific
 import { capitalizeName } from '@/shared/utils/format';
 import { HOME_PATH, isFeatureEnabled, FeatureKey } from '@/config/launch';
 import BrandWordmark from '@/shared/uiComponents/BrandWordmark';
+import Link from 'next/link';
+import MobileBottomNavbar from '@/shared/uiComponents/MobileBottomNavbar';
 
 interface ProfileNavbarProps {
     profileImage: string;
@@ -78,30 +80,27 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
     }, [profileImage]);
 
     const handleMenuClick = async (item: string) => {
+        setIsMobileMenuOpen(false);
+        setIsDropdownOpen(false);
         switch (item) {
             case 'View Profile':
                 if (onOpenLeftPanel && window.innerWidth < 1024) {
                     onOpenLeftPanel();
                     setIsProfilePanelOpen(false);
-                    setIsDropdownOpen(false);
                 } else {
                     router.push(`/profile`);
-                    setIsDropdownOpen(false);
                 }
                 break;
             case 'Update Profile':
-                setIsDropdownOpen(false);
+                router.push(`/profile`);
                 break;
             case 'Create Company Page':
                 router.push(`/create-company/${currentUserId}`);
-                setIsDropdownOpen(false);
                 break;
             case 'Company Page':
                 router.push(`/company/${currentUserId}`);
-                setIsDropdownOpen(false);
                 break;
             case 'Settings':
-                setIsDropdownOpen(false);
                 break;
             case 'Sign Out':
                 setIsLoggingOut(true);
@@ -258,8 +257,39 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                 </button>
                             )}
 
+                            {/* Mobile Messaging Quick Icon */}
+                            {isFeatureEnabled('messaging') && (
+                                <Link
+                                    href={currentUserId ? `/message/${currentUserId}` : '/message'}
+                                    className="lg:hidden relative text-[#4a3728] hover:bg-[#EFE3D8] rounded-lg p-2 transition-colors duration-200"
+                                    aria-label="Messages"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                    <span className="absolute -top-0.5 -right-0.5">
+                                        <MessageNotificationBadge />
+                                    </span>
+                                </Link>
+                            )}
+
+                            {/* Mobile Notifications Quick Icon */}
+                            {isFeatureEnabled('notifications') && (
+                                <Link
+                                    href={currentUserId ? `/notifications/${currentUserId}` : '/notifications'}
+                                    className="lg:hidden relative text-[#4a3728] hover:bg-[#EFE3D8] rounded-lg p-2 transition-colors duration-200"
+                                    aria-label="Notifications"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                    </svg>
+                                </Link>
+                            )}
+
 {SHOW_SEARCH && <div className="h-8 w-px bg-[#E5D9CE] mx-1 hidden md:block" />}
 
+                            {/* Profile commented out from top bar as requested */}
+                            {/*
                             {isMentorshipRoute && (
                                 <ProfileDropdown
                                     user={{ userId: currentUserId }}
@@ -269,13 +299,10 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                 />
                             )}
 
-
-                            
                             <div className="relative">
                                 <button
-                                                                       onClick={() => { if (!isMentorshipRoute) setIsDropdownOpen(!isDropdownOpen); }}
-                                                                       className={`items-center gap-2 rounded-full pl-1 pr-2 py-1 transition-colors duration-200 ${isMentorshipRoute ? 'hidden' : 'flex hover:bg-[#EFE3D8]'}`}
-
+                                    onClick={() => { if (!isMentorshipRoute) setIsDropdownOpen(!isDropdownOpen); }}
+                                    className={`items-center gap-2 rounded-full pl-1 pr-2 py-1 transition-colors duration-200 ${isMentorshipRoute ? 'hidden' : 'flex hover:bg-[#EFE3D8]'}`}
                                 >
                                     <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-white shadow-sm flex-shrink-0 bg-[#4a3728] flex items-center justify-center">
                                         {profileImage && profileImage.trim() !== '' && !imgError ? (
@@ -295,8 +322,7 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                     </div>
                                     <span className="text-sm font-medium hidden md:inline text-[#4a3728] whitespace-nowrap">{capitalizeName(userName || 'User')}</span>
                                     <svg
-                                                                            className={`w-4 h-4 text-[#4a3728]/60 transition-transform duration-200 flex-shrink-0 hidden ${isMentorshipRoute ? '' : 'md:block'} ${isDropdownOpen ? 'rotate-180' : ''}`}
-        
+                                        className={`w-4 h-4 text-[#4a3728]/60 transition-transform duration-200 flex-shrink-0 hidden ${isMentorshipRoute ? '' : 'md:block'} ${isDropdownOpen ? 'rotate-180' : ''}`}
                                         fill="none"
                                         stroke="currentColor"
                                         viewBox="0 0 24 24"
@@ -323,6 +349,7 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                     </div>
                                 )}
                             </div>
+                            */}
                         </div>
                     </div>
 
@@ -335,8 +362,42 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
 
                     {/* Mobile Navigation Menu */}
                     {isMobileMenuOpen && (
-                        <div className="lg:hidden border-t border-[#E5D9CE] bg-[#F6EDE8] -mx-3 sm:-mx-6">
+                        <div className="lg:hidden border-t border-[#E5D9CE] bg-[#F6EDE8] -mx-3 sm:-mx-6 max-h-[calc(100vh-4.5rem)] overflow-y-auto shadow-2xl">
                             <div className="px-3 sm:px-6 py-4 space-y-1">
+                                {/* Profile Card Header */}
+                                <button
+                                    onClick={() => handleMenuClick('View Profile')}
+                                    className="w-full flex items-center gap-3.5 p-3 mb-3 bg-white/90 hover:bg-white border border-[#E5D9CE] rounded-2xl text-left transition-all duration-200 shadow-sm active:scale-[0.99] group"
+                                >
+                                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-[#FAF6F0] shadow-sm flex-shrink-0 bg-[#4a3728] flex items-center justify-center">
+                                        {profileImage && profileImage.trim() !== '' && !imgError ? (
+                                            <img
+                                                src={profileImage}
+                                                alt={userName || "Profile"}
+                                                className="w-full h-full object-cover"
+                                                onError={() => setImgError(true)}
+                                            />
+                                        ) : (
+                                            <img
+                                                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(capitalizeName(userName || 'User'))}&background=4a3728&color=fff&size=128`}
+                                                alt={capitalizeName(userName || "Profile")}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-bold text-[#4a3728] truncate group-hover:text-[#2d2116]">{capitalizeName(userName || 'User')}</p>
+                                        <p className="text-xs text-[#c4963a] font-semibold flex items-center gap-1 mt-0.5">
+                                            <span>View Profile</span>
+                                            <svg className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        </p>
+                                    </div>
+                                </button>
+
+                                <div className="h-px bg-[#E5D9CE]/70 my-2" />
+
                                 {NAV_ITEMS.map((item) => (
                                     <button
                                         key={item}
@@ -351,6 +412,42 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                         {item === 'Messaging' && <div className="ml-auto"><MessageNotificationBadge /></div>}
                                     </button>
                                 ))}
+
+                                <div className="h-px bg-[#E5D9CE]/70 my-2" />
+
+                                {SHOW_COMPANY_MENU && (
+                                    <>
+                                        <button
+                                            onClick={() => handleMenuClick('Company Page')}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-[#4a3728] hover:bg-[#EFE3D8] rounded-xl transition-colors duration-200"
+                                        >
+                                            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                            </svg>
+                                            <span>Company Page</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleMenuClick('Create Company Page')}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-[#4a3728] hover:bg-[#EFE3D8] rounded-xl transition-colors duration-200"
+                                        >
+                                            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            <span>Create Company Page</span>
+                                        </button>
+                                    </>
+                                )}
+
+                                <button
+                                    onClick={() => handleMenuClick('Sign Out')}
+                                    disabled={isLoggingOut}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-[#B4442E] hover:bg-[#FBEAE6] rounded-xl transition-colors duration-200 disabled:opacity-50"
+                                >
+                                    <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                    </svg>
+                                    <span>{isLoggingOut ? 'Signing out...' : 'Sign Out'}</span>
+                                </button>
                             </div>
                         </div>
                     )}
@@ -364,6 +461,12 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                 userName={userName}
                 currentUserId={currentUserId}
                 onOpenLeftPanel={onOpenLeftPanel}
+            />
+
+            {/* Mobile Bottom Navigation Bar */}
+            <MobileBottomNavbar
+                currentUserId={currentUserId}
+                userRole={userRole}
             />
         </>
     );
