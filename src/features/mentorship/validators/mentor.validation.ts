@@ -1,6 +1,14 @@
 import { DOMAINS } from "@/features/mentorship/constants/mentorship";
 import z from "zod";
 
+// Server-side rule: must contain at least one letter or digit
+const requiredAlnum = (label: string) =>
+  z
+    .string({ required_error: `${label} is required` })
+    .trim()
+    .min(1, `${label} is required`)
+    .max(200, `${label} is too long`)
+    .refine((val) => /[a-zA-Z0-9]/.test(val), `${label} must contain letters or digits`);
 
 // ===== ZOD SCHEMAS =====
 export const createMentorSchema = z.object({
@@ -9,7 +17,7 @@ export const createMentorSchema = z.object({
     .string()
     .min(5, 'Title must be at least 5 characters')
     .max(100, 'Title cannot exceed 100 characters'),
-  
+
   linkedinUrl: z
     .string()
     .url('Please enter a valid LinkedIn URL')
@@ -61,6 +69,12 @@ export const createMentorSchema = z.object({
     .max(50),
 
   currentRole: z.string().min(2, 'Current role is required'),
+
+  // Step 2 — required by the server
+  company: requiredAlnum('Company'),
+  college: requiredAlnum('College'),
+  degree: requiredAlnum('Degree'),
+  branch: requiredAlnum('Branch'),
 });
 
 // Step-wise schemas for step validation
@@ -76,4 +90,8 @@ export const step2Schema = createMentorSchema.pick({
   domains: true,
   experienceTotal: true,
   currentRole: true,
+  company: true,
+  college: true,
+  degree: true,
+  branch: true,
 });
