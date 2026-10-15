@@ -299,7 +299,7 @@ export default function ActionCardsSection({
                             onClick={onBecomeMentorClick}
                             icon={<Users className={ICON_CLASS} />}
                             audience={MENTOR_AUDIENCE}
-                            title="Become Mentor"
+                            title="Become Industry Mentor"
                             description={MENTOR_DESC}
                             cta="Apply Now"
                         />

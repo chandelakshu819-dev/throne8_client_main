@@ -8,6 +8,7 @@ import * as z from 'zod';
 import AuthService from '@/lib/api/auth.service';
 import { useAppDispatch } from '@/core/store/store.hooks';
 import { checkAuthStatus } from '@/hooks/auth';
+import { HOME_PATH } from '@/config/launch';
 import CurrentStatus from '@/features/auth/components/CurrentStatus';
 import WorkingJobDetails from '@/features/auth/components/WorkingJobDetails';
 import StudentEducation from '@/features/auth/components/StudentEducation';
@@ -176,7 +177,7 @@ export default function GoogleOnboardingPage() {
             }
 
             dispatch(checkAuthStatus());
-            router.replace('/dashboard');
+            router.replace(HOME_PATH);
         } catch (err: any) {
             console.error('❌ [GOOGLE ONBOARDING] Error:', err);
             setError(err.message || 'Registration failed. Please try again.');

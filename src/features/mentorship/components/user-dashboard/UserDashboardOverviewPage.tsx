@@ -1,3 +1,4 @@
+//src/features/mentorship/components/user-dashboard/UserDashboardOverviewPage.tsx
 import React, { useState } from "react";
 import {
   CalendarClock,
@@ -8,11 +9,11 @@ import {
   Clock3,
   ClipboardList,
   Search,
-  BookOpen
+  BookOpen,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import MentorService from "@/lib/api/mentorship.service";
 import FindMentorModal from "@/features/mentorship/components/sections/FindMentorModal";
+import { capitalizeName } from "@/shared/utils/format";
 
 const COLORS = {
   ink: "#4a3728",
@@ -72,7 +73,6 @@ export default function UserDashboardOverviewPage({
   sessions = [],
   setActivePage,
 }: UserDashboardOverviewPageProps) {
-  const router = useRouter();
   const [isFindMentorOpen, setIsFindMentorOpen] = useState(false);
   const [findMentorMentors, setFindMentorMentors] = useState<any[]>([]);
   const [findMentorLoading, setFindMentorLoading] = useState(false);
@@ -83,18 +83,18 @@ export default function UserDashboardOverviewPage({
       setFindMentorLoading(true);
       try {
         const res = await MentorService.getAllMentors({ page: 1, limit: 100 });
-        const list = Array.isArray(res.data) ? res.data : (res.data?.mentors || []);
+        const list = Array.isArray(res.data) ? res.data : res.data?.mentors || [];
         const mapped = list.map((m: any) => ({
-            id: m.mentorId,
-            userId: m.userId,
-            name: `${m.user?.firstName ?? ""} ${m.user?.lastName ?? ""}`.trim(),
-            role: m.experience?.currentRole?.split(" at ")[0] ?? "Mentor",
-            company: m.experience?.currentRole?.split(" at ")[1] ?? "",
-            rating: m.stats?.averageRating || 0,
-            sessions: m.stats?.totalSessions || m.trustScore?.metrics?.totalCompletedSessions || 0,
-            price: m.pricing?.quickCall || 0,
-            tags: m.skills?.slice(0, 2) ?? [],
-            image: m.profilePic ?? "",
+          id: m.mentorId,
+          userId: m.userId,
+          name: `${m.user?.firstName ?? ""} ${m.user?.lastName ?? ""}`.trim(),
+          role: m.experience?.currentRole?.split(" at ")[0] ?? "Mentor",
+          company: m.experience?.currentRole?.split(" at ")[1] ?? "",
+          rating: m.stats?.averageRating || 0,
+          sessions: m.stats?.totalSessions || m.trustScore?.metrics?.totalCompletedSessions || 0,
+          price: m.pricing?.quickCall || 0,
+          tags: m.skills?.slice(0, 2) ?? [],
+          image: m.profilePic ?? "",
         }));
         setFindMentorMentors(mapped);
       } catch (err) {
@@ -105,10 +105,11 @@ export default function UserDashboardOverviewPage({
     }
   };
 
-  const firstName =
+  const rawFirstName =
     user?.firstName?.trim() ||
     (user?.name ? user.name.trim().split(" ")[0] : null) ||
     "there";
+  const firstName = capitalizeName(rawFirstName);
 
   const now = Date.now();
 
@@ -125,34 +126,39 @@ export default function UserDashboardOverviewPage({
 
   const completed = sessions.filter((s) => {
     const t = new Date(s.startTime || s.scheduledAt || 0).getTime();
-    return (s.status === "completed" || s.status === "done") || (t < now && s.status !== "cancelled");
+    return s.status === "completed" || s.status === "done" || (t < now && s.status !== "cancelled");
   });
 
-  const uniqueMentors = new Set(sessions.map(s => s.mentorName).filter(Boolean)).size;
+  const uniqueMentors = new Set(sessions.map((s) => s.mentorName).filter(Boolean)).size;
 
   const totalMinutes = completed.reduce((acc, s) => acc + (s.duration || 60), 0);
   const totalHours = Math.round(totalMinutes / 60);
 
   const stats = [
-    { label: "Total sessions", value: String(sessions.length), icon: ClipboardList },
-    { label: "Upcoming", value: String(upcoming.length), icon: CalendarClock },
-    { label: "Completed", value: String(completed.length), icon: CheckCircle },
-    { label: "My Mentors", value: String(uniqueMentors), icon: Users },
-    { label: "Mentorship Hours", value: String(totalHours), icon: Clock3 },
+    { label: "Total sessions", value: String(sessions.length), unit: "", icon: ClipboardList, highlight: false },
+    { label: "Upcoming", value: String(upcoming.length), unit: "", icon: CalendarClock, highlight: true },
+    { label: "Completed", value: String(completed.length), unit: "", icon: CheckCircle, highlight: false },
+    { label: "My Mentors", value: String(uniqueMentors), unit: "", icon: Users, highlight: false },
+    { label: "Mentorship Hours", value: String(totalHours), unit: totalHours === 1 ? "hr" : "hrs", icon: Clock3, highlight: false },
   ];
 
-  const pendingActions = [];
+  const pendingActions: {
+    title: string;
+    description: string;
+    icon: React.ElementType;
+    onClick: () => void;
+  }[] = [];
 
   if (user && (!user.bio || !user.jobTitle || !user.profilePhoto)) {
     pendingActions.push({
       title: "Complete your profile",
       description: "Help mentors understand your goals",
       icon: BookOpen,
-      onClick: () => setActivePage?.('profile')
+      onClick: () => setActivePage?.("profile"),
     });
   }
 
-  const unreviewedSessions = sessions.filter(s => {
+  const unreviewedSessions = sessions.filter((s) => {
     const status = (s.status || "").toLowerCase();
     const isCompletedStatus = status === "completed" || status === "done";
     const hasReview = s.review && (s.review.rating || s.review.menteeReview);
@@ -161,15 +167,15 @@ export default function UserDashboardOverviewPage({
 
   if (unreviewedSessions.length > 0) {
     pendingActions.push({
-      title: `Review ${unreviewedSessions.length} completed session${unreviewedSessions.length > 1 ? 's' : ''}`,
+      title: `Review ${unreviewedSessions.length} completed session${unreviewedSessions.length > 1 ? "s" : ""}`,
       description: "Share your feedback to help others",
       icon: ShieldCheck,
-      onClick: () => setActivePage?.('session-history')
+      onClick: () => setActivePage?.("session-history"),
     });
   }
 
   return (
-    <div className="space-y-8 animate-fadeIn max-w-4xl">
+    <div className="space-y-6 animate-fadeIn w-full max-w-7xl mx-auto">
       {/* Greeting */}
       <div>
         <h2 className="text-xl md:text-2xl font-bold" style={{ color: COLORS.ink }}>
@@ -182,171 +188,205 @@ export default function UserDashboardOverviewPage({
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        {stats.map((stat, idx) => (
-          <div
-            key={idx}
-            className={`bg-white p-4 rounded-2xl transition-colors hover:border-[#c9baa9] ${idx === stats.length - 1 ? 'col-span-2 md:col-span-1' : ''}`}
-            style={{ border: `1px solid ${COLORS.hairline}` }}
-          >
+        {stats.map((stat, idx) => {
+          const showDot = stat.highlight && Number(stat.value) > 0;
+          return (
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center mb-3"
-              style={{ backgroundColor: COLORS.chip }}
+              key={idx}
+              className={`relative bg-white p-4 rounded-2xl transition-colors hover:border-[#c9baa9] ${
+                idx === stats.length - 1 ? "col-span-2 md:col-span-1" : ""
+              }`}
+              style={{
+                border: `1px solid ${stat.highlight ? COLORS.gold : COLORS.hairline}`,
+                boxShadow: stat.highlight ? "0 2px 10px rgba(201,168,124,0.22)" : undefined,
+              }}
             >
-              <stat.icon className="w-4 h-4" style={{ color: COLORS.accent }} />
+              {showDot && (
+                <span
+                  className="absolute top-3 right-3 w-2 h-2 rounded-full"
+                  style={{ backgroundColor: COLORS.gold }}
+                />
+              )}
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center mb-3"
+                style={{ backgroundColor: stat.highlight ? "#f4e6d0" : COLORS.chip }}
+              >
+                <stat.icon className="w-4 h-4" style={{ color: COLORS.accent }} />
+              </div>
+              <div className="text-2xl font-bold flex items-baseline gap-1" style={{ color: COLORS.ink }}>
+                {stat.value}
+                {stat.unit && (
+                  <span className="text-sm font-semibold" style={{ color: COLORS.muted }}>
+                    {stat.unit}
+                  </span>
+                )}
+              </div>
+              <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
+                {stat.label}
+              </div>
             </div>
-            <div className="text-2xl font-bold" style={{ color: COLORS.ink }}>
-              {stat.value}
-            </div>
-            <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
-              {stat.label}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
-          {/* Upcoming sessions */}
-          <div className="bg-white p-6 rounded-2xl" style={{ border: `1px solid ${COLORS.hairline}` }}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: COLORS.ink }}>
-                <CalendarClock className="w-4 h-4" style={{ color: COLORS.accent }} />
-                Upcoming sessions
-              </h3>
-            </div>
+      {/* Quick actions: stats ke turant neeche */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button
+          onClick={handleOpenFindMentor}
+          className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all hover:bg-[#8b7355] shadow-md"
+          style={{ backgroundColor: COLORS.ink, color: "#fff" }}
+        >
+          <Search className="w-4 h-4" />
+          Quick Book Mentor
+        </button>
+        <button
+          onClick={() => setActivePage?.("upcoming-sessions")}
+          className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-colors hover:border-[#c9baa9]"
+          style={{ backgroundColor: "#fff", color: COLORS.accent, border: `1px solid ${COLORS.hairline}` }}
+        >
+          <ClipboardList className="w-4 h-4" />
+          View All Sessions
+        </button>
+      </div>
 
-            {upcoming.length === 0 ? (
-              <div
-                className="flex flex-col items-center justify-center gap-2 py-10 rounded-xl text-center"
-                style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
-              >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.chip }}>
-                  <CalendarClock className="w-5 h-5" style={{ color: COLORS.accent }} />
-                </div>
-                <p className="text-sm font-medium" style={{ color: COLORS.muted }}>
-                  No upcoming sessions booked yet.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {upcoming.slice(0, 4).map((s, idx) => {
-                  const name = s.mentorName || "Mentor";
-                  const photo = s.mentorProfilePhoto;
-
-                  return (
-                    <div
-                      key={s.sessionId ?? s._id ?? idx}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9]"
-                      style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        {photo ? (
-                          <img
-                            src={photo}
-                            alt={name}
-                            className="w-9 h-9 rounded-full object-cover shrink-0"
-                            style={{ border: `1px solid ${COLORS.hairline}` }}
-                          />
-                        ) : (
-                          <div
-                            className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white"
-                            style={{ backgroundColor: COLORS.ink }}
-                          >
-                            {initialsFrom(name)}
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold truncate" style={{ color: COLORS.ink }}>
-                            {name}
-                          </p>
-                          <p className="text-xs mt-0.5 truncate" style={{ color: COLORS.muted }}>
-                            {s.title || s.sessionType || "Mentorship Session"}
-                          </p>
-                        </div>
-                      </div>
-                      <span
-                        className="text-xs font-semibold shrink-0 px-2.5 py-1 rounded-full"
-                        style={{ backgroundColor: COLORS.chip, color: COLORS.accent }}
-                      >
-                        {formatWhen(s.startTime || s.scheduledAt)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          {/* Pending Actions */}
-          <div className="bg-white p-6 rounded-2xl" style={{ border: `1px solid ${COLORS.hairline}` }}>
-            <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: COLORS.ink }}>
-              <ShieldCheck className="w-4 h-4" style={{ color: COLORS.accent }} />
-              Pending Actions
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Upcoming sessions */}
+        <div
+          className="lg:col-span-3 bg-white p-6 rounded-2xl"
+          style={{ border: `1px solid ${COLORS.hairline}` }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold flex items-center gap-2" style={{ color: COLORS.ink }}>
+              <CalendarClock className="w-4 h-4" style={{ color: COLORS.accent }} />
+              Upcoming sessions
             </h3>
-
-            {pendingActions.length === 0 ? (
-              <div
-                className="flex flex-col items-center justify-center gap-2 py-8 rounded-xl text-center"
-                style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
-              >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.chip }}>
-                  <CheckCircle className="w-5 h-5" style={{ color: COLORS.accent }} />
-                </div>
-                <p className="text-sm font-medium" style={{ color: COLORS.muted }}>
-                  You're all caught up
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {pendingActions.map((action, idx) => (
-                  <div
-                    key={idx}
-                    onClick={action.onClick}
-                    className="flex items-center justify-between gap-3 p-3.5 rounded-xl transition-all duration-200 hover:-translate-y-1 hover:shadow-md hover:border-[#c9baa9] cursor-pointer"
-                    style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-[#e0d8cf]">
-                        <action.icon className="w-4 h-4" style={{ color: COLORS.accent }} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-[#4a3728]">{action.title}</p>
-                        <p className="text-xs text-[#8a7a6a]">{action.description}</p>
-                      </div>
-                    </div>
-                    <ArrowUpRight className="w-4 h-4 shrink-0" style={{ color: COLORS.accent }} />
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Quick Actions */}
-          <div>
-            <h3 className="text-sm font-bold mb-4" style={{ color: COLORS.ink }}>
-              Quick actions
-            </h3>
-            <div className="flex flex-col gap-3">
+          {upcoming.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: COLORS.chip }}
+              >
+                <CalendarClock className="w-5 h-5" style={{ color: COLORS.accent }} />
+              </div>
+              <p className="text-sm font-medium" style={{ color: COLORS.muted }}>
+                No upcoming sessions booked yet.
+              </p>
               <button
                 onClick={handleOpenFindMentor}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all hover:bg-[#8b7355] shadow-md"
+                className="px-5 py-2.5 rounded-full text-xs font-bold transition-all hover:bg-[#8b7355] shadow-sm"
                 style={{ backgroundColor: COLORS.ink, color: "#fff" }}
               >
-                <Search className="w-4 h-4" />
-                Quick Book Mentor
-              </button>
-              <button
-                onClick={() => setActivePage?.("upcoming-sessions")}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-colors hover:border-[#c9baa9]"
-                style={{ backgroundColor: COLORS.wash, color: COLORS.accent, border: `1px solid ${COLORS.hairline}` }}
-              >
-                <ClipboardList className="w-4 h-4" />
-                View All Sessions
+                Book a session
               </button>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-3">
+              {upcoming.slice(0, 4).map((s, idx) => {
+                const name = s.mentorName || "Mentor";
+                const photo = s.mentorProfilePhoto;
+
+                return (
+                  <div
+                    key={s.sessionId ?? s._id ?? idx}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9]"
+                    style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {photo ? (
+                        <img
+                          src={photo}
+                          alt={name}
+                          className="w-9 h-9 rounded-full object-cover shrink-0"
+                          style={{ border: `1px solid ${COLORS.hairline}` }}
+                        />
+                      ) : (
+                        <div
+                          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white"
+                          style={{ backgroundColor: COLORS.ink }}
+                        >
+                          {initialsFrom(name)}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate" style={{ color: COLORS.ink }}>
+                          {name}
+                        </p>
+                        <p className="text-xs mt-0.5 truncate" style={{ color: COLORS.muted }}>
+                          {s.title || s.sessionType || "Mentorship Session"}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className="text-xs font-semibold shrink-0 px-2.5 py-1 rounded-full"
+                      style={{ backgroundColor: COLORS.chip, color: COLORS.accent }}
+                    >
+                      {formatWhen(s.startTime || s.scheduledAt)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Pending Actions */}
+        <div
+          className="lg:col-span-2 bg-white p-6 rounded-2xl"
+          style={{ border: `1px solid ${COLORS.hairline}` }}
+        >
+          <h3 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: COLORS.ink }}>
+            <ShieldCheck className="w-4 h-4" style={{ color: COLORS.accent }} />
+            Pending Actions
+            {pendingActions.length > 0 && (
+              <span
+                className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                style={{ backgroundColor: "#f4e6d0", color: COLORS.accent }}
+              >
+                {pendingActions.length}
+              </span>
+            )}
+          </h3>
+
+          {pendingActions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: COLORS.chip }}
+              >
+                <CheckCircle className="w-5 h-5" style={{ color: COLORS.accent }} />
+              </div>
+              <p className="text-sm font-medium" style={{ color: COLORS.muted }}>
+                You're all caught up
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {pendingActions.map((action, idx) => (
+                <div
+                  key={idx}
+                  onClick={action.onClick}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && action.onClick()}
+                  className="flex items-center justify-between gap-3 p-3.5 rounded-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-[#c9baa9] cursor-pointer"
+                  style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center bg-white border border-[#e0d8cf]">
+                      <action.icon className="w-4 h-4" style={{ color: COLORS.accent }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-[#4a3728]">{action.title}</p>
+                      <p className="text-xs text-[#8a7a6a]">{action.description}</p>
+                    </div>
+                  </div>
+                  <ArrowUpRight className="w-5 h-5 shrink-0" style={{ color: COLORS.accent }} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

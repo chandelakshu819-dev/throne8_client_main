@@ -120,7 +120,7 @@ export default function MentorMarqueeSection() {
                     {baseList.map((mentor, i) => (
                         <div
                             key={`primary-${mentor.id || "mentor"}-${i}`}
-                            style={{ marginRight: "24px", flexShrink: 0 }}
+                            style={{ marginRight: "24px", flexShrink: 0, display: "flex" }}
                         >
                             <MentorCard mentor={mentor} />
                         </div>
@@ -129,7 +129,7 @@ export default function MentorMarqueeSection() {
                         <div
                             key={`duplicate-${mentor.id || "mentor"}-${i}`}
                             aria-hidden="true"
-                            style={{ marginRight: "24px", flexShrink: 0 }}
+                            style={{ marginRight: "24px", flexShrink: 0, display: "flex" }}
                         >
                             <MentorCard mentor={mentor} />
                         </div>

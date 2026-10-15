@@ -2,6 +2,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import AuthService from '@/lib/api/auth.service';
+import ProfileDropdown from '@/features/mentorship/components/shared/ProfileDropdown';
 import SearchBar from './SearchBar';
 import ProfileSidePanel from './ProfileSidePanel';
 import { useRouter, usePathname } from 'next/navigation';
@@ -64,6 +65,8 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
     const router = useRouter();
     const pathname = usePathname();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    // Mentorship pages par avatar dropdown band (Sign Out wahan Navigation me alag button hai)
+    const isMentorshipRoute = !!pathname?.startsWith('/mentorship');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -255,12 +258,24 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                 </button>
                             )}
 
-                            {SHOW_SEARCH && <div className="h-8 w-px bg-[#E5D9CE] mx-1 hidden md:block" />}
+{SHOW_SEARCH && <div className="h-8 w-px bg-[#E5D9CE] mx-1 hidden md:block" />}
 
+                            {isMentorshipRoute && (
+                                <ProfileDropdown
+                                    user={{ userId: currentUserId }}
+                                    isAuthenticated={!!currentUserId}
+                                    profileImageUrl={profileImage}
+                                    fullName={userName}
+                                />
+                            )}
+
+
+                            
                             <div className="relative">
                                 <button
-                                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                    className="flex items-center gap-2 hover:bg-[#EFE3D8] rounded-full pl-1 pr-2 py-1 transition-colors duration-200"
+                                                                       onClick={() => { if (!isMentorshipRoute) setIsDropdownOpen(!isDropdownOpen); }}
+                                                                       className={`items-center gap-2 rounded-full pl-1 pr-2 py-1 transition-colors duration-200 ${isMentorshipRoute ? 'hidden' : 'flex hover:bg-[#EFE3D8]'}`}
+
                                 >
                                     <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-white shadow-sm flex-shrink-0 bg-[#4a3728] flex items-center justify-center">
                                         {profileImage && profileImage.trim() !== '' && !imgError ? (
@@ -280,7 +295,8 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                     </div>
                                     <span className="text-sm font-medium hidden md:inline text-[#4a3728] whitespace-nowrap">{capitalizeName(userName || 'User')}</span>
                                     <svg
-                                        className={`w-4 h-4 text-[#4a3728]/60 transition-transform duration-200 flex-shrink-0 hidden md:block ${isDropdownOpen ? 'rotate-180' : ''}`}
+                                                                            className={`w-4 h-4 text-[#4a3728]/60 transition-transform duration-200 flex-shrink-0 hidden ${isMentorshipRoute ? '' : 'md:block'} ${isDropdownOpen ? 'rotate-180' : ''}`}
+        
                                         fill="none"
                                         stroke="currentColor"
                                         viewBox="0 0 24 24"
@@ -288,7 +304,7 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({ profileImage, userName, c
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                                     </svg>
                                 </button>
-                                {isDropdownOpen && (
+                                {isDropdownOpen && !isMentorshipRoute && (
                                     <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-lg py-1.5 border border-[#E5D9CE] z-50 overflow-hidden">
                                         {PROFILE_MENU_ITEMS.map((item, idx) => (
                                             <button

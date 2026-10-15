@@ -28,7 +28,7 @@ class PasswordService {
             console.log('🔑 [PASSWORD_RESET_REQUEST] Sending reset OTP...', { email });
 
             const { data } = await api.post<PasswordResponse>(
-                '/api/v1/verify/password/reset/request',
+                '/verify/password/reset/request',
                 { email }
             );
 
@@ -78,7 +78,7 @@ class PasswordService {
             });
 
             const { data } = await api.post<PasswordResponse>(
-                '/api/v1/verify/password/reset/verify',
+                '/verify/password/reset/verify',
                 { email, resetCode, newPassword }
             );
 
@@ -132,7 +132,7 @@ class PasswordService {
             console.log('🔒 [PASSWORD_CHANGE_OTP] Sending change OTP...');
 
             const { data } = await api.post<PasswordResponse>(
-                '/api/v1/verify/password/change/send-otp',
+                '/verify/password/change/send-otp',
                 { currentPassword }
             );
 
@@ -181,7 +181,7 @@ class PasswordService {
             console.log('🔒 [PASSWORD_CHANGE_VERIFY] Verifying OTP and changing password...');
 
             const { data } = await api.post<PasswordResponse>(
-                '/api/v1/verify/password/change/verify',
+                '/verify/password/change/verify',
                 { otp, newPassword }
             );
 
