@@ -34,6 +34,7 @@ import NotificationService from "@/lib/api/notification.service";
 import MarketingKitPage from "./MarketingKitPage";
 import UserDashboardProfilePreferencesPage from "@/features/mentorship/components/user-dashboard/UserDashboardProfilePreferencesPage";
 import { useParams } from "next/navigation";
+import { useNavbarProfileImage } from "@/features/profile/components/home/NavbarProvider";
 // ✅ NEW — realtime notification push (booking requests, session started, etc.)
 import { useSocket } from "@/core/realtime/useSocket";
 
@@ -98,6 +99,7 @@ function normalizeNotifications(res: any): any[] {
 export default function MentorDashboard(
   { userId, onSwitchRole }: { userId: string; onSwitchRole?: () => void }
 ) {
+  const setNavbarProfileImage = useNavbarProfileImage();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -457,6 +459,8 @@ export default function MentorDashboard(
         // ✅ Sidebar dashboardData se bhi photo leta hai, isliye isko bhi update karo
         setDashboardData((prev: any) => (prev ? { ...prev, profilePic: newPic } : prev));
         setProfilePhoto(null);
+        // ✅ Top-right navbar avatar bhi turant update karo
+        setNavbarProfileImage(newPic);
       })
       .catch((err) => {
         console.error("Failed to update profile photo:", err);
@@ -476,6 +480,7 @@ export default function MentorDashboard(
       setMentorData((prev: any) => ({ ...prev, profilePic: null }));
       setDashboardData((prev: any) => (prev ? { ...prev, profilePic: null } : prev));
       setProfilePhoto(null);
+      setNavbarProfileImage(null);
     } catch (err) {
       console.error("Failed to remove profile photo:", err);
       alert("Failed to remove photo. Please try again.");
