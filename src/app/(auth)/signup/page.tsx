@@ -15,6 +15,7 @@ import StudentEducation from '@/features/auth/components/StudentEducation';
 import FresherEducationRole from '@/features/auth/components/FresherEducationRole';
 import {useRegister} from '@/features/auth/hooks/useRegister';
 import { useRouter } from 'next/navigation';
+import { HOME_PATH } from '@/config/launch';
 import { RegistrationData } from '@/features/auth/interface';
 import ProgressSteps from '@/shared/uiComponents/ProgressSteps';
 
@@ -95,7 +96,7 @@ export default function SignupPage() {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Redirect
-      router.push('/dashboard');
+      router.push(HOME_PATH);
 
     } catch (err: any) {
       console.error('❌ Registration Error:', err);

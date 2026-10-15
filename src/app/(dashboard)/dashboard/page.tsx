@@ -16,6 +16,8 @@ import HomePostService from '@/lib/api/homePost.service';
 import RepostService from '@/lib/api/repost.service';
 import AuthService from '@/lib/api/auth.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useRouter } from 'next/navigation';
+import { HOME_PATH, IS_MENTORSHIP_MODE } from '@/config/launch';
 import { useNavbarData } from '@/features/profile/components/home/NavbarProvider';
 import { transformToProfileData } from '@/shared/utils/profileTransformers';
 import ConnectionService from '@/lib/api/connection.service';
@@ -45,7 +47,13 @@ import MentionAutocomplete from '@/shared/uiComponents/MentionAutocomplete';
 // same raw storage format the rest of the app (parser, backend) expects.
 import MentionRichInput, { MentionRichInputHandle } from '@/shared/uiComponents/MentionRichInput';
 
+
 export default function Home() {
+    // Launch mode (mentorship) me /dashboard allowed nahi: seedha HOME_PATH par bhejo
+    const launchRouter = useRouter();
+    useEffect(() => {
+        if (IS_MENTORSHIP_MODE) launchRouter.replace(HOME_PATH);
+    }, [launchRouter]);
     const { user, isLoading } = useAuth();
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
