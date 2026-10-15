@@ -13,7 +13,8 @@ export type FeatureKey =
   | 'messaging'
   | 'jobs'
   | 'study'
-  | 'company';
+  | 'company'
+  | 'resume';
 
 const MODE =
   process.env.NEXT_PUBLIC_LAUNCH_MODE === 'mentorship' ? 'mentorship' : 'full';
@@ -26,6 +27,7 @@ export const HOME_PATH = IS_MENTORSHIP_MODE ? '/mentorship' : '/dashboard';
 
 const MENTORSHIP_MODE_FEATURES: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
   'mentorship',
+  'resume',
 ]);
 
 /** Navbar/sidebar links filter karne ke liye: isFeatureEnabled('jobs') */

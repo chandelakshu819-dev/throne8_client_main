@@ -62,10 +62,12 @@ interface LoginResponse {
             email: string;
             role: string;
         };
-        tokens: {
-            accessToken: string;
-            refreshToken: string;
-            expiresIn: string;
+        // Raw JWTs are no longer needed (httpOnly cookies carry the session) and the backend
+        // may omit them — only the expiry metadata is guaranteed.
+        tokens?: {
+            accessToken?: string;
+            refreshToken?: string;
+            expiresIn?: string | number;
         };
     };
     timestamp: string;
@@ -122,8 +124,9 @@ class AuthService {
             console.log('🔐 [GOOGLE VERIFY] Verifying token with backend...');
             const { data } = await api.post('/auth/google/verify', { idToken });
 
-            if (!data.data?.isNewUser && data.data?.tokens && data.data?.user) {
-                TokenStorage.setAuthData(data.data.tokens, data.data.user);
+            // 🍪 Backend already set the session cookies — remember the user for the UI
+            if (!data.data?.isNewUser && data.data?.user) {
+                TokenStorage.setAuthData(data.data.user);
             }
 
             console.log('✅ [GOOGLE VERIFY] Successful', {
@@ -150,8 +153,8 @@ class AuthService {
             console.log('🔐 [GOOGLE REGISTER] Registering Google user with backend...', registrationData);
             const { data } = await api.post('/auth/google/register', registrationData);
 
-            if (data.data?.tokens && data.data?.user) {
-                TokenStorage.setAuthData(data.data.tokens, data.data.user);
+            if (data.data?.user) {
+                TokenStorage.setAuthData(data.data.user);
             }
 
             console.log('✅ [GOOGLE REGISTER] Successful', {
@@ -196,13 +199,10 @@ class AuthService {
                 email: data.data?.user?.email,
             });
 
-            // 💾 Store tokens (same as login)
-            TokenStorage.setAuthData(
-                data.data.tokens,
-                data.data.user
-            );
+            // 🍪 Session cookies were set by the backend — remember the user for the UI
+            TokenStorage.setAuthData(data.data.user);
 
-            console.log('✅ [REGISTER] Auth data stored in localStorage');
+            console.log('✅ [REGISTER] Session started');
 
             return data;
 
@@ -252,13 +252,10 @@ class AuthService {
                 role: data.data?.user?.role,
             });
 
-            // 💾 Store tokens and user data in localStorage
-            TokenStorage.setAuthData(
-                data.data.tokens,
-                data.data.user
-            );
+            // 🍪 Session cookies were set by the backend — remember the user for the UI
+            TokenStorage.setAuthData(data.data.user);
 
-            console.log('✅ [LOGIN] Auth data stored in localStorage');
+            console.log('✅ [LOGIN] Session started');
 
             return data;
 
@@ -501,9 +498,9 @@ static async getUsersBulk(userIds: string[]): Promise<any> {
             console.error('❌ [LOGOUT] Logout API error:', error);
             // Continue with local cleanup even if API fails
         } finally {
-            // Clear all auth data from localStorage
+            // Backend clears the httpOnly cookies; clear the local user data + flag here
             TokenStorage.clearAuthData();
-            console.log('✅ [LOGOUT] Auth data cleared from localStorage');
+            console.log('✅ [LOGOUT] Local session data cleared');
 
             // Redirect to login page
             if (typeof window !== 'undefined') {
@@ -535,51 +532,6 @@ static async getUsersBulk(userIds: string[]): Promise<any> {
 
 
 }
-
-////////////////////////////////
-/////////////////////////////////////////
-//Changed Modified code Pasted
-/**
- * Ensures we have a valid access token before opening the socket.
- * Refreshes it if expired, using the same endpoint/logic as the axios interceptor.
- */
-
-export const ensureFreshAccessToken = async (): Promise<string | null> => {
-    if (!TokenStorage.isTokenExpired()) {
-        return TokenStorage.getAccessToken();
-    }
-
-    const refreshToken = TokenStorage.getRefreshToken();
-    if (!refreshToken) {
-        console.warn('⚠️ [SOCKET AUTH] No refresh token available');
-        return null;
-    }
-
-    try {
-        console.log('🔄 [SOCKET AUTH] Access token expired, refreshing before connecting...');
-        const { data } = await axios.post(
-            `${API_BASE_URL}${config?.NEXT_PUBLIC_REFRESH_TOKEN_ENDPOINT || process.env.NEXT_PUBLIC_REFRESH_TOKEN_ENDPOINT}`,
-            { refreshToken }
-        );
-
-        const newAccessToken = data.data.tokens.accessToken;
-        TokenStorage.setAuthData(data.data.tokens, data.data.user);
-
-        console.log('✅ [SOCKET AUTH] Token refreshed successfully');
-        return newAccessToken;
-    } catch (err) {
-        console.error('❌ [SOCKET AUTH] Failed to refresh token:', err);
-        return null;
-    }
-};
-
-
-
-
-
-
-
-
 
 export default AuthService;
 export { api };
