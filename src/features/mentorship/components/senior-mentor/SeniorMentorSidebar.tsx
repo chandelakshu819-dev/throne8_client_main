@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { User, Briefcase, Calendar, BarChart3, Bell } from "lucide-react";
 import type { SeniorMentorApplication } from "@/lib/api/seniorMentorApplication.service";
 import { useAppSelector } from "@/core/store/store.hooks";
+import { useNavbarData } from "@/features/profile/components/home/NavbarProvider";
 import { useRouter } from "next/navigation";
 
 interface SeniorMentorSidebarProps {
@@ -20,14 +21,17 @@ export default function SeniorMentorSidebar({
   const initials = fullName ? fullName[0] : "S";
   const [imgFallbackLevel, setImgFallbackLevel] = useState(0);
   const globalProfile = useAppSelector((state) => state.login.profile);
+  const { profileData: navbarProfileData } = useNavbarData();
   
+  
+
   const getPhotoForLevel = (level: number): string | null => {
 
        // Account photo (state.login.profile) pehle: ek hi photo sab roles me dikhe
-       const accountPhoto = globalProfile?.profilePic || globalProfile?.profilePhoto;
+       const accountPhoto = navbarProfileData?.profileImage || globalProfile?.profilePic || globalProfile?.profilePhoto;
        if (level === 0 && accountPhoto) return accountPhoto;
        if (level <= 1 && profilePhoto) return profilePhoto;
-       
+
     return null;
   };
   const currentPhoto = getPhotoForLevel(imgFallbackLevel);

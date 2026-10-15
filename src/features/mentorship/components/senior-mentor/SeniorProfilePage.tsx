@@ -2,6 +2,9 @@ import React from "react";
 import { User, ShieldCheck, CheckCircle2, FileText, Linkedin, AlertCircle } from "lucide-react";
 import type { SeniorMentorApplication } from "@/lib/api/seniorMentorApplication.service";
 import { useAppSelector } from "@/core/store/store.hooks";
+import { useNavbarData } from "@/features/profile/components/home/NavbarProvider";
+
+
 
 interface SeniorProfilePageProps {
   seniorData: SeniorMentorApplication | null;
@@ -24,6 +27,8 @@ const EmptyValue = () => <span className="italic text-sm" style={{ color: "#c0b0
 export default function SeniorProfilePage({ seniorData }: SeniorProfilePageProps) {
   const [imgFallbackLevel, setImgFallbackLevel] = React.useState(0);
   const globalProfile = useAppSelector((state) => state.login.profile);
+  const { profileData: navbarProfileData } = useNavbarData();
+
 
   if (!seniorData) {
     return (
@@ -67,7 +72,7 @@ export default function SeniorProfilePage({ seniorData }: SeniorProfilePageProps
   const getPhotoForLevel = (level: number): string | null => {
 
         // Account photo (state.login.profile) pehle: ek hi photo sab roles me dikhe
-        const accountPhoto = globalProfile?.profilePic || globalProfile?.profilePhoto;
+        const accountPhoto = navbarProfileData?.profileImage || globalProfile?.profilePic || globalProfile?.profilePhoto;
         if (level === 0 && accountPhoto) return accountPhoto;
         if (level <= 1 && profilePhoto) return profilePhoto;
     return null;
