@@ -223,6 +223,7 @@ export default function ProfilePage({
                 type="file"
                 accept="image/*"
                 onChange={(e) => {
+                  if (!e.target.files?.length) return; // cancel dabane par kuch mat karo
                   handlePhotoUpload(e);
                   setShowPhotoModal(false);
                 }}

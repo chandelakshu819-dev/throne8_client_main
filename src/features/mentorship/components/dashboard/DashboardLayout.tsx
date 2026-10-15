@@ -421,24 +421,50 @@ export default function MentorDashboard(
   });
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file || !mentorData?.mentorId) return;
 
-    // Instant preview — sirf UI feedback ke liye, source of truth nahi
+    // Server sirf jpg/jpeg/png/webp/gif leta hai
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+    if (!allowed.includes(file.type)) {
+      alert("Only JPG, PNG, WEBP or GIF images are allowed.");
+      input.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image must be smaller than 5MB.");
+      input.value = "";
+      return;
+    }
+
+    // Instant preview
     const reader = new FileReader();
     reader.onloadend = () => setProfilePhoto(reader.result as string);
     reader.readAsDataURL(file);
 
-    // ✅ Actual backend update — isi se Sidebar + MentorSidebar sync honge
     MentorService.updateProfilePhoto(mentorData.mentorId, file)
       .then((res: any) => {
+        console.log("📸 updateProfilePhoto response:", res);
         const updated = res?.data ?? res;
-        setMentorData((prev: any) => ({ ...prev, profilePic: updated?.profilePic }));
-        setProfilePhoto(null); // local preview clear — ab mentorData.profilePic hi source hai
+        const newPic = updated?.profilePic;
+
+        if (!newPic) {
+          throw new Error("Server did not return the new profile photo.");
+        }
+
+        setMentorData((prev: any) => ({ ...prev, profilePic: newPic }));
+        // ✅ Sidebar dashboardData se bhi photo leta hai, isliye isko bhi update karo
+        setDashboardData((prev: any) => (prev ? { ...prev, profilePic: newPic } : prev));
+        setProfilePhoto(null);
       })
       .catch((err) => {
         console.error("Failed to update profile photo:", err);
-        setProfilePhoto(null); // fail hone par preview bhi hata do
+        setProfilePhoto(null);
+        alert(err?.message || "Failed to update profile photo. Please try again.");
+      })
+      .finally(() => {
+        input.value = ""; // same file dobara select ho sake
       });
   };
 
