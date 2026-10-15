@@ -1,10 +1,27 @@
 "use client";
-
+//src/features/mentorship/components/user-dashboard/UserSidebar.tsx
 import { useEffect } from "react";
-import { LayoutDashboard, ChevronRight, ChevronLeft, CalendarClock, Users, Bookmark, History, Clock, Star, Receipt, Bell, Sparkles, TrendingUp, UserCog, HelpCircle } from "lucide-react";
+import {
+  LayoutDashboard,
+  ChevronRight,
+  ChevronLeft,
+  CalendarClock,
+  Users,
+  Bookmark,
+  History,
+  Clock,
+  Star,
+  Receipt,
+  Bell,
+  Sparkles,
+  TrendingUp,
+  UserCog,
+  HelpCircle,
+  ArrowLeftRight,
+} from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfile } from "@/features/profile/hooks/useProfile";
-import { formatUserDisplayName, getInitials } from "@/shared/utils/format";
+import { formatUserDisplayName, getInitials, capitalizeName } from "@/shared/utils/format";
 
 interface UserSidebarProps {
   activePage: string;
@@ -42,7 +59,6 @@ export default function UserSidebar({
   onSwitchRole,
   isCollapsed = false,
   onToggleCollapse,
-  sessions = [],
 }: UserSidebarProps) {
   const { user } = useAuth();
   const { userProfileData, profileImageUrl, loadProfile } = useProfile();
@@ -56,29 +72,18 @@ export default function UserSidebar({
   const firstName = (userProfileData?.firstName || user?.firstName || "").trim();
   const lastName = (userProfileData?.lastName || user?.lastName || "").trim();
   const directName = [firstName, lastName].filter(Boolean).join(" ");
-  const fullName = directName || formatUserDisplayName(userProfileData, user);
-  const initials = (firstName || lastName)
-    ? `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase()
-    : getInitials(fullName) || "U";
-
-  let mentorText = "No mentor selected";
-  if (sessions && sessions.length > 0) {
-    const uniqueMentors = Array.from(new Set(
-      sessions
-        .map(s => s.mentorName || s.mentor?.name)
-        .filter(Boolean)
-    ));
-    if (uniqueMentors.length === 1) {
-      mentorText = uniqueMentors[0] as string;
-    } else if (uniqueMentors.length > 1) {
-      mentorText = `${uniqueMentors[0]} + ${uniqueMentors.length - 1} more`;
-    }
-  }
+  const fullName = capitalizeName(directName || formatUserDisplayName(userProfileData, user));
+  const initials =
+    firstName || lastName
+      ? `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase()
+      : getInitials(fullName) || "U";
 
   return (
-    <aside 
-      className={`flex flex-col h-full overflow-visible transition-all duration-300 ease-in-out relative ${isCollapsed ? 'w-20' : 'w-80'}`} 
-      style={{ backgroundColor: '#fff', borderRight: '1px solid #ece4db' }}
+    <aside
+      className={`flex flex-col h-full overflow-visible transition-all duration-300 ease-in-out relative ${
+        isCollapsed ? "w-20" : "w-72"
+      }`}
+      style={{ backgroundColor: "#fff", borderRight: "1px solid #ece4db" }}
     >
       {/* Collapse Toggle Button */}
       {onToggleCollapse && (
@@ -88,28 +93,44 @@ export default function UserSidebar({
             onToggleCollapse();
           }}
           className="absolute -right-3.5 top-8 z-50 w-7 h-7 rounded-full flex items-center justify-center border shadow-sm transition-transform hover:scale-105"
-          style={{ backgroundColor: '#fff', borderColor: '#ece4db', color: '#7a5c3e' }}
+          style={{ backgroundColor: "#fff", borderColor: "#ece4db", color: "#7a5c3e" }}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
       )}
-      {/* Profile Card */}
+
+      {/* Profile Card: photo, naam, role pill, switch button */}
       <div
         onClick={() => setActivePage("profile-preferences")}
         role="button"
         tabIndex={0}
-        className={`mt-6 mb-2 rounded-2xl cursor-pointer transition-all duration-200 hover:shadow-md group ${isCollapsed ? 'mx-3 p-3' : 'mx-5 p-6'}`}
-        style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setActivePage("profile-preferences")}
+        className={`mt-5 mb-1 rounded-2xl cursor-pointer transition-all duration-200 hover:shadow-md group shrink-0 ${
+          isCollapsed ? "mx-3 p-2" : "mx-4 p-4"
+        }`}
+        style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}
         title="Manage Profile & Preferences"
       >
         <div className="flex flex-col items-center text-center">
-          <div className={`rounded-2xl overflow-hidden relative transition-all duration-300 ${isCollapsed ? 'w-10 h-10' : 'w-20 h-20 mb-4'}`} style={{ border: '1px solid #e0d8cf' }}>
+          <div
+            className={`rounded-2xl overflow-hidden relative transition-all duration-300 ${
+              isCollapsed ? "w-10 h-10" : "w-16 h-16 mb-3"
+            }`}
+            style={{ border: "1px solid #e0d8cf" }}
+          >
             {profileImageUrl ? (
-              <img src={profileImageUrl} alt={fullName} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+              <img
+                src={profileImageUrl}
+                alt={fullName}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+              />
             ) : (
-              <div className="w-full h-full flex items-center justify-center font-bold text-white transition-all duration-300" style={{ backgroundColor: '#4a3728', fontSize: isCollapsed ? '1rem' : '1.5rem' }}>
+              <div
+                className="w-full h-full flex items-center justify-center font-bold text-white transition-all duration-300"
+                style={{ backgroundColor: "#4a3728", fontSize: isCollapsed ? "1rem" : "1.25rem" }}
+              >
                 {initials}
               </div>
             )}
@@ -117,33 +138,19 @@ export default function UserSidebar({
 
           {!isCollapsed && (
             <>
-              <div className="flex flex-col items-center mb-1 w-full px-2">
-                <div 
-                  className="mb-3 px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase border"
-                  style={{ backgroundColor: '#f3ece4', color: '#4a3728', borderColor: '#e0d8cf' }}
-                >
-                  Mentee Dashboard
-                </div>
-                <span className="text-xs text-[#7a5c3e] mb-1 whitespace-nowrap overflow-hidden text-ellipsis w-full" title={mentorText !== "No mentor selected" ? `Learning with ${mentorText}` : mentorText}>
-                  {mentorText === "No mentor selected" ? mentorText : (
-                    <>Learning with <span className="font-semibold">{mentorText}</span></>
-                  )}
-                </span>
-              </div>
+              <h2
+                className="text-base font-bold group-hover:text-[#7a5c3e] transition-colors whitespace-nowrap overflow-hidden text-ellipsis w-full"
+                style={{ color: "#4a3728" }}
+              >
+                {fullName}
+              </h2>
 
-              <h2 className="text-lg font-bold group-hover:text-[#7a5c3e] transition-colors whitespace-nowrap overflow-hidden text-ellipsis w-full" style={{ color: '#4a3728' }}>{fullName}</h2>
-
-              <div className="flex items-center gap-2 mt-2">
-                <span
-                  className="px-3 py-1 rounded-full text-xs font-semibold"
-                  style={{ backgroundColor: '#f3ece4', color: '#7a5c3e' }}
-                >
-                  Mentee
-                </span>
-                <span className="text-[11px] font-medium text-[#7a5c3e] underline opacity-80 group-hover:opacity-100">
-                  Manage →
-                </span>
-              </div>
+              <span
+                className="mt-2 px-3 py-1 rounded-full text-[11px] font-semibold"
+                style={{ backgroundColor: "#f3ece4", color: "#7a5c3e" }}
+              >
+                Mentee
+              </span>
 
               {isMentor && onSwitchRole && (
                 <button
@@ -151,10 +158,11 @@ export default function UserSidebar({
                     e.stopPropagation();
                     onSwitchRole();
                   }}
-                  className="mt-3 text-[11px] font-semibold underline"
-                  style={{ color: '#4a3728' }}
+                  className="mt-3 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors hover:bg-[#f3ece4]"
+                  style={{ color: "#4a3728", border: "1px solid #e0d8cf", backgroundColor: "#fff" }}
                 >
-                  Switch to Mentor view →
+                  <ArrowLeftRight className="w-3.5 h-3.5" />
+                  Switch to Mentor view
                 </button>
               )}
             </>
@@ -163,8 +171,8 @@ export default function UserSidebar({
       </div>
 
       {/* Menu */}
-      <nav className="flex-1 overflow-y-auto px-5 py-4">
-        <div className="space-y-1">
+      <nav className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="space-y-0.5">
           {USER_MENU_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activePage === item.id;
@@ -176,23 +184,25 @@ export default function UserSidebar({
                 key={item.id}
                 onClick={() => setActivePage(item.id)}
                 title={isCollapsed ? item.label : undefined}
-                className={`w-full flex items-center gap-3 py-3 rounded-xl text-sm font-semibold transition-colors duration-150 ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}
+                className={`w-full flex items-center gap-3 py-2 rounded-xl text-sm font-semibold transition-colors duration-150 ${
+                  isCollapsed ? "justify-center px-0" : "px-3"
+                }`}
                 style={{
-                  backgroundColor: isActive ? '#4a3728' : 'transparent',
-                  color: isActive ? '#fff' : '#5c4a3a',
+                  backgroundColor: isActive ? "#4a3728" : "transparent",
+                  color: isActive ? "#fff" : "#5c4a3a",
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActive) e.currentTarget.style.backgroundColor = '#fbf7f3';
+                  if (!isActive) e.currentTarget.style.backgroundColor = "#fbf7f3";
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+                  if (!isActive) e.currentTarget.style.backgroundColor = "transparent";
                 }}
               >
                 <span
-                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 relative"
-                  style={{ backgroundColor: isActive ? 'rgba(255,255,255,0.15)' : '#f3ece4' }}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 relative"
+                  style={{ backgroundColor: isActive ? "rgba(255,255,255,0.15)" : "#f3ece4" }}
                 >
-                  <Icon className="w-4 h-4" style={{ color: isActive ? '#fff' : '#7a5c3e' }} />
+                  <Icon className="w-4 h-4" style={{ color: isActive ? "#fff" : "#7a5c3e" }} />
                   {isCollapsed && showUnreadDot && !isActive && (
                     <span
                       className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-white"
@@ -200,22 +210,17 @@ export default function UserSidebar({
                     />
                   )}
                 </span>
-                {!isCollapsed && <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
+                {!isCollapsed && (
+                  <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">
+                    {item.label}
+                  </span>
+                )}
 
                 {!isCollapsed && showUnreadDot && !isActive && (
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: "#b91c1c" }}
-                  />
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: "#b91c1c" }} />
                 )}
 
-                {!isCollapsed && (
-                  isActive ? (
-                    <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                  ) : !showUnreadDot ? (
-                    <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100" style={{ color: '#c0b0a0' }} />
-                  ) : null
-                )}
+                {!isCollapsed && isActive && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
               </button>
             );
           })}

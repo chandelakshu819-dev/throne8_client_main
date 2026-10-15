@@ -39,6 +39,7 @@ import { useParams } from "next/navigation";
 import { useNavbarProfileImage } from "@/features/profile/components/home/NavbarProvider";
 // ✅ NEW — realtime notification push (booking requests, session started, etc.)
 import { useSocket } from "@/core/realtime/useSocket";
+import BrandWordmark from "@/shared/uiComponents/BrandWordmark";
 
 function MenteeProfileTabWrapper(props: any) {
   const params = useParams();
@@ -63,11 +64,11 @@ function MenteeProfileTabWrapper(props: any) {
 }
 
 const SERVICE_TYPES: ServiceType[] = [
-  { name: "Consultation", emoji: "💬", icon: MessageCircle, description: "One-on-one consultation sessions" },
-  { name: "Workshop", emoji: "🛠️", icon: Wrench, description: "Group learning workshops" },
-  { name: "Mentoring", emoji: "🎓", icon: GraduationCap, description: "Long-term mentoring programs" },
-  { name: "Coaching", emoji: "🏋️", icon: Dumbbell, description: "Goal-oriented coaching sessions" },
-  { name: "Other", emoji: "✅", icon: CheckSquare, description: "Any other custom services" },
+  { name: "Consultation", icon: MessageCircle, description: "One-on-one consultation sessions" },
+  { name: "Workshop", icon: Wrench, description: "Group learning workshops" },
+  { name: "Mentoring", icon: GraduationCap, description: "Long-term mentoring programs" },
+  { name: "Coaching", icon: Dumbbell, description: "Goal-oriented coaching sessions" },
+  { name: "Other", icon: CheckSquare, description: "Any other custom services" },
 ];
 
 const pageComponents: Record<string, React.FC<any>> = {
@@ -123,7 +124,7 @@ export default function MentorDashboard(
     return searchParams.get("tab") || "dashboard";
   });
 
-  // Tab change hote hi URL me bhi likh do (bina full page reload ke) —
+  // Tab change hote hi URL me bhi likh do (bina full page reload ke),
   // taaki refresh, back/forward button, aur direct-link sharing sab kaam karein.
   const setActivePage = useCallback((page: string, subtab?: string) => {
     setActivePageState(page);
@@ -144,8 +145,7 @@ export default function MentorDashboard(
     }
   }, [pathname, router, searchParams, isMenteeProfileRoute, mentorData?.mentorId, userId]);
 
-  // Agar user browser back/forward button dabaye, to URL ke hisaab se
-  // activePage bhi update ho jaye.
+  // Browser back/forward dabaye to URL ke hisaab se activePage update ho jaye.
   useEffect(() => {
     if (isMenteeProfileRoute) {
       setActivePageState("mentee_profile");
@@ -160,7 +160,7 @@ export default function MentorDashboard(
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [agreedToCode, setAgreedToCode] = useState(false);
 
-  // ── Unified Dashboard Overview Data ──────────────────────────
+  // Unified Dashboard Overview Data
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
@@ -277,36 +277,35 @@ export default function MentorDashboard(
     fetchDashboardData();
   }, [userId, mentorData, sessions, fetchDashboardData]);
 
-   // ── Notification states (mentorship-scoped) ─────────────────
-   const [notifications, setNotifications] = useState<any[]>([]);
-   const [notificationsLoading, setNotificationsLoading] = useState(true);
- 
-   // ✅ NEW — realtime socket hook: pushes 'notification:new' the instant the
-   // backend emits it (booking request, session started/confirmed, etc.)
-   const { latestNotification } = useSocket();
- 
-   const fetchNotifications = useCallback(() => {
-     setNotificationsLoading(true);
-     NotificationService.getMentorshipNotifications({ limit: 50 })
-       .then((res) => setNotifications(normalizeNotifications(res)))
-       .catch((err) => {
-         console.error("Failed to fetch notifications:", err);
-         setNotifications([]);
-       })
-       .finally(() => setNotificationsLoading(false));
-   }, []);
- 
-   useEffect(() => {
-     if (!userId) return;
-     fetchNotifications();
-   }, [userId, fetchNotifications]);
- 
-      // ✅ NEW — prepend the realtime notification to the list the instant it
-   // arrives, instead of waiting for the next full refetch/page-load.
-   // Maps the socket payload's raw `type` (e.g. 'new_booking_request') to the
-   // same "booking"|"review"|"payment"|"message"|"system" bucket the fetched
-   // list uses, so NotificationPage's icon lookup matches either way.
-   useEffect(() => {
+  // Notification states (mentorship-scoped)
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
+
+  // Realtime socket hook: 'notification:new' backend emit karte hi aa jata hai
+  // (booking request, session started/confirmed, etc.)
+  const { latestNotification } = useSocket();
+
+  const fetchNotifications = useCallback(() => {
+    setNotificationsLoading(true);
+    NotificationService.getMentorshipNotifications({ limit: 50 })
+      .then((res) => setNotifications(normalizeNotifications(res)))
+      .catch((err) => {
+        console.error("Failed to fetch notifications:", err);
+        setNotifications([]);
+      })
+      .finally(() => setNotificationsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    fetchNotifications();
+  }, [userId, fetchNotifications]);
+
+  // Realtime notification ko list ke top par turant daalo, refetch ka wait nahi.
+  // Socket payload ka raw `type` (jaise 'new_booking_request') ko usi
+  // "booking"|"review"|"payment"|"message"|"system" bucket me map karte hain
+  // jo fetched list use karti hai, taaki NotificationPage ka icon lookup dono me match kare.
+  useEffect(() => {
     if (!latestNotification) return;
     setNotifications((prev) => {
       const already = (Array.isArray(prev) ? prev : []).some(
@@ -337,9 +336,6 @@ export default function MentorDashboard(
       ];
     });
   }, [latestNotification]);
-  
-
-
 
   const handleMarkNotificationRead = (id: string) => {
     setNotifications((prev) =>
@@ -496,15 +492,11 @@ export default function MentorDashboard(
   };
 
   const handleCreateService = () => {
-
     if (!serviceFormData.serviceName || !serviceFormData.price) return;
 
     setCompletedServices(prev => [
       ...prev,
-      {
-        ...serviceFormData,
-        emoji: SERVICE_TYPES.find(t => t.name === serviceFormData.serviceType)?.emoji || "✅",
-      },
+      { ...serviceFormData },
     ]);
 
     setShowServiceForm(false);
@@ -528,24 +520,19 @@ export default function MentorDashboard(
 
   return (
     <div className="flex flex-col h-screen bg-[#f6ede8]">
-      <div className="h-20 shrink-0" aria-hidden="true" />
+      <div className="h-16 shrink-0" aria-hidden="true" />
 
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between px-4 h-16 shrink-0 bg-[#fbf7f3] border-b border-[#e0d8cf]">
-        <button 
+        <button
           onClick={() => setIsMobileMenuOpen(true)}
           className="p-2 -ml-2 text-[#4a3728] hover:bg-[#f3ece4] rounded-lg transition-colors"
           aria-label="Open menu"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
         </button>
-        
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-[#4a3728] flex items-center justify-center">
-            <span className="text-[#e0d8cf] font-black text-[10px]">T8</span>
-          </div>
-          <span className="text-[#4a3728] font-bold text-sm tracking-tight">throne8</span>
-        </div>
+
+        <BrandWordmark size="sm" />
 
         <div className="w-8 h-8 rounded-full overflow-hidden border border-[#e0d8cf] flex-shrink-0">
           {dashboardData?.profilePic || mentorData?.profilePic ? (
@@ -561,7 +548,7 @@ export default function MentorDashboard(
       <div className="flex flex-1 min-h-0 relative">
         {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-hidden="true"
@@ -587,7 +574,7 @@ export default function MentorDashboard(
         </div>
 
         <main className="flex-1 overflow-y-auto">
-          <div className="px-4 md:px-6 py-8 max-w-[1600px] mx-auto">
+          <div className="px-4 md:px-8 py-6 max-w-[1600px] mx-auto">
             <CurrentPage
               setActivePage={setActivePage}
 
