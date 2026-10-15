@@ -1,57 +1,78 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { currentJobSchema, CurrentJobFormData } from '../schema';
 import SearchableCombobox from './SearchableCombobox';
 import CompanyLogo from './CompanyLogo';
 import { COMPANIES, JOB_TITLES } from '../data/jobData';
+import { RegistrationData } from '../interface';
 
 interface Props {
   onNext: (data: any) => void;
   onBack: () => void;
+  initialData?: Partial<RegistrationData>;
+  onDataChange?: (data: Partial<RegistrationData>) => void;
+  serverErrors?: Record<string, string>;
+  onClearServerError?: (field: string) => void;
 }
 
-export default function CurrentJob({ onNext, onBack }: Props) {
-  const [isCurrentlyWorking, setIsCurrentlyWorking] = useState(true);
+export default function CurrentJob({
+  onNext, onBack, initialData = {}, onDataChange = () => {}, serverErrors = {}, onClearServerError = () => {},
+}: Props) {
+  const [isCurrentlyWorking, setIsCurrentlyWorking] = useState(initialData.isCurrentlyWorking ?? !initialData.endDate);
 
   const {
     register,
     handleSubmit,
     control,
-    formState: { errors, isValid },
+    formState: { errors },
     watch,
     setValue,
   } = useForm<CurrentJobFormData>({
     resolver: zodResolver(currentJobSchema),
-    mode: 'onChange',
+    defaultValues: {
+      jobTitle: initialData.jobTitle || '',
+      companyName: initialData.companyName || '',
+      startDate: initialData.startDate || '',
+      endDate: initialData.endDate || '',
+    },
+    mode: 'onBlur',
     reValidateMode: 'onChange',
   });
 
   const startDate = watch('startDate');
+  const jobTitle = watch('jobTitle');
+  const companyName = watch('companyName');
   const endDate = watch('endDate');
 
-  const isFormValid = isValid && (isCurrentlyWorking || endDate);
+  useEffect(() => {
+    onDataChange({ jobTitle, companyName, startDate, endDate: endDate || '', isCurrentlyWorking });
+  }, [jobTitle, companyName, startDate, endDate, isCurrentlyWorking, onDataChange]);
 
   const handleStatusChange = (working: boolean) => {
     setIsCurrentlyWorking(working);
     if (working) {
       setValue('endDate', '', { shouldValidate: true });
     }
+    onDataChange({ isCurrentlyWorking: working, ...(working ? { endDate: '' } : {}) });
   };
 
   const onSubmit = (data: CurrentJobFormData) => {
-    if (!isCurrentlyWorking && !data.endDate) {
-      return;
-    }
-
     onNext({
       jobTitle: data.jobTitle,
       companyName: data.companyName,
       startDate: data.startDate,
-      endDate: isCurrentlyWorking ? null : data.endDate,
+      endDate: isCurrentlyWorking ? '' : data.endDate || '',
       isCurrentlyWorking: isCurrentlyWorking
+    });
+  };
+  const handleInvalid = () => {
+    window.requestAnimationFrame(() => {
+      const firstInvalid = document.querySelector<HTMLElement>('[aria-invalid="true"]');
+      firstInvalid?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      firstInvalid?.focus();
     });
   };
 
@@ -74,18 +95,23 @@ export default function CurrentJob({ onNext, onBack }: Props) {
                 <SearchableCombobox
                   id="jobTitle"
                   value={field.value ?? ''}
-                  onChange={field.onChange}
+                  onChange={(value) => {
+                    field.onChange(value);
+                    onClearServerError('jobTitle');
+                  }}
                   onBlur={field.onBlur}
                   options={JOB_TITLES}
                   placeholder="e.g. Software Engineer"
-                  className={`w-full px-5 py-4 rounded-xl border ${errors.jobTitle ? 'border-red-500' : 'border-[#4a3728]'
-                    } bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 ${errors.jobTitle ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
+                  className={`w-full px-5 py-4 rounded-xl border ${errors.jobTitle || serverErrors.jobTitle ? 'border-red-500' : 'border-[#4a3728]'
+                    } bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 ${errors.jobTitle || serverErrors.jobTitle ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
                     } transition`}
+                  ariaInvalid={!!errors.jobTitle || !!serverErrors.jobTitle}
+                  ariaDescribedBy={errors.jobTitle || serverErrors.jobTitle ? 'signup-job-title-error' : undefined}
                 />
               )}
             />
-            {errors.jobTitle && (
-              <p className="text-red-500 text-sm mt-2">• {errors.jobTitle.message}</p>
+            {(errors.jobTitle?.message || serverErrors.jobTitle) && (
+              <p id="signup-job-title-error" role="alert" className="text-red-500 text-sm mt-2">• {errors.jobTitle?.message || serverErrors.jobTitle}</p>
             )}
           </div>
 
@@ -100,9 +126,13 @@ export default function CurrentJob({ onNext, onBack }: Props) {
                 <SearchableCombobox
                   id="companyName"
                   value={field.value ?? ''}
-                  onChange={field.onChange}
+                  onChange={(value) => {
+                    field.onChange(value);
+                    onClearServerError('companyName');
+                  }}
                   onBlur={field.onBlur}
                   options={COMPANIES}
+                  allowCustomValue
                   placeholder="e.g. TCS, Infosys, Google"
                   leading={
                     field.value?.trim() ? <CompanyLogo name={field.value} size={26} /> : null
@@ -114,14 +144,16 @@ export default function CurrentJob({ onNext, onBack }: Props) {
                     </>
                   )}
                   className={`w-full py-4 pr-5 rounded-xl border ${field.value?.trim() ? 'pl-14' : 'pl-5'
-                    } ${errors.companyName ? 'border-red-500' : 'border-[#4a3728]'
-                    } bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 ${errors.companyName ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
+                    } ${errors.companyName || serverErrors.companyName ? 'border-red-500' : 'border-[#4a3728]'
+                    } bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 ${errors.companyName || serverErrors.companyName ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
                     } transition`}
+                  ariaInvalid={!!errors.companyName || !!serverErrors.companyName}
+                  ariaDescribedBy={errors.companyName || serverErrors.companyName ? 'signup-company-name-error' : undefined}
                 />
               )}
             />
-            {errors.companyName && (
-              <p className="text-red-500 text-sm mt-2">• {errors.companyName.message}</p>
+            {(errors.companyName?.message || serverErrors.companyName) && (
+              <p id="signup-company-name-error" role="alert" className="text-red-500 text-sm mt-2">• {errors.companyName?.message || serverErrors.companyName}</p>
             )}
           </div>
 
@@ -182,15 +214,19 @@ export default function CurrentJob({ onNext, onBack }: Props) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Start Date *</label>
               <input
-                {...register('startDate')}
+                {...register('startDate', { onChange: () => onClearServerError('startDate') })}
+                id="signup-start-date"
                 type="date"
-                className={`w-full px-5 py-4 rounded-xl border ${errors.startDate ? 'border-red-500' : 'border-[#4a3728]'
-                  } bg-white text-black focus:outline-none focus:ring-2 ${errors.startDate ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
+                aria-invalid={!!errors.startDate || !!serverErrors.startDate}
+                aria-describedby={errors.startDate || serverErrors.startDate ? 'signup-start-date-error' : undefined}
+                className={`w-full px-5 py-4 rounded-xl border ${errors.startDate || serverErrors.startDate ? 'border-red-500' : 'border-[#4a3728]'
+                  } bg-white text-black focus:outline-none focus:ring-2 ${errors.startDate || serverErrors.startDate ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
                   } transition`}
               />
               {errors.startDate && (
-                <p className="text-red-500 text-sm mt-2">• {errors.startDate.message}</p>
+                <p id="signup-start-date-error" role="alert" className="text-red-500 text-sm mt-2">• {errors.startDate.message}</p>
               )}
+              {!errors.startDate && serverErrors.startDate && <p id="signup-start-date-error" role="alert" className="text-red-500 text-sm mt-2">{serverErrors.startDate}</p>}
             </div>
 
             <div>
@@ -198,23 +234,27 @@ export default function CurrentJob({ onNext, onBack }: Props) {
                 End Date {!isCurrentlyWorking && '*'}
               </label>
               <input
-                {...register('endDate')}
+                {...register('endDate', { onChange: () => onClearServerError('endDate') })}
+                id="signup-end-date"
                 type="date"
                 min={startDate}
                 disabled={isCurrentlyWorking}
-                className={`w-full px-5 py-4 rounded-xl border ${errors.endDate ? 'border-red-500' : 'border-[#4a3728]'
-                  } bg-white text-black focus:outline-none focus:ring-2 ${errors.endDate ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
+                aria-invalid={!!errors.endDate || !!serverErrors.endDate}
+                aria-describedby={errors.endDate || serverErrors.endDate ? 'signup-end-date-error' : undefined}
+                className={`w-full px-5 py-4 rounded-xl border ${errors.endDate || serverErrors.endDate ? 'border-red-500' : 'border-[#4a3728]'
+                  } bg-white text-black focus:outline-none focus:ring-2 ${errors.endDate || serverErrors.endDate ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
                   } transition ${isCurrentlyWorking ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''
                   }`}
               />
               {errors.endDate && (
-                <p className="text-red-500 text-sm mt-2">• {errors.endDate.message}</p>
+                <p id="signup-end-date-error" role="alert" className="text-red-500 text-sm mt-2">• {errors.endDate.message}</p>
               )}
+              {!errors.endDate && serverErrors.endDate && <p id="signup-end-date-error" role="alert" className="text-red-500 text-sm mt-2">{serverErrors.endDate}</p>}
               {!errors.endDate && isCurrentlyWorking && (
                 <p className="text-gray-500 text-xs mt-2">Disabled for currently working</p>
               )}
               {!errors.endDate && !isCurrentlyWorking && (
-                <p className="text-gray-500 text-xs mt-2">End date is required for completed jobs</p>
+                <p className="text-gray-500 text-xs mt-2">End date is optional; if entered, it must be at least one month after the start date.</p>
               )}
             </div>
           </div>
@@ -230,14 +270,10 @@ export default function CurrentJob({ onNext, onBack }: Props) {
             </button>
             <button
               type="button"
-              onClick={handleSubmit(onSubmit)}
-              disabled={!isFormValid}
+              onClick={handleSubmit(onSubmit, handleInvalid)}
               className={`
                 px-8 py-4 rounded-xl font-semibold transition shadow-lg
-                ${isFormValid
-                  ? 'bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white hover:opacity-90'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }
+                bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white hover:opacity-90
               `}
             >
               Next

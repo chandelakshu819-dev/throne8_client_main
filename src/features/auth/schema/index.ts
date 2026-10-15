@@ -1,273 +1,154 @@
 import { z } from 'zod';
-import { getMonthsDifference } from '../helpers';
+import {
+  cgpaRule,
+  companyNameRule,
+  confirmPasswordRule,
+  emailRule,
+  endDateRule,
+  firstNameRule,
+  freeTextRule,
+  getMonthsDifference,
+  graduationYearRule,
+  lastNameRule,
+  locationRule,
+  MIN_JOB_DURATION_MONTHS,
+  passwordRule,
+  phoneRule,
+  startDateRule,
+} from './rules';
 
-// Stronger schema
-export const schema = z.object({
-  // Email validation (EXACT SERVER MATCH)
-  email: z
-    .string()
-    .min(1, { message: 'Email is required' })
-    .email({ message: 'Please enter a valid email address' })
-    .toLowerCase()
-    .max(255, { message: 'Email is too long (max 255 characters)' })
-    .refine((email) => {
-      // Block test/demo emails
-      const blockedDomains = ['example.com', 'test.com', 'demo.com'];
-      const domain = email.split('@')[1];
-      return !blockedDomains.includes(domain);
-    }, {
-      message: 'Test or demo emails are not allowed',
-    })
-    .refine((email) => {
-      // Email format validation
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    }, {
-      message: 'Invalid email format',
-    }),
+const accountFields = {
+  email: emailRule,
+  password: passwordRule,
+  confirmPassword: confirmPasswordRule,
+};
 
-  // Password validation (EXACT SERVER MATCH)
-  password: z
-    .string()
-    .min(8, { message: 'Password must be at least 8 characters long' })
-    .max(128, { message: 'Password is too long (max 128 characters)' })
-    .regex(/[A-Z]/, {
-      message: 'Password must contain at least one uppercase letter (A-Z)'
-    })
-    .regex(/[a-z]/, {
-      message: 'Password must contain at least one lowercase letter (a-z)'
-    })
-    .regex(/[0-9]/, {
-      message: 'Password must contain at least one number (0-9)'
-    })
-    .regex(/[@$!%*?&#^()_+\-=\[\]{}|;:,.<>]/, {
-      message: 'Password must contain at least one special character (@$!%*?&#^()_+-=[]{}|;:,.<>)'
-    })
-    .refine((pwd) => !/\s/.test(pwd), {
-      message: 'Password cannot contain spaces'
-    })
-    .refine((pwd) => !pwd.toLowerCase().includes('password'), {
-      message: 'Password cannot contain the word "password"',
-    })
-    .refine((pwd) => !pwd.toLowerCase().includes('123'), {
-      message: 'Avoid common sequences like "123"',
-    }),
-
-  // Confirm Password validation
-  confirmPassword: z.string().min(1, { message: 'Please confirm your password' }),
-
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
+export const schema = z.object(accountFields).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
   path: ['confirmPassword'],
 });
 
+export const personalDetailsSchema = z.object({
+  firstName: firstNameRule,
+  lastName: lastNameRule,
+  phone: phoneRule,
+  location: locationRule,
+});
+
+export const currentStatusSchema = z.object({
+  userType: z.enum(['working', 'student', 'fresher'], {
+    errorMap: () => ({ message: 'Choose your current status to continue' }),
+  }),
+});
+
+export const currentJobSchema = z.object({
+  jobTitle: freeTextRule('Job title'),
+  companyName: companyNameRule,
+  startDate: startDateRule,
+  endDate: endDateRule,
+}).superRefine((data, context) => {
+  if (!data.endDate) return;
+  if (data.endDate < data.startDate) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['endDate'], message: 'End date cannot be before start date' });
+  } else if (getMonthsDifference(data.startDate, data.endDate) < MIN_JOB_DURATION_MONTHS) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['endDate'], message: 'Minimum job duration is 1 month' });
+  }
+});
+
+export const studentEducationSchema = z.object({
+  collegeName: freeTextRule('College name', 3),
+  degree: freeTextRule('Degree'),
+  fieldOfStudy: freeTextRule('Field of study'),
+  graduationYear: graduationYearRule,
+});
+
 export const fresherEducationSchema = z.object({
-  highestEducation: z
-    .string()
-    .min(1, { message: 'Highest education is required' })
-    .max(100, { message: 'Education name too long' }),
+  highestEducation: freeTextRule('Highest education'),
+  preferredRole: freeTextRule('Preferred role'),
+  cgpa: cgpaRule,
+});
 
-  preferredRole: z
-    .string()
-    .min(1, { message: 'Preferred job role is required' })
-    .max(100, { message: 'Role name too long' }),
+const commonRegistrationFields = {
+  ...accountFields,
+  firstName: firstNameRule,
+  lastName: lastNameRule,
+  phoneNumber: phoneRule,
+  location: locationRule,
+  userType: currentStatusSchema.shape.userType,
+};
 
-  cgpa: z
-    .string()
-    .optional()
-    .refine((val) => {
-      if (!val || val.trim() === '') return true; // Optional
-      return /^\d+(\.\d{1,2})?$/.test(val); // Valid decimal
-    }, {
-      message: 'CGPA must be a valid number (e.g., 8.5)'
-    })
-    .refine((val) => {
-      if (!val || val.trim() === '') return true;
-      const num = parseFloat(val);
-      return num >= 0 && num <= 10;
-    }, {
-      message: 'CGPA must be between 0.00 and 10.00'
-    }),
+export const fullRegistrationSchema = z.object({
+  ...commonRegistrationFields,
+  jobTitle: freeTextRule('Job title').optional(),
+  companyName: companyNameRule.optional(),
+  startDate: startDateRule.optional(),
+  endDate: endDateRule,
+  collegeName: freeTextRule('College name', 3).optional(),
+  degree: freeTextRule('Degree').optional(),
+  fieldOfStudy: freeTextRule('Field of study').optional(),
+  graduationYear: graduationYearRule.optional(),
+  highestEducation: freeTextRule('Highest education').optional(),
+  preferredRole: freeTextRule('Preferred role').optional(),
+  cgpa: cgpaRule,
+}).superRefine((data, context) => {
+  if (data.password !== data.confirmPassword) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['confirmPassword'], message: 'Passwords do not match' });
+  }
+  if (data.userType === 'working') {
+    for (const field of ['jobTitle', 'companyName', 'startDate'] as const) {
+      if (!data[field]) context.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: `${field} is required` });
+    }
+    if (data.startDate && data.endDate) {
+      if (data.endDate < data.startDate) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ['endDate'], message: 'End date cannot be before start date' });
+      } else if (getMonthsDifference(data.startDate, data.endDate) < MIN_JOB_DURATION_MONTHS) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ['endDate'], message: 'Minimum job duration is 1 month' });
+      }
+    }
+  } else if (data.userType === 'student') {
+    for (const field of ['collegeName', 'degree', 'fieldOfStudy', 'graduationYear'] as const) {
+      if (!data[field]) context.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: `${field} is required` });
+    }
+  } else {
+    for (const field of ['highestEducation', 'preferredRole'] as const) {
+      if (!data[field]) context.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: `${field} is required` });
+    }
+  }
 });
 
 export const loginSchema = z.object({
-  email: z
-    .string()
+  email: z.string()
     .min(1, { message: 'Email is required' })
     .email({ message: 'Please enter a valid email address' })
     .toLowerCase()
     .max(255, { message: 'Email is too long (max 255 characters)' })
-    .refine((email) => {
-      // No test/demo emails
-      const blockedDomains = ['example.com', 'test.com', 'demo.com'];
-      const domain = email.split('@')[1];
-      return !blockedDomains.includes(domain);
-    }, {
+    .refine((email) => !['example.com', 'test.com', 'demo.com'].includes(email.split('@')[1]), {
       message: 'Test or demo emails are not allowed',
     })
-    .refine((email) => {
-      // Basic email format validation
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    }, {
+    .refine((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), {
       message: 'Invalid email format',
     }),
-
-  password: z
-    .string()
+  password: z.string()
     .min(8, { message: 'Password must be at least 8 characters long' })
     .max(128, { message: 'Password is too long (max 128 characters)' })
-    .regex(/[A-Z]/, {
-      message: 'Password must contain at least one uppercase letter (A-Z)'
-    })
-    .regex(/[a-z]/, {
-      message: 'Password must contain at least one lowercase letter (a-z)'
-    })
-    .regex(/[0-9]/, {
-      message: 'Password must contain at least one number (0-9)'
-    })
+    .regex(/[A-Z]/, { message: 'Password must contain at least one uppercase letter (A-Z)' })
+    .regex(/[a-z]/, { message: 'Password must contain at least one lowercase letter (a-z)' })
+    .regex(/[0-9]/, { message: 'Password must contain at least one number (0-9)' })
     .regex(/[@$!%*?&#^()_+\-=\[\]{}|;:,.<>]/, {
-      message: 'Password must contain at least one special character (@$!%*?&#^()_+-=[]{}|;:,.<>)'
+      message: 'Password must contain at least one special character (@$!%*?&#^()_+-=[]{}|;:,.<>)',
     })
-    .refine((pwd) => !/\s/.test(pwd), {
-      message: 'Password cannot contain spaces'
-    })
-    .refine((pwd) => !pwd.toLowerCase().includes('password'), {
+    .refine((password) => !/\s/.test(password), { message: 'Password cannot contain spaces' })
+    .refine((password) => !password.toLowerCase().includes('password'), {
       message: 'Password cannot contain the word "password"',
     })
-    .refine((pwd) => !pwd.toLowerCase().includes('123'), {
+    .refine((password) => !password.toLowerCase().includes('123'), {
       message: 'Avoid common sequences like "123"',
     }),
 });
 
-export 
-// Validation Schema (Server match)
-const personalDetailsSchema = z.object({
-  firstName: z
-    .string()
-    .min(2, { message: 'First name must be at least 2 characters' })
-    .max(50, { message: 'First name cannot exceed 50 characters' })
-    .regex(/^[a-zA-Z\s\-']+$/, {
-      message: 'First name can only contain letters, spaces, hyphens, and apostrophes'
-    })
-    .refine((val) => val.trim().length > 0, {
-      message: 'First name cannot be empty or just spaces'
-    }),
-
-  lastName: z
-    .string()
-    .min(2, { message: 'Last name must be at least 2 characters' })
-    .max(50, { message: 'Last name cannot exceed 50 characters' })
-    .regex(/^[a-zA-Z\s\-']+$/, {
-      message: 'Last name can only contain letters, spaces, hyphens, and apostrophes'
-    })
-    .refine((val) => val.trim().length > 0, {
-      message: 'Last name cannot be empty or just spaces'
-    }),
-
-  phone: z
-    .string()
-    .regex(/^\+?[1-9]\d{1,14}$/, {
-      message: 'Invalid phone number format (E.164 format required, e.g., +919876543210)'
-    })
-    .refine((val) => val.length >= 10, {
-      message: 'Phone number must be at least 10 digits'
-    }),
-
-  location: z
-    .string()
-    .min(2, { message: 'Location must be at least 2 characters' })
-    .max(100, { message: 'Location cannot exceed 100 characters' })
-    .regex(/^[A-Z][a-zA-Z\s\-]+$/, {
-      message: 'Location must start with a capital letter and contain only letters, spaces, and hyphens'
-    })
-    .refine((val) => val.trim().length > 0, {
-      message: 'Location cannot be empty'
-    }),
-});
-
-export const studentEducationSchema = z.object({
-  collegeName: z
-    .string()
-    .min(3, { message: 'College name must be at least 3 characters' })
-    .max(200, { message: 'College name cannot exceed 200 characters' })
-    .refine((val) => val.trim().length > 0, {
-      message: 'College name cannot be empty'
-    }),
-
-  degree: z
-    .string()
-    .min(1, { message: 'Degree is required (e.g., B.Tech, B.Sc)' })
-    .max(50, { message: 'Degree name too long' }),
-
-  fieldOfStudy: z
-    .string()
-    .min(2, { message: 'Field of study must be at least 2 characters' })
-    .max(100, { message: 'Field of study name too long' }),
-
-  graduationYear: z
-    .string()
-    .regex(/^\d{4}$/, { message: 'Graduation year must be a 4-digit year (e.g., 2025)' })
-    .refine((year) => {
-      const y = parseInt(year);
-      return y >= 1950 && y <= 2035;
-    }, {
-      message: 'Graduation year must be between 1950 and 2035'
-    }),
-});
-
-export const currentJobSchema = z.object({
-  jobTitle: z
-    .string()
-    .min(1, { message: 'Please select a job title' }),
-
-  companyName: z
-    .string()
-    .min(1, { message: 'Please select a company' }),
-
-  startDate: z
-    .string()
-    .min(1, { message: 'Start date is required' })
-    .refine((date) => {
-      const selected = new Date(date);
-      const today = new Date();
-      return selected <= today;
-    }, {
-      message: 'Start date cannot be in the future'
-    }),
-
-  endDate: z
-    .string()
-    .optional()
-    .refine((date) => {
-      if (!date) return true;
-      const selected = new Date(date);
-      const today = new Date();
-      return selected <= today;
-    }, {
-      message: 'End date cannot be in the future'
-    }),
-}).refine((data) => {
-  if (!data.endDate) return true;
-
-  const start = new Date(data.startDate);
-  const end = new Date(data.endDate);
-
-  if (end < start) return false;
-
-  const monthsDiff = getMonthsDifference(data.startDate, data.endDate);
-  return monthsDiff >= 1;
-}, {
-  message: 'End date must be after start date, with minimum 1 month job duration',
-  path: ['endDate'],
-});
-
 export type CurrentJobFormData = z.infer<typeof currentJobSchema>;
-
 export type StudentEducationFormData = z.infer<typeof studentEducationSchema>;
-
 export type PersonalDetailsFormData = z.infer<typeof personalDetailsSchema>;
-
-export type LoginFormData = z.infer<typeof loginSchema>;
-
-export type FresherEducationFormData = z.infer<typeof fresherEducationSchema>;
-
 export type FormData = z.infer<typeof schema>;
+export type FresherEducationFormData = z.infer<typeof fresherEducationSchema>;
+export type LoginFormData = z.infer<typeof loginSchema>;

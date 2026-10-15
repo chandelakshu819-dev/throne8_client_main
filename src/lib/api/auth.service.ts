@@ -76,6 +76,18 @@ interface ApiError {
     statusCode: number;
     message: string;
     errors?: Array<{ field: string; message: string }>;
+    fieldErrors?: Array<{ field: string; message: string }>;
+}
+
+interface RegistrationApiError extends Omit<ApiError, 'errors'> {
+    errors?: string[];
+}
+
+export interface RegistrationFailure {
+    message: string;
+    statusCode?: number;
+    fieldErrors?: Array<{ field: string; message: string }>;
+    errors?: string[];
 }
 
 // SAHI (array hona chahiye + pagination)
@@ -181,20 +193,10 @@ class AuthService {
     */
     static async register(registrationData: any): Promise<any> {
         try {
-            console.log('📝 [REGISTER] Initiating registration...', {
-                email: registrationData.email,
-                userType: registrationData.userType,
-            });
-
             const { data } = await api.post(
                 `${config.NEXT_PUBLIC_REGISTER_ENDPOINT || process.env.NEXT_PUBLIC_REGISTER_ENDPOINT}`,
                 registrationData
             );
-
-            console.log('✅ [REGISTER] Registration successful', {
-                userId: data.data?.user?.userId,
-                email: data.data?.user?.email,
-            });
 
             // 💾 Store tokens (same as login)
             TokenStorage.setAuthData(
@@ -202,36 +204,39 @@ class AuthService {
                 data.data.user
             );
 
-            console.log('✅ [REGISTER] Auth data stored in localStorage');
-
             return data;
 
         } catch (error: any) {
-            console.error('❌ [REGISTER] Registration failed', error);
-
             if (axios.isAxiosError(error)) {
-                const apiError = error.response?.data as ApiError;
-
-                if (error.code === 'ERR_NETWORK') {
-                    throw new Error('Unable to connect to server. Please check your internet connection.');
-                }
-
-                if (apiError?.message) {
-                    throw new Error(apiError.message);
-                }
-
-                if (error.response?.status === 409) {
-                    throw new Error('User already exists with this email.');
-                }
-
-                if (error.response?.status === 400) {
-                    const errors = apiError?.errors?.map(e => e.message).join(', ');
-                    throw new Error(errors || 'Validation failed. Please check your inputs.');
-                }
+                const apiError = error.response?.data as RegistrationApiError;
+                throw {
+                    message: apiError?.message ||
+                        (error.code === 'ERR_NETWORK'
+                            ? 'Unable to connect. Check your connection and retry.'
+                            : 'Registration failed. Please retry.'),
+                    statusCode: error.response?.status,
+                    fieldErrors: apiError?.fieldErrors,
+                    errors: apiError?.errors,
+                } satisfies RegistrationFailure;
             }
 
-            throw new Error('An unexpected error occurred. Please try again.');
+            throw {
+                message: 'An unexpected error occurred. Please retry.',
+            } satisfies RegistrationFailure;
         }
+    }
+
+    static async checkRegistrationAvailability(
+        field: 'email' | 'phone',
+        value: string,
+        signal: AbortSignal
+    ): Promise<boolean> {
+        const { data } = await api.post<{ available: boolean }>(
+            '/auth/availability',
+            { field, value },
+            { signal }
+        );
+        return data.available;
     }
 
     /**

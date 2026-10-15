@@ -13,6 +13,9 @@ interface Props {
   maxResults?: number;
   leading?: ReactNode;
   renderOption?: (option: string) => ReactNode;
+  ariaInvalid?: boolean;
+  ariaDescribedBy?: string;
+  allowCustomValue?: boolean;
 }
 
 export default function SearchableCombobox({
@@ -26,6 +29,9 @@ export default function SearchableCombobox({
   maxResults = 10,
   leading,
   renderOption,
+  ariaInvalid,
+  ariaDescribedBy,
+  allowCustomValue = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -39,8 +45,13 @@ export default function SearchableCombobox({
     const contains = options.filter(
       (o) => !o.toLowerCase().startsWith(query) && o.toLowerCase().includes(query)
     );
-    return [...starts, ...contains].slice(0, maxResults);
-  }, [query, options, maxResults]);
+    if (!allowCustomValue) return [...starts, ...contains].slice(0, maxResults);
+    const exact = options.filter((o) => o.toLowerCase() === query);
+    return [...exact, ...starts.filter((o) => o.toLowerCase() !== query), ...contains].slice(0, maxResults);
+  }, [query, options, maxResults, allowCustomValue]);
+  const hasExactMatch = options.some((option) => option.toLowerCase() === query);
+  const showCustomValue = allowCustomValue && query.length > 0 && !hasExactMatch;
+  const optionCount = suggestions.length + Number(showCustomValue);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -59,22 +70,30 @@ export default function SearchableCombobox({
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!open || suggestions.length === 0) return;
+    if (e.key === 'Enter' && allowCustomValue) {
+      e.preventDefault();
+      if (activeIndex >= 0 && activeIndex < suggestions.length) {
+        select(suggestions[activeIndex]);
+      } else if (activeIndex === suggestions.length && showCustomValue) {
+        select(value.trim());
+      } else {
+        select(value.trim());
+      }
+      return;
+    }
+    if (!open || optionCount === 0) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActiveIndex((i) => (i + 1) % suggestions.length);
+      setActiveIndex((i) => (i + 1) % optionCount);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setActiveIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
-    } else if (e.key === 'Enter' && activeIndex >= 0) {
-      e.preventDefault();
-      select(suggestions[activeIndex]);
+      setActiveIndex((i) => (i <= 0 ? optionCount - 1 : i - 1));
     } else if (e.key === 'Escape') {
       setOpen(false);
     }
   };
 
-  const showDropdown = open && suggestions.length > 0;
+  const showDropdown = open && optionCount > 0;
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -91,14 +110,21 @@ export default function SearchableCombobox({
         placeholder={placeholder}
         role="combobox"
         aria-expanded={showDropdown}
+        aria-controls={`${id}-options`}
         aria-autocomplete="list"
+        aria-activedescendant={activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedBy}
         onChange={(e) => {
           onChange(e.target.value);
           setOpen(true);
           setActiveIndex(-1);
         }}
         onFocus={() => setOpen(true)}
-        onBlur={onBlur}
+        onBlur={() => {
+          if (allowCustomValue) onChange(value.trim());
+          onBlur?.();
+        }}
         onKeyDown={onKeyDown}
         className={
           className ||
@@ -108,12 +134,14 @@ export default function SearchableCombobox({
 
       {showDropdown && (
         <ul
+          id={`${id}-options`}
           role="listbox"
           className="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-xl border border-[#e5d9cc] bg-white shadow-xl"
         >
           {suggestions.map((o, i) => (
             <li
               key={o}
+              id={`${id}-option-${i}`}
               role="option"
               aria-selected={i === activeIndex}
               onMouseDown={(e) => {
@@ -128,6 +156,23 @@ export default function SearchableCombobox({
               {renderOption ? renderOption(o) : o}
             </li>
           ))}
+          {showCustomValue && (
+            <li
+              id={`${id}-option-${suggestions.length}`}
+              role="option"
+              aria-selected={activeIndex === suggestions.length}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                select(value.trim());
+              }}
+              onMouseEnter={() => setActiveIndex(suggestions.length)}
+              className={`cursor-pointer px-4 py-2.5 text-sm text-gray-800 ${
+                activeIndex === suggestions.length ? 'bg-[#f5ede4]' : 'hover:bg-[#f5ede4]'
+              }`}
+            >
+              Use &quot;{value.trim()}&quot;
+            </li>
+          )}
         </ul>
       )}
     </div>

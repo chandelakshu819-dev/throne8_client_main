@@ -159,6 +159,8 @@ interface Props {
   onBlur?: () => void;
   placeholder?: string;
   className?: string;
+  ariaInvalid?: boolean;
+  ariaDescribedBy?: string;
   name?: string;
 }
 
@@ -169,6 +171,8 @@ export default function CollegeAutocomplete({
   onBlur,
   placeholder = 'e.g. IIT Bombay, Delhi University',
   className = '',
+  ariaInvalid,
+  ariaDescribedBy,
   name,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -280,7 +284,10 @@ export default function CollegeAutocomplete({
         placeholder={placeholder}
         role="combobox"
         aria-expanded={showDropdown}
+        aria-controls={`${id}-options`}
         aria-autocomplete="list"
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedBy}
         onChange={(e) => {
           onChange(e.target.value);
           setOpen(true);
@@ -297,6 +304,7 @@ export default function CollegeAutocomplete({
 
       {showDropdown && (
         <ul
+          id={`${id}-options`}
           role="listbox"
           className="absolute left-0 right-0 top-full mt-1 z-50 max-h-64 overflow-y-auto rounded-xl border border-[#e5d9cc] bg-white shadow-xl"
         >

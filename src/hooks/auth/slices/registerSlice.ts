@@ -59,8 +59,8 @@ const registerSlice = createSlice({
             })
             .addCase(registerUser.rejected, (state, action) => {
                 state.loading = false;
-                state.error = action.payload as string || 'Registration failed';
-                console.error('❌ [SLICE] Registration failed:', state.error);
+                const failure = action.payload as { message?: string } | undefined;
+                state.error = failure?.message || 'Registration failed. Please retry.';
             });
     },
 });

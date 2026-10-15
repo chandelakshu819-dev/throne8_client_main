@@ -19,6 +19,7 @@ export interface RegistrationData {
   companyName?: string;
   startDate?: string;
   endDate?: string;
+  isCurrentlyWorking?: boolean;
 
   // Step 4 (Student)
   collegeName?: string;

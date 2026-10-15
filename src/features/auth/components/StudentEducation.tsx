@@ -1,10 +1,12 @@
 'use client';
 
 import { Controller, useForm } from 'react-hook-form';
+import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { studentEducationSchema, StudentEducationFormData } from '../schema';
 import PickerModal from './PickerModal';
 import CollegeAutocomplete from './CollegeAutocomplete';
+import { RegistrationData } from '../interface';
 
 const VALID_DEGREES = [
   'B.Tech', 'B.E', 'B.Sc', 'BCA', 'B.Com', 'B.A', 'BBA', 'B.Pharm', 'B.Arch', 'LLB', 'MBBS',
@@ -79,24 +81,50 @@ const VALID_FIELDS = [
 interface Props {
   onNext: (data: any) => void;
   onBack: () => void;
+  initialData?: Partial<RegistrationData>;
+  onDataChange?: (data: Partial<RegistrationData>) => void;
+  serverErrors?: Record<string, string>;
+  onClearServerError?: (field: string) => void;
 }
 
-export default function StudentEducation({ onNext, onBack }: Props) {
+export default function StudentEducation({
+  onNext, onBack, initialData = {}, onDataChange = () => {}, serverErrors = {}, onClearServerError = () => {},
+}: Props) {
   const {
     register,
     handleSubmit,
     setValue,
     watch,
     control,
-    formState: { errors, isValid },
+    formState: { errors },
   } = useForm<StudentEducationFormData>({
     resolver: zodResolver(studentEducationSchema),
-    mode: 'onChange',
+    defaultValues: {
+      collegeName: initialData.collegeName || '',
+      degree: initialData.degree || '',
+      fieldOfStudy: initialData.fieldOfStudy || '',
+      graduationYear: initialData.graduationYear || '',
+    },
+    mode: 'onBlur',
     reValidateMode: 'onChange',
   });
 
   const degreeValue = watch('degree') || '';
   const fieldOfStudyValue = watch('fieldOfStudy') || '';
+  const collegeName = watch('collegeName') || '';
+  const graduationYear = watch('graduationYear') || '';
+
+  useEffect(() => {
+    onDataChange({ collegeName, degree: degreeValue, fieldOfStudy: fieldOfStudyValue, graduationYear });
+  }, [collegeName, degreeValue, fieldOfStudyValue, graduationYear, onDataChange]);
+
+  const handleInvalid = () => {
+    window.requestAnimationFrame(() => {
+      const firstInvalid = document.querySelector<HTMLElement>('[aria-invalid="true"]');
+      firstInvalid?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      firstInvalid?.focus();
+    });
+  };
 
   const onSubmit = async (data: StudentEducationFormData) => {
     try {
@@ -118,7 +146,7 @@ export default function StudentEducation({ onNext, onBack }: Props) {
           Education
         </h2>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit, handleInvalid)} className="space-y-4" noValidate>
           <div>
             <label htmlFor="collegeName" className="block text-sm font-medium text-gray-700 mb-2">
               College/School Name
@@ -132,8 +160,13 @@ export default function StudentEducation({ onNext, onBack }: Props) {
                   id="collegeName"
                   name={field.name}
                   value={field.value ?? ''}
-                  onChange={field.onChange}
+                  onChange={(value) => {
+                    field.onChange(value);
+                    onClearServerError('collegeName');
+                  }}
                   onBlur={field.onBlur}
+                  ariaInvalid={!!errors.collegeName || !!serverErrors.collegeName}
+                  ariaDescribedBy={errors.collegeName || serverErrors.collegeName ? 'signup-college-name-error' : undefined}
                   placeholder="e.g. IIT Bombay, LNCT Bhopal, MANIT"
                   className={`w-full text-black px-5 py-4 rounded-xl border ${errors.collegeName ? 'border-red-500' : 'border-[#4a3728]'
                     } focus:outline-none focus:ring-2 ${errors.collegeName ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
@@ -141,43 +174,55 @@ export default function StudentEducation({ onNext, onBack }: Props) {
                 />
               )}
             />
-            {errors.collegeName && (
-              <p className="text-red-500 text-sm mt-2">• {errors.collegeName.message}</p>
+            {(errors.collegeName?.message || serverErrors.collegeName) && (
+              <p id="signup-college-name-error" role="alert" className="text-red-500 text-sm mt-2">• {errors.collegeName?.message || serverErrors.collegeName}</p>
             )}
           </div>
 
           <PickerModal
+            id="signup-degree"
             label="Degree"
             placeholder="Select Degree (e.g. B.Tech, MCA)"
             options={VALID_DEGREES}
             value={degreeValue}
-            onChange={(val) => setValue('degree', val, { shouldValidate: true })}
-            error={errors.degree?.message}
+            onChange={(val) => {
+              setValue('degree', val, { shouldValidate: true, shouldTouch: true });
+              onClearServerError('degree');
+            }}
+            error={errors.degree?.message || serverErrors.degree}
           />
 
           <PickerModal
+            id="signup-field-of-study"
             label="Field of Study"
             placeholder="Select Field of Study (e.g. Computer Science)"
             options={VALID_FIELDS}
             value={fieldOfStudyValue}
-            onChange={(val) => setValue('fieldOfStudy', val, { shouldValidate: true })}
-            error={errors.fieldOfStudy?.message}
+            onChange={(val) => {
+              setValue('fieldOfStudy', val, { shouldValidate: true, shouldTouch: true });
+              onClearServerError('fieldOfStudy');
+            }}
+            error={errors.fieldOfStudy?.message || serverErrors.fieldOfStudy}
           />
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Graduation Year</label>
+            <label htmlFor="signup-graduation-year" className="block text-sm font-medium text-gray-700 mb-2">Graduation Year</label>
             <input
-              {...register('graduationYear')}
+              {...register('graduationYear', { onChange: () => onClearServerError('graduationYear') })}
+              id="signup-graduation-year"
               type="text"
               placeholder="e.g. 2025"
               maxLength={4}
+              aria-invalid={!!errors.graduationYear || !!serverErrors.graduationYear}
+              aria-describedby={errors.graduationYear || serverErrors.graduationYear ? 'signup-graduation-year-error' : undefined}
               className={`w-full text-black px-5 py-4 rounded-xl border ${errors.graduationYear ? 'border-red-500' : 'border-[#4a3728]'
                 } focus:outline-none focus:ring-2 ${errors.graduationYear ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
                 } transition`}
             />
             {errors.graduationYear && (
-              <p className="text-red-500 text-sm mt-2">• {errors.graduationYear.message}</p>
+              <p id="signup-graduation-year-error" role="alert" className="text-red-500 text-sm mt-2">• {errors.graduationYear.message}</p>
             )}
+            {!errors.graduationYear && serverErrors.graduationYear && <p id="signup-graduation-year-error" role="alert" className="text-red-500 text-sm mt-2">{serverErrors.graduationYear}</p>}
           </div>
 
           <div className="flex justify-between pt-4">
@@ -190,12 +235,8 @@ export default function StudentEducation({ onNext, onBack }: Props) {
             </button>
             <button
               type="submit"
-              disabled={!isValid}
               className={`px-8 py-4 rounded-xl font-semibold transition shadow-lg
-                ${isValid
-                  ? 'bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white hover:opacity-90'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }
+                bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white hover:opacity-90
               `}
             >
               Next

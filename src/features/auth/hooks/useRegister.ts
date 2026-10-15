@@ -1,5 +1,6 @@
 // src/store/hooks/useRegister.ts
 
+import { useCallback } from 'react';
 import { clearFormData, clearRegisterError, nextStep, previousStep, registerUser, resetRegisterState, setCurrentStep, updateFormData } from '@/hooks/auth';
 import { useAppDispatch,useAppSelector } from '@/store/hooks';
 import { RegistrationData } from '../interface';
@@ -12,33 +13,33 @@ export const useRegister = () => {
     );
 
     // Actions
-    const register = async (data: RegistrationData) => {
+    const register = useCallback(async (data: RegistrationData) => {
         return dispatch(registerUser(data)).unwrap();
-    };
+    }, [dispatch]);
 
-    const goToStep = (step: number) => {
+    const goToStep = useCallback((step: number) => {
         dispatch(setCurrentStep(step));
-    };
+    }, [dispatch]);
 
-    const goNext = () => {
+    const goNext = useCallback(() => {
         dispatch(nextStep());
-    };
+    }, [dispatch]);
 
-    const goBack = () => {
+    const goBack = useCallback(() => {
         dispatch(previousStep());
-    };
+    }, [dispatch]);
 
-    const saveFormData = (data: Partial<RegistrationData>) => {
+    const saveFormData = useCallback((data: Partial<RegistrationData>) => {
         dispatch(updateFormData(data));
-    };
+    }, [dispatch]);
 
     const clearForm = () => {
         dispatch(clearFormData());
     };
 
-    const clearErrors = () => {
+    const clearErrors = useCallback(() => {
         dispatch(clearRegisterError());
-    };
+    }, [dispatch]);
 
     const resetState = () => {
         dispatch(resetRegisterState());

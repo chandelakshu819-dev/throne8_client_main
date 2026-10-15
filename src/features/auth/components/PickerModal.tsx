@@ -9,6 +9,7 @@ interface Option {
 }
 
 interface PickerModalProps {
+  id: string;
   label: string;
   placeholder?: string;
   options: string[] | Option[];
@@ -18,6 +19,7 @@ interface PickerModalProps {
 }
 
 export default function PickerModal({
+  id,
   label,
   placeholder = 'Select an option',
   options,
@@ -34,6 +36,13 @@ export default function PickerModal({
   const normalizedOptions: Option[] = options.map((opt) =>
     typeof opt === 'string' ? { label: opt, value: opt } : opt
   );
+
+  useEffect(() => {
+    if (value && !normalizedOptions.some((option) => option.value === value)) {
+      setIsCustom(true);
+      setCustomValue(value);
+    }
+  }, [value, options]);
 
   const filteredOptions = normalizedOptions.filter((opt) =>
     opt.label.toLowerCase().includes(search.toLowerCase())
@@ -75,11 +84,17 @@ export default function PickerModal({
 
   return (
     <div className="w-full relative" ref={dropdownRef}>
-      <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
 
       {!isCustom ? (
         <button
+          id={id}
           type="button"
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-controls={`${id}-options`}
+          aria-invalid={!!error}
+          aria-describedby={error ? `${id}-error` : undefined}
           onClick={() => setIsOpen(!isOpen)}
           className={`w-full px-5 py-4 rounded-xl border flex items-center justify-between text-left transition bg-white ${
             error ? 'border-red-500' : 'border-[#4a3728]'
@@ -95,10 +110,13 @@ export default function PickerModal({
       ) : (
         <div className="relative">
           <input
+            id={id}
             type="text"
             value={customValue}
             onChange={handleCustomChange}
             placeholder={`Enter custom ${label.toLowerCase()}`}
+            aria-invalid={!!error}
+            aria-describedby={error ? `${id}-error` : undefined}
             className={`w-full text-black px-5 py-4 pr-12 rounded-xl border ${
               error ? 'border-red-500' : 'border-[#4a3728]'
             } focus:outline-none focus:ring-2 ${
@@ -141,12 +159,14 @@ export default function PickerModal({
           </div>
 
           {/* Options list */}
-          <div className="overflow-y-auto max-h-56 divide-y divide-gray-50">
+          <div id={`${id}-options`} role="listbox" className="overflow-y-auto max-h-56 divide-y divide-gray-50">
             {filteredOptions.length > 0 ? (
               filteredOptions.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
+                  role="option"
+                  aria-selected={value === opt.value}
                   onClick={() => handleSelect(opt.value)}
                   className={`w-full px-5 py-3 text-left text-sm transition hover:bg-[#4a3728]/10 flex items-center justify-between ${
                     value === opt.value
@@ -159,13 +179,13 @@ export default function PickerModal({
                 </button>
               ))
             ) : (
-              <div className="p-4 text-center text-sm text-gray-500">No options match "{search}"</div>
+              <div className="p-4 text-center text-sm text-gray-500">No options match &quot;{search}&quot;</div>
             )}
           </div>
         </div>
       )}
 
-      {error && <p className="text-red-500 text-sm mt-2">• {error}</p>}
+      {error && <p id={`${id}-error`} role="alert" className="text-red-500 text-sm mt-2">• {error}</p>}
     </div>
   );
 }

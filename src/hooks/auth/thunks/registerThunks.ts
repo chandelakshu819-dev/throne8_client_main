@@ -28,8 +28,12 @@ export const registerUser = createAsyncThunk(
             return response;
 
         } catch (error: any) {
-            console.error('❌ [THUNK] Registration failed:', error);
-            return rejectWithValue(error.message || 'Registration failed');
+            return rejectWithValue({
+                message: error?.message || 'Registration failed. Please retry.',
+                statusCode: error?.statusCode,
+                fieldErrors: error?.fieldErrors,
+                errors: error?.errors,
+            });
         }
     }
 );

@@ -7,10 +7,15 @@ import {availableSkills} from '../data';
 interface Props {
   onNext: (data: { skills: string[] }) => void;
   onBack: () => void;
+  initialSkills: string[];
+  onSkillsChange: (skills: string[]) => void;
+  submitting: boolean;
 }
 
-export default function Skills({ onNext, onBack }: Props) {
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+export default function Skills({
+  onNext, onBack, initialSkills, onSkillsChange, submitting,
+}: Props) {
+  const [selectedSkills, setSelectedSkills] = useState<string[]>(initialSkills);
   const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
 
@@ -21,14 +26,18 @@ export default function Skills({ onNext, onBack }: Props) {
 
   const addSkill = (skill: string) => {
     if (!selectedSkills.includes(skill)) {
-      setSelectedSkills([...selectedSkills, skill]);
+      const nextSkills = [...selectedSkills, skill];
+      setSelectedSkills(nextSkills);
+      onSkillsChange(nextSkills);
     }
     setInputValue('');
     setIsOpen(false);
   };
 
   const removeSkill = (skill: string) => {
-    setSelectedSkills(selectedSkills.filter(s => s !== skill));
+    const nextSkills = selectedSkills.filter(s => s !== skill);
+    setSelectedSkills(nextSkills);
+    onSkillsChange(nextSkills);
   };
 
   const handleContinue = () => {
@@ -36,6 +45,7 @@ export default function Skills({ onNext, onBack }: Props) {
   };
 
   const handleSkip = () => {
+    onSkillsChange([]);
     onNext({ skills: [] });
   };
 
@@ -125,6 +135,7 @@ export default function Skills({ onNext, onBack }: Props) {
             <button
               type="button"
               onClick={handleSkip}
+              disabled={submitting}
               className="px-7 py-4 rounded-xl font-medium text-[#4a3728] hover:bg-[#4a3728]/5 transition"
             >
               Skip
@@ -133,6 +144,7 @@ export default function Skills({ onNext, onBack }: Props) {
             <button
               type="button"
               onClick={handleContinue}
+              disabled={submitting}
               className="px-10 py-4 bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white rounded-xl font-bold shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300"
             >
               Sign Up
