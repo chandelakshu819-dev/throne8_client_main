@@ -423,7 +423,6 @@ export default function MentorDashboard(
     const file = input.files?.[0];
     if (!file || !mentorData?.mentorId) return;
 
-<<<<<<< HEAD
     // Server sirf jpg/jpeg/png/webp/gif leta hai
     const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
     if (!allowed.includes(file.type)) {
@@ -438,22 +437,14 @@ export default function MentorDashboard(
     }
 
     // Instant preview
-=======
-    // Instant preview, sirf UI feedback ke liye, source of truth nahi
->>>>>>> 70bdae8 (Update mentorship dashboards and sidebars)
     const reader = new FileReader();
     reader.onloadend = () => setProfilePhoto(reader.result as string);
     reader.readAsDataURL(file);
 
-<<<<<<< HEAD
-=======
-    // Actual backend update: isi se Sidebar + MentorSidebar sync honge
->>>>>>> 70bdae8 (Update mentorship dashboards and sidebars)
     MentorService.updateProfilePhoto(mentorData.mentorId, file)
       .then((res: any) => {
         console.log("📸 updateProfilePhoto response:", res);
         const updated = res?.data ?? res;
-<<<<<<< HEAD
         const newPic = updated?.profilePic;
 
         if (!newPic) {
@@ -466,10 +457,6 @@ export default function MentorDashboard(
         setProfilePhoto(null);
         // ✅ Top-right navbar avatar bhi turant update karo
         setNavbarProfileImage(newPic);
-=======
-        setMentorData((prev: any) => ({ ...prev, profilePic: updated?.profilePic }));
-        setProfilePhoto(null); // local preview clear, ab mentorData.profilePic hi source hai
->>>>>>> 70bdae8 (Update mentorship dashboards and sidebars)
       })
       .catch((err) => {
         console.error("Failed to update profile photo:", err);
