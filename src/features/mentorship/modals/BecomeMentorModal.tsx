@@ -340,7 +340,8 @@ export default function BecomeMentorModal({
                     <button
                         type="button"
                         onClick={handleClose}
-                        className="absolute top-6 right-6 w-10 h-10 bg-[#f8f6f4] hover:bg-[#4a3728] text-[#4a3728] hover:text-white rounded-full flex items-center justify-center transition-all z-10"
+                        aria-label="Close"
+                        className="absolute top-6 right-6 w-10 h-10 bg-[#f8f6f4] hover:bg-[#4a3728] text-[#4a3728] hover:text-white rounded-full flex items-center justify-center transition-all z-30"
                     >
                         <X className="w-5 h-5" />
                     </button>
