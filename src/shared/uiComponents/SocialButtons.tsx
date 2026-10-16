@@ -7,6 +7,9 @@ import AuthService from '@/lib/api/auth.service';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch } from '@/core/store/store.hooks';
 import { checkAuthStatus } from '@/hooks/auth';
+import { HOME_PATH } from '@/config/launch';
+
+
 
 export default function SocialButtons() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,7 +42,8 @@ export default function SocialButtons() {
         if (typeof window !== 'undefined') {
           sessionStorage.removeItem('google_id_token');
         }
-        router.push('/dashboard');
+        router.push(HOME_PATH);
+
       }
     } catch (error: any) {
       console.error('❌ [GOOGLE] Login failed:', error);

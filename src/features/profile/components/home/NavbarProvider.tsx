@@ -67,7 +67,7 @@ export default function NavbarProvider({ children }: { children: React.ReactNode
        // Reload / direct open par bhi mentor photo navbar mein dikhe
        useEffect(() => {
            if (!isMentorRoute || !currentUserId) {
-               setProfileImageOverrideState(null);
+// override reset nahi karte: nayi photo mentorship se bahar ke pages par bhi dikhni chahiye
                return;
            }
            let cancelled = false;

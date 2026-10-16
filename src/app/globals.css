@@ -40,6 +40,12 @@ font-family: var(--font-sans, Arial, Helvetica, sans-serif);
 
 }
 
+@media (max-width: 1023px) {
+  body {
+    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

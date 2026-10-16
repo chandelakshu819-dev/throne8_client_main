@@ -75,13 +75,17 @@ export interface CreateGroupSessionInput {
 
 class MentorService {
 
-  static async createMentor(payload: {
+   static async createMentor(payload: {
     title: string;
     bio: string;
     domains: string[];
     skills: string[];
     experienceTotal: number;
     currentRole: string;
+    company: string;
+    college: string;
+    degree: string;
+    branch: string;
     linkedinUrl: string;
     githubUrl?: string;
     profilePic: File;
@@ -91,6 +95,10 @@ class MentorService {
 
       formData.append('title', payload.title);
       formData.append('bio', payload.bio);
+      formData.append('company', payload.company);
+      formData.append('college', payload.college);
+      formData.append('degree', payload.degree);
+      formData.append('branch', payload.branch);
       formData.append('domains', JSON.stringify(payload.domains));
       formData.append('skills', JSON.stringify(payload.skills));
 
