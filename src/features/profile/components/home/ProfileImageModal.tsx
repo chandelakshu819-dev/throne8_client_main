@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect  } from 'react';
 import { X, Upload} from 'lucide-react';
 import AuthService from '@/lib/api/auth.service';
 import { useProfile } from '@/features/profile/hooks/useProfile';
-import MentorService from '@/lib/api/mentorship.service';
+import { syncProfilePhotoToAllRoles } from '@/features/mentorship/utils/syncProfilePhoto';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useNavbarProfileImage } from '@/features/profile/components/home/NavbarProvider';
 import { profilePhotoValidationSchema } from '../../validators/profilePhoto.validation';
@@ -32,7 +32,8 @@ const ProfileImageModal: React.FC<ProfileImageModalProps> = ({
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const { uploadUserProfileImage } = useProfile();
-   
+    const { user: syncAuthUser } = useAuth();
+    const setNavbarProfileImage = useNavbarProfileImage();   
     const isDefaultImage = !currentImageUrl || currentImageUrl === DEFAULT_PROFILE_IMAGE_URL;
     const hasActualImage = currentImageUrl && currentImageUrl !== DEFAULT_PROFILE_IMAGE_URL;
 
@@ -106,17 +107,9 @@ const ProfileImageModal: React.FC<ProfileImageModalProps> = ({
                 setNavbarProfileImage(uploadedImageUrl);
             }
 
-            // ✅ Same account ka mentor profile ho to uski photo bhi sync karo (mentor nahi hai to chup-chap skip)
-            const fileToSync = selectedFile;
-            const syncUserId = (syncAuthUser as any)?.userId || (syncAuthUser as any)?.id;
-            if (syncUserId) {
-                MentorService.getMentorByUserId(syncUserId)
-                    .then((mRes: any) => {
-                        const mid = mRes?.data?.mentorId;
-                        return mid ? MentorService.updateProfilePhoto(mid, fileToSync) : null;
-                    })
-                    .catch(() => { /* user mentor nahi hai */ });
-            }   
+                       // ✅ Industry mentor + Senior mentor, dono me same photo sync karo (jo role nahi hai wo skip ho jata hai)
+                       const syncUserId = (syncAuthUser as any)?.userId || (syncAuthUser as any)?.id;
+                       syncProfilePhotoToAllRoles(selectedFile, syncUserId, { skip: ['account'] });
            
 
            

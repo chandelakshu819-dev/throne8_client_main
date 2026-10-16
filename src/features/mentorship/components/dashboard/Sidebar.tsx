@@ -3,6 +3,9 @@ import { Star, ChevronRight, ChevronLeft, ArrowLeftRight } from "lucide-react";
 import { MENU_ITEMS } from "../../constants/constant";
 import type { MenuItem } from "../../types";
 import { capitalizeName } from "@/shared/utils/format";
+import { useProfile } from "@/features/profile/hooks/useProfile";
+
+
 
 interface SidebarProps {
   activePage: string;
@@ -31,6 +34,8 @@ export default function Sidebar({
   isCollapsed = false,
   onToggleCollapse,
 }: SidebarProps) {
+  // Account photo (mentee/senior se upload hui photo) fallback ke taur par
+  const { profileImageUrl: accountPhoto } = useProfile();
   const firstName = (dashboardData?.user?.firstName ?? mentorData?.user?.firstName ?? "A").trim();
   const lastName = (dashboardData?.user?.lastName ?? mentorData?.user?.lastName ?? "").trim();
   const initials = `${firstName[0] || "A"}${lastName[0] || ""}`.toUpperCase();
@@ -43,7 +48,7 @@ export default function Sidebar({
     .split(" ")
     .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
-  const profilePic = dashboardData?.profilePic ?? mentorData?.profilePic ?? null;
+    const profilePic = dashboardData?.profilePic ?? mentorData?.profilePic ?? accountPhoto ?? null;  
   const rating = Number(
     dashboardData?.stats?.rating ?? dashboardData?.rating ?? mentorData?.stats?.averageRating ?? 0
   );
