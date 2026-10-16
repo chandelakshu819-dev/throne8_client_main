@@ -8,6 +8,26 @@ import { parseRoleCompany, getExperienceLabel } from "@/shared/utils/mentorForma
 // Isse kam mentors hon to marquee nahi chalega (warna wahi chehre repeat hote hain)
 const MIN_FOR_MARQUEE = 6;
 
+// "HTML, CSS, JS" jaisi comma wali string ko alag-alag skills mein todta hai
+// (trim + duplicate hata deta hai)
+const splitSkills = (skills: unknown): string[] => {
+    const list = Array.isArray(skills)
+        ? skills
+        : typeof skills === "string"
+        ? [skills]
+        : [];
+    const seen = new Set<string>();
+    return list
+        .flatMap((s) => String(s).split(/[,;|]/))
+        .map((s) => s.trim())
+        .filter((s) => {
+            const key = s.toLowerCase();
+            if (!s || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+};
+
 export default function MentorMarqueeSection() {
     const [apiMentors, setApiMentors] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -42,11 +62,13 @@ export default function MentorMarqueeSection() {
             role,
             company,
             rating: Number(m.stats?.averageRating) || 0,
-            sessions: m.stats?.totalSessions || m.trustScore?.metrics?.totalCompletedSessions || 0,
+            sessions:
+                m.stats?.totalSessions ||
+                m.trustScore?.metrics?.totalCompletedSessions ||
+                0,
             price: m.pricing?.quickCall || 0,
-           
             image: m.profilePic ?? "",
-            tags: m.skills?.slice(0, 2) ?? [],
+            tags: splitSkills(m.skills), // MentorCard max 3 dikhayega + "+N more"
             exp: getExperienceLabel(m.experience?.total),
             completionRate: m.stats?.completionRate,
             isDummy: false,
@@ -62,7 +84,7 @@ export default function MentorMarqueeSection() {
             <h2 className="text-4xl md:text-5xl font-black tracking-tighter mb-3">
                 <span className="text-[#8b7355]">TOP</span> MENTORS
             </h2>
-            <p className="text-slate-500 text-sm font-medium">
+            <p className="text-[#8a7a6a] text-sm font-medium">
                 Handpicked experts from leading tech companies
             </p>
         </div>
@@ -73,7 +95,7 @@ export default function MentorMarqueeSection() {
         return (
             <section className="py-14 bg-[#f7f1e6] overflow-hidden border-y border-[#f0edea]">
                 {headerBlock}
-                <div className="flex flex-wrap justify-center gap-6 px-6 py-3">
+                <div className="flex flex-wrap justify-center items-stretch gap-6 px-6 py-3">
                     {realCards.map((mentor) => (
                         <MentorCard key={mentor.id} mentor={mentor} />
                     ))}

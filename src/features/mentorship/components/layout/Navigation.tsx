@@ -201,17 +201,19 @@ export default function Navigation({
                             fullName={fullName || undefined}
                         />
 
-                        {/* Sign Out — dropdown ke side me */}
-                        <button
-                            onClick={handleSignOut}
-                            disabled={isLoggingOut}
-                            title="Sign Out"
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-[#E5D9CE] bg-white text-[#B4442E] text-xs font-semibold hover:bg-[#FBEAE6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-                        >
-                            <LogOut className="w-4 h-4" />
-                            <span className="hidden sm:inline">{isLoggingOut ? "Signing out..." : "Sign Out"}</span>
-                        </button>
-                    </div>
+                       {/* Sign Out: sirf logged-in user ko dikhao */}
+                            {user && (
+                                <button
+                                    onClick={handleSignOut}
+                                    disabled={isLoggingOut}
+                                    title="Sign Out"
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-[#E5D9CE] bg-white text-[#B4442E] text-xs font-semibold hover:bg-[#FBEAE6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                                >
+                                    <LogOut className="w-4 h-4" />
+                                    <span className="hidden sm:inline">{isLoggingOut ? "Signing out..." : "Sign Out"}</span>
+                                </button>
+                            )}
+                        </div>
                 </div>
             </div>
         </nav>

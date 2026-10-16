@@ -20,6 +20,20 @@ export function normalizeRole(raw?: string | null): string {
         })
         .join(" ");
 }
+/** "HTML, CSS; JS" ya ["HTML, CSS", "JS"] -> ["HTML", "CSS", "JS"] (trim + duplicate hata deta hai) */
+export function splitSkills(skills: unknown): string[] {
+    const list = Array.isArray(skills) ? skills : typeof skills === "string" ? [skills] : [];
+    const seen = new Set<string>();
+    return list
+        .flatMap((s) => String(s).split(/[,;|]/))
+        .map((s) => s.trim())
+        .filter((s) => {
+            const key = s.toLowerCase();
+            if (!s || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+}
 
 /** Handles "Role @ Company", "Role at Company", plain role, or only title */
 export function parseRoleCompany(

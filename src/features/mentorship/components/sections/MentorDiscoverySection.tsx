@@ -12,13 +12,14 @@ import {
     FileText,
     Eye,
     Calendar,
-    ArrowRight
+    ArrowRight,
+    Award,
 } from "lucide-react";
 import Sidebar from "../layout/Sidebar";
 import MentorService, { PublicSeniorMentor } from "@/lib/api/mentorship.service";
 import {
     parseRoleCompany,
-    getRatingDisplay,
+    splitSkills,
 } from "@/shared/utils/mentorFormat";
 
 interface MentorDiscoverySectionProps {
@@ -45,6 +46,14 @@ interface MentorData {
     sessionId?: string | null;
 }
 
+const MAX_TAGS = 3;
+// Total characters of skill text that fit in one row of a card (keeps tags on a single line)
+const TAG_CHAR_BUDGET = 30;
+
+// "Throne8 (Thronet Technology Private Limited)" -> "Throne8"
+const shortCompany = (company: string): string =>
+    company.replace(/\s*\(.*?\)\s*/g, " ").replace(/\s+/g, " ").trim() || company.trim();
+
 function MentorAvatar({ image, name }: { image: string; name: string }) {
     const [imageFailed, setImageFailed] = useState(false);
     const initials = name
@@ -58,7 +67,7 @@ function MentorAvatar({ image, name }: { image: string; name: string }) {
 
     if (!image || imageFailed) {
         return (
-            <div className="w-full h-full flex items-center justify-center text-[#4a3728] text-lg font-bold">
+            <div className="w-full h-full flex items-center justify-center text-[#4a3728] text-xl font-bold">
                 {initials}
             </div>
         );
@@ -79,6 +88,16 @@ const formatDisplaySkill = (skill: string): string =>
         .replace(/[_-]+/g, " ")
         .replace(/\b\w/g, (character) => character.toUpperCase());
 
+// Display-only role formatter: "product-manager" → "Product Manager"
+const formatDisplayRole = (role: string | undefined | null): string => {
+    if (!role) return "Mentor";
+    return role
+        .replace(/[-_]/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
+const GRID_CLASS = "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch";
+
 export default function MentorDiscoverySection({ toggleCompare, compareList }: MentorDiscoverySectionProps) {
     const router = useRouter();
     const { user } = useAuth();
@@ -96,8 +115,9 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     const [showAllCollegeMentors, setShowAllCollegeMentors] = useState(false);
     const [showAllIndustryMentors, setShowAllIndustryMentors] = useState(false);
 
-    const COLLEGE_LIMIT = 4;
-    const INDUSTRY_LIMIT = 4;
+    // 3-column grid → multiples of 3 so rows fill up
+    const COLLEGE_LIMIT = 6;
+    const INDUSTRY_LIMIT = 6;
 
     // Filter states
     const [companySearch, setCompanySearch] = useState("");
@@ -137,12 +157,13 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                     rating: Number(mentor.stats?.averageRating) || 0,
                     sessions: Number(mentor.stats?.totalSessions || mentor.trustScore?.metrics?.totalCompletedSessions) || 0,
                     image:
-                    (mentor as any).profilePic ||
-                    (mentor as any).profilePhoto ||
-                    (mentor as any).profilePhotoUrl ||
-                    (mentor as any).user?.profilePic ||
-                    "",
-                    tags: Array.isArray(mentor.skills) ? mentor.skills.slice(0, 2) : [],
+                        (mentor as any).profilePic ||
+                        (mentor as any).profilePhoto ||
+                        (mentor as any).profilePhotoUrl ||
+                        (mentor as any).user?.profilePic ||
+                        "",
+                    // Sab skills rakho (comma split ke saath); card mein max 3 + "+N more" dikhega
+                    tags: splitSkills(mentor.skills),
                     expTotal: totalExp,
                     domains: Array.isArray(mentor.domains) ? mentor.domains : [],
                     acceptsBooking: Boolean(mentor.pricing?.quickCall || mentor.availability?.autoAcceptBookings || mentor.availability?.daysAvailable?.length),
@@ -263,14 +284,6 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         ? filteredIndustryMentors
         : filteredIndustryMentors.slice(0, INDUSTRY_LIMIT);
 
-    // Display-only role formatter: "product-manager" → "Product Manager"
-    const formatDisplayRole = (role: string | undefined | null): string => {
-        if (!role) return "Mentor";
-        return role
-            .replace(/[-_]/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase());
-    };
-
     const handleNavigate = (mentor: MentorData) => {
         // Agar mentor khud apni hi profile pe click kar raha hai
         if (user?.userId && mentor.userId && user.userId === mentor.userId) {
@@ -282,43 +295,6 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         router.push(`/mentorship/mentor-card/${slugName}/${mentor.id}`);
     };
 
-    // Rating block: "New" + "4 sessions" wala contradiction yahan fix hai
-    const renderRating = (mentor: MentorData, isIndustryCard: boolean) => {
-        if (!isIndustryCard) {
-            const hasRating = typeof mentor.rating === "number" && mentor.rating > 0;
-            return (
-                <>
-                    {hasRating && (
-                        <>
-                            <Star className="w-3.5 h-3.5 fill-[#d99b26] text-[#d99b26]" />
-                            <span className="font-bold text-[#2d2015]">{mentor.rating?.toFixed(1)}</span>
-                        </>
-                    )}
-                    {mentor.sessions > 0 && (
-                        <span className="text-[11px] text-[#8b7355]">{mentor.sessions} sessions</span>
-                    )}
-                </>
-            );
-        }
-
-        const rd = getRatingDisplay(mentor.rating ?? 0, mentor.sessions);
-        return (
-            <>
-                <Star
-                    className={`w-3.5 h-3.5 ${rd.hasRating ? "fill-[#d99b26] text-[#d99b26]" : "text-[#d9cbbe]"
-                        }`}
-                />
-                <span className="font-bold text-[#2d2015]">{rd.ratingLabel}</span>
-                {rd.sessionsLabel && (
-                    <>
-                        <span className="text-[#c4b5a5]">·</span>
-                        <span className="text-[11px] text-[#8b7355]">{rd.sessionsLabel}</span>
-                    </>
-                )}
-            </>
-        );
-    };
-
     // Render Industry cards from Mentor records and College cards from approved applications.
     const renderCard = (mentor: MentorData, isIndustryCard: boolean) => {
         const college = mentor.college?.trim();
@@ -327,77 +303,115 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         const hasDegree = Boolean(degree);
         const hasEducation = hasCollege || hasDegree;
 
+        // Skills: "Programming Languages: C++" -> "C++", then pick only as many as fit in ONE row
+        const cleanTags = mentor.tags
+            .map((t) => (isIndustryCard ? t : formatDisplaySkill(t)).replace(/^[^:]{2,40}:\s*/, "").trim())
+            .filter(Boolean);
+        const visibleTags: string[] = [];
+        let used = 0;
+        for (const tag of cleanTags) {
+            const cost = tag.length + 3; // tag text + padding allowance
+            if (visibleTags.length >= MAX_TAGS) break;
+            if (visibleTags.length > 0 && used + cost > TAG_CHAR_BUDGET) break;
+            visibleTags.push(tag);
+            used += cost;
+        }
+        const extraTags = cleanTags.length - visibleTags.length;
+
+        const companyLabel = mentor.company ? shortCompany(mentor.company) : "";
+
+        const expLabel =
+            mentor.expTotal > 0
+                ? `${mentor.expTotal}${mentor.expTotal >= 2 ? "+" : ""} Yr${mentor.expTotal > 1 ? "s" : ""} Experience`
+                : "";
+
+        const hasRating = typeof mentor.rating === "number" && mentor.rating > 0;
+        const roleLine = `${formatDisplayRole(mentor.role)}${companyLabel ? ` @ ${companyLabel}` : ""}`;
+
         return (
             <div
                 key={mentor.id}
-                className="rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 relative group bg-white border border-[#e8ded5] hover:border-[#cfbeaf] shadow-sm hover:shadow-md"
+                className="h-full rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 relative group bg-[#faf6f1] border border-[#e8ded5] hover:border-[#c4963a]/60 shadow-sm hover:shadow-md"
             >
                 <div>
                     {/* Avatar */}
                     <div className="flex justify-center mb-2.5">
-                        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-sm ring-1 ring-[#e4d8ce] flex items-center justify-center bg-[#f5ede5]">
+                        <div className="w-16 h-16 rounded-full overflow-hidden border-[3px] border-[#d4a537] shadow-sm flex items-center justify-center bg-[#f5ede5]">
                             <MentorAvatar image={mentor.image} name={mentor.name} />
                         </div>
                     </div>
 
                     {/* Name */}
-                    <h4 className="font-bold text-sm text-center truncate px-1 text-[#2d2015]">
+                    <h4 className="font-bold text-[15px] text-center text-[#2d2015] truncate px-1">
                         {mentor.name}
                     </h4>
 
-                    {/* Company — Industry (senior) cards only; hidden when empty */}
-                    {isIndustryCard && mentor.company ? (
-                        <div className="flex items-center justify-center gap-1.5 mb-1 px-1">
-                            <div className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center bg-[#f5ede5] text-[#4a3728] text-[9px] font-bold border border-[#e4d8ce]">
-                                {mentor.company[0].toUpperCase()}
-                            </div>
-                            <span className="text-[11px] text-[#6b5643] font-medium truncate">
-                                {mentor.company}
-                            </span>
-                        </div>
-                    ) : null}
-
-                    {/* Role — Industry (senior) cards only; removed on College Mentor cards */}
+                    {/* Role @ Company — fixed 2-line height so every card lines up */}
                     {isIndustryCard && (
-                        <p className="text-[11px] text-[#8b7355] text-center font-medium truncate mb-2 px-1">
-                            {formatDisplayRole(mentor.role)}
+                        <p
+                            title={roleLine}
+                            className="text-[10px] uppercase tracking-wide leading-[14px] text-[#8b7355] text-center font-semibold line-clamp-2 mt-1 mb-2 px-1 h-[28px]"
+                        >
+                            {roleLine}
                         </p>
                     )}
 
-                    {/* Rating & Sessions */}
-                    {(isIndustryCard || (mentor.rating && mentor.rating > 0) || mentor.sessions > 0) && (
-                        <div className="flex items-center justify-center gap-1.5 text-xs mb-2.5">
-                            {renderRating(mentor, isIndustryCard)}
+                    {/* Rating & Sessions — fixed height */}
+                    {(isIndustryCard || hasRating || mentor.sessions > 0) && (
+                        <div className="flex items-center justify-center gap-1.5 text-sm mb-2.5 h-6">
+                            {hasRating ? (
+                                <>
+                                    <Star className="w-3.5 h-3.5 fill-[#d99b26] text-[#d99b26]" />
+                                    <span className="font-bold text-[#2d2015]">{mentor.rating?.toFixed(1)}</span>
+                                    <span className="text-[11px] text-[#8b7355]">
+                                        ({mentor.sessions} session{mentor.sessions === 1 ? "" : "s"})
+                                    </span>
+                                </>
+                            ) : isIndustryCard ? (
+                                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#f1e4cf] text-[#8b5e3c]">
+                                    New
+                                </span>
+                            ) : (
+                                mentor.sessions > 0 && (
+                                    <span className="text-[11px] text-[#8b7355]">
+                                        {mentor.sessions} session{mentor.sessions === 1 ? "" : "s"}
+                                    </span>
+                                )
+                            )}
                         </div>
                     )}
 
-                    {/* Expertise Tags — hidden entirely when the mentor has no skills */}
-                    {mentor.tags.length > 0 && (
-                        <div className="flex items-center justify-center gap-1.5 flex-wrap mb-2.5">
-                            {mentor.tags.map((tag: string, idx: number) => (
-                                <span
-                                    key={idx}
-                                    className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-[#f6efe8] text-[#6b5643] border border-[#ebdcd0]"
-                                >
-                                    {isIndustryCard ? tag : formatDisplaySkill(tag)}
-                                </span>
-                            ))}
-                        </div>
-                    )}
+                    {/* Skills — ONE row only, never wraps; fixed height so all cards match */}
+                    <div className="flex flex-nowrap items-center justify-center gap-1 mb-2.5 h-6 overflow-hidden">
+                        {visibleTags.map((tag, idx) => (
+                            <span
+                                key={`${tag}-${idx}`}
+                                title={tag}
+                                className="min-w-0 truncate whitespace-nowrap text-[9.5px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white text-[#6b5643] border border-[#ebdcd0]"
+                            >
+                                {tag}
+                            </span>
+                        ))}
+                        {extraTags > 0 && (
+                            <span className="flex-shrink-0 whitespace-nowrap text-[9.5px] font-bold px-2 py-0.5 rounded-full text-[#8b7355] border border-dashed border-[#c4963a]/50">
+                                +{extraTags}
+                            </span>
+                        )}
+                    </div>
 
                     {/* College & Degree Section — College Mentor cards only; hidden when no data */}
                     {!isIndustryCard && hasEducation && (
-                        <div className="w-full mb-3">
-                            <div className="border-t border-[#e8ded5] mb-2.5" />
-                            <div className="flex items-stretch gap-3 text-left py-3">
+                        <div className="w-full mb-2">
+                            <div className="border-t border-[#e8ded5] mb-2" />
+                            <div className="flex items-stretch gap-3 text-left py-1.5">
                                 {hasCollege && (
                                     <div className={`min-w-0 ${hasDegree ? "flex-1" : "w-full"}`}>
                                         <div className="flex items-center gap-1 text-[#8b7355] mb-1">
-                                            <Landmark className="w-4 h-4 flex-shrink-0 text-[#8b5e3c]" />
-                                            <span className="text-[11px] font-medium uppercase tracking-wider">College</span>
+                                            <Landmark className="w-3.5 h-3.5 flex-shrink-0 text-[#8b5e3c]" />
+                                            <span className="text-[10px] font-medium uppercase tracking-wider">College</span>
                                         </div>
                                         <p
-                                            className="text-[14px] font-semibold text-[#2d2015] line-clamp-2 leading-snug"
+                                            className="text-[13px] font-semibold text-[#2d2015] line-clamp-2 leading-snug"
                                             title={college}
                                         >
                                             {college}
@@ -410,11 +424,11 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                                 {hasDegree && (
                                     <div className={`min-w-0 ${hasCollege ? "flex-1" : "w-full"}`}>
                                         <div className="flex items-center gap-1 text-[#8b7355] mb-1">
-                                            <FileText className="w-4 h-4 flex-shrink-0 text-[#8b5e3c]" />
-                                            <span className="text-[11px] font-medium uppercase tracking-wider">Degree</span>
+                                            <FileText className="w-3.5 h-3.5 flex-shrink-0 text-[#8b5e3c]" />
+                                            <span className="text-[10px] font-medium uppercase tracking-wider">Degree</span>
                                         </div>
                                         <p
-                                            className="text-[14px] font-semibold text-[#2d2015] truncate"
+                                            className="text-[13px] font-semibold text-[#2d2015] truncate"
                                             title={degree}
                                         >
                                             {degree}
@@ -426,43 +440,51 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                     )}
                 </div>
 
-                {/* Action Buttons */}
                 <div>
-                    {!isIndustryCard ? (
-                        <button
-                            onClick={() => router.push(`/mentorship/senior-mentor/${mentor.id}`)}
-                            className="w-full py-2 px-3 bg-[#3a2a1e] hover:bg-[#251910] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-                        >
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>{mentor.sessionId ? "Book Free Session" : "View Profile"}</span>
-                            <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
-                        </button>
-                    ) : mentor.acceptsBooking ? (
-                        <button
-                            onClick={() => handleNavigate(mentor)}
-                            className="w-full py-2 px-3 bg-[#3a2a1e] hover:bg-[#251910] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-                        >
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>Book Session</span>
-                            <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => handleNavigate(mentor)}
-                            className="w-full py-2 px-3 border border-[#cfc2b6] hover:border-[#8b7355] hover:bg-[#faf6f1] text-[#3a2a1e] text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-                        >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>View Profile</span>
-                        </button>
+                    {/* Experience footer — Industry cards */}
+                    {isIndustryCard && expLabel && (
+                        <div className="border-t border-[#e8ded5] pt-2.5 mb-2.5 flex items-center justify-center gap-1.5 text-[#2d2015]">
+                            <Award className="w-3.5 h-3.5 text-[#c4963a]" />
+                            <span className="text-[11px] font-semibold">{expLabel}</span>
+                        </div>
                     )}
+
+                    {/* Action button — same style on all cards */}
+                    <button
+                        onClick={() =>
+                            !isIndustryCard
+                                ? router.push(`/mentorship/senior-mentor/${mentor.id}`)
+                                : handleNavigate(mentor)
+                        }
+                        className="w-full py-2 px-3 bg-[#3a2a1e] hover:bg-[#251910] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                    >
+                        {isIndustryCard && !mentor.acceptsBooking ? (
+                            <>
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>View Profile</span>
+                            </>
+                        ) : (
+                            <>
+                                <Calendar className="w-3.5 h-3.5" />
+                                <span>
+                                    {!isIndustryCard
+                                        ? mentor.sessionId
+                                            ? "Book Free Session"
+                                            : "View Profile"
+                                        : "Book Session"}
+                                </span>
+                                <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
         );
     };
 
     // Skeleton loader grid
-    const renderSkeletonGrid = (count: number = 4) => (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    const renderSkeletonGrid = (count: number = 3) => (
+        <div className={GRID_CLASS}>
             {Array(count).fill(0).map((_, i) => (
                 <div key={i} className="h-[300px] rounded-2xl bg-[#eee5dd] animate-pulse" />
             ))}
@@ -528,7 +550,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                         </div>
                         {renderSectionLoadState(industryStatus, industryError, loadIndustryMentors, filteredIndustryMentors.length === 0) ?? (
                             <>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                <div className={GRID_CLASS}>
                                     {visibleIndustryMentors.map((mentor) => renderCard(mentor, true))}
                                 </div>
                                 {filteredIndustryMentors.length > INDUSTRY_LIMIT && (
@@ -560,7 +582,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                         </div>
                         {renderSectionLoadState(collegeStatus, collegeError, loadCollegeMentors, filteredCollegeMentors.length === 0) ?? (
                             <>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                <div className={GRID_CLASS}>
                                     {visibleCollegeMentors.map((mentor) =>
                                         renderCard({
                                             id: mentor.id,
@@ -571,12 +593,12 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                                             degree: mentor.degree,
                                             sessions: mentor.sessionsCount,
                                             image:
-                                            (mentor as any).profilePic ||
-                                            (mentor as any).profilePhoto ||
-                                            (mentor as any).profilePhotoUrl ||
-                                            (mentor as any).user?.profilePic ||
-                                            "",
-                                            tags: mentor.skills.slice(0, 2),
+                                                (mentor as any).profilePic ||
+                                                (mentor as any).profilePhoto ||
+                                                (mentor as any).profilePhotoUrl ||
+                                                (mentor as any).user?.profilePic ||
+                                                "",
+                                            tags: splitSkills(mentor.skills),
                                             expTotal: 0,
                                             domains: [],
                                             acceptsBooking: mentor.sessionId !== null,
