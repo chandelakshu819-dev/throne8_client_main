@@ -7,9 +7,10 @@ import {availableSkills} from '../data';
 interface Props {
   onNext: (data: { skills: string[] }) => void;
   onBack: () => void;
+  isLoading?: boolean;
 }
 
-export default function Skills({ onNext, onBack }: Props) {
+export default function Skills({ onNext, onBack, isLoading = false }: Props) {
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -32,10 +33,12 @@ export default function Skills({ onNext, onBack }: Props) {
   };
 
   const handleContinue = () => {
+    if (isLoading) return;
     onNext({ skills: selectedSkills });
   };
 
   const handleSkip = () => {
+    if (isLoading) return;
     onNext({ skills: [] });
   };
 
@@ -116,7 +119,8 @@ export default function Skills({ onNext, onBack }: Props) {
           <button
             type="button"
             onClick={onBack}
-            className="px-8 py-4 border-2 border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition"
+            disabled={isLoading}
+            className="px-8 py-4 border-2 border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Back
           </button>
@@ -125,7 +129,8 @@ export default function Skills({ onNext, onBack }: Props) {
             <button
               type="button"
               onClick={handleSkip}
-              className="px-7 py-4 rounded-xl font-medium text-[#4a3728] hover:bg-[#4a3728]/5 transition"
+              disabled={isLoading}
+              className="px-7 py-4 rounded-xl font-medium text-[#4a3728] hover:bg-[#4a3728]/5 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Skip
             </button>
@@ -133,9 +138,17 @@ export default function Skills({ onNext, onBack }: Props) {
             <button
               type="button"
               onClick={handleContinue}
-              className="px-10 py-4 bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white rounded-xl font-bold shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300"
+              disabled={isLoading}
+              className="px-10 py-4 bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white rounded-xl font-bold shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2"
             >
-              Sign Up
+              {isLoading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Submitting...</span>
+                </>
+              ) : (
+                'Sign Up'
+              )}
             </button>
           </div>
         </div>

@@ -24,6 +24,8 @@ const NO_REFRESH_PATHS = [
     "/auth/reset",
     "/auth/verify",
     "/auth/otp",
+    "/verify",
+    "/verify/email",
 ];
 
 const api: AxiosInstance = axios.create({

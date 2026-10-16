@@ -4,6 +4,7 @@ interface UserData {
     userId: string;
     email: string;
     role: string;
+    emailVerified?: boolean;
 }
 
 interface TokenData {

@@ -39,8 +39,8 @@ export const schema = z.object({
     .regex(/[0-9]/, {
       message: 'Password must contain at least one number (0-9)'
     })
-    .regex(/[@$!%*?&#^()_+\-=\[\]{}|;:,.<>]/, {
-      message: 'Password must contain at least one special character (@$!%*?&#^()_+-=[]{}|;:,.<>)'
+    .regex(/[@$!%*?&]/, {
+      message: 'Password must contain at least one special character (@$!%*?&)'
     })
     .refine((pwd) => !/\s/.test(pwd), {
       message: 'Password cannot contain spaces'

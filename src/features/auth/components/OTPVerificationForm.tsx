@@ -9,6 +9,8 @@ interface OTPVerificationFormProps {
   onResendOTP: () => Promise<void>;
   isLoading?: boolean;
   onBackClick: () => void;
+  backButtonText?: string;
+  expiresIn?: number;
 }
 
 export default function OTPVerificationForm({
@@ -17,25 +19,39 @@ export default function OTPVerificationForm({
   onResendOTP,
   isLoading = false,
   onBackClick,
+  backButtonText = 'Back to Email',
+  expiresIn = 600,
 }: OTPVerificationFormProps) {
   const [otp, setOtp] = useState<string[]>(Array(6).fill(''));
   const [apiError, setApiError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResending, setIsResending] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(90); // 1.5 minutes
+  const [timeLeft, setTimeLeft] = useState(expiresIn); // Overall OTP expiration (10 min)
+  const [resendCooldown, setResendCooldown] = useState(60); // Resend button cooldown (60 sec)
   const [canResend, setCanResend] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Timer for resend OTP
+  // Timer for overall OTP expiration
   useEffect(() => {
-    if (timeLeft === 0) {
+    setTimeLeft(expiresIn);
+  }, [expiresIn]);
+
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+    const timer = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [timeLeft]);
+
+  // Timer for resend button cooldown
+  useEffect(() => {
+    if (resendCooldown <= 0) {
       setCanResend(true);
       return;
     }
-
-    const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+    setCanResend(false);
+    const timer = setTimeout(() => setResendCooldown((prev) => prev - 1), 1000);
     return () => clearTimeout(timer);
-  }, [timeLeft]);
+  }, [resendCooldown]);
 
   const handleOtpChange = (value: string, index: number) => {
     if (!/^[0-9]*$/.test(value)) return;
@@ -80,7 +96,10 @@ export default function OTPVerificationForm({
       setApiError(null);
       await onOTPSubmit(otpString);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Invalid OTP. Please try again.';
+      const raw = error instanceof Error ? error.message : 'Invalid OTP. Please try again.';
+      const errorMessage = raw.toLowerCase().includes('email service not configured')
+        ? 'Email verification service is currently unavailable on the server. Please click Resend OTP or contact support.'
+        : raw;
       setApiError(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -92,12 +111,16 @@ export default function OTPVerificationForm({
       setIsResending(true);
       setApiError(null);
       await onResendOTP();
-      setTimeLeft(90);
+      setTimeLeft(expiresIn);
+      setResendCooldown(60);
       setCanResend(false);
       setOtp(Array(6).fill(''));
       inputRefs.current[0]?.focus();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to resend OTP. Please try again.';
+      const raw = error instanceof Error ? error.message : 'Failed to resend OTP. Please try again.';
+      const errorMessage = raw.toLowerCase().includes('email service not configured')
+        ? 'Email verification service is currently unavailable on the server. Please try again shortly or contact support.'
+        : raw;
       setApiError(errorMessage);
     } finally {
       setIsResending(false);
@@ -156,7 +179,7 @@ export default function OTPVerificationForm({
       {/* Timer and Resend */}
       <div className="flex items-center justify-between text-sm">
         <span className={`font-semibold ${timeLeft < 60 ? 'text-red-600' : 'text-[#745842]'}`}>
-          {canResend ? 'Code expired' : `Expires in ${formatTime(timeLeft)}`}
+          {timeLeft === 0 ? 'Code expired' : `Expires in ${formatTime(timeLeft)}`}
         </span>
         <button
           type="button"
@@ -170,6 +193,8 @@ export default function OTPVerificationForm({
               <Loader2 className="w-4 h-4 animate-spin" />
               Sending...
             </>
+          ) : !canResend ? (
+            <span className="text-gray-400">Resend in {resendCooldown}s</span>
           ) : (
             <>
               <RotateCcw className="w-4 h-4" />
@@ -182,7 +207,7 @@ export default function OTPVerificationForm({
       {/* Verify Button */}
       <button
         type="submit"
-        disabled={isSubmitting || isLoading || isResending || otp.join('').length !== 6}
+        disabled={isSubmitting || isLoading || isResending || otp.join('').length !== 6 || timeLeft === 0}
         className="w-full py-3 px-4 bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white font-semibold rounded-xl
                    hover:opacity-90 transition-all shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed
                    flex items-center justify-center gap-2"
@@ -205,7 +230,7 @@ export default function OTPVerificationForm({
         className="w-full py-2 px-4 border-2 border-[#e0d8cf] text-[#4a3728] font-medium rounded-xl
                    hover:bg-[#f6ede8] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Back to Email
+        {backButtonText}
       </button>
 
       {/* Info Text */}
