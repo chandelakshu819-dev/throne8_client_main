@@ -213,6 +213,9 @@ class AuthService {
                 }
                 const apiError = error.response?.data as any;
                 if (apiError?.message) {
+                    if (apiError.message.toLowerCase().includes('email service not configured')) {
+                        throw new Error('Email service is not configured on the server. Please configure SMTP / email provider credentials in your backend environment.');
+                    }
                     throw new Error(apiError.message);
                 }
             }
@@ -254,6 +257,9 @@ class AuthService {
                 }
                 const apiError = error.response?.data as any;
                 if (apiError?.message) {
+                    if (apiError.message.toLowerCase().includes('email service not configured')) {
+                        throw new Error('Email service is not configured on the server. Please configure SMTP / email provider credentials in your backend environment.');
+                    }
                     throw new Error(apiError.message);
                 }
             }
@@ -317,7 +323,7 @@ class AuthService {
     */
     static async register(registrationData: any): Promise<any> {
         try {
-            console.log('📝 [REGISTER] Initiating registration with payload:', registrationData);
+            console.log('📝 [REGISTER] Initiating registration...', { email: registrationData.email, userType: registrationData.userType });
 
             const { data } = await api.post(
                 `${config.NEXT_PUBLIC_REGISTER_ENDPOINT || process.env.NEXT_PUBLIC_REGISTER_ENDPOINT || '/auth/register'}`,
