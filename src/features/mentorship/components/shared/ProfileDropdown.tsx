@@ -117,17 +117,17 @@ export default function ProfileDropdown({
   const userId = user?.userId || user?.id || user?._id || "";
   const detectedRole: WorkspaceKey | null = detectActiveRole(pathname ?? "");
 
-    // Role implied by the current URL. Non-dashboard pages (landing, etc.) default to Mentee.
-    const routeRole: WorkspaceKey = (() => {
-      if (detectedRole === null) return "mentee";
+    // Role implied by the current URL. On non-dashboard pages (landing, etc.)
+    // there is NO active role, so no tick is shown by default.
+    const routeRole: WorkspaceKey | null = (() => {
+      if (detectedRole === null) return null;
       if (detectedRole === "seniorMentor"   && roles?.seniorMentor   === "approved") return "seniorMentor";
       if (detectedRole === "industryMentor" && roles?.industryMentor === "approved") return "industryMentor";
       return "mentee";
     })();
-  
-    // pendingRole makes the tick move instantly on click, before the page loads
-    const activeRole: WorkspaceKey = pendingRole ?? routeRole;
 
+    // pendingRole makes the tick move instantly on click, before the page loads
+    const activeRole: WorkspaceKey | null = pendingRole ?? routeRole;
 
 
 
@@ -163,8 +163,7 @@ export default function ProfileDropdown({
   // /me/roles failed -> show only Mentee
   const visibleRoleOptions = rolesError
     ? getVisibleRoles(baseRoles).filter((o) => o.key === "mentee")
-    : getVisibleRoles(baseRoles, activeRole !== "mentee" ? activeRole : undefined);
-
+    : getVisibleRoles(baseRoles, activeRole && activeRole !== "mentee" ? activeRole : undefined);
 
   const workspaceOptions: WorkspaceOption[] = visibleRoleOptions.map((opt) => ({
     ...opt,
@@ -173,8 +172,8 @@ export default function ProfileDropdown({
     applyHref:     ROLE_APPLY_HREF[opt.key],
   }));
 
+  // Falls back to the first option (Mentee) for the header label only; no tick is shown in that case.
   const activeOption = workspaceOptions.find((o) => o.key === activeRole) ?? workspaceOptions[0];
-
   // ── Outside click + Escape ────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;

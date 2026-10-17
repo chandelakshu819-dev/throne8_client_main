@@ -13,6 +13,7 @@ interface AutocompleteInputProps {
     placeholder?: string;
     className?: string;
     maxResults?: number;
+    skipFilter?: boolean;
 }
 
 export default function AutocompleteInput({
@@ -26,6 +27,7 @@ export default function AutocompleteInput({
     placeholder,
     className,
     maxResults = 8,
+    skipFilter = false,
 }: AutocompleteInputProps) {
     const [open, setOpen] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
@@ -33,8 +35,14 @@ export default function AutocompleteInput({
 
     const filtered = useMemo(() => {
         const q = value.trim().toLowerCase();
-        if (!q) return [];
         const excluded = new Set(excludeValues.map((v) => v.toLowerCase()));
+
+        // suggestions pehle se filter/rank ho chuki hain (jaise domains ka keyword search)
+        if (skipFilter) {
+            return suggestions.filter((s) => !excluded.has(s.toLowerCase())).slice(0, maxResults);
+        }
+
+        if (!q) return [];
         const matches = suggestions.filter((s) => {
             const l = s.toLowerCase();
             return l.includes(q) && !excluded.has(l);
@@ -43,7 +51,7 @@ export default function AutocompleteInput({
         const starts = matches.filter((s) => s.toLowerCase().startsWith(q));
         const rest = matches.filter((s) => !s.toLowerCase().startsWith(q));
         return [...starts, ...rest].slice(0, maxResults);
-    }, [value, suggestions, excludeValues, maxResults]);
+    }, [value, suggestions, excludeValues, maxResults, skipFilter]);
 
     useEffect(() => {
         setActiveIndex(-1);
