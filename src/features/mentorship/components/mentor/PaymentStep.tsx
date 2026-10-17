@@ -1,7 +1,8 @@
 // components/mentor-profile/booking/PaymentStep.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+
 import { ArrowLeft } from "./Icons";
 import { PAY_METHODS, C, btnPrimary } from "../../types/data";
 import type { CalendarData, Service, FormData as BookingFormData } from "../../types/types";
@@ -35,16 +36,25 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
         card: "razorpay",
         wallet: "wallet",
     };
-
-    const price: number = selectedService?.price as number;
+    // Free session ("Free" ya 0): payment UI nahi dikhana, seedha booking karni hai
+    const isFree: boolean =
+        selectedService?.price === "Free" || Number(selectedService?.price) === 0;
+    const price: number = isFree ? 0 : Number(selectedService?.price);
     const gst: number = Math.round(price * 0.18);
     const total: number = price + gst;
 
     const isGroupSession = selectedService?.type === "GroupSession";
 
-    const handleBookSession = async () => {
-        if (!paymentMethod) return;
-        setBooking(true);
+       // StrictMode / double-click par duplicate booking na ho
+       const hasBookedRef = useRef(false);
+
+       const handleBookSession = async (overrideMethod?: string) => {
+           const methodToUse = overrideMethod || paymentMethod;
+           if (!methodToUse) return;
+           if (hasBookedRef.current) return;
+           hasBookedRef.current = true;
+           setBookingError(null);
+           setBooking(true);
 
         try {
             const { selectedDate, currentMonth, availabilityId, slotTime } = calendarData;
@@ -70,7 +80,7 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                     slotTime,
                     scheduledAt,
                     timezone: "Asia/Kolkata",
-                    paymentMethod: paymentMethodMap[paymentMethod] || "razorpay",
+                    paymentMethod: paymentMethodMap[methodToUse] || "razorpay",
                     pricing: {
                         basePrice: price,
                         platformFee: Math.round(price * 0.15),
@@ -87,11 +97,40 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
             setBookingError(
                 error?.response?.data?.message || error?.message || "Booking failed. Please try again."
             );
+            hasBookedRef.current = false; // retry allow karo
             setBooking(false);
         }
     };
 
-    if (booking) {
+    // Free session: slot select + details ho chuki hain, ab seedha book kar do
+    useEffect(() => {
+        if (isFree) {
+            handleBookSession("wallet");
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Free session booking fail hui: error + retry/back dikhao (infinite loader nahi)
+    if (isFree && bookingError && !booking) {
+        return (
+            <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, gap: "16px", padding: "24px", textAlign: "center" }}>
+                <p style={{ fontSize: "18px", fontWeight: "bold", color: C.dark }}>Could not book your session</p>
+                <div style={{ padding: "12px 16px", borderRadius: "12px", background: "#fee2e2", border: "1px solid #fca5a5", color: "#dc2626", fontSize: "13px", fontWeight: 600, maxWidth: "420px" }}>
+                    ❌ {bookingError}
+                </div>
+                <div style={{ display: "flex", gap: "12px" }}>
+                    <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.border}`, cursor: "pointer", color: C.dark, fontSize: "14px", fontWeight: 600, padding: "10px 20px", borderRadius: "10px" }}>
+                        ← Back
+                    </button>
+                    <button onClick={() => handleBookSession("wallet")} style={{ ...btnPrimary, padding: "10px 20px", borderRadius: "10px", fontSize: "14px" }}>
+                        Try again
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (booking || isFree) {
         return (
             <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, gap: "20px" }}>
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -166,7 +205,7 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                     </div>
                 )}
                 {paymentMethod && (
-                    <button onClick={handleBookSession} style={{ ...btnPrimary, width: "100%", padding: "16px", borderRadius: "12px", fontSize: "17px", marginTop: "16px" }}>
+                    <button onClick={() => handleBookSession()} style={{ ...btnPrimary, width: "100%", padding: "16px", borderRadius: "12px", fontSize: "17px", marginTop: "16px" }}>
                         {isGroupSession ? `Pay ₹${total} & Send Join Request 💳` : `Pay ₹${total} 💳`}
                     </button>
                 )}

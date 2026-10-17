@@ -90,9 +90,9 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
         setBookingStep(
             service.type === "Query"
                 ? "query"
-                : service.type === "Resource" || service.price === "Free"
-                    ? "confirmation"
-                    : "calendar"
+                : service.type === "Resource"
+                ? "confirmation"
+                : "calendar"
         );
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
