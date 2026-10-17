@@ -180,17 +180,156 @@ class AuthService {
 
 
     /**
+     * 📧 Send Pre-registration Email OTP
+     * Endpoint: POST /api/v1/auth/register/send-otp
+     * Body: { email: string, firstName?: string }
+     */
+    static async sendRegistrationOtp(payload: { email: string; firstName?: string }): Promise<any> {
+        try {
+            const normalizedEmail = payload.email.trim().toLowerCase();
+            const body: { email: string; firstName?: string } = { email: normalizedEmail };
+            if (payload.firstName?.trim()) {
+                body.firstName = payload.firstName.trim();
+            }
+
+            console.log('📧 [SEND_REG_OTP] Sending pre-registration OTP to:', normalizedEmail);
+
+            const endpoint =
+                config.NEXT_PUBLIC_REGISTER_SEND_OTP_ENDPOINT ||
+                process.env.NEXT_PUBLIC_REGISTER_SEND_OTP_ENDPOINT ||
+                '/auth/register/send-otp';
+
+            const { data } = await api.post(endpoint, body);
+            console.log('✅ [SEND_REG_OTP] OTP sent successfully:', data);
+            return data;
+        } catch (error: any) {
+            console.error('❌ [SEND_REG_OTP] Failed to send registration OTP:', error);
+            if (axios.isAxiosError(error)) {
+                if (error.code === 'ERR_NETWORK') {
+                    throw new Error('Unable to connect to server. Please check your internet connection.');
+                }
+                if (error.response?.status === 409) {
+                    throw new Error('An account with this email already exists. Please log in.');
+                }
+                if (error.response?.status === 429) {
+                    throw new Error('Too many OTP requests. Please wait 15 minutes.');
+                }
+                const apiError = error.response?.data as any;
+                if (apiError?.message) {
+                    if (apiError.message.toLowerCase().includes('email service not configured')) {
+                        throw new Error('Email service is not configured on the server. Please configure SMTP / email provider credentials in your backend environment.');
+                    }
+                    throw new Error(apiError.message);
+                }
+            }
+            throw new Error(error?.message || 'Failed to send verification code. Please try again.');
+        }
+    }
+
+    /**
+     * 🔄 Resend Pre-registration Email OTP
+     * Endpoint: POST /api/v1/auth/register/resend-otp
+     * Body: { email: string, firstName?: string }
+     */
+    static async resendRegistrationOtp(payload: { email: string; firstName?: string }): Promise<any> {
+        try {
+            const normalizedEmail = payload.email.trim().toLowerCase();
+            const body: { email: string; firstName?: string } = { email: normalizedEmail };
+            if (payload.firstName?.trim()) {
+                body.firstName = payload.firstName.trim();
+            }
+
+            console.log('🔄 [RESEND_REG_OTP] Resending pre-registration OTP to:', normalizedEmail);
+
+            const endpoint =
+                config.NEXT_PUBLIC_REGISTER_RESEND_OTP_ENDPOINT ||
+                process.env.NEXT_PUBLIC_REGISTER_RESEND_OTP_ENDPOINT ||
+                '/auth/register/resend-otp';
+
+            const { data } = await api.post(endpoint, body);
+            console.log('✅ [RESEND_REG_OTP] OTP resent successfully:', data);
+            return data;
+        } catch (error: any) {
+            console.error('❌ [RESEND_REG_OTP] Failed to resend registration OTP:', error);
+            if (axios.isAxiosError(error)) {
+                if (error.code === 'ERR_NETWORK') {
+                    throw new Error('Unable to connect to server. Please check your internet connection.');
+                }
+                if (error.response?.status === 429) {
+                    throw new Error('Too many OTP requests. Please wait 15 minutes.');
+                }
+                const apiError = error.response?.data as any;
+                if (apiError?.message) {
+                    if (apiError.message.toLowerCase().includes('email service not configured')) {
+                        throw new Error('Email service is not configured on the server. Please configure SMTP / email provider credentials in your backend environment.');
+                    }
+                    throw new Error(apiError.message);
+                }
+            }
+            throw new Error(error?.message || 'Failed to resend verification code. Please try again.');
+        }
+    }
+
+    /**
+     * ✅ Verify Pre-registration Email OTP
+     * Endpoint: POST /api/v1/auth/register/verify-otp
+     * Body: { email: string, otp: string }
+     * Returns: { status: 'success', data: { email: string, verificationToken: string, expiresIn: number } }
+     */
+    static async verifyRegistrationOtp(payload: { email: string; otp: string }): Promise<any> {
+        try {
+            const normalizedEmail = payload.email.trim().toLowerCase();
+            const normalizedOtp = payload.otp.trim();
+
+            console.log('✅ [VERIFY_REG_OTP] Verifying pre-registration OTP for:', normalizedEmail);
+
+            const endpoint =
+                config.NEXT_PUBLIC_REGISTER_VERIFY_OTP_ENDPOINT ||
+                process.env.NEXT_PUBLIC_REGISTER_VERIFY_OTP_ENDPOINT ||
+                '/auth/register/verify-otp';
+
+            const { data } = await api.post(endpoint, {
+                email: normalizedEmail,
+                otp: normalizedOtp,
+            });
+
+            console.log('✅ [VERIFY_REG_OTP] OTP verified successfully:', {
+                status: data?.status,
+                hasToken: Boolean(data?.data?.verificationToken || data?.verificationToken),
+            });
+
+            return data;
+        } catch (error: any) {
+            console.error('❌ [VERIFY_REG_OTP] Failed to verify registration OTP:', error);
+            if (axios.isAxiosError(error)) {
+                if (error.code === 'ERR_NETWORK') {
+                    throw new Error('Unable to connect to server. Please check your internet connection.');
+                }
+                if (error.response?.status === 400) {
+                    const msg = (error.response?.data as any)?.message;
+                    throw new Error(msg || 'Invalid or expired OTP. Please try again.');
+                }
+                if (error.response?.status === 429) {
+                    throw new Error('Too many attempts. Please wait a few minutes before trying again.');
+                }
+                const apiError = error.response?.data as any;
+                if (apiError?.message) {
+                    throw new Error(apiError.message);
+                }
+            }
+            throw new Error(error?.message || 'OTP verification failed. Please try again.');
+        }
+    }
+
+    /**
      * 📝 Register API Call
     */
     static async register(registrationData: any): Promise<any> {
         try {
-            console.log('📝 [REGISTER] Initiating registration...', {
-                email: registrationData.email,
-                userType: registrationData.userType,
-            });
+            console.log('📝 [REGISTER] Initiating registration...', { email: registrationData.email, userType: registrationData.userType });
 
             const { data } = await api.post(
-                `${config.NEXT_PUBLIC_REGISTER_ENDPOINT || process.env.NEXT_PUBLIC_REGISTER_ENDPOINT}`,
+                `${config.NEXT_PUBLIC_REGISTER_ENDPOINT || process.env.NEXT_PUBLIC_REGISTER_ENDPOINT || '/auth/register'}`,
                 registrationData
             );
 
@@ -207,30 +346,46 @@ class AuthService {
             return data;
 
         } catch (error: any) {
-            console.error('❌ [REGISTER] Registration failed', error);
+            console.error('❌ [REGISTER] Registration failed:', {
+                status: error?.response?.status,
+                data: error?.response?.data,
+                message: error?.message,
+            });
 
             if (axios.isAxiosError(error)) {
-                const apiError = error.response?.data as ApiError;
+                const apiError = error.response?.data as any;
 
                 if (error.code === 'ERR_NETWORK') {
                     throw new Error('Unable to connect to server. Please check your internet connection.');
-                }
-
-                if (apiError?.message) {
-                    throw new Error(apiError.message);
                 }
 
                 if (error.response?.status === 409) {
                     throw new Error('User already exists with this email.');
                 }
 
+                // If backend provided detailed validation errors array
+                if (apiError?.errors) {
+                    if (Array.isArray(apiError.errors) && apiError.errors.length > 0) {
+                        const errorList = apiError.errors.map((e: any) =>
+                            typeof e === 'string' ? e : e.message || e.msg || JSON.stringify(e)
+                        );
+                        throw new Error(errorList.join('. '));
+                    }
+                    if (typeof apiError.errors === 'string') {
+                        throw new Error(apiError.errors);
+                    }
+                }
+
+                if (apiError?.message) {
+                    throw new Error(apiError.message);
+                }
+
                 if (error.response?.status === 400) {
-                    const errors = apiError?.errors?.map(e => e.message).join(', ');
-                    throw new Error(errors || 'Validation failed. Please check your inputs.');
+                    throw new Error('Validation failed. Please check your inputs.');
                 }
             }
 
-            throw new Error('An unexpected error occurred. Please try again.');
+            throw new Error(error?.message || 'An unexpected error occurred. Please try again.');
         }
     }
 

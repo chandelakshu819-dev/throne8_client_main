@@ -91,8 +91,30 @@ class SeniorMentorApplicationService {
     }
   }
 
-  /**
-   * GET /api/v1/mentorship/senior-mentor-applications/:id/profile
+    /**
+   * PUT /api/v1/mentorship/senior-mentor-applications/me/profile-photo
+   * Updates ONLY the profile photo of the current user's Senior Mentor application.
+   * Returns the updated application, or null if the user has no application (404).
+   * NOTE: backend endpoint must exist (see senior profile-photo route).
+   */
+    static async updateMyProfilePhoto(file: File): Promise<SeniorMentorApplication | null> {
+      try {
+        const formData = new FormData();
+        formData.append('profilePhoto', file);
+        const { data } = await api.put('/mentorship/senior-mentor-applications/me/profile-photo', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return data?.data ?? null;
+      } catch (error: any) {
+        // 404 = user ne senior mentor ke liye apply hi nahi kiya -> expected
+        if (error?.response?.status === 404) return null;
+        console.error('❌ [SENIOR_MENTOR_APP] Failed to update profile photo:', error?.response?.data?.message || error?.message);
+        throw error;
+      }
+    }
+  
+    /**
+     * GET /api/v1/mentorship/senior-mentor-applications/:id/profile
    * Returns a Senior Mentor Application by ID (owner only) to display as Profile.
    */
   static async getApplicationProfileById(userId: string): Promise<SeniorMentorApplication | null> {

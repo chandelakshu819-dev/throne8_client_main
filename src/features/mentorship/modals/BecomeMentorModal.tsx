@@ -15,23 +15,24 @@ import { CreateMentorFormData } from "@/features/mentorship/types/mentorship.typ
 import { useProfileData } from "@/features/profile/hooks/useProfileData";
 import { useExperienceData } from "@/features/profile/hooks/useExperienceData";
 import { useEducationData } from "@/features/profile/hooks/useEducationData";
+import AutocompleteInput from "@/features/mentorship/components/shared/AutocompleteInput";
+import { useFieldSuggestions } from "@/features/mentorship/hooks/useFieldSuggestions";
 
-const SKILL_SUGGESTIONS: string[] = [
-    "JavaScript", "TypeScript", "Python", "Java", "C++", "C#", "Go", "Rust",
-    "React", "Next.js", "Vue.js", "Angular", "Node.js", "Express.js", "NestJS",
-    "Redux", "GraphQL", "REST API", "HTML", "CSS", "Tailwind CSS", "SASS",
-    "MongoDB", "PostgreSQL", "MySQL", "Redis", "Firebase", "Docker", "Kubernetes",
-    "AWS", "Azure", "GCP", "CI/CD", "Git", "Data Structures & Algorithms",
-    "System Design", "Machine Learning", "Deep Learning", "Data Science",
-    "TensorFlow", "PyTorch", "SQL", "NoSQL", "Microservices", "Agile", "Scrum",
-    "Product Management", "UI/UX Design", "Figma", "Career Guidance",
-    "Interview Preparation", "Resume Building", "Public Speaking", "Leadership",
-    "Flutter", "React Native", "Swift", "Kotlin", "DevOps", "Cybersecurity",
-    "Blockchain", "Solidity", "Django", "Flask", "Spring Boot", ".NET",
-];
+
+import {
+    ROLE_SUGGESTIONS,
+    COMPANY_SUGGESTIONS,
+    COLLEGE_SUGGESTIONS,
+    DEGREE_SUGGESTIONS,
+    BRANCH_SUGGESTIONS,
+    SKILL_SUGGESTIONS,
+} from "@/features/mentorship/constants/suggestions";
+
+
+
 
 const inputClass =
-    "w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium";
+    "w-full px-4 py-2.5 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium";
 
 interface BecomeMentorModalProps {
     isOpen: boolean;
@@ -70,7 +71,6 @@ export default function BecomeMentorModal({
 
     const [profilePicPreview, setProfilePicPreview] = useState<string>(profileImage);
     const [skillInput, setSkillInput] = useState('');
-    const [showSkillSuggestions, setShowSkillSuggestions] = useState(false);
     const [isProfileLoading, setIsProfileLoading] = useState(true);
     const [profileLoadError, setProfileLoadError] = useState(false);
 
@@ -97,13 +97,12 @@ export default function BecomeMentorModal({
     const watchedSkills = watch('skills');
     const watchedDomains = watch('domains');
 
-    const filteredSkillSuggestions = skillInput.trim()
-        ? SKILL_SUGGESTIONS.filter(
-            (s) =>
-                s.toLowerCase().includes(skillInput.trim().toLowerCase()) &&
-                !watchedSkills?.includes(s)
-        ).slice(0, 8)
-        : [];
+    const roleOptions = useFieldSuggestions('role', watch('currentRole') || '', ROLE_SUGGESTIONS);
+    const companyOptions = useFieldSuggestions('company', watch('company') || '', COMPANY_SUGGESTIONS);
+    const collegeOptions = useFieldSuggestions('college', watch('college') || '', COLLEGE_SUGGESTIONS);
+    const degreeOptions = useFieldSuggestions('degree', watch('degree') || '', DEGREE_SUGGESTIONS);
+    const branchOptions = useFieldSuggestions('branch', watch('branch') || '', BRANCH_SUGGESTIONS);
+    const skillOptions = useFieldSuggestions('skills', skillInput, SKILL_SUGGESTIONS);
 
     // Close domain dropdown on outside click
     useEffect(() => {
@@ -319,7 +318,7 @@ export default function BecomeMentorModal({
                 </div>
             )}
             <div
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-start justify-center p-6 animate-fade-in overflow-y-auto"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-start justify-center p-4 animate-fade-in overflow-y-auto"
                 onClick={handleClose}
             >
                 <form
@@ -334,30 +333,31 @@ export default function BecomeMentorModal({
                             console.log("Validation errors:", errs);
                         })();
                     }}
-                    className="bg-white rounded-[40px] max-w-3xl w-full relative shadow-2xl animate-slide-up-modal my-6"
+                    className="bg-white rounded-[28px] max-w-2xl w-full relative shadow-2xl animate-slide-up-modal my-2"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Close Button */}
                     <button
                         type="button"
                         onClick={handleClose}
-                        className="absolute top-6 right-6 w-10 h-10 bg-[#f8f6f4] hover:bg-[#4a3728] text-[#4a3728] hover:text-white rounded-full flex items-center justify-center transition-all z-10"
+                        aria-label="Close"
+                        className="absolute top-6 right-6 w-10 h-10 bg-[#f8f6f4] hover:bg-[#4a3728] text-[#4a3728] hover:text-white rounded-full flex items-center justify-center transition-all z-30"
                     >
                         <X className="w-5 h-5" />
                     </button>
 
                     {/* Header */}
-                    <div className="bg-gradient-to-br from-[#4a3728] to-[#7a5c3e] p-10 rounded-t-[40px] text-white relative overflow-hidden">
+                    <div className="bg-gradient-to-br from-[#4a3728] to-[#7a5c3e] p-6 rounded-t-[28px] text-white relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
                         <div className="relative z-10">
-                            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-4">
-                                <Users className="w-8 h-8" />
+                        <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center mb-3">
+                        <Users className="w-6 h-6" />
                             </div>
-                            <h2 className="text-3xl font-black mb-2">Become a Mentor</h2>
+                            <h2 className="text-2xl font-black mb-1">Become a Mentor</h2>
                             <p className="text-white/80 font-medium">
                                 Share your expertise and inspire the next generation
                             </p>
-                            <div className="mt-6 flex items-center gap-2">
+                            <div className="mt-4 flex items-center gap-2">
                                 {[1, 2, 3].map((step) => (
                                     <div
                                         key={step}
@@ -369,11 +369,11 @@ export default function BecomeMentorModal({
                     </div>
 
                     {/* Form Content */}
-                    <div className="p-10">
+                    <div className="p-6">
                         {/* Step 1: Personal Information */}
                         {formStep === 1 && (
-                            <div className="space-y-6">
-                                <h3 className="text-2xl font-black text-[#4a3728] mb-6">
+                            <div className="space-y-4">
+                                <h3 className="text-xl font-black text-[#4a3728] mb-4">
                                     Personal Information
                                 </h3>
 
@@ -382,7 +382,7 @@ export default function BecomeMentorModal({
                                         Profile Photo *
                                     </label>
 
-                                    <div className="relative w-36 h-36 group cursor-pointer">
+                                    <div className="relative w-24 h-24 group cursor-pointer">
                                         <img
                                             src={profilePicPreview || profileImage}
                                             alt="Profile"
@@ -419,14 +419,14 @@ export default function BecomeMentorModal({
                                     )}
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Full Name *</label>
                                         <input
                                             type="text"
                                             value={fullName}
                                             readOnly
-                                            className="w-full px-4 py-3 bg-[#ece7e2] border border-[#ece7e2] rounded-2xl text-sm font-medium cursor-not-allowed opacity-75"
+                                            className="w-full px-4 py-3 bg-[#ece7e2] border border-[#ece7e2] rounded-2xl text-sm font-medium cursor-default opacity-75"
                                         />
                                     </div>
 
@@ -490,12 +490,14 @@ export default function BecomeMentorModal({
                                     {/* Current Role */}
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Role *</label>
-                                        <input
-                                            {...register('currentRole')}
-                                            type="text"
-                                            placeholder="Senior Software Engineer"
-                                            className={inputClass}
-                                        />
+                                        <AutocompleteInput
+    value={watch('currentRole') || ''}
+    onChange={(v) => setValue('currentRole', v, { shouldValidate: false })}
+    onSelect={(v) => setValue('currentRole', v, { shouldValidate: true })}
+    suggestions={roleOptions}
+    placeholder="Senior Software Engineer"
+    className={inputClass}
+/>
                                         {errors.currentRole && (
                                             <p className="text-red-500 text-xs mt-1">{errors.currentRole.message as string}</p>
                                         )}
@@ -504,12 +506,14 @@ export default function BecomeMentorModal({
                                     {/* Company */}
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Company *</label>
-                                        <input
-                                            {...register('company')}
-                                            type="text"
-                                            placeholder="Google"
-                                            className={inputClass}
-                                        />
+                                        <AutocompleteInput
+    value={watch('company') || ''}
+    onChange={(v) => setValue('company', v, { shouldValidate: false })}
+    onSelect={(v) => setValue('company', v, { shouldValidate: true })}
+    suggestions={companyOptions}
+    placeholder="Google"
+    className={inputClass}
+/>
                                         {errors.company && (
                                             <p className="text-red-500 text-xs mt-1">{errors.company.message as string}</p>
                                         )}
@@ -518,12 +522,14 @@ export default function BecomeMentorModal({
                                     {/* College */}
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">College / University *</label>
-                                        <input
-                                            {...register('college')}
-                                            type="text"
-                                            placeholder="IIT Bombay"
-                                            className={inputClass}
-                                        />
+                                        <AutocompleteInput
+    value={watch('college') || ''}
+    onChange={(v) => setValue('college', v, { shouldValidate: false })}
+    onSelect={(v) => setValue('college', v, { shouldValidate: true })}
+    suggestions={collegeOptions}
+    placeholder="IIT Bombay"
+    className={inputClass}
+/>
                                         {errors.college && (
                                             <p className="text-red-500 text-xs mt-1">{errors.college.message as string}</p>
                                         )}
@@ -532,12 +538,14 @@ export default function BecomeMentorModal({
                                     {/* Degree */}
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Degree *</label>
-                                        <input
-                                            {...register('degree')}
-                                            type="text"
-                                            placeholder="B.Tech"
-                                            className={inputClass}
-                                        />
+                                        <AutocompleteInput
+    value={watch('degree') || ''}
+    onChange={(v) => setValue('degree', v, { shouldValidate: false })}
+    onSelect={(v) => setValue('degree', v, { shouldValidate: true })}
+    suggestions={degreeOptions}
+    placeholder="B.Tech"
+    className={inputClass}
+/>
                                         {errors.degree && (
                                             <p className="text-red-500 text-xs mt-1">{errors.degree.message as string}</p>
                                         )}
@@ -546,12 +554,14 @@ export default function BecomeMentorModal({
                                     {/* Branch */}
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Branch *</label>
-                                        <input
-                                            {...register('branch')}
-                                            type="text"
-                                            placeholder="Computer Science"
-                                            className={inputClass}
-                                        />
+                                        <AutocompleteInput
+    value={watch('branch') || ''}
+    onChange={(v) => setValue('branch', v, { shouldValidate: false })}
+    onSelect={(v) => setValue('branch', v, { shouldValidate: true })}
+    suggestions={branchOptions}
+    placeholder="Computer Science"
+    className={inputClass}
+/>
                                         {errors.branch && (
                                             <p className="text-red-500 text-xs mt-1">{errors.branch.message as string}</p>
                                         )}
@@ -667,8 +677,8 @@ export default function BecomeMentorModal({
                                     </div>
                                 </div>
 
-                                {/* Skills */}
-                                <div>
+                                                                {/* Skills */}
+                                                                <div>
                                     <label className="block text-sm font-bold text-[#4a3728] mb-2">
                                         Skills * <span className="text-slate-400 font-normal">(press Enter to add)</span>
                                     </label>
@@ -695,60 +705,32 @@ export default function BecomeMentorModal({
                                             </span>
                                         ))}
                                     </div>
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            value={skillInput}
-                                            onChange={(e) => {
-                                                setSkillInput(e.target.value);
-                                                setShowSkillSuggestions(true);
-                                            }}
-                                            onFocus={() => setShowSkillSuggestions(true)}
-                                            onBlur={() => {
-                                                setTimeout(() => setShowSkillSuggestions(false), 150);
-                                            }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.preventDefault();
-                                                    const trimmed = skillInput.trim();
-                                                    if (trimmed && !watchedSkills?.includes(trimmed) && (watchedSkills?.length || 0) < 20) {
-                                                        setValue('skills', [...(watchedSkills || []), trimmed], { shouldValidate: true });
-                                                        setSkillInput('');
-                                                        setShowSkillSuggestions(false);
-                                                    }
-                                                }
-                                            }}
-                                            placeholder="Type a skill and press Enter..."
-                                            className={inputClass}
-                                        />
 
-                                        {showSkillSuggestions && filteredSkillSuggestions.length > 0 && (
-                                            <div className="absolute z-50 w-full mt-1 bg-white border border-[#ece7e2] rounded-2xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
-                                                {filteredSkillSuggestions.map((suggestion) => (
-                                                    <button
-                                                        key={suggestion}
-                                                        type="button"
-                                                        onMouseDown={(e) => {
-                                                            e.preventDefault();
-                                                            if ((watchedSkills?.length || 0) < 20 && !watchedSkills?.includes(suggestion)) {
-                                                                setValue('skills', [...(watchedSkills || []), suggestion], { shouldValidate: true });
-                                                            }
-                                                            setSkillInput('');
-                                                            setShowSkillSuggestions(false);
-                                                        }}
-                                                        className="w-full px-4 py-2.5 text-left text-sm font-medium text-slate-600 hover:bg-[#f8f6f4] hover:text-[#4a3728] transition-colors"
-                                                    >
-                                                        {suggestion}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
+                                    <AutocompleteInput
+                                        value={skillInput}
+                                        onChange={setSkillInput}
+                                        suggestions={skillOptions}
+                                        excludeValues={watchedSkills || []}
+                                        clearOnSelect
+                                        onSelect={(skill) => {
+                                            if ((watchedSkills?.length || 0) < 20 && !watchedSkills?.includes(skill)) {
+                                                setValue('skills', [...(watchedSkills || []), skill], { shouldValidate: true });
+                                            }
+                                        }}
+                                        onEnterFreeText={(trimmed) => {
+                                            if (trimmed && !watchedSkills?.some((x) => x.toLowerCase() === trimmed.toLowerCase()) && (watchedSkills?.length || 0) < 20) {
+                                                setValue('skills', [...(watchedSkills || []), trimmed], { shouldValidate: true });
+                                                setSkillInput('');
+                                            }
+                                        }}
+                                        placeholder="Type a skill and press Enter..."
+                                        className={inputClass}
+                                    />
+
                                     {errors.skills && (
                                         <p className="text-red-500 text-xs mt-1">{errors.skills.message}</p>
                                     )}
                                 </div>
-
                                 {/* Bio */}
                                 <div>
                                     <label className="block text-sm font-bold text-[#4a3728] mb-2">
@@ -826,7 +808,7 @@ export default function BecomeMentorModal({
                         )}
 
                         {/* Navigation Buttons */}
-                        <div className="flex items-center justify-between mt-10 pt-6 border-t border-[#ece7e2]">
+                        <div className="flex items-center justify-between mt-6 pt-4 border-t border-[#ece7e2]">
                             <div className="flex items-center gap-3">
                                 {formStep > 1 && (
                                     <button

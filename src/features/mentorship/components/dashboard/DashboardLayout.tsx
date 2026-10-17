@@ -29,7 +29,7 @@ import PlansPage from "./PlansPage";
 import TrustScorePage from "./TrustScorePage";
 import CommunityPage from "./CommunityPage";
 import MentorService from "@/lib/api/mentorship.service";
-import ProfileService from "@/lib/api/profile.service";
+import { syncProfilePhotoToAllRoles } from "@/features/mentorship/utils/syncProfilePhoto";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
@@ -462,9 +462,10 @@ export default function MentorDashboard(
         setNavbarProfileImage(newPic);
 
         // ✅ Same account → Mentee / Senior / Industry sab jagah ek hi photo: account photo bhi update karo
-        ProfileService.uploadProfilePhoto(file, true)
-          .then(() => { if (typeof loadProfile === "function") loadProfile(); })
-          .catch((err) => console.warn("Account photo sync failed:", err));
+                // (mentor photo already updated above, isliye 'mentor' skip) + senior mentor photo bhi sync
+                syncProfilePhotoToAllRoles(file, mentorData?.userId, { skip: ["mentor"] })
+                .then(() => { if (typeof loadProfile === "function") loadProfile(); })
+                .catch((err) => console.warn("Photo sync failed:", err));
       })
       .catch((err) => {
         console.error("Failed to update profile photo:", err);

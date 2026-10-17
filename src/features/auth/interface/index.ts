@@ -3,6 +3,7 @@ export interface RegistrationData {
   email: string;
   password: string;
   confirmPassword: string;
+  verificationToken?: string;
 
   // Step 2
   firstName: string;
