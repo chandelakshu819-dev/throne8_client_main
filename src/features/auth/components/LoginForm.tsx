@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { useLogin } from '../hooks/useLogin';
 import { LoginFormData, loginSchema } from '../schema';
 import { HOME_PATH } from '@/config/launch';
+import { resolveSafeRedirect, isExternalUrl } from '@/shared/utils/safeRedirect';
 
 export default function LoginForm() {
   const router = useRouter();
@@ -53,7 +54,17 @@ export default function LoginForm() {
 
       router.refresh();
       await new Promise((resolve) => setTimeout(resolve, 50));
-      router.push(HOME_PATH);
+
+      // ?redirect= (set by the proxy for protected pages, and by the Resume Builder).
+      // Validated: same-site paths or allowlisted origins only, otherwise HOME_PATH.
+      const target = resolveSafeRedirect(
+        new URLSearchParams(window.location.search).get('redirect'),
+      );
+      if (target && isExternalUrl(target)) {
+        window.location.assign(target);
+        return;
+      }
+      router.push(target ?? HOME_PATH);
     } catch (error: any) {
       console.error('[FORM] Login failed:', error);
     }

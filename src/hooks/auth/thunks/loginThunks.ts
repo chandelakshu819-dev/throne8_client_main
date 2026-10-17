@@ -4,7 +4,6 @@ import { createAsyncThunk } from '@reduxjs/toolkit';
 import AuthService from '@/lib/api/auth.service';
 import TokenStorage from '@/lib/store/token.storage';
 
-import config from '@/config/env.config';
 import { LoginCredentials, LoginResponse, UserData } from '@/features/auth/interface';
 
 /**
@@ -24,11 +23,8 @@ export const loginUser = createAsyncThunk
         // Call AuthService
         const response = await AuthService.login(credentials);
 
-        // ✅ Store tokens in localStorage (AuthService already does this, but double-check)
-        TokenStorage.setAuthData(
-          response.data.tokens,
-          response.data.user
-        );
+        // 🍪 Session cookies were set by the backend; remember the user for the UI
+        TokenStorage.setAuthData(response.data.user);
 
         // console.log('✅ [THUNK] Login successful:', response.data.user.email);
 
@@ -87,7 +83,7 @@ export const checkAuthStatus = createAsyncThunk
       try {
         // console.log('🔍 [THUNK] Checking auth status...');
 
-        // Check if tokens exist
+        // Does the browser believe it has a session? (flag cookie + stored user)
         const isAuthenticated = TokenStorage.isAuthenticated();
 
         if (!isAuthenticated) {
@@ -95,43 +91,9 @@ export const checkAuthStatus = createAsyncThunk
           return null;
         }
 
-        // Get user data from localStorage
+        // The access cookie is httpOnly (not readable here). If it has expired, the first
+        // API call gets a 401 and the axios interceptor refreshes the session once.
         const userData = TokenStorage.getUserData();
-
-        if (TokenStorage.needsTokenRefresh()) {
-          const refreshToken = TokenStorage.getRefreshToken();
-
-          try {
-            // ✅ AuthService ka method use kar rahe hain
-            const response = await fetch(
-              `${config?.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL}${config?.NEXT_PUBLIC_REFRESH_TOKEN_ENDPOINT || process.env.NEXT_PUBLIC_REFRESH_TOKEN_ENDPOINT}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refreshToken }),
-              }
-            );
-
-            if (!response.ok) {
-              TokenStorage.clearAuthData();
-              return null;
-            }
-
-            const data = await response.json();
-            const {
-              accessToken,
-              refreshToken: newRefreshToken,
-              expiresIn
-            } = data.data.tokens;
-
-            TokenStorage.updateAccessToken(accessToken, expiresIn);
-            // Refresh token rotation — naya token save karo
-            TokenStorage.updateRefreshToken(newRefreshToken);
-          } catch {
-            // Network error — existing userData return karo
-            return userData;
-          }
-        }
 
         return userData;
 
