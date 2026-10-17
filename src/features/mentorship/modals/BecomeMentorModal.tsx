@@ -1,6 +1,6 @@
 "use client";
+import React, { useState, useEffect } from "react";
 
-import React, { useState, useEffect, useRef } from "react";
 import { X, Users, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useForm } from 'react-hook-form';
@@ -10,7 +10,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { createMentorSchema } from "@/features/mentorship/validators/mentor.validation";
 import MentorService from "@/lib/api/mentorship.service";
 import { useScrollLock } from "@/hooks/useScrollLock";
-import { DOMAINS, DOMAIN_LABELS, EXPERIENCE_OPTIONS } from "@/features/mentorship/constants/mentorship";
+import { DOMAINS, DOMAIN_LABELS, EXPERIENCE_OPTIONS, searchDomains } from "@/features/mentorship/constants/mentorship";
 import { CreateMentorFormData } from "@/features/mentorship/types/mentorship.types";
 import { useProfileData } from "@/features/profile/hooks/useProfileData";
 import { useExperienceData } from "@/features/profile/hooks/useExperienceData";
@@ -66,8 +66,8 @@ export default function BecomeMentorModal({
     const [agreements, setAgreements] = useState([false, false, false]);
     const [agreementError, setAgreementError] = useState(false);
     const [isRedirecting, setIsRedirecting] = useState(false);
-    const [domainDropdownOpen, setDomainDropdownOpen] = useState(false);
-    const domainDropdownRef = useRef<HTMLDivElement>(null);
+    const [domainInput, setDomainInput] = useState('');
+    
 
     const [profilePicPreview, setProfilePicPreview] = useState<string>(profileImage);
     const [skillInput, setSkillInput] = useState('');
@@ -96,7 +96,7 @@ export default function BecomeMentorModal({
 
     const watchedSkills = watch('skills');
     const watchedDomains = watch('domains');
-
+    const domainOptions = searchDomains(domainInput).map((d) => DOMAIN_LABELS[d]);
     const roleOptions = useFieldSuggestions('role', watch('currentRole') || '', ROLE_SUGGESTIONS);
     const companyOptions = useFieldSuggestions('company', watch('company') || '', COMPANY_SUGGESTIONS);
     const collegeOptions = useFieldSuggestions('college', watch('college') || '', COLLEGE_SUGGESTIONS);
@@ -104,17 +104,7 @@ export default function BecomeMentorModal({
     const branchOptions = useFieldSuggestions('branch', watch('branch') || '', BRANCH_SUGGESTIONS);
     const skillOptions = useFieldSuggestions('skills', skillInput, SKILL_SUGGESTIONS);
 
-    // Close domain dropdown on outside click
-    useEffect(() => {
-        if (!domainDropdownOpen) return;
-        const handleClickOutside = (event: MouseEvent) => {
-            if (domainDropdownRef.current && !domainDropdownRef.current.contains(event.target as Node)) {
-                setDomainDropdownOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [domainDropdownOpen]);
+
 
     // Fetch profile + education
     useEffect(() => {
@@ -218,19 +208,26 @@ export default function BecomeMentorModal({
         }
     }, [currentCompany, setValue, getValues]);
 
-    // Prefill college / degree / branch from education (best effort, user can edit)
+        // Prefill college / degree / branch:
+    // 1) profile ki Education entry, 2) signup ki details (onboarding.studentProfile)
     useEffect(() => {
         const edu: any = educationList?.[0];
-        if (!edu) return;
+        const sp = userProfileData?.onboarding?.studentProfile;
+        if (!edu && !sp) return;
 
-        const college = edu.school || edu.college || edu.institution || edu.schoolName || edu.collegeName || '';
-        const degree = edu.degree || edu.degreeName || '';
-        const branch = edu.fieldOfStudy || edu.branch || edu.field || edu.major || '';
+        // signup normalize karke 'Other' bhej deta hai, use prefill mat karo
+        const clean = (v: any) => (v && String(v) !== 'Other' ? String(v) : '');
 
-        if (college && !getValues('college')) setValue('college', String(college), { shouldValidate: false });
-        if (degree && !getValues('degree')) setValue('degree', String(degree), { shouldValidate: false });
-        if (branch && !getValues('branch')) setValue('branch', String(branch), { shouldValidate: false });
-    }, [educationList, setValue, getValues]);
+        const college = clean(
+            edu?.school || edu?.college || edu?.institution || edu?.schoolName || edu?.collegeName || sp?.collegeName
+        );
+        const degree = clean(edu?.degree || edu?.degreeName || sp?.degree);
+        const branch = clean(edu?.fieldOfStudy || edu?.branch || edu?.field || edu?.major || sp?.fieldOfStudy);
+
+        if (college && !getValues('college')) setValue('college', college, { shouldValidate: false });
+        if (degree && !getValues('degree')) setValue('degree', degree, { shouldValidate: false });
+        if (branch && !getValues('branch')) setValue('branch', branch, { shouldValidate: false });
+    }, [educationList, userProfileData, setValue, getValues]);
 
     const fullName = userProfileData
         ? [userProfileData.firstName, userProfileData.lastName].filter(Boolean).join(' ').trim()
@@ -586,32 +583,14 @@ export default function BecomeMentorModal({
                                         )}
                                     </div>
 
-                                    {/* Domains */}
-                                    <div className="relative" ref={domainDropdownRef}>
+                                                                       {/* Domains */}
+                                                                       <div className="md:col-span-2">
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">
-                                            Domains * <span className="text-slate-400 font-normal">(max 5)</span>
+                                            Domains * <span className="text-slate-400 font-normal">(max 5, type to search e.g. react, dsa, aws)</span>
                                         </label>
 
-                                        <button
-                                            type="button"
-                                            onClick={() => setDomainDropdownOpen(!domainDropdownOpen)}
-                                            className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl text-sm font-medium text-left flex items-center justify-between"
-                                        >
-                                            <span className={watchedDomains?.length ? 'text-[#4a3728]' : 'text-slate-400'}>
-                                                {watchedDomains?.length
-                                                    ? `${watchedDomains.length} domain${watchedDomains.length > 1 ? 's' : ''} selected`
-                                                    : 'Select domains'}
-                                            </span>
-                                            <svg
-                                                className={`w-4 h-4 text-[#4a3728] transition-transform ${domainDropdownOpen ? 'rotate-180' : ''}`}
-                                                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                            >
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                            </svg>
-                                        </button>
-
                                         {watchedDomains?.length > 0 && (
-                                            <div className="flex flex-wrap gap-2 mt-2">
+                                            <div className="flex flex-wrap gap-2 mb-2">
                                                 {watchedDomains.map((domain) => (
                                                     <span
                                                         key={domain}
@@ -627,7 +606,7 @@ export default function BecomeMentorModal({
                                                                     { shouldValidate: true }
                                                                 )
                                                             }
-                                                            className="hover:text-red-300 ml-1"
+                                                            className="hover:text-red-300"
                                                         >
                                                             ×
                                                         </button>
@@ -636,48 +615,40 @@ export default function BecomeMentorModal({
                                             </div>
                                         )}
 
-                                        {domainDropdownOpen && (
-                                            <div className="absolute z-50 w-full mt-1 bg-white border border-[#ece7e2] rounded-2xl shadow-xl overflow-hidden">
-                                                {DOMAINS.map((domain) => {
-                                                    const isSelected = watchedDomains?.includes(domain);
-                                                    const isDisabled = !isSelected && (watchedDomains?.length || 0) >= 5;
-
-                                                    return (
-                                                        <button
-                                                            key={domain}
-                                                            type="button"
-                                                            disabled={isDisabled}
-                                                            onClick={() => {
-                                                                const current = watchedDomains || [];
-                                                                const updated = isSelected
-                                                                    ? current.filter((d) => d !== domain)
-                                                                    : [...current, domain];
-                                                                setValue('domains', updated, { shouldValidate: true });
-                                                            }}
-                                                            className={`w-full px-4 py-3 text-left text-sm font-medium flex items-center justify-between transition-colors
-                                                                ${isSelected ? 'bg-[#f8f6f4] text-[#4a3728]' : 'text-slate-600 hover:bg-[#f8f6f4]'}
-                                                                ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
-                                                            `}
-                                                        >
-                                                            <span>{DOMAIN_LABELS[domain]}</span>
-                                                            {isSelected && (
-                                                                <svg className="w-4 h-4 text-[#4a3728]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                </svg>
-                                                            )}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
+                                        <AutocompleteInput
+                                            value={domainInput}
+                                            onChange={setDomainInput}
+                                            suggestions={domainOptions}
+                                            excludeValues={(watchedDomains || []).map((d) => DOMAIN_LABELS[d])}
+                                            skipFilter
+                                            clearOnSelect
+                                            maxResults={10}
+                                            onSelect={(label) => {
+                                                const domain = DOMAINS.find((d) => DOMAIN_LABELS[d] === label);
+                                                if (domain && !watchedDomains?.includes(domain) && (watchedDomains?.length || 0) < 5) {
+                                                    setValue('domains', [...(watchedDomains || []), domain], { shouldValidate: true });
+                                                }
+                                            }}
+                                            onEnterFreeText={(trimmed) => {
+                                                // Enter dabane par pehla matching domain add ho jaye
+                                                const first = searchDomains(trimmed).find((d) => !watchedDomains?.includes(d));
+                                                if (trimmed && first && (watchedDomains?.length || 0) < 5) {
+                                                    setValue('domains', [...(watchedDomains || []), first], { shouldValidate: true });
+                                                    setDomainInput('');
+                                                }
+                                            }}
+                                            placeholder="Type a domain, e.g. react, dsa, aws..."
+                                            className={inputClass}
+                                        />
 
                                         {errors.domains && (
                                             <p className="text-red-500 text-xs mt-1">{errors.domains.message}</p>
                                         )}
                                     </div>
-                                </div>
+                                </div>{/* closes grid */}
 
-                                                                {/* Skills */}
+                                {/* Skills */}
+
                                                                 <div>
                                     <label className="block text-sm font-bold text-[#4a3728] mb-2">
                                         Skills * <span className="text-slate-400 font-normal">(press Enter to add)</span>
