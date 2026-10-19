@@ -30,12 +30,17 @@ export default function MentorshipDashboardRouter({
   initialPage,
 }: MentorshipDashboardRouterProps) {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
-  const { roles, loading } = useMyRoles(isAuthenticated);
+  const { isAuthenticated } = useAuth();
+
+  // FIX: pass userId so useMyRoles can verify the Mentor profile when
+  // /me/roles fails or returns "none". Without it, seniorMentor stayed "none",
+  // the guard below redirected to /mentorship, and /mentorship redirected
+  // straight back here -> infinite redirect loop.
+  const { roles, loading } = useMyRoles(isAuthenticated, userId);
 
   // ── Role guard ────────────────────────────────────────────────────────────
-  // If someone navigates to /mentorship/[userId] intending the Student Mentor
-  // dashboard but they're not approved, redirect them to the apply page.
+  // If someone navigates to the Mentor dashboard but they're not approved,
+  // send them back to the landing page.
   useEffect(() => {
     if (loading || !roles) return;
     if (defaultRole === "mentor" && roles.seniorMentor !== "approved") {
@@ -59,13 +64,11 @@ export default function MentorshipDashboardRouter({
   // (avoids flashing the mentee dashboard)
   if (defaultRole === "mentor" && !isMentor) return null;
 
-
   if (defaultRole === "mentor" && isMentor) {
     return (
       <MentorDashboard
         userId={userId}
-        // Switching back to Mentee is now done via the ProfileDropdown in the navbar.
-        // Pass a no-op so the MentorDashboard's internal "Switch" link still compiles.
+        // Switching back to Mentee is done via the ProfileDropdown in the navbar.
         onSwitchRole={() => router.push(routes.menteeDashboard(userId))}
       />
     );
