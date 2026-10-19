@@ -244,9 +244,7 @@ export default function UserDashboardProfilePreferencesPage({
         // ✅ Header avatar turant update
         setNavbarProfileImage(newUrl);
 
-              // ✅ Industry mentor + Senior mentor, dono me same photo sync karo (jo role nahi hai wo skip ho jata hai)
-              const syncUserId = (syncAuthUser as any)?.userId || (syncAuthUser as any)?.id;
-              syncProfilePhotoToAllRoles(file, syncUserId, { skip: ["account"] });
+              
         fetchAllUserData(true);
         if (typeof loadProfile === "function") {
           loadProfile();
@@ -1921,8 +1919,8 @@ function AddExperienceModal({
     try {
       const achievements = achievementsStr
         .split(",")
-        .map((a) => a.trim())
-        .filter((a) => a.length >= 3);
+        .map((a: string) => a.trim())
+        .filter((a: string) => a.length >= 3);
 
       const payload = {
         currentPosition: currentPosition.trim(),

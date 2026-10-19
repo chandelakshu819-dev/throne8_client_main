@@ -107,9 +107,7 @@ const ProfileImageModal: React.FC<ProfileImageModalProps> = ({
                 setNavbarProfileImage(uploadedImageUrl);
             }
 
-                       // ✅ Industry mentor + Senior mentor, dono me same photo sync karo (jo role nahi hai wo skip ho jata hai)
-                       const syncUserId = (syncAuthUser as any)?.userId || (syncAuthUser as any)?.id;
-                       syncProfilePhotoToAllRoles(selectedFile, syncUserId, { skip: ['account'] });
+
            
 
            

@@ -4,8 +4,7 @@ import type { SeniorMentorApplication } from "@/lib/api/seniorMentorApplication.
 import { useAppSelector } from "@/core/store/store.hooks";
 import { useNavbarData, useNavbarProfileImage } from "@/features/profile/components/home/NavbarProvider";
 import { useProfile } from "@/features/profile/hooks/useProfile";
-import { syncProfilePhotoToAllRoles } from "@/features/mentorship/utils/syncProfilePhoto";
-
+import SeniorMentorApplicationService from "@/lib/api/seniorMentorApplication.service";
 
 interface SeniorProfilePageProps {
   seniorData: SeniorMentorApplication | null;
@@ -55,9 +54,9 @@ export default function SeniorProfilePage({ seniorData }: SeniorProfilePageProps
 
     setUploading(true);
     try {
-      // account + industry mentor (agar hai) + senior application, teeno update
-      const res = await syncProfilePhotoToAllRoles(file, seniorData.userId);
-      const newUrl = res.seniorUrl || res.accountUrl || res.mentorUrl;
+          // Sirf Senior Mentor ki photo update hogi (Mentee / Mentor ki photo alag rehti hai)
+          const updatedApp = await SeniorMentorApplicationService.updateMyProfilePhoto(file);
+          const newUrl = updatedApp?.profilePhoto;
       if (!newUrl) throw new Error("Photo upload failed. Please try again.");
       setLocalPhoto(newUrl);
       setNavbarProfileImage(newUrl);
@@ -112,12 +111,11 @@ export default function SeniorProfilePage({ seniorData }: SeniorProfilePageProps
   } = seniorData;
   
   const getPhotoForLevel = (level: number): string | null => {
-
-        // Account photo (state.login.profile) pehle: ek hi photo sab roles me dikhe
-        if (level === 0 && localPhoto) return localPhoto;
-        const accountPhoto = navbarProfileData?.profileImage || globalProfile?.profilePic || globalProfile?.profilePhoto;
-        if (level === 0 && accountPhoto) return accountPhoto;
-        if (level <= 1 && profilePhoto) return profilePhoto;
+    // 1) Abhi upload ki hui photo, 2) Senior Mentor form wali apni photo, 3) account photo (sirf fallback)
+    if (level === 0 && localPhoto) return localPhoto;
+    if (level <= 1 && profilePhoto) return profilePhoto;
+    const accountPhoto = navbarProfileData?.profileImage || globalProfile?.profilePic || globalProfile?.profilePhoto;
+    if (level <= 2 && accountPhoto) return accountPhoto;
     return null;
   };
   const currentPhoto = getPhotoForLevel(imgFallbackLevel);

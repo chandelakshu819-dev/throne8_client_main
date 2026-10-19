@@ -460,12 +460,7 @@ export default function MentorDashboard(
         setProfilePhoto(null);
         // ✅ Top-right navbar avatar bhi turant update karo
         setNavbarProfileImage(newPic);
-
-        // ✅ Same account → Mentee / Senior / Industry sab jagah ek hi photo: account photo bhi update karo
-                // (mentor photo already updated above, isliye 'mentor' skip) + senior mentor photo bhi sync
-                syncProfilePhotoToAllRoles(file, mentorData?.userId, { skip: ["mentor"] })
-                .then(() => { if (typeof loadProfile === "function") loadProfile(); })
-                .catch((err) => console.warn("Photo sync failed:", err));
+        // Mentor ki photo alag hai — Mentee / Senior Mentor ki photo yahan se change nahi hogi
       })
       .catch((err) => {
         console.error("Failed to update profile photo:", err);

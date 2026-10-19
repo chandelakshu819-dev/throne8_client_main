@@ -9,6 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { createMentorSchema } from "@/features/mentorship/validators/mentor.validation";
 import MentorService from "@/lib/api/mentorship.service";
+import { syncProfilePhotoToAllRoles } from "@/features/mentorship/utils/syncProfilePhoto";
 import { useScrollLock } from "@/hooks/useScrollLock";
 import { DOMAINS, DOMAIN_LABELS, EXPERIENCE_OPTIONS, searchDomains } from "@/features/mentorship/constants/mentorship";
 import { CreateMentorFormData } from "@/features/mentorship/types/mentorship.types";
@@ -295,6 +296,11 @@ export default function BecomeMentorModal({
 
             MentorService.invalidateRolesCache();
             const userId = response.data.userId;
+
+            // Mentor photo ko account photo me bhi save karo -> Mentee workspace/navbar me wahi photo dikhe
+            if (formData.profilePic instanceof File) {
+                await syncProfilePhotoToAllRoles(formData.profilePic, userId, { skip: ['mentor', 'senior'] });
+            }
             setIsRedirecting(true);
             router.push(`/mentorship/mentorProfile/${userId}`);
             onClose();

@@ -21,6 +21,7 @@ import SeniorMentorApplicationService, {
     SeniorMentorApplication,
     ApplicationStatus
 } from "@/lib/api/seniorMentorApplication.service";
+import { syncProfilePhotoToAllRoles } from "@/features/mentorship/utils/syncProfilePhoto";
 
 // ============================================================================
 // 1. Enums and Select Options (Mirrored from Backend)
@@ -215,7 +216,11 @@ export default function SeniorMentorApplicationPage() {
             const res = await SeniorMentorApplicationService.apply(formData);
             
             const createdUserId = res?.userId;
-            
+
+            // Senior mentor photo ko account photo me bhi save karo -> Mentee workspace/navbar me wahi photo dikhe
+            if (data.profilePhotoFile instanceof File) {
+                await syncProfilePhotoToAllRoles(data.profilePhotoFile, createdUserId, { skip: ['mentor', 'senior'] });
+            }            
             if (createdUserId) {
                 router.push(`/mentorship/senior-mentor-profile/${createdUserId}`);
             } else {
