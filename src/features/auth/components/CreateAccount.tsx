@@ -3,7 +3,8 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
 import { schema, FormData } from '../schema';
 import { emailRule, normalizeEmail, PASSWORD_RULES } from '../schema/rules';
 import SocialButtons from '@/shared/uiComponents/SocialButtons';
@@ -12,15 +13,25 @@ import { useRegistrationAvailability } from '../hooks/useRegistrationAvailabilit
 import { canContinueAfterAvailabilityCheck } from '../hooks/registrationAvailability';
 
 interface Step1Props {
-  onNext: (data: FormData) => void;
+  onNext: (data: FormData) => void | Promise<void>;
   initialData: Partial<RegistrationData>;
   onDataChange: (data: Partial<RegistrationData>) => void;
   serverErrors: Record<string, string>;
   onClearServerError: (field: string) => void;
+  /** True while the verification code is being sent */
+  isLoading?: boolean;
+  /** Error from sending the verification code (or an expired verification) */
+  serverError?: string | null;
 }
 
 export default function Step1CreateAccount({
-  onNext, initialData, onDataChange, serverErrors, onClearServerError,
+  onNext,
+  initialData,
+  onDataChange,
+  serverErrors,
+  onClearServerError,
+  isLoading = false,
+  serverError = null,
 }: Step1Props) {
   const {
     register,
@@ -84,7 +95,7 @@ export default function Step1CreateAccount({
       () => checkEmailNow(canonicalEmail)
     );
     if (!canContinue) return;
-    onNext({ ...data, email: canonicalEmail });
+    await onNext({ ...data, email: canonicalEmail });
   };
 
   return (
@@ -95,6 +106,23 @@ export default function Step1CreateAccount({
         </h2>
 
         <form onSubmit={handleSubmit(handleAccountSubmit, handleInvalid)} className="space-y-5 sm:space-y-6 md:space-y-8" noValidate>
+          {/* Server Error Alert (e.g. failed to send verification code) */}
+          {serverError && (
+            <div role="alert" className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 flex items-start gap-2.5">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 text-xs sm:text-sm">
+                <span>{serverError}</span>
+                {serverError.toLowerCase().includes('already exists') && (
+                  <span className="block mt-1 font-semibold">
+                    <Link href="/login" className="text-[#4a3728] underline hover:text-[#8b7355]">
+                      Click here to log in &rarr;
+                    </Link>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Email */}
           <div>
             <label htmlFor="signup-email" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">Email</label>
@@ -115,9 +143,10 @@ export default function Step1CreateAccount({
               aria-describedby={emailHintId || (emailAvailability ? 'signup-email-availability' : undefined)}
               aria-required="true"
               suppressHydrationWarning
+              disabled={isLoading}
               className={`w-full px-3 sm:px-4 md:px-5 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl border text-sm ${errors.email ? 'border-red-500' : 'border-[#4a3728]'
                 } bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 ${errors.email ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
-                } transition`}
+                } transition disabled:bg-gray-100 disabled:cursor-not-allowed`}
             />
             {emailMessage && (
               <p id="signup-email-error" role="alert" className="text-red-500 text-xs sm:text-sm mt-1.5 flex items-start gap-1">
@@ -144,13 +173,15 @@ export default function Step1CreateAccount({
               aria-invalid={!!passwordMessage}
               aria-describedby={passwordMessage ? 'signup-password-error signup-password-rules' : 'signup-password-rules'}
               aria-required="true"
+              disabled={isLoading}
               className={`w-full px-3 sm:px-4 md:px-5 py-2.5 sm:py-3 md:py-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border text-sm ${passwordMessage ? 'border-red-500' : 'border-[#4a3728]'
                 } bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 ${passwordMessage ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
-                } transition`}
+                } transition disabled:bg-gray-100 disabled:cursor-not-allowed`}
             />
             <button
               type="button"
               onClick={() => setShowPass(!showPass)}
+              disabled={isLoading}
               className="absolute right-2 sm:right-3 md:right-4 top-9 sm:top-10 md:top-11 text-gray-500 hover:text-gray-700 transition"
             >
               {showPass ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
@@ -181,13 +212,15 @@ export default function Step1CreateAccount({
               aria-invalid={!!confirmPasswordMessage}
               aria-describedby={confirmPasswordMessage ? 'signup-confirm-password-error' : undefined}
               aria-required="true"
+              disabled={isLoading}
               className={`w-full px-3 sm:px-4 md:px-5 py-2.5 sm:py-3 md:py-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border text-sm ${confirmPasswordMessage ? 'border-red-500' : 'border-[#4a3728]'
                 } bg-white text-black placeholder-gray-400 focus:outline-none focus:ring-2 ${confirmPasswordMessage ? 'focus:ring-red-500' : 'focus:ring-[#4a3728]'
-                } transition`}
+                } transition disabled:bg-gray-100 disabled:cursor-not-allowed`}
             />
             <button
               type="button"
               onClick={() => setShowConfirm(!showConfirm)}
+              disabled={isLoading}
               className="absolute right-2 sm:right-3 md:right-4 top-9 sm:top-10 md:top-11 text-gray-500 hover:text-gray-700 transition"
             >
               {showConfirm ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
@@ -206,20 +239,27 @@ export default function Step1CreateAccount({
             )}
           </div>
 
-          {/* Next Button - Right aligned + disabled until valid */}
+          {/* Next Button - Right aligned */}
           <div className="flex justify-end">
             <button
               type="submit"
-              disabled={emailAvailability === 'taken' || !!serverErrors.email || !!serverErrors.password || !!serverErrors.confirmPassword}
+              disabled={isLoading || emailAvailability === 'taken' || !!serverErrors.email || !!serverErrors.password || !!serverErrors.confirmPassword}
               className={`
-                px-4 sm:px-6 md:px-8 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-semibold transition shadow-lg text-sm sm:text-base
-                ${isFormValid
+                px-4 sm:px-6 md:px-8 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-semibold transition shadow-lg text-sm sm:text-base flex items-center justify-center gap-2
+                ${isFormValid && !isLoading
                   ? 'bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white hover:opacity-90'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }
               `}
             >
-              Next
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Sending Code...
+                </>
+              ) : (
+                'Next'
+              )}
             </button>
           </div>
         </form>

@@ -58,6 +58,10 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
     });
 
     const { selectedDate, selectedTime, currentMonth } = calendarData;
+
+    // Free session: payment step skip hota hai, direct booking confirm hoti hai
+    const isFree =
+        selectedService?.price === "Free" || Number(selectedService?.price) === 0;
     const month: number = currentMonth.getMonth();
     const year: number = currentMonth.getFullYear();
     const canProceed: boolean = !!(
@@ -137,7 +141,7 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
                         ["Service", selectedService?.title ?? ""],
                         ["Date", `${selectedDate} ${MONTHS[month]} ${year}`],
                         ["Time", selectedTime ? formatSlotRange(selectedTime.split(" - ")[0]) : ""],
-                        ["Total", `₹${selectedService?.price}`],
+                        ["Total", isFree ? "Free" : `₹${selectedService?.price}`],
                     ] as [string, string][]).map(([k, v]) => (
                         <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: C.dark, marginBottom: "5px" }}>
                             <span style={{ color: C.mid }}>{k}:</span><span style={{ fontWeight: 500 }}>{v}</span>
@@ -146,7 +150,7 @@ const DetailsStep: React.FC<DetailsStepProps> = ({ selectedService, calendarData
                 </div>
 
                 <button onClick={() => onContinue(formData)} disabled={!canProceed} style={{ ...btnPrimary, width: "100%", padding: "16px", borderRadius: "12px", fontSize: "17px", opacity: canProceed ? 1 : 0.5, cursor: canProceed ? "pointer" : "not-allowed" }}>
-                    Proceed to Payment →
+                {isFree ? "Confirm Booking →" : "Proceed to Payment →"}
                 </button>
             </div>
         </div>

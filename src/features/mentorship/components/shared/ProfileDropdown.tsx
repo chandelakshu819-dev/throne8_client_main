@@ -2,7 +2,7 @@
 // src/features/mentorship/components/shared/ProfileDropdown.tsx
 //
 // "Switch Workspace" dropdown in the mentorship navbar.
-// Roles: Mentee / College Mentor (seniorMentor) / Industry Mentor
+// Roles: Mentee / Industry Mentor (seniorMentor key) / Senior Mentor (industryMentor key)
 // Visibility is driven by getVisibleRoles() in constants/roleVisibility.ts.
 // Each visible role has: approved (open) | pending (under review) | none/rejected (locked).
 
@@ -108,7 +108,7 @@ export default function ProfileDropdown({
   const [open, setOpen]   = useState(false);
   const containerRef      = useRef<HTMLDivElement>(null);
 
-  const { roles, loading: rolesLoading, error: rolesError } = useMyRoles(isAuthenticated);
+  const { roles, loading: rolesLoading } = useMyRoles(isAuthenticated);
 
   // Clicked role par tick turant shift ho, page load hone ka wait na kare
   const [pendingRole, setPendingRole] = useState<WorkspaceKey | null>(null);
@@ -117,19 +117,17 @@ export default function ProfileDropdown({
   const userId = user?.userId || user?.id || user?._id || "";
   const detectedRole: WorkspaceKey | null = detectActiveRole(pathname ?? "");
 
-    // Role implied by the current URL. Non-dashboard pages (landing, etc.) default to Mentee.
-    const routeRole: WorkspaceKey = (() => {
-      if (detectedRole === null) return "mentee";
-      if (detectedRole === "seniorMentor"   && roles?.seniorMentor   === "approved") return "seniorMentor";
-      if (detectedRole === "industryMentor" && roles?.industryMentor === "approved") return "industryMentor";
-      return "mentee";
-    })();
-  
-    // pendingRole makes the tick move instantly on click, before the page loads
-    const activeRole: WorkspaceKey = pendingRole ?? routeRole;
+  // Role implied by the current URL. On non-dashboard pages (landing, etc.)
+  // there is NO active role, so no tick is shown by default.
+  const routeRole: WorkspaceKey | null = (() => {
+    if (detectedRole === null) return null;
+    if (detectedRole === "seniorMentor"   && roles?.seniorMentor   === "approved") return "seniorMentor";
+    if (detectedRole === "industryMentor" && roles?.industryMentor === "approved") return "industryMentor";
+    return "mentee";
+  })();
 
-
-
+  // pendingRole makes the tick move instantly on click, before the page loads
+  const activeRole: WorkspaceKey | null = pendingRole ?? routeRole;
 
   const firstName =
     user?.firstName ||
@@ -158,13 +156,22 @@ export default function ProfileDropdown({
   };
 
   // ── Visible options (driven by getVisibleRoles) ───────────────────────────
-  // roles may still be null while loading; default to mentee-only structure.
-  const baseRoles: MyRolesResponse = roles ?? { mentee: "approved", seniorMentor: "none", industryMentor: "none" };
-  // /me/roles failed -> show only Mentee
-  const visibleRoleOptions = rolesError
-    ? getVisibleRoles(baseRoles).filter((o) => o.key === "mentee")
-    : getVisibleRoles(baseRoles, activeRole !== "mentee" ? activeRole : undefined);
+  // roles may still be null while loading, or the API may have failed.
+  // In both cases fall back to: Mentee approved, other two roles locked
+  // ("Apply now"), so all workspace options are always visible.
+  //
+  // FIX: removed the old `rolesError ? ...filter(mentee only)` branch that was
+  // hiding the other roles whenever /me/roles failed.
+  const baseRoles: MyRolesResponse = roles ?? {
+    mentee: "approved",
+    seniorMentor: "none",
+    industryMentor: "none",
+  };
 
+  const visibleRoleOptions = getVisibleRoles(
+    baseRoles,
+    activeRole && activeRole !== "mentee" ? activeRole : undefined
+  );
 
   const workspaceOptions: WorkspaceOption[] = visibleRoleOptions.map((opt) => ({
     ...opt,
@@ -173,6 +180,7 @@ export default function ProfileDropdown({
     applyHref:     ROLE_APPLY_HREF[opt.key],
   }));
 
+  // Falls back to the first option (Mentee) for the header label only; no tick is shown in that case.
   const activeOption = workspaceOptions.find((o) => o.key === activeRole) ?? workspaceOptions[0];
 
   // ── Outside click + Escape ────────────────────────────────────────────────
@@ -328,17 +336,17 @@ export default function ProfileDropdown({
                     opacity: isDisabled ? 0.6 : 1,
                     // Fixed min-height so all rows are equal regardless of indicator
                     minHeight: 56,
-                    background: isActive ? "#f7efe6" : "transparent",
+                    background: isActive ? CREAM : "transparent",
                   }}
                   onMouseEnter={(e) => {
                     if (!isDisabled)
                       (e.currentTarget as HTMLElement).style.background = isActive
-                        ? "#f7efe6"
+                        ? CREAM
                         : "rgba(247,239,230,0.7)";
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLElement).style.background = isActive
-                      ? "#f7efe6"
+                      ? CREAM
                       : "transparent";
                   }}
                 >
@@ -364,16 +372,13 @@ export default function ProfileDropdown({
                     </p>
                   </div>
 
-                  {/* Right indicator — single rule, one indicator per row:
+                  {/* Right indicator — one indicator per row:
                       1. Active   → dark circle with white Check
-                      2. Locked   → Lock icon (muted)
-                      3. Pending  → "Under review" pill
-                      4. Other unlocked → nothing
+                      2. Pending  → "Under review" pill
+                      3. Other    → nothing
                   */}
                   <div className="ml-auto flex-shrink-0 w-6 flex items-center justify-center">
                     {isActive ? (
-                      // Bug 1 fix: use stroke-only Check inside a circle div,
-                      // NOT CheckCircle with fill-current (which hides the tick)
                       <div
                         className="w-6 h-6 rounded-full flex items-center justify-center"
                         style={{ background: BROWN_MID }}
@@ -384,22 +389,20 @@ export default function ProfileDropdown({
                           style={{ color: "white" }}
                         />
                       </div>
-                                        ) : isPending ? (
+                    ) : isPending ? (
                       <span
                         className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                         style={{ background: CREAM_DARK, color: BROWN_LIGHT }}
                       >
                         Under review
                       </span>
-                    ) : null /* other approved rows: no indicator */}
+                    ) : null}
                   </div>
                 </button>
               </li>
             );
           })}
         </ul>
-
-        
       </div>
 
       <style>{`

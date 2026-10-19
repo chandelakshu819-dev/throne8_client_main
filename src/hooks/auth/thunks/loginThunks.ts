@@ -1,159 +1,126 @@
-// src/store/features/auth/thunks/loginThunks.ts
+// src/hooks/auth/thunks/loginThunks.ts
 
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import AuthService from '@/lib/api/auth.service';
 import TokenStorage from '@/lib/store/token.storage';
 
-import config from '@/config/env.config';
 import { LoginCredentials, LoginResponse, UserData } from '@/features/auth/interface';
 
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message) return message;
+  }
+  return fallback;
+};
+
 /**
- * 🔐 Login Thunk
- * Handles login API call + token storage
+ * Login Thunk
+ * AuthService.login pehle hi user data save kar deta hai.
+ * Agar server body mein tokens bhi bhejta hai to unhe bhi store karte hain.
  */
-export const loginUser = createAsyncThunk
-  <LoginResponse,
-    LoginCredentials,
-    { rejectValue: string }
-  >(
-    'auth/login',
-    async (credentials, { rejectWithValue }) => {
-      try {
-        // console.log('🚀 [THUNK] Login attempt:', credentials.email);
+export const loginUser = createAsyncThunk<
+  LoginResponse,
+  LoginCredentials,
+  { rejectValue: string }
+>(
+  'auth/login',
+  async (credentials, { rejectWithValue }) => {
+    try {
+      const response = await AuthService.login(credentials);
 
-        // Call AuthService
-        const response = await AuthService.login(credentials);
+      const user = response.data?.user;
+      if (!user) {
+        return rejectWithValue('Login failed. Invalid response from server.');
+      }
 
-        // ✅ Store tokens in localStorage (AuthService already does this, but double-check)
+      const tokens = response.data?.tokens;
+      if (tokens?.accessToken && tokens?.refreshToken) {
         TokenStorage.setAuthData(
-          response.data.tokens,
-          response.data.user
+          {
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            expiresIn: tokens.expiresIn ?? 900,
+          },
+          user
         );
-
-        // console.log('✅ [THUNK] Login successful:', response.data.user.email);
-
-        return response;
-
-      } catch (error: any) {
-        console.error('❌ [THUNK] Login failed:', error);
-
-        // Extract error message
-        const errorMessage = error.message || 'Login failed. Please try again.';
-
-        return rejectWithValue(errorMessage);
+      } else {
+        TokenStorage.setAuthData(user);
       }
+
+      return response;
+    } catch (error: unknown) {
+      console.error('[THUNK] Login failed:', error);
+      return rejectWithValue(
+        getErrorMessage(error, 'Login failed. Please try again.')
+      );
     }
-  );
+  }
+);
 
 /**
- * 🚪 Logout Thunk
+ * Logout Thunk
+ * Ye sirf user ke Sign Out button se call hona chahiye.
  */
-export const logoutUser = createAsyncThunk
-  <void,
-    void,
-    { rejectValue: string }
-  >(
-    'auth/logout',
-    async (_, { rejectWithValue }) => {
-      try {
-        // console.log('🚪 [THUNK] Logout initiated');
+export const logoutUser = createAsyncThunk<
+  void,
+  void,
+  { rejectValue: string }
+>(
+  'auth/logout',
+  async (_, { rejectWithValue }) => {
+    try {
+      // AuthService.logout local data clear karta hai + API call karta hai
+      await AuthService.logout();
+    } catch (error: unknown) {
+      console.error('[THUNK] Logout failed:', error);
 
-        // Call AuthService logout (clears tokens + calls API)
-        await AuthService.logout();
+      // API fail ho tab bhi local data clear karo (user ne khud logout kiya hai)
+      TokenStorage.clearAuthData('user_logout_api_failed');
 
-        // console.log('✅ [THUNK] Logout successful');
-
-      } catch (error: any) {
-        console.error('❌ [THUNK] Logout failed:', error);
-
-        // Still clear local data even if API fails
-        TokenStorage.clearAuthData();
-
-        return rejectWithValue(error.message || 'Logout failed');
-      }
+      return rejectWithValue(getErrorMessage(error, 'Logout failed'));
     }
-  );
+  }
+);
 
 /**
- * 🔄 Check Auth Status (on app load)
+ * Check Auth Status (app load par)
+ *
+ * Yahan koi network call nahi hoti aur kabhi tokens clear nahi hote.
  */
-export const checkAuthStatus = createAsyncThunk
-  <UserData | null,
-    void,
-    { rejectValue: string }
-  >(
-    'auth/checkStatus',
-    async (_, { rejectWithValue }) => {
-      try {
-        // console.log('🔍 [THUNK] Checking auth status...');
-
-        // Check if tokens exist
-        const isAuthenticated = TokenStorage.isAuthenticated();
-
-        if (!isAuthenticated) {
-          // console.log('ℹ️ [THUNK] No valid session found');
-          return null;
-        }
-
-        // Get user data from localStorage
-        const userData = TokenStorage.getUserData();
-
-        if (TokenStorage.needsTokenRefresh()) {
-          const refreshToken = TokenStorage.getRefreshToken();
-
-          try {
-            // ✅ AuthService ka method use kar rahe hain
-            const response = await fetch(
-              `${config?.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL}${config?.NEXT_PUBLIC_REFRESH_TOKEN_ENDPOINT || process.env.NEXT_PUBLIC_REFRESH_TOKEN_ENDPOINT}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refreshToken }),
-              }
-            );
-
-            if (!response.ok) {
-              TokenStorage.clearAuthData();
-              return null;
-            }
-
-            const data = await response.json();
-            const {
-              accessToken,
-              refreshToken: newRefreshToken,
-              expiresIn
-            } = data.data.tokens;
-
-            TokenStorage.updateAccessToken(accessToken, expiresIn);
-            // Refresh token rotation — naya token save karo
-            TokenStorage.updateRefreshToken(newRefreshToken);
-          } catch {
-            // Network error — existing userData return karo
-            return userData;
-          }
-        }
-
-        return userData;
-
-      } catch (error: any) {
-        console.error('❌ [THUNK] Auth check failed:', error);
-        TokenStorage.clearAuthData();
-        return rejectWithValue(error.message || 'Session validation failed');
+export const checkAuthStatus = createAsyncThunk<
+  UserData | null,
+  void,
+  { rejectValue: string }
+>(
+  'auth/checkStatus',
+  async (_, { rejectWithValue }) => {
+    try {
+      if (!TokenStorage.isAuthenticated()) {
+        return null;
       }
-    }
-  );
 
-  /**  /////////////////changed modified
- * 👤 Fetch Current User's Full Profile (name, photo, stats, etc.)
+      return TokenStorage.getUserData();
+    } catch (error: unknown) {
+      console.error('[THUNK] Auth check failed:', error);
+      return rejectWithValue(getErrorMessage(error, 'Session validation failed'));
+    }
+  }
+);
+
+/**
+ * Fetch Current User's Full Profile (name, photo, stats, etc.)
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const fetchCurrentUser = createAsyncThunk<any, void, { rejectValue: string }>(
-    'auth/fetchCurrentUser',
-    async (_, { rejectWithValue }) => {
-        try {
-            const response = await AuthService.getUserProfile();
-            return response.data;
-        } catch (error: any) {
-            return rejectWithValue(error.message || 'Failed to fetch profile');
-        }
+  'auth/fetchCurrentUser',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await AuthService.getUserProfile();
+      return response.data;
+    } catch (error: unknown) {
+      return rejectWithValue(getErrorMessage(error, 'Failed to fetch profile'));
     }
+  }
 );

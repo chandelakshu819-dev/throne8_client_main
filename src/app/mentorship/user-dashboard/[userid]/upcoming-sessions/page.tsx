@@ -4,6 +4,8 @@ import React from "react";
 import { useParams } from "next/navigation";
 import MentorshipDashboardRouter from "@/features/mentorship/components/MentorshipDashboardRouter";
 
+export const dynamic = "force-dynamic";
+
 export default function UpcomingSessionsRoutePage() {
   const params = useParams();
   const userId = (params?.userid as string) || "";

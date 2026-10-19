@@ -1,31 +1,35 @@
 /**
  * src/config/launch.ts
- * NEXT_PUBLIC_LAUNCH_MODE=mentorship => sirf Auth + Mentorship.
- * Value build time pe inline hoti hai, change ke baad dev server restart / redeploy zaroori hai.
+ * Launch mode config. NEXT_PUBLIC_LAUNCH_MODE=mentorship => sirf Auth + Mentorship + Profile + Notifications.
+ * Value build time pe inline hoti hai, change ke baad Vercel redeploy zaroori hai.
  */
 
 export type FeatureKey =
-  | 'mentorship'
-  | 'profile'
-  | 'notifications'
-  | 'dashboard'
-  | 'network'
-  | 'messaging'
-  | 'jobs'
-  | 'study'
-  | 'company';
+  | "mentorship"
+  | "profile"
+  | "notifications"
+  | "dashboard"
+  | "network"
+  | "messaging"
+  | "jobs"
+  | "study"
+  | "company"
+  | "resume";
 
 const MODE =
-  process.env.NEXT_PUBLIC_LAUNCH_MODE === 'mentorship' ? 'mentorship' : 'full';
+  process.env.NEXT_PUBLIC_LAUNCH_MODE === "mentorship" ? "mentorship" : "full";
 
 export const LAUNCH_MODE = MODE;
-export const IS_MENTORSHIP_MODE = MODE === 'mentorship';
+export const IS_MENTORSHIP_MODE = MODE === "mentorship";
 
 // Login ke baad user kahan jaye
-export const HOME_PATH = IS_MENTORSHIP_MODE ? '/mentorship' : '/dashboard';
+export const HOME_PATH = IS_MENTORSHIP_MODE ? "/mentorship" : "/dashboard";
 
 const MENTORSHIP_MODE_FEATURES: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
-  'mentorship',
+  "mentorship",
+  "resume",
+  "profile",
+  "notifications",
 ]);
 
 /** Navbar/sidebar links filter karne ke liye: isFeatureEnabled('jobs') */
@@ -35,13 +39,23 @@ export function isFeatureEnabled(feature: FeatureKey): boolean {
 
 // Mentorship mode me sirf ye paths allowed hain (baaki sab redirect)
 const ALLOWED_PREFIXES = [
-  '/login',
-  '/signup',
-  '/forgot-my-password',
-  '/auth',
-  '/onboarding',
-  '/mentorship',
-  '/api',
+  "/login",
+  "/signup",
+  "/forgot-my-password",
+  "/auth",
+  "/onboarding",
+  "/mentorship",
+  "/profile",
+  "/notifications",
+  "/api",
+];
+
+// Allowed prefix ke andar bhi ye sub-paths band hain
+const BLOCKED_PREFIXES = [
+  "/profile/network",
+  "/profile/saved-posts",
+  "/profile/hidden-posts",
+  "/profile/analytics",
 ];
 
 const matches = (pathname: string, prefix: string): boolean =>
@@ -49,6 +63,7 @@ const matches = (pathname: string, prefix: string): boolean =>
 
 export function isPathAllowedInLaunchMode(pathname: string): boolean {
   if (!IS_MENTORSHIP_MODE) return true;
-  if (pathname === '/') return true;
+  if (pathname === "/") return true;
+  if (BLOCKED_PREFIXES.some((p) => matches(pathname, p))) return false;
   return ALLOWED_PREFIXES.some((p) => matches(pathname, p));
 }

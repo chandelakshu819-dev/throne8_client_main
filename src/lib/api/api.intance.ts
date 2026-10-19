@@ -1,6 +1,7 @@
-// src/lib/api/api.instance.ts
+// src/lib/api/api.intance.ts
 import config from "@/config/env.config";
 import axios, {
+    AxiosError,
     AxiosInstance,
     AxiosRequestConfig,
     InternalAxiosRequestConfig,
@@ -10,13 +11,17 @@ import TokenStorage from "@/lib/store/token.storage";
 const API_BASE_URL =
     config.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
 
-// Backend route se match hona chahiye (auth.routes.ts check karo)
+// Backend route se match hona chahiye (auth.routes.ts)
 const REFRESH_PATH = "/auth/refresh-token";
 const REFRESH_LOCK_NAME = "throne8_token_refresh";
 
-// In endpoints par 401 ka matlab "credentials galat" hai, "token expire" nahi.
-// Inke liye refresh ya redirect nahi hona chahiye.
-const NO_REFRESH_PATHS = [
+// Refresh call in statuses par retry hoti hai (logout nahi hota)
+const RETRYABLE_REFRESH_STATUSES = [409, 429, 500, 502, 503, 504];
+const REFRESH_MAX_ATTEMPTS = 3;
+
+// Response side: in par 401 ka matlab "credentials / OTP galat" hai,
+// isliye refresh + retry nahi hota.
+const NO_RETRY_PATHS = [
     "/auth/login",
     "/auth/register",
     "/auth/refresh",
@@ -24,13 +29,46 @@ const NO_REFRESH_PATHS = [
     "/auth/reset",
     "/auth/verify",
     "/auth/otp",
+    "/verify",
+    "/verify/email",
 ];
+
+// Request side: sirf ye endpoints bina token ke chalte hain.
+const AUTH_FREE_PATHS = [
+    "/auth/login",
+    "/auth/register",
+    "/auth/refresh",
+    "/auth/forgot",
+    "/auth/reset",
+];
+
+type RetriableRequest = InternalAxiosRequestConfig & { _retry?: boolean };
+
+interface ApiErrorBody {
+    message?: string;
+}
+
+interface RefreshResponse {
+    data?: {
+        tokens?: {
+            accessToken?: string;
+            refreshToken?: string;
+            expiresIn?: string | number;
+        };
+    };
+}
+
+const matchesAny = (url: string | undefined, paths: string[]): boolean =>
+    !!url && paths.some((p) => url.includes(p));
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const api: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
     timeout:
         config.NEXT_PUBLIC_API_TIMEOUT ||
-        Number(process.env.NEXT_PUBLIC_API_TIMEOUT),
+        Number(process.env.NEXT_PUBLIC_API_TIMEOUT) ||
+        30000,
     headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
@@ -39,10 +77,9 @@ const api: AxiosInstance = axios.create({
 });
 
 // ==================== GET REQUEST DEDUPLICATION ====================
-// Identical concurrent GET requests (same url + params) ek hi promise share karte hain.
-// Sirf GET wrap hota hai; mutations hamesha fresh jaate hain.
+// Same url + params wali concurrent GET requests ek hi promise share karti hain.
 
-const pendingGetRequests = new Map<string, Promise<any>>();
+const pendingGetRequests = new Map<string, Promise<unknown>>();
 
 function buildRequestKey(
     url: string,
@@ -72,10 +109,161 @@ api.get = ((url: string, requestConfig?: AxiosRequestConfig) => {
     return requestPromise;
 }) as typeof api.get;
 
+// ==================== LOGOUT ====================
+
+let loggingOut = false;
+
+const forceLogout = (reason: string) => {
+    if (loggingOut) return;
+    loggingOut = true;
+
+    TokenStorage.clearAuthData(reason);
+
+    if (
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login")
+    ) {
+        window.location.href = "/login";
+    } else {
+        loggingOut = false;
+    }
+};
+
+// ==================== TOKEN REFRESH (single shared call) ====================
+
+let refreshPromise: Promise<string> | null = null;
+
+/**
+ * Refresh endpoint call. 409 / 429 / 5xx / network error par retry hota hai
+ * (response kho gaya ho to retry server ke grace window mein aati hai).
+ */
+const callRefreshEndpoint = async (refreshToken: string) => {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= REFRESH_MAX_ATTEMPTS; attempt++) {
+        try {
+            return await axios.post<RefreshResponse>(
+                `${API_BASE_URL}${REFRESH_PATH}`,
+                { refreshToken },
+                {
+                    headers: { "Content-Type": "application/json" },
+                    timeout: 15000,
+                }
+            );
+        } catch (err: unknown) {
+            lastError = err;
+
+            const status = axios.isAxiosError(err)
+                ? err.response?.status
+                : undefined;
+            const retryable =
+                status === undefined || RETRYABLE_REFRESH_STATUSES.includes(status);
+
+            if (!retryable || attempt === REFRESH_MAX_ATTEMPTS) {
+                throw err;
+            }
+
+            await sleep(400 * attempt * attempt);
+        }
+    }
+
+    throw lastError;
+};
+
+/**
+ * Asli refresh call. Lock ke andar chalta hai, to doosre tab ne agar abhi
+ * refresh kar liya hai to uska naya token reuse hota hai (warna same refresh
+ * token do baar use hoga aur backend "reuse" samajh ke session kill kar sakta hai).
+ */
+const performRefresh = async (failedToken: string | null): Promise<string> => {
+    const current = TokenStorage.getAccessToken();
+    if (
+        current &&
+        !TokenStorage.isTokenExpired() &&
+        (!failedToken || current !== failedToken)
+    ) {
+        return current;
+    }
+
+    const refreshToken = TokenStorage.getRefreshToken();
+    if (!refreshToken) {
+        throw new Error("NO_REFRESH_TOKEN");
+    }
+
+    const response = await callRefreshEndpoint(refreshToken);
+
+    const tokens = response.data?.data?.tokens;
+    if (!tokens?.accessToken) {
+        throw new Error("INVALID_REFRESH_RESPONSE");
+    }
+
+    TokenStorage.updateAccessToken(tokens.accessToken, tokens.expiresIn ?? 900);
+    if (tokens.refreshToken) {
+        TokenStorage.updateRefreshToken(tokens.refreshToken);
+    }
+
+    return tokens.accessToken;
+};
+
+const refreshAccessToken = (failedToken: string | null): Promise<string> => {
+    if (refreshPromise) return refreshPromise;
+
+    const run = () => performRefresh(failedToken);
+    const pending: Promise<string> =
+        typeof navigator !== "undefined" && navigator.locks
+            ? (navigator.locks.request(REFRESH_LOCK_NAME, run) as Promise<string>)
+            : run();
+
+    refreshPromise = pending.finally(() => {
+        refreshPromise = null;
+    });
+
+    return refreshPromise;
+};
+
+/**
+ * Sirf tab logout jab server ne refresh token definitely reject kiya ho
+ * (400 / 401) ya refresh token hai hi nahi.
+ * Network error, timeout, 403, 409, 429 ya 5xx par user ko logout NAHI karte.
+ */
+const handleRefreshFailure = (refreshError: unknown) => {
+    if (axios.isAxiosError(refreshError)) {
+        const status = refreshError.response?.status;
+        if (status === 400 || status === 401) {
+            const body = refreshError.response?.data as ApiErrorBody | undefined;
+            forceLogout(
+                `refresh_rejected status=${status} message=${body?.message ?? "n/a"}`
+            );
+        }
+        return;
+    }
+
+    if (
+        refreshError instanceof Error &&
+        refreshError.message === "NO_REFRESH_TOKEN"
+    ) {
+        forceLogout("no_refresh_token");
+    }
+};
+
 // ==================== REQUEST INTERCEPTOR ====================
 
 api.interceptors.request.use(
-    (reqConfig) => {
+    async (reqConfig) => {
+        // Access token gayab ya expire ho aur refresh token ho, to request
+        // bhejne se pehle hi naya token le lo (401 ka wait nahi).
+        if (
+            !matchesAny(reqConfig.url, AUTH_FREE_PATHS) &&
+            TokenStorage.getRefreshToken() &&
+            (!TokenStorage.getAccessToken() || TokenStorage.isTokenExpired())
+        ) {
+            try {
+                await refreshAccessToken(null);
+            } catch (refreshError: unknown) {
+                handleRefreshFailure(refreshError);
+            }
+        }
+
         const token = TokenStorage.getAccessToken();
         if (token) {
             reqConfig.headers.Authorization = `Bearer ${token}`;
@@ -87,81 +275,11 @@ api.interceptors.request.use(
 
 // ==================== RESPONSE INTERCEPTOR ====================
 
-type QueueItem = {
-    resolve: (token: string) => void;
-    reject: (error: unknown) => void;
-};
-
-let isRefreshing = false;
-let failedQueue: QueueItem[] = [];
-
-const processQueue = (error: unknown, token: string | null = null) => {
-    failedQueue.forEach(({ resolve, reject }) => {
-        if (error) reject(error);
-        else resolve(token as string);
-    });
-    failedQueue = [];
-};
-
-const isNoRefreshRequest = (url?: string): boolean =>
-    !!url && NO_REFRESH_PATHS.some((p) => url.includes(p));
-
-const forceLogout = () => {
-    TokenStorage.clearAuthData();
-    if (
-        typeof window !== "undefined" &&
-        !window.location.pathname.startsWith("/login")
-    ) {
-        window.location.href = "/login";
-    }
-};
-
-/**
- * Actual refresh call. Lock ke andar chalta hai, to dusre tab ne agar
- * pehle hi refresh kar liya hai to uska naya token reuse hota hai
- * (warna same refresh token do baar use hoga aur backend usse "reuse" samjhega).
- */
-const performRefresh = async (failedToken: string | null): Promise<string> => {
-    const current = TokenStorage.getAccessToken();
-    if (
-        current &&
-        failedToken &&
-        current !== failedToken &&
-        !TokenStorage.isTokenExpired()
-    ) {
-        return current;
-    }
-
-    const refreshToken = TokenStorage.getRefreshToken();
-    if (!refreshToken) {
-        throw new Error("NO_REFRESH_TOKEN");
-    }
-
-    const response = await axios.post(
-        `${API_BASE_URL}${REFRESH_PATH}`,
-        { refreshToken },
-        { headers: { "Content-Type": "application/json" } }
-    );
-
-    const {
-        accessToken,
-        refreshToken: newRefreshToken,
-        expiresIn,
-    } = response.data.data.tokens;
-
-    TokenStorage.updateAccessToken(accessToken, expiresIn);
-    TokenStorage.updateRefreshToken(newRefreshToken);
-
-    return accessToken;
-};
-
 api.interceptors.response.use(
     (response) => response,
 
-    async (error) => {
-        const originalRequest = error.config as
-            | (InternalAxiosRequestConfig & { _retry?: boolean })
-            | undefined;
+    async (error: AxiosError) => {
+        const originalRequest = error.config as RetriableRequest | undefined;
 
         if (
             !originalRequest ||
@@ -171,65 +289,69 @@ api.interceptors.response.use(
             return Promise.reject(error);
         }
 
-        // Login/register/refresh jaise endpoints, ya wo request jisme token tha hi nahi:
-        // refresh ya redirect nahi, seedha error caller ko do.
-        const hadAuthHeader = !!originalRequest.headers?.Authorization;
-        if (!hadAuthHeader || isNoRefreshRequest(originalRequest.url)) {
+        if (matchesAny(originalRequest.url, NO_RETRY_PATHS)) {
             return Promise.reject(error);
         }
 
-        if (isRefreshing) {
-            return new Promise<string>((resolve, reject) => {
-                failedQueue.push({ resolve, reject });
-            }).then((token) => {
-                originalRequest.headers.Authorization = `Bearer ${token}`;
-                return api(originalRequest);
-            });
+        const failedHeader = originalRequest.headers?.Authorization;
+        const failedToken = failedHeader
+            ? String(failedHeader).replace(/^Bearer\s+/i, "")
+            : null;
+
+        // Refresh token hi nahi hai: session recover nahi ho sakta
+        if (!TokenStorage.getRefreshToken()) {
+            if (failedToken) forceLogout("no_refresh_token_on_401");
+            return Promise.reject(error);
         }
 
         originalRequest._retry = true;
-        isRefreshing = true;
-
-        const failedToken = String(originalRequest.headers.Authorization).replace(
-            /^Bearer\s+/i,
-            ""
-        );
 
         try {
-            const newToken =
-                typeof navigator !== "undefined" && navigator.locks
-                    ? await navigator.locks.request(REFRESH_LOCK_NAME, () =>
-                        performRefresh(failedToken)
-                    )
-                    : await performRefresh(failedToken);
-
-            processQueue(null, newToken);
-
+            const newToken = await refreshAccessToken(failedToken);
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
             return api(originalRequest);
-        } catch (refreshError: any) {
-            processQueue(refreshError, null);
-
-            // Sirf tab logout jab refresh token definitively invalid ho.
-            // Network error ya 5xx par user ko logout mat karo.
-            const status = axios.isAxiosError(refreshError)
-                ? refreshError.response?.status
-                : undefined;
-            const definitelyInvalid =
-                refreshError?.message === "NO_REFRESH_TOKEN" ||
-                status === 400 ||
-                status === 401 ||
-                status === 403;
-
-            if (definitelyInvalid) {
-                forceLogout();
-            }
-
-            return Promise.reject(refreshError);
-        } finally {
-            isRefreshing = false;
+        } catch (refreshError: unknown) {
+            handleRefreshFailure(refreshError);
+            // Original error wapas do, taaki caller ko asli request ka 401 dikhe
+            return Promise.reject(error);
         }
     }
 );
+
+/**
+ * Socket jaise non-axios callers ke liye: valid access token do,
+ * zarurat ho to usi shared refresh se (alag raw refresh kabhi mat karo).
+ */
+export const getFreshAccessToken = async (): Promise<string | null> => {
+    if (!TokenStorage.getRefreshToken()) {
+        return TokenStorage.getAccessToken();
+    }
+    if (TokenStorage.getAccessToken() && !TokenStorage.isTokenExpired()) {
+        return TokenStorage.getAccessToken();
+    }
+    try {
+        return await refreshAccessToken(null);
+    } catch (refreshError: unknown) {
+        handleRefreshFailure(refreshError);
+        return null;
+    }
+};
+
+/**
+ * Forced refresh (socket.client.ts jaise callers ke liye, jab server ne token reject kiya).
+ * Same shared single-flight + lock use karta hai. Naya access token ya null return karta hai.
+ */
+export const refreshSession = async (): Promise<string | null> => {
+    if (!TokenStorage.getRefreshToken()) {
+        return TokenStorage.getAccessToken();
+    }
+    try {
+        // failedToken = current token, taaki performRefresh "abhi bhi valid hai" samajh ke skip na kare
+        return await refreshAccessToken(TokenStorage.getAccessToken());
+    } catch (refreshError: unknown) {
+        handleRefreshFailure(refreshError);
+        return null;
+    }
+};
 
 export default api;

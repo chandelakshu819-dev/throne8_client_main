@@ -3,6 +3,7 @@ export interface RegistrationData {
   email: string;
   password: string;
   confirmPassword: string;
+  verificationToken?: string;
 
   // Step 2
   firstName: string;
@@ -57,10 +58,11 @@ export interface UserData {
     role: string;
 }
 
+// Raw JWTs live in httpOnly cookies now; the backend may omit them from the JSON.
 export interface TokenData {
-    accessToken: string;
-    refreshToken: string;
-    expiresIn: string;
+    accessToken?: string;
+    refreshToken?: string;
+    expiresIn?: string | number;
 }
 
 export interface LoginResponse {
@@ -69,7 +71,7 @@ export interface LoginResponse {
     message: string;
     data: {
         user: UserData;
-        tokens: TokenData;
+        tokens?: TokenData;
     };
     timestamp: string;
 }

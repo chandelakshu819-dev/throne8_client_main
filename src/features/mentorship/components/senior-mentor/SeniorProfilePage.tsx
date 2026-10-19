@@ -1,10 +1,10 @@
 import React from "react";
-import { User, ShieldCheck, CheckCircle2, FileText, Linkedin, AlertCircle } from "lucide-react";
+import { User, ShieldCheck, CheckCircle2, FileText, Linkedin, AlertCircle, Camera, Loader2 } from "lucide-react";
 import type { SeniorMentorApplication } from "@/lib/api/seniorMentorApplication.service";
 import { useAppSelector } from "@/core/store/store.hooks";
-import { useNavbarData } from "@/features/profile/components/home/NavbarProvider";
-
-
+import { useNavbarData, useNavbarProfileImage } from "@/features/profile/components/home/NavbarProvider";
+import { useProfile } from "@/features/profile/hooks/useProfile";
+import SeniorMentorApplicationService from "@/lib/api/seniorMentorApplication.service";
 
 interface SeniorProfilePageProps {
   seniorData: SeniorMentorApplication | null;
@@ -28,6 +28,47 @@ export default function SeniorProfilePage({ seniorData }: SeniorProfilePageProps
   const [imgFallbackLevel, setImgFallbackLevel] = React.useState(0);
   const globalProfile = useAppSelector((state) => state.login.profile);
   const { profileData: navbarProfileData } = useNavbarData();
+  const setNavbarProfileImage = useNavbarProfileImage();
+  const { loadProfile } = useProfile();
+  const [uploading, setUploading] = React.useState(false);
+  // Upload ke turant baad ki photo (server se refetch aane tak)
+  const [localPhoto, setLocalPhoto] = React.useState<string | null>(null);
+
+  // Senior mentor yahin se photo badal sakta hai -> Mentee + Industry me bhi same photo jayegi
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file || !seniorData) return;
+
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+    if (!allowed.includes(file.type)) {
+      alert("Only JPG, PNG, WEBP or GIF images are allowed.");
+      input.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image must be smaller than 5MB.");
+      input.value = "";
+      return;
+    }
+
+    setUploading(true);
+    try {
+          // Sirf Senior Mentor ki photo update hogi (Mentee / Mentor ki photo alag rehti hai)
+          const updatedApp = await SeniorMentorApplicationService.updateMyProfilePhoto(file);
+          const newUrl = updatedApp?.profilePhoto;
+      if (!newUrl) throw new Error("Photo upload failed. Please try again.");
+      setLocalPhoto(newUrl);
+      setNavbarProfileImage(newUrl);
+      if (typeof loadProfile === "function") loadProfile();
+    } catch (err: any) {
+      alert(err?.message || "Failed to update profile photo.");
+    } finally {
+      setUploading(false);
+      input.value = "";
+    }
+  };
+
 
 
   if (!seniorData) {
@@ -70,11 +111,11 @@ export default function SeniorProfilePage({ seniorData }: SeniorProfilePageProps
   } = seniorData;
   
   const getPhotoForLevel = (level: number): string | null => {
-
-        // Account photo (state.login.profile) pehle: ek hi photo sab roles me dikhe
-        const accountPhoto = navbarProfileData?.profileImage || globalProfile?.profilePic || globalProfile?.profilePhoto;
-        if (level === 0 && accountPhoto) return accountPhoto;
-        if (level <= 1 && profilePhoto) return profilePhoto;
+    // 1) Abhi upload ki hui photo, 2) Senior Mentor form wali apni photo, 3) account photo (sirf fallback)
+    if (level === 0 && localPhoto) return localPhoto;
+    if (level <= 1 && profilePhoto) return profilePhoto;
+    const accountPhoto = navbarProfileData?.profileImage || globalProfile?.profilePic || globalProfile?.profilePhoto;
+    if (level <= 2 && accountPhoto) return accountPhoto;
     return null;
   };
   const currentPhoto = getPhotoForLevel(imgFallbackLevel);
@@ -135,6 +176,14 @@ export default function SeniorProfilePage({ seniorData }: SeniorProfilePageProps
                   </div>
                 )}
               </div>
+              <label
+                className="absolute -top-1.5 -left-1.5 w-7 h-7 rounded-full flex items-center justify-center shadow-sm cursor-pointer"
+                style={{ backgroundColor: '#fff', border: '1px solid #e0d8cf' }}
+                title="Change profile photo"
+              >
+                {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: '#4a3728' }} /> : <Camera className="w-3.5 h-3.5" style={{ color: '#4a3728' }} />}
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" disabled={uploading} onChange={handlePhotoChange} />
+              </label>
               {isApproved && (
                 <div className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center shadow-sm" style={{ backgroundColor: '#4a3728', border: '2px solid #fff' }}>
                   <CheckCircle2 className="w-4 h-4 text-white" />

@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import AuthService from "@/lib/api/auth.service";
 import ProfileService from "@/lib/api/profile.service";
-import MentorService from "@/lib/api/mentorship.service";
+import { syncProfilePhotoToAllRoles } from "@/features/mentorship/utils/syncProfilePhoto";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useNavbarProfileImage } from "@/features/profile/components/home/NavbarProvider";
 import TokenStorage from "@/lib/store/token.storage";
@@ -244,16 +244,7 @@ export default function UserDashboardProfilePreferencesPage({
         // ✅ Header avatar turant update
         setNavbarProfileImage(newUrl);
 
-        // ✅ Same account ka mentor profile ho to uski photo bhi sync karo (mentor nahi hai to chup-chap skip)
-        const syncUserId = (syncAuthUser as any)?.userId || (syncAuthUser as any)?.id;
-        if (syncUserId) {
-          MentorService.getMentorByUserId(syncUserId)
-            .then((mRes: any) => {
-              const mid = mRes?.data?.mentorId;
-              return mid ? MentorService.updateProfilePhoto(mid, file) : null;
-            })
-            .catch(() => { /* user mentor nahi hai */ });
-        }
+              
         fetchAllUserData(true);
         if (typeof loadProfile === "function") {
           loadProfile();
@@ -1928,8 +1919,8 @@ function AddExperienceModal({
     try {
       const achievements = achievementsStr
         .split(",")
-        .map((a) => a.trim())
-        .filter((a) => a.length >= 3);
+        .map((a: string) => a.trim())
+        .filter((a: string) => a.length >= 3);
 
       const payload = {
         currentPosition: currentPosition.trim(),

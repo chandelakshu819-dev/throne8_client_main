@@ -21,6 +21,7 @@ import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfile } from "@/features/profile/hooks/useProfile";
+import { useNavbarData } from "@/features/profile/components/home/NavbarProvider";
 import { useSocket } from "@/core/realtime/useSocket";
 import BrandWordmark from "@/shared/uiComponents/BrandWordmark";
 
@@ -84,6 +85,9 @@ export default function UserDashboardLayout({
   const [sessions, setSessions] = useState<any[]>([]);
   const { user } = useAuth();
   const { userProfileData, loadProfile } = useProfile();
+  // Account photo na ho to mentor/senior photo fallback (NavbarProvider se)
+  const { profileData: navbarProfileData } = useNavbarData();
+
 
   useEffect(() => {
     if (!userProfileData && typeof loadProfile === "function") {
@@ -268,8 +272,9 @@ export default function UserDashboardLayout({
         <BrandWordmark size="sm" />
 
         <div className="w-8 h-8 rounded-full overflow-hidden border border-[#e0d8cf] flex-shrink-0">
-          {userProfileData?.profileImageUrl ? (
-            <img src={userProfileData.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
+        {((userProfileData as any)?.profileImageUrl || navbarProfileData?.profileImage) ? (
+
+<img src={(userProfileData as any)?.profileImageUrl || navbarProfileData?.profileImage} alt="Profile" className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-[#4a3728] text-white flex items-center justify-center text-xs font-bold">
               {(userProfileData?.firstName?.[0] || user?.firstName?.[0] || "U").toUpperCase()}
