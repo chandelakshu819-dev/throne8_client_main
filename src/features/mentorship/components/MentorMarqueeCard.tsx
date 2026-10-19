@@ -1,5 +1,4 @@
-// components/marquee/MentorMarqueeCard.tsx
-import React from "react";
+//src/features/mentorship/components/MentorMarqueeCard.tsx
 import { Star, Award } from "lucide-react";
 
 interface MentorMarqueeCardProps {

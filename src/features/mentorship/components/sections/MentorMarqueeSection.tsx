@@ -5,8 +5,8 @@ import { MentorCard } from "@/features/index";
 import MentorService from "@/lib/api/mentorship.service";
 import { parseRoleCompany, getExperienceLabel } from "@/shared/utils/mentorFormat";
 
-// Isse kam mentors hon to marquee nahi chalega (warna wahi chehre repeat hote hain)
-const MIN_FOR_MARQUEE = 6;
+// Isse kam mentors hon to marquee nahi chalega (1-2 mentor ho to static row)
+const MIN_FOR_MARQUEE = 3;
 
 // "HTML, CSS, JS" jaisi comma wali string ko alag-alag skills mein todta hai
 // (trim + duplicate hata deta hai)
@@ -90,7 +90,7 @@ export default function MentorMarqueeSection() {
         </div>
     );
 
-    // Kam mentors: static centered row, koi repeat nahi
+    // Bahut kam mentors (1-2): static centered row, koi repeat nahi
     if (realCards.length < MIN_FOR_MARQUEE) {
         return (
             <section className="py-14 bg-[#f7f1e6] overflow-hidden border-y border-[#f0edea]">
@@ -105,6 +105,7 @@ export default function MentorMarqueeSection() {
     }
 
     // Itne mentors hain ki marquee loop smooth chale
+    // (kam hon to list ko repeat karke screen ki width se bada kar dete hain)
     let baseList = [...realCards];
     while (baseList.length < 8) {
         baseList = [...baseList, ...realCards];
