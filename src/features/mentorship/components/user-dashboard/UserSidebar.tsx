@@ -1,6 +1,7 @@
 "use client";
 //src/features/mentorship/components/user-dashboard/UserSidebar.tsx
 import { useEffect } from "react";
+import { useNavbarData } from "@/features/profile/components/home/NavbarProvider";
 import {
   LayoutDashboard,
   ChevronRight,
@@ -61,7 +62,13 @@ export default function UserSidebar({
   onToggleCollapse,
 }: UserSidebarProps) {
   const { user } = useAuth();
-  const { userProfileData, profileImageUrl, loadProfile } = useProfile();
+  const { userProfileData, profileImageUrl: accountImageUrl, loadProfile } = useProfile();
+  const { menteeImage } = useNavbarData();
+  // Mentee photo -> senior photo -> mentor photo
+  const profileImageUrl = menteeImage || accountImageUrl;
+
+
+
 
   useEffect(() => {
     if (!userProfileData && typeof loadProfile === "function") {
