@@ -1,10 +1,11 @@
-'use client';
+"use client";
 // src/shared/uiComponents/MobileBottomNavbar.tsx
-import React, { memo } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { HOME_PATH, isFeatureEnabled } from '@/config/launch';
-import { NetworkNotificationBadge } from '@/features/networks/components/notifications/NetworkNotificationBadge';
+import React, { memo } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { HOME_PATH, isFeatureEnabled } from "@/config/launch";
+import { NetworkNotificationBadge } from "@/features/networks/components/notifications/NetworkNotificationBadge";
+import { RESUME_APP_URL, RESUME_ICON_PATH } from "@/config/resume";
 
 interface MobileBottomNavbarProps {
   currentUserId?: string;
@@ -19,27 +20,25 @@ export const MobileBottomNavbar = memo(function MobileBottomNavbar({
 
   // Mentorship route: admin vs normal user
   const mentorshipHref =
-    userRole === 'admin'
-      ? '/mentorship/admin'
-      : currentUserId && currentUserId !== 'undefined'
-      ? `/mentorship/${currentUserId}`
-      : '/mentorship';
+    userRole === "admin"
+      ? "/mentorship/admin"
+      : currentUserId && currentUserId !== "undefined"
+        ? `/mentorship/${currentUserId}`
+        : "/mentorship";
 
   // Network route
   const networkHref =
-    currentUserId && currentUserId !== 'undefined'
+    currentUserId && currentUserId !== "undefined"
       ? `/profile/network/${currentUserId}`
-      : '/profile/network';
+      : "/profile/network";
 
   const tabs = [
     {
-      id: 'home',
-      label: 'Home',
+      id: "home",
+      label: "Home",
       href: HOME_PATH,
       isActive:
-        pathname === '/dashboard' ||
-        pathname === '/' ||
-        pathname === HOME_PATH,
+        pathname === "/dashboard" || pathname === "/" || pathname === HOME_PATH,
       icon: (isActive: boolean) => (
         <svg
           className="w-[22px] h-[22px]"
@@ -56,15 +55,15 @@ export const MobileBottomNavbar = memo(function MobileBottomNavbar({
         </svg>
       ),
       badge: null,
-      enabled: isFeatureEnabled('dashboard'),
+      enabled: isFeatureEnabled("dashboard"),
     },
     {
-      id: 'network',
-      label: 'Network',
+      id: "network",
+      label: "Network",
       href: networkHref,
       isActive: Boolean(
-        pathname?.startsWith('/profile/network') ||
-          pathname?.startsWith('/network')
+        pathname?.startsWith("/profile/network") ||
+        pathname?.startsWith("/network")
       ),
       icon: (isActive: boolean) => (
         <svg
@@ -82,13 +81,13 @@ export const MobileBottomNavbar = memo(function MobileBottomNavbar({
         </svg>
       ),
       badge: <NetworkNotificationBadge />,
-      enabled: isFeatureEnabled('network'),
+      enabled: isFeatureEnabled("network"),
     },
     {
-      id: 'study',
-      label: 'Study',
-      href: '/study/groups',
-      isActive: Boolean(pathname?.startsWith('/study')),
+      id: "study",
+      label: "Study",
+      href: "/study/groups",
+      isActive: Boolean(pathname?.startsWith("/study")),
       icon: (isActive: boolean) => (
         <svg
           className="w-[22px] h-[22px]"
@@ -105,13 +104,13 @@ export const MobileBottomNavbar = memo(function MobileBottomNavbar({
         </svg>
       ),
       badge: null,
-      enabled: isFeatureEnabled('study'),
+      enabled: isFeatureEnabled("study"),
     },
     {
-      id: 'mentorship',
-      label: 'Mentorship',
+      id: "mentorship",
+      label: "Mentorship",
       href: mentorshipHref,
-      isActive: Boolean(pathname?.startsWith('/mentorship')),
+      isActive: Boolean(pathname?.startsWith("/mentorship")),
       icon: (isActive: boolean) => (
         <svg
           className="w-[22px] h-[22px]"
@@ -128,13 +127,13 @@ export const MobileBottomNavbar = memo(function MobileBottomNavbar({
         </svg>
       ),
       badge: null,
-      enabled: isFeatureEnabled('mentorship'),
+      enabled: isFeatureEnabled("mentorship"),
     },
     {
-      id: 'jobs',
-      label: 'Jobs',
-      href: '/job/jobs',
-      isActive: Boolean(pathname?.startsWith('/job')),
+      id: "jobs",
+      label: "Jobs",
+      href: "/job/jobs",
+      isActive: Boolean(pathname?.startsWith("/job")),
       icon: (isActive: boolean) => (
         <svg
           className="w-[22px] h-[22px]"
@@ -151,7 +150,31 @@ export const MobileBottomNavbar = memo(function MobileBottomNavbar({
         </svg>
       ),
       badge: null,
-      enabled: isFeatureEnabled('jobs'),
+      enabled: isFeatureEnabled("jobs"),
+    },
+    {
+      id: "resume",
+      label: "Resume",
+      href: RESUME_APP_URL,
+      external: true,
+      isActive: false,
+      icon: (isActive: boolean) => (
+        <svg
+          className="w-[22px] h-[22px]"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.8}
+            d={RESUME_ICON_PATH}
+          />
+        </svg>
+      ),
+      badge: null,
+      enabled: isFeatureEnabled("resume"),
     },
   ];
 
@@ -161,13 +184,15 @@ export const MobileBottomNavbar = memo(function MobileBottomNavbar({
     <nav
       aria-label="Mobile Bottom Navigation"
       className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-[#FAF6F0]/95 backdrop-blur-xl border-t border-[#E5D9CE] shadow-[0_-4px_24px_rgba(74,55,40,0.08)]"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
       <div className="flex items-stretch h-16 px-1 max-w-md mx-auto">
         {visibleTabs.map((tab) => (
           <Link
             key={tab.id}
             href={tab.href}
+            target={tab.external ? "_blank" : undefined}
+            rel={tab.external ? "noopener noreferrer" : undefined}
             aria-label={tab.label}
             className="group relative flex-1 min-w-0 flex flex-col items-center justify-center h-full py-1 text-center select-none transition-transform duration-150 active:scale-95"
           >
@@ -180,8 +205,8 @@ export const MobileBottomNavbar = memo(function MobileBottomNavbar({
             <div
               className={`relative flex items-center justify-center p-1.5 rounded-xl transition-all duration-200 ${
                 tab.isActive
-                  ? 'bg-[#4a3728] text-[#FAF6F0] shadow-sm scale-105'
-                  : 'text-[#4a3728]/70 hover:text-[#4a3728] hover:bg-[#EFE3D8]/60'
+                  ? "bg-[#4a3728] text-[#FAF6F0] shadow-sm scale-105"
+                  : "text-[#4a3728]/70 hover:text-[#4a3728] hover:bg-[#EFE3D8]/60"
               }`}
             >
               {tab.icon(tab.isActive)}
@@ -196,8 +221,8 @@ export const MobileBottomNavbar = memo(function MobileBottomNavbar({
             <span
               className={`text-[10px] tracking-tight mt-0.5 leading-none transition-colors duration-200 whitespace-nowrap ${
                 tab.isActive
-                  ? 'font-bold text-[#4a3728]'
-                  : 'font-medium text-[#7a6a5a] group-hover:text-[#4a3728]'
+                  ? "font-bold text-[#4a3728]"
+                  : "font-medium text-[#7a6a5a] group-hover:text-[#4a3728]"
               }`}
             >
               {tab.label}
