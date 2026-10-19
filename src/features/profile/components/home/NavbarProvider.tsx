@@ -85,32 +85,39 @@ export default function NavbarProvider({ children }: { children: React.ReactNode
 
     const currentUserId = user?.userId || user?.id || user?._id;
 
-    // Mentor / Senior workspace khulte hi (ya reload par) uski apni photo server se laao
-    useEffect(() => {
+       // Mentor + Senior dono ki photo hamesha laao (mentee workspace me fallback ke liye bhi chahiye)
+       useEffect(() => {
         if (!currentUserId) return;
         let cancelled = false;
 
-        if (photoSlot === 'mentor') {
-            MentorService.getMentorByUserId(currentUserId, true)
-                .then((res: any) => {
-                    if (!cancelled) setRoleImages((p) => ({ ...p, mentor: res?.data?.profilePic || null }));
-                })
-                .catch(() => { /* account photo fallback */ });
-        } else if (photoSlot === 'senior') {
-            SeniorMentorApplicationService.getMyApplication()
-                .then((app) => {
-                    if (!cancelled) setRoleImages((p) => ({ ...p, senior: app?.profilePhoto || null }));
-                })
-                .catch(() => { /* account photo fallback */ });
-        }
+        MentorService.getMentorByUserId(currentUserId, true)
+            .then((res: any) => {
+                if (!cancelled) setRoleImages((p) => ({ ...p, mentor: res?.data?.profilePic || null }));
+            })
+            .catch(() => { /* user industry mentor nahi hai */ });
+
+        SeniorMentorApplicationService.getMyApplication()
+            .then((app) => {
+                if (!cancelled) setRoleImages((p) => ({ ...p, senior: app?.profilePhoto || null }));
+            })
+            .catch(() => { /* user senior mentor nahi hai */ });
+
         return () => { cancelled = true; };
     }, [photoSlot, currentUserId]);
+
 
     const baseProfileData = transformToProfileData(userProfileData, profileImageUrl, headlineData);
     // Mentee/account photo (dashboard se upload hui ho toh wahi, warna server wali)
     const accountImage = roleImages.account || baseProfileData.profileImage;
-    // Active workspace ki photo; na ho toh account photo fallback
-    const activeImage = photoSlot === 'account' ? accountImage : (roleImages[photoSlot] || accountImage);
+    // Mentee photo: upload ki hui ho to wahi; warna senior photo, phir mentor photo
+    const menteeImage = accountImage || roleImages.senior || roleImages.mentor || '';
+    // Mentor/Senior workspace: apni photo -> mentee photo -> doosre role ki photo
+    const activeImage =
+        photoSlot === 'account'
+            ? menteeImage
+            : photoSlot === 'mentor'
+                ? (roleImages.mentor || accountImage || roleImages.senior || '')
+                : (roleImages.senior || accountImage || roleImages.mentor || '');
     const profileData = { ...baseProfileData, profileImage: activeImage };
     const fullName = formatUserDisplayName(userProfileData, user);
 
@@ -118,7 +125,7 @@ export default function NavbarProvider({ children }: { children: React.ReactNode
 
     return (
         <NavbarDataContext.Provider
-            value={{ userProfileData, profileData, headlineData, fullName, fetchUserProfile, setProfileImageOverride, roleImages, photoSlot }}
+        value={{ userProfileData, profileData, headlineData, fullName, fetchUserProfile, setProfileImageOverride, roleImages, photoSlot, menteeImage }}
         >
             {!hideNavbar && (
                 <ProfileNavbar
