@@ -1,18 +1,15 @@
-// lib/store/token.storage.ts
+// src/lib/store/token.storage.ts
 //
-// 🍪 Cookie-session version.
-// The access/refresh tokens now live ONLY in httpOnly cookies set by the backend —
-// JavaScript can never read them, so nothing sensitive is kept in localStorage anymore.
-// This class only keeps NON-SENSITIVE data:
+// Tokens are kept in localStorage. This class also keeps:
 //   - the basic user info (userId / email / role) for the UI
-//   - a "logged in" flag cookie (throne8_auth=1) that the Next.js proxy/middleware
+//   - a "logged in" flag cookie (throne8_auth=1) that the Next.js proxy
 //     (src/proxy.ts) can read on the Edge runtime
 
 interface UserData {
-  userId: string;
-  email: string;
-  role: string;
-  emailVerified?: boolean;
+    userId: string;
+    email: string;
+    role: string;
+    emailVerified?: boolean;
 }
 
 interface TokenData {
@@ -26,6 +23,13 @@ const AUTH_COOKIE_NAME = 'throne8_auth';
 
 // Ye refresh token ki life se zyada nahi honi chahiye
 const AUTH_COOKIE_MAX_AGE_DAYS = 30;
+
+// JWT = 3 base64url parts. "undefined", "null", "" jaisi garbage values yahan fail hongi.
+const JWT_SHAPE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+
+function looksLikeJwt(value: string | null | undefined): value is string {
+    return typeof value === 'string' && JWT_SHAPE.test(value);
+}
 
 /**
  * expiresIn ko milliseconds mein badalta hai.
@@ -72,14 +76,29 @@ class TokenStorage {
         document.cookie = `${AUTH_COOKIE_NAME}=1; path=/; max-age=${maxAgeSeconds}; SameSite=Lax`;
     }
 
-  private static clearAuthCookie(): void {
-    if (typeof document === "undefined") return;
-    document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
-  }
+    private static clearAuthCookie(): void {
+        if (typeof document === 'undefined') return;
+        document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+    }
 
     private static writeExpiry(expiresIn: string | number): void {
         const expiryTime = Date.now() + parseExpiresInToMs(expiresIn);
         localStorage.setItem(this.TOKEN_EXPIRY_KEY, expiryTime.toString());
+    }
+
+    /**
+     * Proxy cookie ko localStorage ke saath sync karo (AuthProvider app load par call karta hai).
+     * - Session zinda hai  -> cookie dobara set
+     * - Session nahi hai   -> purani/stale cookie hata do (warna proxy /login se bahar
+     *   bhejta rahega aur loop ban sakta hai)
+     */
+    static syncAuthCookie(): void {
+        if (typeof window === 'undefined') return;
+        if (this.isAuthenticated()) {
+            this.setAuthCookie();
+        } else {
+            this.clearAuthCookie();
+        }
     }
 
     /**
@@ -88,6 +107,10 @@ class TokenStorage {
     static setAuthData(tokens: TokenData, user: UserData): void {
         try {
             if (typeof window === 'undefined') return;
+
+            if (!looksLikeJwt(tokens.accessToken) || !looksLikeJwt(tokens.refreshToken)) {
+                throw new Error('Server returned malformed tokens');
+            }
 
             localStorage.setItem(this.ACCESS_TOKEN_KEY, tokens.accessToken);
             localStorage.setItem(this.REFRESH_TOKEN_KEY, tokens.refreshToken);
@@ -102,11 +125,21 @@ class TokenStorage {
 
     static getAccessToken(): string | null {
         if (typeof window === 'undefined') return null;
-        return localStorage.getItem(this.ACCESS_TOKEN_KEY);
+        try {
+            const token = localStorage.getItem(this.ACCESS_TOKEN_KEY);
+            return looksLikeJwt(token) ? token : null;
+        } catch (error) {
+            console.error('[TokenStorage] Error getting access token:', error);
+            return null;
+        }
     }
 
     static updateRefreshToken(refreshToken: string): void {
         if (typeof window === 'undefined') return;
+        if (!looksLikeJwt(refreshToken)) {
+            console.error('[TokenStorage] Ignoring malformed refresh token');
+            return;
+        }
         localStorage.setItem(this.REFRESH_TOKEN_KEY, refreshToken);
         // Refresh token naya mila, matlab user abhi bhi logged in hai
         this.setAuthCookie();
@@ -115,7 +148,14 @@ class TokenStorage {
     static getRefreshToken(): string | null {
         if (typeof window === 'undefined') return null;
         try {
-            return localStorage.getItem(this.REFRESH_TOKEN_KEY);
+            const token = localStorage.getItem(this.REFRESH_TOKEN_KEY);
+            if (!token) return null;
+            if (!looksLikeJwt(token)) {
+                // Garbage value (e.g. "undefined") server ko bhejne se "jwt malformed" 401 aata hai
+                console.warn('[TokenStorage] Stored refresh token is malformed, ignoring it');
+                return null;
+            }
+            return token;
         } catch (error) {
             console.error('[TokenStorage] Error getting refresh token:', error);
             return null;
@@ -134,17 +174,17 @@ class TokenStorage {
         }
     }
 
-  /**
-   * 👤 Update stored user data (e.g. after a profile photo change) without touching the session
-   */
-  static updateUserData(userData: UserData): void {
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.setItem(this.USER_DATA_KEY, JSON.stringify(userData));
-    } catch (error) {
-      console.error("❌ [TokenStorage] Error updating user data:", error);
+    /**
+     * Update stored user data (e.g. after a profile photo change) without touching the session
+     */
+    static updateUserData(userData: UserData): void {
+        if (typeof window === 'undefined') return;
+        try {
+            localStorage.setItem(this.USER_DATA_KEY, JSON.stringify(userData));
+        } catch (error) {
+            console.error('[TokenStorage] Error updating user data:', error);
+        }
     }
-  }
 
     /**
      * Access token expire hua ya nahi (30 second ka buffer ke saath)
@@ -178,13 +218,15 @@ class TokenStorage {
     /**
      * Saara auth data hatao. Sirf user ke Sign Out par ya refresh token
      * definitely invalid hone par call hona chahiye.
+     * `reason` sirf debugging ke liye hai (kaun logout trigger kar raha hai).
      */
-    static clearAuthData(): void {
+    static clearAuthData(reason?: string): void {
         if (typeof window === 'undefined') return;
 
-        // DEBUG: logout kaun trigger kar raha hai, console mein dikh jayega.
-        // Cause mil jaye to ye line hata dena.
-        console.trace('[TokenStorage] clearAuthData called from:');
+        console.warn(`[TokenStorage] clearAuthData reason="${reason ?? 'unspecified'}"`);
+        if (process.env.NODE_ENV === 'development') {
+            console.trace('[TokenStorage] clearAuthData called from:');
+        }
 
         try {
             localStorage.removeItem(this.ACCESS_TOKEN_KEY);
@@ -199,6 +241,10 @@ class TokenStorage {
 
     static updateAccessToken(accessToken: string, expiresIn: string | number): void {
         if (typeof window === 'undefined') return;
+        if (!looksLikeJwt(accessToken)) {
+            console.error('[TokenStorage] Ignoring malformed access token');
+            return;
+        }
         try {
             localStorage.setItem(this.ACCESS_TOKEN_KEY, accessToken);
             this.writeExpiry(expiresIn);
