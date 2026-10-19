@@ -46,68 +46,122 @@ export interface UseMyRolesResult {
 // be able to navigate to the dashboard (currently false = disabled/greyed)
 export const UNLOCK_WHEN_PENDING = false;
 
+const DEFAULT_ROLES: MyRolesResponse = {
+  mentee: "approved",
+  seniorMentor: "none",
+  industryMentor: "none",
+};
+
 /**
- * useMyRoles — fetches the current user's workspace role statuses once and
- * caches the result at the module level (via MentorService._rolesCache) so
- * every component (navbar, dashboard router, role guard) shares the same data.
+ * FIX: /mentorship/mentors/me/roles can fail or return "none" even when the
+ * user already has a Mentor profile. In that case, double-check using the
+ * Mentor-by-userId endpoint (the same one the mentor dashboard uses).
+ * If a Mentor doc exists, treat the `seniorMentor` role (shown as
+ * "Industry Mentor") as approved so the dropdown opens the dashboard
+ * instead of the "Become a Mentor" form.
+ */
+async function reconcileWithMentorDoc(
+  base: MyRolesResponse,
+  userId?: string
+): Promise<MyRolesResponse> {
+  if (!userId || base.seniorMentor === "approved") return base;
+  try {
+    const res: any = await MentorService.getMentorByUserId(userId);
+    const mentor = res?.data ?? null;
+    if (!mentor) return base;
+
+    const raw = String(
+      mentor.verificationStatus ?? mentor.status ?? mentor.approvalStatus ?? ""
+    ).toLowerCase();
+
+    let status: RoleStatus = "approved";
+    if (raw.includes("pending") || raw.includes("review")) status = "pending";
+    else if (raw.includes("reject")) status = "rejected";
+
+    return {
+      ...base,
+      seniorMentor: status,
+      seniorMentorId: base.seniorMentorId ?? mentor.mentorId ?? mentor._id,
+    };
+  } catch {
+    // 404 = really not a mentor; any other error -> keep the backend value
+    return base;
+  }
+}
+
+/**
+ * useMyRoles — fetches the current user's workspace role statuses and shares
+ * them via MentorService's module-level cache.
+ *
+ * Pass `userId` so the hook can verify the Mentor profile as a fallback
+ * (see reconcileWithMentorDoc above).
  *
  * Keys returned: mentee | seniorMentor | industryMentor
- * (renamed from the old "studentMentor" key)
- *
- * Re-fetches automatically when isAuthenticated flips (login/logout).
- * Call `refetch()` manually after a successful application submit.
+ * Re-fetches when auth state or userId changes. Call `refetch()` manually
+ * after a successful application submit.
  */
-export function useMyRoles(isAuthenticated: boolean): UseMyRolesResult {
+export function useMyRoles(
+  isAuthenticated: boolean,
+  userId?: string
+): UseMyRolesResult {
   const [roles, setRoles] = useState<MyRolesResponse | null>(null);
   const [loading, setLoading] = useState(isAuthenticated);
   const [error, setError] = useState<string | null>(null);
-  const prevAuthRef = useRef<boolean>(isAuthenticated);
-  const fetchedRef = useRef(false);
+  const keyRef = useRef<string>("");
+
+  const load = useCallback(
+    async (isCancelled: () => boolean = () => false) => {
+      setLoading(true);
+      let base: MyRolesResponse = DEFAULT_ROLES;
+      let errMsg: string | null = null;
+
+      try {
+        base = await MentorService.getMyRoles();
+      } catch (err: any) {
+        errMsg = err?.message ?? "Failed to fetch roles";
+        base = DEFAULT_ROLES;
+      }
+
+      const finalRoles = await reconcileWithMentorDoc(base, userId);
+
+      if (isCancelled()) return;
+      setRoles(finalRoles);
+      // If the mentor doc check rescued us, don't surface the roles error.
+      setError(finalRoles.seniorMentor !== "none" ? null : errMsg);
+      setLoading(false);
+    },
+    [userId]
+  );
 
   /** Force a fresh network fetch (ignores module-level cache). */
   const refetch = useCallback(async () => {
     if (!isAuthenticated) { setLoading(false); return; }
     MentorService.invalidateRolesCache();
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await MentorService.getMyRoles();
-      setRoles(data);
-    } catch (err: any) {
-      setError(err?.message ?? "Failed to fetch roles");
-      setRoles({ mentee: "approved", seniorMentor: "none", industryMentor: "none" });
-    } finally {
-      setLoading(false);
-    }
-  }, [isAuthenticated]);
+    await load();
+  }, [isAuthenticated, load]);
 
   useEffect(() => {
-    // Re-fetch on auth state change (login/logout)
-    const authChanged = prevAuthRef.current !== isAuthenticated;
-    prevAuthRef.current = isAuthenticated;
-
     if (!isAuthenticated) {
       // Logged out — clear everything
       setRoles(null);
       setLoading(false);
-      fetchedRef.current = false;
+      keyRef.current = "";
       MentorService.invalidateRolesCache();
       return;
     }
 
-    // First mount or after login
-    if (fetchedRef.current && !authChanged) return; // already fetched, use cache
-    fetchedRef.current = true;
+    // Only (re)fetch when auth state or userId actually changed
+    const key = `auth:${userId ?? ""}`;
+    if (keyRef.current === key) return;
+    keyRef.current = key;
 
-    setLoading(true);
-    MentorService.getMyRoles()
-      .then((data) => { setRoles(data); setError(null); })
-      .catch((err: any) => {
-        setError(err?.message ?? "Failed to fetch roles");
-        setRoles({ mentee: "approved", seniorMentor: "none", industryMentor: "none" });
-      })
-      .finally(() => setLoading(false));
-  }, [isAuthenticated]);
+    let cancelled = false;
+    load(() => cancelled);
+    return () => {
+      cancelled = true;
+      keyRef.current = ""; // lets StrictMode's 2nd effect run re-fetch
+    };
+  }, [isAuthenticated, userId, load]);
 
   return { roles, loading, error, refetch };
 }

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useMyRoles, UNLOCK_WHEN_PENDING, type MyRolesResponse } from "@/features/mentorship/hooks/useMentorRole";
 import { routes } from "@/config/routes";
+import MentorService from "@/lib/api/mentorship.service";
 import {
   FrontendRoleKey,
   RoleOption,
@@ -108,13 +109,14 @@ export default function ProfileDropdown({
   const [open, setOpen]   = useState(false);
   const containerRef      = useRef<HTMLDivElement>(null);
 
-  const { roles, loading: rolesLoading } = useMyRoles(isAuthenticated);
+  const userId = user?.userId || user?.id || user?._id || "";
+
+  // userId pass karo taaki /me/roles fail ho to bhi Mentor profile se role verify ho sake
+  const { roles, loading: rolesLoading } = useMyRoles(isAuthenticated, userId);
 
   // Clicked role par tick turant shift ho, page load hone ka wait na kare
   const [pendingRole, setPendingRole] = useState<WorkspaceKey | null>(null);
   useEffect(() => { setPendingRole(null); }, [pathname]);
-
-  const userId = user?.userId || user?.id || user?._id || "";
   const detectedRole: WorkspaceKey | null = detectActiveRole(pathname ?? "");
 
   // Role implied by the current URL. On non-dashboard pages (landing, etc.)
@@ -219,11 +221,28 @@ export default function ProfileDropdown({
       // Locked (none / rejected) → go to apply flow
       const isLocked = !isApproved && !isPending;
       if (isLocked) {
-        if (opt.key === "seniorMentor" && onOpenBecomeMentorModal) {
-          onOpenBecomeMentorModal();
-        } else {
-          router.push(opt.applyHref(userId));
+        // Safety check: agar user ka Mentor profile already hai to form mat kholo,
+        // seedha dashboard par bhejo (roles API galat/late ho tab bhi).
+        if (opt.key === "seniorMentor") {
+          MentorService.getMentorByUserId(userId)
+            .then((res) => {
+              if (res?.data) {
+                setPendingRole("seniorMentor");
+                router.push(opt.dashboardHref(userId));
+              } else if (onOpenBecomeMentorModal) {
+                onOpenBecomeMentorModal();
+              } else {
+                router.push(opt.applyHref(userId));
+              }
+            })
+            .catch(() => {
+              // 404 = sach mein mentor nahi hai -> form kholo
+              if (onOpenBecomeMentorModal) onOpenBecomeMentorModal();
+              else router.push(opt.applyHref(userId));
+            });
+          return;
         }
+        router.push(opt.applyHref(userId));
       }
       // isPending && UNLOCK_WHEN_PENDING=false → disabled, do nothing
     },
