@@ -1,9 +1,11 @@
 // src/lib/store/token.storage.ts
 //
-// Tokens are kept in localStorage. This class also keeps:
-//   - the basic user info (userId / email / role) for the UI
-//   - a "logged in" flag cookie (throne8_auth=1) that the Next.js proxy
-//     (src/proxy.ts) can read on the Edge runtime
+// Dono modes support karta hai:
+//   - Cookie-session: backend httpOnly cookies set karta hai, yahan sirf user data rakhte hain
+//     -> TokenStorage.setAuthData(user)
+//   - Token mode: tokens localStorage mein rakhte hain
+//     -> TokenStorage.setAuthData(tokens, user)
+// Plus ek "logged in" flag cookie (throne8_auth=1) jo src/proxy.ts padhta hai.
 
 interface UserData {
     userId: string;
@@ -24,11 +26,13 @@ const AUTH_COOKIE_NAME = 'throne8_auth';
 // Ye refresh token ki life se zyada nahi honi chahiye
 const AUTH_COOKIE_MAX_AGE_DAYS = 30;
 
-// JWT = 3 base64url parts. "undefined", "null", "" jaisi garbage values yahan fail hongi.
-const JWT_SHAPE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
-
-function looksLikeJwt(value: string | null | undefined): value is string {
-    return typeof value === 'string' && JWT_SHAPE.test(value);
+/**
+ * Token ka format check nahi karte (JWT ho ya na ho), sirf garbage reject karte hain.
+ */
+function isUsableToken(value: unknown): value is string {
+    if (typeof value !== 'string') return false;
+    const v = value.trim();
+    return v.length > 10 && v !== 'undefined' && v !== 'null' && v !== '[object Object]';
 }
 
 /**
@@ -86,11 +90,14 @@ class TokenStorage {
         localStorage.setItem(this.TOKEN_EXPIRY_KEY, expiryTime.toString());
     }
 
+    private static clearTokens(): void {
+        localStorage.removeItem(this.ACCESS_TOKEN_KEY);
+        localStorage.removeItem(this.REFRESH_TOKEN_KEY);
+        localStorage.removeItem(this.TOKEN_EXPIRY_KEY);
+    }
+
     /**
      * Proxy cookie ko localStorage ke saath sync karo (AuthProvider app load par call karta hai).
-     * - Session zinda hai  -> cookie dobara set
-     * - Session nahi hai   -> purani/stale cookie hata do (warna proxy /login se bahar
-     *   bhejta rahega aur loop ban sakta hai)
      */
     static syncAuthCookie(): void {
         if (typeof window === 'undefined') return;
@@ -102,20 +109,42 @@ class TokenStorage {
     }
 
     /**
-     * Login ke baad tokens aur user data store karo
+     * Login ke baad session store karo.
+     *   setAuthData(user)          -> cookie-session mode
+     *   setAuthData(tokens, user)  -> token mode
      */
-    static setAuthData(tokens: TokenData, user: UserData): void {
+    static setAuthData(user: UserData): void;
+    static setAuthData(tokens: Partial<TokenData> | null | undefined, user: UserData): void;
+    static setAuthData(
+        first: UserData | Partial<TokenData> | null | undefined,
+        second?: UserData
+    ): void {
         try {
             if (typeof window === 'undefined') return;
 
-            if (!looksLikeJwt(tokens.accessToken) || !looksLikeJwt(tokens.refreshToken)) {
-                throw new Error('Server returned malformed tokens');
+            const user = (second !== undefined ? second : first) as UserData | null | undefined;
+            const tokens = (second !== undefined ? first : null) as Partial<TokenData> | null;
+
+            if (!user || typeof user !== 'object') {
+                throw new Error('Missing user data');
             }
 
-            localStorage.setItem(this.ACCESS_TOKEN_KEY, tokens.accessToken);
-            localStorage.setItem(this.REFRESH_TOKEN_KEY, tokens.refreshToken);
             localStorage.setItem(this.USER_DATA_KEY, JSON.stringify(user));
-            this.writeExpiry(tokens.expiresIn);
+
+            if (
+                tokens &&
+                isUsableToken(tokens.accessToken) &&
+                isUsableToken(tokens.refreshToken)
+            ) {
+                localStorage.setItem(this.ACCESS_TOKEN_KEY, tokens.accessToken);
+                localStorage.setItem(this.REFRESH_TOKEN_KEY, tokens.refreshToken);
+                this.writeExpiry(tokens.expiresIn ?? 900);
+            } else {
+                // Cookie-session mode: backend cookies se kaam chalta hai.
+                // Purane/kharab tokens hata do taaki wo server ko na jayein.
+                this.clearTokens();
+            }
+
             this.setAuthCookie();
         } catch (error) {
             console.error('[TokenStorage] Failed to store auth data:', error);
@@ -127,7 +156,7 @@ class TokenStorage {
         if (typeof window === 'undefined') return null;
         try {
             const token = localStorage.getItem(this.ACCESS_TOKEN_KEY);
-            return looksLikeJwt(token) ? token : null;
+            return isUsableToken(token) ? token : null;
         } catch (error) {
             console.error('[TokenStorage] Error getting access token:', error);
             return null;
@@ -136,12 +165,11 @@ class TokenStorage {
 
     static updateRefreshToken(refreshToken: string): void {
         if (typeof window === 'undefined') return;
-        if (!looksLikeJwt(refreshToken)) {
-            console.error('[TokenStorage] Ignoring malformed refresh token');
+        if (!isUsableToken(refreshToken)) {
+            console.error('[TokenStorage] Ignoring unusable refresh token');
             return;
         }
         localStorage.setItem(this.REFRESH_TOKEN_KEY, refreshToken);
-        // Refresh token naya mila, matlab user abhi bhi logged in hai
         this.setAuthCookie();
     }
 
@@ -149,13 +177,7 @@ class TokenStorage {
         if (typeof window === 'undefined') return null;
         try {
             const token = localStorage.getItem(this.REFRESH_TOKEN_KEY);
-            if (!token) return null;
-            if (!looksLikeJwt(token)) {
-                // Garbage value (e.g. "undefined") server ko bhejne se "jwt malformed" 401 aata hai
-                console.warn('[TokenStorage] Stored refresh token is malformed, ignoring it');
-                return null;
-            }
-            return token;
+            return isUsableToken(token) ? token : null;
         } catch (error) {
             console.error('[TokenStorage] Error getting refresh token:', error);
             return null;
@@ -201,12 +223,12 @@ class TokenStorage {
     }
 
     /**
-     * User logged in hai ya nahi. Access token expire hone se logout nahi
-     * maana jata; sirf refresh token + user data dekhte hain.
+     * User logged in hai ya nahi. User data hona kaafi hai (cookie-session mode mein
+     * tokens JS ko dikhte hi nahi). Access token expire hone se logout nahi maana jata.
      */
     static isAuthenticated(): boolean {
         if (typeof window === 'undefined') return false;
-        return !!(this.getRefreshToken() && this.getUserData());
+        return !!this.getUserData();
     }
 
     static needsTokenRefresh(): boolean {
@@ -216,9 +238,9 @@ class TokenStorage {
     }
 
     /**
-     * Saara auth data hatao. Sirf user ke Sign Out par ya refresh token
+     * Saara auth data hatao. Sirf user ke Sign Out par ya session
      * definitely invalid hone par call hona chahiye.
-     * `reason` sirf debugging ke liye hai (kaun logout trigger kar raha hai).
+     * `reason` sirf debugging ke liye hai.
      */
     static clearAuthData(reason?: string): void {
         if (typeof window === 'undefined') return;
@@ -229,10 +251,8 @@ class TokenStorage {
         }
 
         try {
-            localStorage.removeItem(this.ACCESS_TOKEN_KEY);
-            localStorage.removeItem(this.REFRESH_TOKEN_KEY);
+            this.clearTokens();
             localStorage.removeItem(this.USER_DATA_KEY);
-            localStorage.removeItem(this.TOKEN_EXPIRY_KEY);
             this.clearAuthCookie();
         } catch (error) {
             console.error('[TokenStorage] Error clearing auth data:', error);
@@ -241,8 +261,8 @@ class TokenStorage {
 
     static updateAccessToken(accessToken: string, expiresIn: string | number): void {
         if (typeof window === 'undefined') return;
-        if (!looksLikeJwt(accessToken)) {
-            console.error('[TokenStorage] Ignoring malformed access token');
+        if (!isUsableToken(accessToken)) {
+            console.error('[TokenStorage] Ignoring unusable access token');
             return;
         }
         try {

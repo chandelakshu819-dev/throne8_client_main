@@ -67,7 +67,8 @@ const api: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
     timeout:
         config.NEXT_PUBLIC_API_TIMEOUT ||
-        Number(process.env.NEXT_PUBLIC_API_TIMEOUT),
+        Number(process.env.NEXT_PUBLIC_API_TIMEOUT) ||
+        30000,
     headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
@@ -330,6 +331,23 @@ export const getFreshAccessToken = async (): Promise<string | null> => {
     }
     try {
         return await refreshAccessToken(null);
+    } catch (refreshError: unknown) {
+        handleRefreshFailure(refreshError);
+        return null;
+    }
+};
+
+/**
+ * Forced refresh (socket.client.ts jaise callers ke liye, jab server ne token reject kiya).
+ * Same shared single-flight + lock use karta hai. Naya access token ya null return karta hai.
+ */
+export const refreshSession = async (): Promise<string | null> => {
+    if (!TokenStorage.getRefreshToken()) {
+        return TokenStorage.getAccessToken();
+    }
+    try {
+        // failedToken = current token, taaki performRefresh "abhi bhi valid hai" samajh ke skip na kare
+        return await refreshAccessToken(TokenStorage.getAccessToken());
     } catch (refreshError: unknown) {
         handleRefreshFailure(refreshError);
         return null;

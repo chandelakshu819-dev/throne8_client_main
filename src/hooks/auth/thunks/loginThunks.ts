@@ -17,7 +17,8 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
 
 /**
  * Login Thunk
- * Login API call + token storage
+ * AuthService.login pehle hi user data save kar deta hai.
+ * Agar server body mein tokens bhi bhejta hai to unhe bhi store karte hain.
  */
 export const loginUser = createAsyncThunk<
   LoginResponse,
@@ -29,19 +30,24 @@ export const loginUser = createAsyncThunk<
     try {
       const response = await AuthService.login(credentials);
 
-      const tokens = response.data?.tokens;
-      if (!tokens?.accessToken || !tokens?.refreshToken) {
+      const user = response.data?.user;
+      if (!user) {
         return rejectWithValue('Login failed. Invalid response from server.');
       }
 
-      TokenStorage.setAuthData(
-        {
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          expiresIn: tokens.expiresIn ?? 900,
-        },
-        response.data.user
-      );
+      const tokens = response.data?.tokens;
+      if (tokens?.accessToken && tokens?.refreshToken) {
+        TokenStorage.setAuthData(
+          {
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            expiresIn: tokens.expiresIn ?? 900,
+          },
+          user
+        );
+      } else {
+        TokenStorage.setAuthData(user);
+      }
 
       return response;
     } catch (error: unknown) {
@@ -65,7 +71,7 @@ export const logoutUser = createAsyncThunk<
   'auth/logout',
   async (_, { rejectWithValue }) => {
     try {
-      // AuthService.logout tokens clear karta hai + API call karta hai
+      // AuthService.logout local data clear karta hai + API call karta hai
       await AuthService.logout();
     } catch (error: unknown) {
       console.error('[THUNK] Logout failed:', error);
@@ -82,9 +88,6 @@ export const logoutUser = createAsyncThunk<
  * Check Auth Status (app load par)
  *
  * Yahan koi network call nahi hoti aur kabhi tokens clear nahi hote.
- * Access token expire ho to api.intance.ts ka interceptor pehli request
- * se pehle shared refresh kar leta hai (lock + single-flight ke saath).
- * Logout sirf tab hota hai jab server refresh token ko definitely reject kare.
  */
 export const checkAuthStatus = createAsyncThunk<
   UserData | null,
@@ -101,7 +104,6 @@ export const checkAuthStatus = createAsyncThunk<
       return TokenStorage.getUserData();
     } catch (error: unknown) {
       console.error('[THUNK] Auth check failed:', error);
-      // Yahan tokens clear nahi karte: local read fail hone se session invalid nahi hota
       return rejectWithValue(getErrorMessage(error, 'Session validation failed'));
     }
   }
