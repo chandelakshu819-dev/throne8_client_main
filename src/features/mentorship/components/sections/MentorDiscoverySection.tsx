@@ -137,11 +137,11 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                     rating: Number(mentor.stats?.averageRating) || 0,
                     sessions: Number(mentor.stats?.totalSessions || mentor.trustScore?.metrics?.totalCompletedSessions) || 0,
                     image:
-                    (mentor as any).profilePic ||
-                    (mentor as any).profilePhoto ||
-                    (mentor as any).profilePhotoUrl ||
-                    (mentor as any).user?.profilePic ||
-                    "",
+                        mentor.profilePic ||
+                        mentor.profilePhoto ||
+                        mentor.profilePhotoUrl ||
+                        mentor.user?.profilePic ||
+                        "",
                     tags: Array.isArray(mentor.skills) ? mentor.skills.slice(0, 2) : [],
                     expTotal: totalExp,
                     domains: Array.isArray(mentor.domains) ? mentor.domains : [],
@@ -570,12 +570,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                                             college: mentor.college,
                                             degree: mentor.degree,
                                             sessions: mentor.sessionsCount,
-                                            image:
-                                            (mentor as any).profilePic ||
-                                            (mentor as any).profilePhoto ||
-                                            (mentor as any).profilePhotoUrl ||
-                                            (mentor as any).user?.profilePic ||
-                                            "",
+                                            image: mentor.profilePic ?? "",
                                             tags: mentor.skills.slice(0, 2),
                                             expTotal: 0,
                                             domains: [],
