@@ -1754,30 +1754,38 @@ class MentorService {
     if (_rolesCache) return _rolesCache;
     try {
       const { data } = await api.get('/mentorship/mentors/me/roles');
-      const result: MyRolesResponse = data?.data ?? {
+      console.log('[MENTOR_SERVICE] getMyRoles raw response:', data);
+
+      // Backend ya to { data: {...} } bhejta hai ya seedha {...}, dono chalenge
+      const payload = (data?.data ?? data) as Partial<MyRolesResponse> | undefined;
+
+      const result: MyRolesResponse = {
         mentee: 'approved',
-        seniorMentor: 'none',
-        industryMentor: 'none',
+        seniorMentor: payload?.seniorMentor ?? 'none',
+        industryMentor: payload?.industryMentor ?? 'none',
+        seniorMentorId: payload?.seniorMentorId,
+        industryMentorId: payload?.industryMentorId,
       };
-            // Fallback: if the application is verified but /me/roles didn't say approved
-            if (result.industryMentor !== 'approved') {
-              try {
-                const app = await SeniorMentorApplicationService.getMyApplication();
-                const status = String(app?.verificationStatus ?? '').toLowerCase();
-                if (status === 'verified' || status === 'approved' || status === 'active') {
-                  result.industryMentor = 'approved';
-                  result.industryMentorId =
-                    result.industryMentorId ?? (app as any)?.seniorMentorId;
-                }
-              } catch {
-                /* ignore, keep backend value */
-              }
-            }
-      
-            _rolesCache = result;
-            return result;
+
+      // Fallback: application verified hai par /me/roles ne approved nahi kaha
+      if (result.industryMentor !== 'approved') {
+        try {
+          const app = await SeniorMentorApplicationService.getMyApplication();
+          const status = String(app?.verificationStatus ?? '').toLowerCase();
+          if (status === 'verified' || status === 'approved' || status === 'active') {
+            result.industryMentor = 'approved';
+            result.industryMentorId =
+              result.industryMentorId ?? (app as any)?.seniorMentorId;
+          }
+        } catch {
+          /* ignore, keep backend value */
+        }
+      }
+
+      _rolesCache = result;
+      return result;
     } catch (error: any) {
-      console.error('❌ [MENTOR_SERVICE] getMyRoles failed:', error?.message);
+      console.error('❌ [MENTOR_SERVICE] getMyRoles failed:', error?.response?.status, error?.response?.data || error?.message);
       throw error;
     }
   }
