@@ -1,8 +1,8 @@
 "use client";
 //src/features/mentorship/components/sections/MentorshipServicesSection.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Clock, Calendar } from "lucide-react";
-import SessionService from "@/lib/api/session.service";
+import { ArrowRight, Clock, Calendar, Star } from "lucide-react";
+import PublicServicesService from "@/lib/api/publicServices.service";
 import MentorService from "@/lib/api/mentorship.service";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -49,7 +49,7 @@ export default function MentorshipServicesSection({
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const sessionRes = await SessionService.getAllSessionsFromDB({ limit: 100 });
+                const sessionRes = await PublicServicesService.getPublicServices({ limit: 100 });
                 const allSessions = Array.isArray(sessionRes?.data)
                     ? sessionRes.data
                     : Array.isArray(sessionRes?.data?.sessions)
@@ -61,6 +61,15 @@ export default function MentorshipServicesSection({
                 const globalServices = allSessions.filter(
                     (s: any) => s.sessionType !== "group_session"
                 );
+
+                // Debug help: agar list empty aaye to console me count dikhega
+                console.info(
+                    "[MentorshipServices] fetched:",
+                    allSessions.length,
+                    "after group filter:",
+                    globalServices.length
+                );
+
                 setRawServices(globalServices);
 
                 const uniqueMentorIds = Array.from(
@@ -321,7 +330,7 @@ export default function MentorshipServicesSection({
                                                         <>
                                                             <span className="text-[#e2dcd5]">|</span>
                                                             <div className="flex items-center gap-1 font-semibold text-[#c4963a]">
-                                                                <span>⭐</span>
+                                                                <Star className="w-3 h-3 fill-[#c4963a] text-[#c4963a]" />
                                                                 <span>{rating.ratingLabel}</span>
                                                                 {rating.sessionsLabel && (
                                                                     <span className="text-[#8e847c] font-normal text-[10px]">
