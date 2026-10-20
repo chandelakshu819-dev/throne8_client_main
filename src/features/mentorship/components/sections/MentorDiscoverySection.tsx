@@ -284,16 +284,25 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         ? filteredIndustryMentors
         : filteredIndustryMentors.slice(0, INDUSTRY_LIMIT);
 
-    const handleNavigate = (mentor: MentorData) => {
-        // Agar mentor khud apni hi profile pe click kar raha hai
-        if (user?.userId && mentor.userId && user.userId === mentor.userId) {
-            router.push(`/mentorship/user-dashboard/${user.userId}`);
-            return;
-        }
-
-        const slugName = (mentor.name || "mentor").toLowerCase().replace(/\s+/g, "-");
-        router.push(`/mentorship/mentor-card/${slugName}/${mentor.id}`);
-    };
+        const handleNavigate = (mentor: MentorData) => {
+            // Agar mentor khud apni hi profile pe click kar raha hai
+            if (user?.userId && mentor.userId && user.userId === mentor.userId) {
+                router.push(`/mentorship/user-dashboard/${user.userId}`);
+                return;
+            }
+    
+            const slugName = (mentor.name || "mentor").toLowerCase().replace(/\s+/g, "-");
+            router.push(`/mentorship/mentor-card/${slugName}/${mentor.id}`);
+        };
+    
+        // Card ya button, kahin bhi click ho, same page khulna chahiye
+        const handleCardNavigate = (mentor: MentorData, isIndustryCard: boolean) => {
+            if (!isIndustryCard) {
+                router.push(`/mentorship/senior-mentor/${mentor.id}`);
+                return;
+            }
+            handleNavigate(mentor);
+        };
 
     // Render Industry cards from Mentor records and College cards from approved applications.
     const renderCard = (mentor: MentorData, isIndustryCard: boolean) => {
@@ -330,9 +339,18 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
 
         return (
             <div
-                key={mentor.id}
-                className="h-full rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 relative group bg-[#faf6f1] border border-[#e8ded5] hover:border-[#c4963a]/60 shadow-sm hover:shadow-md"
-            >
+            key={mentor.id}
+            role="link"
+            tabIndex={0}
+            onClick={() => handleCardNavigate(mentor, isIndustryCard)}
+            onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleCardNavigate(mentor, isIndustryCard);
+                }
+            }}
+            className="h-full cursor-pointer rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 relative group bg-[#faf6f1] border border-[#e8ded5] hover:border-[#c4963a]/60 shadow-sm hover:shadow-md"
+        >
                 <div>
                     {/* Avatar */}
                     <div className="flex justify-center mb-2.5">
@@ -451,11 +469,10 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
 
                     {/* Action button — same style on all cards */}
                     <button
-                        onClick={() =>
-                            !isIndustryCard
-                                ? router.push(`/mentorship/senior-mentor/${mentor.id}`)
-                                : handleNavigate(mentor)
-                        }
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleCardNavigate(mentor, isIndustryCard);
+                        }}
                         className="w-full py-2 px-3 bg-[#3a2a1e] hover:bg-[#251910] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
                         {isIndustryCard && !mentor.acceptsBooking ? (
