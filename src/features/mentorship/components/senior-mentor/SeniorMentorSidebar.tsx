@@ -18,7 +18,13 @@ export default function SeniorMentorSidebar({
   activeTab = 'profile',
   unreadNotificationCount = 0,
 }: SeniorMentorSidebarProps) {
-  const router = useRouter();
+
+  const nextRouter = useRouter();
+  // Sidebar tabs ke beech switch karte waqt history me nayi entry add nahi hogi,
+  // taaki Back dabane par seedha dashboard par jaye (Services -> Profile -> Dashboard nahi).
+  const router = {
+    push: (url: string) => nextRouter.replace(url),
+  };
   const { fullName, profilePhoto, currentRole, primaryExpertise } = application;
   const initials = fullName ? fullName[0] : "S";
   const [imgFallbackLevel, setImgFallbackLevel] = useState(0);

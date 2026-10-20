@@ -634,15 +634,7 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
             </div>
 
           
-            {!selectedDateStr && (
-              <div
-                className="mb-3 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2"
-                style={{ backgroundColor: "#fff7ed", color: "#9a3412", border: "1px solid #fed7aa" }}
-              >
-                <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-                Select a date on the calendar to enable saving.
-              </div>
-            )}
+            
 
             <div className="space-y-2.5">
 

@@ -444,7 +444,7 @@ export default function SeniorMentorServicesPage({ seniorData }: { seniorData: S
 
             // After creating a new service, always guide the mentor to set availability
             showToast("Service created! Now set your availability so mentees can book.", "success");
-            setTimeout(() => router.push(availabilityUrl), 1200);
+            setTimeout(() => router.replace(availabilityUrl), 1200);
           }}
         />
       )}
