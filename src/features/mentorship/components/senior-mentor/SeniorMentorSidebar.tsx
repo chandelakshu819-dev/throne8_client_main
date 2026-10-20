@@ -4,6 +4,8 @@ import type { SeniorMentorApplication } from "@/lib/api/seniorMentorApplication.
 import { useAppSelector } from "@/core/store/store.hooks";
 import { useNavbarData } from "@/features/profile/components/home/NavbarProvider";
 import { useRouter } from "next/navigation";
+import PhotoLightbox from "../shared/PhotoLightbox";
+
 
 interface SeniorMentorSidebarProps {
   application: SeniorMentorApplication;
@@ -20,6 +22,7 @@ export default function SeniorMentorSidebar({
   const { fullName, profilePhoto, currentRole, primaryExpertise } = application;
   const initials = fullName ? fullName[0] : "S";
   const [imgFallbackLevel, setImgFallbackLevel] = useState(0);
+  const [showPhoto, setShowPhoto] = useState(false);  
   const globalProfile = useAppSelector((state) => state.login.profile);
   const { profileData: navbarProfileData } = useNavbarData();
   
@@ -48,7 +51,19 @@ export default function SeniorMentorSidebar({
         <div className="flex flex-col items-center text-center">
           <div className="w-24 h-24 rounded-full overflow-hidden mb-4 shadow-sm" style={{ border: '3px solid #e0d8cf' }}>
             {currentPhoto ? (
-              <img src={currentPhoto} alt={fullName} className="w-full h-full object-cover" onError={() => setImgFallbackLevel(prev => prev + 1)} />
+              <>
+              <img
+                src={currentPhoto}
+                alt={fullName}
+                title="Click to view photo"
+                className="w-full h-full object-cover cursor-zoom-in"
+                onClick={() => setShowPhoto(true)}
+                onError={() => setImgFallbackLevel(prev => prev + 1)}
+              />
+              {showPhoto && (
+                <PhotoLightbox src={currentPhoto} alt={fullName} onClose={() => setShowPhoto(false)} />
+              )}
+            </>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-3xl font-black text-white" style={{ backgroundColor: '#4a3728' }}>
                 {initials}

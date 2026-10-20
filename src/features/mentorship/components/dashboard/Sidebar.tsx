@@ -4,7 +4,8 @@ import { MENU_ITEMS } from "../../constants/constant";
 import type { MenuItem } from "../../types";
 import { capitalizeName } from "@/shared/utils/format";
 import { useProfile } from "@/features/profile/hooks/useProfile";
-
+import { useState } from "react";
+import PhotoLightbox from "../shared/PhotoLightbox";
 
 
 interface SidebarProps {
@@ -36,6 +37,7 @@ export default function Sidebar({
 }: SidebarProps) {
   // Account photo (mentee/senior se upload hui photo) fallback ke taur par
   const { profileImageUrl: accountPhoto } = useProfile();
+  const [showPhoto, setShowPhoto] = useState(false);
   const firstName = (dashboardData?.user?.firstName ?? mentorData?.user?.firstName ?? "A").trim();
   const lastName = (dashboardData?.user?.lastName ?? mentorData?.user?.lastName ?? "").trim();
   const initials = `${firstName[0] || "A"}${lastName[0] || ""}`.toUpperCase();
@@ -95,7 +97,18 @@ export default function Sidebar({
             style={{ border: "1px solid #e0d8cf" }}
           >
             {profilePic ? (
-              <img src={profilePic} alt={fullName} className="w-full h-full object-cover" />
+              <>
+              <img
+                src={profilePic}
+                alt={fullName}
+                title="Click to view photo"
+                className="w-full h-full object-cover cursor-zoom-in"
+                onClick={() => setShowPhoto(true)}
+              />
+              {showPhoto && (
+                <PhotoLightbox src={profilePic} alt={fullName} onClose={() => setShowPhoto(false)} />
+              )}
+            </>
             ) : (
               <div
                 className="w-full h-full flex items-center justify-center font-bold text-white transition-all duration-300"

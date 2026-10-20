@@ -1,6 +1,7 @@
 "use client";
 //src/features/mentorship/components/user-dashboard/UserSidebar.tsx
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import PhotoLightbox from "../shared/PhotoLightbox";
 import { useNavbarData } from "@/features/profile/components/home/NavbarProvider";
 import {
   LayoutDashboard,
@@ -64,6 +65,7 @@ export default function UserSidebar({
   const { user } = useAuth();
   const { userProfileData, profileImageUrl: accountImageUrl, loadProfile } = useProfile();
   const { menteeImage } = useNavbarData();
+  const [showPhoto, setShowPhoto] = useState(false);  
   // Mentee photo -> senior photo -> mentor photo
   const profileImageUrl = menteeImage || accountImageUrl;
 
@@ -128,11 +130,21 @@ export default function UserSidebar({
             style={{ border: "1px solid #e0d8cf" }}
           >
             {profileImageUrl ? (
-              <img
-                src={profileImageUrl}
-                alt={fullName}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-              />
+                            <>
+                            <img
+                              src={profileImageUrl}
+                              alt={fullName}
+                              title="Click to view photo"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform cursor-zoom-in"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowPhoto(true);
+                              }}
+                            />
+                            {showPhoto && (
+                              <PhotoLightbox src={profileImageUrl} alt={fullName} onClose={() => setShowPhoto(false)} />
+                            )}
+                          </>
             ) : (
               <div
                 className="w-full h-full flex items-center justify-center font-bold text-white transition-all duration-300"
