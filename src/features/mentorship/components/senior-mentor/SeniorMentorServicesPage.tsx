@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import type { SeniorMentorApplication } from "@/lib/api/seniorMentorApplication.service";
 import SeniorSessionService from "@/lib/api/seniorSession.service";
+import SeniorAvailabilityService from "@/lib/api/seniorAvailability.service";
+import { useRouter } from "next/navigation";
 import CreateOneToOneSession from "./CreateOneToOneSession";
 import { 
   User, Users, Sparkles, ChevronRight, Edit, 
@@ -180,8 +182,10 @@ function SessionCard({ session, onEdit, onDeleteClick }: { session: ISeniorSessi
 }
 
 // --- Main Page ---
-
 export default function SeniorMentorServicesPage({ seniorData }: { seniorData: SeniorMentorApplication }) {
+  const router = useRouter();
+  const availabilityUrl = `/mentorship/senior-mentor-profile/${seniorData.userId}/availability`;
+
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [sessionToEdit, setSessionToEdit] = useState<ISeniorSession | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<ISeniorSession | null>(null);
@@ -434,7 +438,38 @@ export default function SeniorMentorServicesPage({ seniorData }: { seniorData: S
             setSelectedCategory(null);
             setSessionToEdit(null);
           }} 
-          onSuccess={fetchSessions}
+          onSuccess={async () => {
+            const wasEdit = !!sessionToEdit;
+            fetchSessions();
+            if (wasEdit) return;
+
+            // Does the mentor have any real upcoming slots (next 30 days)?
+            let hasAvailability = false;
+            try {
+              const fmt = (d: Date) =>
+                `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              const start = new Date();
+              const end = new Date();
+              end.setDate(end.getDate() + 30);
+
+              const days = await SeniorAvailabilityService.getMonthlyAvailability(
+                seniorData.userId,
+                fmt(start),
+                fmt(end),
+                30
+              );
+              hasAvailability =
+                Array.isArray(days) && days.some((d) => d.slots?.some((s) => s.status !== "past"));
+            } catch {
+              // If the check fails, treat it as "not set" so the mentor is guided to Availability
+              hasAvailability = false;
+            }
+
+            if (!hasAvailability) {
+              showToast("Service created! Now set your availability so mentees can book.", "success");
+              setTimeout(() => router.push(availabilityUrl), 1200);
+            }
+          }}
         />
       )}
 

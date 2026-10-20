@@ -255,10 +255,7 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
   const [currentMonthDate, setCurrentMonthDate] = useState<Date>(() => new Date());
   const [monthlyData, setMonthlyData] = useState<MonthlyDayData[]>([]);
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
-  const [selectedDateStr, setSelectedDateStr] = useState<string>(() => {
-    const t = new Date();
-    return toDateStr(t.getFullYear(), t.getMonth(), t.getDate());
-  });
+  const [selectedDateStr, setSelectedDateStr] = useState<string>("");
 
   const effectiveMentorId = useMemo(() => {
     return mentorData?.userId || mentorData?.id || (config as any)?.mentorId || "";
@@ -443,12 +440,9 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
       setSaveMessage({ type: "error", text: "Please select a date." });
       return;
     }
-    if (toMin(newBlockEnd) <= toMin(newBlockStart)) {
-      setSaveMessage({ type: "error", text: "Block end time must be after start time." });
-      return;
-    }
     try {
-      await SeniorAvailabilityService.addBlockedTime(newBlockDate, newBlockStart, newBlockEnd, newBlockReason);
+      // Full-day block (no custom time / reason)
+      await SeniorAvailabilityService.addBlockedTime(newBlockDate, "00:00", "23:59");
       setSaveMessage({ type: "success", text: `Blocked time added for ${newBlockDate}` });
       setNewBlockDate("");
       setNewBlockReason("");
@@ -584,11 +578,11 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:items-stretch">
         {/* ── Left Section ──────────────────────────────── */}
-        <div className="lg:col-span-2 space-y-5">
+        <div className="lg:col-span-2 flex flex-col">
           {/* Weekly Schedule */}
-          <div className="bg-white p-6 rounded-2xl" style={{ border: "1px solid #e0d8cf" }}>
+          <div className="bg-white p-6 rounded-2xl flex-1" style={{ border: "1px solid #e0d8cf" }}>
             <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
               <h3 className="text-base font-bold" style={{ color: "#4a3728" }}>Weekly Schedule</h3>
 
@@ -624,31 +618,34 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
                 <button
                   type="button"
                   onClick={handleSaveConfig}
-                  disabled={isSaving}
+                  disabled={isSaving || !selectedDateStr}
+                  title={!selectedDateStr ? "Select a date on the calendar first" : "Save changes"}
                   className="px-3.5 py-1.5 rounded-lg text-white text-xs font-bold flex items-center gap-1.5 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90"
                   style={{ backgroundColor: "#4a3728" }}
                 >
                   <Check className="w-3.5 h-3.5" />
-                  {isSaving ? "Saving..." : "Save Changes"}
+                  {isSaving
+  ? "Saving..."
+  : selectedDateStr
+  ? `Save ${Number(selectedDateStr.split("-")[2])} ${MONTH_NAMES[Number(selectedDateStr.split("-")[1]) - 1].slice(0, 3)}`
+  : "Save Changes"}
                 </button>
               </div>
             </div>
 
-            <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-              <p className="text-xs" style={{ color: "#8a7a6a" }}>
-                Recurring working windows. Use + to add another time range in a day.
-              </p>
-              <button
-                type="button"
-                onClick={copyMondayToAll}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 hover:bg-[#f3ece4] transition-colors"
-                style={{ backgroundColor: "#fbf7f3", color: "#7a5c3e", border: "1px solid #e0d8cf" }}
+          
+            {!selectedDateStr && (
+              <div
+                className="mb-3 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2"
+                style={{ backgroundColor: "#fff7ed", color: "#9a3412", border: "1px solid #fed7aa" }}
               >
-                <Calendar className="w-3 h-3" /> Copy Monday → All
-              </button>
-            </div>
+                <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                Select a date on the calendar to enable saving.
+              </div>
+            )}
 
             <div className="space-y-2.5">
+
               {weekSchedule.map((item, idx) => {
                 const isSelectedDay = selectedDayName === item.day;
                 return (
@@ -763,8 +760,8 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
         </div>
 
         {/* ── Right Section ──────────────────────────────── */}
-        <div className="lg:col-span-1 space-y-5">
-          {/* Calendar */}
+        <div className="lg:col-span-1 flex flex-col gap-5">
+        {/* Calendar */}
           <div className="bg-white p-5 rounded-2xl" style={{ border: "1px solid #e0d8cf" }}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold flex items-center gap-2" style={{ color: "#4a3728" }}>
@@ -800,22 +797,22 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
 
             {/* Date grid — shows the number of slots under each date */}
             <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: firstDayWeekday }, (_, i) => <div key={`e-${i}`} className="aspect-square" />)}
+            {Array.from({ length: firstDayWeekday }, (_, i) => <div key={`e-${i}`} className="h-9" />)}
               {Array.from({ length: daysInMonth }, (_, i) => {
                 const date = i + 1;
                 const dateStr = toDateStr(year, monthIndex, date);
                 const dayData = monthlyByDate.get(dateStr);
                 const slotCount = dayData?.totalSlots ?? 0;
                 const blocked =
-                  !!dayData && (dayData.isDateBlocked || (dayData.totalSlots > 0 && dayData.blockedSlots === dayData.totalSlots));
+                !!dayData && dayData.totalSlots > 0 && dayData.blockedSlots === dayData.totalSlots;
                 const isToday = dateStr === todayStr;
                 const isSel = selectedDateStr === dateStr;
                 return (
                   <button
                     type="button"
                     key={dateStr}
-                    onClick={() => setSelectedDateStr(dateStr)}
-                    className="aspect-square flex flex-col items-center justify-center rounded-lg cursor-pointer transition-colors relative"
+                    onClick={() => setSelectedDateStr(dateStr === selectedDateStr ? "" : dateStr)}
+                    className="h-9 flex flex-col items-center justify-center rounded-lg cursor-pointer transition-colors relative"
                     style={{
                       backgroundColor: blocked ? "#fee2e2" : isSel ? "#4a3728" : isToday ? "#f3ece4" : "#fff",
                       border: !isSel ? `1px solid ${blocked ? "#fca5a5" : isToday ? "#c9a87c" : "#e0d8cf"}` : "none",
@@ -863,17 +860,18 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
           <div className="bg-white p-5 rounded-2xl" style={{ border: "1px solid #e0d8cf" }}>
             <div className="flex items-center justify-between gap-2">
               <h4 className="text-sm font-bold flex items-center gap-2" style={{ color: "#4a3728" }}>
-                <Clock className="w-4 h-4" style={{ color: "#7a5c3e" }} /> {selectedDateStr}
+              <Clock className="w-4 h-4" style={{ color: "#7a5c3e" }} /> {selectedDateStr || "Select a date"}
               </h4>
               <button
                 type="button"
+                disabled={!selectedDateStr}
                 onClick={() => {
                   setNewBlockDate(selectedDateStr);
                   setNewBlockStart("00:00");
                   setNewBlockEnd("23:59");
                   setShowBlockDateInput(true);
                 }}
-                className="text-[11px] font-bold px-2.5 py-1 rounded-lg"
+                className="text-[11px] font-bold px-2.5 py-1 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ backgroundColor: "#fee2e2", color: "#dc2626" }}
               >
                 + Block Day
@@ -887,11 +885,11 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
                   <span className="font-bold text-rose-700">{selectedDayData.blockedSlots} Blocked</span>
                 </>
               ) : (
-                "No schedule configured for this day"
+                                selectedDateStr ? "No schedule configured for this day" : "Pick a date from the calendar to see its slots"
               )}
             </p>
 
-            <div className="max-h-[260px] overflow-y-auto pr-1 space-y-2">
+            <div className="max-h-[170px] overflow-y-auto pr-1 space-y-2">
               {selectedDayData && selectedDayData.slots.length > 0 ? (
                 selectedDayData.slots.map((slot, sIdx) => {
                   const isAvail = slot.status === "available";
@@ -937,8 +935,8 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
             </div>
           </div>
 
-          {/* Blocked Dates */}
-          <div className="bg-white p-5 rounded-2xl" style={{ border: "1px solid #e0d8cf" }}>
+                   {/* Blocked Dates */}
+                   <div className="bg-white p-5 rounded-2xl flex-1" style={{ border: "1px solid #e0d8cf" }}>
             <h4 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: "#4a3728" }}>
               <Ban className="w-4 h-4" style={{ color: "#7a5c3e" }} /> Blocked Dates
             </h4>
@@ -954,7 +952,9 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
                     <div className="min-w-0">
                       <p className="text-sm font-semibold" style={{ color: "#4a3728" }}>{block.date}</p>
                       <p className="text-xs" style={{ color: "#8a7a6a" }}>
-                        {block.startTime} - {block.endTime}
+                      {block.startTime === "00:00" && block.endTime === "23:59"
+                          ? "Full day"
+                          : `${block.startTime} - ${block.endTime}`}
                         {block.reason ? ` · ${block.reason}` : ""}
                       </p>
                     </div>
@@ -996,19 +996,7 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
                   className="w-full px-3.5 py-2 rounded-lg outline-none text-sm font-semibold"
                   style={{ border: "1px solid #e0d8cf", backgroundColor: "#fbf7f3", color: "#4a3728" }}
                 />
-                <div className="flex items-center gap-2 justify-between">
-                  <TimeInput value={newBlockStart} onChange={setNewBlockStart} />
-                  <span style={{ color: "#8a7a6a" }} className="text-xs font-semibold">to</span>
-                  <TimeInput value={newBlockEnd} onChange={setNewBlockEnd} />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Reason (optional)"
-                  value={newBlockReason}
-                  onChange={(e) => setNewBlockReason(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-lg outline-none text-sm font-semibold"
-                  style={{ border: "1px solid #e0d8cf", backgroundColor: "#fbf7f3", color: "#4a3728" }}
-                />
+                
                 <div className="flex gap-2">
                   <button
                     type="button"
