@@ -138,25 +138,29 @@ const forceLogout = (reason: string) => {
 
 // ==================== TOKEN REFRESH (single shared call) ====================
 
-let refreshPromise: Promise<string> | null = null;
+let refreshPromise: Promise<string | null> | null = null;
 
 /**
- * Refresh endpoint call. 409 / 429 / 5xx / network error par retry hota hai
- * (response kho gaya ho to retry server ke grace window mein aati hai).
+ * Refresh endpoint call. 409 / 429 / 5xx / network error par retry hota hai.
+ *
+ * Token mode  : refreshToken body me jata hai.
+ * Cookie mode : refreshToken null hota hai; httpOnly refresh cookie
+ *               withCredentials se khud jaati hai.
  */
-const callRefreshEndpoint = async (refreshToken: string) => {
+const callRefreshEndpoint = async (refreshToken: string | null) => {
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= REFRESH_MAX_ATTEMPTS; attempt++) {
         try {
             return await axios.post<RefreshResponse>(
                 `${API_BASE_URL}${REFRESH_PATH}`,
-                { refreshToken },
+                refreshToken ? { refreshToken } : {},
                 {
                     headers: {
                         "Content-Type": "application/json",
                         [CSRF_HEADER_NAME]: CSRF_HEADER_VALUE,
                     },
+                    withCredentials: true,
                     timeout: 15000,
                 }
             );
@@ -182,10 +186,14 @@ const callRefreshEndpoint = async (refreshToken: string) => {
 
 /**
  * Asli refresh call. Lock ke andar chalta hai, to doosre tab ne agar abhi
- * refresh kar liya hai to uska naya token reuse hota hai (warna same refresh
- * token do baar use hoga aur backend "reuse" samajh ke session kill kar sakta hai).
+ * refresh kar liya hai to uska naya token reuse hota hai.
+ *
+ * Return: naya access token (token mode) ya null (cookie mode: server ne
+ * naye httpOnly cookies set kar diye). Fail hone par throw karta hai.
  */
-const performRefresh = async (failedToken: string | null): Promise<string> => {
+const performRefresh = async (
+    failedToken: string | null
+): Promise<string | null> => {
     const current = TokenStorage.getAccessToken();
     if (
         current &&
@@ -196,11 +204,12 @@ const performRefresh = async (failedToken: string | null): Promise<string> => {
     }
 
     const refreshToken = TokenStorage.getRefreshToken();
-    if (!refreshToken) {
-        throw new Error("NO_REFRESH_TOKEN");
-    }
-
     const response = await callRefreshEndpoint(refreshToken);
+
+    // Cookie mode: JS ke paas tokens nahi hote, server cookies rotate karta hai.
+    if (!refreshToken) {
+        return null;
+    }
 
     const tokens = response.data?.data?.tokens;
     if (!tokens?.accessToken) {
@@ -215,13 +224,17 @@ const performRefresh = async (failedToken: string | null): Promise<string> => {
     return tokens.accessToken;
 };
 
-const refreshAccessToken = (failedToken: string | null): Promise<string> => {
+const refreshAccessToken = (
+    failedToken: string | null
+): Promise<string | null> => {
     if (refreshPromise) return refreshPromise;
 
     const run = () => performRefresh(failedToken);
-    const pending: Promise<string> =
+    const pending: Promise<string | null> =
         typeof navigator !== "undefined" && navigator.locks
-            ? (navigator.locks.request(REFRESH_LOCK_NAME, run) as Promise<string>)
+            ? (navigator.locks.request(REFRESH_LOCK_NAME, run) as Promise<
+                  string | null
+              >)
             : run();
 
     refreshPromise = pending.finally(() => {
@@ -232,8 +245,7 @@ const refreshAccessToken = (failedToken: string | null): Promise<string> => {
 };
 
 /**
- * Sirf tab logout jab server ne refresh token definitely reject kiya ho
- * (400 / 401) ya refresh token hai hi nahi.
+ * Sirf tab logout jab server ne refresh definitely reject kiya ho (400 / 401).
  * Network error, timeout, 403, 409, 429 ya 5xx par user ko logout NAHI karte.
  */
 const handleRefreshFailure = (refreshError: unknown) => {
@@ -245,14 +257,6 @@ const handleRefreshFailure = (refreshError: unknown) => {
                 `refresh_rejected status=${status} message=${body?.message ?? "n/a"}`
             );
         }
-        return;
-    }
-
-    if (
-        refreshError instanceof Error &&
-        refreshError.message === "NO_REFRESH_TOKEN"
-    ) {
-        forceLogout("no_refresh_token");
     }
 };
 
@@ -260,14 +264,12 @@ const handleRefreshFailure = (refreshError: unknown) => {
 
 api.interceptors.request.use(
     async (reqConfig) => {
-        // Safety net: kisi call ne headers overwrite kiye ho tab bhi
-        // CSRF header hamesha jaaye (cookie-session mode ke liye zaroori).
         if (!reqConfig.headers.has(CSRF_HEADER_NAME)) {
             reqConfig.headers.set(CSRF_HEADER_NAME, CSRF_HEADER_VALUE);
         }
 
-        // Access token gayab ya expire ho aur refresh token ho, to request
-        // bhejne se pehle hi naya token le lo (401 ka wait nahi).
+        // Token mode: access token gayab/expire ho to request se pehle hi refresh.
+        // (Cookie mode me JS ko expiry pata nahi, wahan 401 par refresh hota hai.)
         if (
             !matchesAny(reqConfig.url, AUTH_FREE_PATHS) &&
             TokenStorage.getRefreshToken() &&
@@ -309,22 +311,23 @@ api.interceptors.response.use(
             return Promise.reject(error);
         }
 
+        // Koi session hi nahi (anonymous visitor): refresh try karne ka koi matlab nahi
+        if (!TokenStorage.isAuthenticated() && !TokenStorage.getRefreshToken()) {
+            return Promise.reject(error);
+        }
+
         const failedHeader = originalRequest.headers?.Authorization;
         const failedToken = failedHeader
             ? String(failedHeader).replace(/^Bearer\s+/i, "")
             : null;
 
-        // Refresh token hi nahi hai: session recover nahi ho sakta
-        if (!TokenStorage.getRefreshToken()) {
-            if (failedToken) forceLogout("no_refresh_token_on_401");
-            return Promise.reject(error);
-        }
-
         originalRequest._retry = true;
 
         try {
             const newToken = await refreshAccessToken(failedToken);
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            if (newToken) {
+                originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            }
             return api(originalRequest);
         } catch (refreshError: unknown) {
             handleRefreshFailure(refreshError);
@@ -335,8 +338,7 @@ api.interceptors.response.use(
 );
 
 /**
- * Socket jaise non-axios callers ke liye: valid access token do,
- * zarurat ho to usi shared refresh se (alag raw refresh kabhi mat karo).
+ * Non-axios callers ke liye: valid access token do (token mode).
  */
 export const getFreshAccessToken = async (): Promise<string | null> => {
     if (!TokenStorage.getRefreshToken()) {
@@ -354,20 +356,25 @@ export const getFreshAccessToken = async (): Promise<string | null> => {
 };
 
 /**
- * Forced refresh (socket.client.ts jaise callers ke liye, jab server ne token reject kiya).
- * Same shared single-flight + lock use karta hai. Naya access token ya null return karta hai.
+ * Forced session renewal (token + cookie dono mode).
+ * true = session renew ho gaya, false = fail (401 par logout bhi ho chuka hota hai).
  */
-export const refreshSession = async (): Promise<string | null> => {
-    if (!TokenStorage.getRefreshToken()) {
-        return TokenStorage.getAccessToken();
-    }
+export const renewSession = async (): Promise<boolean> => {
     try {
-        // failedToken = current token, taaki performRefresh "abhi bhi valid hai" samajh ke skip na kare
-        return await refreshAccessToken(TokenStorage.getAccessToken());
+        await refreshAccessToken(TokenStorage.getAccessToken());
+        return true;
     } catch (refreshError: unknown) {
         handleRefreshFailure(refreshError);
-        return null;
+        return false;
     }
+};
+
+/**
+ * Backward compatible: naya access token (token mode) ya null.
+ */
+export const refreshSession = async (): Promise<string | null> => {
+    const ok = await renewSession();
+    return ok ? TokenStorage.getAccessToken() : null;
 };
 
 export default api;

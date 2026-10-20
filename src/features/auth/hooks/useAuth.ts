@@ -1,7 +1,8 @@
+// src/features/auth/hooks/useAuth.ts
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import AuthService from '@/lib/api/auth.service';
 import TokenStorage from '@/lib/store/token.storage';
 
@@ -17,6 +18,57 @@ interface UseAuthReturn {
     logout: () => Promise<void>;
     refreshAuth: () => void;
 }
+
+// ==================== SESSION VALIDATION ====================
+// localStorage ka userData sirf "marker" hai. Asli session server ke paas hai
+// (httpOnly cookies). Yahan ek authenticated call se confirm karte hain.
+// api.intance.ts 401 par khud refresh try karta hai; yahan tak error tabhi
+// aata hai jab refresh bhi fail ho gaya ho.
+
+const VALIDATION_TTL_MS = 5 * 60 * 1000;
+
+let lastValidatedAt = 0;
+let inFlightValidation: Promise<boolean> | null = null;
+
+const isAuthError = (err: any): boolean => {
+    const status = err?.response?.status ?? err?.status;
+    if (status === 401) return true;
+    const message = String(err?.message || '');
+    return /login again|authentication required|unauthori[sz]ed|session has ended/i.test(message);
+};
+
+/**
+ * true  = session valid ya pata nahi (network/5xx: user ko logout nahi karte)
+ * false = server ne definitely reject kiya (refresh ke baad bhi 401)
+ */
+const validateSession = (): Promise<boolean> => {
+    if (Date.now() - lastValidatedAt < VALIDATION_TTL_MS) {
+        return Promise.resolve(true);
+    }
+    if (inFlightValidation) return inFlightValidation;
+
+    inFlightValidation = AuthService.getUserProfile()
+        .then(() => {
+            lastValidatedAt = Date.now();
+            return true;
+        })
+        .catch((err: any) => {
+            if (isAuthError(err)) return false;
+            return true;
+        })
+        .finally(() => {
+            inFlightValidation = null;
+        });
+
+    return inFlightValidation;
+};
+
+const resetSessionValidation = () => {
+    lastValidatedAt = 0;
+    inFlightValidation = null;
+};
+
+// ==================== useAuth ====================
 
 export function useAuth(): UseAuthReturn {
     const router = useRouter();
@@ -64,6 +116,7 @@ export function useAuth(): UseAuthReturn {
     const logout = async () => {
         try {
             await AuthService.logout();
+            resetSessionValidation();
             setUser(null);
             router.push('/login');
         } catch (error) {
@@ -80,30 +133,55 @@ export function useAuth(): UseAuthReturn {
     };
 }
 
+// ==================== useProtectedRoute ====================
+
 export function useProtectedRoute() {
     const router = useRouter();
+    const pathname = usePathname();
     const [isChecking, setIsChecking] = useState(true);
 
     useEffect(() => {
-        const checkAuth = async () => {
-            await new Promise(resolve => setTimeout(resolve, 50));
+        let cancelled = false;
 
-            // 🍪 Tokens are httpOnly cookies, so check the local session marker
-            // (flag cookie + stored user). If the cookie session has really expired,
-            // the first API call gets a 401 and api.instance.ts refreshes it once
-            // (or sends the user to /login if that fails).
+        const goToLogin = () => {
+            TokenStorage.clearAuthData('protected_route_invalid_session'); // flag cookie bhi clear, loop tootega
+            resetSessionValidation();
+            const target =
+                pathname && pathname !== '/login'
+                    ? `/login?redirect=${encodeURIComponent(pathname)}`
+                    : '/login';
+            router.replace(target);
+        };
+
+        const check = async () => {
+            await new Promise((resolve) => setTimeout(resolve, 50));
+            if (cancelled) return;
+
+            // Step 1: local marker (instant)
             if (!TokenStorage.isAuthenticated()) {
-                TokenStorage.clearAuthData(); // flag cookie bhi clear karega, loop tootega
                 setIsChecking(false);
-                router.replace('/login');
+                goToLogin();
                 return;
             }
 
+            // Page turant dikhao, validation background mein chalegi
             setIsChecking(false);
+
+            // Step 2: server se session confirm (refresh interceptor ke through)
+            const valid = await validateSession();
+            if (cancelled) return;
+
+            if (!valid) {
+                goToLogin();
+            }
         };
 
-        checkAuth();
-    }, [router]);
+        check();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [router, pathname]);
 
     return { isChecking };
 }
