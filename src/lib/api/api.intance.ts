@@ -11,6 +11,12 @@ import TokenStorage from "@/lib/store/token.storage";
 const API_BASE_URL =
     config.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
 
+// Backend cookieAuth.middleware.ts: POST/PUT/PATCH/DELETE par cookies tabhi
+// maani jaati hain jab ye header ho (CSRF protection). Iske bina cookie-session
+// mode me write requests "Authorization header required" (401) se fail hoti hain.
+const CSRF_HEADER_NAME = "X-Requested-With";
+const CSRF_HEADER_VALUE = "XMLHttpRequest";
+
 // Backend route se match hona chahiye (auth.routes.ts)
 const REFRESH_PATH = "/auth/refresh-token";
 const REFRESH_LOCK_NAME = "throne8_token_refresh";
@@ -72,6 +78,7 @@ const api: AxiosInstance = axios.create({
     headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        [CSRF_HEADER_NAME]: CSRF_HEADER_VALUE,
     },
     withCredentials: true,
 });
@@ -146,7 +153,10 @@ const callRefreshEndpoint = async (refreshToken: string) => {
                 `${API_BASE_URL}${REFRESH_PATH}`,
                 { refreshToken },
                 {
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        [CSRF_HEADER_NAME]: CSRF_HEADER_VALUE,
+                    },
                     timeout: 15000,
                 }
             );
@@ -250,6 +260,12 @@ const handleRefreshFailure = (refreshError: unknown) => {
 
 api.interceptors.request.use(
     async (reqConfig) => {
+        // Safety net: kisi call ne headers overwrite kiye ho tab bhi
+        // CSRF header hamesha jaaye (cookie-session mode ke liye zaroori).
+        if (!reqConfig.headers.has(CSRF_HEADER_NAME)) {
+            reqConfig.headers.set(CSRF_HEADER_NAME, CSRF_HEADER_VALUE);
+        }
+
         // Access token gayab ya expire ho aur refresh token ho, to request
         // bhejne se pehle hi naya token le lo (401 ka wait nahi).
         if (
