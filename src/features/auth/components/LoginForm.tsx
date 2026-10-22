@@ -33,13 +33,14 @@ export default function LoginForm() {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     mode: 'onChange',
   });
 
   const onSubmit = async (data: LoginFormData) => {
+    if (loading || isSubmitting) return;
     try {
       clearLoginError();
 
@@ -141,16 +142,16 @@ export default function LoginForm() {
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={loading || !mounted}
+        disabled={loading || isSubmitting || !mounted}
         className={`w-full py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-semibold transition shadow-lg text-sm sm:text-base
             ${rememberMe
             ? 'bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white hover:opacity-90'
             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }
-    ${loading || !mounted ? 'opacity-70' : ''}
+    ${loading || isSubmitting || !mounted ? 'opacity-70' : ''}
   `}
       >
-        {loading ? 'Signing In...' : 'Sign In'}
+        {loading || isSubmitting ? 'Signing In...' : 'Sign In'}
       </button>
     </form>
   );
