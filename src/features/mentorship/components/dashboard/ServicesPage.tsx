@@ -527,6 +527,13 @@ export default function ServicesPage({
       setFieldErrors({});
       setSelectedServiceType(null);
       setFormData(getDefaultFormData());
+
+      // ✅ NEW: service create hone ke baad Availability tab par redirect
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', 'availability');
+      params.delete('subtab');
+      params.delete('q');
+      router.push(`${pathname}?${params.toString()}`);
     } catch (err: any) {
       setSaveError(err.message);
     } finally {

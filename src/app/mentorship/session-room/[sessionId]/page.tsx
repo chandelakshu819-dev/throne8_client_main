@@ -9,6 +9,10 @@ import SessionService from '@/lib/api/session.service';
 import MentorService from '@/lib/api/mentorship.service';
 import SeniorSessionService from '@/lib/api/seniorSession.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { routes } from '@/config/routes';
+import UserDashboardReviewModal from '@/features/mentorship/components/user-dashboard/UserDashboardReviewModal';
+
+
 
 type CallStatus = 'active' | 'reconnecting' | 'left' | 'dropped';
 // socket.io khud ~5 attempts (~17s) karta hai; ye sirf safety ceiling hai
@@ -54,6 +58,19 @@ export default function SessionRoomPage() {
   const [isRejoining, setIsRejoining] = useState(false);
   const [rejoinError, setRejoinError] = useState<string | null>(null);
   const rejoinInFlightRef = useRef(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const reviewPromptShownRef = useRef(false);
+  const redirectedRef = useRef(false);
+
+  // Review sirf 1:1 (SessionMentor) session ka mentee de sakta hai.
+  const isMentee = (() => {
+    if (!sessionData || !currentUserId || sessionData.booking) return false;
+    const uid = String(currentUserId);
+    const inBookings = (sessionData.bookings || []).some(
+      (b: any) => String(b.menteeId || b.bookedBy || '') === uid
+    );
+    return inBookings || String(sessionData.menteeId || '') === uid;
+  })();  
   const dropTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attemptRejoinRef = useRef<() => Promise<'joined' | 'ended' | 'failed' | 'busy'>>(
     async () => 'failed'
@@ -109,10 +126,16 @@ export default function SessionRoomPage() {
           normalized = res?.data ?? res;
         } catch (oneOnOneErr: any) {
           const msg = (oneOnOneErr?.message || '').toLowerCase();
+          if (msg.includes('has ended') || msg.includes('no longer active')) {
+            const endedRes = await SessionService.getSessionById(sessionId);
+            normalized = endedRes?.data ?? endedRes;
+            setEndedByCheck(true);
+            setSessionData(normalized);
+            return;
+          }
           if (
             msg.includes('not started yet') ||
             msg.includes('too early') ||
-            msg.includes('has ended') ||
             msg.includes('expired')
           ) {
             throw oneOnOneErr;
@@ -151,7 +174,7 @@ export default function SessionRoomPage() {
   }, [sessionId]);
 
   useEffect(() => {
-    if (sessionData && currentUserId && !hasJoinedRef.current) {
+    if (sessionData && currentUserId && !endedByCheck && !hasJoinedRef.current) {      
       hasJoinedRef.current = true;
       joinRoom(true, true).then((ok) => {
         if (!ok) return; // permission/socket fail → "joined" notification mat bhejo
@@ -160,7 +183,7 @@ export default function SessionRoomPage() {
         setPeerNotified(true);
       });
     }
-  }, [sessionData, currentUserId, joinRoom, sessionId]);
+  }, [sessionData, currentUserId, endedByCheck, joinRoom, sessionId]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -213,6 +236,15 @@ export default function SessionRoomPage() {
   const handleGoBack = useCallback(() => {
     router.back();
   }, [router]);
+
+  const goToReviews = useCallback(() => {
+    if (redirectedRef.current) return;
+    redirectedRef.current = true;
+    setShowReviewModal(false);
+    router.replace(`${routes.menteeDashboard(currentUserId)}?tab=reviews`);
+  }, [router, currentUserId]);
+
+
 
   // Rejoin se pehle: session sach me khatam to nahi ho gayi? (socket event miss ho sakta hai)
   const checkIfSessionOver = useCallback(async (): Promise<boolean> => {
@@ -397,9 +429,20 @@ export default function SessionRoomPage() {
          {roomEnded?.endedAt && (
            <p style={{ fontSize: 12, opacity: 0.6, margin: 0 }}>Ended at {formatTime(roomEnded.endedAt)}</p>
          )}
-         <button onClick={handleGoBack} style={{ marginTop: 8, borderRadius: 9999, padding: '10px 24px', border: 'none', fontWeight: 600, color: 'white', backgroundColor: '#4a3728', cursor: 'pointer' }}>
-           Go Back
+                <button
+           onClick={isMentee ? goToReviews : handleGoBack}
+           style={{ marginTop: 8, borderRadius: 9999, padding: '10px 24px', border: 'none', fontWeight: 600, color: 'white', backgroundColor: '#4a3728', cursor: 'pointer' }}
+         >
+           {isMentee ? 'Go to Reviews & Feedback' : 'Go Back'}
          </button>
+         {isMentee && showReviewModal && (
+           <UserDashboardReviewModal
+             sessionId={sessionId}
+             mentorId={String(sessionData.mentorId || '')}
+             onClose={goToReviews}
+             onSuccess={() => {}}
+           />
+         )}
        </div>
      );
    }
