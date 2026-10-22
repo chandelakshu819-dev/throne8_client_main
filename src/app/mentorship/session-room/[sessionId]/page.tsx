@@ -10,7 +10,6 @@ import MentorService from '@/lib/api/mentorship.service';
 import SeniorSessionService from '@/lib/api/seniorSession.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { routes } from '@/config/routes';
-import UserDashboardReviewModal from '@/features/mentorship/components/user-dashboard/UserDashboardReviewModal';
 
 
 
@@ -58,19 +57,30 @@ export default function SessionRoomPage() {
   const [isRejoining, setIsRejoining] = useState(false);
   const [rejoinError, setRejoinError] = useState<string | null>(null);
   const rejoinInFlightRef = useRef(false);
-  const [showReviewModal, setShowReviewModal] = useState(false);
-  const reviewPromptShownRef = useRef(false);
+
+ 
+  const [sessionKind, setSessionKind] = useState<'one-on-one' | 'group' | 'senior'>('one-on-one');
+  const [redirectCountdown, setRedirectCountdown] = useState(5);
+  const [redirectCancelled, setRedirectCancelled] = useState(false);
   const redirectedRef = useRef(false);
 
-  // Review sirf 1:1 (SessionMentor) session ka mentee de sakta hai.
-  const isMentee = (() => {
-    if (!sessionData || !currentUserId || sessionData.booking) return false;
-    const uid = String(currentUserId);
-    const inBookings = (sessionData.bookings || []).some(
-      (b: any) => String(b.menteeId || b.bookedBy || '') === uid
-    );
-    return inBookings || String(sessionData.menteeId || '') === uid;
-  })();  
+    // Only the mentee of a 1:1 session can review it.
+    const isMentee = (() => {
+      if (!sessionData || !currentUserId || sessionData.booking || sessionKind !== 'one-on-one') return false;
+      const uid = String(currentUserId);
+      const inBookings = (sessionData.bookings || []).some(
+        (b: any) => String(b.menteeId || b.bookedBy || '') === uid
+      );
+      if (inBookings || String(sessionData.menteeId || '') === uid) return true;
+      const rawMentor = sessionData.mentorId;
+      const mentorUid =
+        rawMentor && typeof rawMentor === 'object'
+          ? String(rawMentor._id || rawMentor.userId || '')
+          : String(rawMentor || '');
+      // mentor id known and it is not me -> I am the mentee
+      return !!mentorUid && mentorUid !== uid;
+    })();
+
   const dropTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attemptRejoinRef = useRef<() => Promise<'joined' | 'ended' | 'failed' | 'busy'>>(
     async () => 'failed'
@@ -95,9 +105,12 @@ export default function SessionRoomPage() {
     leaveRoom,
     toggleCamera,
     toggleMic,
+
   } = useLiveRoom({
     roomId,
+    sessionId,
     userId: currentUserId,
+
     userName: currentUserName,
   });
 
@@ -144,8 +157,10 @@ export default function SessionRoomPage() {
           try {
             const groupRes = await MentorService.getGroupSessionById(sessionId);
             normalized = groupRes?.data ?? groupRes;
+            setSessionKind('group');
           } catch (groupErr: any) {
             console.warn('[SessionRoom] Group session fetch failed, trying senior session:', groupErr.message);
+            setSessionKind('senior');
             const seniorRes = await SeniorSessionService.getSessionById(sessionId);
             const seniorData = seniorRes?.data ?? seniorRes;
             const matchedBooking = (seniorData.bookings || []).find(
@@ -240,9 +255,27 @@ export default function SessionRoomPage() {
   const goToReviews = useCallback(() => {
     if (redirectedRef.current) return;
     redirectedRef.current = true;
-    setShowReviewModal(false);
-    router.replace(`${routes.menteeDashboard(currentUserId)}?tab=reviews`);
-  }, [router, currentUserId]);
+    // ?review=<sessionId> makes the Reviews page open this session's feedback form
+    router.replace(
+      `${routes.menteeDashboard(currentUserId)}?tab=reviews&review=${encodeURIComponent(sessionId)}`
+    );
+  }, [router, currentUserId, sessionId]);
+
+  // Mentee: once the session has ended, auto-redirect to Reviews & Feedback after 5s
+  const shouldAutoRedirect = (!!roomEnded || endedByCheck) && isMentee && !redirectCancelled;
+
+  useEffect(() => {
+    if (!shouldAutoRedirect) return;
+    setRedirectCountdown(5);
+    const t = setInterval(() => {
+      setRedirectCountdown((c) => (c <= 1 ? 0 : c - 1));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [shouldAutoRedirect]);
+
+  useEffect(() => {
+    if (shouldAutoRedirect && redirectCountdown === 0) goToReviews();
+  }, [shouldAutoRedirect, redirectCountdown, goToReviews]);
 
 
 
@@ -400,7 +433,7 @@ export default function SessionRoomPage() {
   if (loading) {
     return (
       <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f6ede8' }}>
-        <p style={{ color: '#4a3728' }}>Session load ho raha hai...</p>
+<p style={{ color: '#4a3728' }}>Loading session...</p>
       </div>
     );
   }
@@ -429,20 +462,29 @@ export default function SessionRoomPage() {
          {roomEnded?.endedAt && (
            <p style={{ fontSize: 12, opacity: 0.6, margin: 0 }}>Ended at {formatTime(roomEnded.endedAt)}</p>
          )}
-                <button
-           onClick={isMentee ? goToReviews : handleGoBack}
-           style={{ marginTop: 8, borderRadius: 9999, padding: '10px 24px', border: 'none', fontWeight: 600, color: 'white', backgroundColor: '#4a3728', cursor: 'pointer' }}
-         >
-           {isMentee ? 'Go to Reviews & Feedback' : 'Go Back'}
-         </button>
-         {isMentee && showReviewModal && (
-           <UserDashboardReviewModal
-             sessionId={sessionId}
-             mentorId={String(sessionData.mentorId || '')}
-             onClose={goToReviews}
-             onSuccess={() => {}}
-           />
+                        {isMentee && (
+           <p style={{ fontSize: 13, opacity: 0.85, margin: 0 }}>
+             {redirectCancelled
+               ? 'How was your session? Your feedback helps other mentees.'
+               : `Taking you to Reviews & Feedback in ${redirectCountdown}s...`}
+           </p>
          )}
+         <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+           <button
+             onClick={isMentee ? goToReviews : handleGoBack}
+             style={{ borderRadius: 9999, padding: '10px 24px', border: 'none', fontWeight: 600, color: 'white', backgroundColor: '#7a5c3e', cursor: 'pointer' }}
+           >
+             {isMentee ? 'Give feedback now' : 'Go Back'}
+           </button>
+           {isMentee && !redirectCancelled && (
+             <button
+               onClick={() => setRedirectCancelled(true)}
+               style={{ borderRadius: 9999, padding: '10px 24px', border: '1px solid rgba(255,255,255,0.3)', color: 'white', backgroundColor: 'transparent', cursor: 'pointer' }}
+             >
+               Stay on this page
+             </button>
+           )}
+         </div>
        </div>
      );
    }

@@ -195,6 +195,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
             mentorId={mentorId}
             onBack={() => setBookingStep("details")}
             onConfirm={() => setBookingStep("confirmation")}
+            onPickAnotherSlot={() => setBookingStep("calendar")}
             onBookingSuccess={() => {
                 const isGroupTemplate = selectedService?.type === "GroupSession";
                 if (selectedService?.id) {

@@ -17,6 +17,7 @@ interface PaymentStepProps {
     onBack: () => void;
     onConfirm: () => void;
     onBookingSuccess: () => void;
+    onPickAnotherSlot?: () => void;
 }
 
 const BANKS: string[] = ["State Bank of India", "HDFC Bank", "ICICI Bank", "Axis Bank", "Punjab National Bank", "Bank of Baroda"];
@@ -24,8 +25,9 @@ const WALLETS: string[] = ["Paytm", "Amazon Pay", "PhonePe", "Mobikwik"];
 
 const PaymentStep: React.FC<PaymentStepProps> = ({
     selectedService, calendarData, formData, mentorId,
-    onBack, onConfirm, onBookingSuccess
+    onBack, onConfirm, onBookingSuccess, onPickAnotherSlot
 }) => {
+
     const [paymentMethod, setPaymentMethod] = useState<string>("");
     const [booking, setBooking] = useState(false);
     const [bookingError, setBookingError] = useState<string | null>(null);
@@ -203,6 +205,14 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                     <div style={{ padding: "12px 16px", borderRadius: "12px", background: "#fee2e2", border: "1px solid #fca5a5", color: "#dc2626", fontSize: "13px", fontWeight: 600, marginTop: "16px" }}>
                         ❌ {bookingError}
                     </div>
+                )}
+                {bookingError && /already|no longer available/i.test(bookingError) && onPickAnotherSlot && (
+                    <button
+                        onClick={onPickAnotherSlot}
+                        style={{ width: "100%", marginTop: "12px", padding: "12px", borderRadius: "12px", border: `1px solid ${C.border}`, background: "transparent", color: C.dark, fontSize: "14px", fontWeight: 600, cursor: "pointer" }}
+                    >
+                        Choose another slot
+                    </button>
                 )}
                 {paymentMethod && (
                     <button onClick={() => handleBookSession()} style={{ ...btnPrimary, width: "100%", padding: "16px", borderRadius: "12px", fontSize: "17px", marginTop: "16px" }}>

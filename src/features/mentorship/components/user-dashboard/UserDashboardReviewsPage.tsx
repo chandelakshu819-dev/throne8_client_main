@@ -1,7 +1,9 @@
 //src/features/mentorship/components/user-dashboard/UserDashboardReviewsPage.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { Star, MessageSquare, RefreshCw, AlertCircle, CheckCircle2, Clock, Calendar, ArrowRight, Trash2 } from "lucide-react";
 import UserDashboardReviewModal from "./UserDashboardReviewModal";
 import ReviewService, { MentorReview, ReviewTag, REVIEW_TAGS } from "@/lib/api/review.service";
@@ -144,6 +146,49 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
     });
     return set;
   }, [reviews]);
+
+  // Coming from a just-ended call: ?tab=reviews&review=<sessionId>
+  const searchParams = useSearchParams();
+  const reviewTargetId = searchParams?.get("review") || "";
+  const autoOpenedRef = useRef(false);
+
+  useEffect(() => {
+    if (!reviewTargetId || isLoading || autoOpenedRef.current) return;
+    autoOpenedRef.current = true;
+
+    if (reviewedSessionIds.has(reviewTargetId)) {
+      setActiveTab("given");
+      return;
+    }
+
+    const known = sessionMap.get(reviewTargetId);
+    if (known?.mentorId) {
+      setActiveTab("pending");
+      setReviewModalSession(known);
+      return;
+    }
+
+    (async () => {
+      try {
+        const res: any = await SessionService.getSessionById(reviewTargetId);
+        const d = res?.data ?? res;
+        if (!d) return;
+        const raw = d.mentorId;
+        const mentorId =
+          raw && typeof raw === "object" ? String(raw._id || raw.userId || "") : String(raw || "");
+        if (!mentorId) return;
+        setActiveTab("pending");
+        setReviewModalSession({
+          sessionId: reviewTargetId,
+          mentorId,
+          mentorName: d.mentorName || d.mentor?.name,
+          title: d.title,
+        });
+      } catch (err) {
+        console.error("Could not open review form for session:", err);
+      }
+    })();
+  }, [reviewTargetId, isLoading, reviewedSessionIds, sessionMap]);
 
   // "Pending Reviews": completed sessions without a submitted review
   const pendingSessions = useMemo(() => {
@@ -531,7 +576,7 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
               const sessionId = s.sessionId || s._id || `P-${idx}`;
               const id1 = s.sessionId ? String(s.sessionId) : "";
               const id2 = s._id ? String(s._id) : "";
-              const isAlreadyReviewed = (id1 && reviewedSessionIds.has(id1)) || (id2 && reviewedSessionIds.has(id2));
+              const isAlreadyReviewed = !!((id1 && reviewedSessionIds.has(id1)) || (id2 && reviewedSessionIds.has(id2)));
 
               return (
                 <div

@@ -67,8 +67,10 @@ export interface LiveRoomState {
   error: string | null;
 }
 
+
 export interface UseLiveRoomOptions {
   roomId: string;
+  sessionId?: string;
   userId: string;
   userName?: string;
   /** Called when a peer joins */
@@ -205,6 +207,7 @@ async function applyBitrateConstraint(
 
 export function useLiveRoom({
   roomId,
+  sessionId,
   userId,
   userName,
   onPeerJoined,
@@ -1182,8 +1185,15 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
           if (!isMounted.current) return;
           // Sirf apni room/session ka event process karo
           const ids = [payload?.sessionId, payload?.bookingId].filter(Boolean);
-          if (ids.length > 0 && !ids.includes(roomId)) return;
-    
+          if (
+            ids.length > 0 &&
+            !ids.includes(roomId) &&
+            !(sessionId && ids.includes(sessionId))
+          ) {
+            return;
+          }
+          
+          
           leaveRoom();
           setRoomEnded(payload ?? {});
         };
@@ -1213,6 +1223,7 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
     };
   }, [
     roomId,
+    sessionId,
     userId,
     leaveRoom,
     createPeerConnection,
