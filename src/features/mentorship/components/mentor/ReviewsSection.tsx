@@ -320,8 +320,9 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
     const distribution = stats?.distribution ?? { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
 
     return (
-        <div style={{ borderRadius: "24px", padding: "32px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 8px 32px rgba(74,55,40,0.08)" }}>
-            <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "24px" }}>Ratings &amp; Reviews</h2>
+        <div style={{ width: "100%", maxWidth: "820px", borderRadius: "24px", padding: "32px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 8px 32px rgba(74,55,40,0.08)" }}>
+            <h2 style={{ fontSize: "22px", fontWeight: 700, color: C.dark, marginBottom: "24px", letterSpacing: "-0.01em" }}>Ratings &amp; Reviews</h2>
+
 
             {notice && (
                 <div role="status" style={{ position: "sticky", top: "8px", zIndex: 5, marginBottom: "16px", padding: "10px 14px", borderRadius: "12px", background: "#fef3c7", color: "#92400e", fontSize: "13px" }}>
@@ -345,10 +346,10 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
             {!statsLoading && totalReviews > 0 && (
                 <>
                     <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "32px", alignItems: "center", marginBottom: "28px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "32px", alignItems: "center", maxWidth: "520px", padding: "20px 24px", borderRadius: "16px", background: C.bg, border: `1px solid ${C.border}`, marginBottom: "28px" }}>
                         <div style={{ textAlign: "center" }}>
-                            <div style={{ fontSize: "48px", fontWeight: "bold", color: C.dark }}>{averageRating.toFixed(1)}</div>
-                            <div style={{ display: "flex", gap: "2px", justifyContent: "center", marginBottom: "4px" }}>
+
+                        <div style={{ fontSize: "44px", fontWeight: 700, color: C.dark, lineHeight: 1, marginBottom: "8px" }}>{averageRating.toFixed(1)}</div>                            <div style={{ display: "flex", gap: "2px", justifyContent: "center", marginBottom: "4px" }}>
                                 {[...Array(5)].map((_, i) => <Star key={i} filled={i < Math.round(averageRating)} style={{ color: "#f59e0b" }} />)}
                             </div>
                             <div style={{ fontSize: "12px", color: C.mid }}>Based on {totalReviews} review{totalReviews !== 1 ? "s" : ""}</div>
@@ -360,8 +361,8 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
                                 return (
                                     <div key={stars} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                                         <span style={{ fontSize: "12px", color: C.mid, width: "20px" }}>{stars}★</span>
-                                        <div style={{ flex: 1, height: "8px", borderRadius: "4px", background: C.border, overflow: "hidden" }}>
-                                            <div style={{ height: "100%", borderRadius: "4px", background: C.mid, width: `${pct}%` }} />
+                                        <div style={{ flex: 1, height: "8px", borderRadius: "999px", background: C.border, overflow: "hidden" }}>
+                                        <div style={{ height: "100%", borderRadius: "999px", background: "#f59e0b", width: `${pct}%`, transition: "width 0.4s ease" }} />
                                         </div>
                                         <span style={{ fontSize: "12px", color: C.mid, width: "32px" }}>{pct}%</span>
                                     </div>
@@ -377,8 +378,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
                             disabled={loadingMore}
                             onChange={(e) => setSort(e.target.value as ReviewSort)}
                             aria-label="Sort reviews"
-                            style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "10px", border: `1px solid ${C.border}`, background: C.bg, color: C.dark }}
-                        >
+                            style={{ fontSize: "12px", padding: "8px 12px", borderRadius: "10px", border: `1px solid ${C.border}`, background: C.bg, color: C.dark, cursor: "pointer", outline: "none" }}                        >
                             {SORT_OPTIONS.map((o) => (
                                 <option key={o.value} value={o.value}>{o.label}</option>
                             ))}
@@ -388,8 +388,9 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
                     {loading ? (
                         <Spinner label="Loading..." />
                     ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "16px", maxWidth: "720px" }}>
                         {reviews.map((review, idx) => {
+
                             const reviewId = getReviewKey(review, idx);
                             const displayName = getMenteeName(review);
                             const avatar = review.mentee?.profilePic || review.mentee?.profilePhotoId;
@@ -408,9 +409,10 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
                             const identity = (
                                 <>
                                     {isImageUrl(avatar) ? (
-                                        <img src={avatar} alt={displayName} style={{ width: "40px", height: "40px", borderRadius: "50%", objectFit: "cover" }} />
+                                        <img src={avatar} alt={displayName} style={{ width: "44px", height: "44px", borderRadius: "50%", objectFit: "cover", border: `2px solid ${C.surface}`, boxShadow: "0 1px 4px rgba(74,55,40,0.15)" }} />
                                     ) : (
-                                        <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: C.grad, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: "bold" }}>
+<div style={{ width: "44px", height: "44px", borderRadius: "50%", background: C.grad, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: "bold" }}>
+    
                                             {displayName.charAt(0).toUpperCase()}
                                         </div>
                                     )}
@@ -427,7 +429,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
                             );
 
                             return (
-                                <div key={reviewId} style={{ borderRadius: "16px", padding: "20px", background: C.bg, border: `1px solid ${C.border}` }}>
+<div key={reviewId} style={{ borderRadius: "16px", padding: "18px 20px", background: C.bg, border: `1px solid ${C.border}`, boxShadow: "0 2px 8px rgba(74,55,40,0.05)" }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
                                         {profileHref ? (
                                             <Link
@@ -457,8 +459,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ mentorId }) => {
                                         </div>
                                     )}
 
-                                    <p style={{ fontSize: "13px", color: C.dark, lineHeight: "1.6", marginBottom: "8px", whiteSpace: "pre-wrap" }}>{review.comment}</p>
-
+<p style={{ fontSize: "14px", color: C.dark, lineHeight: "1.65", marginBottom: "12px", whiteSpace: "pre-wrap", maxWidth: "620px" }}>{review.comment}</p>
                                     {review.tags && review.tags.length > 0 && (
                                         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
                                             {review.tags.map((tag) => (
