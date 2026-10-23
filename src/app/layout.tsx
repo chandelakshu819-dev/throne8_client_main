@@ -1,7 +1,7 @@
 ﻿//src/app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
-import 'remixicon/fonts/remixicon.css';
+import "remixicon/fonts/remixicon.css";
 import ReduxProvider from "@/store/providers/ReduxProvider";
 import NavbarProvider from "@/features/profile/components/home/NavbarProvider";
 import MentorshipCallProvider from "@/providers/MentorshipCallProvider";
@@ -10,7 +10,8 @@ export const metadata: Metadata = {
   title: "Throne8 - Professional Networking Platform",
   description: "Connect, collaborate, and grow with professionals worldwide",
   icons: {
-    icon: '/throne8logo.png',
+    // icon: '/throne8logo.png',
+    icon: "/throne8logo-192-favicon.png",
   },
 };
 
@@ -21,12 +22,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-           <body className="antialiased">
+      <body className="antialiased">
         <ReduxProvider>
           <MentorshipCallProvider>
-            <NavbarProvider>
-              {children}
-            </NavbarProvider>
+            <NavbarProvider>{children}</NavbarProvider>
           </MentorshipCallProvider>
         </ReduxProvider>
       </body>
