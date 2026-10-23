@@ -19,7 +19,9 @@ import {
 } from "lucide-react";
 import SeniorMentorApplicationService, {
     SeniorMentorApplication,
-    ApplicationStatus
+    ApplicationStatus,
+    MIN_HELP_AREAS,
+    MAX_HELP_AREAS,
 } from "@/lib/api/seniorMentorApplication.service";
 import { syncProfilePhotoToAllRoles } from "@/features/mentorship/utils/syncProfilePhoto";
 
@@ -98,7 +100,10 @@ const createSchema = z.object({
     technologies: z.array(z.string()).max(30, "Max 30 technologies allowed"),
     achievements: z.array(z.string()).max(15, "Max 15 achievements allowed"),
     certifications: z.array(z.string()).max(15, "Max 15 certifications allowed"),
-    helpAreas: z.array(z.nativeEnum(MentorshipHelpArea)).min(1, "Select at least 1 help area").max(7, "Select up to 7 help areas"),
+    helpAreas: z
+        .array(z.nativeEnum(MentorshipHelpArea))
+        .min(MIN_HELP_AREAS, `Please select at least ${MIN_HELP_AREAS} help areas`)
+        .max(MAX_HELP_AREAS, `Select up to ${MAX_HELP_AREAS} help areas`),
 
     // Step 4: Motivation
     motivation: z.string().min(30, "Please write at least 30 characters").max(1000),
@@ -132,8 +137,9 @@ export default function SeniorMentorApplicationPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState(false);
+    const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-    const { register, handleSubmit, trigger, formState: { errors }, setValue, watch } = useForm<FormValues>({
+    const { register, handleSubmit, trigger, formState: { errors }, setValue, watch, setError, clearErrors } = useForm<FormValues>({
         resolver: zodResolver(createSchema),
         defaultValues: {
             mentorRole: undefined,
@@ -144,6 +150,21 @@ export default function SeniorMentorApplicationPage() {
             helpAreas: [],
         }
     });
+
+    const selectedHelpAreas = (watch('helpAreas') || []) as MentorshipHelpArea[];
+    const isMaxHelpAreas = selectedHelpAreas.length >= MAX_HELP_AREAS;
+
+    useEffect(() => {
+        if (!toast) return;
+        const timer = setTimeout(() => setToast(null), 5000);
+        return () => clearTimeout(timer);
+    }, [toast]);
+
+    useEffect(() => {
+        if (selectedHelpAreas.length >= MIN_HELP_AREAS && errors.helpAreas) {
+            clearErrors('helpAreas');
+        }
+    }, [selectedHelpAreas.length, errors.helpAreas, clearErrors]);
 
     useEffect(() => {
         const fetchStatus = async () => {
@@ -164,17 +185,48 @@ export default function SeniorMentorApplicationPage() {
     }, [router]);
 
     const handleNext = async () => {
+        if (currentStep === 3) {
+            if (selectedHelpAreas.length < MIN_HELP_AREAS) {
+                setError('helpAreas', {
+                    type: 'manual',
+                    message: `Please select at least ${MIN_HELP_AREAS} help areas (you have selected ${selectedHelpAreas.length}).`
+                });
+                const el = document.getElementById('help-areas-section');
+                el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+        }
         const stepFields = steps.find(s => s.id === currentStep)?.fields as (keyof FormValues)[];
         const isValid = await trigger(stepFields);
         if (isValid) {
             setCurrentStep(prev => prev + 1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+            const firstInvalid = document.querySelector<HTMLElement>('[aria-invalid="true"]');
+            firstInvalid?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     };
 
     const handlePrev = () => {
         setCurrentStep(prev => prev - 1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const onInvalid = (formErrors: any) => {
+        console.error('❌ [SENIOR_MENTOR_APP] Validation errors on submit:', formErrors);
+        const errorKeys = Object.keys(formErrors);
+        if (errorKeys.length > 0) {
+            const firstKey = errorKeys[0];
+            const stepWithErr = steps.find(s => (s.fields as string[]).includes(firstKey));
+            if (stepWithErr) {
+                setCurrentStep(stepWithErr.id);
+            }
+            const msg = formErrors[firstKey]?.message || `Please check required fields in Step ${stepWithErr?.id || currentStep}.`;
+            const fullErrMsg = `Application submit nahi hui: ${msg}`;
+            setErrorMsg(fullErrMsg);
+            setToast({ type: 'error', message: fullErrMsg });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     };
 
     const onSubmit = async (data: FormValues) => {
@@ -213,13 +265,15 @@ export default function SeniorMentorApplicationPage() {
             if (data.resumeFile) formData.append('resume', data.resumeFile);
             if (data.proofDocumentFile) formData.append('proofDocument', data.proofDocumentFile);
 
+            console.log('📝 Submitting senior mentor application...');
             const res = await SeniorMentorApplicationService.apply(formData);
             
             const createdUserId = res?.userId;
+            setToast({ type: 'success', message: 'Application submitted successfully!' });
 
             // Senior mentor photo ko account photo me bhi save karo -> Mentee workspace/navbar me wahi photo dikhe
             if (data.profilePhotoFile instanceof File) {
-                await syncProfilePhotoToAllRoles(data.profilePhotoFile, createdUserId, { skip: ['mentor', 'senior'] });
+                await syncProfilePhotoToAllRoles(data.profilePhotoFile, createdUserId, { skip: ['mentor', 'senior'] }).catch(() => undefined);
             }            
             if (createdUserId) {
                 router.push(`/mentorship/senior-mentor-profile/${createdUserId}`);
@@ -228,11 +282,34 @@ export default function SeniorMentorApplicationPage() {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
         } catch (error: any) {
+            console.error('❌ [SENIOR_MENTOR_APP] Application submit failed:', error);
+            let reason = 'Failed to submit application. Please try again.';
+            const resp = error?.response?.data;
             if (error?.response?.status === 409) {
-                setErrorMsg('You already have an active Senior Mentor application.');
-            } else {
-                setErrorMsg(error?.response?.data?.message || 'Failed to submit application. Please try again.');
+                reason = 'You already have an active Senior Mentor application.';
+            } else if (resp?.errors && Array.isArray(resp.errors) && resp.errors.length > 0) {
+                resp.errors.forEach((err: { field?: string; message?: string }) => {
+                    if (err.field && err.message) {
+                        setError(err.field as any, { type: 'server', message: err.message });
+                    }
+                });
+                const firstErr = resp.errors[0];
+                reason = firstErr.message || `${firstErr.field} is invalid`;
+                const stepWithErr = steps.find(s => (s.fields as string[]).includes(firstErr.field));
+                if (stepWithErr) {
+                    setCurrentStep(stepWithErr.id);
+                }
+            } else if (resp?.message) {
+                reason = resp.message;
+            } else if (resp?.error?.message) {
+                reason = resp.error.message;
+            } else if (error?.message) {
+                reason = error.message;
             }
+            const fullErrMsg = `Application submit nahi hui: ${reason}`;
+            setErrorMsg(fullErrMsg);
+            setToast({ type: 'error', message: fullErrMsg });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         } finally {
             setIsSubmitting(false);
         }
@@ -347,7 +424,7 @@ export default function SeniorMentorApplicationPage() {
     return (
         <div className="min-h-screen bg-[#FAF9F6] flex items-start justify-center p-6 animate-fade-in overflow-y-auto">
             <div className="max-w-3xl w-full my-6 relative">
-                <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-[40px] shadow-2xl relative">
+                <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="bg-white rounded-[40px] shadow-2xl relative">
                     
                     {/* Close Button */}
                     <button
@@ -594,26 +671,72 @@ export default function SeniorMentorApplicationPage() {
                                 <TagInput fieldName="achievements" label="Achievements" placeholder="e.g. Outstanding Engineer Award 2023" />
                                 <TagInput fieldName="certifications" label="Certifications" placeholder="e.g. AWS Certified Solutions Architect" />
 
-                                <div>
-                                    <label className="block text-sm font-bold text-[#4a3728] mb-4">Help Areas * <span className="text-slate-400 font-normal ml-1">(Select up to 7)</span></label>
+                                <div
+                                    id="help-areas-section"
+                                    className={`p-6 rounded-2xl border-2 transition-all ${
+                                        errors.helpAreas
+                                            ? 'border-red-500 bg-red-50/20 shadow-sm'
+                                            : 'border-[#ece7e2] bg-[#f8f6f4]/40'
+                                    }`}
+                                >
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-[#4a3728]">
+                                                Help Areas * <span className="text-slate-500 font-normal ml-1">(Select 3 to 7)</span>
+                                            </label>
+                                            {isMaxHelpAreas && (
+                                                <p className="text-xs font-semibold text-amber-700 mt-0.5">
+                                                    Maximum 7 selected
+                                                </p>
+                                            )}
+                                        </div>
+                                        <span
+                                            className={`text-xs font-bold px-3 py-1 rounded-full self-start sm:self-auto border transition-colors ${
+                                                selectedHelpAreas.length >= MIN_HELP_AREAS && selectedHelpAreas.length <= MAX_HELP_AREAS
+                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                                    : selectedHelpAreas.length > MAX_HELP_AREAS
+                                                    ? 'bg-red-50 text-red-600 border-red-300'
+                                                    : 'bg-white text-[#4a3728] border-[#ece7e2]'
+                                            }`}
+                                        >
+                                            {selectedHelpAreas.length}/{MAX_HELP_AREAS} selected
+                                        </span>
+                                    </div>
+
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {Object.values(MentorshipHelpArea).map((area) => {
                                             const label = area.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                                            const checked = watch('helpAreas')?.includes(area);
+                                            const checked = selectedHelpAreas.includes(area);
+                                            const disabled = !checked && isMaxHelpAreas;
                                             return (
-                                                <label key={area} className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${checked ? 'border-[#4a3728] bg-[#f8f6f4]' : 'border-[#ece7e2] hover:border-[#4a3728]'} `}>
+                                                <label
+                                                    key={area}
+                                                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                                                        disabled
+                                                            ? 'opacity-40 cursor-not-allowed border-gray-200 bg-gray-50'
+                                                            : checked
+                                                            ? 'border-[#4a3728] bg-[#f8f6f4] cursor-pointer shadow-sm'
+                                                            : 'border-[#ece7e2] hover:border-[#4a3728] cursor-pointer bg-white'
+                                                    }`}
+                                                >
                                                     <input 
                                                         type="checkbox" 
                                                         value={area}
+                                                        disabled={disabled}
                                                         {...register('helpAreas')}
-                                                        className="w-4 h-4 text-[#4a3728] rounded focus:ring-[#4a3728]"
+                                                        className="w-4 h-4 text-[#4a3728] rounded focus:ring-[#4a3728] disabled:cursor-not-allowed"
                                                     />
                                                     <span className={`text-sm font-bold ${checked ? 'text-[#4a3728]' : 'text-slate-600'}`}>{label}</span>
                                                 </label>
-                                            )
+                                            );
                                         })}
                                     </div>
-                                    {errors.helpAreas && <p className="text-red-500 text-xs mt-2">{errors.helpAreas.message}</p>}
+                                    {errors.helpAreas && (
+                                        <p className="text-red-500 text-sm font-semibold mt-3 flex items-center gap-1.5">
+                                            <span>•</span>
+                                            <span>{errors.helpAreas.message}</span>
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -672,6 +795,25 @@ export default function SeniorMentorApplicationPage() {
                         </div>
                     </div>
                 </form>
+                {toast && (
+                    <div
+                        className={`fixed bottom-6 right-6 z-50 px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border transition-all animate-in fade-in slide-in-from-bottom-4 ${
+                            toast.type === 'error'
+                                ? 'bg-red-600 text-white border-red-700'
+                                : 'bg-[#4a3728] text-white border-[#3d2d21]'
+                        }`}
+                    >
+                        <span className="text-sm font-semibold">{toast.message}</span>
+                        <button
+                            type="button"
+                            onClick={() => setToast(null)}
+                            className="ml-2 p-1 hover:bg-white/20 rounded-full transition"
+                            aria-label="Close notification"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

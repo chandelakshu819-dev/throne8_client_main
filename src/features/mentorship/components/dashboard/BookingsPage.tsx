@@ -15,6 +15,7 @@ import {
   XCircle,
   Check,
   X,
+  Loader2,
 } from "lucide-react";
 import SessionService from "@/lib/api/session.service";
 import ProfileService from "@/lib/api/profile.service";
@@ -47,14 +48,14 @@ type MentorBookingRow = {
   // still-PENDING join request and an already-ACCEPTED, grouped session)
   isGroupSession?: boolean;
   status:
-    | "pending"
-    | "confirmed"
-    | "rescheduled"
-    | "in_progress"
-    | "completed"
-    | "cancelled"
-    | "open"
-    | "full";
+  | "pending"
+  | "confirmed"
+  | "rescheduled"
+  | "in_progress"
+  | "completed"
+  | "cancelled"
+  | "open"
+  | "full";
   // ✅ NEW: present only on grouped (accepted) group-session rows — one
   // row per session, carrying the full accepted-participant list instead
   // of the table spawning a duplicate row per student.
@@ -111,7 +112,19 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   const [allBookings, setAllBookings] = useState<MentorBookingRow[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [loadingData, setLoadingData] = useState(true);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  type BookingActionType = "accept" | "reject" | "start" | "end" | "reschedule";
+  const [rowActionsLoading, setRowActionsLoading] = useState<Record<string, BookingActionType>>({});
+
+  const setRowAction = (key: string, action: BookingActionType | null) => {
+    setRowActionsLoading((prev) => {
+      if (!action) {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      }
+      return { ...prev, [key]: action };
+    });
+  };
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -408,10 +421,11 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   };
 
   const handleConfirm = async (sessionId: string, bookingId?: string) => {
-    setActionLoading(sessionId);
-    try {
-      const bookingRow = allBookings.find((b) => b.sessionId === sessionId && b.bookingId === bookingId);
+    const bookingRow = allBookings.find((b) => b.sessionId === sessionId && b.bookingId === bookingId);
+    const rowKey = bookingId || sessionId;
+    setRowAction(rowKey, "accept");
 
+    try {
       if (bookingRow?.isGroupSession) {
         if (!bookingRow.menteeId) {
           showToast("Could not identify the join request.", "error");
@@ -419,17 +433,22 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         }
         await SessionService.acceptGroupJoinRequest(sessionId, bookingRow.menteeId);
         showToast("Join request accepted", "success");
+        setAllBookings((prev) => prev.filter((b) => b.bookingId !== rowKey));
       } else {
         await SessionService.confirmSession(sessionId, bookingId);
         showToast("Booking confirmed successfully", "success");
+        setAllBookings((prev) =>
+          prev.map((b) =>
+            b.bookingId === bookingId ? { ...b, status: "confirmed" } : b
+          )
+        );
       }
 
       await fetchSessions();
-      setBookingTab("upcoming");
     } catch (err: any) {
       showToast(err?.message || "Failed to confirm booking.", "error");
     } finally {
-      setActionLoading(null);
+      setRowAction(rowKey, null);
     }
   };
 
@@ -442,8 +461,9 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   const confirmStartSession = async () => {
     if (!startModalBooking) return;
     const { sessionId, bookingId, isGroupSession } = startModalBooking;
+    const rowKey = bookingId || sessionId;
 
-    setActionLoading(sessionId);
+    setRowAction(rowKey, "start");
     setStartError(null);
 
     try {
@@ -480,7 +500,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       setStartError(message);
       showToast(message, "error");
     } finally {
-      setActionLoading(null);
+      setRowAction(rowKey, null);
     }
   };
 
@@ -534,9 +554,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `receipt-${(r.menteeName || booking.menteeName || "student").replace(/\s+/g, "_")}-${
-        r.bookingId || booking.bookingId
-      }.html`;
+      link.download = `receipt-${(r.menteeName || booking.menteeName || "student").replace(/\s+/g, "_")}-${r.bookingId || booking.bookingId
+        }.html`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -554,7 +573,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   // actually attended) is only meaningful for group sessions — the
   // Attendance modal supplies it before this gets called for a group row.
   const handleEnd = async (sessionId: string, bookingId?: string, attendees?: string[]) => {
-    setActionLoading(sessionId);
+    const rowKey = bookingId || sessionId;
+    setRowAction(rowKey, "end");
     try {
       const bookingRow = allBookings.find((b) => b.sessionId === sessionId && b.bookingId === bookingId);
 
@@ -574,12 +594,17 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       }
 
       showToast("Session completed", "success");
+      setAllBookings((prev) =>
+        prev.map((b) =>
+          b.bookingId === rowKey ? { ...b, status: "completed" } : b
+        )
+      );
       await fetchSessions();
       setBookingTab("completed");
     } catch (err: any) {
       showToast(err?.message || "Failed to complete session.", "error");
     } finally {
-      setActionLoading(null);
+      setRowAction(rowKey, null);
     }
   };
 
@@ -622,7 +647,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       return;
     }
 
-    setActionLoading(cancelSessionId);
+    const rowKey = cancelBookingId || cancelSessionId;
+    setRowAction(rowKey, "reject");
 
     try {
       if (isPendingGroupRequest) {
@@ -632,9 +658,15 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         }
         await SessionService.rejectGroupJoinRequest(cancelSessionId, bookingRow.menteeId);
         showToast("Join request declined", "success");
+        setAllBookings((prev) => prev.filter((b) => b.bookingId !== rowKey));
       } else if (bookingRow?.isGroupSession) {
         await SessionService.cancelGroupSession(cancelSessionId, cancelReason);
         showToast("Session cancelled successfully", "success");
+        setAllBookings((prev) =>
+          prev.map((b) =>
+            b.sessionId === cancelSessionId ? { ...b, status: "cancelled" } : b
+          )
+        );
       } else {
         if (!cancelBookingId) {
           showToast("Please provide a reason.", "error");
@@ -642,6 +674,11 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         }
         await SessionService.cancelSession(cancelSessionId, cancelReason, cancelBookingId);
         showToast("Session cancelled successfully", "success");
+        setAllBookings((prev) =>
+          prev.map((b) =>
+            b.bookingId === cancelBookingId ? { ...b, status: "cancelled" } : b
+          )
+        );
       }
 
       setShowCancelModal(false);
@@ -653,7 +690,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     } catch (err: any) {
       showToast(err?.message || "Failed to process request.", "error");
     } finally {
-      setActionLoading(null);
+      setRowAction(rowKey, null);
     }
   };
 
@@ -663,7 +700,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       return;
     }
 
-    setActionLoading(rescheduleSessionId);
+    const rowKey = rescheduleBookingId || rescheduleSessionId;
+    setRowAction(rowKey, "reschedule");
 
     try {
       const scheduledAtISO = new Date(`${rescheduleDate}:00+05:30`).toISOString();
@@ -687,7 +725,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     } catch (err: any) {
       showToast(err?.message || "Failed to reschedule session.", "error");
     } finally {
-      setActionLoading(null);
+      setRowAction(rowKey, null);
     }
   };
 
@@ -793,12 +831,12 @@ export default function BookingsPage({ mentorData }: BookingProps) {
               tab === "all"
                 ? allBookings.filter((b) => b.status !== "completed").length
                 : tab === "pending"
-                ? pendingBookings.length
-                : tab === "upcoming"
-                ? upcomingBookings.length
-                : tab === "in_progress"
-                ? inProgressBookings.length
-                : completedBookings.length;
+                  ? pendingBookings.length
+                  : tab === "upcoming"
+                    ? upcomingBookings.length
+                    : tab === "in_progress"
+                      ? inProgressBookings.length
+                      : completedBookings.length;
 
             const { label, icon: Icon } = tabMeta[tab];
             const isActive = bookingTab === tab;
@@ -854,7 +892,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Time</th>
                   <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Status</th>
                   {bookingTab !== "all" && (
-                     <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Actions</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Actions</th>
                   )}
                 </tr>
               </thead>
@@ -864,6 +902,9 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   const resolvedPhoto = booking.menteeId ? photoUrls[booking.menteeId] : null;
                   const sb = statusBadge[booking.status] ?? statusBadge.pending;
                   const isGroupedRow = !!booking.participants; // accepted, session-level row
+                  const rowKey = booking.bookingId || booking.sessionId;
+                  const currentAction = rowActionsLoading[rowKey];
+                  const isRowLoading = Boolean(currentAction);
 
                   return (
                     <tr key={`${booking.sessionId}-${booking.bookingId}-${idx}`} className="transition-colors hover:bg-[#fbf7f3]">
@@ -934,184 +975,199 @@ export default function BookingsPage({ mentorData }: BookingProps) {
 
                       {/* Actions */}
                       {bookingTab !== "all" && (
-                      <td className="px-5 py-3.5">
-                        <div className="flex gap-1.5">
-                          {/* Pending — only real pending join-request rows land here */}
-                          {bookingTab === "pending" && (
-                            <>
-                              <button
-                                onClick={() => handleConfirm(booking.sessionId, booking.bookingId)}
-                                disabled={actionLoading === booking.sessionId}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                style={{ backgroundColor: "#dcfce7", color: "#15803d" }}
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                                {actionLoading === booking.sessionId ? "..." : "Accept"}
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setCancelSessionId(booking.sessionId);
-                                  setCancelBookingId(booking.bookingId);
-                                  setShowCancelModal(true);
-                                }}
-                                disabled={actionLoading === booking.sessionId}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                style={{ backgroundColor: "#fee2e2", color: "#dc2626" }}
-                              >
-                                <XCircle className="w-3.5 h-3.5" />
-                                Reject
-                              </button>
-                            </>
-                          )}
-
-                          {/* Upcoming */}
-                          {(bookingTab === "upcoming" ||
-                            (bookingTab === "all" &&
-                              (booking.status === "confirmed" ||
-                                booking.status === "rescheduled" ||
-                                (booking.isGroupSession &&
-                                  (booking.status === "open" || booking.status === "full"))))) && (
-                            <>
-                              {booking.isGroupSession ? (
-                                (booking.status === "open" ||
-                                  booking.status === "full" ||
-                                  booking.status === "confirmed") &&
-                                !(booking.isTemplate || !booking.scheduledAt) && (() => {
-                                  const scheduledTime = booking.scheduledAt ? new Date(booking.scheduledAt).getTime() : 0;
-                                  const now = Date.now();
-                                  const isTooEarly = now < scheduledTime - 5 * 60 * 1000;
-                                  const isTooLate = now > scheduledTime + 10 * 60 * 1000;
-                                  const isWithinWindow = !isTooEarly && !isTooLate;
-
-                                  return (
-                                    <div className="flex flex-col items-start gap-0.5">
-                                      <button
-                                        onClick={() => openStartModal(booking)}
-                                        disabled={actionLoading === booking.sessionId || !isWithinWindow}
-                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                        style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
-                                        title={isTooEarly ? "Available 5 minutes before scheduled start" : isTooLate ? "Window passed (10 min after scheduled start)" : undefined}
-                                      >
-                                        <Play className="w-3.5 h-3.5" />
-                                        Start
-                                      </button>
-                                      {!isWithinWindow && (
-                                        <span className="text-[10px] text-amber-700 whitespace-nowrap">
-                                          {isTooEarly ? "Starts 5m before scheduled time" : "Start window closed (+10m)"}
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })()
-                              ) : (
+                        <td className="px-5 py-3.5">
+                          <div className="flex gap-1.5">
+                            {/* Pending — only real pending join-request rows land here */}
+                            {bookingTab === "pending" && (
+                              <>
                                 <button
-                                  onClick={() => openStartModal(booking)}
-                                  disabled={actionLoading === booking.sessionId}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                  style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
+                                  onClick={() => handleConfirm(booking.sessionId, booking.bookingId)}
+                                  disabled={isRowLoading}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50 min-w-[76px]"
+                                  style={{ backgroundColor: "#dcfce7", color: "#15803d" }}
                                 >
-                                  <Play className="w-3.5 h-3.5" />
-                                  Start
+                                  {currentAction === "accept" ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Check className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>Accept</span>
                                 </button>
-                              )}
 
-                              {/* Reschedule not supported for group sessions yet */}
-                              {!booking.isGroupSession && (
                                 <button
                                   onClick={() => {
-                                    setRescheduleSessionId(booking.sessionId);
-                                    setRescheduleBookingId(booking.bookingId);
-                                    setShowRescheduleModal(true);
+                                    setCancelSessionId(booking.sessionId);
+                                    setCancelBookingId(booking.bookingId);
+                                    setShowCancelModal(true);
                                   }}
-                                  disabled={actionLoading === booking.sessionId}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                  style={{ backgroundColor: "#fed7aa", color: "#c2410c" }}
+                                  disabled={isRowLoading}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50 min-w-[76px]"
+                                  style={{ backgroundColor: "#fee2e2", color: "#dc2626" }}
                                 >
-                                  <RotateCw className="w-3.5 h-3.5" />
-                                  Reschedule
+                                  {currentAction === "reject" ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <XCircle className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>Reject</span>
                                 </button>
-                              )}
+                              </>
+                            )}
 
-                              <button
-                                onClick={() => {
-                                  setCancelSessionId(booking.sessionId);
-                                  setCancelBookingId(booking.bookingId);
-                                  setShowCancelModal(true);
-                                }}
-                                disabled={actionLoading === booking.sessionId}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                style={{ backgroundColor: "#fee2e2", color: "#dc2626" }}
-                              >
-                                <XCircle className="w-3.5 h-3.5" />
-                                Cancel
-                              </button>
-                            </>
-                          )}
+                            {/* Upcoming */}
+                            {bookingTab === "upcoming" && (
+                              <>
+                                {booking.isGroupSession ? (
+                                  (booking.status === "open" ||
+                                    booking.status === "full" ||
+                                    booking.status === "confirmed") &&
+                                  !(booking.isTemplate || !booking.scheduledAt) && (() => {
+                                    const scheduledTime = booking.scheduledAt ? new Date(booking.scheduledAt).getTime() : 0;
+                                    const now = Date.now();
+                                    const isTooEarly = now < scheduledTime - 5 * 60 * 1000;
+                                    const isTooLate = now > scheduledTime + 10 * 60 * 1000;
+                                    const isWithinWindow = !isTooEarly && !isTooLate;
 
-                          {/* In Progress */}
-                          {(bookingTab === "in_progress" || (bookingTab === "all" && booking.status === "in_progress")) && (
-                            <div className="flex items-center gap-1.5">
-                              {booking.isGroupSession && booking.meetingUrl && (
-                                <button
-                                  onClick={() => window.open(booking.meetingUrl, '_blank', 'noopener,noreferrer')}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
-                                  style={{ backgroundColor: "#22c55e", color: "#ffffff" }}
-                                >
-                                  <Play className="w-3.5 h-3.5" />
-                                  Open Meet
-                                </button>
-                              )}
-                              <button
-                                onClick={() => handleEndSessionClick(booking)}
-                                disabled={actionLoading === booking.sessionId}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                style={{ backgroundColor: "#f3e8ff", color: "#7c3aed" }}
-                              >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                {actionLoading === booking.sessionId ? "..." : "End Session"}
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Completed */}
-                          {bookingTab === "completed" && (
-                            <>
-                              {isGroupedRow ? (
-                                <button
-                                  onClick={() => openParticipantsModal(booking)}
-                                  className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4]"
-                                  style={{ border: "1px solid #e0d8cf" }}
-                                  title="View Participants"
-                                >
-                                  <Eye className="w-3.5 h-3.5" style={{ color: "#7a5c3e" }} />
-                                </button>
-                              ) : (
-                                <>
+                                    return (
+                                      <div className="flex flex-col items-start gap-0.5">
+                                        <button
+                                          onClick={() => openStartModal(booking)}
+                                          disabled={isRowLoading || !isWithinWindow}
+                                          className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                          style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
+                                          title={isTooEarly ? "Available 5 minutes before scheduled start" : isTooLate ? "Window passed (10 min after scheduled start)" : undefined}
+                                        >
+                                          {currentAction === "start" ? (
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                          ) : (
+                                            <Play className="w-3.5 h-3.5" />
+                                          )}
+                                          <span>Start</span>
+                                        </button>
+                                        {!isWithinWindow && (
+                                          <span className="text-[10px] text-amber-700 whitespace-nowrap">
+                                            {isTooEarly ? "Starts 5m before scheduled time" : "Start window closed (+10m)"}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })()
+                                ) : (
                                   <button
-                                    onClick={() => openDetailsModal(booking)}
+                                    onClick={() => openStartModal(booking)}
+                                    disabled={isRowLoading}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                    style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
+                                  >
+                                    {currentAction === "start" ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <Play className="w-3.5 h-3.5" />
+                                    )}
+                                    <span>Start</span>
+                                  </button>
+                                )}
+
+                                {/* Reschedule not supported for group sessions yet */}
+                                {!booking.isGroupSession && (
+                                  <button
+                                    onClick={() => {
+                                      setRescheduleSessionId(booking.sessionId);
+                                      setRescheduleBookingId(booking.bookingId);
+                                      setShowRescheduleModal(true);
+                                    }}
+                                    disabled={isRowLoading}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                    style={{ backgroundColor: "#fed7aa", color: "#c2410c" }}
+                                  >
+                                    <RotateCw className="w-3.5 h-3.5" />
+                                    <span>Reschedule</span>
+                                  </button>
+                                )}
+
+                                <button
+                                  onClick={() => {
+                                    setCancelSessionId(booking.sessionId);
+                                    setCancelBookingId(booking.bookingId);
+                                    setShowCancelModal(true);
+                                  }}
+                                  disabled={isRowLoading}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                  style={{ backgroundColor: "#fee2e2", color: "#dc2626" }}
+                                >
+                                  <XCircle className="w-3.5 h-3.5" />
+                                  <span>Cancel</span>
+                                </button>
+                              </>
+                            )}
+
+                            {/* In Progress */}
+                            {bookingTab === "in_progress" && (
+                              <div className="flex items-center gap-1.5">
+                                {booking.isGroupSession && booking.meetingUrl && (
+                                  <button
+                                    onClick={() => window.open(booking.meetingUrl, '_blank', 'noopener,noreferrer')}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
+                                    style={{ backgroundColor: "#22c55e", color: "#ffffff" }}
+                                  >
+                                    <Play className="w-3.5 h-3.5" />
+                                    Open Meet
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleEndSessionClick(booking)}
+                                  disabled={isRowLoading}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50 min-w-[104px]"
+                                  style={{ backgroundColor: "#f3e8ff", color: "#7c3aed" }}
+                                >
+                                  {currentAction === "end" ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>End Session</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Completed */}
+                            {bookingTab === "completed" && (
+                              <>
+                                {isGroupedRow ? (
+                                  <button
+                                    onClick={() => openParticipantsModal(booking)}
                                     className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4]"
                                     style={{ border: "1px solid #e0d8cf" }}
-                                    title="View Details"
+                                    title="View Participants"
                                   >
                                     <Eye className="w-3.5 h-3.5" style={{ color: "#7a5c3e" }} />
                                   </button>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => openDetailsModal(booking)}
+                                      className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4]"
+                                      style={{ border: "1px solid #e0d8cf" }}
+                                      title="View Details"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" style={{ color: "#7a5c3e" }} />
+                                    </button>
 
-                                  <button
-                                    onClick={() => handleDownloadReceipt(booking)}
-                                    disabled={downloadingId === booking.bookingId}
-                                    className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4] disabled:opacity-50"
-                                    style={{ border: "1px solid #e0d8cf" }}
-                                    title="Download"
-                                  >
-                                    <Download className="w-3.5 h-3.5" style={{ color: "#7a5c3e" }} />
-                                  </button>
-                                </>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </td>
+                                    <button
+                                      onClick={() => handleDownloadReceipt(booking)}
+                                      disabled={downloadingId === booking.bookingId}
+                                      className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4] disabled:opacity-50"
+                                      style={{ border: "1px solid #e0d8cf" }}
+                                      title="Download"
+                                    >
+                                      <Download className="w-3.5 h-3.5" style={{ color: "#7a5c3e" }} />
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </td>
                       )}
                     </tr>
                   );
@@ -1166,9 +1222,9 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
                   style={{ backgroundColor: "#dc2626" }}
                   onClick={handleCancelSubmit}
-                  disabled={actionLoading === cancelSessionId}
+                  disabled={rowActionsLoading[cancelBookingId || cancelSessionId || ""] === "reject"}
                 >
-                  {actionLoading === cancelSessionId ? "Processing..." : "Confirm"}
+                  {rowActionsLoading[cancelBookingId || cancelSessionId || ""] === "reject" ? "Processing..." : "Confirm"}
                 </button>
               </div>
             </div>
@@ -1228,9 +1284,9 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
                   style={{ backgroundColor: "#4a3728" }}
                   onClick={handleRescheduleSubmit}
-                  disabled={actionLoading === rescheduleSessionId}
+                  disabled={rowActionsLoading[rescheduleBookingId || rescheduleSessionId || ""] === "reschedule"}
                 >
-                  {actionLoading === rescheduleSessionId ? "Processing..." : "Confirm Reschedule"}
+                  {rowActionsLoading[rescheduleBookingId || rescheduleSessionId || ""] === "reschedule" ? "Processing..." : "Confirm Reschedule"}
                 </button>
               </div>
             </div>
@@ -1332,19 +1388,23 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                           setStartModalBooking(null);
                           setStartError(null);
                         }}
-                        disabled={actionLoading === startModalBooking.sessionId}
+                        disabled={rowActionsLoading[startModalBooking.bookingId || startModalBooking.sessionId] === "start"}
                       >
                         Cancel
                       </button>
 
                       <button
                         className="px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
-                        style={{ backgroundColor: "#1d4ed8", opacity: (actionLoading === startModalBooking.sessionId || !canStartSession) ? 0.6 : 1 }}
+                        style={{ backgroundColor: "#1d4ed8", opacity: (rowActionsLoading[startModalBooking.bookingId || startModalBooking.sessionId] === "start" || !canStartSession) ? 0.6 : 1 }}
                         onClick={confirmStartSession}
-                        disabled={actionLoading === startModalBooking.sessionId || !canStartSession}
+                        disabled={rowActionsLoading[startModalBooking.bookingId || startModalBooking.sessionId] === "start" || !canStartSession}
                       >
-                        <Play className="w-3.5 h-3.5" />
-                        {actionLoading === startModalBooking.sessionId ? "Starting..." : "Start Session"}
+                        {rowActionsLoading[startModalBooking.bookingId || startModalBooking.sessionId] === "start" ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Play className="w-3.5 h-3.5" />
+                        )}
+                        <span>{rowActionsLoading[startModalBooking.bookingId || startModalBooking.sessionId] === "start" ? "Starting..." : "Start Session"}</span>
                       </button>
                     </div>
                   </>
@@ -1547,7 +1607,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                     setShowAttendanceModal(false);
                     setAttendanceBooking(null);
                   }}
-                  disabled={actionLoading === attendanceBooking.sessionId}
+                  disabled={rowActionsLoading[attendanceBooking.bookingId || attendanceBooking.sessionId] === "end"}
                 >
                   Cancel
                 </button>
@@ -1556,10 +1616,14 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   className="px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
                   style={{ backgroundColor: "#7c3aed" }}
                   onClick={confirmAttendanceAndComplete}
-                  disabled={actionLoading === attendanceBooking.sessionId}
+                  disabled={rowActionsLoading[attendanceBooking.bookingId || attendanceBooking.sessionId] === "end"}
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  {actionLoading === attendanceBooking.sessionId ? "Completing..." : "Complete Session"}
+                  {rowActionsLoading[attendanceBooking.bookingId || attendanceBooking.sessionId] === "end" ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  )}
+                  <span>{rowActionsLoading[attendanceBooking.bookingId || attendanceBooking.sessionId] === "end" ? "Completing..." : "Complete Session"}</span>
                 </button>
               </div>
             </div>

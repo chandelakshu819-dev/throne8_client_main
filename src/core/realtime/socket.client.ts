@@ -2,15 +2,14 @@
 import { io, Socket } from 'socket.io-client';
 import TokenStorage from '@/lib/store/token.storage';
 import config from '@/config/env.config';
-import { renewSession } from '@/lib/api/api.intance';
+import { renewSession, isRefreshCoolingDown } from '@/lib/api/api.intance';
 
 let socket: Socket | null = null;
 
-const MAX_AUTH_RETRIES = 2;
-const COOLDOWN_MS = 60_000;
+const SOCKET_AUTH_COOLDOWN_MS = 5 * 60 * 1000;
+const AUTH_ERROR_REGEX = /token|auth|expired/i;
 
 let authRetrying = false;
-let authRetries = 0;
 let blockedUntil = 0;
 
 export const initializeSocket = (): Socket => {
@@ -22,7 +21,7 @@ export const initializeSocket = (): Socket => {
         return socket;
     }
 
-    // Auth fail loop ke baad cooldown: bar-bar naya socket mat banao
+    // Auth fail ke baad cooldown: naya handshake mat bhejo
     if (Date.now() < blockedUntil) {
         throw new Error('Socket auth cooldown active');
     }
@@ -48,7 +47,6 @@ export const initializeSocket = (): Socket => {
     );
 
     socket.on('connect', () => {
-        authRetries = 0;
         console.log('✅ Socket connected:', socket?.id);
     });
 
@@ -59,29 +57,32 @@ export const initializeSocket = (): Socket => {
     socket.on('connect_error', async (error) => {
         console.error('❌ Socket connection error:', error.message);
 
-        // Sirf auth errors par session renew try karo
-        if (authRetrying || !/token|auth|expired/i.test(error.message)) return;
+        // Network / server errors: socket.io khud reconnect karta hai (max 5 attempts)
+        if (!AUTH_ERROR_REGEX.test(error.message)) return;
 
-        if (authRetries >= MAX_AUTH_RETRIES) {
-            console.error('❌ Socket: auth retry limit reached, stopping');
-            blockedUntil = Date.now() + COOLDOWN_MS;
-            authRetries = 0;
+        // Auth error par socket.io auto-retry nahi karta. Ek hi baar session
+        // renew try karo, aur sirf tab jab refresh cooldown mein na ho.
+        if (authRetrying) return;
+
+        if (isRefreshCoolingDown()) {
+            console.warn('⏸️ Socket: refresh cooling down, not retrying');
+            blockedUntil = Date.now() + SOCKET_AUTH_COOLDOWN_MS;
             disconnectSocket();
             return;
         }
 
         authRetrying = true;
-        authRetries += 1;
         try {
             const renewed = await renewSession();
             if (renewed) {
                 socket?.connect();
             } else {
-                // Session renew nahi hua (401 par logout ho chuka hoga) -> reconnect mat karo
+                blockedUntil = Date.now() + SOCKET_AUTH_COOLDOWN_MS;
                 disconnectSocket();
             }
         } catch (refreshError) {
             console.error('❌ Socket: session refresh failed', refreshError);
+            blockedUntil = Date.now() + SOCKET_AUTH_COOLDOWN_MS;
             disconnectSocket();
         } finally {
             authRetrying = false;
@@ -93,14 +94,13 @@ export const initializeSocket = (): Socket => {
 
 export const getSocket = (): Socket | null => {
     // Sirf tab naya socket banao jab kabhi bana hi nahi (socket === null).
-    // Existing socket temporarily disconnected ho to socket.io khud reconnect karta hai.
     if (!socket) {
         try {
             if (TokenStorage.isAuthenticated()) {
                 return initializeSocket();
             }
         } catch (err) {
-            console.error('❌ getSocket: auto-init failed', err);
+            // Cooldown ya no-session: chupchap null do
             return null;
         }
     }
@@ -109,6 +109,7 @@ export const getSocket = (): Socket | null => {
 
 export const disconnectSocket = () => {
     if (socket) {
+        socket.removeAllListeners();
         socket.disconnect();
         socket = null;
         console.log('🔌 Socket disconnected manually');

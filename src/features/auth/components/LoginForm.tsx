@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLogin } from '../hooks/useLogin';
-import { LoginFormData, loginSchema } from '../schema';
+import { LoginFormData, loginSchema } from '../schemas/loginSchema';
 import { HOME_PATH } from '@/config/launch';
 import { resolveSafeRedirect, isExternalUrl } from '@/shared/utils/safeRedirect';
 
@@ -36,7 +36,7 @@ export default function LoginForm() {
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    mode: 'onChange',
+    mode: 'onSubmit',
   });
 
   const onSubmit = async (data: LoginFormData) => {
@@ -71,10 +71,13 @@ export default function LoginForm() {
     }
   };
 
+  const isDisabled = loading || !mounted;
+
   return (
     <form
       method="post"
       onSubmit={handleSubmit(onSubmit)}
+      noValidate
       className="space-y-4 sm:space-y-5 md:space-y-6"
     >
       {/* API ERROR MESSAGE */}
@@ -93,6 +96,7 @@ export default function LoginForm() {
           id="email"
           {...register('email')}
           type="email"
+          autoComplete="email"
           placeholder="your@email.com"
           suppressHydrationWarning
           className="w-full px-3 sm:px-4 md:px-5 py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl border border-[#4a3728] bg-white text-black placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#4a3728] focus:border-transparent transition"
@@ -109,6 +113,7 @@ export default function LoginForm() {
           id="password"
           {...register('password')}
           type={showPassword ? 'text' : 'password'}
+          autoComplete="current-password"
           placeholder="••••••••"
           className="w-full px-3 sm:px-4 md:px-5 py-2.5 sm:py-3 md:py-4 pr-10 sm:pr-12 rounded-lg sm:rounded-xl border border-[#4a3728] bg-white text-black placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#4a3728] focus:border-transparent transition"
         />
@@ -142,14 +147,11 @@ export default function LoginForm() {
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={loading || isSubmitting || !mounted}
+        disabled={isDisabled}
         className={`w-full py-2.5 sm:py-3 md:py-4 rounded-lg sm:rounded-xl font-semibold transition shadow-lg text-sm sm:text-base
-            ${rememberMe
-            ? 'bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white hover:opacity-90'
-            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }
-    ${loading || isSubmitting || !mounted ? 'opacity-70' : ''}
-  `}
+          bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white
+          ${isDisabled ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}
+        `}
       >
         {loading || isSubmitting ? 'Signing In...' : 'Sign In'}
       </button>

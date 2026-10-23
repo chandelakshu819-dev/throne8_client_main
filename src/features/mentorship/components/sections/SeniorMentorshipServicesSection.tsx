@@ -7,7 +7,7 @@ import MentorService from "@/lib/api/mentorship.service";
 import { useRouter } from "next/navigation";
 import { getRatingDisplay } from "@/shared/utils/mentorFormat";
 import { cleanText, isMeaningfulText } from "@/shared/utils/textSanitize";
-import { resolveHostInfo } from "@/features/mentorship/utils/sessionCard";
+import { resolveSeniorHost } from "@/features/mentorship/utils/seniorHost";
 import { useInfiniteCarousel } from "@/features/mentorship/hooks/useInfiniteCarousel";
 import ServiceThumbnail from "@/features/mentorship/components/shared/ServiceThumbnail";
 
@@ -25,10 +25,8 @@ export default function SeniorMentorshipServicesSection() {
             rawServices.filter((s) => {
                 if (!isMeaningfulText(s?.title)) return false;
                 if ((s?.title ?? "").trim().length < 8) return false;
-                const hostData = mentorMap.get(s.mentorId) || s.host;
-                if (!hostData) return false;
-                const host = resolveHostInfo(hostData, {}, { name: "", role: "" });
-                if (!host.name) return false;
+                const host = resolveSeniorHost(s, mentorMap.get(s.mentorId));
+                if (host.isFallback) return false;
                 return true;
             }),
         [rawServices, mentorMap]
@@ -56,8 +54,14 @@ export default function SeniorMentorshipServicesSection() {
 
                 setRawServices(allSessions);
 
+                // Agar backend ne har session ke saath host bhej diya hai to
+                // mentor list fetch karne ki zarurat nahi
+                const sessionsMissingHost = allSessions.filter(
+                    (s: any) => resolveSeniorHost(s).isFallback
+                );
+
                 const uniqueMentorIds = Array.from(
-                    new Set(allSessions.map((s: any) => s.mentorId))
+                    new Set(sessionsMissingHost.map((s: any) => s.mentorId))
                 ).filter(Boolean) as string[];
                 const map = new Map<string, any>();
 
@@ -163,19 +167,11 @@ export default function SeniorMentorshipServicesSection() {
                             const serviceId = service.sessionId || service._id || service.id;
                             const uniqueKey = `carousel-item-${serviceId}-${index}`;
 
-                            const hostData = mentorMap.get(service.mentorId) || service.host;
+                            const hostData = mentorMap.get(service.mentorId);
+                            const host = resolveSeniorHost(service, hostData);
 
-                            // Skip card if mentor profile not found — prevents ghost "Senior Mentor" cards
-                            if (!hostData) return null;
-
-                            const host = resolveHostInfo(
-                                hostData,
-                                {},
-                                { name: "", role: "" }
-                            );
-                            // If resolveHostInfo still yields no name, skip the card
-                            if (!host.name) return null;
-
+                            // Skip card if no real host — prevents ghost "Senior Mentor" cards
+                            if (host.isFallback) return null;
 
                             const topCategory = (
                                 service.category ||
@@ -192,10 +188,19 @@ export default function SeniorMentorshipServicesSection() {
                             if (Array.isArray(service.skills)) service.skills.forEach(addTag);
                             const displayTags = tags.slice(0, 2);
 
+                            const embeddedHost = service.host || service.mentor || null;
                             const rawRating =
-                                hostData?.stats?.averageRating ?? hostData?.rating ?? service.rating;
+                                hostData?.stats?.averageRating ??
+                                hostData?.rating ??
+                                embeddedHost?.stats?.averageRating ??
+                                embeddedHost?.rating ??
+                                service.rating;
                             const rawSessions =
-                                hostData?.stats?.totalSessions ?? hostData?.totalSessions ?? service.sessionCount;
+                                hostData?.stats?.totalSessions ??
+                                hostData?.totalSessions ??
+                                embeddedHost?.stats?.totalSessions ??
+                                embeddedHost?.totalSessions ??
+                                service.sessionCount;
                             const rating = getRatingDisplay(rawRating, rawSessions);
 
                             const thumbnail = service.thumbnailImage || service.thumbnail;
@@ -264,7 +269,7 @@ export default function SeniorMentorshipServicesSection() {
                                                         {host.name}
                                                     </span>
                                                     <span className="text-[11px] text-[#8e847c] font-medium leading-tight truncate mt-0.5">
-                                                        {host.roleLabel}
+                                                        {host.role}
                                                     </span>
                                                 </div>
                                             </div>
