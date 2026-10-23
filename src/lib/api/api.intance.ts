@@ -12,8 +12,7 @@ const API_BASE_URL =
     config.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // Backend cookieAuth.middleware.ts: POST/PUT/PATCH/DELETE par cookies tabhi
-// maani jaati hain jab ye header ho (CSRF protection). Iske bina cookie-session
-// mode me write requests "Authorization header required" (401) se fail hoti hain.
+// maani jaati hain jab ye header ho (CSRF protection).
 const CSRF_HEADER_NAME = "X-Requested-With";
 const CSRF_HEADER_VALUE = "XMLHttpRequest";
 
@@ -21,9 +20,16 @@ const CSRF_HEADER_VALUE = "XMLHttpRequest";
 const REFRESH_PATH = "/auth/refresh-token";
 const REFRESH_LOCK_NAME = "throne8_token_refresh";
 
-// Refresh call in statuses par retry hoti hai (logout nahi hota)
-const RETRYABLE_REFRESH_STATUSES = [409, 429, 500, 502, 503, 504];
-const REFRESH_MAX_ATTEMPTS = 3;
+// Refresh call in statuses par retry hoti hai. 429 JAAN-BOOJH KE NAHI hai:
+// rate limiter ko retry se aur peeche mat dhakelo.
+const RETRYABLE_REFRESH_STATUSES = [409, 500, 502, 503, 504];
+const REFRESH_MAX_ATTEMPTS = 2;
+
+// Refresh storm protection
+const REFRESH_COOLDOWN_MS = 60_000; // 429 / circuit breaker
+const REFRESH_SOFT_COOLDOWN_MS = 15_000; // network / 5xx / invalid response
+const REFRESH_WINDOW_MS = 60_000;
+const MAX_REFRESHES_PER_WINDOW = 4;
 
 // Response side: in par 401 ka matlab "credentials / OTP galat" hai,
 // isliye refresh + retry nahi hota.
@@ -62,6 +68,13 @@ interface RefreshResponse {
             expiresIn?: string | number;
         };
     };
+}
+
+class RefreshCooldownError extends Error {
+    constructor() {
+        super("REFRESH_COOLDOWN");
+        this.name = "RefreshCooldownError";
+    }
 }
 
 const matchesAny = (url: string | undefined, paths: string[]): boolean =>
@@ -124,6 +137,9 @@ const forceLogout = (reason: string) => {
     if (loggingOut) return;
     loggingOut = true;
 
+    // Debug: console me dikhega ki logout kisne trigger kiya
+    console.warn(`[api] forceLogout triggered: ${reason}`);
+
     TokenStorage.clearAuthData(reason);
 
     if (
@@ -136,12 +152,46 @@ const forceLogout = (reason: string) => {
     }
 };
 
+// ==================== REFRESH STORM PROTECTION ====================
+
+let refreshBlockedUntil = 0;
+let recentRefreshStarts: number[] = [];
+
+const blockRefresh = (ms: number) => {
+    refreshBlockedUntil = Math.max(refreshBlockedUntil, Date.now() + ms);
+};
+
+const onRefreshError = (err: unknown) => {
+    if (axios.isAxiosError(err)) {
+        const status = err.response?.status;
+
+        if (status === 429) {
+            const retryAfterSec = Number(err.response?.headers?.["retry-after"]);
+            const retryAfterMs = Number.isFinite(retryAfterSec)
+                ? retryAfterSec * 1000
+                : 0;
+            blockRefresh(Math.max(REFRESH_COOLDOWN_MS, retryAfterMs));
+            return;
+        }
+
+        // 400 / 401: chhota cooldown, taaki refresh baar-baar na chale
+        if (status === 400 || status === 401) {
+            blockRefresh(5_000);
+            return;
+        }
+    }
+
+    // Network error, 5xx, invalid response
+    blockRefresh(REFRESH_SOFT_COOLDOWN_MS);
+};
+
 // ==================== TOKEN REFRESH (single shared call) ====================
 
 let refreshPromise: Promise<string | null> | null = null;
 
 /**
- * Refresh endpoint call. 409 / 429 / 5xx / network error par retry hota hai.
+ * Refresh endpoint call. 409 / 5xx / network error par chhota retry hota hai.
+ * 429 par retry NAHI hota.
  *
  * Token mode  : refreshToken body me jata hai.
  * Cookie mode : refreshToken null hota hai; httpOnly refresh cookie
@@ -177,7 +227,7 @@ const callRefreshEndpoint = async (refreshToken: string | null) => {
                 throw err;
             }
 
-            await sleep(400 * attempt * attempt);
+            await sleep(500 * attempt);
         }
     }
 
@@ -185,11 +235,8 @@ const callRefreshEndpoint = async (refreshToken: string | null) => {
 };
 
 /**
- * Asli refresh call. Lock ke andar chalta hai, to doosre tab ne agar abhi
- * refresh kar liya hai to uska naya token reuse hota hai.
- *
- * Return: naya access token (token mode) ya null (cookie mode: server ne
- * naye httpOnly cookies set kar diye). Fail hone par throw karta hai.
+ * Asli refresh call (lock ke andar).
+ * Return: naya access token (token mode) ya null (cookie mode).
  */
 const performRefresh = async (
     failedToken: string | null
@@ -206,7 +253,7 @@ const performRefresh = async (
     const refreshToken = TokenStorage.getRefreshToken();
     const response = await callRefreshEndpoint(refreshToken);
 
-    // Cookie mode: JS ke paas tokens nahi hote, server cookies rotate karta hai.
+    // Cookie mode: server naye httpOnly cookies set kar deta hai.
     if (!refreshToken) {
         return null;
     }
@@ -229,6 +276,26 @@ const refreshAccessToken = (
 ): Promise<string | null> => {
     if (refreshPromise) return refreshPromise;
 
+    const now = Date.now();
+
+    // Cooldown active: server ko dobara mat chhedo
+    if (now < refreshBlockedUntil) {
+        return Promise.reject(new RefreshCooldownError());
+    }
+
+    // Circuit breaker: refresh "successful" ho raha ho par session phir bhi na bane
+    recentRefreshStarts = recentRefreshStarts.filter(
+        (t) => now - t < REFRESH_WINDOW_MS
+    );
+    if (recentRefreshStarts.length >= MAX_REFRESHES_PER_WINDOW) {
+        console.error(
+            "[api] Too many refreshes in a short time, pausing refresh for 60s"
+        );
+        blockRefresh(REFRESH_COOLDOWN_MS);
+        return Promise.reject(new RefreshCooldownError());
+    }
+    recentRefreshStarts.push(now);
+
     const run = () => performRefresh(failedToken);
     const pending: Promise<string | null> =
         typeof navigator !== "undefined" && navigator.locks
@@ -237,26 +304,46 @@ const refreshAccessToken = (
               >)
             : run();
 
-    refreshPromise = pending.finally(() => {
-        refreshPromise = null;
-    });
+    refreshPromise = pending
+        .then(
+            (value) => value,
+            (err: unknown) => {
+                onRefreshError(err);
+                throw err;
+            }
+        )
+        .finally(() => {
+            refreshPromise = null;
+        });
 
     return refreshPromise;
 };
 
 /**
- * Sirf tab logout jab server ne refresh definitely reject kiya ho (400 / 401).
- * Network error, timeout, 403, 409, 429 ya 5xx par user ko logout NAHI karte.
+ * Sirf tab logout jab server ne session definitely reject kiya ho:
+ *  - 401: server ne refresh reject kiya
+ *  - 400: SIRF jab humne refresh token bheja ho (token mode). Bina refresh token
+ *         ke aaya 400 matlab "request me token hi nahi tha" (cookie blocked /
+ *         cookie mode), ye session reject hona nahi hai, isliye logout nahi.
+ * Network error, timeout, 429, 5xx, cooldown par bhi logout NAHI.
  */
 const handleRefreshFailure = (refreshError: unknown) => {
-    if (axios.isAxiosError(refreshError)) {
-        const status = refreshError.response?.status;
-        if (status === 400 || status === 401) {
-            const body = refreshError.response?.data as ApiErrorBody | undefined;
-            forceLogout(
-                `refresh_rejected status=${status} message=${body?.message ?? "n/a"}`
-            );
-        }
+    if (!axios.isAxiosError(refreshError)) return;
+
+    const status = refreshError.response?.status;
+    const body = refreshError.response?.data as ApiErrorBody | undefined;
+    const hadRefreshToken = !!TokenStorage.getRefreshToken();
+
+    const rejected = status === 401 || (status === 400 && hadRefreshToken);
+
+    if (rejected) {
+        forceLogout(
+            `refresh_rejected status=${status} message=${body?.message ?? "n/a"}`
+        );
+    } else if (status === 400) {
+        console.warn(
+            "[api] refresh-token 400 without a stored refresh token, logout skipped"
+        );
     }
 };
 
@@ -357,7 +444,7 @@ export const getFreshAccessToken = async (): Promise<string | null> => {
 
 /**
  * Forced session renewal (token + cookie dono mode).
- * true = session renew ho gaya, false = fail (401 par logout bhi ho chuka hota hai).
+ * true = session renew ho gaya, false = fail ya cooldown active.
  */
 export const renewSession = async (): Promise<boolean> => {
     try {
@@ -368,6 +455,10 @@ export const renewSession = async (): Promise<boolean> => {
         return false;
     }
 };
+
+/** Cooldown chal raha hai ya nahi (socket jaise callers ke liye). */
+export const isRefreshCoolingDown = (): boolean =>
+    Date.now() < refreshBlockedUntil;
 
 /**
  * Backward compatible: naya access token (token mode) ya null.

@@ -1,12 +1,12 @@
 "use client";
-
+//src/app/mentorship/senior-services/page.tsx
 import React, { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Calendar, ArrowRight, User, GraduationCap, Clock } from "lucide-react";
+import { Search, Filter, ArrowRight, GraduationCap, Clock } from "lucide-react";
 import SeniorSessionService from "@/lib/api/seniorSession.service";
 import MentorService from "@/lib/api/mentorship.service";
 import { isMeaningfulText } from "@/shared/utils/textSanitize";
-import { resolveHostInfo } from "@/features/mentorship/utils/sessionCard";
+import { resolveSeniorHost } from "@/features/mentorship/utils/seniorHost";
 
 export default function SeniorServicesMarketplace() {
     const router = useRouter();
@@ -30,7 +30,9 @@ export default function SeniorServicesMarketplace() {
                 const validServices = Array.isArray(sessionRes?.data) ? sessionRes.data : [];
                 setServices(validServices);
 
-                const uniqueMentorIds = Array.from(new Set(validServices.map((s: any) => s.mentorId))).filter(Boolean) as string[];
+                // Sirf unhi sessions ke liye mentor list fetch karo jinke saath host data nahi aaya
+                const missingHost = validServices.filter((s: any) => resolveSeniorHost(s).isFallback);
+                const uniqueMentorIds = Array.from(new Set(missingHost.map((s: any) => s.mentorId))).filter(Boolean) as string[];
                 const map = new Map<string, any>();
 
                 if (uniqueMentorIds.length > 0) {
@@ -39,8 +41,8 @@ export default function SeniorServicesMarketplace() {
 
                     while (hasMore && page <= 5) {
                         const mRes = await MentorService.getAllMentors({ page, limit: 50 });
-                        const list = Array.isArray(mRes.data) ? mRes.data : (mRes.data?.mentors || []);
-                        
+                        const list = Array.isArray(mRes?.data) ? mRes.data : (mRes?.data?.mentors || []);
+
                         if (!list || list.length === 0) {
                             hasMore = false;
                         } else {
@@ -49,7 +51,7 @@ export default function SeniorServicesMarketplace() {
                                 if (m.userId) map.set(m.userId, m);
                             });
 
-                            const allFound = uniqueMentorIds.every(id => map.has(id));
+                            const allFound = uniqueMentorIds.every((id) => map.has(id));
                             if (list.length < 50 || allFound) {
                                 hasMore = false;
                             }
@@ -72,72 +74,75 @@ export default function SeniorServicesMarketplace() {
         router.push(`/mentorship/senior-service/${serviceId}`);
     };
 
-    // Extract dynamic dropdown options safely
+    // Dropdown options
     const mentorOptions = useMemo(() => {
-        const names = Array.from(mentorMap.values()).map(m => `${m.user?.firstName || ''} ${m.user?.lastName || ''}`.trim()).filter(Boolean);
-        services.forEach(s => {
-            if (s.host?.name) names.push(s.host.name);
-        });
+        const names = services
+            .map((s) => resolveSeniorHost(s, mentorMap.get(s.mentorId)))
+            .filter((h) => !h.isFallback)
+            .map((h) => h.name);
         return ["All Senior Mentors", ...Array.from(new Set(names))];
-    }, [mentorMap, services]);
+    }, [services, mentorMap]);
 
     const categoryOptions = useMemo(() => {
-        const types = services.map(s => s.category || s.sessionType).filter(Boolean) as string[];
-        const unique = Array.from(new Set(types)).map(t => t.replace(/_/g, ' '));
+        const types = services.map((s) => s.category || s.sessionType).filter(Boolean) as string[];
+        const unique = Array.from(new Set(types)).map((t) => t.replace(/_/g, " "));
         return ["All Categories", ...unique];
     }, [services]);
 
     const durationOptions = useMemo(() => {
-        const durations = services.map(s => s.duration).filter(d => typeof d === 'number') as number[];
+        const durations = services.map((s) => s.duration).filter((d) => typeof d === "number") as number[];
         const unique = Array.from(new Set(durations)).sort((a, b) => a - b);
-        return ["All Durations", ...unique.map(d => `${d} mins`)];
+        return ["All Durations", ...unique.map((d) => `${d} mins`)];
     }, [services]);
 
-    // Apply Client-Side Filtering
+    // Client-side filtering
     const filteredServices = useMemo(() => {
-        return services.filter(service => {
-            if (!isMeaningfulText(service?.title)) return false;
-            if ((service?.title ?? "").trim().length < 8) return false;
+        return services
+            .filter((service) => {
+                // Garbled / test / too-short titles public listing mein nahi dikhengi
+                if (!isMeaningfulText(service?.title)) return false;
+                if ((service?.title ?? "").trim().length < 8) return false;
 
-            const hostData = mentorMap.get(service.mentorId) || service.host;
-            if (!hostData) return false;
-            const host = resolveHostInfo(hostData, {}, { name: "", role: "" });
-            if (!host.name) return false;
+                // Host profile na mile to ghost "Senior Mentor" card nahi dikhana
+                const host = resolveSeniorHost(service, mentorMap.get(service.mentorId));
+                if (host.isFallback) return false;
 
-            const mName = host.name.toLowerCase();
-            const mRole = host.roleLabel?.toLowerCase() || "";
-            const sTitle = service.title?.toLowerCase() || "";
-            const sDesc = service.description?.toLowerCase() || "";
-            const categoryTag = (service.category || service.sessionType || "").replace(/_/g, ' ');
+                const mName = host.name.toLowerCase();
+                const mRole = host.role.toLowerCase();
+                const sTitle = service.title?.toLowerCase() || "";
+                const sDesc = service.description?.toLowerCase() || "";
+                const categoryTag = (service.category || service.sessionType || "").replace(/_/g, " ");
 
-            // Search Filter
-            if (searchQuery) {
-                const query = searchQuery.toLowerCase();
-                const matched = sTitle.includes(query) || sDesc.includes(query) || mName.includes(query) || mRole.includes(query) || categoryTag.toLowerCase().includes(query);
-                if (!matched) return false;
-            }
+                if (searchQuery) {
+                    const query = searchQuery.toLowerCase();
+                    const matched =
+                        sTitle.includes(query) ||
+                        sDesc.includes(query) ||
+                        mName.includes(query) ||
+                        mRole.includes(query) ||
+                        categoryTag.toLowerCase().includes(query);
+                    if (!matched) return false;
+                }
 
-            // Mentor Filter
-            if (selectedMentor !== "All Senior Mentors" && mName !== selectedMentor.toLowerCase()) return false;
+                if (selectedMentor !== "All Senior Mentors" && mName !== selectedMentor.toLowerCase()) return false;
 
-            // Category Filter
-            if (selectedCategory !== "All Categories") {
-                if (categoryTag.toLowerCase() !== selectedCategory.toLowerCase()) return false;
-            }
+                if (selectedCategory !== "All Categories") {
+                    if (categoryTag.toLowerCase() !== selectedCategory.toLowerCase()) return false;
+                }
 
-            // Duration Filter
-            if (selectedDuration !== "All Durations") {
-                const durMatch = parseInt(selectedDuration);
-                if (service.duration !== durMatch) return false;
-            }
+                if (selectedDuration !== "All Durations") {
+                    const durMatch = parseInt(selectedDuration);
+                    if (service.duration !== durMatch) return false;
+                }
 
-            return true;
-        }).sort((a, b) => {
-            if (sortBy === "Duration: Short to Long") return (a.duration || 0) - (b.duration || 0);
-            if (sortBy === "Duration: Long to Short") return (b.duration || 0) - (a.duration || 0);
-            if (sortBy === "Newest") return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-            return 0; // "Recommended"
-        });
+                return true;
+            })
+            .sort((a, b) => {
+                if (sortBy === "Duration: Short to Long") return (a.duration || 0) - (b.duration || 0);
+                if (sortBy === "Duration: Long to Short") return (b.duration || 0) - (a.duration || 0);
+                if (sortBy === "Newest") return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+                return 0; // "Recommended"
+            });
     }, [services, mentorMap, searchQuery, selectedMentor, selectedCategory, selectedDuration, sortBy]);
 
     const resetFilters = () => {
@@ -171,11 +176,10 @@ export default function SeniorServicesMarketplace() {
             </div>
 
             <div className="max-w-[1400px] mx-auto px-4 md:px-8 flex flex-col lg:flex-row gap-8">
-                
                 {/* Mobile Filter Toggle */}
                 <div className="lg:hidden flex items-center justify-between bg-white p-4 rounded-2xl border border-[#ece7e2] shadow-sm mb-2">
                     <span className="font-bold text-[#2d2116]">Filters & Search</span>
-                    <button 
+                    <button
                         onClick={() => setShowFiltersMobile(!showFiltersMobile)}
                         className="px-4 py-2 bg-[#eef1f6] text-[#3a5266] rounded-xl font-bold text-sm"
                     >
@@ -183,11 +187,10 @@ export default function SeniorServicesMarketplace() {
                     </button>
                 </div>
 
-                <aside className={`w-full lg:w-[280px] flex-shrink-0 flex flex-col gap-6 ${showFiltersMobile ? 'flex' : 'hidden lg:flex'}`}>
-                    
+                <aside className={`w-full lg:w-[280px] flex-shrink-0 flex flex-col gap-6 ${showFiltersMobile ? "flex" : "hidden lg:flex"}`}>
                     <div className="bg-white rounded-[32px] border border-[#ece7e2] shadow-sm p-6">
                         <div className="relative">
-                            <input 
+                            <input
                                 type="text"
                                 placeholder="Search senior mentors or sessions..."
                                 value={searchQuery}
@@ -204,46 +207,54 @@ export default function SeniorServicesMarketplace() {
                                 <Filter className="w-4 h-4" />
                                 Filters
                             </div>
-                            <button onClick={resetFilters} className="text-xs font-bold text-[#3a5266] hover:underline">Clear Filters</button>
+                            <button onClick={resetFilters} className="text-xs font-bold text-[#3a5266] hover:underline">
+                                Clear Filters
+                            </button>
                         </div>
-                        
+
                         <div>
                             <label className="block text-xs font-bold text-[#8e847c] uppercase tracking-wider mb-2">Mentor</label>
-                            <select 
-                                value={selectedMentor} 
+                            <select
+                                value={selectedMentor}
                                 onChange={(e) => setSelectedMentor(e.target.value)}
                                 className="w-full bg-[#fdfbf9] border border-[#ece7e2] rounded-xl px-3 py-2.5 text-sm font-bold text-[#2d2116] focus:outline-none focus:border-[#3a5266]"
                             >
-                                {mentorOptions.map(opt => <option key={opt}>{opt}</option>)}
+                                {mentorOptions.map((opt) => (
+                                    <option key={opt}>{opt}</option>
+                                ))}
                             </select>
                         </div>
 
                         <div>
                             <label className="block text-xs font-bold text-[#8e847c] uppercase tracking-wider mb-2">Category</label>
-                            <select 
-                                value={selectedCategory} 
+                            <select
+                                value={selectedCategory}
                                 onChange={(e) => setSelectedCategory(e.target.value)}
                                 className="w-full bg-[#fdfbf9] border border-[#ece7e2] rounded-xl px-3 py-2.5 text-sm font-bold text-[#2d2116] focus:outline-none focus:border-[#3a5266] capitalize"
                             >
-                                {categoryOptions.map(opt => <option key={opt}>{opt}</option>)}
+                                {categoryOptions.map((opt) => (
+                                    <option key={opt}>{opt}</option>
+                                ))}
                             </select>
                         </div>
 
                         <div>
                             <label className="block text-xs font-bold text-[#8e847c] uppercase tracking-wider mb-2">Duration</label>
-                            <select 
-                                value={selectedDuration} 
+                            <select
+                                value={selectedDuration}
                                 onChange={(e) => setSelectedDuration(e.target.value)}
                                 className="w-full bg-[#fdfbf9] border border-[#ece7e2] rounded-xl px-3 py-2.5 text-sm font-bold text-[#2d2116] focus:outline-none focus:border-[#3a5266]"
                             >
-                                {durationOptions.map(opt => <option key={opt}>{opt}</option>)}
+                                {durationOptions.map((opt) => (
+                                    <option key={opt}>{opt}</option>
+                                ))}
                             </select>
                         </div>
 
                         <div className="mt-2 pt-5 border-t border-[#ece7e2]">
                             <label className="block text-xs font-bold text-[#8e847c] uppercase tracking-wider mb-2">Sort By</label>
-                            <select 
-                                value={sortBy} 
+                            <select
+                                value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value)}
                                 className="w-full bg-[#fdfbf9] border border-[#ece7e2] rounded-xl px-3 py-2.5 text-sm font-bold text-[#2d2116] focus:outline-none focus:border-[#3a5266]"
                             >
@@ -259,7 +270,7 @@ export default function SeniorServicesMarketplace() {
                 <div className="flex-1 w-full">
                     {loading ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {[1, 2, 3, 4, 5, 6].map(i => (
+                            {[1, 2, 3, 4, 5, 6].map((i) => (
                                 <div key={i} className="flex flex-col bg-white rounded-[32px] border border-[#ece7e2] shadow-sm animate-pulse min-h-[420px]">
                                     <div className="w-full h-[180px] bg-[#eef1f6] rounded-t-[32px]"></div>
                                     <div className="p-6 flex-grow">
@@ -275,28 +286,27 @@ export default function SeniorServicesMarketplace() {
                         <>
                             <div className="mb-6 flex items-center justify-between">
                                 <span className="text-[#8e847c] font-bold text-sm">
-                                    {filteredServices.length} {filteredServices.length === 1 ? 'senior mentor service' : 'senior mentor services'} available
+                                    {filteredServices.length}{" "}
+                                    {filteredServices.length === 1 ? "senior mentor service" : "senior mentor services"} available
                                 </span>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {filteredServices.map((service, index) => {
-                                    const hostData = mentorMap.get(service.mentorId) || service.host;
-                                    const host = resolveHostInfo(hostData, {}, { name: "Senior Mentor", role: "Senior Professional" });
-                                    const hostName = host.name;
-                                    const hostRole = host.roleLabel;
-                                    const hostPic = host.pic;
-                                    const categoryTag = (service.category || service.sessionType || "CAREER PLANNING").replace(/_/g, ' ').toUpperCase();
+                                    const host = resolveSeniorHost(service, mentorMap.get(service.mentorId));
+                                    const categoryTag = (service.category || service.sessionType || "CAREER PLANNING")
+                                        .replace(/_/g, " ")
+                                        .toUpperCase();
 
                                     return (
-                                        <div 
+                                        <div
                                             key={service.sessionId || service._id || service.id || index}
                                             className="group flex flex-col bg-white rounded-[32px] overflow-hidden border border-[#ece7e2] shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-xl transition-all duration-300 cursor-pointer hover:-translate-y-1.5 h-full min-h-[400px]"
-                                            onClick={() => handleServiceClick(service.sessionId || service._id || service.id as string)}
+                                            onClick={() => handleServiceClick((service.sessionId || service._id || service.id) as string)}
                                         >
                                             <div className="relative w-full h-[160px] bg-gradient-to-br from-[#eef1f6] to-[#d5dde2] overflow-hidden flex-shrink-0">
                                                 {service.thumbnailImage || service.thumbnail ? (
-                                                    <img 
-                                                        src={service.thumbnailImage || service.thumbnail} 
+                                                    <img
+                                                        src={service.thumbnailImage || service.thumbnail}
                                                         alt={service.title}
                                                         className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                                     />
@@ -305,7 +315,7 @@ export default function SeniorServicesMarketplace() {
                                                         <div className="w-full h-full border border-[#d5dde2] rounded-2xl bg-gradient-to-tr from-[#f4ece1] to-white opacity-50"></div>
                                                     </div>
                                                 )}
-                                                
+
                                                 <div className="absolute top-4 left-4 bg-[#1b2b3a]/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm z-10">
                                                     <span className="text-[10px] font-bold text-white uppercase tracking-wider">
                                                         {categoryTag}
@@ -313,41 +323,42 @@ export default function SeniorServicesMarketplace() {
                                                 </div>
 
                                                 <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm z-10">
-                                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">{service.duration} MINS</span>
+                                                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                                                        {service.duration} MINS
+                                                    </span>
                                                 </div>
                                             </div>
 
                                             <div className="flex flex-col p-6 flex-grow">
                                                 <div className="flex items-center gap-3 mb-4">
-                                                    {hostPic ? (
-                                                        <img 
-                                                            src={hostPic} 
-                                                            alt={hostName} 
+                                                    {host.pic ? (
+                                                        <img
+                                                            src={host.pic}
+                                                            alt={host.name}
                                                             className="w-8 h-8 rounded-full object-cover border border-[#ece7e2]"
                                                         />
                                                     ) : (
                                                         <div className="w-8 h-8 rounded-full bg-[#f4ece1] text-[#3a5266] flex items-center justify-center font-bold border border-[#ece7e2] text-xs">
-                                                            {hostName ? hostName.charAt(0).toUpperCase() : "S"}
+                                                            {host.name.charAt(0).toUpperCase()}
                                                         </div>
                                                     )}
                                                     <div className="flex flex-col">
                                                         <span className="text-sm font-bold text-[#2d2116] leading-tight">
-                                                            {hostName}
+                                                            {host.name}
                                                         </span>
-                                                        {hostRole && (
-                                                            <span className="text-[11px] text-[#8e847c] font-bold mt-0.5 leading-tight line-clamp-1">
-                                                                {hostRole}
-                                                            </span>
-                                                        )}
+                                                        <span className="text-[11px] text-[#8e847c] font-bold mt-0.5 leading-tight line-clamp-1">
+                                                            {host.role}
+                                                        </span>
                                                     </div>
                                                 </div>
 
                                                 <h3 className="text-lg font-black text-[#1b2b3a] leading-tight mb-3 group-hover:text-[#2d4766] transition-colors line-clamp-2">
                                                     {service.title}
                                                 </h3>
-                                                
+
                                                 <p className="text-sm text-[#8e847c] line-clamp-2 mb-6">
-                                                    {service.description || "A personalized 1-to-1 session designed to help you achieve your specific goals."}
+                                                    {service.description ||
+                                                        "A personalized 1-to-1 session designed to help you achieve your specific goals."}
                                                 </p>
 
                                                 <div className="flex items-center justify-between mb-5 mt-auto">
@@ -376,7 +387,7 @@ export default function SeniorServicesMarketplace() {
                             </div>
                             <h3 className="text-2xl font-black text-[#2d2116] mb-2">No senior mentor sessions found</h3>
                             <p className="text-[#8e847c] mb-6 max-w-md">Try changing your filters or search for another topic.</p>
-                            <button 
+                            <button
                                 onClick={resetFilters}
                                 className="px-6 py-3 bg-[#1b2b3a] text-white font-bold text-sm rounded-xl hover:bg-[#111c26] transition-colors"
                             >
