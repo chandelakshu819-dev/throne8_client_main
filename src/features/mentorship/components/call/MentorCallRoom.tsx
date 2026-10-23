@@ -73,8 +73,10 @@ interface Props {
   userId: string;
   userName: string;
   isMentor: boolean;
-  /** Back to bookings / previous page. */
-  onExit: () => void;
+   /** Back to bookings / previous page. */
+   onExit: () => void;
+   /** Mentor only: called right after the mentor leaves the call (session keeps running). */
+   onMentorLeft?: () => void;
   /** Mentee only: go to Reviews & Feedback for this session. */
   onGoToReview: () => void;
 }
@@ -425,6 +427,7 @@ export default function MentorCallRoom({
   userName,
   isMentor,
   onExit,
+  onMentorLeft,
   onGoToReview,
 }: Props) {
   const {
@@ -624,7 +627,10 @@ export default function MentorCallRoom({
     setReactionsOpen(false);
     leaveRoom();
     goPhase('left');
-  }, [leaveRoom, goPhase]);
+    // Mentor left while the session is still running: go to the dashboard overview,
+    // where the live session is listed with a Rejoin button.
+    if (isMentor) onMentorLeft?.();
+  }, [leaveRoom, goPhase, isMentor, onMentorLeft]);
 
   const handleEndSession = useCallback(async () => {
     setEnding(true);

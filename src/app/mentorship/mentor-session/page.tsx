@@ -58,6 +58,18 @@ function MentorSessionContent() {
     router.replace(`${routes.menteeDashboard(userId)}?${qs.toString()}`);
   }, [router, userId, sessionId]);
 
+  // Mentor left by mistake: land on the dashboard overview, where the live
+  // session is listed with a Rejoin button.
+  const goToMentorOverview = useCallback((): void => {
+    if (!userId) {
+      router.replace('/mentorship');
+      return;
+    }
+    router.replace(`${routes.seniorMentorDashboard(userId)}?tab=dashboard`);
+  }, [router, userId]);
+
+
+
   if (authLoading) {
     return (
       <div style={SHELL}>
@@ -107,6 +119,7 @@ function MentorSessionContent() {
       userName={userName}
       isMentor={isMentor}
       onExit={goBack}
+      onMentorLeft={goToMentorOverview}
       onGoToReview={goToReview}
     />
   );
