@@ -9,6 +9,9 @@ export enum ApplicationStatus {
   REJECTED = 'rejected',
 }
 
+export const MIN_HELP_AREAS = 3;
+export const MAX_HELP_AREAS = 7;
+
 // ── Shape of the application returned by GET /me ──────────────────────────────
 export interface SeniorMentorApplication {
   applicationId: string;

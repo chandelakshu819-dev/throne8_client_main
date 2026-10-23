@@ -3,6 +3,17 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useLiveRoom } from '@/core/webrtc/useLiveRoom';
+import {
+  Maximize2,
+  Minimize2,
+  LayoutGrid,
+  UserSquare2,
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  PhoneOff,
+} from 'lucide-react';
 
 import { getSocket, initializeSocket } from '@/core/realtime/socket.client';
 import SessionService from '@/lib/api/session.service';
@@ -11,11 +22,192 @@ import SeniorSessionService from '@/lib/api/seniorSession.service';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { routes } from '@/config/routes';
 
-
-
 type CallStatus = 'active' | 'reconnecting' | 'left' | 'dropped';
+type LayoutMode = 'speaker' | 'grid';
+
 // socket.io khud ~5 attempts (~17s) karta hai; ye sirf safety ceiling hai
 const RECONNECT_GRACE_MS = 30000;
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+function initialsOf(name: string) {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'U';
+  return ((parts[0][0] || '') + (parts[1]?.[0] || '')).toUpperCase();
+}
+
+// ─── VideoTile ────────────────────────────────────────────────────────────────
+// Keeps the <video> element mounted (just invisible) when cam is off, so
+// remote audio keeps playing without interruption.
+function VideoTile({
+  stream,
+  showVideo,
+  muted,
+  mirror,
+  label,
+  avatarName,
+  radius = 8,
+  avatarSize = 80,
+}: {
+  stream: MediaStream | null | undefined;
+  showVideo: boolean;
+  muted?: boolean;
+  mirror?: boolean;
+  label: string;
+  avatarName: string;
+  radius?: number;
+  avatarSize?: number;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Attach stream via ref — no re-mount when layouts change
+  useEffect(() => {
+    const el = videoRef.current;
+    if (el && el.srcObject !== stream) el.srcObject = stream ?? null;
+  }, [stream]);
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        borderRadius: radius,
+        backgroundColor: '#1c1c1c',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Always mounted; invisible (not removed) when cam is off — preserves remote audio */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={muted}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          display: 'block',
+          transform: mirror ? 'scaleX(-1)' : undefined,
+          visibility: showVideo ? 'visible' : 'hidden',
+        }}
+      />
+      {/* Avatar fallback when cam is off */}
+      {!showVideo && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              width: avatarSize,
+              height: avatarSize,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #7a5c3e, #c9a87c)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: avatarSize * 0.36,
+              fontWeight: 600,
+              color: '#fff',
+              flexShrink: 0,
+            }}
+          >
+            {initialsOf(avatarName)}
+          </div>
+        </div>
+      )}
+      {/* Name badge */}
+      <span
+        style={{
+          position: 'absolute',
+          bottom: 8,
+          left: 8,
+          borderRadius: 6,
+          backgroundColor: 'rgba(0,0,0,0.55)',
+          padding: '2px 8px',
+          fontSize: 12,
+          color: '#fff',
+          maxWidth: '80%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+// ─── Icon control button ───────────────────────────────────────────────────────
+function CtrlBtn({
+  onClick,
+  title,
+  danger,
+  active,
+  children,
+}: {
+  onClick: () => void;
+  title: string;
+  danger?: boolean;
+  active?: boolean;
+  children: React.ReactNode;
+}) {
+  const [hover, setHover] = useState(false);
+  const bg = danger
+    ? '#b91c1c'
+    : active
+      ? '#7a5c3e'
+      : hover
+        ? 'rgba(255,255,255,0.18)'
+        : 'rgba(255,255,255,0.10)';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        width: 48,
+        height: 48,
+        borderRadius: '50%',
+        border: 'none',
+        background: bg,
+        color: '#fff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        transition: 'background 0.15s',
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ─── localStorage helpers (wrapped in try/catch for private-browsing safety) ──
+function readStoredLayout(): LayoutMode {
+  try {
+    const v = localStorage.getItem('sr_layoutMode');
+    if (v === 'grid' || v === 'speaker') return v;
+  } catch { }
+  return 'speaker'; // new default: speaker view
+}
+
+function storeLayout(mode: LayoutMode) {
+  try {
+    localStorage.setItem('sr_layoutMode', mode);
+  } catch { }
+}
 
 
 function formatDate(iso?: string) {
@@ -58,28 +250,39 @@ export default function SessionRoomPage() {
   const [rejoinError, setRejoinError] = useState<string | null>(null);
   const rejoinInFlightRef = useRef(false);
 
- 
+
   const [sessionKind, setSessionKind] = useState<'one-on-one' | 'group' | 'senior'>('one-on-one');
   const [redirectCountdown, setRedirectCountdown] = useState(5);
   const [redirectCancelled, setRedirectCancelled] = useState(false);
   const redirectedRef = useRef(false);
 
-    // Only the mentee of a 1:1 session can review it.
-    const isMentee = (() => {
-      if (!sessionData || !currentUserId || sessionData.booking || sessionKind !== 'one-on-one') return false;
-      const uid = String(currentUserId);
-      const inBookings = (sessionData.bookings || []).some(
-        (b: any) => String(b.menteeId || b.bookedBy || '') === uid
-      );
-      if (inBookings || String(sessionData.menteeId || '') === uid) return true;
-      const rawMentor = sessionData.mentorId;
-      const mentorUid =
-        rawMentor && typeof rawMentor === 'object'
-          ? String(rawMentor._id || rawMentor.userId || '')
-          : String(rawMentor || '');
-      // mentor id known and it is not me -> I am the mentee
-      return !!mentorUid && mentorUid !== uid;
-    })();
+  // ── Layout state ─────────────────────────────────────────────────────────
+  // Lazily initialised from localStorage (client-only) to avoid SSR mismatch
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('speaker');
+  const [layoutReady, setLayoutReady] = useState(false);
+  // true = local stream on main stage, remote in PiP (click-to-swap)
+  const [pipSwapped, setPipSwapped] = useState(false);
+
+  // Fullscreen
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Only the mentee of a 1:1 session can review it.
+  const isMentee = (() => {
+    if (!sessionData || !currentUserId || sessionData.booking || sessionKind !== 'one-on-one') return false;
+    const uid = String(currentUserId);
+    const inBookings = (sessionData.bookings || []).some(
+      (b: any) => String(b.menteeId || b.bookedBy || '') === uid
+    );
+    if (inBookings || String(sessionData.menteeId || '') === uid) return true;
+    const rawMentor = sessionData.mentorId;
+    const mentorUid =
+      rawMentor && typeof rawMentor === 'object'
+        ? String(rawMentor._id || rawMentor.userId || '')
+        : String(rawMentor || '');
+    // mentor id known and it is not me -> I am the mentee
+    return !!mentorUid && mentorUid !== uid;
+  })();
 
   const dropTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attemptRejoinRef = useRef<() => Promise<'joined' | 'ended' | 'failed' | 'busy'>>(
@@ -87,7 +290,7 @@ export default function SessionRoomPage() {
   );
 
   // ✅ NEW: floating emoji reactions during the live call
-  const [floatingReactions, setFloatingReactions] = useState <
+  const [floatingReactions, setFloatingReactions] = useState<
     { id: number; emoji: string; fromSelf: boolean }[]
   >([]);
   const reactionIdRef = useRef(0);
@@ -189,7 +392,7 @@ export default function SessionRoomPage() {
   }, [sessionId]);
 
   useEffect(() => {
-    if (sessionData && currentUserId && !endedByCheck && !hasJoinedRef.current) {      
+    if (sessionData && currentUserId && !endedByCheck && !hasJoinedRef.current) {
       hasJoinedRef.current = true;
       joinRoom(true, true).then((ok) => {
         if (!ok) return; // permission/socket fail → "joined" notification mat bhejo
@@ -430,10 +633,64 @@ export default function SessionRoomPage() {
     [sessionId]
   );
 
+  // ── Layout: read from localStorage after mount (avoids SSR mismatch) ────────
+  useEffect(() => {
+    setLayoutMode(readStoredLayout());
+    setLayoutReady(true);
+  }, []);
+
+  const toggleLayout = useCallback(() => {
+    setLayoutMode((prev) => {
+      const next: LayoutMode = prev === 'speaker' ? 'grid' : 'speaker';
+      storeLayout(next);
+      return next;
+    });
+    setPipSwapped(false);
+  }, []);
+
+  // ── Fullscreen ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement && stageRef.current) {
+      stageRef.current.requestFullscreen().catch(() => { });
+    } else {
+      document.exitFullscreen().catch(() => { });
+    }
+  }, []);
+
+  // ── Resolved remote participant name ────────────────────────────────────
+  const peer = peers[0] ?? null;
+  const resolvedRemoteName = (() => {
+    const sd = sessionData;
+    if (!sd) return peer?.userName || 'Participant';
+    const rawMentor = sd.mentorId;
+    const mentorObj = rawMentor && typeof rawMentor === 'object' ? rawMentor : null;
+    return (
+      mentorObj?.fullName ||
+      mentorObj?.name ||
+      (mentorObj?.firstName
+        ? `${mentorObj.firstName} ${mentorObj.lastName || ''}`.trim()
+        : null) ||
+      sd.mentorName ||
+      sd.mentor?.fullName ||
+      sd.mentor?.name ||
+      (sd.mentor?.firstName
+        ? `${sd.mentor.firstName} ${sd.mentor.lastName || ''}`.trim()
+        : null) ||
+      peer?.userName ||
+      (isMentee ? 'Mentor' : 'Participant')
+    );
+  })();
+
   if (loading) {
     return (
       <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f6ede8' }}>
-<p style={{ color: '#4a3728' }}>Loading session...</p>
+        <p style={{ color: '#4a3728' }}>Loading session...</p>
       </div>
     );
   }
@@ -449,87 +706,87 @@ export default function SessionRoomPage() {
     );
   }
 
-   // Priority: ended > left/dropped > normal call
-   const sessionEnded = !!roomEnded || endedByCheck;
+  // Priority: ended > left/dropped > normal call
+  const sessionEnded = !!roomEnded || endedByCheck;
 
-   if (sessionEnded) {
-     return (
-       <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#1a1a1a', color: 'white', padding: 24, textAlign: 'center' }}>
-         <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>Session ended</h1>
-         <p style={{ fontSize: 14, opacity: 0.8, maxWidth: 360, margin: 0 }}>
-           {sessionData.title || 'This session'} has ended, so it can’t be rejoined.
-         </p>
-         {roomEnded?.endedAt && (
-           <p style={{ fontSize: 12, opacity: 0.6, margin: 0 }}>Ended at {formatTime(roomEnded.endedAt)}</p>
-         )}
-                        {isMentee && (
-           <p style={{ fontSize: 13, opacity: 0.85, margin: 0 }}>
-             {redirectCancelled
-               ? 'How was your session? Your feedback helps other mentees.'
-               : `Taking you to Reviews & Feedback in ${redirectCountdown}s...`}
-           </p>
-         )}
-         <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-           <button
-             onClick={isMentee ? goToReviews : handleGoBack}
-             style={{ borderRadius: 9999, padding: '10px 24px', border: 'none', fontWeight: 600, color: 'white', backgroundColor: '#7a5c3e', cursor: 'pointer' }}
-           >
-             {isMentee ? 'Give feedback now' : 'Go Back'}
-           </button>
-           {isMentee && !redirectCancelled && (
-             <button
-               onClick={() => setRedirectCancelled(true)}
-               style={{ borderRadius: 9999, padding: '10px 24px', border: '1px solid rgba(255,255,255,0.3)', color: 'white', backgroundColor: 'transparent', cursor: 'pointer' }}
-             >
-               Stay on this page
-             </button>
-           )}
-         </div>
-       </div>
-     );
-   }
- 
-   if (callStatus === 'left' || callStatus === 'dropped') {
-     const isDropped = callStatus === 'dropped';
-     return (
-       <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#1a1a1a', color: 'white', padding: 24, textAlign: 'center' }}>
-         <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>
-           {isDropped ? 'Connection lost' : 'You left the session'}
-         </h1>
-         <p style={{ fontSize: 14, opacity: 0.8, maxWidth: 360, margin: 0 }}>
-           {isDropped
-             ? 'Your connection dropped. You can jump back into the same room.'
-             : 'Left by mistake? You can jump back into the same room.'}
-         </p>
-         {(liveRoomError || rejoinError) && (
-           <p style={{ fontSize: 13, color: '#f87171', margin: 0 }}>{liveRoomError || rejoinError}</p>
-         )}
-         <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-           <button
-             onClick={handleRejoin}
-             disabled={isRejoining}
-             style={{ borderRadius: 9999, padding: '10px 24px', border: 'none', fontWeight: 600, color: 'white', backgroundColor: '#7a5c3e', opacity: isRejoining ? 0.6 : 1, cursor: isRejoining ? 'not-allowed' : 'pointer' }}
-           >
-             {isRejoining ? 'Rejoining…' : 'Rejoin Session'}
-           </button>
-           <button
-             onClick={handleGoBack}
-             style={{ borderRadius: 9999, padding: '10px 24px', border: '1px solid rgba(255,255,255,0.3)', color: 'white', backgroundColor: 'transparent', cursor: 'pointer' }}
-           >
-             Go Back
-           </button>
-         </div>
-       </div>
-     );
-   }
- 
-   return (
-     <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', backgroundColor: '#1a1a1a', color: 'white' }}>
-       {callStatus === 'reconnecting' && (
-         <div style={{ backgroundColor: '#b45309', padding: '6px 24px', textAlign: 'center', fontSize: 13, flexShrink: 0 }}>
-           Connection lost — reconnecting…
-         </div>
-       )}
+  if (sessionEnded) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#1a1a1a', color: 'white', padding: 24, textAlign: 'center' }}>
+        <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>Session ended</h1>
+        <p style={{ fontSize: 14, opacity: 0.8, maxWidth: 360, margin: 0 }}>
+          {sessionData.title || 'This session'} has ended, so it can’t be rejoined.
+        </p>
+        {roomEnded?.endedAt && (
+          <p style={{ fontSize: 12, opacity: 0.6, margin: 0 }}>Ended at {formatTime(roomEnded.endedAt)}</p>
+        )}
+        {isMentee && (
+          <p style={{ fontSize: 13, opacity: 0.85, margin: 0 }}>
+            {redirectCancelled
+              ? 'How was your session? Your feedback helps other mentees.'
+              : `Taking you to Reviews & Feedback in ${redirectCountdown}s...`}
+          </p>
+        )}
+        <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <button
+            onClick={isMentee ? goToReviews : handleGoBack}
+            style={{ borderRadius: 9999, padding: '10px 24px', border: 'none', fontWeight: 600, color: 'white', backgroundColor: '#7a5c3e', cursor: 'pointer' }}
+          >
+            {isMentee ? 'Give feedback now' : 'Go Back'}
+          </button>
+          {isMentee && !redirectCancelled && (
+            <button
+              onClick={() => setRedirectCancelled(true)}
+              style={{ borderRadius: 9999, padding: '10px 24px', border: '1px solid rgba(255,255,255,0.3)', color: 'white', backgroundColor: 'transparent', cursor: 'pointer' }}
+            >
+              Stay on this page
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (callStatus === 'left' || callStatus === 'dropped') {
+    const isDropped = callStatus === 'dropped';
+    return (
+      <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#1a1a1a', color: 'white', padding: 24, textAlign: 'center' }}>
+        <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>
+          {isDropped ? 'Connection lost' : 'You left the session'}
+        </h1>
+        <p style={{ fontSize: 14, opacity: 0.8, maxWidth: 360, margin: 0 }}>
+          {isDropped
+            ? 'Your connection dropped. You can jump back into the same room.'
+            : 'Left by mistake? You can jump back into the same room.'}
+        </p>
+        {(liveRoomError || rejoinError) && (
+          <p style={{ fontSize: 13, color: '#f87171', margin: 0 }}>{liveRoomError || rejoinError}</p>
+        )}
+        <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+          <button
+            onClick={handleRejoin}
+            disabled={isRejoining}
+            style={{ borderRadius: 9999, padding: '10px 24px', border: 'none', fontWeight: 600, color: 'white', backgroundColor: '#7a5c3e', opacity: isRejoining ? 0.6 : 1, cursor: isRejoining ? 'not-allowed' : 'pointer' }}
+          >
+            {isRejoining ? 'Rejoining…' : 'Rejoin Session'}
+          </button>
+          <button
+            onClick={handleGoBack}
+            style={{ borderRadius: 9999, padding: '10px 24px', border: '1px solid rgba(255,255,255,0.3)', color: 'white', backgroundColor: 'transparent', cursor: 'pointer' }}
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', backgroundColor: '#1a1a1a', color: 'white' }}>
+      {callStatus === 'reconnecting' && (
+        <div style={{ backgroundColor: '#b45309', padding: '6px 24px', textAlign: 'center', fontSize: 13, flexShrink: 0 }}>
+          Connection lost — reconnecting…
+        </div>
+      )}
       {/* Header */}
       <div style={{ backgroundColor: '#4a3728', padding: '12px 24px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -548,10 +805,19 @@ export default function SessionRoomPage() {
         </div>
       </div>
 
-          {/* Video grid */}
-          <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 16, overflowY: 'auto' }}>
+      {/* Video stage */}
+      <div
+        ref={stageRef}
+        style={{
+          position: 'relative',
+          flex: 1,
+          minHeight: 0,
+          overflow: 'hidden',
+          display: 'flex',
+        }}
+      >
         {/* Floating reaction overlay */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 10 }}>
           {floatingReactions.map((r) => (
             <span
               key={r.id}
@@ -563,55 +829,148 @@ export default function SessionRoomPage() {
           ))}
         </div>
 
-        <div style={{ position: 'relative', aspectRatio: '16/9', width: '100%', maxWidth: 480, borderRadius: 8, backgroundColor: 'black' }}>
-          {localStream && (
-            <video
-              autoPlay
-              muted
-              playsInline
-              ref={(el) => {
-                if (el && el.srcObject !== localStream) el.srcObject = localStream;
-              }}
-              style={{ height: '100%', width: '100%', borderRadius: 8, objectFit: 'cover' }}
-            />
-          )}
-          <span style={{ position: 'absolute', bottom: 8, left: 8, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.5)', padding: '2px 8px', fontSize: 12 }}>
-            You
-          </span>
-        </div>
+        {/* ─── SPEAKER VIEW ─── */}
+        {(layoutMode === 'speaker' && layoutReady) && (
+          <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+            {/* Main stage tile */}
+            {peer ? (
+              <VideoTile
+                stream={pipSwapped ? localStream : peer.stream}
+                showVideo={pipSwapped ? (isCameraOn && !!localStream) : (!!peer.stream && peer.cameraOn !== false)}
+                muted={pipSwapped}
+                mirror={pipSwapped}
+                label={pipSwapped ? 'You' : resolvedRemoteName}
+                avatarName={pipSwapped ? currentUserName : resolvedRemoteName}
+                radius={0}
+                avatarSize={140}
+              />
+            ) : (
+              /* No peer yet — show local stream centred on stage */
+              <VideoTile
+                stream={localStream}
+                showVideo={isCameraOn && !!localStream}
+                muted
+                mirror
+                label={`${currentUserName} (You)`}
+                avatarName={currentUserName}
+                radius={0}
+                avatarSize={140}
+              />
+            )}
 
-        {peers.length === 0 && (
-          <div style={{ display: 'flex', aspectRatio: '16/9', width: '100%', maxWidth: 480, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.4)' }}>
-            <p style={{ fontSize: 13, opacity: 0.7 }}>
-              {peerNotified ? 'Other person has been notified — waiting for them to join…' : 'Waiting for the other person to join…'}
-            </p>
+            {/* Waiting badge */}
+            {!peer && (
+              <div style={{
+                position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(23,18,14,0.82)', border: '1px solid rgba(255,255,255,0.09)',
+                borderRadius: 9999, padding: '6px 16px', fontSize: 13, pointerEvents: 'none', whiteSpace: 'nowrap'
+              }}>
+                {peerNotified ? 'Other person notified — waiting for them to join…' : 'Waiting for the other person to join…'}
+              </div>
+            )}
+
+            {/* Fullscreen button — top-right of stage */}
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              style={{
+                position: 'absolute', top: 12, right: 12,
+                width: 36, height: 36, borderRadius: '50%',
+                border: 'none', background: 'rgba(0,0,0,0.45)',
+                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', zIndex: 5,
+              }}
+            >
+              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+
+            {/* PiP self-view — click to swap */}
+            {peer && (
+              <div
+                onClick={() => setPipSwapped((v) => !v)}
+                title="Click to swap view"
+                style={{
+                  position: 'absolute', bottom: 16, right: 16,
+                  width: 'clamp(100px, 18vw, 200px)', aspectRatio: '16/9',
+                  borderRadius: 12, overflow: 'hidden',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                  cursor: 'pointer', zIndex: 20,
+                  transition: 'transform 0.15s, box-shadow 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.05)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)';
+                }}
+              >
+                <VideoTile
+                  stream={pipSwapped ? peer.stream : localStream}
+                  showVideo={pipSwapped ? (!!peer.stream && peer.cameraOn !== false) : (isCameraOn && !!localStream)}
+                  muted={!pipSwapped}
+                  mirror={!pipSwapped}
+                  label={pipSwapped ? resolvedRemoteName : 'You'}
+                  avatarName={pipSwapped ? resolvedRemoteName : currentUserName}
+                  radius={12}
+                  avatarSize={44}
+                />
+              </div>
+            )}
           </div>
         )}
 
-        {peers.map((peer) => (
-          <div key={peer.socketId} style={{ position: 'relative', aspectRatio: '16/9', width: '100%', maxWidth: 480, borderRadius: 8, backgroundColor: 'black' }}>
-            {peer.stream && (
-              <video
-                autoPlay
-                playsInline
-                ref={(el) => {
-                  if (el && el.srcObject !== peer.stream) el.srcObject = peer.stream;
-                }}
-                style={{ height: '100%', width: '100%', borderRadius: 8, objectFit: 'cover' }}
+        {/* ─── GRID VIEW ─── */}
+        {(layoutMode === 'grid' || !layoutReady) && (
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', flex: 1,
+            alignItems: 'center', justifyContent: 'center',
+            gap: 16, padding: 16, overflowY: 'auto',
+          }}>
+            {/* Local tile */}
+            <div style={{ position: 'relative', aspectRatio: '16/9', width: '100%', maxWidth: 480, borderRadius: 8, overflow: 'hidden' }}>
+              <VideoTile
+                stream={localStream}
+                showVideo={isCameraOn && !!localStream}
+                muted
+                mirror
+                label="You"
+                avatarName={currentUserName}
+                radius={8}
+                avatarSize={80}
               />
+            </div>
+
+            {/* Remote / waiting tile */}
+            {peers.length === 0 ? (
+              <div style={{ display: 'flex', aspectRatio: '16/9', width: '100%', maxWidth: 480, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.4)' }}>
+                <p style={{ fontSize: 13, opacity: 0.7, textAlign: 'center', padding: '0 16px' }}>
+                  {peerNotified ? 'Other person notified — waiting for them to join…' : 'Waiting for the other person to join…'}
+                </p>
+              </div>
+            ) : (
+              peers.map((p) => (
+                <div key={p.socketId} style={{ position: 'relative', aspectRatio: '16/9', width: '100%', maxWidth: 480, borderRadius: 8, overflow: 'hidden' }}>
+                  <VideoTile
+                    stream={p.stream}
+                    showVideo={!!p.stream && p.cameraOn !== false}
+                    label={resolvedRemoteName}
+                    avatarName={resolvedRemoteName}
+                    radius={8}
+                    avatarSize={80}
+                  />
+                </div>
+              ))
             )}
-            <span style={{ position: 'absolute', bottom: 8, left: 8, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.5)', padding: '2px 8px', fontSize: 12 }}>
-              {peer.userName || 'Participant'}
-            </span>
           </div>
-        ))}
+        )}
       </div>
 
-      {liveRoomError && <p style={{ padding: '0 24px 8px', textAlign: 'center', fontSize: 13, color: '#f87171' }}>{liveRoomError}</p>}
-      {isConnecting && <p style={{ padding: '0 24px 8px', textAlign: 'center', fontSize: 13, opacity: 0.7 }}>Connecting…</p>}
+      {liveRoomError && <p style={{ padding: '0 24px 8px', textAlign: 'center', fontSize: 13, color: '#f87171', flexShrink: 0 }}>{liveRoomError}</p>}
+      {isConnecting && <p style={{ padding: '0 24px 8px', textAlign: 'center', fontSize: 13, opacity: 0.7, flexShrink: 0 }}>Connecting…</p>}
 
-            {/* Reactions bar */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#1a1a1a', padding: '8px 0', flexShrink: 0 }}>
+      {/* Reactions bar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#1a1a1a', padding: '8px 0', flexShrink: 0 }}>
         {REACTIONS.map((emoji) => (
           <button
             key={emoji}
@@ -624,16 +983,47 @@ export default function SessionRoomPage() {
         ))}
       </div>
 
-      {/* Controls */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: '#2a2a2a', padding: '16px 0', flexShrink: 0 }}>
-        <button onClick={toggleMic} style={{ borderRadius: 9999, padding: '8px 16px', border: 'none', color: 'white', backgroundColor: isMicOn ? '#7a5c3e' : '#dc2626' }}>
-          {isMicOn ? 'Mute' : 'Unmute'}
-        </button>
-        <button onClick={toggleCamera} style={{ borderRadius: 9999, padding: '8px 16px', border: 'none', color: 'white', backgroundColor: isCameraOn ? '#7a5c3e' : '#dc2626' }}>
-          {isCameraOn ? 'Camera Off' : 'Camera On'}
-        </button>
-        <button onClick={handleEndCall} style={{ borderRadius: 9999, padding: '8px 24px', border: 'none', fontWeight: 600, color: 'white', backgroundColor: '#b91c1c' }}>
-          End Call
+      {/* Control bar — icon-based */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#2a2a2a', padding: '14px 24px', flexShrink: 0 }}>
+        {/* Mic */}
+        <CtrlBtn onClick={toggleMic} title={isMicOn ? 'Mute microphone' : 'Unmute microphone'} danger={!isMicOn}>
+          {isMicOn ? <Mic size={20} /> : <MicOff size={20} />}
+        </CtrlBtn>
+
+        {/* Camera */}
+        <CtrlBtn onClick={toggleCamera} title={isCameraOn ? 'Turn off camera' : 'Turn on camera'} danger={!isCameraOn}>
+          {isCameraOn ? <Video size={20} /> : <VideoOff size={20} />}
+        </CtrlBtn>
+
+        {/* Layout toggle */}
+        <CtrlBtn
+          onClick={toggleLayout}
+          title={layoutMode === 'speaker' ? 'Switch to grid view' : 'Switch to speaker view'}
+        >
+          {layoutMode === 'speaker' ? <LayoutGrid size={20} /> : <UserSquare2 size={20} />}
+        </CtrlBtn>
+
+        {/* Fullscreen */}
+        <CtrlBtn onClick={toggleFullscreen} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
+          {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+        </CtrlBtn>
+
+        {/* Divider */}
+        <div style={{ width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.12)', flexShrink: 0 }} />
+
+        {/* End Call */}
+        <button
+          onClick={handleEndCall}
+          title="End call"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            borderRadius: 9999, padding: '10px 20px',
+            border: 'none', fontWeight: 600, color: 'white',
+            backgroundColor: '#b91c1c', cursor: 'pointer',
+          }}
+        >
+          <PhoneOff size={18} />
+          <span>End Call</span>
         </button>
       </div>
 

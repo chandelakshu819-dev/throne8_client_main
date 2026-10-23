@@ -202,13 +202,28 @@ export default function GoogleOnboardingPage() {
                 return (
                     <>
                         {(formData.status === 'working' || formData.userType === 'working') && (
-                            <WorkingJobDetails onNext={handleComplete} onBack={goBack} />
+                            <WorkingJobDetails
+                                onNext={handleComplete}
+                                onBack={goBack}
+                                initialData={formData}
+                                onDataChange={(data) => setFormData((prev: any) => ({ ...prev, ...data }))}
+                            />
                         )}
                         {(formData.status === 'student' || formData.userType === 'student') && (
-                            <StudentEducation onNext={handleComplete} onBack={goBack} />
+                            <StudentEducation
+                                onNext={handleComplete}
+                                onBack={goBack}
+                                initialData={formData}
+                                onDataChange={(data) => setFormData((prev: any) => ({ ...prev, ...data }))}
+                            />
                         )}
                         {(formData.status === 'fresher' || formData.userType === 'fresher') && (
-                            <FresherEducationRole onNext={handleComplete} onBack={goBack} />
+                            <FresherEducationRole
+                                onNext={handleComplete}
+                                onBack={goBack}
+                                initialData={formData}
+                                onDataChange={(data) => setFormData((prev: any) => ({ ...prev, ...data }))}
+                            />
                         )}
                     </>
                 );

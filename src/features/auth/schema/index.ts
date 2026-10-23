@@ -57,8 +57,8 @@ export const currentJobSchema = z.object({
 
 export const studentEducationSchema = z.object({
   collegeName: freeTextRule('College name', 3),
-  degree: freeTextRule('Degree'),
-  fieldOfStudy: freeTextRule('Field of study'),
+  degree: freeTextRule('Degree', 2, 60),
+  fieldOfStudy: freeTextRule('Field of study', 2, 60),
   graduationYear: graduationYearRule,
 });
 
@@ -84,8 +84,8 @@ export const fullRegistrationSchema = z.object({
   startDate: startDateRule.optional(),
   endDate: endDateRule,
   collegeName: freeTextRule('College name', 3).optional(),
-  degree: freeTextRule('Degree').optional(),
-  fieldOfStudy: freeTextRule('Field of study').optional(),
+  degree: freeTextRule('Degree', 2, 60).optional(),
+  fieldOfStudy: freeTextRule('Field of study', 2, 60).optional(),
   graduationYear: graduationYearRule.optional(),
   highestEducation: freeTextRule('Highest education').optional(),
   preferredRole: freeTextRule('Preferred role').optional(),
