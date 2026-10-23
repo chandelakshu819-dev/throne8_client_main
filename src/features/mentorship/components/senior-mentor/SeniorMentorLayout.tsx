@@ -179,7 +179,12 @@ export default function SeniorMentorLayout({
 
         <main className="flex-1 overflow-y-auto">
           <div className="px-4 md:px-6 py-8 max-w-[1600px] mx-auto">
-            {activeTab === 'profile' && <SeniorProfilePage seniorData={application} />}
+            {activeTab === 'profile' && (
+              <SeniorProfilePage
+                seniorData={application}
+                onUpdateApplication={(updated) => setApplication(updated)}
+              />
+            )}
             {activeTab === 'services' && <SeniorMentorServicesPage seniorData={application} />}
             {activeTab === 'bookings' && <SeniorBookingsPage seniorData={application} />}
             {activeTab === 'analytics' && <SeniorAnalyticsPage seniorData={application} />}

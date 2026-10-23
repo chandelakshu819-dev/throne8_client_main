@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Search, Filter, Calendar, ArrowRight, User, GraduationCap, Clock } from "lucide-react";
 import SeniorSessionService from "@/lib/api/seniorSession.service";
 import MentorService from "@/lib/api/mentorship.service";
+import { isMeaningfulText } from "@/shared/utils/textSanitize";
+import { resolveHostInfo } from "@/features/mentorship/utils/sessionCard";
 
 export default function SeniorServicesMarketplace() {
     const router = useRouter();
@@ -44,6 +46,7 @@ export default function SeniorServicesMarketplace() {
                         } else {
                             list.forEach((m: any) => {
                                 if (m.mentorId) map.set(m.mentorId, m);
+                                if (m.userId) map.set(m.userId, m);
                             });
 
                             const allFound = uniqueMentorIds.every(id => map.has(id));
@@ -72,8 +75,11 @@ export default function SeniorServicesMarketplace() {
     // Extract dynamic dropdown options safely
     const mentorOptions = useMemo(() => {
         const names = Array.from(mentorMap.values()).map(m => `${m.user?.firstName || ''} ${m.user?.lastName || ''}`.trim()).filter(Boolean);
+        services.forEach(s => {
+            if (s.host?.name) names.push(s.host.name);
+        });
         return ["All Senior Mentors", ...Array.from(new Set(names))];
-    }, [mentorMap]);
+    }, [mentorMap, services]);
 
     const categoryOptions = useMemo(() => {
         const types = services.map(s => s.category || s.sessionType).filter(Boolean) as string[];
@@ -90,9 +96,16 @@ export default function SeniorServicesMarketplace() {
     // Apply Client-Side Filtering
     const filteredServices = useMemo(() => {
         return services.filter(service => {
-            const m = mentorMap.get(service.mentorId);
-            const mName = m ? `${m.user?.firstName || ''} ${m.user?.lastName || ''}`.toLowerCase() : "";
-            const mRole = m?.experience?.currentRole?.toLowerCase() || m?.headline?.toLowerCase() || "";
+            if (!isMeaningfulText(service?.title)) return false;
+            if ((service?.title ?? "").trim().length < 8) return false;
+
+            const hostData = mentorMap.get(service.mentorId) || service.host;
+            if (!hostData) return false;
+            const host = resolveHostInfo(hostData, {}, { name: "", role: "" });
+            if (!host.name) return false;
+
+            const mName = host.name.toLowerCase();
+            const mRole = host.roleLabel?.toLowerCase() || "";
             const sTitle = service.title?.toLowerCase() || "";
             const sDesc = service.description?.toLowerCase() || "";
             const categoryTag = (service.category || service.sessionType || "").replace(/_/g, ' ');
@@ -267,12 +280,11 @@ export default function SeniorServicesMarketplace() {
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {filteredServices.map((service, index) => {
-                                    const hostData = mentorMap.get(service.mentorId);
-                                    const hostName = hostData 
-                                        ? `${hostData.user?.firstName || ''} ${hostData.user?.lastName || ''}`.trim()
-                                        : "Senior Mentor";
-                                    const hostRole = hostData?.experience?.currentRole || hostData?.headline || "Senior Professional";
-                                    const hostPic = hostData?.profilePic || hostData?.user?.profilePic || "";
+                                    const hostData = mentorMap.get(service.mentorId) || service.host;
+                                    const host = resolveHostInfo(hostData, {}, { name: "Senior Mentor", role: "Senior Professional" });
+                                    const hostName = host.name;
+                                    const hostRole = host.roleLabel;
+                                    const hostPic = host.pic;
                                     const categoryTag = (service.category || service.sessionType || "CAREER PLANNING").replace(/_/g, ' ').toUpperCase();
 
                                     return (

@@ -17,10 +17,21 @@ export default function SeniorMentorshipServicesSection() {
     const [mentorMap, setMentorMap] = useState<Map<string, any>>(new Map());
     const [loading, setLoading] = useState(true);
 
-    // Garbled title wali (test/junk) sessions public listing mein nahi dikhengi
+    // Garbled title wali (test/junk) sessions public listing mein nahi dikhengi.
+    // Extra check: title < 8 chars trimmed = too short to be a real service name.
+    // Also ensures the session has a valid host before considering it renderable.
     const services = useMemo(
-        () => rawServices.filter((s) => isMeaningfulText(s?.title)),
-        [rawServices]
+        () =>
+            rawServices.filter((s) => {
+                if (!isMeaningfulText(s?.title)) return false;
+                if ((s?.title ?? "").trim().length < 8) return false;
+                const hostData = mentorMap.get(s.mentorId) || s.host;
+                if (!hostData) return false;
+                const host = resolveHostInfo(hostData, {}, { name: "", role: "" });
+                if (!host.name) return false;
+                return true;
+            }),
+        [rawServices, mentorMap]
     );
 
     const {
@@ -68,6 +79,7 @@ export default function SeniorMentorshipServicesSection() {
                         } else {
                             list.forEach((m: any) => {
                                 if (m.mentorId) map.set(m.mentorId, m);
+                                if (m.userId) map.set(m.userId, m);
                             });
                             const allFound = uniqueMentorIds.every((id) => map.has(id));
                             if (list.length < limit || allFound) hasMore = false;
@@ -151,12 +163,19 @@ export default function SeniorMentorshipServicesSection() {
                             const serviceId = service.sessionId || service._id || service.id;
                             const uniqueKey = `carousel-item-${serviceId}-${index}`;
 
-                            const hostData = mentorMap.get(service.mentorId);
+                            const hostData = mentorMap.get(service.mentorId) || service.host;
+
+                            // Skip card if mentor profile not found — prevents ghost "Senior Mentor" cards
+                            if (!hostData) return null;
+
                             const host = resolveHostInfo(
                                 hostData,
                                 {},
-                                { name: "Senior Mentor", role: "Senior Professional" }
+                                { name: "", role: "" }
                             );
+                            // If resolveHostInfo still yields no name, skip the card
+                            if (!host.name) return null;
+
 
                             const topCategory = (
                                 service.category ||

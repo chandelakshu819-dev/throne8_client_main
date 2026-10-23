@@ -127,6 +127,22 @@ class SeniorMentorApplicationService {
       throw error;
     }
   }
+
+  /**
+   * PATCH /api/v1/mentorship/senior-mentor-applications/me
+   * Update the current user's Senior Mentor profile fields.
+   */
+  static async updateMyApplication(updates: Partial<SeniorMentorApplication>): Promise<SeniorMentorApplication> {
+    try {
+      console.log('🎓 [SENIOR_MENTOR_APP] Updating profile...');
+      const { data } = await api.patch('/mentorship/senior-mentor-applications/me', updates);
+      console.log('✅ [SENIOR_MENTOR_APP] Updated profile successfully');
+      return data?.data;
+    } catch (error: any) {
+      console.error('❌ [SENIOR_MENTOR_APP] Failed to update profile:', error?.response?.data?.message || error?.message);
+      throw error;
+    }
+  }
 }
 
 export default SeniorMentorApplicationService;

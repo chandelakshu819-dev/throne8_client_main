@@ -165,11 +165,18 @@ export default function GroupSessionsSection({
                                 const uniqueKey = `carousel-group-session-${sessionId}-${index}`;
 
                                 const hostData = mentorMap.get(session.mentorId) || session.host;
+
+                                // Skip card if no mentor profile found (prevents "Industry Mentor" ghost cards).
+                                // Exception: if parent passed explicit mentorName (mentor profile page), keep it.
+                                if (!hostData && !mentorName) return null;
+
                                 const host = resolveHostInfo(
                                     hostData,
                                     { name: mentorName, role: mentorRole, image: mentorImage },
-                                    { name: "Industry Mentor", role: "Mentor" }
+                                    { name: "", role: "" }
                                 );
+                                if (!host.name) return null;
+
 
                                 const tags: string[] = [];
                                 const addTag = (t?: string) => {

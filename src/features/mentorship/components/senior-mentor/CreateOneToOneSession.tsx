@@ -16,8 +16,10 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
     const isEdit = !!editSession;
 
     const [title, setTitle] = useState('');
+    const [titleError, setTitleError] = useState('');
     const [duration, setDuration] = useState(60);
     const [description, setDescription] = useState('');
+    const [descError, setDescError] = useState('');
     const [shortDescription, setShortDescription] = useState('');
     const [tagsText, setTagsText] = useState('');
     const [outcomesText, setOutcomesText] = useState('');
@@ -61,12 +63,24 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
 
     const handleSubmit = async () => {
         const finalCategory = isEdit ? editCategory.trim() : (isCustom ? customCategory.trim() : category);
+        const trimmedTitle = title.trim();
+        const trimmedDesc = description.trim();
 
-        if (!title || !description || !duration || !finalCategory) {
-            showToast("Please fill in all required fields", "error");
-            return;
+        // Client-side validation (mirrors server: title ≥10, desc ≥20)
+        let hasError = false;
+        if (!trimmedTitle || trimmedTitle.length < 10) {
+            setTitleError('Service name must be at least 10 characters.');
+            hasError = true;
         }
-        
+        if (!trimmedDesc || trimmedDesc.length < 20) {
+            setDescError('Description must be at least 20 characters.');
+            hasError = true;
+        }
+        if (!finalCategory) {
+            showToast("Please select or enter a category", "error");
+            hasError = true;
+        }
+        if (hasError) return;
         setIsSubmitting(true);
         try {
             const formData = new FormData();
@@ -199,7 +213,7 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
                     <div>
                         <div className="flex items-center gap-4 mb-2">
                             <label className="flex flex-1 items-center gap-2 text-sm font-bold text-[#4a3728]">
-                                Service Name
+                                Service Name <span className="text-red-500">*</span>
                             </label>
                             <span className={`text-xs font-bold ${title.length >= 80 ? 'text-red-500' : 'text-[#8a7a6a]'}`}>
                                 {title.length}/80
@@ -208,25 +222,28 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
                         <input 
                             value={title}
                             maxLength={80}
-                            onChange={(e) => setTitle(e.target.value)}
-                            className="w-full px-4 py-3 bg-[#f3ece4] border-2 border-[#e0d8cf] focus:border-[#4a3728] rounded-xl outline-none text-[#4a3728] font-bold transition-colors" 
+                            onChange={(e) => { setTitle(e.target.value); if (titleError) setTitleError(''); }}
+                            className={`w-full px-4 py-3 bg-[#f3ece4] border-2 ${titleError ? 'border-red-400' : 'border-[#e0d8cf]'} focus:border-[#4a3728] rounded-xl outline-none text-[#4a3728] font-bold transition-colors`}
                             placeholder={getTitlePlaceholder(category)} 
                         />
+                        {titleError && <p className="text-xs text-red-500 font-semibold mt-1.5 ml-1">{titleError}</p>}
+                        {!titleError && <p className="text-xs text-[#8a7a6a] font-medium mt-1.5 ml-1">Min 10 characters. Be specific — avoid single-word titles.</p>}
                     </div>
                     
                     {/* Description */}
                     <div>
                         <label className="flex items-center gap-2 text-sm font-bold text-[#4a3728] mb-2">
                             <FileText className="w-4 h-4 text-[#7a5c3e]" />
-                            Description
+                            Description <span className="text-red-500">*</span>
                         </label>
                         <textarea 
                             value={description}
-                            onChange={(e) => setDescription(e.target.value)}
+                            onChange={(e) => { setDescription(e.target.value); if (descError) setDescError(''); }}
                             maxLength={2000}
-                            className="w-full px-4 py-3 bg-[#f3ece4] border-2 border-[#e0d8cf] focus:border-[#4a3728] rounded-xl outline-none text-[#4a3728] min-h-[120px] resize-none font-medium transition-colors" 
-                            placeholder="Describe what students can expect from this mentoring session..." 
+                            className={`w-full px-4 py-3 bg-[#f3ece4] border-2 ${descError ? 'border-red-400' : 'border-[#e0d8cf]'} focus:border-[#4a3728] rounded-xl outline-none text-[#4a3728] min-h-[120px] resize-none font-medium transition-colors`}
+                            placeholder="Describe what students can expect from this mentoring session... (min 20 characters)" 
                         />
+                        {descError && <p className="text-xs text-red-500 font-semibold mt-1.5 ml-1">{descError}</p>}
                     </div>
                     
                     {/* Duration */}

@@ -172,11 +172,18 @@ export default function MentorshipServicesSection({
                                 const uniqueKey = `carousel-item-${serviceId}-${index}`;
 
                                 const hostData = mentorMap.get(service.mentorId) || service.host;
+
+                                // Skip card if no mentor profile found (prevents "Industry Mentor" ghost cards).
+                                // Exception: if parent passed explicit mentorName (single mentor profile page).
+                                if (!hostData && !mentorName) return null;
+
                                 const host = resolveHostInfo(
                                     hostData,
                                     { name: mentorName, role: mentorRole, image: mentorImage },
-                                    { name: "Industry Mentor", role: "Mentor" }
+                                    { name: "", role: "" }
                                 );
+                                if (!host.name) return null;
+
 
                                 const cardMentorId = hostData?.mentorId || service.mentorId || "";
                                 const mentorProfileUrl = cardMentorId
