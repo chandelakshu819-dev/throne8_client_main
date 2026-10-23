@@ -74,13 +74,27 @@ export default function UserDashboardLayout({
     return "dashboard";
   }, [initialPage, pathname, searchParams]);
 
-  const [activePage, setActivePage] = useState(getResolvedInitialPage);
+  const [activePage, setActivePageState] = useState(getResolvedInitialPage);
+
+  // Tab badalne par URL mein ?page=<tab> likho, taaki refresh par wahi tab khule
+  const setActivePage = useCallback(
+    (page: string) => {
+      setActivePageState(page);
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.delete("tab");
+      params.set("page", page);
+      router.replace(`/mentorship/user-dashboard/${userId}?${params.toString()}`, {
+        scroll: false,
+      });
+    },
+    [router, searchParams, userId]
+  );
 
   useEffect(() => {
     if (pathname?.includes("/upcoming-sessions")) {
-      setActivePage("upcoming-sessions");
+      setActivePageState("upcoming-sessions");
     }
-  }, [pathname]);
+  }, [pathname]); 
 
   const [sessions, setSessions] = useState<any[]>([]);
   const { user } = useAuth();
