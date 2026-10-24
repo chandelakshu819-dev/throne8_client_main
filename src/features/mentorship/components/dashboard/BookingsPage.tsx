@@ -71,7 +71,8 @@ type BookingTab =
   | "pending"
   | "upcoming"
   | "in_progress"
-  | "completed";
+  | "completed"
+  | "missed";
 
 const tabMeta: Record<
   BookingTab,
@@ -82,6 +83,7 @@ const tabMeta: Record<
   upcoming: { label: "Upcoming", icon: Calendar },
   in_progress: { label: "In Progress", icon: Play },
   completed: { label: "Completed", icon: CheckCircle2 },
+  missed: { label: "Missed", icon: XCircle },
 };
 
 const statPalette: Record<string, { bg: string; fg: string }> = {
@@ -103,12 +105,68 @@ const statusBadge: Record<
   in_progress: { bg: "#dbeafe", fg: "#1d4ed8", label: "In Progress" },
   completed: { bg: "#f3e8ff", fg: "#7c3aed", label: "Completed" },
   cancelled: { bg: "#fee2e2", fg: "#dc2626", label: "Cancelled" },
+  // DB me abhi bhi in_progress, par scheduled time nikal chuka (mentor ne End Session nahi dabaya)
+  ended: { bg: "#fed7aa", fg: "#c2410c", label: "Ended" },
+  // Kabhi start nahi hua aur slot ka time nikal chuka
+  missed: { bg: "#f3f4f6", fg: "#6b7280", label: "Missed" },
+};
+
+const ENDED_GRACE_MINUTES = 15;
+const DEFAULT_SESSION_MINUTES = 60;
+const DEFAULT_GROUP_SESSION_MINUTES = 120;
+
+const slotToMinutes = (t: string): number | null => {
+  const m = t.trim().match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/);
+  return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : null;
+};
+
+// Row ka scheduled end time (ms). 1:1 rows me length slotTime ("HH:mm - HH:mm") se aati hai.
+const getRowEndMs = (b: MentorBookingRow): number | null => {
+  if (!b.scheduledAt) return null;
+  const startMs = new Date(b.scheduledAt).getTime();
+  if (Number.isNaN(startMs)) return null;
+
+  let minutes = b.isGroupSession ? DEFAULT_GROUP_SESSION_MINUTES : DEFAULT_SESSION_MINUTES;
+  const parts = String(b.slotTime || "").split("-");
+  if (parts.length === 2) {
+    const s = slotToMinutes(parts[0]);
+    const e = slotToMinutes(parts[1]);
+    if (s !== null && e !== null && e > s) minutes = e - s;
+  }
+  return startMs + minutes * 60000;
+};
+
+// in_progress hai lekin time (+ grace) nikal chuka -> ab live nahi hai
+const isEndedRow = (b: MentorBookingRow, nowMs: number): boolean => {
+  if (b.status !== "in_progress") return false;
+  const endMs = getRowEndMs(b);
+  return endMs !== null && nowMs > endMs + ENDED_GRACE_MINUTES * 60000;
+};
+
+// Kabhi start nahi hua (confirmed/rescheduled/open/full) aur slot ka end time nikal chuka -> Missed
+const isMissedRow = (b: MentorBookingRow, nowMs: number): boolean => {
+  const neverStarted =
+    b.status === "confirmed" ||
+    b.status === "rescheduled" ||
+    (!!b.isGroupSession && (b.status === "open" || b.status === "full"));
+  if (!neverStarted || b.isTemplate) return false;
+  const endMs = getRowEndMs(b);
+  return endMs !== null && nowMs > endMs;
 };
 
 export default function BookingsPage({ mentorData }: BookingProps) {
   const router = useRouter();
 
+
+
   const [bookingTab, setBookingTab] = useState<BookingTab>("all");
+
+  // Har minute "ended" rows dobara evaluate ho (page khula rahe tab bhi)
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, []);
   const [allBookings, setAllBookings] = useState<MentorBookingRow[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [loadingData, setLoadingData] = useState(true);
@@ -341,33 +399,47 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     });
   }, [allBookings]);
 
-  // Booking categories
-  const pendingBookings = allBookings.filter((b) => b.status === "pending");
+    // Booking categories
+    const pendingBookings = allBookings.filter((b) => b.status === "pending");
+    const missedBookings = allBookings.filter((b) => isMissedRow(b, nowMs));
   const upcomingBookings = allBookings.filter(
     (b) =>
-      b.status === "confirmed" ||
-      b.status === "rescheduled" ||
-      (b.isGroupSession && (b.status === "open" || b.status === "full"))
+      (b.status === "confirmed" ||
+        b.status === "rescheduled" ||
+        (b.isGroupSession && (b.status === "open" || b.status === "full"))) &&
+      !isMissedRow(b, nowMs)
   );
-  const inProgressBookings = allBookings.filter((b) => b.status === "in_progress");
-  const completedBookings = allBookings.filter((b) => b.status === "completed");
+    // in_progress (DB) par time nikal chuka -> "ended", live nahi
+    const endedBookings = allBookings.filter((b) => isEndedRow(b, nowMs));
+    const inProgressBookings = allBookings.filter(
+      (b) => b.status === "in_progress" && !isEndedRow(b, nowMs)
+    );
+    const completedBookings = allBookings.filter((b) => b.status === "completed");
+    // Completed tab: asli completed + ended rows (jinhe mentor End Session se close karega)
+    const completedTabBookings = [...endedBookings, ...completedBookings];
+    const activeBookings = allBookings.filter(
+      (b) => b.status !== "completed" && !isEndedRow(b, nowMs) && !isMissedRow(b, nowMs)
+    );
+  
+    const getCurrentBookings = () => {
+      switch (bookingTab) {
+        case "all":
+          return activeBookings;
+        case "pending":
+          return pendingBookings;
+        case "upcoming":
+          return upcomingBookings;
+        case "in_progress":
+          return inProgressBookings;
+          case "completed":
+            return completedTabBookings;
+          case "missed":
+            return missedBookings;
+        default:
+          return activeBookings;
+      }
+    };
 
-  const getCurrentBookings = () => {
-    switch (bookingTab) {
-      case "all":
-        return allBookings.filter((b) => b.status !== "completed");
-      case "pending":
-        return pendingBookings;
-      case "upcoming":
-        return upcomingBookings;
-      case "in_progress":
-        return inProgressBookings;
-      case "completed":
-        return completedBookings;
-      default:
-        return allBookings.filter((b) => b.status !== "completed");
-    }
-  };
 
   const currentBookings = useMemo(() => {
     const base = getCurrentBookings();
@@ -379,7 +451,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         b.serviceName?.toLowerCase().includes(q) ||
         (b.participants || []).some((p) => p.menteeName?.toLowerCase().includes(q))
     );
-  }, [bookingTab, allBookings, searchQuery]);
+  }, [bookingTab, allBookings, searchQuery, nowMs]);
+
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return "N/A";
@@ -808,7 +881,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
           { label: "Pending", value: pendingBookings.length, icon: Clock, palette: "amber" },
           { label: "Upcoming", value: upcomingBookings.length, icon: Calendar, palette: "green" },
           { label: "In Progress", value: inProgressBookings.length, icon: Play, palette: "blue" },
-          { label: "Completed", value: completedBookings.length, icon: CheckCircle2, palette: "purple" },
+          { label: "Completed", value: completedTabBookings.length, icon: CheckCircle2, palette: "purple" },
         ].map((stat, idx) => {
           const c = statPalette[stat.palette];
           return (
@@ -826,17 +899,19 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       {/* TABS */}
       <div className="bg-white p-1.5 rounded-2xl overflow-x-auto" style={{ border: "1px solid #e0d8cf" }}>
         <div className="flex gap-1.5 min-w-max">
-          {(["all", "pending", "upcoming", "in_progress", "completed"] as const).map((tab) => {
+        {(["all", "pending", "upcoming", "in_progress", "completed", "missed"] as const).map((tab) => {
             const count =
               tab === "all"
-                ? allBookings.filter((b) => b.status !== "completed").length
-                : tab === "pending"
-                  ? pendingBookings.length
-                  : tab === "upcoming"
-                    ? upcomingBookings.length
-                    : tab === "in_progress"
-                      ? inProgressBookings.length
-                      : completedBookings.length;
+              ? activeBookings.length
+              : tab === "pending"
+                ? pendingBookings.length
+                : tab === "upcoming"
+                  ? upcomingBookings.length
+                  : tab === "in_progress"
+                  ? inProgressBookings.length
+                  : tab === "completed"
+                    ? completedTabBookings.length
+                    : missedBookings.length;
 
             const { label, icon: Icon } = tabMeta[tab];
             const isActive = bookingTab === tab;
@@ -900,7 +975,17 @@ export default function BookingsPage({ mentorData }: BookingProps) {
               <tbody className="divide-y" style={{ borderColor: "#f0ebe4" }}>
                 {currentBookings.map((booking, idx) => {
                   const resolvedPhoto = booking.menteeId ? photoUrls[booking.menteeId] : null;
-                  const sb = statusBadge[booking.status] ?? statusBadge.pending;
+
+                  const isEndedBooking = isEndedRow(booking, nowMs);
+                  const isMissedBooking = isMissedRow(booking, nowMs);
+                  const sb = isEndedBooking
+                    ? statusBadge.ended
+                    : isMissedBooking
+                      ? statusBadge.missed
+                      : statusBadge[booking.status] ?? statusBadge.pending;
+
+                      
+
                   const isGroupedRow = !!booking.participants; // accepted, session-level row
                   const rowKey = booking.bookingId || booking.sessionId;
                   const currentAction = rowActionsLoading[rowKey];
@@ -1130,8 +1215,26 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                               </div>
                             )}
 
+                                                       {/* Ended: time nikal chuka par mentor ne abhi close nahi kiya */}
+                                                       {bookingTab === "completed" && isEndedBooking && (
+                              <button
+                                onClick={() => handleEndSessionClick(booking)}
+                                disabled={isRowLoading}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50 min-w-[104px]"
+                                style={{ backgroundColor: "#f3e8ff", color: "#7c3aed" }}
+                              >
+                                {currentAction === "end" ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                )}
+                                <span>End Session</span>
+                              </button>
+                            )}
+
                             {/* Completed */}
-                            {bookingTab === "completed" && (
+                            {bookingTab === "completed" && !isEndedBooking && (
+
                               <>
                                 {isGroupedRow ? (
                                   <button
