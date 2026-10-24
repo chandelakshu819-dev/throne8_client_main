@@ -730,8 +730,15 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         await SessionService.rejectGroupJoinRequest(cancelSessionId, bookingRow.menteeId);
         showToast("Join request declined", "success");
         setAllBookings((prev) => prev.filter((b) => b.bookingId !== rowKey));
+
       } else if (bookingRow?.isGroupSession) {
-        await SessionService.cancelGroupSession(cancelSessionId, cancelReason);
+        if (cancelReason.trim().length < 10) {
+          showToast("Reason must be at least 10 characters.", "error");
+          return;
+        }
+        await SessionService.cancelGroupSession(cancelSessionId, cancelReason.trim());
+
+        
         showToast("Session cancelled successfully", "success");
         setAllBookings((prev) =>
           prev.map((b) =>
