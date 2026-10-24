@@ -18,7 +18,7 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState<string>('');
   const [showUpdatePasswordModal, setShowUpdatePasswordModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [verifiedOtp, setVerifiedOtp] = useState<string>('');
+  const [resetToken, setResetToken] = useState<string>('');
 
   // ==================== STEP 1: HANDLE EMAIL SUBMISSION ====================
   const handleEmailSubmit = async (submittedEmail: string) => {
@@ -43,8 +43,13 @@ export default function ForgotPasswordPage() {
         throw new Error('Please enter a valid 6-digit OTP');
       }
       
-      // OTP store karo — verify password reset ke time use hoga
-      setVerifiedOtp(otp);
+      const response = await PasswordService.verifyPasswordResetOTP(email, otp);
+      const token = response?.data?.resetToken || (response as any)?.resetToken;
+      if (!token) {
+        throw new Error('Verification failed. Please try again.');
+      }
+
+      setResetToken(token);
       setShowUpdatePasswordModal(true);
     } catch (error) {
       throw error;
@@ -66,7 +71,7 @@ export default function ForgotPasswordPage() {
   const handlePasswordUpdate = async (newPassword: string) => {
     try {
       setIsLoading(true);
-      await PasswordService.verifyPasswordReset(email, verifiedOtp, newPassword);
+      await PasswordService.verifyPasswordReset(email, resetToken, newPassword);
       setShowUpdatePasswordModal(false);
       setStep('success');
     } catch (error) {
@@ -80,6 +85,7 @@ export default function ForgotPasswordPage() {
   const handleBackClick = () => {
     setStep('email');
     setEmail('');
+    setResetToken('');
   };
 
   return (

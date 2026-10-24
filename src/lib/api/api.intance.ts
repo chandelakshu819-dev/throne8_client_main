@@ -52,6 +52,7 @@ const AUTH_FREE_PATHS = [
     "/auth/refresh",
     "/auth/forgot",
     "/auth/reset",
+    "/verify",
 ];
 
 type RetriableRequest = InternalAxiosRequestConfig & { _retry?: boolean };

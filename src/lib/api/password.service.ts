@@ -62,24 +62,78 @@ class PasswordService {
     }
 
     /**
-     * Step 2: Verify OTP + Set new password
-     * POST /api/v1/password/reset/verify
-     * Body: { email: string, resetCode: string, newPassword: string }
+     * Step 2: Verify reset OTP
+     * POST /api/v1/verify/password/reset/verify-otp
+     * Body: { email: string, otp: string }
      */
-    static async verifyPasswordReset(
-        email: string,
-        resetCode: string,
-        newPassword: string
-    ): Promise<PasswordResponse> {
+    static async verifyPasswordResetOTP(email: string, otp: string): Promise<PasswordResponse> {
         try {
-            console.log('🔑 [PASSWORD_RESET_VERIFY] Verifying reset code...', {
+            console.log('🔑 [PASSWORD_RESET_VERIFY_OTP] Verifying OTP...', {
                 email,
-                resetCodeLength: resetCode.length,
+                otpLength: otp.length,
             });
 
             const { data } = await api.post<PasswordResponse>(
+                '/verify/password/reset/verify-otp',
+                { email, otp }
+            );
+
+            console.log('✅ [PASSWORD_RESET_VERIFY_OTP] OTP verified successfully', {
+                message: data.message,
+            });
+
+            return data;
+        } catch (error: any) {
+            console.error('❌ [PASSWORD_RESET_VERIFY_OTP] Failed', error, {
+                error: error?.response?.data || error?.message,
+                status: error?.response?.status,
+                email,
+            });
+
+            if (error?.response?.data?.message) {
+                throw new Error(error.response.data.message);
+            }
+            if (error?.code === 'ERR_NETWORK') {
+                throw new Error('Unable to connect to server. Please check your internet connection.');
+            }
+            if (error?.response?.status === 400) {
+                throw new Error('Invalid or expired OTP. Please request a new code.');
+            }
+            if (error?.response?.status === 401) {
+                throw new Error('Invalid OTP. Please enter the correct code sent to your email.');
+            }
+            if (error?.response?.status === 429) {
+                throw new Error('Too many attempts. Please request a new reset code.');
+            }
+
+            throw new Error('Failed to verify OTP. Please try again.');
+        }
+    }
+
+    /**
+     * Step 3: Verify reset authorization (resetToken or resetCode) + Set new password
+     * POST /api/v1/verify/password/reset/verify
+     * Body: { email?: string, resetToken?: string, resetCode?: string, newPassword: string }
+     */
+    static async verifyPasswordReset(
+        email: string,
+        resetCodeOrToken: string,
+        newPassword: string
+    ): Promise<PasswordResponse> {
+        try {
+            const isToken = resetCodeOrToken.length >= 32;
+            console.log('🔑 [PASSWORD_RESET_VERIFY] Verifying reset authorization...', {
+                email,
+                isToken,
+            });
+
+            const payload = isToken
+                ? { resetToken: resetCodeOrToken, newPassword }
+                : { email, resetCode: resetCodeOrToken, newPassword };
+
+            const { data } = await api.post<PasswordResponse>(
                 '/verify/password/reset/verify',
-                { email, resetCode, newPassword }
+                payload
             );
 
             console.log('✅ [PASSWORD_RESET_VERIFY] Password reset successful', {
