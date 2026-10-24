@@ -9,8 +9,6 @@ import { useAppDispatch } from '@/core/store/store.hooks';
 import { checkAuthStatus } from '@/hooks/auth';
 import { HOME_PATH } from '@/config/launch';
 
-
-
 export default function SocialButtons() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -27,10 +25,8 @@ export default function SocialButtons() {
         throw new Error('No credential token received from Google.');
       }
 
-      console.log('🔐 [GOOGLE] Verifying idToken with backend...');
       const response = await AuthService.googleVerify(idToken);
 
-      // Sync Redux state
       dispatch(checkAuthStatus());
 
       if (response?.data?.isNewUser) {
@@ -43,10 +39,9 @@ export default function SocialButtons() {
           sessionStorage.removeItem('google_id_token');
         }
         router.push(HOME_PATH);
-
       }
     } catch (error: any) {
-      console.error('❌ [GOOGLE] Login failed:', error);
+      console.error('[GOOGLE] Login failed:', error);
       setApiError(error.message || 'Google login failed. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -54,21 +49,21 @@ export default function SocialButtons() {
   };
 
   const handleGoogleError = () => {
-    console.error('❌ [GOOGLE] Login failed or cancelled');
+    console.error('[GOOGLE] Login failed or cancelled');
     setApiError('Google sign-in was unsuccessful or cancelled.');
   };
 
-  const getApiUrl = () => {
-    return config.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api/v1';
-  };
+  const getApiUrl = () =>
+    config.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    'http://localhost:4000/api/v1';
 
   const handleGitHubLogin = () => {
     try {
       setIsSubmitting(true);
-      const apiUrl = getApiUrl();
-      window.location.href = `${apiUrl}/auth/github`;
+      window.location.href = `${getApiUrl()}/auth/github`;
     } catch (error) {
-      console.error('❌ [GITHUB] OAuth initiation failed:', error);
+      console.error('[GITHUB] OAuth initiation failed:', error);
       setApiError('Failed to initiate GitHub login. Please try again.');
       setIsSubmitting(false);
     }
