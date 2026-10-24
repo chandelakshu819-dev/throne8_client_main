@@ -1,21 +1,9 @@
 "use client";
 //src/features/mentorship/components/user-dashboard/UserDashboardLayout.tsx
 import { useEffect, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import UserSidebar from "./UserSidebar";
 import UserDashboardOverviewPage from "./UserDashboardOverviewPage";
-import UserDashboardProgressPage from "./UserDashboardProgressPage";
-import UserDashboardQueriesPage from "./UserDashboardQueriesPage";
-import UserDashboardUpcomingSessionsPage from "./UserDashboardUpcomingSessionsPage";
-import UserDashboardMyMentorsPage from "./UserDashboardMyMentorsPage";
-import UserDashboardMyBookingsPage from "./UserDashboardMyBookingsPage";
-import UserDashboardSessionHistoryPage from "./UserDashboardSessionHistoryPage";
-import UserDashboardGroupSessionsPage from "./UserDashboardGroupSessionsPage";
-import UserDashboardWaitlistPage from "./UserDashboardWaitlistPage";
-import UserDashboardReviewsPage from "./UserDashboardReviewsPage";
-import UserDashboardPaymentsPage from "./UserDashboardPaymentsPage";
-import UserDashboardNotificationsPage from "./UserDashboardNotificationsPage";
-import UserDashboardRecommendedMentorsPage from "./UserDashboardRecommendedMentorsPage";
-import UserDashboardProfilePreferencesPage from "./UserDashboardProfilePreferencesPage";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
@@ -24,6 +12,30 @@ import { useProfile } from "@/features/profile/hooks/useProfile";
 import { useNavbarData } from "@/features/profile/components/home/NavbarProvider";
 import { useSocket } from "@/core/realtime/useSocket";
 import BrandWordmark from "@/shared/uiComponents/BrandWordmark";
+
+// Tab loader: sirf jab tab khulta hai tab uska code download hota hai
+const PageLoader = () => (
+  <div className="flex items-center justify-center py-24">
+    <span className="text-sm text-[#7a5c3e]">Loading...</span>
+  </div>
+);
+
+const lazyPage = (loader: () => Promise<any>) =>
+  dynamic(loader, { loading: () => <PageLoader /> }) as React.FC<any>;
+
+const UserDashboardProgressPage = lazyPage(() => import("./UserDashboardProgressPage"));
+const UserDashboardQueriesPage = lazyPage(() => import("./UserDashboardQueriesPage"));
+const UserDashboardUpcomingSessionsPage = lazyPage(() => import("./UserDashboardUpcomingSessionsPage"));
+const UserDashboardMyMentorsPage = lazyPage(() => import("./UserDashboardMyMentorsPage"));
+const UserDashboardMyBookingsPage = lazyPage(() => import("./UserDashboardMyBookingsPage"));
+const UserDashboardSessionHistoryPage = lazyPage(() => import("./UserDashboardSessionHistoryPage"));
+const UserDashboardGroupSessionsPage = lazyPage(() => import("./UserDashboardGroupSessionsPage"));
+const UserDashboardWaitlistPage = lazyPage(() => import("./UserDashboardWaitlistPage"));
+const UserDashboardReviewsPage = lazyPage(() => import("./UserDashboardReviewsPage"));
+const UserDashboardPaymentsPage = lazyPage(() => import("./UserDashboardPaymentsPage"));
+const UserDashboardNotificationsPage = lazyPage(() => import("./UserDashboardNotificationsPage"));
+const UserDashboardRecommendedMentorsPage = lazyPage(() => import("./UserDashboardRecommendedMentorsPage"));
+const UserDashboardProfilePreferencesPage = lazyPage(() => import("./UserDashboardProfilePreferencesPage"));
 
 const pageComponents: Record<string, React.FC<any>> = {
   dashboard: UserDashboardOverviewPage,
@@ -94,14 +106,13 @@ export default function UserDashboardLayout({
     if (pathname?.includes("/upcoming-sessions")) {
       setActivePageState("upcoming-sessions");
     }
-  }, [pathname]); 
+  }, [pathname]);
 
   const [sessions, setSessions] = useState<any[]>([]);
   const { user } = useAuth();
   const { userProfileData, loadProfile } = useProfile();
   // Account photo na ho to mentor/senior photo fallback (NavbarProvider se)
   const { profileData: navbarProfileData } = useNavbarData();
-
 
   useEffect(() => {
     if (!userProfileData && typeof loadProfile === "function") {
@@ -286,9 +297,8 @@ export default function UserDashboardLayout({
         <BrandWordmark size="sm" />
 
         <div className="w-8 h-8 rounded-full overflow-hidden border border-[#e0d8cf] flex-shrink-0">
-        {((userProfileData as any)?.profileImageUrl || navbarProfileData?.profileImage) ? (
-
-<img src={(userProfileData as any)?.profileImageUrl || navbarProfileData?.profileImage} alt="Profile" className="w-full h-full object-cover" />
+          {((userProfileData as any)?.profileImageUrl || navbarProfileData?.profileImage) ? (
+            <img src={(userProfileData as any)?.profileImageUrl || navbarProfileData?.profileImage} alt="Profile" className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-[#4a3728] text-white flex items-center justify-center text-xs font-bold">
               {(userProfileData?.firstName?.[0] || user?.firstName?.[0] || "U").toUpperCase()}
