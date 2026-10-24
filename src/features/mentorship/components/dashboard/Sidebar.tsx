@@ -4,7 +4,9 @@ import { MENU_ITEMS } from "../../constants/constant";
 import type { MenuItem } from "../../types";
 import { capitalizeName } from "@/shared/utils/format";
 import { useProfile } from "@/features/profile/hooks/useProfile";
-import { useState } from "react";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useNavbarData } from "@/features/profile/components/home/NavbarProvider";
+import { useEffect, useState } from "react";
 import PhotoLightbox from "../shared/PhotoLightbox";
 
 
@@ -35,22 +37,51 @@ export default function Sidebar({
   isCollapsed = false,
   onToggleCollapse,
 }: SidebarProps) {
-  // Account photo (mentee/senior se upload hui photo) fallback ke taur par
-  const { profileImageUrl: accountPhoto } = useProfile();
+    // Account profile (mentee view jaisa) -- mentor API load hone se pehle ya fail hone par bhi
+  // sahi naam/photo dikhane ke liye fallback
+  const { userProfileData, profileImageUrl: accountPhoto, loadProfile } = useProfile();
+  const { user: authUser } = useAuth();
+  const { menteeImage } = useNavbarData();
   const [showPhoto, setShowPhoto] = useState(false);
-  const firstName = (dashboardData?.user?.firstName ?? mentorData?.user?.firstName ?? "A").trim();
-  const lastName = (dashboardData?.user?.lastName ?? mentorData?.user?.lastName ?? "").trim();
-  const initials = `${firstName[0] || "A"}${lastName[0] || ""}`.toUpperCase();
-  const fullName = capitalizeName(
-    dashboardData?.user?.name || `${firstName} ${lastName}`.trim()
+
+  useEffect(() => {
+    if (!userProfileData && typeof loadProfile === "function") {
+      loadProfile();
+    }
+  }, [userProfileData, loadProfile]);
+
+  const pick = (...vals: any[]) =>
+    vals.find((v) => typeof v === "string" && v.trim().length > 0)?.trim() ?? "";
+
+  const firstName = pick(
+    dashboardData?.user?.firstName,
+    mentorData?.user?.firstName,
+    userProfileData?.firstName,
+    authUser?.firstName
   );
+  const lastName = pick(
+    dashboardData?.user?.lastName,
+    mentorData?.user?.lastName,
+    userProfileData?.lastName,
+    authUser?.lastName
+  );
+  const joinedName = `${firstName} ${lastName}`.trim();
+  const fullName = capitalizeName(
+    pick(dashboardData?.user?.name, joinedName) || "Mentor"
+  );
+  const initials = (
+    firstName || lastName
+      ? `${firstName[0] || ""}${lastName[0] || ""}`
+      : fullName[0] || "M"
+  ).toUpperCase();
   const rawDomain = dashboardData?.category || mentorData?.domains?.[0] || "Mentor";
   const domain = String(rawDomain)
     .replace(/_/g, " ")
     .split(" ")
     .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
-    const profilePic = dashboardData?.profilePic ?? mentorData?.profilePic ?? accountPhoto ?? null;  
+    const profilePic =
+    dashboardData?.profilePic || mentorData?.profilePic || accountPhoto || menteeImage || null;
   const rating = Number(
     dashboardData?.stats?.rating ?? dashboardData?.rating ?? mentorData?.stats?.averageRating ?? 0
   );

@@ -1,7 +1,8 @@
 // src/features/mentorship/components/dashboard/DashboardLayout.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 
@@ -165,9 +166,13 @@ export default function MentorDashboard(
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
 
+    // Skeleton sirf pehli baar dikhao; mentorData/sessions badalne par refetch ho to
+  // existing data screen par rahe
+  const hasLoadedDashboardRef = useRef(false);
+
   const fetchDashboardData = useCallback(async () => {
     if (!userId) return;
-    setDashboardLoading(true);
+    if (!hasLoadedDashboardRef.current) setDashboardLoading(true);
     setDashboardError(null);
 
     let fetchedData = null;
@@ -269,14 +274,18 @@ export default function MentorDashboard(
     } else {
       setDashboardError("Unable to load mentor dashboard data.");
     }
+    hasLoadedDashboardRef.current = true;
     setDashboardLoading(false);
   }, [userId, mentorData, sessions]);
 
+  // Mentor lookup khatam hone ke baad hi dashboard fetch karo,
+  // taaki sahi mentorId se call ho
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || loading) return;
     fetchDashboardData();
-  }, [userId, mentorData, sessions, fetchDashboardData]);
+  }, [userId, loading, mentorData, sessions, fetchDashboardData]);
 
+  
   // Notification states (mentorship-scoped)
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
