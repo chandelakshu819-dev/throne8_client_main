@@ -1,18 +1,30 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { AlertCircle, Loader2 } from "lucide-react";
 import SeniorMentorApplicationService, { SeniorMentorApplication } from "@/lib/api/seniorMentorApplication.service";
 import MentorService from "@/lib/api/mentorship.service";
 import NotificationService from "@/lib/api/notification.service";
 import { useSocket } from "@/core/realtime/useSocket";
 import SeniorMentorSidebar from "./SeniorMentorSidebar";
-import SeniorProfilePage from "./SeniorProfilePage";
-import SeniorMentorServicesPage from "./SeniorMentorServicesPage";
-import SeniorBookingsPage from "./SeniorBookingsPage";
-import SeniorAnalyticsPage from "./SeniorAnalyticsPage";
-import SeniorMentorAvailabilityPage from "./SeniorMentorAvailabilityPage";
-import NotificationPage from "../dashboard/NotificationPage";
 import { useRouter } from "next/navigation";
+
+// Sirf active tab ka code download hoga
+const PageLoader = () => (
+  <div className="flex items-center justify-center py-24">
+    <Loader2 className="w-8 h-8 text-[#4a3728] animate-spin" />
+  </div>
+);
+
+const lazyPage = (loader: () => Promise<any>) =>
+  dynamic(loader, { loading: () => <PageLoader /> }) as React.FC<any>;
+
+const SeniorProfilePage = lazyPage(() => import("./SeniorProfilePage"));
+const SeniorMentorServicesPage = lazyPage(() => import("./SeniorMentorServicesPage"));
+const SeniorBookingsPage = lazyPage(() => import("./SeniorBookingsPage"));
+const SeniorAnalyticsPage = lazyPage(() => import("./SeniorAnalyticsPage"));
+const SeniorMentorAvailabilityPage = lazyPage(() => import("./SeniorMentorAvailabilityPage"));
+const NotificationPage = lazyPage(() => import("../dashboard/NotificationPage"));
 
 function normalizeNotifications(res: any): any[] {
   const data = res?.data ?? res;
@@ -111,14 +123,10 @@ export default function SeniorMentorLayout({
 
   useEffect(() => {
     if (!userId) return;
-    
+
     Promise.all([
       SeniorMentorApplicationService.getMyApplication(),
-      MentorService.getMentorByUserId(userId).catch(err => {
-        // Specifically catch and log, as not all users might have a provisioned Mentor profile yet
-        console.warn("Mentor profile fetch warning:", err);
-        return null;
-      })
+      MentorService.getMentorByUserId(userId).catch(() => null),
     ])
       .then(([appRes, mentorRes]) => {
         if (appRes) {
@@ -126,7 +134,7 @@ export default function SeniorMentorLayout({
         } else {
           setErrorMsg("Profile not found or access denied.");
         }
-        
+
         if (mentorRes && mentorRes.data) {
           setMentorProfile(mentorRes.data);
         }
@@ -155,8 +163,8 @@ export default function SeniorMentorLayout({
           <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
           <h2 className="text-2xl font-black text-[#4a3728] mb-2">Error Loading Profile</h2>
           <p className="text-slate-600 font-medium mb-6">{errorMsg || "An unknown error occurred."}</p>
-          <button 
-            onClick={() => router.push('/dashboard')} 
+          <button
+            onClick={() => router.push('/dashboard')}
             className="px-6 py-2.5 bg-[#4a3728] text-white rounded-xl font-bold shadow hover:bg-[#7a5c3e] transition"
           >
             Return to Dashboard
@@ -169,7 +177,7 @@ export default function SeniorMentorLayout({
   return (
     <div className="flex flex-col h-screen bg-[#f6ede8] font-sans">
       <div className="h-20 shrink-0" aria-hidden="true" />
-      
+
       <div className="flex flex-1 min-h-0">
         <SeniorMentorSidebar
           application={application}
@@ -182,7 +190,7 @@ export default function SeniorMentorLayout({
             {activeTab === 'profile' && (
               <SeniorProfilePage
                 seniorData={application}
-                onUpdateApplication={(updated) => setApplication(updated)}
+                onUpdateApplication={(updated: SeniorMentorApplication) => setApplication(updated)}
               />
             )}
             {activeTab === 'services' && <SeniorMentorServicesPage seniorData={application} />}

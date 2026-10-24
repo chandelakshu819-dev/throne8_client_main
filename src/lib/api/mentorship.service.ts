@@ -14,6 +14,11 @@ export interface MyRolesResponse {
   seniorMentorId?: string;        // mentorId from Mentor doc
   industryMentorId?: string;      // seniorMentorId from SeniorMentorApplication doc
 }
+
+/** Module-level cache so the navbar doesn't refetch on every re-render. */
+let _rolesCache: MyRolesResponse | null = null;
+/** In-flight request, so concurrent callers share ONE network call. */
+let _rolesInflight: Promise<MyRolesResponse> | null = null;
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface PublicSeniorMentor {
@@ -47,12 +52,11 @@ export interface PublicSeniorMentorResponse {
 }
 
 export interface CreateGroupSessionInput {
-
   title: string;
   description: string;
   topic: string;
   category?: string;
-  scheduledAt?: string;   // ✅ CHANGED: optional — isTemplate: true pe nahi bheja jaata
+  scheduledAt?: string;
   duration: number;
   timezone: string;
   maxParticipants: number;
@@ -67,15 +71,13 @@ export interface CreateGroupSessionInput {
     allowed: boolean;
     periodDays: number;
   };
-  isTemplate?: boolean;   // ✅ NEW
+  isTemplate?: boolean;
   meetingUrl?: string;
 }
 
-
-
 class MentorService {
 
-   static async createMentor(payload: {
+  static async createMentor(payload: {
     title: string;
     bio: string;
     domains: string[];
@@ -207,7 +209,6 @@ class MentorService {
       const { data } = await api.get<any>(endpoint);
       return data;
     } catch (error: any) {
-      console.error("[GET_MENTOR_DASHBOARD] Failed", error?.response?.data || error?.message);
       throw new Error(error?.response?.data?.message || "Failed to fetch mentor dashboard data.");
     }
   }
@@ -316,8 +317,6 @@ class MentorService {
       );
     }
   }
-
-
 
   static async removeProfilePhoto(mentorId: string): Promise<any> {
     try {
@@ -444,17 +443,17 @@ class MentorService {
     limit?: number;
   }): Promise<PublicSeniorMentorsResponse> {
     try {
-     const endpoint =
-       config.NEXT_PUBLIC_SENIOR_MENTORS_ENDPOINT ||
-       process.env.NEXT_PUBLIC_SENIOR_MENTORS_ENDPOINT ||
-       "/mentorship/senior-mentors";
-     const { data } = await api.get<PublicSeniorMentorsResponse>(endpoint, { params });
-     return data;
+      const endpoint =
+        config.NEXT_PUBLIC_SENIOR_MENTORS_ENDPOINT ||
+        process.env.NEXT_PUBLIC_SENIOR_MENTORS_ENDPOINT ||
+        "/mentorship/senior-mentors";
+      const { data } = await api.get<PublicSeniorMentorsResponse>(endpoint, { params });
+      return data;
     } catch (error: unknown) {
-     if (axios.isAxiosError<{ message?: string }>(error) && error.response?.data?.message) {
-       throw new Error(error.response.data.message);
-     }
-     throw new Error("Failed to fetch college mentors. Please try again.");
+      if (axios.isAxiosError<{ message?: string }>(error) && error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw new Error("Failed to fetch college mentors. Please try again.");
     }
   }
 
@@ -479,7 +478,7 @@ class MentorService {
     }
   }
 
-    static async getMentorById(mentorId: string): Promise<any> {
+  static async getMentorById(mentorId: string): Promise<any> {
     try {
       const base =
         config.NEXT_PUBLIC_MENTOR_BY_ID_ENDPOINT ||
@@ -750,12 +749,8 @@ class MentorService {
   }
 
   /**
-   * ✅ NEW: the mentee/mentor's own group sessions — powers the "My
-   * Registered Sessions" tab on the user dashboard (mentee side) and any
-   * future mentor-side "my group sessions" view. Backend endpoint already
-   * existed (GET /group-sessions/my-sessions?role=...); this was the
-   * missing frontend method — the dashboard tab was hardcoding an empty
-   * array with a comment incorrectly claiming no such endpoint existed.
+   * The mentee/mentor's own group sessions — powers the "My Registered
+   * Sessions" tab on the user dashboard.
    */
   static async getMyGroupSessions(
     role: 'mentor' | 'mentee' = 'mentee'
@@ -802,10 +797,8 @@ class MentorService {
 
   /**
    * Mentee sends a request to join a group session.
-   *
-   * IMPORTANT:
-   * This does NOT directly add the mentee as a participant.
-   * Mentor has to accept the request first.
+   * This does NOT directly add the mentee as a participant;
+   * the mentor has to accept the request first.
    */
   static async requestToJoinGroupSession(
     sessionId: string,
@@ -874,13 +867,8 @@ class MentorService {
   }
 
   /**
-   * Get current user's join request status
-   * for a particular group session.
-   *
-   * Expected response:
-   * {
-   *   status: "pending" | "accepted" | "rejected"
-   * }
+   * Get current user's join request status for a group session.
+   * Expected response: { status: "pending" | "accepted" | "rejected" }
    */
   static async getMyGroupJoinRequest(
     sessionId: string
@@ -924,71 +912,62 @@ class MentorService {
     }
   }
 
-    /**
-   * ✅ NEW: fetch a group-session TEMPLATE's bookable slots for a given
-   * date, derived from the mentor's Availability. Powers the mentee-facing
-   * "Select Date & Time" calendar for Group Session (same pattern as
-   * Quick Call's CalendarStep, but backed by /template-slots instead of
-   * /availability/mentor/:id).
+  /**
+   * Fetch a group-session TEMPLATE's bookable slots for a given date,
+   * derived from the mentor's Availability.
    */
-    static async getGroupTemplateAvailability(
-      templateId: string,
-      date: string // "YYYY-MM-DD"
-    ): Promise<any> {
-      try {
-        const { data } = await api.get(
-          `/mentorship/group-sessions/${templateId}/template-slots`,
-          { params: { date } }
-        );
-        return data;
-      } catch (error: any) {
-        if (axios.isAxiosError(error)) {
-          const apiError = error.response?.data;
-          if (error.code === 'ERR_NETWORK') {
-            throw new Error('Unable to connect to server. Please check your internet connection.');
-          }
-          if (apiError?.message) {
-            throw new Error(apiError.message);
-          }
+  static async getGroupTemplateAvailability(
+    templateId: string,
+    date: string // "YYYY-MM-DD"
+  ): Promise<any> {
+    try {
+      const { data } = await api.get(
+        `/mentorship/group-sessions/${templateId}/template-slots`,
+        { params: { date } }
+      );
+      return data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const apiError = error.response?.data;
+        if (error.code === 'ERR_NETWORK') {
+          throw new Error('Unable to connect to server. Please check your internet connection.');
         }
-        throw new Error('Failed to fetch group session slots.');
+        if (apiError?.message) {
+          throw new Error(apiError.message);
+        }
       }
+      throw new Error('Failed to fetch group session slots.');
     }
-  
-    /**
-     * ✅ NEW: mentee ne group-session TEMPLATE ke liye Quick-Call-style
-     * calendar se ek date+time slot choose kiya (mentor ki Availability se).
-   * Backend: agar us exact slot pe already koi open group "instance" hai
-   * to mentee usi instance mein pending join-request bhejta hai; warna
-   * naya instance banta hai (mentor ki availability se wo slot book karke)
-   * aur usi mein request bheji jaati hai.
+  }
+
+  /**
+   * Mentee picks a date+time slot for a group-session TEMPLATE.
+   * Backend: if an open group "instance" already exists at that exact slot,
+   * the mentee sends a pending join-request to it; otherwise a new instance
+   * is created and the request is sent to that.
    */
-    static async joinGroupSessionBySlot(
-      templateId: string,
-      payload: {
-        date: string;            // "YYYY-MM-DD"
-        startTime: string;       // "HH:mm"
-        availabilityId?: string;
-        transactionId?: string;
-      }
-    ): Promise<any> {
-      try {
-        // ✅ FIX: backend's joinBySlot controller only reads `scheduledAt`
-        // (and `transactionId`) from the body — it never reads `date`,
-        // `startTime` or `availabilityId`. Sending those alone meant every
-        // request failed with 400 "scheduledAt is required to pick a slot".
-        // Combine date + startTime into the ISO datetime the backend expects.
-        const scheduledAt = new Date(`${payload.date}T${payload.startTime}:00+05:30`).toISOString();
-        
-        
-        const { data } = await api.post(
-          `/mentorship/group-sessions/${templateId}/join-by-slot`,
-          { scheduledAt, transactionId: payload.transactionId }
-        );
-  
-        return data;
-  
-      } catch (error: any) {
+  static async joinGroupSessionBySlot(
+    templateId: string,
+    payload: {
+      date: string;            // "YYYY-MM-DD"
+      startTime: string;       // "HH:mm"
+      availabilityId?: string;
+      transactionId?: string;
+    }
+  ): Promise<any> {
+    try {
+      // Backend's joinBySlot controller only reads `scheduledAt` and
+      // `transactionId`, so combine date + startTime into an ISO datetime.
+      const scheduledAt = new Date(`${payload.date}T${payload.startTime}:00+05:30`).toISOString();
+
+      const { data } = await api.post(
+        `/mentorship/group-sessions/${templateId}/join-by-slot`,
+        { scheduledAt, transactionId: payload.transactionId }
+      );
+
+      return data;
+
+    } catch (error: any) {
       if (axios.isAxiosError(error)) {
         const apiError = error.response?.data;
 
@@ -1027,13 +1006,8 @@ class MentorService {
   // =========================================================
 
   /**
-   * Direct join.
-   *
-   * DO NOT use this from the "Join Group" button when
-   * mentor approval is required.
-   *
-   * Keep this method because other existing flows may still
-   * use it after approval/payment.
+   * Direct join. Do NOT use from the "Join Group" button when mentor
+   * approval is required. Kept for flows that use it after approval/payment.
    */
   static async joinGroupSession(
     id: string,
@@ -1405,6 +1379,7 @@ class MentorService {
       throw new Error('Failed to save/unsave mentor. Please try again.');
     }
   }
+
   static async reportMentor(
     mentorId: string,
     reason: string
@@ -1458,7 +1433,6 @@ class MentorService {
       );
     }
   }
-
 
   // =========================================================
   // NORMAL SESSION
@@ -1744,19 +1718,21 @@ class MentorService {
       throw MentorService.waitlistError(error, 'Failed to update auto-offer setting.');
     }
   }
+
   // ── Workspace Role Status ───────────────────────────────────────────────────
   /**
    * GET /mentorship/mentors/me/roles
-   * Single cached call that returns the logged-in user’s approval status across
-   * all three workspace roles. Cache is busted by calling invalidateRolesCache().
+   * Cached + de-duplicated: concurrent callers share one in-flight request.
+   * Cache is busted by calling invalidateRolesCache().
    */
-  static async getMyRoles(): Promise<MyRolesResponse> {
-    if (_rolesCache) return _rolesCache;
-    try {
-      const { data } = await api.get('/mentorship/mentors/me/roles');
-      console.log('[MENTOR_SERVICE] getMyRoles raw response:', data);
+  static getMyRoles(): Promise<MyRolesResponse> {
+    if (_rolesCache) return Promise.resolve(_rolesCache);
+    if (_rolesInflight) return _rolesInflight;
 
-      // Backend ya to { data: {...} } bhejta hai ya seedha {...}, dono chalenge
+    _rolesInflight = (async (): Promise<MyRolesResponse> => {
+      const { data } = await api.get('/mentorship/mentors/me/roles');
+
+      // Backend either sends { data: {...} } or the object directly
       const payload = (data?.data ?? data) as Partial<MyRolesResponse> | undefined;
 
       const result: MyRolesResponse = {
@@ -1767,7 +1743,7 @@ class MentorService {
         industryMentorId: payload?.industryMentorId,
       };
 
-      // Fallback: application verified hai par /me/roles ne approved nahi kaha
+      // Fallback: application is verified but /me/roles didn't say approved
       if (result.industryMentor !== 'approved') {
         try {
           const app = await SeniorMentorApplicationService.getMyApplication();
@@ -1784,19 +1760,18 @@ class MentorService {
 
       _rolesCache = result;
       return result;
-    } catch (error: any) {
-      console.error('❌ [MENTOR_SERVICE] getMyRoles failed:', error?.response?.status, error?.response?.data || error?.message);
-      throw error;
-    }
+    })().finally(() => {
+      _rolesInflight = null;
+    });
+
+    return _rolesInflight;
   }
 
   /** Call after the user applies for a role so the next render re-fetches. */
   static invalidateRolesCache(): void {
     _rolesCache = null;
+    _rolesInflight = null;
   }
 }
-
-/** Module-level cache so the navbar doesn’t refetch on every re-render. */
-let _rolesCache: MyRolesResponse | null = null;
 
 export default MentorService;

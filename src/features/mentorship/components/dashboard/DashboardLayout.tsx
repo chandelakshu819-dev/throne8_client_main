@@ -1,10 +1,21 @@
 // src/features/mentorship/components/dashboard/DashboardLayout.tsx
 "use client";
 
-
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation";
+import dynamic from "next/dynamic";
+import { MessageCircle, Wrench, GraduationCap, Dumbbell, CheckSquare } from "lucide-react";
 
+import Sidebar from "./Sidebar";
+import DashboardOverviewPage from "./DashboardOverviewPage";
+import MentorService from "@/lib/api/mentorship.service";
+import { useProfile } from "@/features/profile/hooks/useProfile";
+import SessionService from "@/lib/api/session.service";
+import NotificationService from "@/lib/api/notification.service";
+import { useNavbarProfileImage } from "@/features/profile/components/home/NavbarProvider";
+// Realtime notification push (booking requests, session started, etc.)
+import { useSocket } from "@/core/realtime/useSocket";
+import BrandWordmark from "@/shared/uiComponents/BrandWordmark";
 
 type ServiceType = {
   name: string;
@@ -12,35 +23,34 @@ type ServiceType = {
   icon: React.FC<any>;
   description?: string;
 };
-import { MessageCircle, Wrench, GraduationCap, Dumbbell, CheckSquare } from "lucide-react";
 
-import Sidebar from "./Sidebar";
-import DashboardOverviewPage from "./DashboardOverviewPage";
-import NotificationPage from "./NotificationPage";
-import ProfilePage from "./ProfilePage";
-import ServicesPage from "./ServicesPage";
-import BookingsPage from "./BookingsPage";
-import WaitlistPage from "./WaitlistPage";
-import QueriesPage from "./QueriesPage";
-import AvailabilityPage from "./AvailabilityPage";
-import PaymentsPage from "./PaymentsPage";
-import ReviewsPage from "./ReviewsPage";
-import AnalyticsPage from "./AnalyticsPage";
-import PlansPage from "./PlansPage";
-import TrustScorePage from "./TrustScorePage";
-import CommunityPage from "./CommunityPage";
-import MentorService from "@/lib/api/mentorship.service";
-import { syncProfilePhotoToAllRoles } from "@/features/mentorship/utils/syncProfilePhoto";
-import { useProfile } from "@/features/profile/hooks/useProfile";
-import SessionService from "@/lib/api/session.service";
-import NotificationService from "@/lib/api/notification.service";
-import MarketingKitPage from "./MarketingKitPage";
-import UserDashboardProfilePreferencesPage from "@/features/mentorship/components/user-dashboard/UserDashboardProfilePreferencesPage";
-import { useParams } from "next/navigation";
-import { useNavbarProfileImage } from "@/features/profile/components/home/NavbarProvider";
-// ✅ NEW — realtime notification push (booking requests, session started, etc.)
-import { useSocket } from "@/core/realtime/useSocket";
-import BrandWordmark from "@/shared/uiComponents/BrandWordmark";
+// Tab loader: sirf jab tab khulta hai tab uska code download hota hai
+const PageLoader = () => (
+  <div className="flex items-center justify-center py-24">
+    <span className="text-sm text-[#7a5c3e]">Loading...</span>
+  </div>
+);
+
+const lazyPage = (loader: () => Promise<any>) =>
+  dynamic(loader, { loading: () => <PageLoader /> }) as React.FC<any>;
+
+const NotificationPage = lazyPage(() => import("./NotificationPage"));
+const ProfilePage = lazyPage(() => import("./ProfilePage"));
+const ServicesPage = lazyPage(() => import("./ServicesPage"));
+const BookingsPage = lazyPage(() => import("./BookingsPage"));
+const WaitlistPage = lazyPage(() => import("./WaitlistPage"));
+const QueriesPage = lazyPage(() => import("./QueriesPage"));
+const AvailabilityPage = lazyPage(() => import("./AvailabilityPage"));
+const PaymentsPage = lazyPage(() => import("./PaymentsPage"));
+const ReviewsPage = lazyPage(() => import("./ReviewsPage"));
+const AnalyticsPage = lazyPage(() => import("./AnalyticsPage"));
+const PlansPage = lazyPage(() => import("./PlansPage"));
+const TrustScorePage = lazyPage(() => import("./TrustScorePage"));
+const CommunityPage = lazyPage(() => import("./CommunityPage"));
+const MarketingKitPage = lazyPage(() => import("./MarketingKitPage"));
+const UserDashboardProfilePreferencesPage = lazyPage(
+  () => import("@/features/mentorship/components/user-dashboard/UserDashboardProfilePreferencesPage")
+);
 
 function MenteeProfileTabWrapper(props: any) {
   const params = useParams();
@@ -166,7 +176,7 @@ export default function MentorDashboard(
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
 
-    // Skeleton sirf pehli baar dikhao; mentorData/sessions badalne par refetch ho to
+  // Skeleton sirf pehli baar dikhao; mentorData/sessions badalne par refetch ho to
   // existing data screen par rahe
   const hasLoadedDashboardRef = useRef(false);
 
@@ -285,7 +295,6 @@ export default function MentorDashboard(
     fetchDashboardData();
   }, [userId, loading, mentorData, sessions, fetchDashboardData]);
 
-  
   // Notification states (mentorship-scoped)
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
@@ -455,7 +464,6 @@ export default function MentorDashboard(
 
     MentorService.updateProfilePhoto(mentorData.mentorId, file)
       .then((res: any) => {
-        console.log("📸 updateProfilePhoto response:", res);
         const updated = res?.data ?? res;
         const newPic = updated?.profilePic;
 
@@ -464,10 +472,10 @@ export default function MentorDashboard(
         }
 
         setMentorData((prev: any) => ({ ...prev, profilePic: newPic }));
-        // ✅ Sidebar dashboardData se bhi photo leta hai, isliye isko bhi update karo
+        // Sidebar dashboardData se bhi photo leta hai, isliye isko bhi update karo
         setDashboardData((prev: any) => (prev ? { ...prev, profilePic: newPic } : prev));
         setProfilePhoto(null);
-        // ✅ Top-right navbar avatar bhi turant update karo
+        // Top-right navbar avatar bhi turant update karo
         setNavbarProfileImage(newPic);
         // Mentor ki photo alag hai — Mentee / Senior Mentor ki photo yahan se change nahi hogi
       })
@@ -480,7 +488,6 @@ export default function MentorDashboard(
         input.value = ""; // same file dobara select ho sake
       });
   };
-
 
   const handlePhotoRemove = async () => {
     if (!mentorData?.mentorId) return;

@@ -2,24 +2,34 @@
 // src/features/mentorship/components/MentorshipDashboardRouter.tsx
 //
 // Single entry point for /mentorship/[userid].
-// Now uses useMyRoles() instead of a plain isMentor boolean so that:
-//   1. Users who haven't been approved as a Student Mentor are
-//      redirected to the "apply" flow instead of seeing the dashboard.
-//   2. The "switch role" mechanism is URL-driven (via ProfileDropdown)
-//      rather than managed by a useState inside this file.
+// Dashboards are lazy-loaded so only the one being shown is downloaded.
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import UserDashboardLayout from "./user-dashboard/UserDashboardLayout";
-import MentorDashboard from "./dashboard/DashboardLayout";
+import dynamic from "next/dynamic";
 import { useMyRoles } from "../hooks/useMentorRole";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { routes } from "@/config/routes";
 
+const FullScreenLoader = () => (
+  <div className="flex items-center justify-center h-screen bg-[#f6ede8]">
+    <span className="text-sm text-[#7a5c3e]">Loading...</span>
+  </div>
+);
+
+const UserDashboardLayout = dynamic(
+  () => import("./user-dashboard/UserDashboardLayout"),
+  { loading: () => <FullScreenLoader /> }
+);
+
+const MentorDashboard = dynamic(
+  () => import("./dashboard/DashboardLayout"),
+  { loading: () => <FullScreenLoader /> }
+);
+
 interface MentorshipDashboardRouterProps {
   userId: string;
-  /** Which dashboard to render — still accepted for backward compat,
-   *  but now validated against the user's actual approval status. */
+  /** Which dashboard to render — validated against the user's actual approval status. */
   defaultRole?: "mentee" | "mentor";
   initialPage?: string;
 }
@@ -32,15 +42,12 @@ export default function MentorshipDashboardRouter({
   const router = useRouter();
   const { isAuthenticated } = useAuth();
 
-  // FIX: pass userId so useMyRoles can verify the Mentor profile when
-  // /me/roles fails or returns "none". Without it, seniorMentor stayed "none",
-  // the guard below redirected to /mentorship, and /mentorship redirected
-  // straight back here -> infinite redirect loop.
+  // userId is passed so useMyRoles can verify the Mentor profile when
+  // /me/roles fails or returns "none" (prevents the redirect loop).
   const { roles, loading } = useMyRoles(isAuthenticated, userId);
 
   // ── Role guard ────────────────────────────────────────────────────────────
-  // If someone navigates to the Mentor dashboard but they're not approved,
-  // send them back to the landing page.
+  // Mentor URL but not approved -> back to the landing page.
   useEffect(() => {
     if (loading || !roles) return;
     if (defaultRole === "mentor" && roles.seniorMentor !== "approved") {
@@ -48,23 +55,13 @@ export default function MentorshipDashboardRouter({
     }
   }, [loading, roles, defaultRole, userId, router]);
 
-  // ── Loading state ─────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-[#f6ede8]">
-        <span className="text-sm text-[#7a5c3e]">Loading...</span>
-      </div>
-    );
-  }
-
-  // ── Render correct dashboard ──────────────────────────────────────────────
   const isMentor = roles?.seniorMentor === "approved";
 
-  // Mentor URL without the role: render nothing while the redirect above runs
-  // (avoids flashing the mentee dashboard)
-  if (defaultRole === "mentor" && !isMentor) return null;
+  // ── Mentor URL: must wait for roles to verify approval ────────────────────
+  if (defaultRole === "mentor") {
+    if (loading) return <FullScreenLoader />;
+    if (!isMentor) return null; // redirect above is running
 
-  if (defaultRole === "mentor" && isMentor) {
     return (
       <MentorDashboard
         userId={userId}
@@ -74,6 +71,7 @@ export default function MentorshipDashboardRouter({
     );
   }
 
+  // ── Mentee URL: render immediately, don't wait for the roles API ──────────
   return (
     <UserDashboardLayout
       userId={userId}
