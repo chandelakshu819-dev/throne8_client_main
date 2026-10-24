@@ -409,16 +409,14 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         (b.isGroupSession && (b.status === "open" || b.status === "full"))) &&
       !isMissedRow(b, nowMs)
   );
-    // in_progress (DB) par time nikal chuka -> "ended", live nahi
-    const endedBookings = allBookings.filter((b) => isEndedRow(b, nowMs));
-    const inProgressBookings = allBookings.filter(
-      (b) => b.status === "in_progress" && !isEndedRow(b, nowMs)
-    );
+       // In Progress tab: DB me jitne bhi in_progress hain (time nikal chuka ho to badge "Ended" dikhega,
+    // aur mentor wahin se End Session karega). Ye rows kabhi Completed tab me nahi jayenge.
+    const inProgressBookings = allBookings.filter((b) => b.status === "in_progress");
     const completedBookings = allBookings.filter((b) => b.status === "completed");
-    // Completed tab: asli completed + ended rows (jinhe mentor End Session se close karega)
-    const completedTabBookings = [...endedBookings, ...completedBookings];
+    // Completed tab: SIRF asli completed sessions
+    const completedTabBookings = completedBookings;
     const activeBookings = allBookings.filter(
-      (b) => b.status !== "completed" && !isEndedRow(b, nowMs) && !isMissedRow(b, nowMs)
+      (b) => b.status !== "completed" && !isMissedRow(b, nowMs)
     );
   
     const getCurrentBookings = () => {
@@ -1215,26 +1213,10 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                               </div>
                             )}
 
-                                                       {/* Ended: time nikal chuka par mentor ne abhi close nahi kiya */}
-                                                       {bookingTab === "completed" && isEndedBooking && (
-                              <button
-                                onClick={() => handleEndSessionClick(booking)}
-                                disabled={isRowLoading}
-                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50 min-w-[104px]"
-                                style={{ backgroundColor: "#f3e8ff", color: "#7c3aed" }}
-                              >
-                                {currentAction === "end" ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                )}
-                                <span>End Session</span>
-                              </button>
-                            )}
-
+                               
                             {/* Completed */}
-                            {bookingTab === "completed" && !isEndedBooking && (
 
+                            {bookingTab === "completed" && (
                               <>
                                 {isGroupedRow ? (
                                   <button
