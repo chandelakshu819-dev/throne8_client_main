@@ -22,6 +22,9 @@ interface PaymentStepProps {
 
 type Stage = "idle" | "preparing" | "paying" | "confirming";
 
+// Platform commission (mentor ke hisse se katti hai, user ke total mein add nahi hoti)
+const PLATFORM_FEE_RATE = 0.2;
+
 const PaymentStep: React.FC<PaymentStepProps> = ({
     selectedService,
     calendarData,
@@ -41,8 +44,8 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
     const isFree: boolean =
         selectedService?.price === "Free" || Number(selectedService?.price) === 0;
     const price: number = isFree ? 0 : Number(selectedService?.price);
-    const gst: number = Math.round(price * 0.18);
-    const total: number = price + gst;
+    // GST nahi: user se sirf service ka price liya jata hai
+    const total: number = price;
 
     const isGroupSession = selectedService?.type === "GroupSession";
 
@@ -84,7 +87,7 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                     paymentMethod: "wallet",
                     pricing: {
                         basePrice: price,
-                        platformFee: Math.round(price * 0.15),
+                        platformFee: Math.round(price * PLATFORM_FEE_RATE),
                         totalAmount: total,
                         currency: "INR",
                     },
@@ -253,11 +256,14 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                 {/* Summary */}
                 <div style={{ borderRadius: "16px", padding: "20px", background: C.bg, border: `1px solid ${C.border}`, marginBottom: "24px" }}>
                     <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "12px" }}>Payment Summary</h3>
-                    {([["Service Fee", `\u20B9${price}`], ["Platform Fee", "\u20B90"], ["GST (18%)", `\u20B9${gst}`], ["Total", `\u20B9${total}`]] as [string, string][]).map(([k, v], i) => (
-                        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: i === 3 ? "15px" : "13px", fontWeight: i === 3 ? "bold" : "normal", color: C.dark, marginBottom: "5px", borderTop: i === 3 ? `1px solid ${C.border}` : "none", paddingTop: i === 3 ? "8px" : "0", marginTop: i === 3 ? "6px" : "0" }}>
-                            <span style={{ color: i === 3 ? C.dark : C.mid }}>{k}:</span><span>{v}</span>
+                    {([["Session Fee", `\u20B9${price}`], ["Total to pay", `\u20B9${total}`]] as [string, string][]).map(([k, v], i) => (
+                        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: i === 1 ? "16px" : "13px", fontWeight: i === 1 ? "bold" : "normal", color: C.dark, marginBottom: "5px", borderTop: i === 1 ? `1px solid ${C.border}` : "none", paddingTop: i === 1 ? "8px" : "0", marginTop: i === 1 ? "6px" : "0" }}>
+                            <span style={{ color: i === 1 ? C.dark : C.mid }}>{k}:</span><span>{v}</span>
                         </div>
                     ))}
+                    <p style={{ fontSize: "12px", color: C.mid, margin: "10px 0 0" }}>
+                        No extra charges. The price shown is exactly what you pay.
+                    </p>
                 </div>
 
                 {bookingError && (

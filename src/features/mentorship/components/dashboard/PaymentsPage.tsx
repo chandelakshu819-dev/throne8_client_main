@@ -1,13 +1,12 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   CreditCard,
   TrendingUp,
-  Calendar,
   Clock,
   CheckCircle,
-  ArrowUp,
+  Wallet,
   Plus,
   Trash2,
   Star,
@@ -19,6 +18,7 @@ import {
 } from "lucide-react";
 import SessionService from "@/lib/api/session.service";
 import ProfileService from "@/lib/api/profile.service";
+import PayoutService, { MentorPayoutOverview, MentorPayoutItem } from "@/lib/api/payout.service";
 import WithdrawalService, {
   WithdrawalMethod,
   AddBankPayload,
@@ -52,6 +52,8 @@ function maskAccount(num: string): string {
   if (!num) return "";
   return "****" + num.slice(-4);
 }
+
+const inr = (n: number) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -161,7 +163,7 @@ function AddMethodModal({ type, mentorId, onClose, onSuccess }: AddMethodModalPr
                 {type === "bank" ? "Add Bank Account" : "Add UPI ID"}
               </h3>
               <p className="text-xs text-[#8a7a6a]">
-                {type === "bank" ? "For bank transfer withdrawals" : "For instant UPI withdrawals"}
+                {type === "bank" ? "For bank transfer payouts" : "For instant UPI payouts"}
               </p>
             </div>
           </div>
@@ -431,6 +433,9 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
   const [txLoading, setTxLoading] = useState(true);
   const [txError, setTxError] = useState<string | null>(null);
 
+  // ── Payout (80/20 + hold) state ─────────────────────────────────────────
+  const [overview, setOverview] = useState<MentorPayoutOverview | null>(null);
+
   // ── Withdrawal methods state ────────────────────────────────────────────
   const [methods, setMethods] = useState<WithdrawalMethod[]>([]);
   const [methodsLoading, setMethodsLoading] = useState(true);
@@ -457,7 +462,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
       .then((res) => {
         const sessions: any[] = Array.isArray(res.data) ? res.data : [];
         const rows: TransactionRow[] = sessions.flatMap((s: any) => {
-          const bks = Array.isArray(s.bookings) && s.bookings.length > 0 
+          const bks = Array.isArray(s.bookings) && s.bookings.length > 0
             ? s.bookings.map((b: any) => ({
                 bookingId: b._id,
                 transactionId: b.payment?.transactionId || b.paymentId || b.payment?.razorpayPaymentId || b._id,
@@ -482,7 +487,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
                 payoutStatus: b.payoutStatus || b.payment?.payoutStatus || (b.status === "completed" ? "paid_out" : "pending_payout"),
               }))
             : [];
-            
+
           // If no bookings array, but session has status (old format or 1-on-1)
           if (bks.length === 0 && (s.status || s.menteeId)) {
             bks.push({
@@ -509,7 +514,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
               payoutStatus: s.payoutStatus || s.payment?.payoutStatus || (s.status === "completed" ? "paid_out" : "pending_payout"),
             });
           }
-          
+
           return bks;
         });
         setTransactions(rows);
@@ -518,19 +523,42 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
       .finally(() => setTxLoading(false));
   }, [mentorId]);
 
+  // ── Fetch real payout overview (held / released / paid) ─────────────────
+  useEffect(() => {
+    if (!mentorId) return;
+    PayoutService.getMentorOverview(mentorId)
+      .then(setOverview)
+      .catch(() => setOverview(null));
+  }, [mentorId]);
+
+  const payoutByBooking = useMemo(() => {
+    const map: Record<string, MentorPayoutItem> = {};
+    (overview?.items || []).forEach((it) => {
+      if (it.bookingId) map[String(it.bookingId)] = it;
+    });
+    return map;
+  }, [overview]);
+
+  // Mentor ko kya milta hai: payout record ho to wahi, warna base - platform fee
+  const earnOf = (t: TransactionRow): number =>
+    payoutByBooking[String(t.bookingId)]?.mentorAmount ?? Math.max(0, t.basePrice - t.platformFee);
+
   // ── Payment Filters Hook ────────────────────────────────────────────────
   const {
     filters,
     updateFilter,
     clearAllFilters,
     filteredTransactions,
-    filteredTotal,
     moreFilterCount,
     isFilterActive,
     activeChips,
     totalCount,
     filteredCount,
   } = usePaymentFilters(transactions);
+
+  const filteredEarnTotal = filteredTransactions
+    .filter((t) => t.bookingStatus !== "cancelled")
+    .reduce((sum, t) => sum + earnOf(t), 0);
 
   // Extract unique available session types from dataset
   const availableSessionTypes = Array.from(
@@ -571,41 +599,20 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
     });
   }, [transactions]);
 
-  // ── Earnings calculations ───────────────────────────────────────────────
-  const earnedRows = transactions.filter((t) =>
-    ["confirmed", "rescheduled", "in_progress", "completed"].includes(t.bookingStatus)
-  );
-  const totalEarnings = earnedRows.reduce((sum, t) => sum + t.total, 0);
-
-  const now = new Date();
-  const thisMonthEarnings = earnedRows
-    .filter((t) => {
-      const d = new Date(t.date);
-      return !isNaN(d.getTime()) && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    })
-    .reduce((sum, t) => sum + t.total, 0);
-
-  const pendingAmount = transactions
-    .filter((t) => t.paymentStatus === "pending")
-    .reduce((sum, t) => sum + t.total, 0);
+  // ── Earnings cards ──────────────────────────────────────────────────────
+  const pending = overview?.summary.pending ?? 0;
+  const available = overview?.summary.available ?? 0;
+  const paid = overview?.summary.paid ?? 0;
+  const totalEarned = pending + available + paid;
 
   const earningsStats = [
-    {
-      label: "Total Earnings", amount: `₹${totalEarnings.toLocaleString("en-IN")}`,
-      icon: TrendingUp, change: totalEarnings > 0 ? `₹${totalEarnings.toLocaleString("en-IN")} earned` : "No earnings yet",
-      showArrow: totalEarnings > 0,
-    },
-    {
-      label: "This Month", amount: `₹${thisMonthEarnings.toLocaleString("en-IN")}`,
-      icon: Calendar, change: thisMonthEarnings > 0 ? `₹${thisMonthEarnings.toLocaleString("en-IN")} this month` : "No earnings this month",
-      showArrow: thisMonthEarnings > 0,
-    },
-    {
-      label: "Pending", amount: `₹${pendingAmount.toLocaleString("en-IN")}`,
-      icon: Clock, change: pendingAmount > 0 ? "Awaiting confirmation" : "No pending payments",
-      showArrow: false,
-    },
+    { label: "Total Earned", amount: inr(totalEarned), icon: TrendingUp, note: "Your 80% share of all sessions" },
+    { label: "On Hold", amount: inr(pending), icon: Clock, note: "Released after admin review" },
+    { label: "Ready for Payout", amount: inr(available), icon: Wallet, note: "Approved, being sent to you" },
+    { label: "Paid to You", amount: inr(paid), icon: CheckCircle, note: "Already in your account" },
   ];
+
+  const noMethod = !methodsLoading && methods.length === 0;
 
   // ── Withdrawal method handlers ──────────────────────────────────────────
   const handleMethodAdded = (method: WithdrawalMethod) => {
@@ -643,15 +650,18 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
     }
   };
 
-  // ── Status badge ────────────────────────────────────────────────────────
-  const paymentStatusBadge = (status: string) => {
-    const s = status.toLowerCase();
-    if (s === "completed") return "bg-green-100 text-green-700";
-    if (s === "pending") return "bg-yellow-100 text-yellow-700";
-    if (s === "failed") return "bg-red-100 text-red-700";
-    if (s === "refunded") return "bg-purple-100 text-purple-700";
-    if (s === "cancelled") return "bg-gray-100 text-gray-600";
-    return "bg-yellow-100 text-yellow-700";
+  // ── Payout badge ────────────────────────────────────────────────────────
+  const payoutBadge = (t: TransactionRow) => {
+    const item = payoutByBooking[String(t.bookingId)];
+    if (item?.payoutStatus === "paid")
+      return { text: "Paid", cls: "bg-green-100 text-green-700" };
+    if (item?.payoutStatus === "released")
+      return { text: "Approved", cls: "bg-blue-100 text-blue-700" };
+    if (item?.payoutStatus === "held")
+      return { text: "On hold", cls: "bg-yellow-100 text-yellow-700" };
+    if (t.bookingStatus === "cancelled")
+      return { text: "Cancelled", cls: "bg-gray-100 text-gray-600" };
+    return { text: "—", cls: "bg-gray-50 text-gray-400" };
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -676,15 +686,45 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
         </div>
         <div>
           <h2 className="text-3xl font-bold" style={{ color: "#4a3728" }}>Payment &amp; Earnings</h2>
-          <p style={{ color: "#8a7a6a" }} className="text-sm">Track your income</p>
+          <p style={{ color: "#8a7a6a" }} className="text-sm">
+            You keep 80% of every session. 20% is the platform fee.
+          </p>
         </div>
       </div>
 
-           {/* Earnings Stats */}
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {earningsStats.map((stat, idx) => (
+      {/* No account warning */}
+      {noMethod && (
+        <div className="flex items-start gap-3 p-4 rounded-xl border-2 border-amber-300 bg-amber-50">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-bold text-amber-800 text-sm">Add your bank account or UPI to get paid</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              We can only send your earnings once a payout account is added.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => setAddModal("upi")}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+              style={{ backgroundColor: "#4a3728" }}
+            >
+              Add UPI
+            </button>
+            <button
+              onClick={() => setAddModal("bank")}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border-2 border-[#4a3728] text-[#4a3728]"
+            >
+              Add Bank
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Earnings Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {earningsStats.map((stat) => (
           <div
-            key={idx}
+            key={stat.label}
             className="p-4 rounded-xl shadow-md text-white hover:scale-[1.02] transition-all duration-300"
             style={{ backgroundColor: "#4a3728" }}
           >
@@ -693,15 +733,10 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
               <stat.icon className="w-5 h-5 opacity-80" />
             </div>
             <p className="text-2xl font-bold mb-1">{stat.amount}</p>
-            <div className="flex items-center gap-1.5 text-xs opacity-80">
-              {stat.showArrow && <ArrowUp className="w-3 h-3" />}
-              <span>{stat.change}</span>
-            </div>
+            <p className="text-xs opacity-80">{stat.note}</p>
           </div>
         ))}
       </div>
-
-
 
       {/* Transaction History */}
       <div className="bg-white p-6 md:p-8 rounded-2xl shadow-xl border-2 border-[#e0d8cf]">
@@ -723,7 +758,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
           disabled={txLoading}
           withdrawalJumpButtonNode={
             <WithdrawalJumpButton
-              hasNoMethods={!methodsLoading && methods.length === 0}
+              hasNoMethods={noMethod}
               targetId="withdrawal-methods"
               onScrollTriggered={handleTriggerHighlight}
             />
@@ -740,7 +775,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
             <table className="w-full text-sm border-collapse">
               <thead className="sticky top-0 z-20 shadow-sm" style={{ backgroundColor: "#fbf7f3" }}>
                 <tr className="border-b border-[#e0d8cf]" style={{ backgroundColor: "#fbf7f3" }}>
-                  {["Mentee", "Date", "Base Price", "Platform Fee", "Total", "Method", "Status"].map((h) => (
+                  {["Mentee", "Date", "Session Price", "Platform Fee (20%)", "You Earn (80%)", "Method", "Payout"].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-semibold whitespace-nowrap" style={{ color: "#4a3728" }}>
                       {h}
                     </th>
@@ -749,7 +784,6 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
               </thead>
               <tbody className="divide-y divide-[#e0d8cf]">
                 {txLoading ? (
-                  // 5-6 Skeleton rows matching layout
                   [...Array(6)].map((_, idx) => (
                     <tr key={idx} className="animate-pulse border-t border-[#e0d8cf]">
                       <td className="px-4 py-3">
@@ -770,7 +804,6 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
                     </tr>
                   ))
                 ) : transactions.length === 0 ? (
-                  // Mentor has no payments at all
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-[#8a7a6a]">
                       <CreditCard className="w-10 h-10 mx-auto mb-2 opacity-30 text-[#8a7a6a]" />
@@ -779,12 +812,11 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
                     </td>
                   </tr>
                 ) : filteredTransactions.length === 0 ? (
-                  // Active filters matched 0 rows
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center text-[#8a7a6a]">
                       <CreditCard className="w-10 h-10 mx-auto mb-2 opacity-30 text-[#8a7a6a]" />
-                      <p className="font-bold text-base text-[#4a3728]">No transactions yet.</p>
-                      <p className="text-xs mt-1 text-[#8a7a6a]">No transactions found. Try changing your filters.</p>
+                      <p className="font-bold text-base text-[#4a3728]">No transactions found.</p>
+                      <p className="text-xs mt-1 text-[#8a7a6a]">Try changing your filters.</p>
                       <button
                         type="button"
                         onClick={clearAllFilters}
@@ -797,6 +829,8 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
                 ) : (
                   filteredTransactions.map((t) => {
                     const photo = t.menteeId ? photoUrls[t.menteeId] : null;
+                    const badge = payoutBadge(t);
+                    const item = payoutByBooking[String(t.bookingId)];
                     return (
                       <tr key={t.bookingId} className="border-t border-[#e0d8cf] hover:bg-[#fbf7f3] transition-colors">
                         <td className="px-4 py-3">
@@ -818,18 +852,23 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-[#8a7a6a] whitespace-nowrap">{t.date}</td>
-                        <td className="px-4 py-3 font-medium text-[#4a3728] whitespace-nowrap">₹{t.basePrice}</td>
-                        <td className="px-4 py-3 text-[#8a7a6a] whitespace-nowrap">₹{t.platformFee}</td>
-                        <td className="px-4 py-3 font-bold text-green-600 whitespace-nowrap">₹{t.total}</td>
+                        <td className="px-4 py-3 font-medium text-[#4a3728] whitespace-nowrap">{inr(t.basePrice)}</td>
+                        <td className="px-4 py-3 text-[#8a7a6a] whitespace-nowrap">
+                          {inr(item?.platformAmount ?? t.platformFee)}
+                        </td>
+                        <td className="px-4 py-3 font-bold text-green-600 whitespace-nowrap">{inr(earnOf(t))}</td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className="px-2 py-1 rounded-full text-xs font-semibold capitalize" style={{ backgroundColor: "#fbf7f3", color: "#4a3728" }}>
                             {t.method}
                           </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold capitalize ${paymentStatusBadge(t.paymentStatus)}`}>
-                            {t.paymentStatus}
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${badge.cls}`}>
+                            {badge.text}
                           </span>
+                          {item?.payoutStatus === "paid" && item.reference && (
+                            <span className="block text-[10px] text-[#8a7a6a] font-mono mt-1">UTR: {item.reference}</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -839,13 +878,13 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
               <tfoot className="sticky bottom-0 z-20 shadow-[0_-4px_12px_rgba(0,0,0,0.15)]">
                 <tr style={{ backgroundColor: "#4a3728" }} className="text-white">
                   <td colSpan={4} className="px-4 py-2.5 text-sm font-bold whitespace-nowrap rounded-bl-xl">
-                    {isFilterActive ? "Filtered Total" : "Grand Total"}
+                    {isFilterActive ? "Filtered You Earn" : "Total You Earn"}
                   </td>
                   <td className="px-4 py-2.5 text-lg font-bold whitespace-nowrap">
                     {txLoading ? (
                       <div className="h-5 w-20 bg-white/30 rounded animate-pulse inline-block" />
                     ) : (
-                      `₹${filteredTotal.toLocaleString("en-IN")}`
+                      inr(filteredEarnTotal)
                     )}
                   </td>
                   <td colSpan={2} className="px-4 py-2.5 rounded-br-xl"></td>
@@ -867,8 +906,8 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
       >
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-2xl font-bold text-[#4a3728]">Withdrawal Methods</h3>
-            <p className="text-sm text-[#8a7a6a] mt-1">Add bank account or UPI to receive payouts</p>
+            <h3 className="text-2xl font-bold text-[#4a3728]">Payout Account</h3>
+            <p className="text-sm text-[#8a7a6a] mt-1">Your default account is where approved earnings are sent</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -895,7 +934,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
         ) : methods.length === 0 ? (
           <div className="text-center py-10 border-2 border-dashed border-[#e0d8cf] rounded-2xl">
             <CreditCard className="w-12 h-12 mx-auto text-[#c0b8b0] mb-3" />
-            <p className="font-bold text-[#4a3728] mb-1">No withdrawal methods added</p>
+            <p className="font-bold text-[#4a3728] mb-1">No payout account added</p>
             <p className="text-sm text-[#8a7a6a] mb-4">Add a bank account or UPI ID to receive your earnings</p>
             <div className="flex gap-3 justify-center">
               <button onClick={() => setAddModal("bank")}

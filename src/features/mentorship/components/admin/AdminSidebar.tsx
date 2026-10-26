@@ -7,6 +7,7 @@ import {
   Flag,
   MessageSquareWarning,
   Receipt,
+  Wallet,
   ChevronRight,
 } from "lucide-react";
 
@@ -16,6 +17,7 @@ interface AdminSidebarProps {
   pendingMentorCount?: number;
   reportedReviewCount?: number;
   communityReportCount?: number;
+  heldPayoutCount?: number;
 }
 
 const ADMIN_MENU_ITEMS = [
@@ -27,6 +29,7 @@ const ADMIN_MENU_ITEMS = [
   { id: "reported-reviews", label: "Reported Reviews", icon: Flag },
   { id: "community-reports", label: "Community Reports", icon: MessageSquareWarning },
   { id: "payments", label: "Payment Logs", icon: Receipt },
+  { id: "payouts", label: "Mentor Payouts", icon: Wallet },
 ];
 
 
@@ -36,6 +39,7 @@ export default function AdminSidebar({
   pendingMentorCount = 0,
   reportedReviewCount = 0,
   communityReportCount = 0,
+  heldPayoutCount = 0,
 }: AdminSidebarProps) {
   return (
     <aside className="w-72 flex flex-col" style={{ backgroundColor: '#fff', borderRight: '1px solid #ece4db' }}>
@@ -59,7 +63,8 @@ export default function AdminSidebar({
             const badgeCount =
               item.id === "pending-mentors" ? pendingMentorCount :
               item.id === "reported-reviews" ? reportedReviewCount :
-              item.id === "community-reports" ? communityReportCount : 0;
+              item.id === "community-reports" ? communityReportCount :
+              item.id === "payouts" ? heldPayoutCount : 0;
 
             return (
               <button
