@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, Clock, CheckCircle2, Play, XCircle, Eye, Download } from "lucide-react";
+import { Calendar, Clock, CheckCircle2, Play, XCircle, Eye, Download, History, RotateCw, Loader2 } from "lucide-react";
 import SessionService from "@/lib/api/session.service";
 
 interface UserDashboardMyBookingsPageProps {
@@ -24,12 +24,13 @@ type MyBookingRow = {
     | "in_progress"
     | "completed"
     | "cancelled"
-    | "ended";
-  duration?: number;
-  isGroupSession: boolean;
-};
+    | "missed";
+    duration?: number;
+    amount?: number;
+    isGroupSession: boolean;
+  };
 
-type BookingTab = "all" | "pending" | "upcoming" | "in_progress" | "completed";
+type BookingTab = "all" | "pending" | "upcoming" | "in_progress" | "completed" | "missed" | "history";
 
 const tabMeta: Record<BookingTab, { label: string; icon: React.ElementType }> = {
   all: { label: "All Active", icon: Clock },
@@ -37,6 +38,8 @@ const tabMeta: Record<BookingTab, { label: string; icon: React.ElementType }> = 
   upcoming: { label: "Upcoming", icon: Calendar },
   in_progress: { label: "In Progress", icon: Play },
   completed: { label: "Completed", icon: CheckCircle2 },
+  missed: { label: "Missed", icon: XCircle },
+  history: { label: "History", icon: History },
 };
 
 const statusBadge: Record<string, { bg: string; fg: string; label: string }> = {
@@ -46,35 +49,63 @@ const statusBadge: Record<string, { bg: string; fg: string; label: string }> = {
   in_progress: { bg: "#dbeafe", fg: "#1d4ed8", label: "In Progress" },
   completed: { bg: "#f3e8ff", fg: "#7c3aed", label: "Completed" },
   cancelled: { bg: "#fee2e2", fg: "#dc2626", label: "Cancelled" },
-  ended: { bg: "#f3f4f6", fg: "#4b5563", label: "Ended" },
+  missed: { bg: "#f3f4f6", fg: "#6b7280", label: "Missed" },
 };
 
+const ENDED_GRACE_MINUTES = 15; // mentor page ke saath same rakhna
+const PAGE_SIZE = 20;
+
+// "HH:mm - HH:mm" -> minutes
+const slotMinutes = (slot?: string): number | null => {
+  if (!slot) return null;
+  const parts = slot.split("-").map((x) => x.trim());
+  if (parts.length !== 2) return null;
+  const toMin = (t: string) => {
+    const m = t.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/);
+    return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : null;
+  };
+  const s = toMin(parts[0]);
+  const e = toMin(parts[1]);
+  return s !== null && e !== null && e > s ? e - s : null;
+};
+
+// DB status + current time -> row ka asli status (mentor page jaisa hi logic)
 function computeDynamicStatus(
   baseStatus: MyBookingRow["status"],
   scheduledAt: string | undefined,
-  durationMinutes: number = 30
+  durationMinutes?: number,
+  slotTime?: string,
+  isGroup: boolean = false
 ): MyBookingRow["status"] {
-  if (["completed", "cancelled"].includes(baseStatus)) return baseStatus;
-
+  if (["completed", "cancelled", "missed"].includes(baseStatus)) return baseStatus;
   if (!scheduledAt) return baseStatus;
   const startTime = new Date(scheduledAt).getTime();
   if (Number.isNaN(startTime)) return baseStatus;
 
-  const endTime = startTime + durationMinutes * 60 * 1000;
+  const minutes =
+    slotMinutes(slotTime) ??
+    (durationMinutes && durationMinutes > 0 ? durationMinutes : isGroup ? 120 : 60);
+  const endTime = startTime + minutes * 60 * 1000;
   const now = Date.now();
 
-  if (now > endTime) {
-    return "ended";
+  // Live tha, time + grace nikal gaya -> auto-complete
+  if (baseStatus === "in_progress") {
+    return now > endTime + ENDED_GRACE_MINUTES * 60 * 1000 ? "completed" : "in_progress";
   }
+    // 1:1: start+15 min ke baad mentor start nahi kar sakta -> Missed. Group: slot end.
+     // Pending 1:1 request slot start par expire; baaki start + 15 min par
+     const missedAfter = isGroup
+     ? endTime
+     : baseStatus === "pending"
+       ? startTime
+       : startTime + 15 * 60 * 1000;
+   if (now > missedAfter) return "missed";
 
-  if (now >= startTime && now <= endTime) {
-    if (baseStatus === "pending") return "pending";
-    return "in_progress";
-  }
+   
 
   if (baseStatus === "pending") return "pending";
-  if (baseStatus === "rescheduled") return "rescheduled";
-  return "confirmed";
+  if (now >= startTime) return "in_progress"; // time chal raha hai -> Join dikhao
+  return baseStatus === "rescheduled" ? "rescheduled" : "confirmed";
 }
 
 // Maps a GroupSession participant's requestStatus + the parent session's
@@ -98,6 +129,48 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
   const [allBookings, setAllBookings] = useState<MyBookingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [reschedRow, setReschedRow] = useState<MyBookingRow | null>(null);
+  const [reschedDate, setReschedDate] = useState("");
+
+  const handleRefund = async (row: MyBookingRow) => {
+    if (!window.confirm(`Full refund of ₹${row.amount} ke liye confirm karo?`)) return;
+    setBusyId(row.bookingId);
+    try {
+      await SessionService.refundMissedSession(row.sessionId, row.bookingId);
+      setMsg({ text: "Refund initiated. 3-5 business days me aayega.", ok: true });
+      fetchAll();
+    } catch (e: any) {
+      setMsg({ text: e?.message || "Refund failed.", ok: false });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleRescheduleSubmit = async () => {
+    if (!reschedRow || !reschedDate) return;
+    setBusyId(reschedRow.bookingId);
+    try {
+      const iso = new Date(`${reschedDate}:00+05:30`).toISOString();
+      await SessionService.rescheduleSession(
+        reschedRow.sessionId,
+        iso,
+        "Rescheduled after missed session",
+        reschedRow.bookingId
+      );
+      setMsg({ text: "Session rescheduled.", ok: true });
+      setReschedRow(null);
+      setReschedDate("");
+      fetchAll();
+    } catch (e: any) {
+      setMsg({ text: e?.message || "Reschedule failed.", ok: false });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+
 
   const fetchAll = () => {
     setLoading(true);
@@ -131,7 +204,7 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
                 scheduledAt: s.scheduledAt,
                 duration: s.duration,
                 slotTime: s.slotTime,
-                status: computeDynamicStatus(s.status, s.scheduledAt, s.duration),
+                status: s.status,
                 isGroupSession: false,
               },
             ];
@@ -146,7 +219,8 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
           scheduledAt: b.scheduledAt || s.scheduledAt,
           duration: s.duration,
           slotTime: b.slotTime,
-          status: computeDynamicStatus(b.status, b.scheduledAt || s.scheduledAt, s.duration),
+          status: b.status,
+          amount: Number(b.pricing?.totalAmount ?? s.pricing?.totalAmount ?? 0),
           isGroupSession: false,
         }));
       });
@@ -169,7 +243,7 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
             scheduledAt: s.scheduledAt,
             duration: s.duration,
             slotTime: undefined,
-            status: computeDynamicStatus(baseStatus, s.scheduledAt, s.duration),
+            status: baseStatus,
             isGroupSession: true,
           } as MyBookingRow;
         })
@@ -190,12 +264,51 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  const pendingBookings = allBookings.filter((b) => b.status === "pending");
-  const upcomingBookings = allBookings.filter(
-    (b) => b.status === "confirmed" || b.status === "rescheduled"
+  // Har minute statuses dobara evaluate (page khula rahe tab bhi)
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [bookingTab]);
+
+  // DB ka raw status -> time ke hisaab se asli status
+  const rows = useMemo(
+    () =>
+      allBookings.map((r) => ({
+        ...r,
+        status: computeDynamicStatus(r.status, r.scheduledAt, r.duration, r.slotTime, r.isGroupSession),
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allBookings, nowMs]
   );
-  const inProgressBookings = allBookings.filter((b) => b.status === "in_progress");
-  const completedBookings = allBookings.filter((b) => b.status === "completed" || b.status === "ended");
+
+  const timeOf = (r: MyBookingRow) => {
+    const t = r.scheduledAt ? new Date(r.scheduledAt).getTime() : 0;
+    return Number.isNaN(t) ? 0 : t;
+  };
+  const nearestFirst = (a: MyBookingRow, b: MyBookingRow) => timeOf(a) - timeOf(b);
+  const latestFirst = (a: MyBookingRow, b: MyBookingRow) => timeOf(b) - timeOf(a);
+
+  const pendingBookings = rows.filter((b) => b.status === "pending").sort(nearestFirst);
+  const upcomingBookings = rows
+    .filter((b) => b.status === "confirmed" || b.status === "rescheduled")
+    .sort(nearestFirst);
+  const inProgressBookings = rows.filter((b) => b.status === "in_progress");
+  const completedBookings = rows.filter((b) => b.status === "completed");
+  const missedBookings = rows.filter((b) => b.status === "missed");
+  // All Active = sirf wahi jo abhi kaam ke hain (past nahi)
+  const activeBookings = rows
+    .filter((b) => ["pending", "confirmed", "rescheduled", "in_progress"].includes(b.status))
+    .sort(nearestFirst);
+  // History = poora past (completed + missed + cancelled)
+  const historyBookings = rows
+    .filter((b) => ["completed", "missed", "cancelled"].includes(b.status))
+    .sort(latestFirst);
 
   const currentBookings = useMemo(() => {
     switch (bookingTab) {
@@ -207,10 +320,15 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
         return inProgressBookings;
       case "completed":
         return completedBookings;
+      case "missed":
+        return missedBookings;
+      case "history":
+        return historyBookings;
       default:
-        return allBookings.filter((b) => b.status !== "completed" && b.status !== "cancelled" && b.status !== "ended");
+        return activeBookings;
     }
-  }, [bookingTab, allBookings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookingTab, rows]);
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return "N/A";
@@ -271,17 +389,16 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
 
       <div className="bg-white p-1.5 rounded-2xl overflow-x-auto" style={{ border: "1px solid #e0d8cf" }}>
         <div className="flex gap-1.5 min-w-max">
-          {(["all", "pending", "upcoming", "in_progress", "completed"] as const).map((tab) => {
-            const count =
-              tab === "all"
-                ? allBookings.filter((b) => b.status !== "completed" && b.status !== "cancelled" && b.status !== "ended").length
-                : tab === "pending"
-                ? pendingBookings.length
-                : tab === "upcoming"
-                ? upcomingBookings.length
-                : tab === "in_progress"
-                ? inProgressBookings.length
-                : completedBookings.length;
+          {(["all", "pending", "upcoming", "in_progress", "completed", "missed", "history"] as const).map((tab) => {
+            const count = {
+              all: activeBookings.length,
+              pending: pendingBookings.length,
+              upcoming: upcomingBookings.length,
+              in_progress: inProgressBookings.length,
+              completed: completedBookings.length,
+              missed: missedBookings.length,
+              history: historyBookings.length,
+            }[tab];
             const { label, icon: Icon } = tabMeta[tab];
             const isActive = bookingTab === tab;
             return (
@@ -323,7 +440,7 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
                 <Calendar className="w-6 h-6" style={{ color: "#a08070" }} />
               </div>
               <p className="text-sm font-semibold" style={{ color: "#4a3728" }}>
-                No {bookingTab.replace("_", " ")} bookings found
+                No {tabMeta[bookingTab].label.toLowerCase()} bookings found
               </p>
               <p className="text-xs mt-1">Bookings will appear here when available</p>
             </div>
@@ -339,7 +456,7 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
                 </tr>
               </thead>
               <tbody className="divide-y" style={{ borderColor: "#f0ebe4" }}>
-                {currentBookings.map((row, idx) => {
+                {currentBookings.slice(0, visibleCount).map((row, idx) => {
                   const sb = statusBadge[row.status] ?? statusBadge.pending;
                   return (
                     <tr key={`${row.sessionId}-${row.bookingId}-${idx}`} className="transition-colors hover:bg-[#fbf7f3]">
@@ -394,9 +511,39 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
                               Awaiting mentor response
                             </span>
                           )}
-                          {row.status !== "pending" && row.status !== "in_progress" && row.status !== "completed" && (
-                            <span className="text-xs" style={{ color: "#8a7a6a" }}>—</span>
+                                                   {row.status === "missed" && !row.isGroupSession && (
+                            <>
+                              {(row.amount ?? 0) > 0 && (
+                                <button
+                                  onClick={() => handleRefund(row)}
+                                  disabled={busyId === row.bookingId}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                  style={{ backgroundColor: "#dcfce7", color: "#15803d" }}
+                                >
+                                  {busyId === row.bookingId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                                  Refund ₹{row.amount}
+                                </button>
+                              )}
+                              <button
+                                onClick={() => setReschedRow(row)}
+                                disabled={busyId === row.bookingId}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                style={{ backgroundColor: "#fed7aa", color: "#c2410c" }}
+                              >
+                                <RotateCw className="w-3.5 h-3.5" />
+                                Reschedule
+                              </button>
+                            </>
                           )}
+                          {row.status === "missed" && row.isGroupSession && (
+                            <span className="text-xs" style={{ color: "#8a7a6a" }}>Missed</span>
+                          )}
+                          {row.status !== "pending" &&
+                            row.status !== "in_progress" &&
+                            row.status !== "completed" &&
+                            row.status !== "missed" && (
+                              <span className="text-xs" style={{ color: "#8a7a6a" }}>—</span>
+                            )}
                         </div>
                       </td>
                     </tr>
@@ -407,6 +554,61 @@ export default function UserDashboardMyBookingsPage({ user }: UserDashboardMyBoo
           )}
         </div>
       </div>
+
+      
+      {msg && (
+        <div
+          className="text-sm font-semibold rounded-lg px-4 py-3"
+          style={{ backgroundColor: msg.ok ? "#dcfce7" : "#fee2e2", color: msg.ok ? "#15803d" : "#dc2626" }}
+        >
+          {msg.text}
+          <button className="ml-3 underline" onClick={() => setMsg(null)}>close</button>
+        </div>
+      )}
+
+      {reschedRow && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4" style={{ border: "1px solid #e0d8cf" }}>
+            <h3 className="text-lg font-bold mb-4" style={{ color: "#4a3728" }}>Reschedule Session</h3>
+            <input
+              type="datetime-local"
+              className="w-full rounded-lg p-3 outline-none text-sm"
+              style={{ border: "1px solid #e0d8cf", color: "#4a3728" }}
+              value={reschedDate}
+              onChange={(e) => setReschedDate(e.target.value)}
+            />
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                className="px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ backgroundColor: "#fbf7f3", color: "#7a5c3e", border: "1px solid #e0d8cf" }}
+                onClick={() => { setReschedRow(null); setReschedDate(""); }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+                style={{ backgroundColor: "#4a3728" }}
+                onClick={handleRescheduleSubmit}
+                disabled={!reschedDate || busyId === reschedRow.bookingId}
+              >
+                {busyId === reschedRow.bookingId ? "Processing..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!loading && currentBookings.length > visibleCount && (
+        <div className="flex justify-center">
+          <button
+            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
+            style={{ backgroundColor: "#fbf7f3", color: "#7a5c3e", border: "1px solid #e0d8cf" }}
+          >
+            Load more ({currentBookings.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
     </div>
   );
 }

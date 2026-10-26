@@ -396,7 +396,21 @@ class SessionService {
         }
     }
 
-    // ── GET SESSION RECEIPT (for completed booking's Download/View) ────
+
+        // ── MENTEE: missed booking ka 100% refund ──────────────
+        static async refundMissedSession(sessionId: string, bookingId: string): Promise<ApiResponse> {
+            try {
+                const { data } = await api.post<ApiResponse>(
+                    `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/refund-missed`,
+                    { bookingId }
+                );
+                return data;
+            } catch (error: any) {
+                throw new Error(error?.response?.data?.message || "Failed to process refund.");
+            }
+        }
+    
+        // ── GET SESSION RECEIPT (for completed booking's Download/View) ────
     // Fetches real booking data (mentee name, price, payment status,
     // completedAt) to build the receipt shown/downloaded from BookingsPage.
     static async getSessionReceipt(sessionId: string, bookingId?: string): Promise<ApiResponse> {

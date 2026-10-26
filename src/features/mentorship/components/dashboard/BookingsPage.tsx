@@ -16,6 +16,7 @@ import {
   Check,
   X,
   Loader2,
+  History,
 } from "lucide-react";
 import SessionService from "@/lib/api/session.service";
 import ProfileService from "@/lib/api/profile.service";
@@ -55,7 +56,8 @@ type MentorBookingRow = {
   | "completed"
   | "cancelled"
   | "open"
-  | "full";
+  | "full"
+  | "missed";
   // ✅ NEW: present only on grouped (accepted) group-session rows — one
   // row per session, carrying the full accepted-participant list instead
   // of the table spawning a duplicate row per student.
@@ -72,7 +74,8 @@ type BookingTab =
   | "upcoming"
   | "in_progress"
   | "completed"
-  | "missed";
+  | "missed"
+  | "history";
 
 const tabMeta: Record<
   BookingTab,
@@ -84,6 +87,7 @@ const tabMeta: Record<
   in_progress: { label: "In Progress", icon: Play },
   completed: { label: "Completed", icon: CheckCircle2 },
   missed: { label: "Missed", icon: XCircle },
+  history: { label: "History", icon: History },
 };
 
 const statPalette: Record<string, { bg: string; fg: string }> = {
@@ -111,7 +115,9 @@ const statusBadge: Record<
   missed: { bg: "#f3f4f6", fg: "#6b7280", label: "Missed" },
 };
 
+
 const ENDED_GRACE_MINUTES = 15;
+const START_LATE_LIMIT_MINUTES = 15; // server: START_LATE_LIMIT_MS
 const DEFAULT_SESSION_MINUTES = 60;
 const DEFAULT_GROUP_SESSION_MINUTES = 120;
 
@@ -136,23 +142,52 @@ const getRowEndMs = (b: MentorBookingRow): number | null => {
   return startMs + minutes * 60000;
 };
 
-// in_progress hai lekin time (+ grace) nikal chuka -> ab live nahi hai
-const isEndedRow = (b: MentorBookingRow, nowMs: number): boolean => {
-  if (b.status !== "in_progress") return false;
-  const endMs = getRowEndMs(b);
-  return endMs !== null && nowMs > endMs + ENDED_GRACE_MINUTES * 60000;
+type EffectiveStatus =
+  | "pending"
+  | "upcoming"
+  | "in_progress"
+  | "completed"
+  | "cancelled"
+  | "missed";
+
+// Ek hi jagah decide hota hai ki row asal me kis haal me hai (DB status + current time).
+// Saare tabs, badges aur buttons isi se chalte hain, isliye "Ended + End Session" jaisa confusion nahi hoga.
+const getEffectiveStatus = (b: MentorBookingRow, nowMs: number): EffectiveStatus => {
+  if (b.status === "completed") return "completed";
+  if (b.status === "cancelled") return "cancelled";
+  if (b.status === "missed") return "missed";
+
+  const endMs = b.isTemplate ? null : getRowEndMs(b);
+  const startMs = b.scheduledAt ? new Date(b.scheduledAt).getTime() : NaN;
+  // 1:1: mentor start+15 min ke baad Start nahi kar sakta -> missed. Group: slot end tak.
+  const timeOver = b.isGroupSession
+    ? endMs !== null && nowMs > endMs
+    : !b.isTemplate && !Number.isNaN(startMs) && nowMs > startMs + START_LATE_LIMIT_MINUTES * 60000;
+
+
+
+  if (b.status === "in_progress") {
+    // Live tha, ab time + grace nikal gaya -> auto-complete (backend cron bhi yahi karega)
+    return endMs !== null && nowMs > endMs + ENDED_GRACE_MINUTES * 60000 ? "completed" : "in_progress";
+  }
+
+  // Pending request slot start par hi expire (accept sirf start time tak)
+  if (b.status === "pending") {
+    const pendingExpired = !b.isTemplate && !Number.isNaN(startMs) && nowMs >= startMs;
+    return b.isGroupSession ? (timeOver ? "missed" : "pending") : pendingExpired ? "missed" : "pending";
+  }
+  // confirmed / rescheduled / open / full
+  return timeOver ? "missed" : "upcoming";
 };
 
-// Kabhi start nahi hua (confirmed/rescheduled/open/full) aur slot ka end time nikal chuka -> Missed
-const isMissedRow = (b: MentorBookingRow, nowMs: number): boolean => {
-  const neverStarted =
-    b.status === "confirmed" ||
-    b.status === "rescheduled" ||
-    (!!b.isGroupSession && (b.status === "open" || b.status === "full"));
-  if (!neverStarted || b.isTemplate) return false;
-  const endMs = getRowEndMs(b);
-  return endMs !== null && nowMs > endMs;
+const PAGE_SIZE = 20;
+
+const timeOf = (b: MentorBookingRow): number => {
+  const t = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
+  return Number.isNaN(t) ? 0 : t;
 };
+const byNearestFirst = (a: MentorBookingRow, b: MentorBookingRow) => timeOf(a) - timeOf(b);
+const byLatestFirst = (a: MentorBookingRow, b: MentorBookingRow) => timeOf(b) - timeOf(a);
 
 export default function BookingsPage({ mentorData }: BookingProps) {
   const router = useRouter();
@@ -160,6 +195,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
 
 
   const [bookingTab, setBookingTab] = useState<BookingTab>("all");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   // Har minute "ended" rows dobara evaluate ho (page khula rahe tab bhi)
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -399,48 +435,41 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     });
   }, [allBookings]);
 
-    // Booking categories
-    const pendingBookings = allBookings.filter((b) => b.status === "pending");
-    const missedBookings = allBookings.filter((b) => isMissedRow(b, nowMs));
-  const upcomingBookings = allBookings.filter(
-    (b) =>
-      (b.status === "confirmed" ||
-        b.status === "rescheduled" ||
-        (b.isGroupSession && (b.status === "open" || b.status === "full"))) &&
-      !isMissedRow(b, nowMs)
-  );
-       // In Progress tab: DB me jitne bhi in_progress hain (time nikal chuka ho to badge "Ended" dikhega,
-    // aur mentor wahin se End Session karega). Ye rows kabhi Completed tab me nahi jayenge.
-    const inProgressBookings = allBookings.filter((b) => b.status === "in_progress");
-    const completedBookings = allBookings.filter((b) => b.status === "completed");
-    // Completed tab: SIRF asli completed sessions
-    const completedTabBookings = completedBookings;
-    const activeBookings = allBookings.filter(
-      (b) => b.status !== "completed" && !isMissedRow(b, nowMs)
-    );
-  
-    const getCurrentBookings = () => {
-      switch (bookingTab) {
-        case "all":
-          return activeBookings;
-        case "pending":
-          return pendingBookings;
-        case "upcoming":
-          return upcomingBookings;
-        case "in_progress":
-          return inProgressBookings;
-          case "completed":
-            return completedTabBookings;
-          case "missed":
-            return missedBookings;
-        default:
-          return activeBookings;
-      }
+  // ── Booking categories (sab getEffectiveStatus se, har minute nowMs ke saath refresh) ──
+  const buckets = useMemo(() => {
+    const out: Record<EffectiveStatus, MentorBookingRow[]> = {
+      pending: [],
+      upcoming: [],
+      in_progress: [],
+      completed: [],
+      cancelled: [],
+      missed: [],
     };
+    allBookings.forEach((b) => out[getEffectiveStatus(b, nowMs)].push(b));
+    return out;
+  }, [allBookings, nowMs]);
 
+  const pendingBookings = [...buckets.pending].sort(byNearestFirst);
+  const upcomingBookings = [...buckets.upcoming].sort(byNearestFirst);
+  const inProgressBookings = buckets.in_progress;
+  const completedTabBookings = buckets.completed;
+  const missedBookings = buckets.missed;
+  // All Active = sirf wahi jo abhi actionable hain (past kuch nahi)
+  const activeBookings = [...buckets.pending, ...buckets.upcoming, ...buckets.in_progress].sort(byNearestFirst);
+  // History = poora past (completed + missed + cancelled), latest pehle
+  const historyBookings = [...buckets.completed, ...buckets.missed, ...buckets.cancelled].sort(byLatestFirst);
 
   const currentBookings = useMemo(() => {
-    const base = getCurrentBookings();
+    const byTab: Record<BookingTab, MentorBookingRow[]> = {
+      all: activeBookings,
+      pending: pendingBookings,
+      upcoming: upcomingBookings,
+      in_progress: inProgressBookings,
+      completed: completedTabBookings,
+      missed: missedBookings,
+      history: historyBookings,
+    };
+    const base = byTab[bookingTab] ?? activeBookings;
     if (!searchQuery.trim()) return base;
     const q = searchQuery.trim().toLowerCase();
     return base.filter(
@@ -449,7 +478,13 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         b.serviceName?.toLowerCase().includes(q) ||
         (b.participants || []).some((p) => p.menteeName?.toLowerCase().includes(q))
     );
-  }, [bookingTab, allBookings, searchQuery, nowMs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookingTab, buckets, searchQuery]);
+
+  // Tab / search badalte hi list dobara pehle page se
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [bookingTab, searchQuery]);
 
 
   const formatDate = (dateStr?: string | null) => {
@@ -904,19 +939,16 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       {/* TABS */}
       <div className="bg-white p-1.5 rounded-2xl overflow-x-auto" style={{ border: "1px solid #e0d8cf" }}>
         <div className="flex gap-1.5 min-w-max">
-        {(["all", "pending", "upcoming", "in_progress", "completed", "missed"] as const).map((tab) => {
-            const count =
-              tab === "all"
-              ? activeBookings.length
-              : tab === "pending"
-                ? pendingBookings.length
-                : tab === "upcoming"
-                  ? upcomingBookings.length
-                  : tab === "in_progress"
-                  ? inProgressBookings.length
-                  : tab === "completed"
-                    ? completedTabBookings.length
-                    : missedBookings.length;
+        {(["all", "pending", "upcoming", "in_progress", "completed", "missed", "history"] as const).map((tab) => {
+            const count = {
+              all: activeBookings.length,
+              pending: pendingBookings.length,
+              upcoming: upcomingBookings.length,
+              in_progress: inProgressBookings.length,
+              completed: completedTabBookings.length,
+              missed: missedBookings.length,
+              history: historyBookings.length,
+            }[tab];
 
             const { label, icon: Icon } = tabMeta[tab];
             const isActive = bookingTab === tab;
@@ -958,7 +990,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                 <Calendar className="w-6 h-6" style={{ color: "#a08070" }} />
               </div>
               <p className="text-sm font-semibold" style={{ color: "#4a3728" }}>
-                {searchQuery ? "No matching bookings" : `No ${bookingTab.replace("_", " ")} bookings found`}
+                {searchQuery ? "No matching bookings" : `No ${tabMeta[bookingTab].label.toLowerCase()} bookings found`}
               </p>
               <p className="text-xs mt-1">{searchQuery ? "Try a different search" : "Bookings will appear here when available"}</p>
             </div>
@@ -971,23 +1003,20 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Date</th>
                   <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Time</th>
                   <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Status</th>
-                  {bookingTab !== "all" && (
+                  {(
                     <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Actions</th>
                   )}
                 </tr>
               </thead>
 
               <tbody className="divide-y" style={{ borderColor: "#f0ebe4" }}>
-                {currentBookings.map((booking, idx) => {
+                {currentBookings.slice(0, visibleCount).map((booking, idx) => {
                   const resolvedPhoto = booking.menteeId ? photoUrls[booking.menteeId] : null;
 
-                  const isEndedBooking = isEndedRow(booking, nowMs);
-                  const isMissedBooking = isMissedRow(booking, nowMs);
-                  const sb = isEndedBooking
-                    ? statusBadge.ended
-                    : isMissedBooking
-                      ? statusBadge.missed
-                      : statusBadge[booking.status] ?? statusBadge.pending;
+                  // Row ka asli haal (status + time). Buttons aur badge dono isi se.
+                  const eff = getEffectiveStatus(booking, nowMs);
+                  const badgeKey = eff === "upcoming" ? booking.status : eff;
+                  const sb = statusBadge[badgeKey] ?? statusBadge.pending;
 
                       
 
@@ -1064,11 +1093,11 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                       </td>
 
                       {/* Actions */}
-                      {bookingTab !== "all" && (
+                      {(
                         <td className="px-5 py-3.5">
                           <div className="flex gap-1.5">
                             {/* Pending — only real pending join-request rows land here */}
-                            {bookingTab === "pending" && (
+                            {eff === "pending" && (
                               <>
                                 <button
                                   onClick={() => handleConfirm(booking.sessionId, booking.bookingId)}
@@ -1105,7 +1134,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                             )}
 
                             {/* Upcoming */}
-                            {bookingTab === "upcoming" && (
+                            {eff === "upcoming" && (
                               <>
                                 {booking.isGroupSession ? (
                                   (booking.status === "open" ||
@@ -1192,7 +1221,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                             )}
 
                             {/* In Progress */}
-                            {bookingTab === "in_progress" && (
+                            {eff === "in_progress" && (
                               <div className="flex items-center gap-1.5">
                                 {booking.isGroupSession && booking.meetingUrl && (
                                   <button
@@ -1223,7 +1252,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                                
                             {/* Completed */}
 
-                            {bookingTab === "completed" && (
+                            {eff === "completed" && (
                               <>
                                 {isGroupedRow ? (
                                   <button
@@ -1258,6 +1287,13 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                                 )}
                               </>
                             )}
+
+                            {/* Missed / Cancelled — koi action nahi */}
+                            {(eff === "missed" || eff === "cancelled") && (
+                              <span className="text-xs" style={{ color: "#8a7a6a" }}>
+                                {eff === "missed" ? "Mentee notified (refund / reschedule)" : "—"}
+                              </span>
+                            )}
                           </div>
                         </td>
                       )}
@@ -1269,6 +1305,19 @@ export default function BookingsPage({ mentorData }: BookingProps) {
           )}
         </div>
       </div>
+
+      {/* LOAD MORE */}
+      {!loadingData && currentBookings.length > visibleCount && (
+        <div className="flex justify-center">
+          <button
+            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
+            style={{ backgroundColor: "#fbf7f3", color: "#7a5c3e", border: "1px solid #e0d8cf" }}
+          >
+            Load more ({currentBookings.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
 
       {/* CANCEL / REJECT MODAL */}
       {showCancelModal &&
