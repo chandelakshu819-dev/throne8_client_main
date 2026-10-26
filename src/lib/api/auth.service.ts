@@ -127,9 +127,11 @@ class AuthService {
     /**
      * Google registration
      */
-    static async googleRegister(registrationData: any): Promise<any> {
+      static async googleRegister(registrationData: any): Promise<any> {
         try {
-            const { data } = await api.post('/auth/google/register', registrationData);
+            const { data } = await api.post('/auth/google/register', registrationData, {
+                timeout: 20000,
+            });
 
             if (data.data?.user) {
                 persistSession(data.data);
@@ -138,6 +140,12 @@ class AuthService {
             return data;
         } catch (error: any) {
             if (axios.isAxiosError(error)) {
+                if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                    throw new Error('Server is taking too long. Please try again.');
+                }
+                if (error.code === 'ERR_NETWORK') {
+                    throw new Error('Unable to connect to server. Please check your internet connection.');
+                }
                 const apiError = error.response?.data as ApiError;
                 if (error.response?.status === 400) {
                     const errors = Array.isArray(apiError?.errors)
