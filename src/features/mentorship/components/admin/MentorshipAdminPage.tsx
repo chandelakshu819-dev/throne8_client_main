@@ -10,16 +10,19 @@ import {
   Star,
   Flag,
   IndianRupee,
+  Wallet,
 } from "lucide-react";
 import AdminLayout from "./AdminLayout";
 import AdminService from "@/lib/api/admin.service";
 import CommunityService from "@/lib/api/community.service";
+import PayoutService from "@/lib/api/payout.service";
 import CommunityReportsView from "./CommunityReportsView";
 import PendingMentorsView from "./PendingMentorsView";
 import AllMentorsView from "./AllMentorsView";
 import ReportedReviewsView from "./ReportedReviewsView";
 import AllReviewsView from "./AllReviewsView";
 import SessionsView from "./SessionsView";
+import PayoutsView from "./PayoutsView";
 
 const inrFormatter = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 2,
@@ -39,6 +42,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   "reported-reviews": { title: "Reported Reviews", subtitle: "Reviews flagged for moderation" },
   "community-reports": { title: "Community Reports", subtitle: "Review and moderate flagged forum threads and replies" },
   payments: { title: "Payment Logs", subtitle: "Transaction history across the module" },
+  payouts: { title: "Mentor Payouts", subtitle: "Approve held earnings and pay mentors" },
 };
 
 
@@ -215,6 +219,7 @@ export default function MentorshipAdminPage() {
   const [pendingMentorCount, setPendingMentorCount] = useState<number | null>(null);
   const [reportedReviewCount, setReportedReviewCount] = useState<number | null>(null);
   const [communityReportCount, setCommunityReportCount] = useState<number | null>(null);
+  const [heldPayoutCount, setHeldPayoutCount] = useState<number | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const isMountedRef = useRef(true);
   const inFlightRef = useRef(false);
@@ -229,11 +234,12 @@ export default function MentorshipAdminPage() {
       reason instanceof Error ? reason.message : String(reason);
 
     try {
-      const [dashboardRes, pendingRes, reportedRes, communityRes] = await Promise.allSettled([
+      const [dashboardRes, pendingRes, reportedRes, communityRes, payoutRes] = await Promise.allSettled([
         AdminService.getDashboardStats(),
         AdminService.getPendingMentors({ page: 1, limit: 1 }),
         AdminService.getReportedReviews({ page: 1, limit: 1 }),
         CommunityService.listCommunityReports({ page: 1, limit: 1, status: "pending" }),
+        PayoutService.adminList("held", 1, 1),
       ]);
 
       if (!isMountedRef.current) return;
@@ -265,6 +271,13 @@ export default function MentorshipAdminPage() {
       } else {
         setCommunityReportCount(null);
         failures.push(`Could not load community report count: ${reasonText(communityRes.reason)}`);
+      }
+
+      if (payoutRes.status === "fulfilled") {
+        setHeldPayoutCount(payoutRes.value.total ?? 0);
+      } else {
+        setHeldPayoutCount(null);
+        failures.push(`Could not load payouts count: ${reasonText(payoutRes.reason)}`);
       }
 
       setErrors(failures);
@@ -319,7 +332,40 @@ export default function MentorshipAdminPage() {
         </div>
       )}
 
-      {activePage === "dashboard" && <DashboardOverview stats={stats} loading={loading} />}
+      {activePage === "dashboard" && (
+        <div className="space-y-5">
+          <DashboardOverview stats={stats} loading={loading} />
+
+          {/* Payouts shortcut (sidebar mein link na ho tab bhi yahan se khulega) */}
+          <button
+            type="button"
+            onClick={() => handleSetActivePage("payouts")}
+            className="w-full flex items-center justify-between gap-4 rounded-2xl p-5 text-left transition-transform hover:-translate-y-0.5"
+            style={{ backgroundColor: "#4a3728", color: "#fff" }}
+          >
+            <span className="flex items-center gap-4">
+              <span className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(255,255,255,0.15)" }}>
+                <Wallet className="w-5 h-5" />
+              </span>
+              <span>
+                <span className="block text-base font-bold">Mentor Payouts</span>
+                <span className="block text-xs opacity-80">
+                  {heldPayoutCount == null
+                    ? "Payouts review karne ke liye kholo"
+                    : heldPayoutCount === 0
+                      ? "Abhi koi payout approval ke liye pending nahi"
+                      : `${heldPayoutCount} payout approval ka intezaar kar rahe hain`}
+                </span>
+              </span>
+            </span>
+            {heldPayoutCount != null && heldPayoutCount > 0 && (
+              <span className="px-3 py-1 rounded-full text-sm font-bold" style={{ backgroundColor: "#fff", color: "#4a3728" }}>
+                {heldPayoutCount}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
 
       {activePage === "pending-mentors" && (
         <PendingMentorsView
@@ -347,6 +393,10 @@ export default function MentorshipAdminPage() {
 
       {activePage === "sessions" && <SessionsView />}
 
+      {activePage === "payouts" && (
+        <PayoutsView onHeldCountChange={(count) => setHeldPayoutCount(count)} />
+      )}
+
       {activePage !== "dashboard" &&
         activePage !== "pending-mentors" &&
         activePage !== "all-mentors" &&
@@ -354,11 +404,12 @@ export default function MentorshipAdminPage() {
         activePage !== "reported-reviews" &&
         activePage !== "all-reviews" &&
         activePage !== "reviews" &&
-        activePage !== "sessions" && (
+        activePage !== "sessions" &&
+        activePage !== "payouts" && (
           <p style={{ color: "#8a7a6a" }}>
             {PAGE_META[activePage]?.title} page — agla step mein banega.
           </p>
         )}
     </AdminLayout>
   );
-}
+}

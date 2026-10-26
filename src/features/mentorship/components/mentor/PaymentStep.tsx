@@ -1,13 +1,13 @@
-// components/mentor-profile/booking/PaymentStep.tsx
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
 
 import { ArrowLeft } from "./Icons";
-import { PAY_METHODS, C, btnPrimary } from "../../types/data";
+import { C, btnPrimary } from "../../types/data";
 import type { CalendarData, Service, FormData as BookingFormData } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
 import MentorService from "@/lib/api/mentorship.service";
+import PaymentService, { PaymentCancelledError } from "@/lib/api/payment.service";
 
 interface PaymentStepProps {
     selectedService: Service | null;
@@ -20,72 +20,74 @@ interface PaymentStepProps {
     onPickAnotherSlot?: () => void;
 }
 
-const BANKS: string[] = ["State Bank of India", "HDFC Bank", "ICICI Bank", "Axis Bank", "Punjab National Bank", "Bank of Baroda"];
-const WALLETS: string[] = ["Paytm", "Amazon Pay", "PhonePe", "Mobikwik"];
+type Stage = "idle" | "preparing" | "paying" | "confirming";
+
+// Platform commission (mentor ke hisse se katti hai, user ke total mein add nahi hoti)
+const PLATFORM_FEE_RATE = 0.2;
 
 const PaymentStep: React.FC<PaymentStepProps> = ({
-    selectedService, calendarData, formData, mentorId,
-    onBack, onConfirm, onBookingSuccess, onPickAnotherSlot
+    selectedService,
+    calendarData,
+    mentorId,
+    onBack,
+    onBookingSuccess,
+    onPickAnotherSlot,
 }) => {
-
-    const [paymentMethod, setPaymentMethod] = useState<string>("");
-    const [booking, setBooking] = useState(false);
+    const [stage, setStage] = useState<Stage>("idle");
     const [bookingError, setBookingError] = useState<string | null>(null);
+    // Payment ho chuki hai lekin confirmation fail hui: dobara pay nahi karne dena
+    const [paidReference, setPaidReference] = useState<string | null>(null);
 
-    const paymentMethodMap: Record<string, string> = {
-        upi: "razorpay",
-        netbanking: "razorpay",
-        card: "razorpay",
-        wallet: "wallet",
-    };
-    // Free session ("Free" ya 0): payment UI nahi dikhana, seedha booking karni hai
+    // StrictMode / double click par duplicate request na jaye
+    const lockRef = useRef(false);
+
     const isFree: boolean =
         selectedService?.price === "Free" || Number(selectedService?.price) === 0;
     const price: number = isFree ? 0 : Number(selectedService?.price);
-    const gst: number = Math.round(price * 0.18);
-    const total: number = price + gst;
+    // GST nahi: user se sirf service ka price liya jata hai
+    const total: number = price;
 
     const isGroupSession = selectedService?.type === "GroupSession";
 
-       // StrictMode / double-click par duplicate booking na ho
-       const hasBookedRef = useRef(false);
+    const buildSlotInfo = () => {
+        const { selectedDate, currentMonth, availabilityId, slotTime } = calendarData;
+        const year = currentMonth.getFullYear();
+        const month = String(currentMonth.getMonth() + 1).padStart(2, "0");
+        const day = String(selectedDate).padStart(2, "0");
+        const startTime = slotTime.split(" - ")[0];
+        const scheduledAt = new Date(`${year}-${month}-${day}T${startTime}:00+05:30`).toISOString();
+        return { year, month, day, startTime, availabilityId, slotTime, scheduledAt };
+    };
 
-       const handleBookSession = async (overrideMethod?: string) => {
-           const methodToUse = overrideMethod || paymentMethod;
-           if (!methodToUse) return;
-           if (hasBookedRef.current) return;
-           hasBookedRef.current = true;
-           setBookingError(null);
-           setBooking(true);
+    // Free 1:1 session aur group join request: payment gateway ke bina
+    const handleFreeOrGroupBooking = async () => {
+        if (lockRef.current) return;
+        lockRef.current = true;
+        setBookingError(null);
+        setStage("confirming");
 
         try {
-            const { selectedDate, currentMonth, availabilityId, slotTime } = calendarData;
-            const year = currentMonth.getFullYear();
-            const month = String(currentMonth.getMonth() + 1).padStart(2, "0");
-            const day = String(selectedDate).padStart(2, "0");
-            const startTime = slotTime.split(" - ")[0];
+            const slot = buildSlotInfo();
 
             if (isGroupSession) {
                 await MentorService.joinGroupSessionBySlot(String(selectedService?.id || ""), {
-                    date: `${year}-${month}-${day}`,
-                    startTime,
-                    availabilityId,
+                    date: `${slot.year}-${slot.month}-${slot.day}`,
+                    startTime: slot.startTime,
+                    availabilityId: slot.availabilityId,
                     transactionId: `PAY_${Date.now()}`,
                 });
             } else {
-                const scheduledAt = new Date(`${year}-${month}-${day}T${startTime}:00+05:30`).toISOString();
-
                 await SessionService.bookSession({
                     sessionId: String(selectedService?.id || ""),
                     mentorId,
-                    availabilityId,
-                    slotTime,
-                    scheduledAt,
+                    availabilityId: slot.availabilityId,
+                    slotTime: slot.slotTime,
+                    scheduledAt: slot.scheduledAt,
                     timezone: "Asia/Kolkata",
-                    paymentMethod: paymentMethodMap[methodToUse] || "razorpay",
+                    paymentMethod: "wallet",
                     pricing: {
                         basePrice: price,
-                        platformFee: Math.round(price * 0.15),
+                        platformFee: Math.round(price * PLATFORM_FEE_RATE),
                         totalAmount: total,
                         currency: "INR",
                     },
@@ -94,37 +96,110 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
 
             onBookingSuccess();
         } catch (error: any) {
-            console.error("Booking failed:", error.message);
-            console.error("Full error:", error?.response?.data);
             setBookingError(
                 error?.response?.data?.message || error?.message || "Booking failed. Please try again."
             );
-            hasBookedRef.current = false; // retry allow karo
-            setBooking(false);
+            lockRef.current = false;
+            setStage("idle");
         }
     };
 
-    // Free session: slot select + details ho chuki hain, ab seedha book kar do
+    // Paid 1:1 session: order -> Razorpay Checkout -> server verify + booking
+    const handlePayment = async () => {
+        if (lockRef.current) return;
+        lockRef.current = true;
+        setBookingError(null);
+
+        let razorpayPaymentId: string | null = null;
+
+        try {
+            setStage("preparing");
+            const slot = buildSlotInfo();
+
+            const order = await PaymentService.createSessionOrder({
+                sessionId: String(selectedService?.id || ""),
+                mentorId,
+                availabilityId: slot.availabilityId,
+                slotTime: slot.slotTime,
+                scheduledAt: slot.scheduledAt,
+                timezone: "Asia/Kolkata",
+            });
+
+            // Server ka price screen ke price se alag ho to charge karne se pehle ruk jao
+            if (order.pricing.totalAmount !== total) {
+                throw new Error("The session price has changed. Please go back and select the session again.");
+            }
+
+            setStage("paying");
+            const checkout = await PaymentService.openCheckout(order, {
+                description: selectedService?.title,
+                themeColor: C.dark,
+            });
+            razorpayPaymentId = checkout.razorpay_payment_id;
+
+            setStage("confirming");
+            await PaymentService.verifyPayment({
+                paymentId: order.paymentId,
+                razorpayOrderId: checkout.razorpay_order_id,
+                razorpayPaymentId: checkout.razorpay_payment_id,
+                razorpaySignature: checkout.razorpay_signature,
+            });
+
+            onBookingSuccess();
+        } catch (error: any) {
+            if (error instanceof PaymentCancelledError) {
+                setBookingError(null);
+                lockRef.current = false;
+                setStage("idle");
+                return;
+            }
+
+            const message = error?.message || "Payment failed. Please try again.";
+
+            if (razorpayPaymentId) {
+                // Paisa kat chuka hai: lock rakho taaki dobara payment na ho
+                setPaidReference(razorpayPaymentId);
+                setBookingError(message);
+                setStage("idle");
+                return;
+            }
+
+            setBookingError(message);
+            lockRef.current = false;
+            setStage("idle");
+        }
+    };
+
+    // Free session: slot select + details ho chuki hain, seedha book kar do
     useEffect(() => {
         if (isFree) {
-            handleBookSession("wallet");
+            handleFreeOrGroupBooking();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Free session booking fail hui: error + retry/back dikhao (infinite loader nahi)
-    if (isFree && bookingError && !booking) {
+    const spinnerScreen = (title: string, subtitle: string) => (
+        <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, gap: "20px" }}>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            <div style={{ width: "48px", height: "48px", border: `4px solid ${C.border}`, borderTop: `4px solid ${C.dark}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+            <p style={{ fontSize: "18px", fontWeight: "bold", color: C.dark }}>{title}</p>
+            <p style={{ fontSize: "13px", color: C.mid }}>{subtitle}</p>
+        </div>
+    );
+
+    // Free session booking fail hui: error + retry/back (infinite loader nahi)
+    if (isFree && bookingError && stage === "idle") {
         return (
             <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, gap: "16px", padding: "24px", textAlign: "center" }}>
                 <p style={{ fontSize: "18px", fontWeight: "bold", color: C.dark }}>Could not book your session</p>
                 <div style={{ padding: "12px 16px", borderRadius: "12px", background: "#fee2e2", border: "1px solid #fca5a5", color: "#dc2626", fontSize: "13px", fontWeight: 600, maxWidth: "420px" }}>
-                    ❌ {bookingError}
+                    {bookingError}
                 </div>
                 <div style={{ display: "flex", gap: "12px" }}>
                     <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.border}`, cursor: "pointer", color: C.dark, fontSize: "14px", fontWeight: 600, padding: "10px 20px", borderRadius: "10px" }}>
-                        ← Back
+                        Back
                     </button>
-                    <button onClick={() => handleBookSession("wallet")} style={{ ...btnPrimary, padding: "10px 20px", borderRadius: "10px", fontSize: "14px" }}>
+                    <button onClick={() => handleFreeOrGroupBooking()} style={{ ...btnPrimary, padding: "10px 20px", borderRadius: "10px", fontSize: "14px" }}>
                         Try again
                     </button>
                 </div>
@@ -132,19 +207,21 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
         );
     }
 
-    if (booking || isFree) {
-        return (
-            <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: C.bg, gap: "20px" }}>
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                <div style={{ width: "48px", height: "48px", border: `4px solid ${C.border}`, borderTop: `4px solid ${C.dark}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                <p style={{ fontSize: "18px", fontWeight: "bold", color: C.dark }}>Booking your session...</p>
-                <p style={{ fontSize: "13px", color: C.mid }}>Please wait, do not close this page</p>
-            </div>
+    if (stage === "confirming" || (isFree && !bookingError)) {
+        return spinnerScreen(
+            paidReference || stage === "confirming" ? "Confirming your booking..." : "Booking your session...",
+            "Please wait, do not close this page"
         );
     }
 
-    const inp: React.CSSProperties = { width: "100%", padding: "12px 16px", borderRadius: "12px", border: `1px solid ${C.border}`, background: C.bg, color: C.dark, fontSize: "14px", boxSizing: "border-box", marginBottom: "10px" };
-    const sel: React.CSSProperties = { ...inp, marginBottom: "16px" };
+    const busy = stage === "preparing" || stage === "paying";
+
+    const payLabel = (): string => {
+        if (stage === "preparing") return "Preparing payment...";
+        if (stage === "paying") return "Complete the payment in the Razorpay window";
+        if (isGroupSession) return "Send Join Request";
+        return `Pay \u20B9${total}`;
+    };
 
     return (
         <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px" }}>
@@ -152,10 +229,11 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                 <div style={{ marginBottom: "16px" }}>
                     <button
                         onClick={onBack}
+                        disabled={busy}
                         style={{
                             background: "transparent",
                             border: `1px solid ${C.border}`,
-                            cursor: "pointer",
+                            cursor: busy ? "not-allowed" : "pointer",
                             color: C.dark,
                             display: "inline-flex",
                             alignItems: "center",
@@ -169,43 +247,37 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                         <ArrowLeft /> Back
                     </button>
                 </div>
-                <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>Payment Method</h2>
-                <p style={{ color: C.mid, fontSize: "13px", marginBottom: "24px" }}>Choose your preferred payment method</p>
 
-                {/* Method Cards */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
-                    {PAY_METHODS.map((m) => {
-                        const active: boolean = paymentMethod === m.id;
-                        return (
-                            <div key={m.id} onClick={() => setPaymentMethod(m.id)} style={{ borderRadius: "16px", padding: "24px", cursor: "pointer", textAlign: "center", transition: "all 0.2s", background: active ? C.mid : C.bg, border: active ? "none" : `2px solid ${C.border}`, color: active ? "#fff" : C.dark, boxShadow: active ? "0 8px 30px rgba(122,92,62,0.3)" : "none" }}>
-                                <div style={{ fontSize: "28px", marginBottom: "8px" }}>{m.icon}</div>
-                                <div style={{ fontWeight: "bold", marginBottom: "4px" }}>{m.label}</div>
-                                <div style={{ fontSize: "12px", opacity: 0.8 }}>{m.sub}</div>
-                            </div>
-                        );
-                    })}
-                </div>
+                <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>Payment</h2>
+                <p style={{ color: C.mid, fontSize: "13px", marginBottom: "24px" }}>
+                    Review your order. You can pay using UPI, cards, net banking or wallets in the next step.
+                </p>
 
                 {/* Summary */}
                 <div style={{ borderRadius: "16px", padding: "20px", background: C.bg, border: `1px solid ${C.border}`, marginBottom: "24px" }}>
                     <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "12px" }}>Payment Summary</h3>
-                    {([["Service Fee", `₹${price}`], ["Platform Fee", "₹0"], ["GST (18%)", `₹${gst}`], ["Total", `₹${total}`]] as [string, string][]).map(([k, v], i) => (
-                        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: i === 3 ? "15px" : "13px", fontWeight: i === 3 ? "bold" : "normal", color: C.dark, marginBottom: "5px", borderTop: i === 3 ? `1px solid ${C.border}` : "none", paddingTop: i === 3 ? "8px" : "0", marginTop: i === 3 ? "6px" : "0" }}>
-                            <span style={{ color: i === 3 ? C.dark : C.mid }}>{k}:</span><span>{v}</span>
+                    {([["Session Fee", `\u20B9${price}`], ["Total to pay", `\u20B9${total}`]] as [string, string][]).map(([k, v], i) => (
+                        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: i === 1 ? "16px" : "13px", fontWeight: i === 1 ? "bold" : "normal", color: C.dark, marginBottom: "5px", borderTop: i === 1 ? `1px solid ${C.border}` : "none", paddingTop: i === 1 ? "8px" : "0", marginTop: i === 1 ? "6px" : "0" }}>
+                            <span style={{ color: i === 1 ? C.dark : C.mid }}>{k}:</span><span>{v}</span>
                         </div>
                     ))}
+                    <p style={{ fontSize: "12px", color: C.mid, margin: "10px 0 0" }}>
+                        No extra charges. The price shown is exactly what you pay.
+                    </p>
                 </div>
-
-                {paymentMethod === "upi" && <input type="text" placeholder="Enter UPI ID (e.g. name@upi)" style={inp} />}
-                {paymentMethod === "netbanking" && <select style={sel}><option>Select Your Bank</option>{BANKS.map(b => <option key={b}>{b}</option>)}</select>}
-                {paymentMethod === "card" && <><input type="text" placeholder="Card Number" style={inp} /><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}><input type="text" placeholder="MM/YY" style={{ ...inp, marginBottom: 0 }} /><input type="text" placeholder="CVV" style={{ ...inp, marginBottom: 0 }} /></div></>}
-                {paymentMethod === "wallet" && <select style={sel}><option>Select Wallet</option>{WALLETS.map(w => <option key={w}>{w}</option>)}</select>}
 
                 {bookingError && (
                     <div style={{ padding: "12px 16px", borderRadius: "12px", background: "#fee2e2", border: "1px solid #fca5a5", color: "#dc2626", fontSize: "13px", fontWeight: 600, marginTop: "16px" }}>
-                        ❌ {bookingError}
+                        {bookingError}
                     </div>
                 )}
+
+                {paidReference && (
+                    <div style={{ padding: "12px 16px", borderRadius: "12px", background: C.bg, border: `1px solid ${C.border}`, color: C.dark, fontSize: "13px", marginTop: "12px" }}>
+                        Your payment was received (reference: {paidReference}). Please do not pay again. Check My Bookings or contact support if you need help.
+                    </div>
+                )}
+
                 {bookingError && /already|no longer available/i.test(bookingError) && onPickAnotherSlot && (
                     <button
                         onClick={onPickAnotherSlot}
@@ -214,14 +286,30 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                         Choose another slot
                     </button>
                 )}
-                {paymentMethod && (
-                    <button onClick={() => handleBookSession()} style={{ ...btnPrimary, width: "100%", padding: "16px", borderRadius: "12px", fontSize: "17px", marginTop: "16px" }}>
-                        {isGroupSession ? `Pay ₹${total} & Send Join Request 💳` : `Pay ₹${total} 💳`}
+
+                {!paidReference && (
+                    <button
+                        onClick={isGroupSession ? handleFreeOrGroupBooking : handlePayment}
+                        disabled={busy}
+                        style={{
+                            ...btnPrimary,
+                            width: "100%",
+                            padding: "16px",
+                            borderRadius: "12px",
+                            fontSize: "17px",
+                            marginTop: "16px",
+                            opacity: busy ? 0.7 : 1,
+                            cursor: busy ? "not-allowed" : "pointer",
+                        }}
+                    >
+                        {payLabel()}
                     </button>
                 )}
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "20px", padding: "14px", borderRadius: "12px", background: C.bg, border: `1px solid ${C.border}` }}>
-                    <span style={{ fontSize: "20px" }}>🔒</span>
-                    <p style={{ fontSize: "12px", color: C.mid, margin: 0 }}>Your payment information is secure and encrypted. We never store your card details.</p>
+
+                <div style={{ marginTop: "20px", padding: "14px", borderRadius: "12px", background: C.bg, border: `1px solid ${C.border}` }}>
+                    <p style={{ fontSize: "12px", color: C.mid, margin: 0 }}>
+                        Payments are processed securely by Razorpay. We never store your card details.
+                    </p>
                 </div>
             </div>
         </div>
