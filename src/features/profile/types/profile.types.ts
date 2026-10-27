@@ -1,4 +1,4 @@
-// src/store/features/profile/profile.types.ts
+//src/features/profile/types/profile.types.ts
 
 export interface UserProfileData {
     companyId: string | null;

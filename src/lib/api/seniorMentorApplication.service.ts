@@ -22,13 +22,13 @@ export interface SeniorMentorApplication {
   degree: string;
   fieldOfStudy: string;
   graduationYear: number;
-  currentRole: string;
-  currentCompany: string;
+  currentRole?: string;
+  currentCompany?: string;
   shortBio: string;
   linkedinUrl: string;
   githubUrl?: string;
   portfolioUrl?: string;
-  yearsOfExperience: number;
+  yearsOfExperience?: number;
   experienceLevel: string;
   primaryExpertise: string;
   otherSkills: string[];

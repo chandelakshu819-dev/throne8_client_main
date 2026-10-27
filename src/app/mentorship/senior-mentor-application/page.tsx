@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
-    ArrowLeft,
     Upload,
     CheckCircle2,
     X,
@@ -24,6 +23,11 @@ import SeniorMentorApplicationService, {
     MAX_HELP_AREAS,
 } from "@/lib/api/seniorMentorApplication.service";
 import { syncProfilePhotoToAllRoles } from "@/features/mentorship/utils/syncProfilePhoto";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useProfileData } from "@/features/profile/hooks/useProfileData";
+import { useEducationData } from "@/features/profile/hooks/useEducationData";
+import { useExperienceData } from "@/features/profile/hooks/useExperienceData";
+import { useAboutData } from "@/features/profile/hooks/useAboutData";
 
 // ============================================================================
 // 1. Enums and Select Options (Mirrored from Backend)
@@ -92,7 +96,8 @@ const createSchema = z.object({
     linkedinUrl: z.string().regex(/^https?:\/\/(www\.)?linkedin\.com\/.+/i, "Invalid LinkedIn URL"),
     githubUrl: z.string().regex(/^https?:\/\/(www\.)?github\.com\/.+/i, "Invalid GitHub URL").optional().or(z.literal('')),
     portfolioUrl: z.string().url("Must be a valid URL").optional().or(z.literal('')),
-    yearsOfExperience: z.number({ invalid_type_error: "Must be a valid number" }).min(0).max(50),
+    // Optional: khali chhodne par undefined (register me setValueAs lagaya hai)
+    yearsOfExperience: z.number({ invalid_type_error: "Must be a valid number" }).min(0, "Cannot be negative").max(50, "Cannot exceed 50").optional(),
     experienceLevel: z.nativeEnum(ExperienceLevel, { errorMap: () => ({ message: "Select an experience level" }) }),
     primaryExpertise: z.nativeEnum(Domain, { errorMap: () => ({ message: "Select primary expertise" }) }),
 
@@ -130,6 +135,32 @@ const steps = [
     { id: 5, title: 'Verification', fields: ['resumeFile', 'proofDocumentFile'] },
 ];
 
+// ============================================================================
+// 3. Prefill helpers (profile data se form bharne ke liye)
+// ============================================================================
+
+// Pehla non-empty string value jo given keys me mile
+const pickString = (obj: any, keys: string[]): string => {
+    for (const k of keys) {
+        const v = obj?.[k];
+        if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+    return '';
+};
+
+const getEducationYear = (edu: any): number | undefined => {
+    const direct = edu?.endYear ?? edu?.graduationYear ?? edu?.yearOfCompletion;
+    if (direct) {
+        const n = Number(direct);
+        if (!Number.isNaN(n)) return n;
+    }
+    if (edu?.endDate) {
+        const y = new Date(edu.endDate).getFullYear();
+        if (!Number.isNaN(y)) return y;
+    }
+    return undefined;
+};
+
 export default function SeniorMentorApplicationPage() {
     const router = useRouter();
     const [currentStep, setCurrentStep] = useState(1);
@@ -140,7 +171,7 @@ export default function SeniorMentorApplicationPage() {
     const [successMsg, setSuccessMsg] = useState(false);
     const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-    const { register, handleSubmit, trigger, formState: { errors }, setValue, watch, setError, clearErrors } = useForm<FormValues>({
+    const { register, handleSubmit, trigger, formState: { errors }, setValue, getValues, watch, setError, clearErrors } = useForm<FormValues>({
         resolver: zodResolver(createSchema),
         defaultValues: {
             mentorRole: undefined,
@@ -152,8 +183,29 @@ export default function SeniorMentorApplicationPage() {
         }
     });
 
+    // ---- Profile data (prefill ke liye) ----
+    const { user } = useAuth();
+    const { userProfileData, profileImageUrl, aboutId, fetchUserProfile } = useProfileData();
+    const { educationList, fetchEducationData } = useEducationData();
+    const { experienceList, fetchExperienceData } = useExperienceData();
+    const { aboutData, fetchAboutData } = useAboutData(aboutId);
+
     const selectedHelpAreas = (watch('helpAreas') || []) as MentorshipHelpArea[];
     const isMaxHelpAreas = selectedHelpAreas.length >= MAX_HELP_AREAS;
+
+    // Field tabhi bharo jab user ne khud kuch na likha ho
+    const fillIfEmpty = useCallback((name: keyof FormValues, value: any) => {
+        if (value === undefined || value === null || value === '') return;
+        const current = getValues(name) as any;
+        const isEmpty =
+            current === undefined ||
+            current === null ||
+            current === '' ||
+            (typeof current === 'number' && Number.isNaN(current));
+        if (isEmpty) {
+            setValue(name, value, { shouldDirty: true });
+        }
+    }, [getValues, setValue]);
 
     useEffect(() => {
         if (!toast) return;
@@ -184,6 +236,90 @@ export default function SeniorMentorApplicationPage() {
         };
         fetchStatus();
     }, [router]);
+
+    // ---- Prefill: profile + education fetch (application na ho tabhi) ----
+    useEffect(() => {
+        if (isLoadingInit || !user?.userId) return;
+        fetchUserProfile(user.userId);
+        fetchEducationData();
+    }, [isLoadingInit, user?.userId, fetchUserProfile, fetchEducationData]);
+
+    // Profile aane par: name + experience ids
+    useEffect(() => {
+        if (!userProfileData) return;
+        const fullName = `${userProfileData.firstName || ''} ${userProfileData.lastName || ''}`.trim();
+        fillIfEmpty('fullName', fullName);
+        fetchExperienceData(userProfileData.experienceIds || []);
+    }, [userProfileData, fillIfEmpty, fetchExperienceData]);
+
+    // About fetch (bio ke liye)
+    useEffect(() => {
+        if (aboutId) fetchAboutData();
+    }, [aboutId, fetchAboutData]);
+
+    // Education se college / degree / field / year
+    useEffect(() => {
+        if (!educationList || educationList.length === 0) return;
+        // Sabse latest graduation year wali education lo
+        const latest = [...educationList].sort(
+            (a, b) => (getEducationYear(b) ?? 0) - (getEducationYear(a) ?? 0)
+        )[0];
+
+        fillIfEmpty('college', pickString(latest, ['schoolName', 'school', 'institution', 'institute', 'collegeName', 'college', 'university', 'universityName']));
+        fillIfEmpty('degree', pickString(latest, ['degree', 'degreeName']));
+        fillIfEmpty('fieldOfStudy', pickString(latest, ['fieldOfStudy', 'field', 'major', 'stream', 'specialization']));
+        fillIfEmpty('graduationYear', getEducationYear(latest));
+    }, [educationList, fillIfEmpty]);
+
+    // Experience se current role / company
+    useEffect(() => {
+        if (!experienceList || experienceList.length === 0) return;
+        const current = experienceList.find((e: any) => e.current) || experienceList[0];
+        fillIfEmpty('currentRole', current?.position);
+        fillIfEmpty('currentCompany', current?.company);
+    }, [experienceList, fillIfEmpty]);
+
+    // Experience na ho to profile ki currentPosition
+    useEffect(() => {
+        if (userProfileData?.currentPosition) {
+            fillIfEmpty('currentRole', userProfileData.currentPosition);
+        }
+    }, [userProfileData, fillIfEmpty]);
+
+    // About se short bio
+    useEffect(() => {
+        if (!aboutData) return;
+        fillIfEmpty('shortBio', pickString(aboutData as any, ['summary', 'about', 'aboutText', 'bio', 'description', 'content']));
+    }, [aboutData, fillIfEmpty]);
+
+    // Profile photo (URL se File banao, best-effort)
+    useEffect(() => {
+        if (!profileImageUrl) return;
+        if (getValues('profilePhotoFile') instanceof File) return;
+        let cancelled = false;
+
+        const loadPhoto = async () => {
+            try {
+                const res = await fetch(profileImageUrl);
+                if (!res.ok) return;
+                const blob = await res.blob();
+                const allowed = ['image/jpeg', 'image/jpg', 'image/png'];
+                if (!allowed.includes(blob.type)) return; // webp etc. skip, user khud upload karega
+                if (blob.size > MAX_FILE_SIZE) return;
+                if (cancelled) return;
+                const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+                const file = new File([blob], `profile-photo.${ext}`, { type: blob.type });
+                if (!(getValues('profilePhotoFile') instanceof File)) {
+                    setValue('profilePhotoFile', file as any, { shouldDirty: true });
+                }
+            } catch {
+                // CORS / network fail: user manually upload karega
+            }
+        };
+        loadPhoto();
+
+        return () => { cancelled = true; };
+    }, [profileImageUrl, getValues, setValue]);
 
     const handleNext = async () => {
         if (currentStep === 3) {
@@ -246,11 +382,14 @@ export default function SeniorMentorApplicationPage() {
             if (data.currentRole?.trim()) formData.append('currentRole', data.currentRole.trim());
             if (data.currentCompany?.trim()) formData.append('currentCompany', data.currentCompany.trim());
             formData.append('shortBio', data.shortBio);
-            
+
             formData.append('linkedinUrl', data.linkedinUrl);
             if (data.githubUrl) formData.append('githubUrl', data.githubUrl);
             if (data.portfolioUrl) formData.append('portfolioUrl', data.portfolioUrl);
-            formData.append('yearsOfExperience', data.yearsOfExperience.toString());
+            // Optional: sirf tab bhejo jab user ne bhara ho
+            if (data.yearsOfExperience !== undefined && !Number.isNaN(data.yearsOfExperience)) {
+                formData.append('yearsOfExperience', data.yearsOfExperience.toString());
+            }
             formData.append('experienceLevel', data.experienceLevel);
             formData.append('primaryExpertise', data.primaryExpertise);
 
@@ -269,14 +408,14 @@ export default function SeniorMentorApplicationPage() {
 
             console.log('Submitting senior mentor application...');
             const res = await SeniorMentorApplicationService.apply(formData);
-            
+
             const createdUserId = res?.userId;
             setToast({ type: 'success', message: 'Application submitted successfully!' });
 
             // Senior mentor photo ko account photo me bhi save karo -> Mentee workspace/navbar me wahi photo dikhe
             if (data.profilePhotoFile instanceof File) {
                 await syncProfilePhotoToAllRoles(data.profilePhotoFile, createdUserId, { skip: ['mentor', 'senior'] }).catch(() => undefined);
-            }            
+            }
             if (createdUserId) {
                 router.push(`/mentorship/senior-mentor-profile/${createdUserId}`);
             } else {
@@ -421,13 +560,13 @@ export default function SeniorMentorApplicationPage() {
     }
 
     const profilePhotoFile = watch('profilePhotoFile') as File;
-    const profilePicPreview = profilePhotoFile ? URL.createObjectURL(profilePhotoFile) : '';
+    const profilePicPreview = profilePhotoFile instanceof File ? URL.createObjectURL(profilePhotoFile) : '';
 
     return (
         <div className="min-h-screen bg-[#FAF9F6] flex items-start justify-center p-6 animate-fade-in overflow-y-auto">
             <div className="max-w-3xl w-full my-6 relative">
                 <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="bg-white rounded-[40px] shadow-2xl relative">
-                    
+
                     {/* Close Button */}
                     <button
                         type="button"
@@ -448,7 +587,7 @@ export default function SeniorMentorApplicationPage() {
                             <p className="text-white/80 font-medium">
                                 Empower the community with your advanced industry leadership
                             </p>
-                            
+
                             {/* Progress Bar */}
                             <div className="mt-8">
                                 <div className="flex items-center gap-2 mb-3">
@@ -483,12 +622,12 @@ export default function SeniorMentorApplicationPage() {
                                 <button type="button" onClick={() => setErrorMsg('')} className="p-1 hover:bg-white rounded-full transition"><X className="w-4 h-4" /></button>
                             </div>
                         )}
-                        
+
                         {/* ──────────────── STEP 1: Basic Profile ──────────────── */}
                         {currentStep === 1 && (
                             <div className="space-y-6">
                                 <h3 className="text-2xl font-black text-[#4a3728] mb-6">Profile</h3>
-                                
+
                                 <div>
                                     <label className="block text-sm font-bold text-[#4a3728] mb-3">Which path best describes you? *</label>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -505,7 +644,7 @@ export default function SeniorMentorApplicationPage() {
                                             <span className={`text-base font-black tracking-tight mb-0.5 transition-colors ${watch('mentorRole') === 'senior_mentor' ? 'text-[#4a3728]' : 'text-slate-700'}`}>Senior Mentor</span>
                                             <span className="text-xs text-slate-500 leading-relaxed font-medium">Currently associated with the college as a senior or active student.</span>
                                         </label>
-                                        
+
                                         <label className={`relative flex flex-col p-4 border-2 rounded-2xl cursor-pointer transition-all duration-300 group overflow-hidden ${watch('mentorRole') === 'alumni' ? 'border-[#4a3728] bg-gradient-to-br from-[#f8f6f4] to-white shadow-md transform -translate-y-1' : 'border-[#ece7e2] bg-white hover:border-[#8a7a6a] hover:shadow-sm'}`}>
                                             <input type="radio" value="alumni" {...register('mentorRole')} className="absolute opacity-0" />
                                             {watch('mentorRole') === 'alumni' && (
@@ -633,8 +772,16 @@ export default function SeniorMentorApplicationPage() {
                                         {errors.portfolioUrl && <p className="text-red-500 text-xs mt-1">{errors.portfolioUrl.message}</p>}
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Years of Experience *</label>
-                                        <input type="number" {...register('yearsOfExperience', { valueAsNumber: true })} className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Years of Experience <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            step="any"
+                                            {...register('yearsOfExperience', {
+                                                setValueAs: (v) => (v === '' || v === null || v === undefined ? undefined : Number(v)),
+                                            })}
+                                            className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900"
+                                        />
                                         {errors.yearsOfExperience && <p className="text-red-500 text-xs mt-1">{errors.yearsOfExperience.message}</p>}
                                     </div>
                                     <div>
@@ -667,7 +814,7 @@ export default function SeniorMentorApplicationPage() {
                         {currentStep === 3 && (
                             <div className="space-y-8">
                                 <h3 className="text-2xl font-black text-[#4a3728] mb-6">Skills & Mentorship Areas</h3>
-                                
+
                                 <TagInput fieldName="technologies" label="Technologies *" placeholder="e.g. React, Node.js" />
                                 <TagInput fieldName="otherSkills" label="Other Skills *" placeholder="e.g. Agile, System Design" />
                                 <TagInput fieldName="achievements" label="Achievements" placeholder="e.g. Outstanding Engineer Award 2023" />
@@ -721,8 +868,8 @@ export default function SeniorMentorApplicationPage() {
                                                             : 'border-[#ece7e2] hover:border-[#4a3728] cursor-pointer bg-white'
                                                     }`}
                                                 >
-                                                    <input 
-                                                        type="checkbox" 
+                                                    <input
+                                                        type="checkbox"
                                                         value={area}
                                                         disabled={disabled}
                                                         {...register('helpAreas')}
@@ -747,7 +894,7 @@ export default function SeniorMentorApplicationPage() {
                         {currentStep === 4 && (
                             <div className="space-y-6">
                                 <h3 className="text-2xl font-black text-[#4a3728] mb-6">Motivation</h3>
-                                
+
                                 <div>
                                     <label className="block text-sm font-bold text-[#4a3728] mb-2">Why do you want to become a Senior Mentor? *</label>
                                     <textarea {...register('motivation')} rows={6} placeholder="Share your motivation..." className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900 resize-none"></textarea>
@@ -765,10 +912,10 @@ export default function SeniorMentorApplicationPage() {
                         {currentStep === 5 && (
                             <div className="space-y-6">
                                 <h3 className="text-2xl font-black text-[#4a3728] mb-6">Verification Documents</h3>
-                                
+
                                 <FileInput fieldName="resumeFile" label="Resume / CV *" accept=".pdf,.doc,.docx" helpText="PDF, DOC, DOCX • Max 5MB" icon={FileText} />
                                 <FileInput fieldName="proofDocumentFile" label="Proof of Experience *" accept=".pdf,.jpg,.jpeg,.png" helpText="PDF, JPG, PNG • Max 5MB" icon={FileText} />
-                                
+
                                 <div className="bg-[#f8f6f4] rounded-2xl p-5 border border-[#ece7e2] flex items-start gap-4 mt-6">
                                     <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center flex-shrink-0 text-[#4a3728] font-bold text-sm shadow-sm">!</div>
                                     <p className="text-xs text-[#5c4a3a] leading-relaxed font-semibold">By submitting, you agree to our mentorship guidelines. All submitted documents are strictly used for verification purposes and will be handled securely.</p>
