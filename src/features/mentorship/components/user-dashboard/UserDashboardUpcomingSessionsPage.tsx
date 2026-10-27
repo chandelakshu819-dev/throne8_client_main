@@ -183,7 +183,8 @@ export function getSessionTimeWindow(session: Session): {
   return { startMs, endMs, durationMinutes };
 }
 
-const TERMINAL_STATUSES = new Set(["cancelled", "completed", "refunded", "no_show"]);
+
+const TERMINAL_STATUSES = new Set(["cancelled", "completed", "refunded", "no_show", "missed"]);
 const INCOMING_EARLY_JOIN_WINDOW_MS = 15 * 60 * 1000; // 15 mins before scheduled start
 
 /**
@@ -668,6 +669,8 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
       alert(err instanceof Error ? err.message : "Failed to reschedule session.");
     }
   };
+
+  const navigateToBookings = () => {
     if (setActivePage) {
       setActivePage("my-bookings");
     } else {
@@ -694,10 +697,12 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
           onContinue={handleMissedRescheduleConfirm}
         />
       </div>
-    );
-  }
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center animate-fadeIn max-w-5xl space-y-4">
+       );
+      }
+    
+      if (loading) {
+        return (
+          <div className="flex flex-col items-center justify-center py-20 text-center animate-fadeIn max-w-5xl space-y-4">
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: COLORS.accent }} />
         <p className="text-sm font-medium" style={{ color: COLORS.muted }}>
           Loading your upcoming sessions...
@@ -960,7 +965,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
             return (
               <div
                 id={sid ? `session-card-${sid}` : undefined}
-                
+
                 key={`${sid ?? idx}-${bookingId ?? idx}`}
                 className={`flex flex-col p-4 md:p-5 rounded-2xl transition-all duration-300 ${
                   isTarget

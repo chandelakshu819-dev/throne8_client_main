@@ -26,7 +26,7 @@ interface BookableSlot {
     endTime: string;
     isBooked?: boolean;
     isBlocked?: boolean;
-    status?: 'available' | 'booked' | 'blocked' | 'full' | 'joinable';
+    status?: 'available' | 'booked' | 'blocked' | 'full' | 'joinable' | 'past';
 }
 
 const toMinutes = (t: string): number => {
@@ -151,11 +151,28 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
         const d2 = String(selectedDate || 0).padStart(2, "0");
         const curDateStr = `${y2}-${m2}-${d2}`;
 
-        return buildSlotsForDuration(daySlots, serviceDuration, seniorBookedSlots, curDateStr);
+        const base = buildSlotsForDuration(daySlots, serviceDuration, seniorBookedSlots, curDateStr);
+
+        // Aaj ki date par jo slot start ho chuka hai, use "PAST" mark karo
+        const now = new Date();
+        const isToday =
+            year === now.getFullYear() &&
+            month === now.getMonth() &&
+            selectedDate === now.getDate();
+        if (!isToday) return base;
+
+        const nowMins = now.getHours() * 60 + now.getMinutes();
+        return base.map((s) =>
+            !s.isBooked && !s.isBlocked && toMinutes(s.startTime) <= nowMins
+                ? { ...s, status: 'past' as const }
+                : s
+        );
     }, [isGroupTemplate, groupSlots, daySlots, serviceDuration, seniorBookedSlots, selectedDate, year, month]);
 
+
+
     const availableSlotsCount = useMemo(() => {
-        return allGeneratedSlots.filter((s) => !s.isBooked && !s.isBlocked && s.status !== 'full').length;
+        return allGeneratedSlots.filter((s) => !s.isBooked && !s.isBlocked && s.status !== 'full' && s.status !== 'past').length;
     }, [allGeneratedSlots]);
 
     const freeWindows = useMemo(() => {
