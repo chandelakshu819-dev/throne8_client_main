@@ -467,14 +467,11 @@ export default function SessionRoomPage() {
   // Mentee: once the session has ended, auto-redirect to Reviews & Feedback after 5s
   const shouldAutoRedirect = (!!roomEnded || endedByCheck) && isMentee && !redirectCancelled;
 
-  useEffect(() => {
-    if (!shouldAutoRedirect) return;
-    setRedirectCountdown(5);
-    const t = setInterval(() => {
-      setRedirectCountdown((c) => (c <= 1 ? 0 : c - 1));
-    }, 1000);
-    return () => clearInterval(t);
-  }, [shouldAutoRedirect]);
+    // Mentor ne End kiya -> mentee ko turant review form par bhejo
+    useEffect(() => {
+      if (!shouldAutoRedirect) return;
+      goToReviews();
+    }, [shouldAutoRedirect, goToReviews]);
 
   useEffect(() => {
     if (shouldAutoRedirect && redirectCountdown === 0) goToReviews();
@@ -723,7 +720,7 @@ export default function SessionRoomPage() {
           <p style={{ fontSize: 13, opacity: 0.85, margin: 0 }}>
             {redirectCancelled
               ? 'How was your session? Your feedback helps other mentees.'
-              : `Taking you to Reviews & Feedback in ${redirectCountdown}s...`}
+              : 'Taking you to Reviews & Feedback...'}
           </p>
         )}
         <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -1014,7 +1011,7 @@ export default function SessionRoomPage() {
         {/* End Call */}
         <button
           onClick={handleEndCall}
-          title="End call"
+          title="Leave call"
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
             borderRadius: 9999, padding: '10px 20px',
@@ -1023,7 +1020,7 @@ export default function SessionRoomPage() {
           }}
         >
           <PhoneOff size={18} />
-          <span>End Call</span>
+          <span>Leave</span>
         </button>
       </div>
 

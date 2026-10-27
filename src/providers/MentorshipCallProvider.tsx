@@ -27,6 +27,9 @@ export default function MentorshipCallProvider({ children }: { children: React.R
   const audioCtxRef = useRef<AudioContext | null>(null);
   const ringIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSessionIdRef = useRef<string | null>(null);
+  const lastEndedKeyRef = useRef<string | null>(null);
+
+
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -96,14 +99,38 @@ export default function MentorshipCallProvider({ children }: { children: React.R
       startRing();
     };
 
-    socket.on('session:started', handleSessionStarted);
-    socket.on('mentorship:session:started', handleSessionStarted);
+        // Mentor ne session End kiya -> mentee ko turant review form par bhejo
+        const handleSessionEnded = (payload: any) => {
+          if (!payload?.sessionId) return;
+          if (String(payload.status || '').toLowerCase() !== 'completed') return;
+          if (payload.endedBy && payload.endedBy === user.userId) return; // mentor ne khud end kiya, usse redirect nahi
+    
+          const key = `${payload.sessionId}:${payload.bookingId || ''}`;
+          if (lastEndedKeyRef.current === key) return;
+          lastEndedKeyRef.current = key;
+    
+          // Room page par ho to wahi apna redirect karega
+          if (pathname?.includes('/mentorship/session-room') && pathname.includes(payload.sessionId)) return;
+    
+          stopRing();
+          setIncoming(null);
+          router.push(
+            `/mentorship/user-dashboard/${user.userId}?tab=reviews&review=${encodeURIComponent(payload.sessionId)}`
+          );
+        };
+    
+        socket.on('session:started', handleSessionStarted);
+        socket.on('mentorship:session:started', handleSessionStarted);
+        socket.on('session:ended', handleSessionEnded);
+    
+        return () => {
+          socket.off('session:started', handleSessionStarted);
+          socket.off('mentorship:session:started', handleSessionStarted);
+          socket.off('session:ended', handleSessionEnded);
+        };
+      }, [isAuthenticated, user?.userId, pathname, startRing, stopRing, router]);
 
-    return () => {
-      socket.off('session:started', handleSessionStarted);
-      socket.off('mentorship:session:started', handleSessionStarted);
-    };
-  }, [isAuthenticated, user?.userId, pathname, startRing]);
+      
 
   const handleJoin = async () => {
     if (!incoming) return;

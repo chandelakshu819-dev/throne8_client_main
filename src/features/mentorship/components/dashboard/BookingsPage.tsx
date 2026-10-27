@@ -148,9 +148,10 @@ type EffectiveStatus =
   | "in_progress"
   | "completed"
   | "cancelled"
-  | "missed";
+  | "missed"
+  | "ended"; // slot ka time nikal gaya, mentor ne End nahi dabaya, backend ka faisla baaki
 
-// Ek hi jagah decide hota hai ki row asal me kis haal me hai (DB status + current time).
+// Ek hi jagah decide hota haiki row asal me kis haal me hai (DB status + current time).
 // Saare tabs, badges aur buttons isi se chalte hain, isliye "Ended + End Session" jaisa confusion nahi hoga.
 const getEffectiveStatus = (b: MentorBookingRow, nowMs: number): EffectiveStatus => {
   if (b.status === "completed") return "completed";
@@ -166,10 +167,12 @@ const getEffectiveStatus = (b: MentorBookingRow, nowMs: number): EffectiveStatus
 
 
 
-  if (b.status === "in_progress") {
-    // Live tha, ab time + grace nikal gaya -> auto-complete (backend cron bhi yahi karega)
-    return endMs !== null && nowMs > endMs + ENDED_GRACE_MINUTES * 60000 ? "completed" : "in_progress";
-  }
+    if (b.status === "in_progress") {
+      // Slot chal raha hai -> In Progress. Slot khatam par mentor ne End nahi dabaya -> Ended.
+      // completed / no_show ka faisla sirf backend karta hai, frontend nahi.
+      return endMs !== null && nowMs >= endMs ? "ended" : "in_progress";
+    }
+
 
   // Pending request slot start par hi expire (accept sirf start time tak)
   if (b.status === "pending") {
@@ -444,7 +447,11 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       completed: [],
       cancelled: [],
       missed: [],
+      ended: [],
     };
+
+
+
     allBookings.forEach((b) => out[getEffectiveStatus(b, nowMs)].push(b));
     return out;
   }, [allBookings, nowMs]);
@@ -455,7 +462,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   const completedTabBookings = buckets.completed;
   const missedBookings = buckets.missed;
   // All Active = sirf wahi jo abhi actionable hain (past kuch nahi)
-  const activeBookings = [...buckets.pending, ...buckets.upcoming, ...buckets.in_progress].sort(byNearestFirst);
+  const activeBookings = [...buckets.pending, ...buckets.upcoming, ...buckets.in_progress, ...buckets.ended].sort(byNearestFirst);
   // History = poora past (completed + missed + cancelled), latest pehle
   const historyBookings = [...buckets.completed, ...buckets.missed, ...buckets.cancelled].sort(byLatestFirst);
 
@@ -1221,7 +1228,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                             )}
 
                             {/* In Progress */}
-                            {eff === "in_progress" && (
+                            {(eff === "in_progress" || eff === "ended") && (
                               <div className="flex items-center gap-1.5">
                                 {booking.isGroupSession && booking.meetingUrl && (
                                   <button

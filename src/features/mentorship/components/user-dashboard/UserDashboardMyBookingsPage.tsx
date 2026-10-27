@@ -24,7 +24,8 @@ type MyBookingRow = {
     | "in_progress"
     | "completed"
     | "cancelled"
-    | "missed";
+    | "missed"
+    | "no_show";
     duration?: number;
     amount?: number;
     isGroupSession: boolean;
@@ -50,6 +51,7 @@ const statusBadge: Record<string, { bg: string; fg: string; label: string }> = {
   completed: { bg: "#f3e8ff", fg: "#7c3aed", label: "Completed" },
   cancelled: { bg: "#fee2e2", fg: "#dc2626", label: "Cancelled" },
   missed: { bg: "#f3f4f6", fg: "#6b7280", label: "Missed" },
+  no_show: { bg: "#fee2e2", fg: "#b91c1c", label: "No Show" },
 };
 
 const ENDED_GRACE_MINUTES = 15; // mentor page ke saath same rakhna
@@ -88,10 +90,12 @@ function computeDynamicStatus(
   const endTime = startTime + minutes * 60 * 1000;
   const now = Date.now();
 
-  // Live tha, time + grace nikal gaya -> auto-complete
-  if (baseStatus === "in_progress") {
-    return now > endTime + ENDED_GRACE_MINUTES * 60 * 1000 ? "completed" : "in_progress";
+   // completed sirf tab jab mentor End Session dabaye (backend status). Frontend khud complete nahi karta.
+   if (baseStatus === "in_progress") {
+    return "in_progress";
   }
+
+  
     // 1:1: start+15 min ke baad mentor start nahi kar sakta -> Missed. Group: slot end.
      // Pending 1:1 request slot start par expire; baaki start + 15 min par
      const missedAfter = isGroup
@@ -101,7 +105,7 @@ function computeDynamicStatus(
        : startTime + 15 * 60 * 1000;
    if (now > missedAfter) return "missed";
 
-   
+
 
   if (baseStatus === "pending") return "pending";
   if (now >= startTime) return "in_progress"; // time chal raha hai -> Join dikhao

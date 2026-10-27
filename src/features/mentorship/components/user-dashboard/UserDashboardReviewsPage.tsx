@@ -162,6 +162,11 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
     }
 
     const known = sessionMap.get(reviewTargetId);
+    // Sirf completed session ka review form kholo (no_show / missed ka nahi)
+    if (known && !["completed", "done"].includes((known.status || "").toLowerCase())) {
+      setActiveTab("pending");
+      return;
+    }
     if (known?.mentorId) {
       setActiveTab("pending");
       setReviewModalSession(known);
