@@ -364,7 +364,17 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
       setError(null);
       const res = await SessionService.getAllSessions({ role: "mentee", limit: 100 });
       let fetchedSessions = (res.data || []) as Session[];
+      console.log("DEBUG currentUserId:", currentUserId, "| user:", user, "| authUser:", authUser);
+      console.log(
+        "DEBUG bookings:",
+        fetchedSessions.map((x: any) => ({
+          sid: x.sessionId,
+          bookings: (x.bookings || []).map((b: any) => ({ status: b.status, menteeId: b.menteeId, bookedBy: b.bookedBy })),
+        }))
+      );
 
+
+      
       // If a targetSessionId was specified by the Incoming Session flow but is not in
       // the list (e.g. status changed or pagination), fetch the real session from the backend:
       if (targetSessionId) {
