@@ -15,6 +15,8 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import { joinMentorshipSession } from "@/features/mentorship/services/sessionJoin.service";
 import MentorService from "@/lib/api/mentorship.service";
 import FindMentorModal from "@/features/mentorship/components/sections/FindMentorModal";
+import CalendarStep from "@/features/mentorship/components/mentor/CalendarStep";
+import type { CalendarData } from "@/features/mentorship/types/types";
 
 const COLORS = {
   ink: "#4a3728",
@@ -266,7 +268,18 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
   const [error, setError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<"my-sessions" | "upcoming">("my-sessions");
-  const [filterType, setFilterType] = useState<"all" | "live">("all");
+  const [filterType, setFilterType] = useState<"all" | "live" | "missed">("all");
+  const [missedSessions, setMissedSessions] = useState<Session[]>([]);
+  const [missedBusyId, setMissedBusyId] = useState<string | null>(null);
+  const [missedReschedule, setMissedReschedule] = useState<{
+    sessionId: string;
+    bookingId: string;
+    mentorId: string;
+    title: string;
+    duration: number;
+  } | null>(null);
+  
+  
 
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [isFindMentorOpen, setIsFindMentorOpen] = useState(false);
@@ -460,7 +473,14 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
           return timeA - timeB;
         });
 
-      setUpcoming(validUpcoming);
+
+        setUpcoming(validUpcoming);
+
+        // Mentor ne session start nahi kiya -> missed bookings (refund / reschedule ke liye)
+        const missedList = menteeSessionItems
+          .filter((s) => (s.status || "").toLowerCase().trim() === "missed")
+          .sort((a, b) => new Date(b.scheduledAt || 0).getTime() - new Date(a.scheduledAt || 0).getTime());
+        setMissedSessions(missedList);
     } catch (err: unknown) {
       console.error("Failed to fetch upcoming sessions", err);
       const errorMessage = err instanceof Error ? err.message : "Unable to load upcoming sessions.";
@@ -587,7 +607,67 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
     }
   };
 
-  const navigateToBookings = () => {
+  
+
+  const handleMissedRefund = async (s: Session) => {
+    const sid = s.sessionId ?? s._id;
+    const bId = s.bookingId;
+    if (!sid || !bId) {
+      alert("Booking ID missing. Please refresh and try again.");
+      return;
+    }
+    if (!window.confirm("Request a full refund for this missed session?")) return;
+    try {
+      setMissedBusyId(bId);
+      await SessionService.refundMissedSession(sid, bId);
+      alert("Refund requested. You will get a notification and the amount arrives in 3-5 business days.");
+      setMissedSessions((prev) => prev.filter((x) => x.bookingId !== bId));
+      await fetchUpcoming();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to request refund.");
+    } finally {
+      setMissedBusyId(null);
+    }
+  };
+
+  const handleMissedRescheduleOpen = (s: Session) => {
+    const sid = s.sessionId ?? s._id;
+    const mentorId = (s as any).mentorId;
+    if (!sid || !s.bookingId || !mentorId) {
+      alert("Session details missing. Please refresh and try again.");
+      return;
+    }
+    setMissedReschedule({
+      sessionId: sid,
+      bookingId: s.bookingId,
+      mentorId,
+      title: s.title || "Mentorship Session",
+      duration: Number(s.duration) || 30,
+    });
+  };
+
+  const handleMissedRescheduleConfirm = async (d: CalendarData) => {
+    if (!missedReschedule) return;
+    try {
+      const year = d.currentMonth.getFullYear();
+      const month = String(d.currentMonth.getMonth() + 1).padStart(2, "0");
+      const day = String(d.selectedDate).padStart(2, "0");
+      const startTime = d.slotTime.split(" - ")[0];
+      const iso = new Date(`${year}-${month}-${day}T${startTime}:00+05:30`).toISOString();
+      await SessionService.rescheduleSession(
+        missedReschedule.sessionId,
+        iso,
+        "Rescheduled after missed session",
+        missedReschedule.bookingId
+      );
+      alert("Session rescheduled successfully.");
+      setMissedReschedule(null);
+      setFilterType("all");
+      await fetchUpcoming();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to reschedule session.");
+    }
+  };
     if (setActivePage) {
       setActivePage("my-bookings");
     } else {
@@ -595,7 +675,27 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
     }
   };
 
-  if (loading) {
+
+
+  if (missedReschedule) {
+    return (
+      <div>
+        <CalendarStep
+          mentorId={missedReschedule.mentorId}
+          selectedService={{
+            id: missedReschedule.sessionId,
+            type: "1:1 Call",
+            title: missedReschedule.title,
+            duration: String(missedReschedule.duration),
+            originalPrice: null,
+            price: "Free",
+          }}
+          onBack={() => setMissedReschedule(null)}
+          onContinue={handleMissedRescheduleConfirm}
+        />
+      </div>
+    );
+  }
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center animate-fadeIn max-w-5xl space-y-4">
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: COLORS.accent }} />
@@ -622,7 +722,8 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
     );
   }
 
-  const filteredSessions = upcoming.filter(s => {
+
+  const filteredSessions = (activeTab === "my-sessions" && filterType === "missed") ? missedSessions : upcoming.filter(s => {
     const sid = s.sessionId ?? s._id;
     const tempStatus = evaluateSessionLiveStatus(s, false, currentTime);
     const isTarget = Boolean(targetSessionId && sid === targetSessionId && !tempStatus.isPast);
@@ -724,7 +825,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
       {/* MY SESSIONS FILTERS */}
       {activeTab === "my-sessions" && (
         <div className="flex items-center gap-2">
-          {["all", "live"].map(f => (
+                    {["all", "live", "missed"].map(f => (
             <button
               key={f}
               onClick={() => setFilterType(f as any)}
@@ -734,7 +835,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
                   : "bg-white text-[#8a7a6a] border-[#e0d8cf] hover:border-[#c9a87c]"
               }`}
             >
-              {f === "live" ? "Live Now" : f}
+              {f === "live" ? "Live Now" : f === "missed" ? `Missed (${missedSessions.length})` : f}
             </button>
           ))}
         </div>
@@ -752,15 +853,24 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
             <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>
               {activeTab === "upcoming"
                 ? "No upcoming sessions"
+
+                : filterType === "missed"
+                ? "No missed sessions"
                 : filterType === "live"
                 ? "No live sessions right now"
+
+
                 : "No upcoming sessions"}
             </h3>
             <p className="text-sm mt-1" style={{ color: COLORS.muted }}>
               {activeTab === "upcoming"
                 ? "You don't have any upcoming sessions scheduled at the moment."
+
+                : filterType === "missed"
+                ? "Sessions your mentor did not start will appear here."
                 : filterType === "live"
                 ? "There are no sessions currently live."
+
                 : "You don't have any upcoming sessions scheduled at the moment."}
             </p>
           </div>
@@ -787,9 +897,70 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
             const isTarget = Boolean(targetSessionId && sid === targetSessionId && !tempStatus.isPast);
             const { isLive, canJoin, isPast } = evaluateSessionLiveStatus(s, isTarget, currentTime);
 
+            if ((s.status || "").toLowerCase() === "missed") {
+              const amount = Number((s.bookings?.[0] as any)?.pricing?.totalAmount ?? (s as any).pricing?.totalAmount ?? 0);
+              const busy = missedBusyId === bookingId;
+              return (
+                <div
+                  key={`missed-${sid ?? idx}-${bookingId ?? idx}`}
+                  className="flex flex-col md:flex-row items-start md:items-center gap-4 p-4 md:p-5 rounded-2xl bg-white"
+                  style={{ border: `1px solid ${COLORS.hairline}` }}
+                >
+                  <div className="flex items-center gap-3 w-full md:w-[28%] shrink-0">
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-base font-bold text-white"
+                      style={{ backgroundColor: COLORS.ink }}
+                    >
+                      {initialsFrom(name)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold truncate" style={{ color: COLORS.ink }}>{name}</p>
+                      <span className="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider bg-gray-100 text-gray-600">
+                        Missed
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="w-full md:flex-1 space-y-1 md:px-4 md:border-l" style={{ borderColor: COLORS.hairline }}>
+                    <p className="text-sm font-bold line-clamp-2" style={{ color: COLORS.ink }}>{s.title || "Mentorship Session"}</p>
+                    <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
+                      <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+                      <span>{formatDateStr(s.scheduledAt || s.startTime)} · {formatTimeStr(s.scheduledAt || s.startTime)}</span>
+                    </div>
+                    <p className="text-xs" style={{ color: COLORS.muted }}>
+                      The mentor did not start this session. Reschedule it{amount > 0 ? " or request a full refund" : ""}.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2 shrink-0 w-full md:w-auto">
+                    <button
+                      onClick={() => handleMissedRescheduleOpen(s)}
+                      disabled={busy}
+                      className="flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50"
+                      style={{ backgroundColor: COLORS.ink }}
+                    >
+                      Reschedule
+                    </button>
+                    {amount > 0 && (
+                      <button
+                        onClick={() => handleMissedRefund(s)}
+                        disabled={busy}
+                        className="flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        style={{ border: `1px solid ${COLORS.danger}`, color: COLORS.danger }}
+                      >
+                        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                        Refund ₹{amount}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <div
                 id={sid ? `session-card-${sid}` : undefined}
+                
                 key={`${sid ?? idx}-${bookingId ?? idx}`}
                 className={`flex flex-col p-4 md:p-5 rounded-2xl transition-all duration-300 ${
                   isTarget
