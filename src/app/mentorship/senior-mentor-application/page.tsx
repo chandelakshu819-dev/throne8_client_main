@@ -83,8 +83,9 @@ const createSchema = z.object({
     degree: z.string().min(1, "Degree is required").max(100),
     fieldOfStudy: z.string().min(1, "Field of study is required").max(100),
     graduationYear: z.number({ invalid_type_error: "Must be a valid year" }).min(1980).max(new Date().getFullYear() + 10),
-    currentRole: z.string().min(1, "Current role is required").max(100),
-    currentCompany: z.string().min(1, "Current company is required").max(100),
+    // Optional: sirf unke liye jinke paas current role / company hai
+    currentRole: z.string().max(100, "Current role cannot exceed 100 characters").optional().or(z.literal('')),
+    currentCompany: z.string().max(100, "Current company cannot exceed 100 characters").optional().or(z.literal('')),
     shortBio: z.string().min(50, "Bio must be at least 50 characters").max(1000),
 
     // Step 2: Professional
@@ -213,7 +214,7 @@ export default function SeniorMentorApplicationPage() {
     };
 
     const onInvalid = (formErrors: any) => {
-        console.error('❌ [SENIOR_MENTOR_APP] Validation errors on submit:', formErrors);
+        console.error('[SENIOR_MENTOR_APP] Validation errors on submit:', formErrors);
         const errorKeys = Object.keys(formErrors);
         if (errorKeys.length > 0) {
             const firstKey = errorKeys[0];
@@ -241,8 +242,9 @@ export default function SeniorMentorApplicationPage() {
             formData.append('degree', data.degree);
             formData.append('fieldOfStudy', data.fieldOfStudy);
             formData.append('graduationYear', data.graduationYear.toString());
-            formData.append('currentRole', data.currentRole);
-            formData.append('currentCompany', data.currentCompany);
+            // Optional: sirf tab bhejo jab user ne bhara ho
+            if (data.currentRole?.trim()) formData.append('currentRole', data.currentRole.trim());
+            if (data.currentCompany?.trim()) formData.append('currentCompany', data.currentCompany.trim());
             formData.append('shortBio', data.shortBio);
             
             formData.append('linkedinUrl', data.linkedinUrl);
@@ -265,7 +267,7 @@ export default function SeniorMentorApplicationPage() {
             if (data.resumeFile) formData.append('resume', data.resumeFile);
             if (data.proofDocumentFile) formData.append('proofDocument', data.proofDocumentFile);
 
-            console.log('📝 Submitting senior mentor application...');
+            console.log('Submitting senior mentor application...');
             const res = await SeniorMentorApplicationService.apply(formData);
             
             const createdUserId = res?.userId;
@@ -282,7 +284,7 @@ export default function SeniorMentorApplicationPage() {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
         } catch (error: any) {
-            console.error('❌ [SENIOR_MENTOR_APP] Application submit failed:', error);
+            console.error('[SENIOR_MENTOR_APP] Application submit failed:', error);
             let reason = 'Failed to submit application. Please try again.';
             const resp = error?.response?.data;
             if (error?.response?.status === 409) {
@@ -592,12 +594,12 @@ export default function SeniorMentorApplicationPage() {
                                         {errors.fieldOfStudy && <p className="text-red-500 text-xs mt-1">{errors.fieldOfStudy.message}</p>}
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Role *</label>
+                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Role <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
                                         <input type="text" {...register('currentRole')} placeholder="e.g. Software Engineer" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.currentRole && <p className="text-red-500 text-xs mt-1">{errors.currentRole.message}</p>}
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Company *</label>
+                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Company <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
                                         <input type="text" {...register('currentCompany')} className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.currentCompany && <p className="text-red-500 text-xs mt-1">{errors.currentCompany.message}</p>}
                                     </div>
