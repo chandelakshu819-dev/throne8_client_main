@@ -255,6 +255,20 @@ export function evaluateSessionLiveStatus(
   };
 }
 
+
+
+// Backend jaisa hi rule: pending = slot start par expire, confirmed/rescheduled = start + 15 min
+const MISSED_START_GRACE_MS = 15 * 60 * 1000;
+function isOverdueMissed(s: Session): boolean {
+  const st = (s.status || "").toLowerCase().trim();
+  if (st === "missed") return true;
+  const startMs = new Date(s.scheduledAt || s.startTime || 0).getTime();
+  if (!startMs || Number.isNaN(startMs)) return false;
+  if (st === "pending") return Date.now() > startMs;
+  if (st === "confirmed" || st === "rescheduled") return Date.now() > startMs + MISSED_START_GRACE_MS;
+  return false;
+}
+
 export default function UserDashboardUpcomingSessionsPage({ setActivePage, user }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -361,7 +375,6 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
 
   const fetchUpcoming = React.useCallback(async () => {
     try {
-      setLoading(true);
       setError(null);
       const res = await SessionService.getAllSessions({ role: "mentee", limit: 100 });
       let fetchedSessions = (res.data || []) as Session[];
@@ -447,6 +460,10 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
             ? (s.bookings[0].status as string).toLowerCase().trim()
             : "";
 
+
+                      // Missed booking sirf Missed tab mein dikhni chahiye
+          if (isOverdueMissed(s)) return false;
+
           // Exclude cancelled/completed/refunded/no_show unless specifically targeted
           if (!isTarget && (excludedStatuses.has(sessionStatus) || excludedStatuses.has(bookingStatus))) {
             return false;
@@ -490,7 +507,8 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
 
         // Mentor ne session start nahi kiya -> missed bookings (refund / reschedule ke liye)
         const missedList = menteeSessionItems
-          .filter((s) => (s.status || "").toLowerCase().trim() === "missed")
+        .filter((s) => isOverdueMissed(s))
+        .map((s) => ({ ...s, status: "missed" }))
           .sort((a, b) => new Date(b.scheduledAt || 0).getTime() - new Date(a.scheduledAt || 0).getTime());
         setMissedSessions(missedList);
     } catch (err: unknown) {
@@ -504,6 +522,8 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
 
   useEffect(() => {
     fetchUpcoming();
+    const t = setInterval(fetchUpcoming, 60 * 1000);
+    return () => clearInterval(t);
   }, [fetchUpcoming]);
 
   // UX: Automatically locate and scroll the target session card into view
@@ -927,55 +947,88 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
               return (
                 <div
                   key={`missed-${sid ?? idx}-${bookingId ?? idx}`}
-                  className="flex flex-col md:flex-row items-start md:items-center gap-4 p-4 md:p-5 rounded-2xl bg-white"
+                  className="flex flex-col p-4 md:p-5 rounded-2xl bg-white hover:shadow-sm transition-all duration-300"
                   style={{ border: `1px solid ${COLORS.hairline}` }}
                 >
-                  <div className="flex items-center gap-3 w-full md:w-[28%] shrink-0">
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-base font-bold text-white"
-                      style={{ backgroundColor: COLORS.ink }}
-                    >
-                      {initialsFrom(name)}
+                  <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                    {/* 1. Mentor Info */}
+                    <div className="flex items-center gap-3 w-full md:w-[28%] shrink-0">
+                      {photo ? (
+                        <img
+                          src={photo}
+                          alt={name}
+                          className="w-12 h-12 rounded-full object-cover shrink-0"
+                          style={{ border: `1px solid ${COLORS.hairline}` }}
+                        />
+                      ) : (
+                        <div
+                          className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-base font-bold text-white"
+                          style={{ backgroundColor: COLORS.ink }}
+                        >
+                          {initialsFrom(name)}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold truncate" style={{ color: COLORS.ink }}>{name}</p>
+                        <p className="text-xs truncate mt-0.5" style={{ color: COLORS.muted }}>Mentor</p>
+                        <div className="mt-1.5 flex items-center">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider bg-red-50 text-red-700">
+                            Missed
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold truncate" style={{ color: COLORS.ink }}>{name}</p>
-                      <span className="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider bg-gray-100 text-gray-600">
-                        Missed
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="w-full md:flex-1 space-y-1 md:px-4 md:border-l" style={{ borderColor: COLORS.hairline }}>
-                    <p className="text-sm font-bold line-clamp-2" style={{ color: COLORS.ink }}>{s.title || "Mentorship Session"}</p>
-                    <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
-                      <CalendarClock className="w-3.5 h-3.5 shrink-0" />
-                      <span>{formatDateStr(s.scheduledAt || s.startTime)} · {formatTimeStr(s.scheduledAt || s.startTime)}</span>
+                    {/* 2. Session Details */}
+                    <div className="w-full md:flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 md:px-4 md:border-l" style={{ borderColor: COLORS.hairline }}>
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold line-clamp-2" style={{ color: COLORS.ink }} title={s.title || "Mentorship Session"}>
+                          {s.title || "Mentorship Session"}
+                        </p>
+                        <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
+                          <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+                          <span>{formatDateStr(s.scheduledAt || s.startTime)}</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5 pt-1 sm:pt-0">
+                        <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
+                          <Clock className="w-3.5 h-3.5 shrink-0" />
+                          <span>
+                            {formatTimeStr(s.scheduledAt || s.startTime)}
+                            {s.duration ? ` (${s.duration} min)` : ""}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.muted }}>
+                          {isOnline ? <Video className="w-3.5 h-3.5 shrink-0" /> : <MapPin className="w-3.5 h-3.5 shrink-0" />}
+                          <span>{isOnline ? "Online Meeting" : "In Person"}</span>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-xs" style={{ color: COLORS.muted }}>
-                      The mentor did not start this session. Reschedule it{amount > 0 ? " or request a full refund" : ""}.
-                    </p>
-                  </div>
 
-                  <div className="flex gap-2 shrink-0 w-full md:w-auto">
-                    <button
-                      onClick={() => handleMissedRescheduleOpen(s)}
-                      disabled={busy}
-                      className="flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50"
-                      style={{ backgroundColor: COLORS.ink }}
-                    >
-                      Reschedule
-                    </button>
-                    {amount > 0 && (
+                    {/* 3. Actions: Reschedule + Refund */}
+                    <div className="flex flex-col gap-2 shrink-0 w-full md:w-[165px] md:border-l md:pl-4 pt-4 md:pt-0 border-t md:border-t-0 mt-2 md:mt-0" style={{ borderColor: COLORS.hairline }}>
+                      <p className="text-[11px] leading-snug" style={{ color: COLORS.muted }}>
+                        Mentor did not start this session.
+                      </p>
                       <button
-                        onClick={() => handleMissedRefund(s)}
+                        onClick={() => handleMissedRescheduleOpen(s)}
                         disabled={busy}
-                        className="flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        className="w-full px-3 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50"
+                        style={{ backgroundColor: COLORS.ink }}
+                      >
+                        Reschedule
+                      </button>
+                      <button
+                        onClick={() => amount > 0 && handleMissedRefund(s)}
+                        disabled={busy || amount <= 0}
+                        title={amount > 0 ? "Request full refund" : "Free session: nothing to refund"}
+                        className="w-full px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                         style={{ border: `1px solid ${COLORS.danger}`, color: COLORS.danger }}
                       >
                         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                        Refund ₹{amount}
+                        {amount > 0 ? `Refund ₹${amount}` : "Refund"}
                       </button>
-                    )}
+                    </div>
                   </div>
                 </div>
               );
