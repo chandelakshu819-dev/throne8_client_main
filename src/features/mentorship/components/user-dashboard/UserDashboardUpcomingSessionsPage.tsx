@@ -272,6 +272,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
   const [filterType, setFilterType] = useState<"all" | "live" | "missed">("all");
   const [missedSessions, setMissedSessions] = useState<Session[]>([]);
   const [missedBusyId, setMissedBusyId] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>("");
   const [missedReschedule, setMissedReschedule] = useState<{
     sessionId: string;
     bookingId: string;
@@ -374,7 +375,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
       );
 
 
-      
+
       // If a targetSessionId was specified by the Incoming Session flow but is not in
       // the list (e.g. status changed or pagination), fetch the real session from the backend:
       if (targetSessionId) {
@@ -836,6 +837,14 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
           Upcoming
         </button>
       </div>
+
+
+
+      {debugInfo && (
+        <pre className="text-[10px] p-3 rounded-lg bg-gray-100 overflow-auto max-h-64 whitespace-pre-wrap">
+          {debugInfo}
+        </pre>
+      )}
 
       {/* MY SESSIONS FILTERS */}
       {activeTab === "my-sessions" && (
