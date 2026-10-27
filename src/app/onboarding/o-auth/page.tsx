@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,12 +20,12 @@ const locationPhoneSchema = z.object({
         .min(2, { message: 'Location must be at least 2 characters' })
         .max(50)
         .regex(/^[A-Z][a-zA-Z\s\-]+$/, {
-            message: 'Location must start with a capital letter'
+            message: 'Location must start with a capital letter',
         }),
     phoneNumber: z
         .string()
         .regex(/^\+?[1-9]\d{1,14}$/, {
-            message: 'Invalid phone format (e.g., +919876543210)'
+            message: 'Invalid phone format (e.g., +919876543210)',
         })
         .optional()
         .or(z.literal('')),
@@ -34,7 +34,11 @@ const locationPhoneSchema = z.object({
 type LocationPhoneData = z.infer<typeof locationPhoneSchema>;
 
 function LocationPhoneStep({ onNext }: { onNext: (data: any) => void }) {
-    const { register, handleSubmit, formState: { errors, isValid } } = useForm<LocationPhoneData>({
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, isValid },
+    } = useForm<LocationPhoneData>({
         resolver: zodResolver(locationPhoneSchema),
         mode: 'onChange',
     });
@@ -64,8 +68,9 @@ function LocationPhoneStep({ onNext }: { onNext: (data: any) => void }) {
                         {...register('location')}
                         type="text"
                         placeholder="Mumbai"
-                        className={`w-full px-5 py-4 rounded-xl border text-black ${errors.location ? 'border-red-500' : 'border-[#4a3728]'
-                            } focus:outline-none focus:ring-2 focus:ring-[#4a3728] transition`}
+                        className={`w-full px-5 py-4 rounded-xl border text-black ${
+                            errors.location ? 'border-red-500' : 'border-[#4a3728]'
+                        } focus:outline-none focus:ring-2 focus:ring-[#4a3728] transition`}
                     />
                     {errors.location && (
                         <p className="text-red-500 text-sm mt-1">• {errors.location.message}</p>
@@ -80,8 +85,9 @@ function LocationPhoneStep({ onNext }: { onNext: (data: any) => void }) {
                         {...register('phoneNumber')}
                         type="tel"
                         placeholder="+919876543210"
-                        className={`w-full px-5 py-4 rounded-xl border text-black ${errors.phoneNumber ? 'border-red-500' : 'border-[#4a3728]'
-                            } focus:outline-none focus:ring-2 focus:ring-[#4a3728] transition`}
+                        className={`w-full px-5 py-4 rounded-xl border text-black ${
+                            errors.phoneNumber ? 'border-red-500' : 'border-[#4a3728]'
+                        } focus:outline-none focus:ring-2 focus:ring-[#4a3728] transition`}
                     />
                     {errors.phoneNumber && (
                         <p className="text-red-500 text-sm mt-1">• {errors.phoneNumber.message}</p>
@@ -93,10 +99,11 @@ function LocationPhoneStep({ onNext }: { onNext: (data: any) => void }) {
                     <button
                         type="submit"
                         disabled={!isValid}
-                        className={`px-8 py-4 rounded-xl font-semibold transition shadow-lg ${isValid
-                            ? 'bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white hover:opacity-90'
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            }`}
+                        className={`px-8 py-4 rounded-xl font-semibold transition shadow-lg ${
+                            isValid
+                                ? 'bg-gradient-to-r from-[#4a3728] to-[#8b7355] text-white hover:opacity-90'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
                     >
                         Next
                     </button>
@@ -106,6 +113,23 @@ function LocationPhoneStep({ onNext }: { onNext: (data: any) => void }) {
     );
 }
 
+/** Promise ko max `ms` tak hi wait karo, uske baad aage badho (reject nahi karta). */
+const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T | undefined> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+        return await Promise.race([
+            promise,
+            new Promise<undefined>((resolve) => {
+                timer = setTimeout(() => resolve(undefined), ms);
+            }),
+        ]);
+    } catch {
+        return undefined;
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+};
+
 export default function GoogleOnboardingPage() {
     const router = useRouter();
     const dispatch = useAppDispatch();
@@ -113,6 +137,7 @@ export default function GoogleOnboardingPage() {
     const [formData, setFormData] = useState<any>({});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const submittingRef = useRef(false);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -131,57 +156,76 @@ export default function GoogleOnboardingPage() {
     const goBack = () => setCurrentStep((prev) => prev - 1);
 
     const handleComplete = async (finalStepData: any) => {
+        // Double click / double submit guard
+        if (submittingRef.current) return;
+        submittingRef.current = true;
+
         const allData = { ...formData, ...finalStepData };
+        const userType = allData.userType || allData.status;
+
         setLoading(true);
         setError(null);
 
         try {
-            const idToken = typeof window !== 'undefined' ? sessionStorage.getItem('google_id_token') : null;
+            const idToken =
+                typeof window !== 'undefined' ? sessionStorage.getItem('google_id_token') : null;
             if (!idToken) {
-                throw new Error('Google session expired or missing token. Please sign in with Google again.');
+                throw new Error(
+                    'Google session expired or missing token. Please sign in with Google again.'
+                );
             }
 
             const cleanData = {
                 idToken,
                 location: allData.location,
                 phoneNumber: allData.phoneNumber || '',
-                userType: allData.userType || allData.status,
+                userType,
                 skills: allData.skills || [],
 
-                ...( (allData.userType === 'working' || allData.status === 'working') && {
+                ...(userType === 'working' && {
                     jobTitle: allData.jobTitle,
                     companyName: allData.companyName,
                     startDate: allData.startDate,
                     endDate: allData.endDate || undefined,
                 }),
 
-                ...( (allData.userType === 'student' || allData.status === 'student') && {
+                ...(userType === 'student' && {
                     collegeName: allData.collegeName,
                     degree: allData.degree,
                     fieldOfStudy: allData.fieldOfStudy,
                     graduationYear: allData.graduationYear,
                 }),
 
-                ...( (allData.userType === 'fresher' || allData.status === 'fresher') && {
+                ...(userType === 'fresher' && {
                     highestEducation: allData.highestEducation,
                     preferredRole: allData.preferredRole,
                     cgpa: allData.cgpa || undefined,
                 }),
             };
 
-            console.log('📝 [GOOGLE ONBOARDING] Submitting Google registration...', cleanData);
+            // NOTE: idToken kabhi console me log mat karo
             await AuthService.googleRegister(cleanData);
 
             if (typeof window !== 'undefined') {
                 sessionStorage.removeItem('google_id_token');
             }
 
-            dispatch(checkAuthStatus());
+            // checkAuthStatus atke to bhi max 4s baad aage badho
+            await withTimeout(Promise.resolve(dispatch(checkAuthStatus())), 4000);
+
             router.replace(HOME_PATH);
+
+            // Safety net: 6s me page change na ho to hard redirect
+            setTimeout(() => {
+                if (typeof window !== 'undefined' && window.location.pathname.startsWith('/onboarding')) {
+                    window.location.replace(HOME_PATH);
+                }
+            }, 6000);
         } catch (err: any) {
-            console.error('❌ [GOOGLE ONBOARDING] Error:', err);
-            setError(err.message || 'Registration failed. Please try again.');
+            console.error('❌ [GOOGLE ONBOARDING] Error:', err?.message || err);
+            setError(err?.message || 'Registration failed. Please try again.');
             setLoading(false);
+            submittingRef.current = false;
         }
     };
 
@@ -191,12 +235,7 @@ export default function GoogleOnboardingPage() {
                 return <LocationPhoneStep onNext={saveAndNext} />;
 
             case 2:
-                return (
-                    <CurrentStatus
-                        onNext={saveAndNext}
-                        onBack={goBack}
-                    />
-                );
+                return <CurrentStatus onNext={saveAndNext} onBack={goBack} />;
 
             case 3:
                 return (
@@ -206,7 +245,9 @@ export default function GoogleOnboardingPage() {
                                 onNext={handleComplete}
                                 onBack={goBack}
                                 initialData={formData}
-                                onDataChange={(data) => setFormData((prev: any) => ({ ...prev, ...data }))}
+                                onDataChange={(data) =>
+                                    setFormData((prev: any) => ({ ...prev, ...data }))
+                                }
                             />
                         )}
                         {(formData.status === 'student' || formData.userType === 'student') && (
@@ -214,7 +255,9 @@ export default function GoogleOnboardingPage() {
                                 onNext={handleComplete}
                                 onBack={goBack}
                                 initialData={formData}
-                                onDataChange={(data) => setFormData((prev: any) => ({ ...prev, ...data }))}
+                                onDataChange={(data) =>
+                                    setFormData((prev: any) => ({ ...prev, ...data }))
+                                }
                             />
                         )}
                         {(formData.status === 'fresher' || formData.userType === 'fresher') && (
@@ -222,7 +265,9 @@ export default function GoogleOnboardingPage() {
                                 onNext={handleComplete}
                                 onBack={goBack}
                                 initialData={formData}
-                                onDataChange={(data) => setFormData((prev: any) => ({ ...prev, ...data }))}
+                                onDataChange={(data) =>
+                                    setFormData((prev: any) => ({ ...prev, ...data }))
+                                }
                             />
                         )}
                     </>
@@ -236,18 +281,17 @@ export default function GoogleOnboardingPage() {
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
             <div className="w-full max-w-md">
-                {/* Progress bar */}
                 <div className="flex gap-2 mb-8">
                     {[1, 2, 3].map((step) => (
                         <div
                             key={step}
-                            className={`h-1.5 flex-1 rounded-full transition-all ${step <= currentStep ? 'bg-[#4a3728]' : 'bg-gray-200'
-                                }`}
+                            className={`h-1.5 flex-1 rounded-full transition-all ${
+                                step <= currentStep ? 'bg-[#4a3728]' : 'bg-gray-200'
+                            }`}
                         />
                     ))}
                 </div>
 
-                {/* Error */}
                 {error && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
                         {error}
@@ -256,7 +300,6 @@ export default function GoogleOnboardingPage() {
 
                 {renderStep()}
 
-                {/* Loading overlay */}
                 {loading && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                         <div className="bg-white p-6 rounded-xl shadow-2xl flex items-center gap-4">
