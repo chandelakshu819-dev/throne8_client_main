@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -71,7 +71,131 @@ enum MentorshipHelpArea {
 }
 
 // ============================================================================
-// 2. Zod Schema
+// 2. Suggestion lists (user inme se chun sakta hai ya khud kuch bhi likh sakta hai)
+// ============================================================================
+
+const DEGREE_SUGGESTIONS = [
+    'B.Tech', 'B.E.', 'B.Sc', 'B.Com', 'B.A.', 'BBA', 'BCA', 'B.Des', 'B.Arch', 'B.Pharm', 'LLB', 'MBBS',
+    'M.Tech', 'M.E.', 'M.Sc', 'M.Com', 'M.A.', 'MBA', 'MCA', 'M.Des', 'M.Arch', 'LLM', 'PGDM',
+    'Diploma', 'Ph.D',
+];
+
+const FIELD_SUGGESTIONS = [
+    'Computer Science', 'Information Technology', 'Electronics and Communication', 'Electrical Engineering',
+    'Mechanical Engineering', 'Civil Engineering', 'Chemical Engineering', 'Artificial Intelligence',
+    'Machine Learning', 'Data Science', 'Cyber Security', 'Software Engineering', 'Biotechnology',
+    'Business Administration', 'Finance', 'Marketing', 'Human Resources', 'Commerce', 'Economics',
+    'Mathematics', 'Physics', 'Chemistry', 'Design', 'Law',
+];
+
+const ROLE_SUGGESTIONS = [
+    'Software Engineer', 'Senior Software Engineer', 'Software Developer', 'Full Stack Developer',
+    'Frontend Developer', 'Backend Developer', 'Mobile App Developer', 'DevOps Engineer', 'Cloud Engineer',
+    'Data Scientist', 'Data Analyst', 'Data Engineer', 'Machine Learning Engineer', 'AI Engineer',
+    'QA Engineer', 'Security Engineer', 'UI/UX Designer', 'Product Manager', 'Project Manager',
+    'Engineering Manager', 'Technical Lead', 'Solutions Architect', 'Business Analyst',
+    'Digital Marketing Manager', 'HR Manager', 'Founder', 'Freelancer', 'Student',
+];
+
+const COLLEGE_SUGGESTIONS = [
+    // --- Top national institutes ---
+    'IIT Delhi', 'IIT Bombay', 'IIT Madras', 'IIT Kanpur', 'IIT Kharagpur', 'IIT Roorkee', 'IIT Guwahati',
+    'NIT Trichy', 'NIT Warangal', 'NIT Surathkal', 'IIIT Hyderabad', 'IIIT Delhi', 'BITS Pilani',
+    'Delhi University', 'Delhi Technological University', 'Netaji Subhas University of Technology',
+    'VIT Vellore', 'SRM Institute of Science and Technology', 'Manipal Institute of Technology',
+    'Amity University', 'Lovely Professional University', 'Chandigarh University', 'Thapar Institute',
+    'Anna University', 'Jadavpur University', 'Pune University', 'Mumbai University',
+    'Symbiosis International University', 'KIIT University', 'Christ University',
+
+    // --- Bhopal: engineering colleges & universities ---
+    'MANIT Bhopal (Maulana Azad National Institute of Technology)',
+    'IIIT Bhopal',
+    'School of Planning and Architecture (SPA) Bhopal',
+    'UIT-RGPV Bhopal (University Institute of Technology, RGPV)',
+    'Rajiv Gandhi Proudyogiki Vishwavidyalaya (RGPV) Bhopal',
+    'VIT Bhopal University',
+    'LNCT Bhopal (Lakshmi Narain College of Technology)',
+    'LNCT&S Bhopal (LNCT Science)',
+    'LNCT University Bhopal',
+    'SISTec Bhopal (Sagar Institute of Science and Technology)',
+    'SIRT Bhopal (Sagar Institute of Research and Technology)',
+    'SIRTE Bhopal (Sagar Institute of Research and Technology - Excellence)',
+    'Sage University Bhopal',
+    'TIT Bhopal (Technocrats Institute of Technology)',
+    'TIT&S Bhopal (Technocrats Institute of Technology and Science)',
+    'TIT-E Bhopal (Technocrats Institute of Technology - Excellence)',
+    'Oriental Institute of Science and Technology (OIST) Bhopal',
+    'Oriental College of Technology (OCT) Bhopal',
+    'Oriental University Indore',
+    'NRI Institute of Information Science and Technology (NRI-IIST) Bhopal',
+    'NRI Institute of Research and Technology (NIRT) Bhopal',
+    'Truba Institute of Engineering and Information Technology Bhopal',
+    'Truba College of Science and Technology Bhopal',
+    'Bansal Institute of Science and Technology Bhopal',
+    'Bansal College of Engineering Bhopal',
+    'VNS Institute of Technology Bhopal',
+    'Radharaman Institute of Technology and Science (RITS) Bhopal',
+    'Patel College of Science and Technology (PCST) Bhopal',
+    'Patel Institute of Technology Bhopal',
+    'Millennium Institute of Technology (MIT) Bhopal',
+    'Mittal Institute of Technology Bhopal',
+    'Scope Global Skills University Bhopal',
+    'SCOPE College of Engineering Bhopal',
+    'RKDF Institute of Science and Technology Bhopal',
+    'RKDF University Bhopal',
+    'Corporate Institute of Science and Technology (CIST) Bhopal',
+    'Bhabha Engineering Research Institute (BERI) Bhopal',
+    'Bhabha University Bhopal',
+    'Gargi Institute of Science and Technology (GIST) Bhopal',
+    'Trinity Institute of Technology and Research (TITR) Bhopal',
+    'Bhopal Institute of Technology (BIT) Bhopal',
+    'Bhopal Institute of Technology and Science (BITS) Bhopal',
+    'Jawaharlal Institute of Technology (JNCT) Bhopal',
+    'IES College of Technology Bhopal',
+    'IES University Bhopal',
+    'Agnos College of Technology Bhopal',
+    "People's College of Research and Technology (PCRT) Bhopal",
+    "People's University Bhopal",
+    'Sarvepalli Radhakrishnan University (SRK University) Bhopal',
+    'Sri Satya Sai University of Technology and Medical Sciences Sehore',
+    'Ravindranath Tagore University Bhopal',
+    'Mansarovar Global University Sehore',
+];
+
+const COMPANY_SUGGESTIONS = [
+    // --- Global tech ---
+    'Google', 'Microsoft', 'Amazon', 'Meta', 'Apple', 'Netflix', 'Adobe', 'Oracle', 'Salesforce', 'Atlassian',
+
+    // --- Indian startups / product companies ---
+    'Flipkart', 'Paytm', 'Zomato', 'Swiggy', 'Razorpay', 'PhonePe', 'CRED', 'Ola', 'Meesho', 'Zoho',
+    'Myntra', 'Nykaa', 'Lenskart', 'Urban Company', 'Zepto', 'Rapido', 'Ola Electric', 'BigBasket',
+    'Delhivery', 'MakeMyTrip', 'Info Edge (Naukri)', 'Freshworks', 'Zerodha', 'Groww', 'Upstox',
+    'Dream11', 'BharatPe', 'Juspay', 'Postman', 'BrowserStack', 'InMobi', 'Dunzo', 'ShareChat',
+    'PhysicsWallah', 'Unacademy', 'upGrad', 'Pine Labs', 'Ather Energy', 'Cars24', 'PolicyBazaar',
+
+    // --- Indian IT services ---
+    'TCS', 'Infosys', 'Wipro', 'HCLTech', 'Tech Mahindra', 'Cognizant', 'Accenture', 'Capgemini',
+    'LTIMindtree', 'Mphasis', 'Persistent Systems', 'Hexaware', 'Coforge', 'Zensar', 'Birlasoft',
+    'KPIT Technologies', 'Tata Elxsi', 'Cyient', 'Sonata Software', 'Mindtree',
+
+    // --- Large Indian conglomerates / core / PSU ---
+    'Reliance Industries', 'Reliance Jio', 'Tata Group', 'Tata Motors', 'Tata Steel', 'Adani Group',
+    'Mahindra & Mahindra', 'Larsen & Toubro (L&T)', 'Bharti Airtel', 'Maruti Suzuki', 'Hero MotoCorp',
+    'Bajaj Auto', 'TVS Motor', 'Bosch India', 'Siemens India', 'ITC', 'Hindustan Unilever',
+    'ISRO', 'DRDO', 'BHEL', 'ONGC', 'NTPC', 'Indian Oil', 'HAL', 'BEL', 'Coal India', 'SAIL',
+
+    // --- Banking / finance ---
+    'HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank', 'Kotak Mahindra Bank', 'Bajaj Finserv',
+    'Goldman Sachs', 'Morgan Stanley',
+
+    // --- Other global ---
+    'Deloitte', 'IBM', 'Samsung', 'Intel', 'Walmart', 'Self Employed',
+];
+
+const uniq = (arr: string[]): string[] => Array.from(new Set(arr.filter(Boolean)));
+
+// ============================================================================
+// 3. Zod Schema
 // ============================================================================
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -136,27 +260,33 @@ const steps = [
 ];
 
 // ============================================================================
-// 3. Prefill helpers (profile data se form bharne ke liye)
+// 4. Prefill helpers (profile data se form bharne ke liye)
 // ============================================================================
 
-// Pehla non-empty string value jo given keys me mile
-const pickString = (obj: any, keys: string[]): string => {
-    for (const k of keys) {
-        const v = obj?.[k];
-        if (typeof v === 'string' && v.trim()) return v.trim();
+// Object me se pehli non-empty string value jiska key regex se match kare (exact key naam pata na ho tab bhi chalega)
+const findStringByKey = (obj: any, keyRegex: RegExp): string => {
+    if (!obj || typeof obj !== 'object') return '';
+    for (const [k, v] of Object.entries(obj)) {
+        if (keyRegex.test(k) && typeof v === 'string' && v.trim()) return v.trim();
     }
     return '';
 };
 
+const COLLEGE_KEY = /(school|college|institut|universit)/i;
+const DEGREE_KEY = /^(degree|degreeName|qualification)$/i;
+const FIELD_KEY = /(fieldOfStudy|field|major|stream|special)/i;
+const YEAR_KEY = /(endYear|graduationYear|yearOfCompletion|passingYear|toYear|endDate|completionDate)/i;
+
 const getEducationYear = (edu: any): number | undefined => {
-    const direct = edu?.endYear ?? edu?.graduationYear ?? edu?.yearOfCompletion;
-    if (direct) {
-        const n = Number(direct);
-        if (!Number.isNaN(n)) return n;
-    }
-    if (edu?.endDate) {
-        const y = new Date(edu.endDate).getFullYear();
-        if (!Number.isNaN(y)) return y;
+    if (!edu || typeof edu !== 'object') return undefined;
+    for (const [k, v] of Object.entries(edu)) {
+        if (!YEAR_KEY.test(k) || v === null || v === undefined || v === '') continue;
+        if (typeof v === 'number' && v > 1900) return v;
+        if (typeof v === 'string') {
+            if (/^\d{4}$/.test(v.trim())) return Number(v.trim());
+            const y = new Date(v).getFullYear();
+            if (!Number.isNaN(y)) return y;
+        }
     }
     return undefined;
 };
@@ -192,6 +322,34 @@ export default function SeniorMentorApplicationPage() {
 
     const selectedHelpAreas = (watch('helpAreas') || []) as MentorshipHelpArea[];
     const isMaxHelpAreas = selectedHelpAreas.length >= MAX_HELP_AREAS;
+
+    // User ke apne profile ke college / company suggestion list me sabse upar
+    const collegeOptions = useMemo(() => {
+        const own = (educationList || []).map((e: any) => findStringByKey(e, COLLEGE_KEY));
+        const reg = typeof userProfileData?.education === 'string' ? [userProfileData.education] : [];
+        return uniq([...own, ...reg, ...COLLEGE_SUGGESTIONS]);
+    }, [educationList, userProfileData]);
+
+    const degreeOptions = useMemo(() => {
+        const own = (educationList || []).map((e: any) => findStringByKey(e, DEGREE_KEY));
+        return uniq([...own, ...DEGREE_SUGGESTIONS]);
+    }, [educationList]);
+
+    const fieldOptions = useMemo(() => {
+        const own = (educationList || []).map((e: any) => findStringByKey(e, FIELD_KEY));
+        return uniq([...own, ...FIELD_SUGGESTIONS]);
+    }, [educationList]);
+
+    const roleOptions = useMemo(() => {
+        const own = (experienceList || []).map((e: any) => e?.position as string);
+        const reg = userProfileData?.currentPosition ? [userProfileData.currentPosition] : [];
+        return uniq([...own, ...reg, ...ROLE_SUGGESTIONS]);
+    }, [experienceList, userProfileData]);
+
+    const companyOptions = useMemo(() => {
+        const own = (experienceList || []).map((e: any) => e?.company as string);
+        return uniq([...own, ...COMPANY_SUGGESTIONS]);
+    }, [experienceList]);
 
     // Field tabhi bharo jab user ne khud kuch na likha ho
     const fillIfEmpty = useCallback((name: keyof FormValues, value: any) => {
@@ -244,11 +402,19 @@ export default function SeniorMentorApplicationPage() {
         fetchEducationData();
     }, [isLoadingInit, user?.userId, fetchUserProfile, fetchEducationData]);
 
-    // Profile aane par: name + experience ids
+    // Profile aane par: name, register ke time ka data, experience ids
     useEffect(() => {
         if (!userProfileData) return;
+        console.log('[PREFILL] userProfileData:', userProfileData);
         const fullName = `${userProfileData.firstName || ''} ${userProfileData.lastName || ''}`.trim();
         fillIfEmpty('fullName', fullName);
+        // Register ke time jo likha tha (agar education/currentPosition string me saved hai)
+        if (typeof userProfileData.education === 'string') {
+            fillIfEmpty('college', userProfileData.education.trim());
+        }
+        if (userProfileData.currentPosition) {
+            fillIfEmpty('currentRole', userProfileData.currentPosition);
+        }
         fetchExperienceData(userProfileData.experienceIds || []);
     }, [userProfileData, fillIfEmpty, fetchExperienceData]);
 
@@ -260,36 +426,34 @@ export default function SeniorMentorApplicationPage() {
     // Education se college / degree / field / year
     useEffect(() => {
         if (!educationList || educationList.length === 0) return;
+        console.log('[PREFILL] educationList[0]:', educationList[0]);
         // Sabse latest graduation year wali education lo
         const latest = [...educationList].sort(
             (a, b) => (getEducationYear(b) ?? 0) - (getEducationYear(a) ?? 0)
         )[0];
 
-        fillIfEmpty('college', pickString(latest, ['schoolName', 'school', 'institution', 'institute', 'collegeName', 'college', 'university', 'universityName']));
-        fillIfEmpty('degree', pickString(latest, ['degree', 'degreeName']));
-        fillIfEmpty('fieldOfStudy', pickString(latest, ['fieldOfStudy', 'field', 'major', 'stream', 'specialization']));
+        // Education list ka data register wale string se better hai, isliye college yahan se force set
+        const college = findStringByKey(latest, COLLEGE_KEY);
+        if (college) setValue('college', college, { shouldDirty: true });
+        fillIfEmpty('degree', findStringByKey(latest, DEGREE_KEY));
+        fillIfEmpty('fieldOfStudy', findStringByKey(latest, FIELD_KEY));
         fillIfEmpty('graduationYear', getEducationYear(latest));
-    }, [educationList, fillIfEmpty]);
+    }, [educationList, fillIfEmpty, setValue]);
 
     // Experience se current role / company
     useEffect(() => {
         if (!experienceList || experienceList.length === 0) return;
+        console.log('[PREFILL] experienceList[0]:', experienceList[0]);
         const current = experienceList.find((e: any) => e.current) || experienceList[0];
         fillIfEmpty('currentRole', current?.position);
         fillIfEmpty('currentCompany', current?.company);
     }, [experienceList, fillIfEmpty]);
 
-    // Experience na ho to profile ki currentPosition
-    useEffect(() => {
-        if (userProfileData?.currentPosition) {
-            fillIfEmpty('currentRole', userProfileData.currentPosition);
-        }
-    }, [userProfileData, fillIfEmpty]);
-
     // About se short bio
     useEffect(() => {
         if (!aboutData) return;
-        fillIfEmpty('shortBio', pickString(aboutData as any, ['summary', 'about', 'aboutText', 'bio', 'description', 'content']));
+        console.log('[PREFILL] aboutData:', aboutData);
+        fillIfEmpty('shortBio', findStringByKey(aboutData, /(summary|about|bio|description|content|story)/i));
     }, [aboutData, fillIfEmpty]);
 
     // Profile photo (URL se File banao, best-effort)
@@ -567,6 +731,13 @@ export default function SeniorMentorApplicationPage() {
             <div className="max-w-3xl w-full my-6 relative">
                 <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="bg-white rounded-[40px] shadow-2xl relative">
 
+                    {/* Suggestion lists (user inme se chun sakta hai ya khud likh sakta hai) */}
+                    <datalist id="college-list">{collegeOptions.map((o) => <option key={o} value={o} />)}</datalist>
+                    <datalist id="degree-list">{degreeOptions.map((o) => <option key={o} value={o} />)}</datalist>
+                    <datalist id="field-list">{fieldOptions.map((o) => <option key={o} value={o} />)}</datalist>
+                    <datalist id="role-list">{roleOptions.map((o) => <option key={o} value={o} />)}</datalist>
+                    <datalist id="company-list">{companyOptions.map((o) => <option key={o} value={o} />)}</datalist>
+
                     {/* Close Button */}
                     <button
                         type="button"
@@ -714,32 +885,32 @@ export default function SeniorMentorApplicationPage() {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Graduation Year *</label>
-                                        <input type="number" {...register('graduationYear', { valueAsNumber: true })} className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <input type="number" {...register('graduationYear', { valueAsNumber: true })} placeholder="e.g. 2024" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.graduationYear && <p className="text-red-500 text-xs mt-1">{errors.graduationYear.message}</p>}
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">College / University *</label>
-                                        <input type="text" {...register('college')} className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <input type="text" list="college-list" autoComplete="off" {...register('college')} placeholder="Start typing or pick from suggestions" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.college && <p className="text-red-500 text-xs mt-1">{errors.college.message}</p>}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Degree *</label>
-                                        <input type="text" {...register('degree')} placeholder="e.g. B.Tech" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <input type="text" list="degree-list" autoComplete="off" {...register('degree')} placeholder="e.g. B.Tech" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.degree && <p className="text-red-500 text-xs mt-1">{errors.degree.message}</p>}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Field of Study *</label>
-                                        <input type="text" {...register('fieldOfStudy')} placeholder="e.g. Computer Science" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <input type="text" list="field-list" autoComplete="off" {...register('fieldOfStudy')} placeholder="e.g. Computer Science" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.fieldOfStudy && <p className="text-red-500 text-xs mt-1">{errors.fieldOfStudy.message}</p>}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Role <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
-                                        <input type="text" {...register('currentRole')} placeholder="e.g. Software Engineer" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <input type="text" list="role-list" autoComplete="off" {...register('currentRole')} placeholder="e.g. Software Engineer" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.currentRole && <p className="text-red-500 text-xs mt-1">{errors.currentRole.message}</p>}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Company <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
-                                        <input type="text" {...register('currentCompany')} className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <input type="text" list="company-list" autoComplete="off" {...register('currentCompany')} placeholder="e.g. Google" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.currentCompany && <p className="text-red-500 text-xs mt-1">{errors.currentCompany.message}</p>}
                                     </div>
                                 </div>
