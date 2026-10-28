@@ -52,6 +52,24 @@ export interface MentorPayoutOverview {
   items: MentorPayoutItem[];
 }
 
+export type RefundStatus = "pending" | "refunded";
+
+export interface AdminRefundRow {
+  bookingId: string;
+  sessionId: string;
+  title?: string;
+  scheduledAt?: string;
+  mentorName: string;
+  menteeName?: string;
+  amount: number;
+  status: RefundStatus;
+  refundMode?: "gateway" | "manual";
+  requestedAt?: string;
+  refundedAt?: string;
+  reference?: string;
+  details: { email?: string; phone?: string; upiId?: string; note?: string };
+}
+
 const errMsg = (e: any, fallback: string) =>
   e?.response?.data?.message || e?.message || fallback;
 
@@ -85,6 +103,30 @@ class PayoutService {
       await api.post(`/mentorship/admin/payouts/${paymentId}/mark-paid`, { reference });
     } catch (e) {
       throw new Error(errMsg(e, "Failed to mark payout as paid."));
+    }
+  }
+
+  static async adminListRefunds(
+    status: RefundStatus,
+    page = 1,
+    limit = 20
+  ): Promise<{ rows: AdminRefundRow[]; total: number }> {
+    try {
+      const { data } = await api.get("/mentorship/admin/refunds", { params: { status, page, limit } });
+      return {
+        rows: Array.isArray(data?.data) ? data.data : [],
+        total: data?.meta?.total ?? data?.pagination?.total ?? (data?.data?.length || 0),
+      };
+    } catch (e) {
+      throw new Error(errMsg(e, "Failed to load refunds."));
+    }
+  }
+
+  static async markRefunded(bookingId: string, reference: string): Promise<void> {
+    try {
+      await api.post(`/mentorship/admin/refunds/${bookingId}/mark-refunded`, { reference });
+    } catch (e) {
+      throw new Error(errMsg(e, "Failed to mark refund as paid."));
     }
   }
 

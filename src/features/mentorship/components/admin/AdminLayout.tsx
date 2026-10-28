@@ -9,6 +9,8 @@ interface AdminLayoutProps {
   pendingMentorCount?: number;
   reportedReviewCount?: number;
   communityReportCount?: number;
+  heldPayoutCount?: number;
+  pendingRefundCount?: number;
   pageTitle: string;
   pageSubtitle?: string;
   children: ReactNode;
@@ -20,6 +22,8 @@ export default function AdminLayout({
   pendingMentorCount = 0,
   reportedReviewCount = 0,
   communityReportCount = 0,
+  heldPayoutCount = 0,
+  pendingRefundCount = 0,
   pageTitle,
   pageSubtitle,
   children,
@@ -35,6 +39,8 @@ export default function AdminLayout({
         pendingMentorCount={pendingMentorCount}
         reportedReviewCount={reportedReviewCount}
         communityReportCount={communityReportCount}
+        heldPayoutCount={heldPayoutCount}
+        pendingRefundCount={pendingRefundCount}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">

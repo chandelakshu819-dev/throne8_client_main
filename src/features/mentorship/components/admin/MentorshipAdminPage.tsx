@@ -23,6 +23,7 @@ import ReportedReviewsView from "./ReportedReviewsView";
 import AllReviewsView from "./AllReviewsView";
 import SessionsView from "./SessionsView";
 import PayoutsView from "./PayoutsView";
+import RefundsView from "./RefundsView";
 
 const inrFormatter = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 2,
@@ -43,6 +44,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   "community-reports": { title: "Community Reports", subtitle: "Review and moderate flagged forum threads and replies" },
   payments: { title: "Payment Logs", subtitle: "Transaction history across the module" },
   payouts: { title: "Mentor Payouts", subtitle: "Approve held earnings and pay mentors" },
+  refunds: { title: "Refunds", subtitle: "Missed-session refund requests from students" },
 };
 
 
@@ -220,6 +222,7 @@ export default function MentorshipAdminPage() {
   const [reportedReviewCount, setReportedReviewCount] = useState<number | null>(null);
   const [communityReportCount, setCommunityReportCount] = useState<number | null>(null);
   const [heldPayoutCount, setHeldPayoutCount] = useState<number | null>(null);
+  const [pendingRefundCount, setPendingRefundCount] = useState<number | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const isMountedRef = useRef(true);
   const inFlightRef = useRef(false);
@@ -234,12 +237,13 @@ export default function MentorshipAdminPage() {
       reason instanceof Error ? reason.message : String(reason);
 
     try {
-      const [dashboardRes, pendingRes, reportedRes, communityRes, payoutRes] = await Promise.allSettled([
+      const [dashboardRes, pendingRes, reportedRes, communityRes, payoutRes, refundRes] = await Promise.allSettled([
         AdminService.getDashboardStats(),
         AdminService.getPendingMentors({ page: 1, limit: 1 }),
         AdminService.getReportedReviews({ page: 1, limit: 1 }),
         CommunityService.listCommunityReports({ page: 1, limit: 1, status: "pending" }),
         PayoutService.adminList("held", 1, 1),
+        PayoutService.adminListRefunds("pending", 1, 1),
       ]);
 
       if (!isMountedRef.current) return;
@@ -280,6 +284,13 @@ export default function MentorshipAdminPage() {
         failures.push(`Could not load payouts count: ${reasonText(payoutRes.reason)}`);
       }
 
+      if (refundRes.status === "fulfilled") {
+        setPendingRefundCount(refundRes.value.total ?? 0);
+      } else {
+        setPendingRefundCount(null);
+        failures.push(`Could not load refunds count: ${reasonText(refundRes.reason)}`);
+      }
+
       setErrors(failures);
     } finally {
       inFlightRef.current = false;
@@ -304,6 +315,8 @@ export default function MentorshipAdminPage() {
       pendingMentorCount={pendingMentorCount ?? undefined}
       reportedReviewCount={reportedReviewCount ?? undefined}
       communityReportCount={communityReportCount ?? undefined}
+      heldPayoutCount={heldPayoutCount ?? undefined}
+      pendingRefundCount={pendingRefundCount ?? undefined}
       pageTitle={meta.title}
       pageSubtitle={meta.subtitle}
     >
@@ -397,6 +410,10 @@ export default function MentorshipAdminPage() {
         <PayoutsView onHeldCountChange={(count) => setHeldPayoutCount(count)} />
       )}
 
+      {activePage === "refunds" && (
+        <RefundsView onPendingCountChange={(count) => setPendingRefundCount(count)} />
+      )}
+
       {activePage !== "dashboard" &&
         activePage !== "pending-mentors" &&
         activePage !== "all-mentors" &&
@@ -405,7 +422,8 @@ export default function MentorshipAdminPage() {
         activePage !== "all-reviews" &&
         activePage !== "reviews" &&
         activePage !== "sessions" &&
-        activePage !== "payouts" && (
+        activePage !== "payouts" &&
+        activePage !== "refunds" && (
           <p style={{ color: "#8a7a6a" }}>
             {PAGE_META[activePage]?.title} page — agla step mein banega.
           </p>
