@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -18,16 +18,22 @@ import {
 } from "lucide-react";
 import SeniorMentorApplicationService, {
     SeniorMentorApplication,
-    ApplicationStatus,
     MIN_HELP_AREAS,
     MAX_HELP_AREAS,
 } from "@/lib/api/seniorMentorApplication.service";
 import { syncProfilePhotoToAllRoles } from "@/features/mentorship/utils/syncProfilePhoto";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { useProfileData } from "@/features/profile/hooks/useProfileData";
-import { useEducationData } from "@/features/profile/hooks/useEducationData";
-import { useExperienceData } from "@/features/profile/hooks/useExperienceData";
-import { useAboutData } from "@/features/profile/hooks/useAboutData";
+import AuthService from "@/lib/api/auth.service";
+import ProfileService from "@/lib/api/profile.service";
+import CollegeAutocomplete from "@/features/auth/components/CollegeAutocomplete";
+import {
+    resolveEducationPrefill,
+    resolveExperiencePrefill,
+    IEducationItem,
+    IExperienceItem,
+    IAboutData,
+    IProfilePhotoData,
+} from "@/features/mentorship/utils/seniorMentorPrefill.util";
 
 // ============================================================================
 // 1. Enums and Select Options (Mirrored from Backend)
@@ -70,10 +76,6 @@ enum MentorshipHelpArea {
     CAREER_GUIDANCE = 'career_guidance',
 }
 
-// ============================================================================
-// 2. Suggestion lists (user inme se chun sakta hai ya khud kuch bhi likh sakta hai)
-// ============================================================================
-
 const DEGREE_SUGGESTIONS = [
     'B.Tech', 'B.E.', 'B.Sc', 'B.Com', 'B.A.', 'BBA', 'BCA', 'B.Des', 'B.Arch', 'B.Pharm', 'LLB', 'MBBS',
     'M.Tech', 'M.E.', 'M.Sc', 'M.Com', 'M.A.', 'MBA', 'MCA', 'M.Des', 'M.Arch', 'LLM', 'PGDM',
@@ -90,145 +92,59 @@ const FIELD_SUGGESTIONS = [
 
 const ROLE_SUGGESTIONS = [
     'Software Engineer', 'Senior Software Engineer', 'Software Developer', 'Full Stack Developer',
-    'Frontend Developer', 'Backend Developer', 'Mobile App Developer', 'DevOps Engineer', 'Cloud Engineer',
-    'Data Scientist', 'Data Analyst', 'Data Engineer', 'Machine Learning Engineer', 'AI Engineer',
-    'QA Engineer', 'Security Engineer', 'UI/UX Designer', 'Product Manager', 'Project Manager',
-    'Engineering Manager', 'Technical Lead', 'Solutions Architect', 'Business Analyst',
-    'Digital Marketing Manager', 'HR Manager', 'Founder', 'Freelancer', 'Student',
-];
-
-const COLLEGE_SUGGESTIONS = [
-    // --- Top national institutes ---
-    'IIT Delhi', 'IIT Bombay', 'IIT Madras', 'IIT Kanpur', 'IIT Kharagpur', 'IIT Roorkee', 'IIT Guwahati',
-    'NIT Trichy', 'NIT Warangal', 'NIT Surathkal', 'IIIT Hyderabad', 'IIIT Delhi', 'BITS Pilani',
-    'Delhi University', 'Delhi Technological University', 'Netaji Subhas University of Technology',
-    'VIT Vellore', 'SRM Institute of Science and Technology', 'Manipal Institute of Technology',
-    'Amity University', 'Lovely Professional University', 'Chandigarh University', 'Thapar Institute',
-    'Anna University', 'Jadavpur University', 'Pune University', 'Mumbai University',
-    'Symbiosis International University', 'KIIT University', 'Christ University',
-
-    // --- Bhopal: engineering colleges & universities ---
-    'MANIT Bhopal (Maulana Azad National Institute of Technology)',
-    'IIIT Bhopal',
-    'School of Planning and Architecture (SPA) Bhopal',
-    'UIT-RGPV Bhopal (University Institute of Technology, RGPV)',
-    'Rajiv Gandhi Proudyogiki Vishwavidyalaya (RGPV) Bhopal',
-    'VIT Bhopal University',
-    'LNCT Bhopal (Lakshmi Narain College of Technology)',
-    'LNCT&S Bhopal (LNCT Science)',
-    'LNCT University Bhopal',
-    'SISTec Bhopal (Sagar Institute of Science and Technology)',
-    'SIRT Bhopal (Sagar Institute of Research and Technology)',
-    'SIRTE Bhopal (Sagar Institute of Research and Technology - Excellence)',
-    'Sage University Bhopal',
-    'TIT Bhopal (Technocrats Institute of Technology)',
-    'TIT&S Bhopal (Technocrats Institute of Technology and Science)',
-    'TIT-E Bhopal (Technocrats Institute of Technology - Excellence)',
-    'Oriental Institute of Science and Technology (OIST) Bhopal',
-    'Oriental College of Technology (OCT) Bhopal',
-    'Oriental University Indore',
-    'NRI Institute of Information Science and Technology (NRI-IIST) Bhopal',
-    'NRI Institute of Research and Technology (NIRT) Bhopal',
-    'Truba Institute of Engineering and Information Technology Bhopal',
-    'Truba College of Science and Technology Bhopal',
-    'Bansal Institute of Science and Technology Bhopal',
-    'Bansal College of Engineering Bhopal',
-    'VNS Institute of Technology Bhopal',
-    'Radharaman Institute of Technology and Science (RITS) Bhopal',
-    'Patel College of Science and Technology (PCST) Bhopal',
-    'Patel Institute of Technology Bhopal',
-    'Millennium Institute of Technology (MIT) Bhopal',
-    'Mittal Institute of Technology Bhopal',
-    'Scope Global Skills University Bhopal',
-    'SCOPE College of Engineering Bhopal',
-    'RKDF Institute of Science and Technology Bhopal',
-    'RKDF University Bhopal',
-    'Corporate Institute of Science and Technology (CIST) Bhopal',
-    'Bhabha Engineering Research Institute (BERI) Bhopal',
-    'Bhabha University Bhopal',
-    'Gargi Institute of Science and Technology (GIST) Bhopal',
-    'Trinity Institute of Technology and Research (TITR) Bhopal',
-    'Bhopal Institute of Technology (BIT) Bhopal',
-    'Bhopal Institute of Technology and Science (BITS) Bhopal',
-    'Jawaharlal Institute of Technology (JNCT) Bhopal',
-    'IES College of Technology Bhopal',
-    'IES University Bhopal',
-    'Agnos College of Technology Bhopal',
-    "People's College of Research and Technology (PCRT) Bhopal",
-    "People's University Bhopal",
-    'Sarvepalli Radhakrishnan University (SRK University) Bhopal',
-    'Sri Satya Sai University of Technology and Medical Sciences Sehore',
-    'Ravindranath Tagore University Bhopal',
-    'Mansarovar Global University Sehore',
+    'Frontend Developer', 'Backend Developer', 'DevOps Engineer', 'Cloud Engineer',
+    'Data Scientist', 'Machine Learning Engineer', 'AI Engineer', 'Product Manager',
+    'UI/UX Designer', 'Product Designer', 'Data Analyst', 'Business Analyst',
+    'QA Engineer', 'Security Engineer', 'Solutions Architect', 'Engineering Manager',
 ];
 
 const COMPANY_SUGGESTIONS = [
-    // --- Global tech ---
-    'Google', 'Microsoft', 'Amazon', 'Meta', 'Apple', 'Netflix', 'Adobe', 'Oracle', 'Salesforce', 'Atlassian',
-
-    // --- Indian startups / product companies ---
-    'Flipkart', 'Paytm', 'Zomato', 'Swiggy', 'Razorpay', 'PhonePe', 'CRED', 'Ola', 'Meesho', 'Zoho',
-    'Myntra', 'Nykaa', 'Lenskart', 'Urban Company', 'Zepto', 'Rapido', 'Ola Electric', 'BigBasket',
-    'Delhivery', 'MakeMyTrip', 'Info Edge (Naukri)', 'Freshworks', 'Zerodha', 'Groww', 'Upstox',
-    'Dream11', 'BharatPe', 'Juspay', 'Postman', 'BrowserStack', 'InMobi', 'Dunzo', 'ShareChat',
-    'PhysicsWallah', 'Unacademy', 'upGrad', 'Pine Labs', 'Ather Energy', 'Cars24', 'PolicyBazaar',
-
-    // --- Indian IT services ---
-    'TCS', 'Infosys', 'Wipro', 'HCLTech', 'Tech Mahindra', 'Cognizant', 'Accenture', 'Capgemini',
-    'LTIMindtree', 'Mphasis', 'Persistent Systems', 'Hexaware', 'Coforge', 'Zensar', 'Birlasoft',
-    'KPIT Technologies', 'Tata Elxsi', 'Cyient', 'Sonata Software', 'Mindtree',
-
-    // --- Large Indian conglomerates / core / PSU ---
-    'Reliance Industries', 'Reliance Jio', 'Tata Group', 'Tata Motors', 'Tata Steel', 'Adani Group',
-    'Mahindra & Mahindra', 'Larsen & Toubro (L&T)', 'Bharti Airtel', 'Maruti Suzuki', 'Hero MotoCorp',
-    'Bajaj Auto', 'TVS Motor', 'Bosch India', 'Siemens India', 'ITC', 'Hindustan Unilever',
-    'ISRO', 'DRDO', 'BHEL', 'ONGC', 'NTPC', 'Indian Oil', 'HAL', 'BEL', 'Coal India', 'SAIL',
-
-    // --- Banking / finance ---
-    'HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank', 'Kotak Mahindra Bank', 'Bajaj Finserv',
-    'Goldman Sachs', 'Morgan Stanley',
-
-    // --- Other global ---
-    'Deloitte', 'IBM', 'Samsung', 'Intel', 'Walmart', 'Self Employed',
+    'Google', 'Microsoft', 'Amazon', 'Apple', 'Meta', 'Netflix', 'Adobe', 'Uber', 'Salesforce',
+    'Tata Consultancy Services', 'Infosys', 'Wipro', 'HCL Technologies', 'Tech Mahindra', 'Cognizant',
+    'Accenture', 'Deloitte', 'PwC', 'EY', 'KPMG', 'Goldman Sachs', 'Morgan Stanley', 'JPMorgan Chase',
+    'Flipkart', 'Swiggy', 'Zomato', 'Paytm', 'Razorpay', 'PhonePe', 'CRED', 'Ola', 'Byju\'s',
 ];
 
-const uniq = (arr: string[]): string[] => Array.from(new Set(arr.filter(Boolean)));
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 // ============================================================================
-// 3. Zod Schema
+// 2. Validation Schema (Zod)
 // ============================================================================
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 const createSchema = z.object({
-    // Step 1: Basic Profile
-    mentorRole: z.enum(['senior_mentor', 'alumni'], { required_error: "Role is required" }),
+    // Step 1: Profile
+    mentorRole: z.enum(['senior_mentor', 'alumni'], {
+        required_error: "Please select your mentor role",
+    }),
     fullName: z.string().min(2, "Full name must be at least 2 characters").max(100),
     profilePhotoFile: z.any().refine((file) => file instanceof File, "Profile photo is required")
         .refine((file: File) => file && file.size <= MAX_FILE_SIZE, "Max file size is 5MB")
-        .refine((file: File) => file && ['image/jpeg', 'image/jpg', 'image/png'].includes(file.type), "Only .jpg, .jpeg, .png formats are supported"),
-    college: z.string().min(1, "College/University is required").max(200),
-    degree: z.string().min(1, "Degree is required").max(100),
-    fieldOfStudy: z.string().min(1, "Field of study is required").max(100),
-    graduationYear: z.number({ invalid_type_error: "Must be a valid year" }).min(1980).max(new Date().getFullYear() + 10),
-    // Optional: sirf unke liye jinke paas current role / company hai
-    currentRole: z.string().max(100, "Current role cannot exceed 100 characters").optional().or(z.literal('')),
-    currentCompany: z.string().max(100, "Current company cannot exceed 100 characters").optional().or(z.literal('')),
-    shortBio: z.string().min(50, "Bio must be at least 50 characters").max(1000),
+        .refine((file: File) => file && ['image/jpeg', 'image/jpg', 'image/png'].includes(file.type), "Only .jpg, .jpeg, .png formats supported"),
+    college: z.string().min(2, "College/University must be at least 2 characters").max(150),
+    degree: z.string().min(2, "Degree must be at least 2 characters").max(100),
+    fieldOfStudy: z.string().min(2, "Field of study must be at least 2 characters").max(100),
+    graduationYear: z.number({ invalid_type_error: "Graduation year is required" })
+        .int()
+        .min(1980, "Invalid year")
+        .max(new Date().getFullYear() + 10, "Invalid year"),
+    currentRole: z.string().min(2, "Current role is required").max(100),
+    currentCompany: z.string().min(2, "Current company is required").max(100),
+    shortBio: z.string().min(20, "Short bio must be at least 20 characters").max(600),
 
-    // Step 2: Professional
-    linkedinUrl: z.string().regex(/^https?:\/\/(www\.)?linkedin\.com\/.+/i, "Invalid LinkedIn URL"),
-    githubUrl: z.string().regex(/^https?:\/\/(www\.)?github\.com\/.+/i, "Invalid GitHub URL").optional().or(z.literal('')),
+    // Step 2: Professional Details
+    linkedinUrl: z.string().url("Valid LinkedIn URL is required").regex(/linkedin\.com/, "Must be a valid LinkedIn URL"),
+    githubUrl: z.string().url("Must be a valid URL").regex(/github\.com/, "Must be a valid GitHub URL").optional().or(z.literal('')),
     portfolioUrl: z.string().url("Must be a valid URL").optional().or(z.literal('')),
-    // Optional: khali chhodne par undefined (register me setValueAs lagaya hai)
-    yearsOfExperience: z.number({ invalid_type_error: "Must be a valid number" }).min(0, "Cannot be negative").max(50, "Cannot exceed 50").optional(),
-    experienceLevel: z.nativeEnum(ExperienceLevel, { errorMap: () => ({ message: "Select an experience level" }) }),
-    primaryExpertise: z.nativeEnum(Domain, { errorMap: () => ({ message: "Select primary expertise" }) }),
+    yearsOfExperience: z.number({ invalid_type_error: "Years of experience is required" })
+        .min(1, "Minimum 1 year of experience required")
+        .max(50, "Invalid years of experience"),
+    experienceLevel: z.nativeEnum(ExperienceLevel, { errorMap: () => ({ message: "Please select your experience level" }) }),
+    primaryExpertise: z.nativeEnum(Domain, { errorMap: () => ({ message: "Please select your primary expertise" }) }),
 
-    // Step 3: Skills & Mentorship
-    otherSkills: z.array(z.string()).max(20, "Max 20 skills allowed"),
-    technologies: z.array(z.string()).max(30, "Max 30 technologies allowed"),
-    achievements: z.array(z.string()).max(15, "Max 15 achievements allowed"),
+    // Step 3: Skills & Domain
+    otherSkills: z.array(z.string()).min(1, "Add at least 1 secondary skill").max(20, "Max 20 skills allowed"),
+    technologies: z.array(z.string()).min(1, "Add at least 1 tool/technology").max(30, "Max 30 technologies allowed"),
+    achievements: z.array(z.string()).max(10, "Max 10 achievements allowed"),
     certifications: z.array(z.string()).max(15, "Max 15 certifications allowed"),
     helpAreas: z
         .array(z.nativeEnum(MentorshipHelpArea))
@@ -259,49 +175,34 @@ const steps = [
     { id: 5, title: 'Verification', fields: ['resumeFile', 'proofDocumentFile'] },
 ];
 
-// ============================================================================
-// 4. Prefill helpers (profile data se form bharne ke liye)
-// ============================================================================
-
-// Object me se pehli non-empty string value jiska key regex se match kare (exact key naam pata na ho tab bhi chalega)
-const findStringByKey = (obj: any, keyRegex: RegExp): string => {
-    if (!obj || typeof obj !== 'object') return '';
-    for (const [k, v] of Object.entries(obj)) {
-        if (keyRegex.test(k) && typeof v === 'string' && v.trim()) return v.trim();
-    }
-    return '';
-};
-
-const COLLEGE_KEY = /(school|college|institut|universit)/i;
-const DEGREE_KEY = /^(degree|degreeName|qualification)$/i;
-const FIELD_KEY = /(fieldOfStudy|field|major|stream|special)/i;
-const YEAR_KEY = /(endYear|graduationYear|yearOfCompletion|passingYear|toYear|endDate|completionDate)/i;
-
-const getEducationYear = (edu: any): number | undefined => {
-    if (!edu || typeof edu !== 'object') return undefined;
-    for (const [k, v] of Object.entries(edu)) {
-        if (!YEAR_KEY.test(k) || v === null || v === undefined || v === '') continue;
-        if (typeof v === 'number' && v > 1900) return v;
-        if (typeof v === 'string') {
-            if (/^\d{4}$/.test(v.trim())) return Number(v.trim());
-            const y = new Date(v).getFullYear();
-            if (!Number.isNaN(y)) return y;
-        }
-    }
-    return undefined;
-};
-
 export default function SeniorMentorApplicationPage() {
     const router = useRouter();
+    const { user, isLoading: isAuthLoading } = useAuth();
     const [currentStep, setCurrentStep] = useState(1);
-    const [existingApplication, setExistingApplication] = useState<SeniorMentorApplication | null>(null);
     const [isLoadingInit, setIsLoadingInit] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState(false);
     const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const [photoHint, setPhotoHint] = useState<string | null>(null);
 
-    const { register, handleSubmit, trigger, formState: { errors }, setValue, getValues, watch, setError, clearErrors } = useForm<FormValues>({
+    const hasPrefilledRef = useRef(false);
+    const isPrefilledPhotoRef = useRef(false);
+    const isRedirectingRef = useRef(false);
+    const timedOutRef = useRef(false);
+
+    const {
+        register,
+        handleSubmit,
+        trigger,
+        formState: { errors, dirtyFields },
+        setValue,
+        watch,
+        setError,
+        clearErrors,
+        control,
+        getValues,
+    } = useForm<FormValues>({
         resolver: zodResolver(createSchema),
         defaultValues: {
             mentorRole: undefined,
@@ -310,60 +211,11 @@ export default function SeniorMentorApplicationPage() {
             achievements: [],
             certifications: [],
             helpAreas: [],
-        }
+        },
     });
-
-    // ---- Profile data (prefill ke liye) ----
-    const { user } = useAuth();
-    const { userProfileData, profileImageUrl, aboutId, fetchUserProfile } = useProfileData();
-    const { educationList, fetchEducationData } = useEducationData();
-    const { experienceList, fetchExperienceData } = useExperienceData();
-    const { aboutData, fetchAboutData } = useAboutData(aboutId);
 
     const selectedHelpAreas = (watch('helpAreas') || []) as MentorshipHelpArea[];
     const isMaxHelpAreas = selectedHelpAreas.length >= MAX_HELP_AREAS;
-
-    // User ke apne profile ke college / company suggestion list me sabse upar
-    const collegeOptions = useMemo(() => {
-        const own = (educationList || []).map((e: any) => findStringByKey(e, COLLEGE_KEY));
-        const reg = typeof userProfileData?.education === 'string' ? [userProfileData.education] : [];
-        return uniq([...own, ...reg, ...COLLEGE_SUGGESTIONS]);
-    }, [educationList, userProfileData]);
-
-    const degreeOptions = useMemo(() => {
-        const own = (educationList || []).map((e: any) => findStringByKey(e, DEGREE_KEY));
-        return uniq([...own, ...DEGREE_SUGGESTIONS]);
-    }, [educationList]);
-
-    const fieldOptions = useMemo(() => {
-        const own = (educationList || []).map((e: any) => findStringByKey(e, FIELD_KEY));
-        return uniq([...own, ...FIELD_SUGGESTIONS]);
-    }, [educationList]);
-
-    const roleOptions = useMemo(() => {
-        const own = (experienceList || []).map((e: any) => e?.position as string);
-        const reg = userProfileData?.currentPosition ? [userProfileData.currentPosition] : [];
-        return uniq([...own, ...reg, ...ROLE_SUGGESTIONS]);
-    }, [experienceList, userProfileData]);
-
-    const companyOptions = useMemo(() => {
-        const own = (experienceList || []).map((e: any) => e?.company as string);
-        return uniq([...own, ...COMPANY_SUGGESTIONS]);
-    }, [experienceList]);
-
-    // Field tabhi bharo jab user ne khud kuch na likha ho
-    const fillIfEmpty = useCallback((name: keyof FormValues, value: any) => {
-        if (value === undefined || value === null || value === '') return;
-        const current = getValues(name) as any;
-        const isEmpty =
-            current === undefined ||
-            current === null ||
-            current === '' ||
-            (typeof current === 'number' && Number.isNaN(current));
-        if (isEmpty) {
-            setValue(name, value, { shouldDirty: true });
-        }
-    }, [getValues, setValue]);
 
     useEffect(() => {
         if (!toast) return;
@@ -377,130 +229,207 @@ export default function SeniorMentorApplicationPage() {
         }
     }, [selectedHelpAreas.length, errors.helpAreas, clearErrors]);
 
+    // 1. Standalone 8-second safety timer on mount (independent of auth wait)
     useEffect(() => {
-        const fetchStatus = async () => {
-            try {
-                const app = await SeniorMentorApplicationService.getMyApplication();
-                if (app) {
-                    const profileUserId = app.userId;
-                    router.push(`/mentorship/senior-mentor-profile/${profileUserId}`);
-                    return; // Prevent state updates and skip to redirect immediately
-                }
-            } catch (err) {
-                console.error("Error fetching application status", err);
-            } finally {
+        const timer = setTimeout(() => {
+            timedOutRef.current = true;
+            if (!isRedirectingRef.current) {
                 setIsLoadingInit(false);
             }
-        };
-        fetchStatus();
-    }, [router]);
+        }, 8000);
+        return () => clearTimeout(timer);
+    }, []);
 
-    // ---- Prefill: profile + education fetch (application na ho tabhi) ----
+    // 2. Main data loading coordinator
     useEffect(() => {
-        if (isLoadingInit || !user?.userId) return;
-        fetchUserProfile(user.userId);
-        fetchEducationData();
-    }, [isLoadingInit, user?.userId, fetchUserProfile, fetchEducationData]);
+        if (isAuthLoading || hasPrefilledRef.current) return;
 
-    // Profile aane par: name, register ke time ka data, experience ids
-    useEffect(() => {
-        if (!userProfileData) return;
-        console.log('[PREFILL] userProfileData:', userProfileData);
-        const fullName = `${userProfileData.firstName || ''} ${userProfileData.lastName || ''}`.trim();
-        fillIfEmpty('fullName', fullName);
-        // Register ke time jo likha tha (agar education/currentPosition string me saved hai)
-        if (typeof userProfileData.education === 'string') {
-            fillIfEmpty('college', userProfileData.education.trim());
-        }
-        if (userProfileData.currentPosition) {
-            fillIfEmpty('currentRole', userProfileData.currentPosition);
-        }
-        fetchExperienceData(userProfileData.experienceIds || []);
-    }, [userProfileData, fillIfEmpty, fetchExperienceData]);
+        let isMounted = true;
 
-    // About fetch (bio ke liye)
-    useEffect(() => {
-        if (aboutId) fetchAboutData();
-    }, [aboutId, fetchAboutData]);
-
-    // Education se college / degree / field / year
-    useEffect(() => {
-        if (!educationList || educationList.length === 0) return;
-        console.log('[PREFILL] educationList[0]:', educationList[0]);
-        // Sabse latest graduation year wali education lo
-        const latest = [...educationList].sort(
-            (a, b) => (getEducationYear(b) ?? 0) - (getEducationYear(a) ?? 0)
-        )[0];
-
-        // Education list ka data register wale string se better hai, isliye college yahan se force set
-        const college = findStringByKey(latest, COLLEGE_KEY);
-        if (college) setValue('college', college, { shouldDirty: true });
-        fillIfEmpty('degree', findStringByKey(latest, DEGREE_KEY));
-        fillIfEmpty('fieldOfStudy', findStringByKey(latest, FIELD_KEY));
-        fillIfEmpty('graduationYear', getEducationYear(latest));
-    }, [educationList, fillIfEmpty, setValue]);
-
-    // Experience se current role / company
-    useEffect(() => {
-        if (!experienceList || experienceList.length === 0) return;
-        console.log('[PREFILL] experienceList[0]:', experienceList[0]);
-        const current = experienceList.find((e: any) => e.current) || experienceList[0];
-        fillIfEmpty('currentRole', current?.position);
-        fillIfEmpty('currentCompany', current?.company);
-    }, [experienceList, fillIfEmpty]);
-
-    // About se short bio
-    useEffect(() => {
-        if (!aboutData) return;
-        console.log('[PREFILL] aboutData:', aboutData);
-        fillIfEmpty('shortBio', findStringByKey(aboutData, /(summary|about|bio|description|content|story)/i));
-    }, [aboutData, fillIfEmpty]);
-
-    // Profile photo (URL se File banao, best-effort)
-    useEffect(() => {
-        if (!profileImageUrl) return;
-        if (getValues('profilePhotoFile') instanceof File) return;
-        let cancelled = false;
-
-        const loadPhoto = async () => {
+        const loadAndPrefill = async () => {
             try {
-                const res = await fetch(profileImageUrl);
-                if (!res.ok) return;
-                const blob = await res.blob();
-                const allowed = ['image/jpeg', 'image/jpg', 'image/png'];
-                if (!allowed.includes(blob.type)) return; // webp etc. skip, user khud upload karega
-                if (blob.size > MAX_FILE_SIZE) return;
-                if (cancelled) return;
-                const ext = blob.type === 'image/png' ? 'png' : 'jpg';
-                const file = new File([blob], `profile-photo.${ext}`, { type: blob.type });
-                if (!(getValues('profilePhotoFile') instanceof File)) {
-                    setValue('profilePhotoFile', file as any, { shouldDirty: true });
+                // A. Check application status first
+                const app = await SeniorMentorApplicationService.getMyApplication().catch(() => null);
+                if (!isMounted) return;
+
+                // 1. Redirect must NOT depend on timeout:
+                if (app) {
+                    isRedirectingRef.current = true;
+                    const profileUserId = app.userId;
+                    router.push(`/mentorship/senior-mentor-profile/${profileUserId}`);
+                    return; // Redirect without setting isLoadingInit(false)
                 }
-            } catch {
-                // CORS / network fail: user manually upload karega
+
+                // If timed out already, skip prefill
+                if (timedOutRef.current) {
+                    setIsLoadingInit(false);
+                    return;
+                }
+
+                // If user is not logged in, show empty form immediately
+                if (!user?.userId) {
+                    if (!timedOutRef.current) setIsLoadingInit(false);
+                    return;
+                }
+
+                // B. Fetch profile & education in parallel
+                const [profileRes, eduRes] = await Promise.allSettled([
+                    AuthService.getUserProfile(),
+                    ProfileService.getAllEducation(false),
+                ]);
+
+                if (!isMounted || timedOutRef.current) return;
+
+                const userProfile = profileRes.status === 'fulfilled' ? profileRes.value?.data : null;
+                const educationList: IEducationItem[] =
+                    eduRes.status === 'fulfilled' ? (eduRes.value?.data?.educationList || []) : [];
+
+                if (!userProfile) {
+                    if (!timedOutRef.current) setIsLoadingInit(false);
+                    return;
+                }
+
+                // C. Fetch experiences, about, and photo URL in parallel
+                const expPromises = (userProfile.experienceIds || []).map((id: string) =>
+                    ProfileService.getExperienceById(id)
+                        .then((res: { data?: { experience?: IExperienceItem } }) => res?.data?.experience)
+                        .catch(() => null)
+                );
+
+                const aboutPromise = userProfile.aboutId
+                    ? ProfileService.getAboutById(userProfile.aboutId)
+                          .then((res: { data?: { about?: IAboutData } }) => res?.data?.about?.aboutText || '')
+                          .catch(() => '')
+                    : Promise.resolve('');
+
+                const photoUrlPromise = userProfile.profilePhotoId
+                    ? ProfileService.getProfilePhotoById(userProfile.profilePhotoId)
+                          .then((res: { data?: { photo?: IProfilePhotoData } }) => res?.data?.photo?.cloudinarySecureUrl || '')
+                          .catch(() => '')
+                    : Promise.resolve('');
+
+                const [expResults, aboutText, photoUrl] = await Promise.all([
+                    Promise.all(expPromises),
+                    aboutPromise,
+                    photoUrlPromise,
+                ]);
+
+                if (!isMounted || timedOutRef.current) return;
+
+                const experienceList: IExperienceItem[] = expResults.filter(Boolean) as IExperienceItem[];
+
+                // D. Download photo blob with a single 4-second AbortController covering fetch + blob read
+                let photoFile: File | null = null;
+                if (photoUrl && !timedOutRef.current) {
+                    const photoController = new AbortController();
+                    const photoTimer = setTimeout(() => photoController.abort(), 4000);
+                    try {
+                        const res = await fetch(photoUrl, { signal: photoController.signal });
+                        if (!res.ok) {
+                            clearTimeout(photoTimer);
+                            if (!timedOutRef.current) setPhotoHint('Could not load existing profile photo. Please upload one manually.');
+                        } else {
+                            const blob = await res.blob();
+                            clearTimeout(photoTimer);
+                            if (!isMounted || timedOutRef.current) return;
+                            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+                            if (blob.size <= 5 * 1024 * 1024 && allowedTypes.includes(blob.type)) {
+                                const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+                                photoFile = new File([blob], `profile-photo.${ext}`, { type: blob.type });
+                            } else if (blob.size > 5 * 1024 * 1024) {
+                                if (!timedOutRef.current) setPhotoHint('Existing profile photo exceeds 5MB. Please upload a smaller image.');
+                            } else {
+                                if (!timedOutRef.current) setPhotoHint('Existing photo is not JPG/PNG. Please upload a JPG or PNG.');
+                            }
+                        }
+                    } catch {
+                        clearTimeout(photoTimer);
+                        if (!timedOutRef.current) setPhotoHint('Could not load existing profile photo. Please upload one manually.');
+                    }
+                }
+
+                if (!isMounted || timedOutRef.current) return;
+
+                // E. Apply Prefill (Only if user has NOT dirtied the field)
+                // 1) Full Name
+                const fullName = `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim();
+                if (fullName && !dirtyFields.fullName) {
+                    setValue('fullName', fullName, { shouldValidate: true, shouldDirty: false });
+                }
+
+                // 2) Education
+                const eduPrefill = resolveEducationPrefill(
+                    educationList,
+                    userProfile.onboarding?.studentProfile,
+                    userProfile.onboarding?.fresherProfile
+                );
+                if (eduPrefill.college && !dirtyFields.college) {
+                    setValue('college', eduPrefill.college, { shouldValidate: true, shouldDirty: false });
+                }
+                if (eduPrefill.degree && !dirtyFields.degree) {
+                    setValue('degree', eduPrefill.degree, { shouldValidate: true, shouldDirty: false });
+                }
+                if (eduPrefill.fieldOfStudy && !dirtyFields.fieldOfStudy) {
+                    setValue('fieldOfStudy', eduPrefill.fieldOfStudy, { shouldValidate: true, shouldDirty: false });
+                }
+                if (eduPrefill.graduationYear && !dirtyFields.graduationYear) {
+                    setValue('graduationYear', eduPrefill.graduationYear, { shouldValidate: true, shouldDirty: false });
+                }
+
+                // 3) Experience (Single source rule: both from Experience or both from workingProfile)
+                const expPrefill = resolveExperiencePrefill(
+                    experienceList,
+                    userProfile.onboarding?.workingProfile
+                );
+                if (expPrefill.role && !dirtyFields.currentRole) {
+                    setValue('currentRole', expPrefill.role, { shouldValidate: true, shouldDirty: false });
+                }
+                if (expPrefill.company && !dirtyFields.currentCompany) {
+                    setValue('currentCompany', expPrefill.company, { shouldValidate: true, shouldDirty: false });
+                }
+
+                // 4) Short Bio (from About)
+                if (aboutText && !dirtyFields.shortBio) {
+                    setValue('shortBio', aboutText.trim(), { shouldValidate: true, shouldDirty: false });
+                }
+
+                // 5) Profile Photo
+                if (photoFile && !dirtyFields.profilePhotoFile && !getValues('profilePhotoFile')) {
+                    setValue('profilePhotoFile', photoFile as any, { shouldValidate: false, shouldDirty: false });
+                    isPrefilledPhotoRef.current = true;
+                }
+            } catch (err) {
+                console.error("Error during senior mentor form initialization", err);
+            } finally {
+                if (isMounted && !isRedirectingRef.current) {
+                    hasPrefilledRef.current = true;
+                    setIsLoadingInit(false);
+                }
             }
         };
-        loadPhoto();
 
-        return () => { cancelled = true; };
-    }, [profileImageUrl, getValues, setValue]);
+        loadAndPrefill();
+        return () => {
+            isMounted = false;
+        };
+    }, [isAuthLoading, user?.userId, router, setValue, getValues, dirtyFields]);
 
     const handleNext = async () => {
         if (currentStep === 3) {
             if (selectedHelpAreas.length < MIN_HELP_AREAS) {
                 setError('helpAreas', {
                     type: 'manual',
-                    message: `Please select at least ${MIN_HELP_AREAS} help areas (you have selected ${selectedHelpAreas.length}).`
+                    message: `Please select at least ${MIN_HELP_AREAS} help areas (you have selected ${selectedHelpAreas.length}).`,
                 });
                 const el = document.getElementById('help-areas-section');
                 el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 return;
             }
         }
-        const stepFields = steps.find(s => s.id === currentStep)?.fields as (keyof FormValues)[];
+        const stepFields = steps.find((s) => s.id === currentStep)?.fields as (keyof FormValues)[];
         const isValid = await trigger(stepFields);
         if (isValid) {
-            setCurrentStep(prev => prev + 1);
+            setCurrentStep((prev) => prev + 1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
             const firstInvalid = document.querySelector<HTMLElement>('[aria-invalid="true"]');
@@ -509,7 +438,7 @@ export default function SeniorMentorApplicationPage() {
     };
 
     const handlePrev = () => {
-        setCurrentStep(prev => prev - 1);
+        setCurrentStep((prev) => prev - 1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -518,11 +447,13 @@ export default function SeniorMentorApplicationPage() {
         const errorKeys = Object.keys(formErrors);
         if (errorKeys.length > 0) {
             const firstKey = errorKeys[0];
-            const stepWithErr = steps.find(s => (s.fields as string[]).includes(firstKey));
+            const stepWithErr = steps.find((s) => (s.fields as string[]).includes(firstKey));
             if (stepWithErr) {
                 setCurrentStep(stepWithErr.id);
             }
-            const msg = formErrors[firstKey]?.message || `Please check required fields in Step ${stepWithErr?.id || currentStep}.`;
+            const msg =
+                formErrors[firstKey]?.message ||
+                `Please check required fields in Step ${stepWithErr?.id || currentStep}.`;
             const fullErrMsg = `Application submit nahi hui: ${msg}`;
             setErrorMsg(fullErrMsg);
             setToast({ type: 'error', message: fullErrMsg });
@@ -530,77 +461,79 @@ export default function SeniorMentorApplicationPage() {
         }
     };
 
-    const onSubmit = async (data: FormValues) => {
-        setErrorMsg('');
-        setIsSubmitting(true);
+    const onSubmit = async (values: FormValues) => {
         try {
+            setIsSubmitting(true);
+            setErrorMsg('');
+            setToast(null);
+
             const formData = new FormData();
-            formData.append('mentorRole', data.mentorRole);
-            formData.append('fullName', data.fullName);
-            if (data.profilePhotoFile) formData.append('profilePhoto', data.profilePhotoFile);
-            formData.append('college', data.college);
-            formData.append('degree', data.degree);
-            formData.append('fieldOfStudy', data.fieldOfStudy);
-            formData.append('graduationYear', data.graduationYear.toString());
-            // Optional: sirf tab bhejo jab user ne bhara ho
-            if (data.currentRole?.trim()) formData.append('currentRole', data.currentRole.trim());
-            if (data.currentCompany?.trim()) formData.append('currentCompany', data.currentCompany.trim());
-            formData.append('shortBio', data.shortBio);
 
-            formData.append('linkedinUrl', data.linkedinUrl);
-            if (data.githubUrl) formData.append('githubUrl', data.githubUrl);
-            if (data.portfolioUrl) formData.append('portfolioUrl', data.portfolioUrl);
-            // Optional: sirf tab bhejo jab user ne bhara ho
-            if (data.yearsOfExperience !== undefined && !Number.isNaN(data.yearsOfExperience)) {
-                formData.append('yearsOfExperience', data.yearsOfExperience.toString());
+            formData.append('mentorRole', values.mentorRole);
+            formData.append('fullName', values.fullName);
+            formData.append('college', values.college);
+            formData.append('degree', values.degree);
+            formData.append('fieldOfStudy', values.fieldOfStudy);
+            formData.append('graduationYear', values.graduationYear.toString());
+            formData.append('currentRole', values.currentRole);
+            formData.append('currentCompany', values.currentCompany);
+            formData.append('shortBio', values.shortBio);
+
+            formData.append('linkedinUrl', values.linkedinUrl);
+            if (values.githubUrl) formData.append('githubUrl', values.githubUrl);
+            if (values.portfolioUrl) formData.append('portfolioUrl', values.portfolioUrl);
+            formData.append('yearsOfExperience', values.yearsOfExperience.toString());
+            formData.append('experienceLevel', values.experienceLevel);
+            formData.append('primaryExpertise', values.primaryExpertise);
+
+            formData.append('otherSkills', JSON.stringify(values.otherSkills));
+            formData.append('technologies', JSON.stringify(values.technologies));
+            formData.append('achievements', JSON.stringify(values.achievements));
+            formData.append('certifications', JSON.stringify(values.certifications));
+            formData.append('helpAreas', JSON.stringify(values.helpAreas));
+
+            formData.append('motivation', values.motivation);
+            formData.append('adviceToJuniorSelf', values.adviceToJuniorSelf);
+
+            if (values.profilePhotoFile instanceof File) {
+                formData.append('profilePhotoFile', values.profilePhotoFile);
             }
-            formData.append('experienceLevel', data.experienceLevel);
-            formData.append('primaryExpertise', data.primaryExpertise);
-
-            // Arrays
-            if (data.otherSkills?.length) formData.append('otherSkills', JSON.stringify(data.otherSkills));
-            if (data.technologies?.length) formData.append('technologies', JSON.stringify(data.technologies));
-            if (data.achievements?.length) formData.append('achievements', JSON.stringify(data.achievements));
-            if (data.certifications?.length) formData.append('certifications', JSON.stringify(data.certifications));
-            if (data.helpAreas?.length) formData.append('helpAreas', JSON.stringify(data.helpAreas));
-
-            formData.append('motivation', data.motivation);
-            formData.append('adviceToJuniorSelf', data.adviceToJuniorSelf);
-
-            if (data.resumeFile) formData.append('resume', data.resumeFile);
-            if (data.proofDocumentFile) formData.append('proofDocument', data.proofDocumentFile);
-
-            console.log('Submitting senior mentor application...');
-            const res = await SeniorMentorApplicationService.apply(formData);
-
-            const createdUserId = res?.userId;
-            setToast({ type: 'success', message: 'Application submitted successfully!' });
-
-            // Senior mentor photo ko account photo me bhi save karo -> Mentee workspace/navbar me wahi photo dikhe
-            if (data.profilePhotoFile instanceof File) {
-                await syncProfilePhotoToAllRoles(data.profilePhotoFile, createdUserId, { skip: ['mentor', 'senior'] }).catch(() => undefined);
+            if (values.resumeFile instanceof File) {
+                formData.append('resumeFile', values.resumeFile);
             }
-            if (createdUserId) {
-                router.push(`/mentorship/senior-mentor-profile/${createdUserId}`);
-            } else {
+            if (values.proofDocumentFile instanceof File) {
+                formData.append('proofDocumentFile', values.proofDocumentFile);
+            }
+
+            const resp = await SeniorMentorApplicationService.apply(formData);
+
+            if (resp && (resp.applicationId || resp.verificationStatus)) {
+                if (!isPrefilledPhotoRef.current && values.profilePhotoFile instanceof File) {
+                    syncProfilePhotoToAllRoles(values.profilePhotoFile, user?.userId, { skip: ['senior'] }).catch((err) => {
+                        console.error('Failed to sync profile photo to other roles:', err);
+                    });
+                }
                 setSuccessMsg(true);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                throw new Error('Submission failed');
             }
         } catch (error: any) {
-            console.error('[SENIOR_MENTOR_APP] Application submit failed:', error);
-            let reason = 'Failed to submit application. Please try again.';
+            console.error('[SENIOR_MENTOR_APP] Submission failed:', error);
             const resp = error?.response?.data;
-            if (error?.response?.status === 409) {
-                reason = 'You already have an active Senior Mentor application.';
-            } else if (resp?.errors && Array.isArray(resp.errors) && resp.errors.length > 0) {
-                resp.errors.forEach((err: { field?: string; message?: string }) => {
-                    if (err.field && err.message) {
-                        setError(err.field as any, { type: 'server', message: err.message });
+            let reason = 'Please check the required fields.';
+            if (Array.isArray(resp?.errors) && resp.errors.length > 0) {
+                resp.errors.forEach((err: { field: string; message: string }) => {
+                    if (err.field) {
+                        setError(err.field as keyof FormValues, {
+                            type: 'server',
+                            message: err.message || 'Invalid value',
+                        });
                     }
                 });
                 const firstErr = resp.errors[0];
                 reason = firstErr.message || `${firstErr.field} is invalid`;
-                const stepWithErr = steps.find(s => (s.fields as string[]).includes(firstErr.field));
+                const stepWithErr = steps.find((s) => (s.fields as string[]).includes(firstErr.field));
                 if (stepWithErr) {
                     setCurrentStep(stepWithErr.id);
                 }
@@ -628,8 +561,6 @@ export default function SeniorMentorApplicationPage() {
         );
     }
 
-
-
     if (successMsg) {
         return (
             <div className="min-h-screen bg-[#FAF9F6] p-6 lg:p-12">
@@ -647,10 +578,9 @@ export default function SeniorMentorApplicationPage() {
         );
     }
 
-    // Dynamic Tag Input Component adapted to BecomeMentor UI
-    const TagInput = ({ fieldName, label, placeholder }: { fieldName: keyof FormValues, label: string, placeholder: string }) => {
+    const TagInput = ({ fieldName, label, placeholder }: { fieldName: keyof FormValues; label: string; placeholder: string }) => {
         const [inputValue, setInputValue] = useState("");
-        const tags = watch(fieldName) as string[] || [];
+        const tags = (watch(fieldName) as string[]) || [];
 
         const addTag = () => {
             const val = inputValue.trim();
@@ -695,8 +625,7 @@ export default function SeniorMentorApplicationPage() {
         );
     };
 
-    // File Input Component adapted to BecomeMentor UI
-    const FileInput = ({ fieldName, label, accept, helpText, icon: Icon }: { fieldName: keyof FormValues, label: string, accept: string, helpText: string, icon: any }) => {
+    const FileInput = ({ fieldName, label, accept, helpText, icon: Icon }: { fieldName: keyof FormValues; label: string; accept: string; helpText: string; icon: any }) => {
         const file = watch(fieldName) as File;
         return (
             <div>
@@ -721,7 +650,7 @@ export default function SeniorMentorApplicationPage() {
                 {errors[fieldName] && <p className="text-red-500 text-xs mt-1">{errors[fieldName]?.message as string}</p>}
             </div>
         );
-    }
+    };
 
     const profilePhotoFile = watch('profilePhotoFile') as File;
     const profilePicPreview = profilePhotoFile instanceof File ? URL.createObjectURL(profilePhotoFile) : '';
@@ -730,15 +659,11 @@ export default function SeniorMentorApplicationPage() {
         <div className="min-h-screen bg-[#FAF9F6] flex items-start justify-center p-6 animate-fade-in overflow-y-auto">
             <div className="max-w-3xl w-full my-6 relative">
                 <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="bg-white rounded-[40px] shadow-2xl relative">
+                    <datalist id="degree-list">{DEGREE_SUGGESTIONS.map((o) => <option key={o} value={o} />)}</datalist>
+                    <datalist id="field-list">{FIELD_SUGGESTIONS.map((o) => <option key={o} value={o} />)}</datalist>
+                    <datalist id="role-list">{ROLE_SUGGESTIONS.map((o) => <option key={o} value={o} />)}</datalist>
+                    <datalist id="company-list">{COMPANY_SUGGESTIONS.map((o) => <option key={o} value={o} />)}</datalist>
 
-                    {/* Suggestion lists (user inme se chun sakta hai ya khud likh sakta hai) */}
-                    <datalist id="college-list">{collegeOptions.map((o) => <option key={o} value={o} />)}</datalist>
-                    <datalist id="degree-list">{degreeOptions.map((o) => <option key={o} value={o} />)}</datalist>
-                    <datalist id="field-list">{fieldOptions.map((o) => <option key={o} value={o} />)}</datalist>
-                    <datalist id="role-list">{roleOptions.map((o) => <option key={o} value={o} />)}</datalist>
-                    <datalist id="company-list">{companyOptions.map((o) => <option key={o} value={o} />)}</datalist>
-
-                    {/* Close Button */}
                     <button
                         type="button"
                         onClick={() => router.back()}
@@ -747,7 +672,6 @@ export default function SeniorMentorApplicationPage() {
                         <X className="w-5 h-5" />
                     </button>
 
-                    {/* Header */}
                     <div className="bg-gradient-to-br from-[#4a3728] to-[#7a5c3e] p-10 rounded-t-[40px] text-white relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
                         <div className="relative z-10">
@@ -759,7 +683,6 @@ export default function SeniorMentorApplicationPage() {
                                 Empower the community with your advanced industry leadership
                             </p>
 
-                            {/* Progress Bar */}
                             <div className="mt-8">
                                 <div className="flex items-center gap-2 mb-3">
                                     {[1, 2, 3, 4, 5].map((step) => (
@@ -771,208 +694,191 @@ export default function SeniorMentorApplicationPage() {
                                         />
                                     ))}
                                 </div>
-                                <p className="text-white font-bold text-sm">
-                                    Step {currentStep}: <span className="opacity-90 font-medium">{steps.find(s=>s.id===currentStep)?.title}</span>
-                                </p>
+                                <div className="flex justify-between text-xs font-bold text-white/60">
+                                    <span>Step {currentStep} of 5</span>
+                                    <span>{steps.find(s => s.id === currentStep)?.title}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Form Content */}
                     <div className="p-10">
-                        {existingApplication && existingApplication.verificationStatus === ApplicationStatus.REJECTED && (
-                            <div className="mb-8 bg-red-50 border border-red-200 text-red-700 px-6 py-5 rounded-2xl shadow-sm">
-                                <h3 className="font-bold mb-1">Your previous application was returned</h3>
-                                <p className="text-sm font-medium opacity-90">{existingApplication.rejectionReason || "Please update your details and submit again."}</p>
-                            </div>
-                        )}
-
                         {errorMsg && (
-                            <div className="mb-8 bg-red-50 border border-red-200 text-red-600 px-5 py-4 rounded-xl flex items-center justify-between">
-                                <span className="font-medium text-sm">{errorMsg}</span>
-                                <button type="button" onClick={() => setErrorMsg('')} className="p-1 hover:bg-white rounded-full transition"><X className="w-4 h-4" /></button>
+                            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-2xl text-sm font-semibold flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                {errorMsg}
                             </div>
                         )}
 
-                        {/* ──────────────── STEP 1: Basic Profile ──────────────── */}
+                        {/* STEP 1: Profile */}
                         {currentStep === 1 && (
                             <div className="space-y-6">
-                                <h3 className="text-2xl font-black text-[#4a3728] mb-6">Profile</h3>
+                                <h3 className="text-2xl font-black text-[#4a3728] mb-6">Personal & Academic Info</h3>
 
                                 <div>
-                                    <label className="block text-sm font-bold text-[#4a3728] mb-3">Which path best describes you? *</label>
+                                    <label className="block text-sm font-bold text-[#4a3728] mb-2">Which mentor role best describes you? *</label>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <label className={`relative flex flex-col p-4 border-2 rounded-2xl cursor-pointer transition-all duration-300 group overflow-hidden ${watch('mentorRole') === 'senior_mentor' ? 'border-[#4a3728] bg-gradient-to-br from-[#f8f6f4] to-white shadow-md transform -translate-y-1' : 'border-[#ece7e2] bg-white hover:border-[#8a7a6a] hover:shadow-sm'}`}>
-                                            <input type="radio" value="senior_mentor" {...register('mentorRole')} className="absolute opacity-0" />
-                                            {watch('mentorRole') === 'senior_mentor' && (
-                                                <div className="absolute top-4 right-4 text-[#4a3728]">
-                                                    <CheckCircle2 className="w-5 h-5" />
-                                                </div>
-                                            )}
-                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-colors duration-300 ${watch('mentorRole') === 'senior_mentor' ? 'bg-[#4a3728] text-white shadow-md' : 'bg-[#f8f6f4] text-[#8a7a6a] group-hover:bg-[#ece7e2]'}`}>
-                                                <Award className="w-5 h-5" />
+                                        <label className={`flex items-start gap-3 p-4 border rounded-2xl cursor-pointer transition ${watch('mentorRole') === 'senior_mentor' ? 'border-[#4a3728] bg-[#f8f6f4] shadow-sm' : 'border-[#ece7e2] hover:border-[#4a3728]'}`}>
+                                            <input type="radio" value="senior_mentor" {...register('mentorRole')} className="mt-1 text-[#4a3728] focus:ring-[#4a3728]" />
+                                            <div>
+                                                <p className="text-sm font-bold text-[#4a3728] flex items-center gap-1.5">
+                                                    <Award className="w-4 h-4 text-[#4a3728]" />
+                                                    Senior Mentor
+                                                </p>
+                                                <p className="text-xs text-slate-500 mt-1">Pre-final or Final year student with strong technical and problem-solving skills.</p>
                                             </div>
-                                            <span className={`text-base font-black tracking-tight mb-0.5 transition-colors ${watch('mentorRole') === 'senior_mentor' ? 'text-[#4a3728]' : 'text-slate-700'}`}>Senior Mentor</span>
-                                            <span className="text-xs text-slate-500 leading-relaxed font-medium">Currently associated with the college as a senior or active student.</span>
                                         </label>
-
-                                        <label className={`relative flex flex-col p-4 border-2 rounded-2xl cursor-pointer transition-all duration-300 group overflow-hidden ${watch('mentorRole') === 'alumni' ? 'border-[#4a3728] bg-gradient-to-br from-[#f8f6f4] to-white shadow-md transform -translate-y-1' : 'border-[#ece7e2] bg-white hover:border-[#8a7a6a] hover:shadow-sm'}`}>
-                                            <input type="radio" value="alumni" {...register('mentorRole')} className="absolute opacity-0" />
-                                            {watch('mentorRole') === 'alumni' && (
-                                                <div className="absolute top-4 right-4 text-[#4a3728]">
-                                                    <CheckCircle2 className="w-5 h-5" />
-                                                </div>
-                                            )}
-                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-colors duration-300 ${watch('mentorRole') === 'alumni' ? 'bg-[#4a3728] text-white shadow-md' : 'bg-[#f8f6f4] text-[#8a7a6a] group-hover:bg-[#ece7e2]'}`}>
-                                                <GraduationCap className="w-5 h-5" />
+                                        <label className={`flex items-start gap-3 p-4 border rounded-2xl cursor-pointer transition ${watch('mentorRole') === 'alumni' ? 'border-[#4a3728] bg-[#f8f6f4] shadow-sm' : 'border-[#ece7e2] hover:border-[#4a3728]'}`}>
+                                            <input type="radio" value="alumni" {...register('mentorRole')} className="mt-1 text-[#4a3728] focus:ring-[#4a3728]" />
+                                            <div>
+                                                <p className="text-sm font-bold text-[#4a3728] flex items-center gap-1.5">
+                                                    <GraduationCap className="w-4 h-4 text-[#4a3728]" />
+                                                    Alumni
+                                                </p>
+                                                <p className="text-xs text-slate-500 mt-1">Graduated professional with industry experience, guiding students on placements & career.</p>
                                             </div>
-                                            <span className={`text-base font-black tracking-tight mb-0.5 transition-colors ${watch('mentorRole') === 'alumni' ? 'text-[#4a3728]' : 'text-slate-700'}`}>Alumni</span>
-                                            <span className="text-xs text-slate-500 leading-relaxed font-medium">Former student or graduate contributing industry expertise.</span>
                                         </label>
                                     </div>
-                                    {errors.mentorRole && <p className="text-red-500 text-xs mt-2 font-medium flex items-center gap-1"><X className="w-3 h-3"/>{errors.mentorRole?.message as string}</p>}
+                                    {errors.mentorRole && <p className="text-red-500 text-xs mt-1">{errors.mentorRole.message}</p>}
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-bold text-[#4a3728] mb-2">
-                                        Profile Photo *
-                                    </label>
-                                    <div className="relative w-36 h-36 group cursor-pointer bg-[#ece7e2] rounded-2xl flex items-center justify-center border-4 border-white shadow-xl transition-all duration-500 group-hover:shadow-2xl group-hover:scale-105 overflow-hidden">
-                                        {profilePicPreview ? (
-                                            <img
-                                                src={profilePicPreview}
-                                                alt="Profile"
-                                                className="w-full h-full object-cover"
+                                    <label className="block text-sm font-bold text-[#4a3728] mb-2">Profile Photo *</label>
+                                    <div className="flex items-center gap-6">
+                                        <div className="w-24 h-24 rounded-full border-2 border-dashed border-[#ece7e2] overflow-hidden flex items-center justify-center bg-[#f8f6f4] relative">
+                                            {profilePicPreview ? (
+                                                <img src={profilePicPreview} alt="Preview" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <ImageIcon className="w-8 h-8 text-[#8a7a6a]" />
+                                            )}
+                                        </div>
+                                        <label className="px-5 py-2.5 bg-[#f8f6f4] hover:bg-[#ece7e2] text-[#4a3728] font-bold rounded-xl text-sm cursor-pointer transition flex items-center gap-2">
+                                            <Upload className="w-4 h-4" />
+                                            Upload Photo
+                                            <input
+                                                type="file"
+                                                className="hidden"
+                                                accept="image/jpeg,image/png"
+                                                onChange={(e) => {
+                                                    if (e.target.files?.[0]) {
+                                                        isPrefilledPhotoRef.current = false;
+                                                        setValue('profilePhotoFile', e.target.files[0] as any, { shouldValidate: true, shouldDirty: true });
+                                                    }
+                                                }}
                                             />
-                                        ) : (
-                                            <ImageIcon className="w-10 h-10 text-slate-400" />
-                                        )}
-                                        <input
-                                            type="file"
-                                            accept="image/jpeg,image/png,image/jpg"
-                                            className="hidden"
-                                            id="profilePicInput"
-                                            onChange={(e) => {
-                                                const file = e.target.files?.[0];
-                                                if (file) {
-                                                    setValue('profilePhotoFile', file as any, { shouldValidate: true });
-                                                }
-                                            }}
-                                        />
-                                        <label
-                                            htmlFor="profilePicInput"
-                                            className={
-                                                profilePicPreview
-                                                    ? "absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/90 cursor-pointer transition-all duration-300 opacity-0 group-hover:opacity-100"
-                                                    : "absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/80 cursor-pointer transition-all duration-300"
-                                            }
-                                        >
-                                            <p className="text-xs font-bold text-[#4a3728] text-center px-2">
-                                                {profilePicPreview ? "Change photo" : "Click to upload"}
-                                            </p>
                                         </label>
                                     </div>
-                                    {errors.profilePhotoFile && (
-                                        <p className="text-red-500 text-xs mt-1">{errors.profilePhotoFile.message as string}</p>
+                                    {photoHint && (
+                                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+                                            {photoHint}
+                                        </p>
                                     )}
+                                    {errors.profilePhotoFile && <p className="text-red-500 text-xs mt-1">{errors.profilePhotoFile.message as string}</p>}
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Full Name *</label>
-                                        <input type="text" {...register('fullName')} className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <input type="text" {...register('fullName')} autoComplete="name" placeholder="John Doe" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.fullName && <p className="text-red-500 text-xs mt-1">{errors.fullName.message}</p>}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Graduation Year *</label>
-                                        <input type="number" {...register('graduationYear', { valueAsNumber: true })} placeholder="e.g. 2024" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <input type="number" {...register('graduationYear', { valueAsNumber: true })} autoComplete="off" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.graduationYear && <p className="text-red-500 text-xs mt-1">{errors.graduationYear.message}</p>}
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">College / University *</label>
-                                        <input type="text" list="college-list" autoComplete="off" {...register('college')} placeholder="Start typing or pick from suggestions" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <Controller
+                                            name="college"
+                                            control={control}
+                                            render={({ field }) => (
+                                                <CollegeAutocomplete
+                                                    id="college"
+                                                    name={field.name}
+                                                    value={field.value || ''}
+                                                    onChange={(val) => field.onChange(val)}
+                                                    onBlur={field.onBlur}
+                                                    ariaInvalid={!!errors.college}
+                                                    placeholder="Search or enter your college / university"
+                                                    className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900"
+                                                />
+                                            )}
+                                        />
                                         {errors.college && <p className="text-red-500 text-xs mt-1">{errors.college.message}</p>}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Degree *</label>
-                                        <input type="text" list="degree-list" autoComplete="off" {...register('degree')} placeholder="e.g. B.Tech" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <input type="text" list="degree-list" {...register('degree')} autoComplete="off" placeholder="e.g. B.Tech" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.degree && <p className="text-red-500 text-xs mt-1">{errors.degree.message}</p>}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Field of Study *</label>
-                                        <input type="text" list="field-list" autoComplete="off" {...register('fieldOfStudy')} placeholder="e.g. Computer Science" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <input type="text" list="field-list" {...register('fieldOfStudy')} autoComplete="off" placeholder="e.g. Computer Science" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.fieldOfStudy && <p className="text-red-500 text-xs mt-1">{errors.fieldOfStudy.message}</p>}
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Role <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
-                                        <input type="text" list="role-list" autoComplete="off" {...register('currentRole')} placeholder="e.g. Software Engineer" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Role *</label>
+                                        <input type="text" list="role-list" {...register('currentRole')} autoComplete="organization-title" placeholder="e.g. Software Engineer" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.currentRole && <p className="text-red-500 text-xs mt-1">{errors.currentRole.message}</p>}
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Company <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
-                                        <input type="text" list="company-list" autoComplete="off" {...register('currentCompany')} placeholder="e.g. Google" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Company *</label>
+                                        <input type="text" list="company-list" {...register('currentCompany')} autoComplete="organization" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.currentCompany && <p className="text-red-500 text-xs mt-1">{errors.currentCompany.message}</p>}
                                     </div>
                                 </div>
+
                                 <div>
-                                    <label className="block text-sm font-bold text-[#4a3728] mb-2">Short Bio * <span className="text-slate-400 font-normal ml-1">(min 50 chars)</span></label>
-                                    <textarea {...register('shortBio')} rows={4} placeholder="Briefly describe your background..." className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900 resize-none"></textarea>
+                                    <label className="block text-sm font-bold text-[#4a3728] mb-2">Short Bio (Introduction) *</label>
+                                    <textarea {...register('shortBio')} rows={4} placeholder="Briefly describe your mentorship background and how you can guide juniors..." className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900 resize-none"></textarea>
                                     {errors.shortBio && <p className="text-red-500 text-xs mt-1">{errors.shortBio.message}</p>}
                                 </div>
                             </div>
                         )}
 
-                        {/* ──────────────── STEP 2: Professional ──────────────── */}
+                        {/* STEP 2: Professional Details */}
                         {currentStep === 2 && (
                             <div className="space-y-6">
-                                <h3 className="text-2xl font-black text-[#4a3728] mb-6">Professional Information</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <h3 className="text-2xl font-black text-[#4a3728] mb-6">Professional Footprint</h3>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
-                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">LinkedIn URL *</label>
-                                        <input type="url" {...register('linkedinUrl')} placeholder="https://linkedin.com/in/..." className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">LinkedIn Profile URL *</label>
+                                        <input type="url" {...register('linkedinUrl')} placeholder="https://linkedin.com/in/username" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.linkedinUrl && <p className="text-red-500 text-xs mt-1">{errors.linkedinUrl.message}</p>}
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">GitHub URL <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
-                                        <input type="url" {...register('githubUrl')} placeholder="https://github.com/..." className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">GitHub Profile URL (Optional)</label>
+                                        <input type="url" {...register('githubUrl')} placeholder="https://github.com/username" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.githubUrl && <p className="text-red-500 text-xs mt-1">{errors.githubUrl.message}</p>}
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Portfolio URL <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
-                                        <input type="url" {...register('portfolioUrl')} placeholder="https://yourwebsite.com" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
+                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Portfolio / Website (Optional)</label>
+                                        <input type="url" {...register('portfolioUrl')} placeholder="https://portfolio.me" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.portfolioUrl && <p className="text-red-500 text-xs mt-1">{errors.portfolioUrl.message}</p>}
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Years of Experience <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            step="any"
-                                            {...register('yearsOfExperience', {
-                                                setValueAs: (v) => (v === '' || v === null || v === undefined ? undefined : Number(v)),
-                                            })}
-                                            className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900"
-                                        />
+                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Years of Experience *</label>
+                                        <input type="number" {...register('yearsOfExperience', { valueAsNumber: true })} className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
                                         {errors.yearsOfExperience && <p className="text-red-500 text-xs mt-1">{errors.yearsOfExperience.message}</p>}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Experience Level *</label>
                                         <select {...register('experienceLevel')} className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900">
                                             <option value="">Select Level</option>
-                                            {Object.entries(ExperienceLevel).map(([key, value]) => (
-                                                <option key={key} value={value}>{key.charAt(0) + key.slice(1).toLowerCase()} Level</option>
+                                            {Object.values(ExperienceLevel).map((lvl) => (
+                                                <option key={lvl} value={lvl}>{lvl.toUpperCase()}</option>
                                             ))}
                                         </select>
                                         {errors.experienceLevel && <p className="text-red-500 text-xs mt-1">{errors.experienceLevel.message}</p>}
                                     </div>
                                     <div className="md:col-span-2">
-                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Primary Expertise *</label>
+                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Primary Expertise Domain *</label>
                                         <select {...register('primaryExpertise')} className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900">
                                             <option value="">Select Domain</option>
                                             {Object.values(Domain).map((d) => (
-                                                <option key={d} value={d}>
-                                                    {d.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                                                </option>
+                                                <option key={d} value={d}>{d.replace(/_/g, ' ').toUpperCase()}</option>
                                             ))}
                                         </select>
                                         {errors.primaryExpertise && <p className="text-red-500 text-xs mt-1">{errors.primaryExpertise.message}</p>}
@@ -981,57 +887,32 @@ export default function SeniorMentorApplicationPage() {
                             </div>
                         )}
 
-                        {/* ──────────────── STEP 3: Skills ──────────────── */}
+                        {/* STEP 3: Skills & Mentorship */}
                         {currentStep === 3 && (
-                            <div className="space-y-8">
-                                <h3 className="text-2xl font-black text-[#4a3728] mb-6">Skills & Mentorship Areas</h3>
+                            <div className="space-y-6">
+                                <h3 className="text-2xl font-black text-[#4a3728] mb-6">Skills & Mentorship Capabilities</h3>
 
-                                <TagInput fieldName="technologies" label="Technologies *" placeholder="e.g. React, Node.js" />
-                                <TagInput fieldName="otherSkills" label="Other Skills *" placeholder="e.g. Agile, System Design" />
-                                <TagInput fieldName="achievements" label="Achievements" placeholder="e.g. Outstanding Engineer Award 2023" />
-                                <TagInput fieldName="certifications" label="Certifications" placeholder="e.g. AWS Certified Solutions Architect" />
+                                <TagInput fieldName="technologies" label="Tools, Frameworks & Tech Stack *" placeholder="e.g. React, Next.js, Node.js (Press Add)" />
+                                <TagInput fieldName="otherSkills" label="Core Competencies & Skills *" placeholder="e.g. System Design, Data Structures (Press Add)" />
+                                <TagInput fieldName="achievements" label="Key Highlights & Achievements (Optional)" placeholder="e.g. Smart India Hackathon Winner 2024" />
+                                <TagInput fieldName="certifications" label="Certificates & Credentials (Optional)" placeholder="e.g. AWS Certified Solutions Architect" />
 
-                                <div
-                                    id="help-areas-section"
-                                    className={`p-6 rounded-2xl border-2 transition-all ${
-                                        errors.helpAreas
-                                            ? 'border-red-500 bg-red-50/20 shadow-sm'
-                                            : 'border-[#ece7e2] bg-[#f8f6f4]/40'
-                                    }`}
-                                >
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-                                        <div>
-                                            <label className="block text-sm font-bold text-[#4a3728]">
-                                                Help Areas * <span className="text-slate-500 font-normal ml-1">(Select 3 to 7)</span>
-                                            </label>
-                                            {isMaxHelpAreas && (
-                                                <p className="text-xs font-semibold text-amber-700 mt-0.5">
-                                                    Maximum 7 selected
-                                                </p>
-                                            )}
-                                        </div>
-                                        <span
-                                            className={`text-xs font-bold px-3 py-1 rounded-full self-start sm:self-auto border transition-colors ${
-                                                selectedHelpAreas.length >= MIN_HELP_AREAS && selectedHelpAreas.length <= MAX_HELP_AREAS
-                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                                                    : selectedHelpAreas.length > MAX_HELP_AREAS
-                                                    ? 'bg-red-50 text-red-600 border-red-300'
-                                                    : 'bg-white text-[#4a3728] border-[#ece7e2]'
-                                            }`}
-                                        >
-                                            {selectedHelpAreas.length}/{MAX_HELP_AREAS} selected
-                                        </span>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div id="help-areas-section" className="pt-4 border-t border-[#ece7e2]">
+                                    <label className="block text-sm font-bold text-[#4a3728] mb-1">
+                                        Areas where you can guide juniors *
+                                    </label>
+                                    <p className="text-xs text-slate-500 mb-3">
+                                        Select at least {MIN_HELP_AREAS} and up to {MAX_HELP_AREAS} areas ({selectedHelpAreas.length}/{MAX_HELP_AREAS} selected)
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         {Object.values(MentorshipHelpArea).map((area) => {
-                                            const label = area.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
                                             const checked = selectedHelpAreas.includes(area);
                                             const disabled = !checked && isMaxHelpAreas;
+                                            const label = area.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
                                             return (
                                                 <label
                                                     key={area}
-                                                    className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                                                    className={`flex items-center gap-3 p-3.5 border rounded-2xl transition ${
                                                         disabled
                                                             ? 'opacity-40 cursor-not-allowed border-gray-200 bg-gray-50'
                                                             : checked
@@ -1061,7 +942,7 @@ export default function SeniorMentorApplicationPage() {
                             </div>
                         )}
 
-                        {/* ──────────────── STEP 4: Motivation ──────────────── */}
+                        {/* STEP 4: Motivation */}
                         {currentStep === 4 && (
                             <div className="space-y-6">
                                 <h3 className="text-2xl font-black text-[#4a3728] mb-6">Motivation</h3>
@@ -1079,7 +960,7 @@ export default function SeniorMentorApplicationPage() {
                             </div>
                         )}
 
-                        {/* ──────────────── STEP 5: Verification ──────────────── */}
+                        {/* STEP 5: Verification */}
                         {currentStep === 5 && (
                             <div className="space-y-6">
                                 <h3 className="text-2xl font-black text-[#4a3728] mb-6">Verification Documents</h3>
@@ -1100,40 +981,20 @@ export default function SeniorMentorApplicationPage() {
                                 <button type="button" onClick={handlePrev} className="px-7 py-3 text-[#4a3728] font-bold hover:bg-[#f8f6f4] rounded-xl transition-colors">
                                     Previous
                                 </button>
-                            ) : <div></div>}
-
-                            {currentStep < steps.length ? (
-                                <button type="button" onClick={handleNext} className="px-8 py-3 bg-[#4a3728] text-white rounded-xl font-bold shadow hover:bg-[#7a5c3e] transition-colors flex items-center gap-2">
+                            ) : <div />}
+                            
+                            {currentStep < 5 ? (
+                                <button type="button" onClick={handleNext} className="px-8 py-3 bg-[#4a3728] text-white font-bold rounded-xl hover:bg-[#7a5c3e] transition-colors shadow">
                                     Next Step
                                 </button>
                             ) : (
-                                <button type="submit" disabled={isSubmitting} className="px-8 py-3 bg-[#4a3728] text-white rounded-xl font-bold shadow hover:bg-[#7a5c3e] transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
-                                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
-                                    {isSubmitting ? "Submitting..." : "Submit Application"}
+                                <button type="submit" disabled={isSubmitting} className="px-10 py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all shadow-lg flex items-center gap-2">
+                                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Submit Application"}
                                 </button>
                             )}
                         </div>
                     </div>
                 </form>
-                {toast && (
-                    <div
-                        className={`fixed bottom-6 right-6 z-50 px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border transition-all animate-in fade-in slide-in-from-bottom-4 ${
-                            toast.type === 'error'
-                                ? 'bg-red-600 text-white border-red-700'
-                                : 'bg-[#4a3728] text-white border-[#3d2d21]'
-                        }`}
-                    >
-                        <span className="text-sm font-semibold">{toast.message}</span>
-                        <button
-                            type="button"
-                            onClick={() => setToast(null)}
-                            className="ml-2 p-1 hover:bg-white/20 rounded-full transition"
-                            aria-label="Close notification"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                )}
             </div>
         </div>
     );
