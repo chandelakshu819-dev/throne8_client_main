@@ -1,6 +1,8 @@
 //src/features/mentorship/components/user-dashboard/UserDashboardUpcomingSessionsPage.tsx
 
+
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarClock,
@@ -9,6 +11,8 @@ import {
   MapPin,
   Loader2,
   XCircle,
+  CheckCircle2,
+  X,
 } from "lucide-react";
 import SessionService from "@/lib/api/session.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -286,6 +290,36 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
   const [filterType, setFilterType] = useState<"all" | "live" | "missed">("all");
   const [missedSessions, setMissedSessions] = useState<Session[]>([]);
   const [missedBusyId, setMissedBusyId] = useState<string | null>(null);
+  const [refundModal, setRefundModal] = useState<{
+    isOpen: boolean;
+    sessionId: string | null;
+    bookingId: string | null;
+    amount: number;
+    email: string;
+    phone: string;
+    upiId: string;
+    note: string;
+    isSubmitting: boolean;
+  }>({
+    isOpen: false,
+    sessionId: null,
+    bookingId: null,
+    amount: 0,
+    email: "",
+    phone: "",
+    upiId: "",
+    note: "",
+    isSubmitting: false,
+  });
+  const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // toast 5 second baad apne aap hat jaye
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 5000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
   const [debugInfo, setDebugInfo] = useState<string>("");
   const [missedReschedule, setMissedReschedule] = useState<{
     sessionId: string;
@@ -296,6 +330,16 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
   } | null>(null);
   
   
+
+
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const showToast = (message: string, type: "success" | "error" = "success") =>
+    setToast({ message, type });
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [isFindMentorOpen, setIsFindMentorOpen] = useState(false);
@@ -546,7 +590,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
         bookingId,
         router,
         onError: (err: Error) => {
-          alert(err.message || "Unable to join session. Please try again.");
+          showToast(err.message || "Unable to join session. Please try again.", "error");
         },
       });
     } catch {
@@ -558,7 +602,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
 
   const openCancelModal = (sessionId: string, bookingId?: string) => {
     if (!bookingId) {
-      alert("Error: Booking ID is missing. Cannot cancel session.");
+      showToast("Booking ID is missing. Cannot cancel session.", "error");
       return;
     }
     setCancelModal({
@@ -573,32 +617,32 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
   const confirmCancelSession = async () => {
     const { sessionId, bookingId, reason } = cancelModal;
     if (!sessionId || !bookingId) {
-      alert("Missing required session or booking information.");
+      showToast("Missing required session or booking information.", "error");
       return;
     }
 
     // Backend validation requires minimum 10 characters
     if (reason.trim().length < 10) {
-      alert("Cancellation reason must be at least 10 characters.");
+      showToast("Cancellation reason must be at least 10 characters.", "error");
       return;
     }
 
     try {
       setCancelModal(prev => ({ ...prev, isCanceling: true }));
       await SessionService.cancelSession(sessionId, reason.trim(), bookingId);
-      alert("Session cancelled successfully.");
+      showToast("Session cancelled successfully.", "success");
       setCancelModal({ isOpen: false, sessionId: null, bookingId: null, reason: "", isCanceling: false });
       await fetchUpcoming();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to cancel session.";
-      alert(`Cancellation failed: ${errorMessage}`);
+      showToast(`Cancellation failed: ${errorMessage}`, "error");
       setCancelModal(prev => ({ ...prev, isCanceling: false }));
     }
   };
 
   const openRescheduleModal = (sessionId: string, bookingId?: string) => {
     if (!bookingId) {
-      alert("Error: Booking ID is missing. Cannot reschedule session.");
+      showToast("Booking ID is missing. Cannot reschedule session.", "error");
       return;
     }
     setRescheduleModal({
@@ -615,12 +659,12 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
   const confirmRescheduleSession = async () => {
     const { sessionId, bookingId, newDate, newTime, reason } = rescheduleModal;
     if (!sessionId || !bookingId || !newDate || !newTime) {
-      alert("Please provide both new date and time.");
+      showToast("Please provide both new date and time.", "error");
       return;
     }
 
     if (reason.trim().length > 0 && reason.trim().length < 3) {
-      alert("Reason must be at least 3 characters if provided.");
+      showToast("Reason must be at least 3 characters if provided.", "error");
       return;
     }
 
@@ -629,44 +673,95 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
     try {
       setRescheduleModal(prev => ({ ...prev, isRescheduling: true }));
       await SessionService.rescheduleSession(sessionId, newScheduledAt, reason.trim(), bookingId);
-      alert("Session rescheduled successfully.");
+      showToast("Session rescheduled successfully.", "success");
       setRescheduleModal({ isOpen: false, sessionId: null, bookingId: null, newDate: "", newTime: "", reason: "", isRescheduling: false });
       await fetchUpcoming();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Failed to reschedule session.";
-      alert(`Reschedule failed: ${errorMessage}`);
+      showToast(`Reschedule failed: ${errorMessage}`, "error");
       setRescheduleModal(prev => ({ ...prev, isRescheduling: false }));
     }
   };
 
   
 
-  const handleMissedRefund = async (s: Session) => {
+  // Refund button -> form modal kholo
+  const handleMissedRefund = (s: Session) => {
     const sid = s.sessionId ?? s._id;
-    const bId = s.bookingId;
-    if (!sid || !bId) {
-      alert("Booking ID missing. Please refresh and try again.");
+    if (!sid || !s.bookingId) {
+      showToast("Booking ID missing. Please refresh and try again.", "error");
       return;
     }
-    if (!window.confirm("Request a full refund for this missed session?")) return;
+    const amount = Number(
+      (s.bookings?.[0] as any)?.pricing?.totalAmount ?? (s as any).pricing?.totalAmount ?? 0
+    );
+    setRefundModal({
+      isOpen: true,
+      sessionId: sid,
+      bookingId: s.bookingId,
+      amount,
+      email: (user as any)?.email || (authUser as any)?.email || "",
+      phone: "",
+      upiId: "",
+      note: "",
+      isSubmitting: false,
+    });
+  };
+
+  // Form submit
+  const confirmMissedRefund = async () => {
+    const { sessionId, bookingId, email, phone, upiId, note } = refundModal;
+    if (!sessionId || !bookingId) return;
+
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    const phoneClean = phone.replace(/\D/g, "").slice(-10);
+    const phoneOk = phoneClean.length === 10;
+    const upiOk = /^[\w.\-]{2,}@[a-zA-Z]{2,}$/.test(upiId.trim());
+
+    if (!emailOk) {
+      showToast("Please enter a valid email address.", "error");
+      return;
+    }
+    if (!phoneOk && !upiOk) {
+      showToast("Enter a valid 10-digit phone number or UPI ID.", "error");
+      return;
+    }
+    if (phone.trim() && !phoneOk) {
+      showToast("Phone number must be 10 digits.", "error");
+      return;
+    }
+    if (upiId.trim() && !upiOk) {
+      showToast("Please enter a valid UPI ID (e.g. name@okaxis).", "error");
+      return;
+    }
+
     try {
-      setMissedBusyId(bId);
-      await SessionService.refundMissedSession(sid, bId);
-      alert("Refund requested. You will get a notification and the amount arrives in 3-5 business days.");
-      setMissedSessions((prev) => prev.filter((x) => x.bookingId !== bId));
+      setRefundModal((prev) => ({ ...prev, isSubmitting: true }));
+      setMissedBusyId(bookingId);
+      await SessionService.refundMissedSession(sessionId, bookingId, {
+        email: email.trim(),
+        phone: phoneOk ? phoneClean : "",
+        upiId: upiId.trim(),
+        note: note.trim(),
+      });
+      showToast("Refund request sent to the mentor. You will be notified once it is processed.", "success");
+      setMissedSessions((prev) => prev.filter((x) => x.bookingId !== bookingId));
+      setRefundModal((prev) => ({ ...prev, isOpen: false, isSubmitting: false }));
       await fetchUpcoming();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to request refund.");
+      showToast(err instanceof Error ? err.message : "Failed to request refund.", "error");
+      setRefundModal((prev) => ({ ...prev, isSubmitting: false }));
     } finally {
       setMissedBusyId(null);
     }
   };
 
+
   const handleMissedRescheduleOpen = (s: Session) => {
     const sid = s.sessionId ?? s._id;
     const mentorId = (s as any).mentorId;
     if (!sid || !s.bookingId || !mentorId) {
-      alert("Session details missing. Please refresh and try again.");
+      showToast("Session details missing. Please refresh and try again.", "error");
       return;
     }
     setMissedReschedule({
@@ -692,12 +787,12 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
         "Rescheduled after missed session",
         missedReschedule.bookingId
       );
-      alert("Session rescheduled successfully.");
+      showToast("Session rescheduled successfully.", "success");
       setMissedReschedule(null);
       setFilterType("all");
       await fetchUpcoming();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to reschedule session.");
+      showToast(err instanceof Error ? err.message : "Failed to reschedule session.", "error");
     }
   };
 
@@ -778,7 +873,32 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
 
   return (
     <div className="space-y-6 animate-fadeIn max-w-5xl relative">
-      {/* PAGE HEADER */}
+    {/* TOAST */}
+    {toast &&
+      typeof document !== "undefined" &&
+      createPortal(
+        <div
+          className="fixed top-5 right-5 z-[9999] flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg"
+          style={{
+            backgroundColor: toast.type === "success" ? "#dcfce7" : "#fee2e2",
+            color: toast.type === "success" ? "#15803d" : "#dc2626",
+            border: toast.type === "success" ? "1px solid #86efac" : "1px solid #fca5a5",
+          }}
+        >
+          {toast.type === "success" ? (
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+          ) : (
+            <XCircle className="w-4 h-4 shrink-0" />
+          )}
+          <span className="text-sm font-semibold">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-2 shrink-0">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>,
+        document.body
+      )}
+
+    {/* PAGE HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold" style={{ color: COLORS.ink }}>
@@ -1227,6 +1347,115 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
           })}
         </div>
       )}
+
+
+      {/* Refund Request Modal */}
+      {refundModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl relative" style={{ border: `1px solid ${COLORS.hairline}` }}>
+            <button
+              onClick={() => !refundModal.isSubmitting && setRefundModal((prev) => ({ ...prev, isOpen: false }))}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              disabled={refundModal.isSubmitting}
+            >
+              <XCircle className="w-5 h-5" />
+            </button>
+            <h3 className="text-xl font-bold mb-1" style={{ color: COLORS.ink }}>Request Refund</h3>
+            <p className="text-sm mb-4" style={{ color: COLORS.muted }}>
+              Share where the mentor should return your payment
+              {refundModal.amount > 0 ? ` (₹${refundModal.amount})` : ""}. Your request goes to the mentor as a notification.
+            </p>
+            <div className="space-y-4 mb-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink }}>Email *</label>
+                <input
+                  type="email"
+                  value={refundModal.email}
+                  onChange={(e) => setRefundModal((prev) => ({ ...prev, email: e.target.value }))}
+                  placeholder="you@example.com"
+                  className="w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2"
+                  style={{ borderColor: COLORS.hairline, outlineColor: COLORS.accent }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink }}>Phone Number</label>
+                <input
+                  type="tel"
+                  value={refundModal.phone}
+                  onChange={(e) => setRefundModal((prev) => ({ ...prev, phone: e.target.value }))}
+                  placeholder="10-digit mobile number" maxLength={14}
+                  className="w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2"
+                  style={{ borderColor: COLORS.hairline, outlineColor: COLORS.accent }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink }}>UPI ID</label>
+                <input
+                  type="text"
+                  value={refundModal.upiId}
+                  onChange={(e) => setRefundModal((prev) => ({ ...prev, upiId: e.target.value }))}
+                  placeholder="name@okaxis"
+                  className="w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2"
+                  style={{ borderColor: COLORS.hairline, outlineColor: COLORS.accent }}
+                />
+                <p className="text-[11px] mt-1" style={{ color: COLORS.muted }}>
+                  Phone number ya UPI ID, kam se kam ek zaroori hai.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: COLORS.ink }}>Note (Optional)</label>
+                <textarea
+                  value={refundModal.note}
+                  onChange={(e) => setRefundModal((prev) => ({ ...prev, note: e.target.value }))}
+                  placeholder="Anything the mentor should know..."
+                  maxLength={300}
+                  className="w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2"
+                  style={{ borderColor: COLORS.hairline, outlineColor: COLORS.accent }}
+                  rows={2}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setRefundModal((prev) => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 rounded-xl text-sm font-semibold transition-colors"
+                style={{ backgroundColor: COLORS.wash, color: COLORS.accent }}
+                disabled={refundModal.isSubmitting}
+              >
+                Close
+              </button>
+              <button
+                onClick={confirmMissedRefund}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-white flex items-center gap-2 transition-colors disabled:opacity-50"
+                style={{ backgroundColor: COLORS.danger }}
+                disabled={refundModal.isSubmitting}
+              >
+                {refundModal.isSubmitting ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</>
+                ) : (
+                  "Request Refund"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {notice && (
+        <div
+          role="status"
+          className="fixed top-5 right-5 z-[60] max-w-sm rounded-xl px-4 py-3 shadow-lg text-sm font-medium text-white flex items-start gap-3"
+          style={{ backgroundColor: notice.type === "success" ? "#16a34a" : COLORS.danger }}
+        >
+          <span className="flex-1">{notice.text}</span>
+          <button onClick={() => setNotice(null)} aria-label="Dismiss">
+            <XCircle className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+
 
       {/* Cancel Modal */}
       {cancelModal.isOpen && (

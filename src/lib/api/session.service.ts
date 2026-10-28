@@ -398,11 +398,16 @@ class SessionService {
 
 
         // ── MENTEE: missed booking ka 100% refund ──────────────
-        static async refundMissedSession(sessionId: string, bookingId: string): Promise<ApiResponse> {
+
+        static async refundMissedSession(
+            sessionId: string,
+            bookingId: string,
+            refundDetails?: { email: string; phone?: string; upiId?: string; note?: string }
+        ): Promise<ApiResponse> {
             try {
                 const { data } = await api.post<ApiResponse>(
                     `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/refund-missed`,
-                    { bookingId }
+                    { bookingId, refundDetails }
                 );
                 return data;
             } catch (error: any) {

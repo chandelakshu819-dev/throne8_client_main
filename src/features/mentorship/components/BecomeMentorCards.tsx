@@ -44,7 +44,7 @@ const CARDS: CardConfig[] = [
   {
     key: 'senior',
     icon: <Star className="w-5 h-5" />,
-    title: 'Become Senior Mentor',
+    title: 'Become College Mentor',
     description:
       'Share your industry experience, guide aspiring professionals, and help shape the next generation of talent.',
     ctaLabel: 'Apply Now',
