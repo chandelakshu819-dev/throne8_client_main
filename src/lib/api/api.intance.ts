@@ -259,17 +259,24 @@ const performRefresh = async (
         return null;
     }
 
-    const tokens = response.data?.data?.tokens;
-    if (!tokens?.accessToken) {
+    const rawData = (response.data as any)?.data || response.data;
+    const tokens = rawData?.tokens || rawData;
+    const accessToken = tokens?.accessToken || rawData?.accessToken;
+
+    if (!accessToken) {
         throw new Error("INVALID_REFRESH_RESPONSE");
     }
 
-    TokenStorage.updateAccessToken(tokens.accessToken, tokens.expiresIn ?? 900);
-    if (tokens.refreshToken) {
-        TokenStorage.updateRefreshToken(tokens.refreshToken);
+    TokenStorage.updateAccessToken(
+        accessToken,
+        tokens?.expiresIn ?? rawData?.expiresIn ?? 900
+    );
+    const newRefreshToken = tokens?.refreshToken || rawData?.refreshToken;
+    if (newRefreshToken) {
+        TokenStorage.updateRefreshToken(newRefreshToken);
     }
 
-    return tokens.accessToken;
+    return accessToken;
 };
 
 const refreshAccessToken = (
@@ -300,7 +307,7 @@ const refreshAccessToken = (
     const run = () => performRefresh(failedToken);
     const pending: Promise<string | null> =
         typeof navigator !== "undefined" && navigator.locks
-            ? (navigator.locks.request(REFRESH_LOCK_NAME, run) as Promise<
+            ? (navigator.locks.request(REFRESH_LOCK_NAME, run) as unknown as Promise<
                   string | null
               >)
             : run();
@@ -367,6 +374,10 @@ api.interceptors.request.use(
                 await refreshAccessToken(null);
             } catch (refreshError: unknown) {
                 handleRefreshFailure(refreshError);
+                // Do not proceed with an expired token!
+                // If refresh was rejected (401/400), handleRefreshFailure triggers forceLogout.
+                // If refresh failed transiently, reject this request so we don't send an expired token.
+                return Promise.reject(refreshError);
             }
         }
 

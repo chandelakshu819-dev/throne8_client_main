@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -14,7 +14,8 @@ import {
     Image as ImageIcon,
     Users,
     GraduationCap,
-    Award
+    Award,
+    ChevronDown
 } from "lucide-react";
 import SeniorMentorApplicationService, {
     SeniorMentorApplication,
@@ -175,6 +176,167 @@ const steps = [
     { id: 5, title: 'Verification', fields: ['resumeFile', 'proofDocumentFile'] },
 ];
 
+// ============================================================================
+// 3. Themed Combobox (native <datalist> ki jagah)
+//    Native datalist ka dropdown browser draw karta hai, isliye uska color
+//    CSS se change nahi hota. Ye custom dropdown form ke theme me hai:
+//    white bg, #ece7e2 border, #4a3728 text, #f8f6f4 hover.
+// ============================================================================
+
+const MAX_VISIBLE_OPTIONS = 50;
+
+interface ComboboxInputProps {
+    control: Control<FormValues>;
+    name: 'college' | 'degree' | 'fieldOfStudy' | 'currentRole' | 'currentCompany';
+    options: string[];
+    placeholder?: string;
+}
+
+function ComboboxInput({ control, name, options, placeholder }: ComboboxInputProps) {
+    const [open, setOpen] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const listRef = useRef<HTMLUListElement>(null);
+
+    // Bahar click karne par dropdown band
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setOpen(false);
+                setActiveIndex(-1);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Keyboard se navigate karte time active option screen me rahe
+    useEffect(() => {
+        if (activeIndex < 0 || !listRef.current) return;
+        const el = listRef.current.children[activeIndex] as HTMLElement | undefined;
+        el?.scrollIntoView({ block: 'nearest' });
+    }, [activeIndex]);
+
+    return (
+        <Controller
+            control={control}
+            name={name}
+            render={({ field, fieldState }) => {
+                const value = (field.value as string) || '';
+                const query = value.trim().toLowerCase();
+
+                const filtered = (query
+                    ? options.filter((o) => o.toLowerCase().includes(query))
+                    : options
+                ).slice(0, MAX_VISIBLE_OPTIONS);
+
+                const selectOption = (opt: string) => {
+                    field.onChange(opt);
+                    setOpen(false);
+                    setActiveIndex(-1);
+                };
+
+                const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        if (!open) {
+                            setOpen(true);
+                            return;
+                        }
+                        setActiveIndex((prev) => (filtered.length === 0 ? -1 : (prev + 1) % filtered.length));
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setActiveIndex((prev) =>
+                            filtered.length === 0 ? -1 : prev <= 0 ? filtered.length - 1 : prev - 1
+                        );
+                    } else if (e.key === 'Enter') {
+                        if (open && activeIndex >= 0 && filtered[activeIndex]) {
+                            e.preventDefault();
+                            selectOption(filtered[activeIndex]);
+                        }
+                    } else if (e.key === 'Escape') {
+                        setOpen(false);
+                        setActiveIndex(-1);
+                    }
+                };
+
+                return (
+                    <div ref={containerRef} className="relative">
+                        <input
+                            type="text"
+                            ref={field.ref}
+                            name={field.name}
+                            value={value}
+                            autoComplete="off"
+                            placeholder={placeholder}
+                            aria-invalid={fieldState.error ? 'true' : 'false'}
+                            aria-expanded={open}
+                            aria-autocomplete="list"
+                            role="combobox"
+                            onChange={(e) => {
+                                field.onChange(e.target.value);
+                                setOpen(true);
+                                setActiveIndex(-1);
+                            }}
+                            onFocus={() => setOpen(true)}
+                            onBlur={field.onBlur}
+                            onKeyDown={handleKeyDown}
+                            className="w-full px-4 py-3 pr-11 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900"
+                        />
+                        <button
+                            type="button"
+                            tabIndex={-1}
+                            aria-label="Toggle suggestions"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => setOpen((prev) => !prev)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#8a7a6a] hover:text-[#4a3728] transition-colors"
+                        >
+                            <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {open && (
+                            <div className="absolute left-0 right-0 z-30 mt-2 bg-white border border-[#ece7e2] rounded-2xl shadow-xl overflow-hidden">
+                                {filtered.length > 0 ? (
+                                    <ul ref={listRef} role="listbox" className="max-h-60 overflow-y-auto py-1.5">
+                                        {filtered.map((opt, idx) => {
+                                            const isActive = idx === activeIndex;
+                                            return (
+                                                <li
+                                                    key={opt}
+                                                    role="option"
+                                                    aria-selected={isActive}
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        selectOption(opt);
+                                                    }}
+                                                    onMouseEnter={() => setActiveIndex(idx)}
+                                                    className={`px-4 py-2.5 text-sm font-medium cursor-pointer transition-colors ${isActive
+                                                            ? 'bg-[#f8f6f4] text-[#4a3728]'
+                                                            : 'text-slate-700 hover:bg-[#f8f6f4] hover:text-[#4a3728]'
+                                                        }`}
+                                                >
+                                                    {opt}
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                ) : (
+                                    <p className="px-4 py-3 text-xs font-medium text-[#8a7a6a]">
+                                        No matching suggestions. You can keep what you typed.
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                        {fieldState.error && (
+                            <p className="text-red-500 text-xs mt-1">{fieldState.error.message as string}</p>
+                        )}
+                    </div>
+                );
+            }}
+        />
+    );
+}
+
 export default function SeniorMentorApplicationPage() {
     const router = useRouter();
     const { user, isLoading: isAuthLoading } = useAuth();
@@ -298,14 +460,14 @@ export default function SeniorMentorApplicationPage() {
 
                 const aboutPromise = userProfile.aboutId
                     ? ProfileService.getAboutById(userProfile.aboutId)
-                          .then((res: { data?: { about?: IAboutData } }) => res?.data?.about?.aboutText || '')
-                          .catch(() => '')
+                        .then((res: { data?: { about?: IAboutData } }) => res?.data?.about?.aboutText || '')
+                        .catch(() => '')
                     : Promise.resolve('');
 
                 const photoUrlPromise = userProfile.profilePhotoId
                     ? ProfileService.getProfilePhotoById(userProfile.profilePhotoId)
-                          .then((res: { data?: { photo?: IProfilePhotoData } }) => res?.data?.photo?.cloudinarySecureUrl || '')
-                          .catch(() => '')
+                        .then((res: { data?: { photo?: IProfilePhotoData } }) => res?.data?.photo?.cloudinarySecureUrl || '')
+                        .catch(() => '')
                     : Promise.resolve('');
 
                 const [expResults, aboutText, photoUrl] = await Promise.all([
@@ -659,11 +821,7 @@ export default function SeniorMentorApplicationPage() {
         <div className="min-h-screen bg-[#FAF9F6] flex items-start justify-center p-6 animate-fade-in overflow-y-auto">
             <div className="max-w-3xl w-full my-6 relative">
                 <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="bg-white rounded-[40px] shadow-2xl relative">
-                    <datalist id="degree-list">{DEGREE_SUGGESTIONS.map((o) => <option key={o} value={o} />)}</datalist>
-                    <datalist id="field-list">{FIELD_SUGGESTIONS.map((o) => <option key={o} value={o} />)}</datalist>
-                    <datalist id="role-list">{ROLE_SUGGESTIONS.map((o) => <option key={o} value={o} />)}</datalist>
-                    <datalist id="company-list">{COMPANY_SUGGESTIONS.map((o) => <option key={o} value={o} />)}</datalist>
-
+                    {/* Close Button */}
                     <button
                         type="button"
                         onClick={() => router.back()}
@@ -688,9 +846,8 @@ export default function SeniorMentorApplicationPage() {
                                     {[1, 2, 3, 4, 5].map((step) => (
                                         <div
                                             key={step}
-                                            className={`h-1.5 rounded-full flex-1 transition-all ${
-                                                currentStep >= step ? "bg-white" : "bg-white/30"
-                                            }`}
+                                            className={`h-1.5 rounded-full flex-1 transition-all ${currentStep >= step ? "bg-white" : "bg-white/30"
+                                                }`}
                                         />
                                     ))}
                                 </div>
@@ -809,23 +966,19 @@ export default function SeniorMentorApplicationPage() {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Degree *</label>
-                                        <input type="text" list="degree-list" {...register('degree')} autoComplete="off" placeholder="e.g. B.Tech" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
-                                        {errors.degree && <p className="text-red-500 text-xs mt-1">{errors.degree.message}</p>}
+                                        <ComboboxInput control={control} name="degree" options={DEGREE_SUGGESTIONS} placeholder="e.g. B.Tech" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Field of Study *</label>
-                                        <input type="text" list="field-list" {...register('fieldOfStudy')} autoComplete="off" placeholder="e.g. Computer Science" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
-                                        {errors.fieldOfStudy && <p className="text-red-500 text-xs mt-1">{errors.fieldOfStudy.message}</p>}
+                                        <ComboboxInput control={control} name="fieldOfStudy" options={FIELD_SUGGESTIONS} placeholder="e.g. Computer Science" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Role *</label>
-                                        <input type="text" list="role-list" {...register('currentRole')} autoComplete="organization-title" placeholder="e.g. Software Engineer" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
-                                        {errors.currentRole && <p className="text-red-500 text-xs mt-1">{errors.currentRole.message}</p>}
+                                        <ComboboxInput control={control} name="currentRole" options={ROLE_SUGGESTIONS} placeholder="e.g. Software Engineer" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Company *</label>
-                                        <input type="text" list="company-list" {...register('currentCompany')} autoComplete="organization" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
-                                        {errors.currentCompany && <p className="text-red-500 text-xs mt-1">{errors.currentCompany.message}</p>}
+                                        <ComboboxInput control={control} name="currentCompany" options={COMPANY_SUGGESTIONS} placeholder="e.g. Google" />
                                     </div>
                                 </div>
 
@@ -912,13 +1065,12 @@ export default function SeniorMentorApplicationPage() {
                                             return (
                                                 <label
                                                     key={area}
-                                                    className={`flex items-center gap-3 p-3.5 border rounded-2xl transition ${
-                                                        disabled
+                                                    className={`flex items-center gap-3 p-3.5 border rounded-2xl transition ${disabled
                                                             ? 'opacity-40 cursor-not-allowed border-gray-200 bg-gray-50'
                                                             : checked
-                                                            ? 'border-[#4a3728] bg-[#f8f6f4] cursor-pointer shadow-sm'
-                                                            : 'border-[#ece7e2] hover:border-[#4a3728] cursor-pointer bg-white'
-                                                    }`}
+                                                                ? 'border-[#4a3728] bg-[#f8f6f4] cursor-pointer shadow-sm'
+                                                                : 'border-[#ece7e2] hover:border-[#4a3728] cursor-pointer bg-white'
+                                                        }`}
                                                 >
                                                     <input
                                                         type="checkbox"
@@ -982,7 +1134,7 @@ export default function SeniorMentorApplicationPage() {
                                     Previous
                                 </button>
                             ) : <div />}
-                            
+
                             {currentStep < 5 ? (
                                 <button type="button" onClick={handleNext} className="px-8 py-3 bg-[#4a3728] text-white font-bold rounded-xl hover:bg-[#7a5c3e] transition-colors shadow">
                                     Next Step

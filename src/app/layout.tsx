@@ -5,6 +5,7 @@ import "remixicon/fonts/remixicon.css";
 import ReduxProvider from "@/store/providers/ReduxProvider";
 import NavbarProvider from "@/features/profile/components/home/NavbarProvider";
 import MentorshipCallProvider from "@/providers/MentorshipCallProvider";
+import AuthProvider from "@/providers/AuthProvider";
 
 export const metadata: Metadata = {
   title: "Throne8 - Professional Networking Platform",
@@ -24,9 +25,11 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         <ReduxProvider>
-          <MentorshipCallProvider>
-            <NavbarProvider>{children}</NavbarProvider>
-          </MentorshipCallProvider>
+          <AuthProvider>
+            <MentorshipCallProvider>
+              <NavbarProvider>{children}</NavbarProvider>
+            </MentorshipCallProvider>
+          </AuthProvider>
         </ReduxProvider>
       </body>
     </html>

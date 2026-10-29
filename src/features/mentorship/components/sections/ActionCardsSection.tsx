@@ -45,7 +45,7 @@ const MENTOR_DESC =
 function resolveCardContent(application: SeniorMentorApplication | null, isLoading: boolean) {
     if (isLoading) {
         return {
-            title: "Become Senior Mentor",
+            title: "Become College Mentor",
             audience: SENIOR_AUDIENCE,
             description: "Checking your application status...",
             cta: "Loading...",
@@ -55,7 +55,7 @@ function resolveCardContent(application: SeniorMentorApplication | null, isLoadi
 
     if (!application) {
         return {
-            title: "Become Senior Mentor",
+            title: "Become College Mentor",
             audience: SENIOR_AUDIENCE,
             description: DEFAULT_SENIOR_DESC,
             cta: "Apply Now",
@@ -66,7 +66,7 @@ function resolveCardContent(application: SeniorMentorApplication | null, isLoadi
     switch (application.verificationStatus) {
         case ApplicationStatus.PENDING:
             return {
-                title: "Senior Mentor Application",
+                title: "College Mentor Application",
                 audience: "Your application",
                 description: "Your application has been submitted and is awaiting review.",
                 cta: "View Application",
@@ -74,7 +74,7 @@ function resolveCardContent(application: SeniorMentorApplication | null, isLoadi
             };
         case ApplicationStatus.UNDER_REVIEW:
             return {
-                title: "Senior Mentor Application",
+                title: "College Mentor Application",
                 audience: "Your application",
                 description: "Great news, your application is currently under review by our team.",
                 cta: "View Status",
@@ -82,7 +82,7 @@ function resolveCardContent(application: SeniorMentorApplication | null, isLoadi
             };
         case ApplicationStatus.REJECTED:
             return {
-                title: "Senior Mentor Application",
+                title: "College Mentor Application",
                 audience: "Your application",
                 description: application.rejectionReason
                     ? `Your application needs attention: ${application.rejectionReason}`
@@ -92,7 +92,7 @@ function resolveCardContent(application: SeniorMentorApplication | null, isLoadi
             };
         case ApplicationStatus.VERIFIED:
             return {
-                title: "Senior Mentor",
+                title: "College Mentor",
                 audience: "Verified",
                 description:
                     "Congratulations! Your application has been verified. Welcome to the Senior Mentor community.",
@@ -101,7 +101,7 @@ function resolveCardContent(application: SeniorMentorApplication | null, isLoadi
             };
         default:
             return {
-                title: "Become Senior Mentor",
+                title: "Become College Mentor",
                 audience: SENIOR_AUDIENCE,
                 description: DEFAULT_SENIOR_DESC,
                 cta: "Apply Now",
