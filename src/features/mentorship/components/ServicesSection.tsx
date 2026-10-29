@@ -17,8 +17,8 @@ import {
 import SessionService from "@/lib/api/session.service";
 import MentorService from "@/lib/api/mentorship.service";
 import QueryModal from "./QueryModal";
-import WaitlistModal from "./WaitlistModal";
-import { Service } from "@/features/mentorship/types/mentorship.types";
+import WaitlistModal from "./modal/JoinWaitlistModal";
+import { Service } from "@/features/mentorship/types";
 
 interface ServicesSectionProps {
   onServiceClick: (service: Service) => void;
@@ -253,8 +253,8 @@ export default function ServicesSection({
         const list = Array.isArray(response)
           ? response
           : response?.data ||
-            response?.sessions ||
-            response?.results ||
+            (response as any)?.sessions ||
+            (response as any)?.results ||
             [];
 
         const mentorSessions = list.filter(
@@ -312,8 +312,8 @@ export default function ServicesSection({
         const list = Array.isArray(response)
           ? response
           : response?.data ||
-            response?.sessions ||
-            response?.results ||
+            (response as any)?.sessions ||
+            (response as any)?.results ||
             [];
 
         const normalizedGroups =
@@ -2029,7 +2029,8 @@ export default function ServicesSection({
       {queryModalOpen && (
         <QueryModal
           mentorId={mentorId}
-          mentor={mentor}
+          mentorName={mentor?.name}
+          price={mentor?.pricing?.askQuery ?? 0}
           onClose={() =>
             setQueryModalOpen(false)
           }
@@ -2043,6 +2044,7 @@ export default function ServicesSection({
       {waitlistModalOpen &&
         selectedService && (
           <WaitlistModal
+            isOpen={waitlistModalOpen}
             mentorId={mentorId}
             serviceId={
               selectedService?.sessionId ||

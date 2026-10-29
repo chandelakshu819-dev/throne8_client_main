@@ -12,6 +12,7 @@ export function Sidebar() {
   const following = useAppSelector((s) => s.ui.followingCompany)
   const featuredJobs = useAppSelector((s) => s.company.jobs.filter((j) => j.isActive).slice(0, 3))
   const goToJobs = useCallback(() => dispatch(setActiveTab('jobs')), [dispatch])
+  if (!meta) return null;
 
   return (
     <aside className="space-y-4">

@@ -16,7 +16,7 @@ const PostCard = ({
   // "postReactions is not defined" since it's used in the PostActions call.
   postReactions, onReact, fetchCommentsByPost, postSaves, postPins, isFollowing = true,
 }: {
-  fullName: string; headline: string; postLikes: any; openMenuId: any; setOpenMenuId: any; onLikeToggle: any; onPinPost: any; onSavePost: any; onDeletePost: any; onArchivePost: any; onOpenUpdateModal: any; onToggleComments: any; commentsByPost: any; isLoadingComments: any; isSubmittingComment: any; commentLikes: any; formatCommentTime: any; isDeletingCommentId: any; setIsDeletingCommentId: any; replyingToCommentId: any; setReplyingToCommentId: any; currentUserId: string; post: any; index: any; isOwnProfile?: boolean; isDarkMode: any; likedPosts: any; handleLike: any; openMenuIndex: any; openRepostIndex: any; openCommentsIndex: any; commentText: any; setCommentText: any; replyingTo: any; openCommentMenuIndex: any; editingCommentId: any; editCommentText: any; setEditCommentText: any; showEmojiPicker: any; setShowEmojiPicker: any; handlePostAction: any; handleRepost: any; toggleComments: any; handleCommentSubmit: any; handleReply: any; handleCommentReaction: any; toggleCommentMenu: any; handleCommentAction: any; handleEditSubmit: any; handleEmojiClick: any; postComments: any; emojiList: any; togglePostMenu: any; toggleRepostMenu: any; postCommentCounts: any; profileImage: any; onOpenWithPerspectiveModal?: any; handleRepostInstant?: any; replyText?: any; setReplyText?: any; handleReplySubmit?: any; likeCommentToggle?: any; commentLikeStatus?: any; setReplyingTo?: any;
+  fullName?: string; headline?: string; postLikes?: any; openMenuId?: any; setOpenMenuId?: any; onLikeToggle?: any; onPinPost?: any; onSavePost?: any; onDeletePost?: any; onArchivePost?: any; onOpenUpdateModal?: any; onToggleComments?: any; commentsByPost?: any; isLoadingComments?: any; isSubmittingComment?: any; commentLikes?: any; formatCommentTime?: any; isDeletingCommentId?: any; setIsDeletingCommentId?: any; replyingToCommentId?: any; setReplyingToCommentId?: any; currentUserId?: string; post: any; index: any; isOwnProfile?: boolean; isDarkMode?: any; likedPosts?: any; handleLike?: any; openMenuIndex?: any; openRepostIndex?: any; openCommentsIndex?: any; commentText?: any; setCommentText?: any; replyingTo?: any; openCommentMenuIndex?: any; editingCommentId?: any; editCommentText?: any; setEditCommentText?: any; showEmojiPicker?: any; setShowEmojiPicker?: any; handlePostAction?: any; handleRepost?: any; toggleComments?: any; handleCommentSubmit?: any; handleReply?: any; handleCommentReaction?: any; toggleCommentMenu?: any; handleCommentAction?: any; handleEditSubmit?: any; handleEmojiClick?: any; postComments?: any; emojiList?: any; togglePostMenu?: any; toggleRepostMenu?: any; postCommentCounts?: any; profileImage?: any; onOpenWithPerspectiveModal?: any; handleRepostInstant?: any; replyText?: any; setReplyText?: any; handleReplySubmit?: any; likeCommentToggle?: any; commentLikeStatus?: any; setReplyingTo?: any;
   // ✅ ADDED
   postReactions?: Record<string, { counts: any; userReaction: ReactionType | null }>;
   onReact?: (postId: string, type: ReactionType) => void;
@@ -61,7 +61,7 @@ const PostCard = ({
       <div className="relative z-10 flex flex-col h-full">
         <div className="flex-1 min-h-0 flex flex-col">
         <PostHeader
-            currentUserId={currentUserId}
+            currentUserId={currentUserId || ''}
             post={post}
             index={postKey}
             isOwnProfile={isOwnProfile}
@@ -100,7 +100,7 @@ const PostCard = ({
           handleRepostInstant={handleRepostInstant}
           postReactions={postReactions}
           onReact={onReact}
-          currentUserId={currentUserId}
+          currentUserId={currentUserId || ''}
           profileImage={profileImage}   // ✅ NEW
           fullName={fullName}           // ✅ NEW
         />
@@ -113,7 +113,7 @@ const PostCard = ({
           index={index}
           isDarkMode={isDarkMode}
           onClose={() => setIsDetailOpen(false)}
-          currentUserId={currentUserId}
+          currentUserId={currentUserId || ''}
           isOwnProfile={isOwnProfile}
           fullName={fullName}
           headline={headline}

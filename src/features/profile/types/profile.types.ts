@@ -17,6 +17,9 @@ export interface UserProfileData {
     aboutId?: string;
     experienceIds?: string[];
     educationIds?: string[];
+    website?: string;
+    websiteUrl?: string;
+    preferences?: { websiteUrl?: string; [key: string]: any };
     
 }
 export interface ProfileData {

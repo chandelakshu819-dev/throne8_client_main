@@ -119,7 +119,7 @@ export class RegistrationAvailability {
     if (this.request !== request) return;
     clearTimeout(request.timer);
     this.request = undefined;
-    this.checked.set(request.value, status);
+    if (status !== 'checking') this.checked.set(request.value, status);
     if (this.activeValue === request.value) this.publish({ value: request.value, status });
     request.resolve(status);
   }

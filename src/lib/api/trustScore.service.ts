@@ -3,7 +3,7 @@ import api from './api.intance';
 export interface TrustScoreBreakdown {
   profileCompleteness: number;
   reliability: number;
-  studentSatisfaction: number;
+  studentSatisfaction: number | null;
   engagement: number;
 }
 
@@ -19,7 +19,7 @@ export interface TrustScoreData {
     tier: { min: number; name: string; color: string; bg: string; ring: string };
     nextTier: { min: number; name: string; color: string; bg: string; ring: string } | null;
     pointsToNextTier: number;
-    improvementSuggestions: { text: string }[];
+    improvementSuggestions: { text: string; action?: string }[];
   } | null;
   averageRating?: number;
   totalReviews?: number;

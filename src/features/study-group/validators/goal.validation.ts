@@ -38,3 +38,7 @@ export const updateGoalSchema = goalBaseSchema.partial().refine(
   data => Object.keys(data).length > 0,
   { message: 'At least one field required' }
 );
+
+
+export type CreateGoalInput = z.infer<typeof createGoalSchema>;
+export type UpdateGoalInput = z.infer<typeof updateGoalSchema>;

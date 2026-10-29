@@ -5,6 +5,9 @@ import { Camera, Star, Briefcase } from "./Icons";
 import { C } from "../types/data";
 import ProfileService from "@/lib/api/profile.service";
 import MentorService from "@/lib/api/mentorship.service";
+import SocialLinkTile from "./SocialLinkTile";
+import CompanyLogo from "./CompanyLogo";
+import { formatRoleDuration, sortRolesNewestFirst } from "@/shared/utils/mentorFormat";
 
 interface MentorSidebarProps {
     mentorData: any;
@@ -100,6 +103,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
     const trustScoreVal = mentorData?.trustScore?.overall ?? "N/A";
     const currentRole = mentorData?.experience?.currentRole || "Not specified";
     const previousRoles = mentorData?.experience?.previousRoles || [];
+    const sortedRoles = sortRolesNewestFirst(previousRoles);
     const linkedinUrl = mentorData?.socialProof?.linkedinUrl || "#";
     const twitterUrl = mentorData?.socialProof?.twitterUrl || "";
     const websiteUrl = mentorData?.socialProof?.websiteUrl || "";
@@ -396,31 +400,12 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                     )}
 
                     <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginBottom: "32px", flexWrap: "wrap" }}>
-                        {linkedinUrl !== "#" && (
-                            <a href={linkedinUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                                <button style={{ padding: "10px 20px", borderRadius: "12px", background: C.surface, border: `1px solid ${C.border}`, cursor: "pointer", color: C.dark, fontWeight: "600", fontSize: "13px", transition: "all 0.2s", boxShadow: "0 2px 6px rgba(0,0,0,0.03)" }}>LinkedIn</button>
-                            </a>
-                        )}
-                        {mentorData?.socialProof?.githubUrl && (
-                            <a href={mentorData.socialProof.githubUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                                <button style={{ padding: "10px 20px", borderRadius: "12px", background: C.surface, border: `1px solid ${C.border}`, cursor: "pointer", color: C.dark, fontWeight: "600", fontSize: "13px", transition: "all 0.2s", boxShadow: "0 2px 6px rgba(0,0,0,0.03)" }}>GitHub</button>
-                            </a>
-                        )}
-                        {mentorData?.socialProof?.portfolioUrl && (
-                            <a href={mentorData.socialProof.portfolioUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                                <button style={{ padding: "10px 20px", borderRadius: "12px", background: C.surface, border: `1px solid ${C.border}`, cursor: "pointer", color: C.dark, fontWeight: "600", fontSize: "13px", transition: "all 0.2s", boxShadow: "0 2px 6px rgba(0,0,0,0.03)" }}>Portfolio</button>
-                            </a>
-                        )}
-                        {twitterUrl && (
-                            <a href={twitterUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                                <button style={{ padding: "10px 20px", borderRadius: "12px", background: C.surface, border: `1px solid ${C.border}`, cursor: "pointer", color: C.dark, fontWeight: "600", fontSize: "13px", transition: "all 0.2s", boxShadow: "0 2px 6px rgba(0,0,0,0.03)" }}>Twitter</button>
-                            </a>
-                        )}
-                        {websiteUrl && (
-                            <a href={websiteUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                                <button style={{ padding: "10px 20px", borderRadius: "12px", background: C.surface, border: `1px solid ${C.border}`, cursor: "pointer", color: C.dark, fontWeight: "600", fontSize: "13px", transition: "all 0.2s", boxShadow: "0 2px 6px rgba(0,0,0,0.03)" }}>Website</button>
-                            </a>
-                        )}
+                        <SocialLinkTile href={mentorData?.socialProof?.linkedinUrl} type="linkedin" variant="iconOnly" />
+                        <SocialLinkTile href={mentorData?.socialProof?.githubUrl} type="github" variant="iconOnly" />
+                        <SocialLinkTile href={mentorData?.socialProof?.twitterUrl} type="twitter" variant="iconOnly" />
+                        <SocialLinkTile href={mentorData?.socialProof?.leetcodeUrl} type="leetcode" variant="iconOnly" />
+                        <SocialLinkTile href={mentorData?.socialProof?.portfolioUrl} type="portfolio" variant="iconOnly" />
+                        <SocialLinkTile href={mentorData?.socialProof?.websiteUrl} type="website" variant="iconOnly" />
                     </div>
 
                     {domains.length > 0 && (
@@ -502,26 +487,67 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                     <div style={{ textAlign: "left" }}>
                         <h3 style={{ fontWeight: "700", color: C.dark, marginBottom: "16px", fontSize: "16px" }}>Work Experience</h3>
 
-                        <div style={{ borderRadius: "16px", padding: "18px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
-                            <div style={{ fontWeight: "700", color: C.dark, fontSize: "15px", marginBottom: "4px" }}>{currentRole}</div>
-                            <div style={{ fontSize: "13px", color: C.mid, fontWeight: "500" }}>Present</div>
-                        </div>
-
-                        {previousRoles.length > 0 ? (
-                            previousRoles.map((w: any, i: number) => (
-                                <div key={i} style={{ borderRadius: "16px", padding: "18px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
-                                    <div style={{ fontWeight: "700", color: C.dark, fontSize: "15px", marginBottom: "4px" }}>{w.title || w.position}</div>
-                                    <div style={{ color: C.dark, fontSize: "13px", fontWeight: "600", marginBottom: "8px" }}>{w.company}</div>
-                                    <div style={{ display: "flex", gap: "12px", marginBottom: w.description ? "12px" : "0" }}>
-                                        {w.location && <div style={{ fontSize: "12px", color: C.mid, display: "flex", alignItems: "center", gap: "4px" }}>{w.location}</div>}
-                                        {w.duration && <div style={{ fontSize: "12px", color: C.mid, display: "flex", alignItems: "center", gap: "4px" }}>{w.duration}</div>}
+                        {currentRole && currentRole !== "Not specified" && (
+                            <div style={{ borderRadius: "16px", padding: "18px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                    <CompanyLogo
+                                        src={mentorData?.companyLogo || sortedRoles.find((r: any) => r.isCurrent)?.companyLogo}
+                                        companyName={company || currentRole}
+                                        size={32}
+                                    />
+                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                        <div
+                                            title={`${currentRole}${company ? ` at ${company}` : ""}`}
+                                            style={{ fontWeight: "700", color: C.dark, fontSize: "15px", marginBottom: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                                        >
+                                            {currentRole}
+                                        </div>
+                                        {company && (
+                                            <div style={{ color: C.mid, fontSize: "13px", fontWeight: "600", marginBottom: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                {company}
+                                            </div>
+                                        )}
+                                        <div style={{ fontSize: "12px", color: C.mid, fontWeight: "500" }}>Present</div>
                                     </div>
-                                    {w.description && <div style={{ fontSize: "13px", color: C.mid, lineHeight: "1.6" }}>{w.description}</div>}
                                 </div>
-                            ))
-                        ) : (
-                            <p style={{ fontSize: "14px", color: C.mid }}>No previous work experience added yet.</p>
+                            </div>
                         )}
+
+                        {sortedRoles.length > 0 ? (
+                            sortedRoles.map((w: any, i: number) => {
+                                const durationLabel = formatRoleDuration(w);
+                                return (
+                                    <div key={i} style={{ borderRadius: "16px", padding: "18px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+                                        <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                                            <CompanyLogo src={w.companyLogo} companyName={w.company} size={32} />
+                                            <div style={{ minWidth: 0, flex: 1 }}>
+                                                <div
+                                                    title={`${w.title || w.position || "Role"} at ${w.company}`}
+                                                    style={{ fontWeight: "700", color: C.dark, fontSize: "15px", marginBottom: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                                                >
+                                                    {w.title || w.position}
+                                                </div>
+                                                <div style={{ color: C.dark, fontSize: "13px", fontWeight: "600", marginBottom: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                    {w.company}
+                                                </div>
+                                                {w.employmentType && (
+                                                    <span style={{ display: "inline-block", fontSize: "11px", padding: "2px 8px", borderRadius: "4px", background: C.border, color: C.dark, fontWeight: 600, marginBottom: "6px" }}>
+                                                        {w.employmentType}
+                                                    </span>
+                                                )}
+                                                <div style={{ display: "flex", gap: "12px", marginBottom: w.description ? "8px" : "0", flexWrap: "wrap" }}>
+                                                    {w.location && <div style={{ fontSize: "12px", color: C.mid }}>{w.location}</div>}
+                                                    {durationLabel && <div style={{ fontSize: "12px", color: C.mid }}>{durationLabel}</div>}
+                                                </div>
+                                                {w.description && <div style={{ fontSize: "13px", color: C.mid, lineHeight: "1.6" }}>{w.description}</div>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        ) : !currentRole || currentRole === "Not specified" ? (
+                            <p style={{ fontSize: "14px", color: C.mid }}>No previous work experience added yet.</p>
+                        ) : null}
                     </div>
                 </div>
             </div>

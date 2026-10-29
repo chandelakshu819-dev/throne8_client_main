@@ -11,6 +11,9 @@ export interface UserProfileData {
     experienceIds?: string[];
     currentPosition?: string;
     education?: string;
+    website?: string;
+    websiteUrl?: string;
+    preferences?: { websiteUrl?: string; [key: string]: any };
     contactInfo?: any;
     onboarding?: {
         userType?: 'student' | 'working';

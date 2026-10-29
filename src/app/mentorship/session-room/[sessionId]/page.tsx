@@ -25,8 +25,8 @@ import { routes } from '@/config/routes';
 type CallStatus = 'active' | 'reconnecting' | 'left' | 'dropped';
 type LayoutMode = 'speaker' | 'grid';
 
-// socket.io khud ~5 attempts (~17s) karta hai; ye sirf safety ceiling hai
-const RECONNECT_GRACE_MS = 30000;
+// Reconnect grace period: 2 minutes before marking participant as dropped
+const RECONNECT_GRACE_MS = 120000;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 function initialsOf(name: string) {
@@ -251,6 +251,9 @@ export default function SessionRoomPage() {
   const rejoinInFlightRef = useRef(false);
 
 
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [presenceToast, setPresenceToast] = useState<string | null>(null);
+
   const [sessionKind, setSessionKind] = useState<'one-on-one' | 'group' | 'senior'>('one-on-one');
   const [redirectCountdown, setRedirectCountdown] = useState(5);
   const [redirectCancelled, setRedirectCancelled] = useState(false);
@@ -389,7 +392,7 @@ export default function SessionRoomPage() {
       }
     };
     fetchSession();
-  }, [sessionId]);
+  }, [sessionId, bookingId]);
 
   useEffect(() => {
     if (sessionData && currentUserId && !endedByCheck && !hasJoinedRef.current) {
@@ -407,10 +410,28 @@ export default function SessionRoomPage() {
     const socket = getSocket();
     if (!socket) return;
 
-    const handlePeerJoined = (data: { sessionId: string; joinerRole: string }) => {
+    const handlePeerJoined = (data: { sessionId: string; joinerRole?: string; isRejoin?: boolean }) => {
       if (data.sessionId === sessionId) {
         console.log('[SessionRoom] peer joined:', data);
+        if (data.isRejoin) {
+          setPresenceToast(`${isMentee ? 'Mentor' : 'Participant'} rejoined the session`);
+          setTimeout(() => setPresenceToast(null), 4000);
+        }
       }
+    };
+
+    const handleUserJoinedRoom = (data: { userId: string; userName?: string; isRejoin?: boolean }) => {
+      if (!data?.userId || data.userId === currentUserId) return;
+      if (data.isRejoin) {
+        setPresenceToast(`${data.userName || (isMentee ? 'Mentor' : 'Participant')} rejoined the session`);
+        setTimeout(() => setPresenceToast(null), 4000);
+      }
+    };
+
+    const handleUserLeftRoom = (data: { userId: string; userName?: string }) => {
+      if (!data?.userId || data.userId === currentUserId) return;
+      setPresenceToast(`${data.userName || (isMentee ? 'Mentor' : 'Participant')} left the session`);
+      setTimeout(() => setPresenceToast(null), 4000);
     };
 
     const handleReactionReceived = (data: { sessionId: string; emoji: string; fromUserId: string }) => {
@@ -423,12 +444,16 @@ export default function SessionRoomPage() {
     };
 
     socket.on('mentorship:peer-joined', handlePeerJoined);
+    socket.on('user-joined-room', handleUserJoinedRoom);
+    socket.on('user-left-room', handleUserLeftRoom);
     socket.on('mentorship:reaction-received', handleReactionReceived);
     return () => {
       socket.off('mentorship:peer-joined', handlePeerJoined);
+      socket.off('user-joined-room', handleUserJoinedRoom);
+      socket.off('user-left-room', handleUserLeftRoom);
       socket.off('mentorship:reaction-received', handleReactionReceived);
     };
-  }, [sessionId]);
+  }, [sessionId, currentUserId, isMentee]);
 
   useEffect(() => {
     return () => {
@@ -441,8 +466,9 @@ export default function SessionRoomPage() {
     setCallStatus(next);
   }, []);
 
-  // End Call ab back navigate nahi karta — "You left" screen dikhata hai
-  const handleEndCall = useCallback(() => {
+  // End Call confirms before leave so participant knows they can rejoin
+  const confirmLeave = useCallback(() => {
+    setShowLeaveConfirm(false);
     if (dropTimerRef.current) {
       clearTimeout(dropTimerRef.current);
       dropTimerRef.current = null;
@@ -450,6 +476,10 @@ export default function SessionRoomPage() {
     leaveRoom();
     updateCallStatus('left');
   }, [leaveRoom, updateCallStatus]);
+
+  const handleEndCall = useCallback(() => {
+    setShowLeaveConfirm(true);
+  }, []);
 
   const handleGoBack = useCallback(() => {
     router.back();
@@ -785,7 +815,7 @@ export default function SessionRoomPage() {
         </div>
       )}
       {/* Header */}
-      <div style={{ backgroundColor: '#4a3728', padding: '12px 24px', flexShrink: 0 }}>
+      <div style={{ backgroundColor: '#4a3728', padding: '12px 24px', flexShrink: 0, position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>
             {sessionData.title || 'Mentorship Session'}
@@ -801,6 +831,29 @@ export default function SessionRoomPage() {
           {sessionData.status && <span style={{ textTransform: 'uppercase', fontWeight: 600 }}>{sessionData.status}</span>}
         </div>
       </div>
+
+      {presenceToast && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 72,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(30,22,17,0.92)',
+            border: '1px solid rgba(201,168,124,0.4)',
+            color: '#fff',
+            borderRadius: 9999,
+            padding: '8px 22px',
+            fontSize: 13,
+            fontWeight: 500,
+            zIndex: 60,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            pointerEvents: 'none',
+          }}
+        >
+          {presenceToast}
+        </div>
+      )}
 
       {/* Video stage */}
       <div
@@ -1023,6 +1076,75 @@ export default function SessionRoomPage() {
           <span>Leave</span>
         </button>
       </div>
+
+      {/* Leave confirmation dialog */}
+      {showLeaveConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.72)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            padding: 16,
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#262626',
+              borderRadius: 16,
+              padding: 24,
+              maxWidth: 380,
+              width: '100%',
+              border: '1px solid rgba(255,255,255,0.12)',
+              textAlign: 'center',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+            }}
+          >
+            <h3 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 8px 0', color: '#fff' }}>
+              Leave session?
+            </h3>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', margin: '0 0 20px 0', lineHeight: 1.5 }}>
+              You can rejoin until the session ends.
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setShowLeaveConfirm(false)}
+                style={{
+                  borderRadius: 9999,
+                  padding: '10px 20px',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  backgroundColor: 'transparent',
+                  color: '#fff',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Stay in Session
+              </button>
+              <button
+                type="button"
+                onClick={confirmLeave}
+                style={{
+                  borderRadius: 9999,
+                  padding: '10px 20px',
+                  border: 'none',
+                  backgroundColor: '#b91c1c',
+                  color: '#fff',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes floatUp {

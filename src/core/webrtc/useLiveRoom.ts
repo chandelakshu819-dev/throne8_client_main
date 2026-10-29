@@ -845,15 +845,18 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
         socket.off('room-participants-list', onList);
         socket.off('error', onError);
       };
-      const onList = (p: { roomId?: string }) => {
-        if (p?.roomId && p.roomId !== roomId) return;
+      const onList = (p: { roomId?: string; canonicalRoomId?: string; effectiveRoomId?: string }) => {
+        if (p?.roomId && p.roomId !== roomId && p.canonicalRoomId !== roomId && p.effectiveRoomId !== roomId) return;
         cleanup();
         resolve('ok');
       };
       const onError = (p: { event?: string; message?: string }) => {
         if (p?.event !== 'join-live-room') return;
         cleanup();
-        setError(p.message || 'Could not join the room.');
+        const msg = p.message?.includes('not a member of this group')
+          ? 'Unable to join the room. Please verify your session.'
+          : (p.message || 'Could not join the room.');
+        setError(msg);
         resolve('rejected');
       };
       const timer = setTimeout(() => {

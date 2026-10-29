@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import FollowService from '@/lib/api/follow.service';
+import CompanyLogo from "@/features/mentorship/components/CompanyLogo";
 
 interface InterestsSectionProps {
     userId?: string;
@@ -145,15 +146,12 @@ const InterestsSection: React.FC<InterestsSectionProps> = ({ userId, isOwnProfil
                                     >
                                         <div className="flex items-center gap-5 relative z-10">
                                             <div className="relative">
-                                                <div className="w-16 h-16 rounded-2xl overflow-hidden border-3 border-[#e0d8cf] shadow-xl bg-white flex items-center justify-center">
-                                                    {item.companyLogo ? (
-                                                        <img src={item.companyLogo} alt={item.companyName || 'Company'} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <span className="text-xl font-bold text-[#4a3728]">
-                                                            {(item.companyName || item.following || '?').charAt(0).toUpperCase()}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                <CompanyLogo
+                                                    src={item.companyLogo}
+                                                    companyName={item.companyName || item.following || 'Company'}
+                                                    size={64}
+                                                    className="rounded-2xl border-3 border-[#e0d8cf] shadow-xl bg-white"
+                                                />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <h4 className="text-lg font-bold text-[#4a3728] group-hover/card:text-[#7a5c3e] transition-colors duration-300">

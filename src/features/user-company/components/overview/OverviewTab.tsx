@@ -12,6 +12,7 @@ import { Card, SectionHeading, Button } from '../ui';
 export function OverviewTab() {
   const { stats, news, testimonials, meta, shouldAnimate, statsRef, activeTestimonial, setActiveTestimonial } = useOverview();
   const dispatch = useAppDispatch();
+  if (!meta) return null;
 
   return (
     <div className="space-y-8 animate-slide-up">

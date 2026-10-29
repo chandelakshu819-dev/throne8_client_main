@@ -61,13 +61,12 @@ test('registration thunk keeps the backend errors for the signup banner', async 
   };
   const registerUser = loadedModule.exports.registerUser;
 
-  const pageSource = readFileSync(path.join(root, 'src/app/(auth)/signup/page.tsx'), 'utf8');
-  const helperStart = pageSource.indexOf('export function buildRegistrationFailureBanner(');
-  const helperEnd = pageSource.indexOf('\nexport default function SignupPage', helperStart);
+  const helperSourcePath = path.join(root, 'src/features/auth/utils/mapRegistrationFieldErrors.ts');
+  const helperFileSource = readFileSync(helperSourcePath, 'utf8');
+  const helperStart = helperFileSource.indexOf('export function buildRegistrationFailureBanner(');
   assert.notEqual(helperStart, -1);
-  assert.notEqual(helperEnd, -1);
-  const helperSource = pageSource
-    .slice(helperStart, helperEnd)
+  const helperSource = helperFileSource
+    .slice(helperStart)
     .trimEnd()
     .replace('export function', 'function');
   const helperJs = typescript.transpileModule(helperSource, {

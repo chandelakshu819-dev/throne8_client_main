@@ -61,6 +61,11 @@ export default function MentorMarqueeSection() {
                 "Mentor",
             role,
             company,
+            companyLogo:
+                m.companyLogo ||
+                m.experience?.previousRoles?.find((r: any) => r.isCurrent)?.companyLogo ||
+                m.experience?.previousRoles?.[0]?.companyLogo ||
+                "",
             rating: Number(m.stats?.averageRating) || 0,
             sessions:
                 m.stats?.totalSessions ||

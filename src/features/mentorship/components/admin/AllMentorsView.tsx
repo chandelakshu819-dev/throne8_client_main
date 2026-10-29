@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import AdminService from "@/lib/api/admin.service";
 import ProfileService from "@/lib/api/profile.service";
+import { safeUrl } from "@/shared/utils/mentorFormat";
 
 interface MentorAvatarProps {
   photoUrl?: string | null;
@@ -75,7 +76,7 @@ export interface MentorListItem {
     total: number;
     level?: string;
     currentRole?: string;
-    previousRoles?: Array<{ title: string; company: string; duration: string }>;
+    previousRoles?: Array<{ title: string; company: string; duration?: string; companyLogo?: string; isCurrent?: boolean; startDate?: string; endDate?: string }>;
   };
   pricing?: Record<string, number>;
   stats?: {
@@ -94,6 +95,7 @@ export interface MentorListItem {
     portfolioUrl?: string;
     twitterUrl?: string;
     websiteUrl?: string;
+    leetcodeUrl?: string;
     certifications?: string[];
     achievements?: string[];
   };
@@ -521,9 +523,9 @@ export default function AllMentorsView() {
                         <div className="text-[#4a3728] font-medium">
                           {mentor.experience?.currentRole || "Not specified"}
                         </div>
-                        {mentor.socialProof?.linkedinUrl && (
+                        {safeUrl(mentor.socialProof?.linkedinUrl) && (
                           <a
-                            href={mentor.socialProof.linkedinUrl}
+                            href={safeUrl(mentor.socialProof?.linkedinUrl)!}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-[10px] text-[#2563eb] hover:underline mt-0.5"
@@ -843,9 +845,9 @@ export default function AllMentorsView() {
                   External Profiles & Links
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {selectedMentor.socialProof?.linkedinUrl && (
+                  {safeUrl(selectedMentor.socialProof?.linkedinUrl) && (
                     <a
-                      href={selectedMentor.socialProof.linkedinUrl}
+                      href={safeUrl(selectedMentor.socialProof?.linkedinUrl)!}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e0d8cf] text-[#2563eb] hover:bg-[#fbf7f3]"
@@ -854,9 +856,9 @@ export default function AllMentorsView() {
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
-                  {selectedMentor.socialProof?.githubUrl && (
+                  {safeUrl(selectedMentor.socialProof?.githubUrl) && (
                     <a
-                      href={selectedMentor.socialProof.githubUrl}
+                      href={safeUrl(selectedMentor.socialProof?.githubUrl)!}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e0d8cf] text-[#4a3728] hover:bg-[#fbf7f3]"
@@ -865,9 +867,9 @@ export default function AllMentorsView() {
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
-                  {selectedMentor.socialProof?.portfolioUrl && (
+                  {safeUrl(selectedMentor.socialProof?.portfolioUrl) && (
                     <a
-                      href={selectedMentor.socialProof.portfolioUrl}
+                      href={safeUrl(selectedMentor.socialProof?.portfolioUrl)!}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e0d8cf] text-[#0f766e] hover:bg-[#fbf7f3]"
@@ -876,9 +878,33 @@ export default function AllMentorsView() {
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
-                  {!selectedMentor.socialProof?.linkedinUrl &&
-                    !selectedMentor.socialProof?.githubUrl &&
-                    !selectedMentor.socialProof?.portfolioUrl && (
+                  {safeUrl(selectedMentor.socialProof?.twitterUrl) && (
+                    <a
+                      href={safeUrl(selectedMentor.socialProof?.twitterUrl)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e0d8cf] text-[#0f1419] hover:bg-[#fbf7f3]"
+                    >
+                      <span>Twitter / X</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                  {safeUrl(selectedMentor.socialProof?.leetcodeUrl) && (
+                    <a
+                      href={safeUrl(selectedMentor.socialProof?.leetcodeUrl)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e0d8cf] text-[#ffa116] hover:bg-[#fbf7f3]"
+                    >
+                      <span>LeetCode</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                  {!safeUrl(selectedMentor.socialProof?.linkedinUrl) &&
+                    !safeUrl(selectedMentor.socialProof?.githubUrl) &&
+                    !safeUrl(selectedMentor.socialProof?.portfolioUrl) &&
+                    !safeUrl(selectedMentor.socialProof?.twitterUrl) &&
+                    !safeUrl(selectedMentor.socialProof?.leetcodeUrl) && (
                       <span className="text-[#8a7a6a]">No external links provided.</span>
                     )}
                 </div>

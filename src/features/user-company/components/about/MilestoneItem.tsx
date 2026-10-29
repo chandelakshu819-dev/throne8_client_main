@@ -31,7 +31,7 @@ export function MilestoneItem({ milestone: m, isLast }: Props) {
           <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', TYPE_BADGE[m.type])}>
             {m.type}
           </span>
-          {isLast && <Badge label="Now" variant="Core" />}
+          {isLast && <Badge label="Now" variant="default" />}
         </div>
         <p className="text-sm text-brand-brown/70 leading-relaxed">{m.description}</p>
       </div>

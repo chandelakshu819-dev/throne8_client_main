@@ -20,6 +20,10 @@ import { RegistrationData } from '@/features/auth/interface';
 import ProgressSteps from '@/shared/uiComponents/ProgressSteps';
 import { fullRegistrationSchema } from '@/features/auth/schema';
 import AuthService, { RegistrationFailure } from '@/lib/api/auth.service';
+import {
+  mapRegistrationFieldErrors,
+  buildRegistrationFailureBanner,
+} from '@/features/auth/utils/mapRegistrationFieldErrors';
 
 const fieldSteps: Record<string, number> = {
   email: 1,
@@ -43,38 +47,6 @@ const fieldSteps: Record<string, number> = {
   cgpa: 4,
 };
 
-export function mapRegistrationFieldErrors(
-  fieldErrors: RegistrationFailure['fieldErrors']
-): Record<string, string> {
-  return (fieldErrors || []).reduce<Record<string, string>>((mappedErrors, fieldError) => {
-    if (Object.prototype.hasOwnProperty.call(fieldSteps, fieldError.field)) {
-      mappedErrors[fieldError.field] = fieldError.message;
-    }
-    return mappedErrors;
-  }, {});
-}
-
-export function buildRegistrationFailureBanner(
-  failure: RegistrationFailure,
-  submittedData: RegistrationData
-): string {
-  const errorMessages = (failure.statusCode === 400 || failure.statusCode === 409)
-    ? (Array.isArray(failure.errors)
-      ? failure.errors.filter((message) => typeof message === 'string' && message.trim()).slice(0, 3)
-      : [])
-    : [];
-  const submittedValues = Object.values(submittedData)
-    .flatMap((value) => Array.isArray(value) ? value : [value])
-    .filter((value): value is string => typeof value === 'string' && value.length > 0);
-  const redactSubmittedValues = (message: string) => submittedValues.reduce((safeMessage, value) => {
-    const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return safeMessage.replace(new RegExp(escapedValue, 'gi'), '[redacted]');
-  }, message);
-
-  return [failure.message || 'Registration failed. Please retry.', ...errorMessages]
-    .map(redactSubmittedValues)
-    .join('\n');
-}
 
 export default function SignupPage() {
   const router = useRouter();

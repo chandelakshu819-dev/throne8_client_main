@@ -287,7 +287,7 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const { userProfileData, fetchUserProfile } = useProfileData();
 
   useEffect(() => {
-    if (user) fetchUserProfile();
+    if (user) fetchUserProfile(user.userId);
   }, [user, fetchUserProfile]);
 
   const leaderName = userProfileData

@@ -1,5 +1,6 @@
 // mentorDashboard/components/ProfilePage.tsx=> Main Profile
 import React, { useEffect, useState, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import {
   User,
   Camera,
@@ -19,6 +20,9 @@ import VerificationModalPreview from "../profile/modal/VerificationModal";
 import TermsAndConditionsModal from "../profile/modal/TermsAndConditionsModal";
 import VerificationService from "@/lib/api/verification.service";
 import UpdateProfileModal from "../profile/modal/Updateprofilemodal";
+import CompanyLogo from "../CompanyLogo";
+import SocialLinkTile from "../SocialLinkTile";
+import { formatRoleDuration, sortRolesNewestFirst } from "@/shared/utils/mentorFormat";
 
 interface ProfilePageProps {
   profilePhoto: string | null
@@ -80,6 +84,18 @@ export default function ProfilePage({
 
   const user = liveMentorData?.user;
   const exp = liveMentorData?.experience;
+  const previousRoles = exp?.previousRoles || [];
+  const sortedPreviousRoles = sortRolesNewestFirst(previousRoles);
+  const socialProof = liveMentorData?.socialProof || {};
+  const hasSocialLinks = !!(
+    socialProof.linkedinUrl ||
+    socialProof.githubUrl ||
+    socialProof.twitterUrl ||
+    socialProof.leetcodeUrl ||
+    socialProof.portfolioUrl ||
+    socialProof.websiteUrl
+  );
+  const [initialModalTab, setInitialModalTab] = useState<string>("basic");
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [verificationStatuses, setVerificationStatuses] = useState({
@@ -92,6 +108,20 @@ export default function ProfilePage({
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Scroll to #verification-section when subtab=verification (only once after element is mounted)
+  const searchParams = useSearchParams();
+  const hasScrolledToVerification = useRef(false);
+
+  useEffect(() => {
+    if (searchParams?.get("subtab") === "verification" && !hasScrolledToVerification.current) {
+      const el = document.getElementById("verification-section");
+      if (el) {
+        hasScrolledToVerification.current = true;
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  }, [searchParams, liveMentorData]);
 
   // ✅ FIX: was hardcoded "1,234 views" for every mentor. Now reads the
   // real count from liveMentorData, trying a few likely field-name shapes
@@ -257,7 +287,10 @@ export default function ProfilePage({
             </div>
 
             <button
-              onClick={() => setShowUpdateModal(true)}
+              onClick={() => {
+                setInitialModalTab("basic");
+                setShowUpdateModal(true);
+              }}
               className="text-sm font-semibold px-4 py-2 rounded-xl text-white transition-opacity hover:opacity-90"
               style={{ backgroundColor: "#4a3728" }}
             >
@@ -323,39 +356,145 @@ export default function ProfilePage({
           </div>
         </div>
 
+        {/* Work Experience */}
+        <div className="bg-white p-6 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+            <div>
+              <h3 className="text-base font-bold" style={{ color: '#4a3728' }}>Work Experience</h3>
+              <p className="text-xs" style={{ color: '#8a7a6a' }}>Your career journey and previous positions</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setInitialModalTab("experience");
+                setShowUpdateModal(true);
+              }}
+              className="text-xs font-semibold px-3.5 py-1.5 rounded-xl text-white transition-opacity hover:opacity-90 flex items-center gap-1.5 cursor-pointer"
+              style={{ backgroundColor: "#4a3728" }}
+            >
+              Manage Experience
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {/* Current Role */}
+            {exp?.currentRole && (
+              <div className="p-4 rounded-xl flex items-center gap-3.5" style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}>
+                <CompanyLogo
+                  src={liveMentorData?.companyLogo || sortedPreviousRoles.find((r: any) => r.isCurrent)?.companyLogo}
+                  companyName={liveMentorData?.company || exp.currentRole}
+                  size={36}
+                />
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="text-sm font-bold truncate"
+                    style={{ color: "#4a3728" }}
+                    title={`${exp.currentRole}${liveMentorData?.company ? ` at ${liveMentorData.company}` : ""}`}
+                  >
+                    {exp.currentRole}
+                  </p>
+                  {liveMentorData?.company && (
+                    <p className="text-xs font-semibold truncate" style={{ color: "#7a5c3e" }}>
+                      {liveMentorData.company}
+                    </p>
+                  )}
+                  <span className="inline-block text-[11px] font-medium" style={{ color: "#8a7a6a" }}>
+                    Present
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Previous Roles list */}
+            {sortedPreviousRoles.length > 0 ? (
+              sortedPreviousRoles.map((role: any, idx: number) => {
+                const durationLabel = formatRoleDuration(role);
+                return (
+                  <div key={idx} className="p-4 rounded-xl flex items-start gap-3.5" style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}>
+                    <CompanyLogo
+                      src={role.companyLogo}
+                      companyName={role.company}
+                      size={36}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p
+                          className="text-sm font-bold truncate"
+                          style={{ color: "#4a3728" }}
+                          title={`${role.title || role.position || "Role"} at ${role.company}`}
+                        >
+                          {role.title || role.position || "Role"}
+                        </p>
+                        {role.employmentType && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#ece7e2] text-[#4a3728]">
+                            {role.employmentType}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-semibold truncate" style={{ color: "#7a5c3e" }}>
+                        {role.company}
+                      </p>
+                      <div className="flex items-center gap-3 text-[11px] mt-0.5" style={{ color: "#8a7a6a" }}>
+                        {role.location && <span>{role.location}</span>}
+                        {durationLabel && <span>{durationLabel}</span>}
+                      </div>
+                      {role.description && (
+                        <p className="text-xs mt-2 leading-relaxed" style={{ color: "#5a4535" }}>
+                          {role.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            ) : !exp?.currentRole ? (
+              <p className="italic text-sm" style={{ color: "#c0b0a0" }}>
+                No work experience added yet. Click &quot;Manage Experience&quot; to add roles.
+              </p>
+            ) : null}
+          </div>
+        </div>
+
         {/* Social Media Integration */}
         <div className="bg-white p-6 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
-          <h3 className="text-base font-bold mb-4" style={{ color: '#4a3728' }}>Social Media Integration</h3>
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+            <div>
+              <h3 className="text-base font-bold" style={{ color: '#4a3728' }}>Social Media Integration</h3>
+              <p className="text-xs" style={{ color: '#8a7a6a' }}>Verified professional and coding profiles</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setInitialModalTab("social");
+                setShowUpdateModal(true);
+              }}
+              className="text-xs font-semibold px-3.5 py-1.5 rounded-xl text-white transition-opacity hover:opacity-90 flex items-center gap-1.5 cursor-pointer"
+              style={{ backgroundColor: "#4a3728" }}
+            >
+              Update Links
+            </button>
+          </div>
+
           <div className="space-y-3">
-            <div className="flex items-center gap-4 p-3.5 rounded-xl" style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3' }}>
-              <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center flex-shrink-0" style={{ border: '1px solid #e0d8cf' }}>
-                <Linkedin className="w-4.5 h-4.5 text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: '#4a3728' }}>LinkedIn Profile</p>
-                <p className="text-xs" style={{ color: '#8a7a6a' }}>Connect your LinkedIn account</p>
-              </div>
-              <button className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90" style={{ backgroundColor: '#4a3728' }}>
-                Connect
-              </button>
-            </div>
-            <div className="flex items-center gap-4 p-3.5 rounded-xl" style={{ border: '1px solid #e0d8cf', backgroundColor: '#fbf7f3' }}>
-              <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center flex-shrink-0" style={{ border: '1px solid #e0d8cf' }}>
-                <Github className="w-4.5 h-4.5 text-black" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: '#4a3728' }}>GitHub</p>
-                <p className="text-xs" style={{ color: '#8a7a6a' }}>Link your GitHub account</p>
-              </div>
-              <button className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90" style={{ backgroundColor: '#4a3728' }}>
-                Connect
-              </button>
-            </div>
+            {hasSocialLinks ? (
+              <>
+                <SocialLinkTile href={socialProof?.linkedinUrl} type="linkedin" variant="card" />
+                <SocialLinkTile href={socialProof?.githubUrl} type="github" variant="card" />
+                <SocialLinkTile href={socialProof?.twitterUrl} type="twitter" variant="card" />
+                <SocialLinkTile href={socialProof?.leetcodeUrl} type="leetcode" variant="card" />
+                <SocialLinkTile href={socialProof?.portfolioUrl} type="portfolio" variant="card" />
+                <SocialLinkTile href={socialProof?.websiteUrl} type="website" variant="card" />
+              </>
+            ) : (
+              <p className="italic text-sm" style={{ color: "#c0b0a0" }}>
+                No social profiles linked yet. Click &quot;Update Links&quot; to link your LinkedIn, GitHub, or LeetCode profiles.
+              </p>
+            )}
           </div>
         </div>
 
         {/* Agreements & Verification */}
-        <div className="bg-white p-6 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
+        <div id="verification-section" className="bg-white p-6 rounded-2xl" style={{ border: '1px solid #e0d8cf' }}>
           <h3 className="text-base font-bold mb-4 flex items-center gap-2" style={{ color: '#4a3728' }}>
             <FileText className="w-4.5 h-4.5" />
             Agreements & Verification
@@ -512,6 +651,7 @@ export default function ProfilePage({
         onClose={() => setShowUpdateModal(false)}
         mentorData={liveMentorData}
         mentorId={liveMentorData?.mentorId ?? ""}
+        initialTab={initialModalTab}
         onUpdateSuccess={(updated) => {
           // ✅ FIX: turant local state update — page refresh ki zarurat nahi
           console.log("✅ Profile updated:", updated);
