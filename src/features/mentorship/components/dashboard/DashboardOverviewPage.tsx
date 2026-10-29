@@ -28,6 +28,7 @@ import {
   useNow,
 } from "@/features/mentorship/utils/sessionJoin"
 import { capitalizeName } from "@/shared/utils/format"
+import ProfileService from "@/lib/api/profile.service"
 
 const COLORS = {
   ink: "#4a3728",
@@ -133,6 +134,15 @@ function formatINR(n: number) {
   }).format(n)
 }
 
+// Photo value URL hai ya photo ID? (ID ko baad me ProfileService se URL me convert karte hain)
+function isUrlLike(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.trim().length > 0 &&
+    (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/"))
+  )
+}
+
 function MenteeAvatar({
   photo,
   name,
@@ -144,12 +154,12 @@ function MenteeAvatar({
 }) {
   const [imgError, setImgError] = useState(false)
   const initials = initialsFrom(name)
-  const isValidUrl = Boolean(
-    photo &&
-    typeof photo === "string" &&
-    photo.trim().length > 0 &&
-    (photo.startsWith("http://") || photo.startsWith("https://") || photo.startsWith("/"))
-  )
+  const isValidUrl = isUrlLike(photo)
+
+  // photo badalne par error reset ho (ID resolve hone ke baad URL aata hai)
+  useEffect(() => {
+    setImgError(false)
+  }, [photo])
 
   if (isValidUrl && !imgError) {
     return (
@@ -190,6 +200,11 @@ export default function DashboardOverviewPage({
   const [sessionsPanelTab, setSessionsPanelTab] = useState<"upcoming" | "missedNotHeld">("upcoming")
   // Day-filter within Upcoming tab
   const [filterTab, setFilterTab] = useState<"all" | "today" | "tomorrow" | "later">("today")
+
+  // photoId -> resolved cloudinary URL
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
+  // Jin photo IDs ki request ja chuki hai (dobara fetch na ho)
+  const requestedPhotoIds = useRef<Set<string>>(new Set())
 
   // Clock skew correction + auto-ticking timer (har 15s)
   const serverNowIso = dashboardData?.serverNow
@@ -252,9 +267,10 @@ export default function DashboardOverviewPage({
           s.menteeName ||
           "Student"
 
-        const menteePhoto =
+        // Photo URL ya photo ID (ID ho to neeche effect se URL me resolve hoga)
+        const menteePhoto: string | null =
           b.menteeProfilePhoto ||
-          (typeof b.mentee?.profilePic === "string" && b.mentee.profilePic.startsWith("http") ? b.mentee.profilePic : null) ||
+          b.mentee?.profilePic ||
           s.menteeProfilePhoto ||
           null
 
@@ -326,6 +342,63 @@ export default function DashboardOverviewPage({
       }
     }
   })
+
+  // ── Photo IDs jinhe URL me resolve karna hai (URL wale skip) ──
+  // String key use kar rahe hain taaki har 15s ke re-render par effect dobara na chale.
+  const pendingPhotoIdsKey = Array.from(
+    new Set(
+      flattenedBookings
+        .map(({ session }) => session.menteeProfilePhoto)
+        .filter(
+          (p): p is string => typeof p === "string" && p.trim().length > 0 && !isUrlLike(p)
+        )
+    )
+  )
+    .sort()
+    .join(",")
+
+  useEffect(() => {
+    if (!pendingPhotoIdsKey) return
+    const ids = pendingPhotoIdsKey
+      .split(",")
+      .filter((id) => id && !requestedPhotoIds.current.has(id))
+    if (ids.length === 0) return
+
+    ids.forEach((id) => requestedPhotoIds.current.add(id))
+
+    let cancelled = false
+    Promise.all(
+      ids.map((id) =>
+        ProfileService.getProfilePhotoById(id)
+          .then((res: any) => ({ id, url: res?.data?.photo?.cloudinarySecureUrl as string | undefined }))
+          .catch(() => {
+            // fail hua to dobara try ho sake
+            requestedPhotoIds.current.delete(id)
+            return { id, url: undefined }
+          })
+      )
+    ).then((results) => {
+      if (cancelled) return
+      setPhotoUrls((prev) => {
+        const next = { ...prev }
+        results.forEach(({ id, url }) => {
+          if (url) next[id] = url
+        })
+        return next
+      })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [pendingPhotoIdsKey])
+
+  // URL ho to wahi, ID ho to resolved URL (jab tak nahi aata, initials dikhte hain)
+  const resolvePhoto = (photo?: string | null): string | null => {
+    if (!photo) return null
+    if (isUrlLike(photo)) return photo
+    return photoUrls[photo] ?? null
+  }
 
   // Upcoming: not terminal, not completed, not stale, end time in the future (or live)
   const upcoming: Session[] = flattenedBookings
@@ -799,7 +872,7 @@ export default function DashboardOverviewPage({
                           : {})}
                         className={`flex items-center gap-3 min-w-0 ${isClickable ? "cursor-pointer group" : ""}`}
                       >
-                        <MenteeAvatar photo={s.menteeProfilePhoto} name={name} />
+                        <MenteeAvatar photo={resolvePhoto(s.menteeProfilePhoto)} name={name} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p
@@ -953,7 +1026,7 @@ export default function DashboardOverviewPage({
                           : {})}
                         className={`flex items-center gap-3 min-w-0 ${isClickable ? "cursor-pointer group" : ""}`}
                       >
-                        <MenteeAvatar photo={s.menteeProfilePhoto} name={name} />
+                        <MenteeAvatar photo={resolvePhoto(s.menteeProfilePhoto)} name={name} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p
