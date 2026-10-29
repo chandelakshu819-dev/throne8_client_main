@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { Download, Eye, FileText, Archive, Table, Presentation } from 'lucide-react';
 import { PostAuthorRow } from './PostAuthorRow';
-import { PostEngagement } from './PostEngagement';
+import { PostEngagement } from '../posts/PostEngagement';
 import { Button } from '../ui';
 import type { DocumentPost, DocumentFileType } from '@/features/company/type/company.types';
 

@@ -201,9 +201,11 @@ export default function ServicesPage({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchQuery, searchOpen]);
 
-  // ── Stats from API ────────────────────────────────────
-  const totalSessions = apiSessions.length;
-  const completedCount = apiSessions.filter(s => s.status === 'completed').length;
+  // ── Stats from API (Service Offerings, not bookings) ─
+  const totalServicesOffered = apiSessions.length + apiGroupSessions.length;
+  const activeServicesCount =
+    apiSessions.filter(s => s.status !== 'cancelled' && s.status !== 'draft').length +
+    apiGroupSessions.filter(g => g.status !== 'cancelled' && g.status !== 'draft').length;
   const avgRating = "—";   // review API se aayega baad me
 
   useEffect(() => {
@@ -869,11 +871,11 @@ export default function ServicesPage({
           )}
         </div>
 
-        {/* Stats — real data from API, now as standalone cards */}
+        {/* Stats — real service offerings from API */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { icon: Users, label: 'Total Sessions', value: sessionsLoading ? '—' : String(totalSessions), accent: '#2563eb' },
-            { icon: Clock, label: 'Completed', value: sessionsLoading ? '—' : String(completedCount), accent: '#15803d' },
+            { icon: Briefcase, label: 'Services Offered', value: (sessionsLoading || groupSessionsLoading) ? '—' : String(totalServicesOffered), accent: '#2563eb' },
+            { icon: Clock, label: 'Active Services', value: (sessionsLoading || groupSessionsLoading) ? '—' : String(activeServicesCount), accent: '#15803d' },
             { icon: Star, label: 'Avg Rating', value: avgRating, accent: '#d97706' },
           ].map(({ icon: Icon, label, value, accent }) => (
             <div

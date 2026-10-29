@@ -1,7 +1,7 @@
 'use client';
 import type { ElementType } from 'react';
 import { Target, Lightbulb, Shield, Globe } from 'lucide-react';
-import { useAbout } from '../_hooks/useAbout';
+import { useAbout } from '../../hooks/useAbout';
 import { Card, SectionHeading } from '../ui';
 
 export function AboutTab() {

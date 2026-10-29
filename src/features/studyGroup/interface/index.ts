@@ -1,4 +1,4 @@
-import { RemotePeer, RoomMode } from "@/lib/webRtc/types";
+import type { RemotePeer, RoomMode } from "@/core/webrtc/useLiveRoom";
 import { TabId } from "../types";
 
 export interface Group {

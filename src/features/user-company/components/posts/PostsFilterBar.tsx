@@ -2,7 +2,7 @@
 import { cn } from '@/shared/utils/cn';
 import { Image, FileText, BookOpen, LayoutGrid } from 'lucide-react';
 import type { PostFilter } from '@/features/company/type/company.types';
-import type { FilterOption } from '../_hooks/usePosts';
+import type { FilterOption } from '../../hooks/usePosts';
 
 const ICONS: Record<PostFilter, React.ElementType> = {
   all: LayoutGrid,

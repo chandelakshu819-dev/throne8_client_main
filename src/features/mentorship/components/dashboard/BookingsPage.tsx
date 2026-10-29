@@ -22,6 +22,7 @@ import SessionService from "@/lib/api/session.service";
 import ProfileService from "@/lib/api/profile.service";
 import { useSocket } from "@/core/realtime/useSocket";
 import MenteeLink from "@/features/mentorship/components/shared/MenteeLink";
+import { getSessionTiming } from "@/features/mentorship/utils/sessionJoin";
 
 interface BookingProps {
   mentorData: any;
@@ -66,6 +67,11 @@ type MentorBookingRow = {
   participants?: GroupParticipant[];
   isTemplate?: boolean;
   meetingUrl?: string;
+  startedAt?: string | Date;
+  endedAt?: string | Date;
+  duration?: number;
+  durationMinutes?: number;
+  actualDuration?: number;
 };
 
 type BookingTab =
@@ -167,11 +173,11 @@ const getEffectiveStatus = (b: MentorBookingRow, nowMs: number): EffectiveStatus
 
 
 
-    if (b.status === "in_progress") {
-      // Slot chal raha hai -> In Progress. Slot khatam par mentor ne End nahi dabaya -> Ended.
-      // completed / no_show ka faisla sirf backend karta hai, frontend nahi.
-      return endMs !== null && nowMs >= endMs ? "ended" : "in_progress";
-    }
+  if (b.status === "in_progress") {
+    // Slot chal raha hai -> In Progress. Slot khatam par mentor ne End nahi dabaya -> Ended.
+    // completed / no_show ka faisla sirf backend karta hai, frontend nahi.
+    return endMs !== null && nowMs >= endMs ? "ended" : "in_progress";
+  }
 
 
   // Pending request slot start par hi expire (accept sirf start time tak)
@@ -331,6 +337,11 @@ export default function BookingsPage({ mentorData }: BookingProps) {
             slotTime: b.slotTime || s.slotTime,
             status: b.status,
             isGroupSession: false,
+            startedAt: b.startedAt || s.startedAt,
+            endedAt: b.endedAt || s.endedAt,
+            duration: b.duration || s.duration,
+            durationMinutes: s.durationMinutes,
+            actualDuration: b.actualDuration || s.actualDuration,
           }))
         );
 
@@ -354,6 +365,11 @@ export default function BookingsPage({ mentorData }: BookingProps) {
           participants: g.participants || [],
           isTemplate: !!g.isTemplate,
           meetingUrl: g.meetingUrl,
+          startedAt: g.startedAt,
+          endedAt: g.endedAt,
+          duration: g.duration,
+          durationMinutes: g.durationMinutes,
+          actualDuration: g.actualDuration,
         }));
 
         // Still-pending group join requests stay one row per request —
@@ -667,8 +683,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `receipt-${(r.menteeName || booking.menteeName || "student").replace(/\s+/g, "_")}-${r.bookingId || booking.bookingId
-        }.html`;
+      link.download = `receipt-${(r.menteeName || booking.menteeName || "student").replace(/\s+/g, "_")}-${r.bookingId || booking.bookingId}.html`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -780,7 +795,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         }
         await SessionService.cancelGroupSession(cancelSessionId, cancelReason.trim());
 
-        
+
         showToast("Session cancelled successfully", "success");
         setAllBookings((prev) =>
           prev.map((b) =>
@@ -946,7 +961,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       {/* TABS */}
       <div className="bg-white p-1.5 rounded-2xl overflow-x-auto" style={{ border: "1px solid #e0d8cf" }}>
         <div className="flex gap-1.5 min-w-max">
-        {(["all", "pending", "upcoming", "in_progress", "completed", "missed", "history"] as const).map((tab) => {
+          {(["all", "pending", "upcoming", "in_progress", "completed", "missed", "history"] as const).map((tab) => {
             const count = {
               all: activeBookings.length,
               pending: pendingBookings.length,
@@ -1025,7 +1040,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   const badgeKey = eff === "upcoming" ? booking.status : eff;
                   const sb = statusBadge[badgeKey] ?? statusBadge.pending;
 
-                      
+
 
                   const isGroupedRow = !!booking.participants; // accepted, session-level row
                   const rowKey = booking.bookingId || booking.sessionId;
@@ -1148,11 +1163,11 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                                     booking.status === "full" ||
                                     booking.status === "confirmed") &&
                                   !(booking.isTemplate || !booking.scheduledAt) && (() => {
-                                    const scheduledTime = booking.scheduledAt ? new Date(booking.scheduledAt).getTime() : 0;
+                                    const timing = getSessionTiming(booking);
+                                    const isWithinWindow = timing.isWithinStartWindow;
                                     const now = Date.now();
-                                    const isTooEarly = now < scheduledTime - 5 * 60 * 1000;
-                                    const isTooLate = now > scheduledTime + 10 * 60 * 1000;
-                                    const isWithinWindow = !isTooEarly && !isTooLate;
+                                    const isTooEarly = !isNaN(timing.startMs) && now < timing.startMs - 5 * 60 * 1000;
+                                    const isTooLate = !isNaN(timing.endMs) && now > timing.endMs;
 
                                     return (
                                       <div className="flex flex-col items-start gap-0.5">
@@ -1178,21 +1193,37 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                                       </div>
                                     );
                                   })()
-                                ) : (
-                                  <button
-                                    onClick={() => openStartModal(booking)}
-                                    disabled={isRowLoading}
-                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                    style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
-                                  >
-                                    {currentAction === "start" ? (
-                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    ) : (
-                                      <Play className="w-3.5 h-3.5" />
-                                    )}
-                                    <span>Start</span>
-                                  </button>
-                                )}
+                                ) : (() => {
+                                  const timing = getSessionTiming(booking);
+                                  const isWithinWindow = timing.isWithinStartWindow;
+                                  const now = Date.now();
+                                  const isTooEarly = !isNaN(timing.startMs) && now < timing.startMs - 5 * 60 * 1000;
+                                  const isTooLate = timing.isStale || (!isNaN(timing.endMs) && now > timing.endMs);
+
+                                  return (
+                                    <div className="flex flex-col items-start gap-0.5">
+                                      <button
+                                        onClick={() => openStartModal(booking)}
+                                        disabled={isRowLoading || !isWithinWindow}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                        style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
+                                        title={isTooEarly ? "Available 5 minutes before scheduled start" : isTooLate ? "Window passed" : undefined}
+                                      >
+                                        {currentAction === "start" ? (
+                                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                          <Play className="w-3.5 h-3.5" />
+                                        )}
+                                        <span>Start</span>
+                                      </button>
+                                      {!isWithinWindow && (
+                                        <span className="text-[10px] text-amber-700 whitespace-nowrap">
+                                          {isTooEarly ? "Starts 5m before scheduled time" : "Start window closed"}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
 
                                 {/* Reschedule not supported for group sessions yet */}
                                 {!booking.isGroupSession && (
@@ -1256,7 +1287,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                               </div>
                             )}
 
-                               
+
                             {/* Completed */}
 
                             {eff === "completed" && (

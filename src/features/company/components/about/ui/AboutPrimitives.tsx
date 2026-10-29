@@ -26,7 +26,8 @@ export function SectionHeader({ label, title, subtitle }: SectionHeaderProps) {
 
 // ── Card ──────────────────────────────────────────────────────────────────────
 interface CardProps {
-    children: React.ReactNode;
+    children?: React.ReactNode;
+    label?: string;
     className?: string;
     hover?: boolean;
 }
@@ -106,12 +107,13 @@ export function AvatarPlaceholder({
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
 interface BadgeProps {
-    children: React.ReactNode;
+    children?: React.ReactNode;
+    label?: string;
     variant?: 'default' | 'dark' | 'blue' | 'green';
     className?: string;
 }
 
-export function Badge({ children, variant = 'default', className = '' }: BadgeProps) {
+export function Badge({ children, label, variant = 'default', className = '' }: BadgeProps) {
     const variantStyles = {
         default: 'bg-[#4a3728]/10 text-[#4a3728] border-[#4a3728]/20',
         dark: 'bg-[#4a3728] text-[#f6ede8] border-transparent',
@@ -127,7 +129,7 @@ export function Badge({ children, variant = 'default', className = '' }: BadgePr
         ${variantStyles[variant]} ${className}
       `}
         >
-            {children}
+            {children ?? label}
         </span>
     );
 }

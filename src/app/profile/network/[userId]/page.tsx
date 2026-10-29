@@ -96,7 +96,7 @@ export default function NetworkPage() {
 
     useEffect(() => {
         if (user) {
-            fetchUserProfile();
+            fetchUserProfile(user.userId);
             fetchNetworkUsers(user.userId);
             loadEducation();
             fetchSkillsData();

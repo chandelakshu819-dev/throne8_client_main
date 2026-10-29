@@ -219,8 +219,26 @@ export default function UserDashboardLayout({
 
   const fetchSessions = useCallback(() => {
     if (!userId) return;
-    SessionService.getAllSessions({ role: "mentee", limit: 100 })
-      .then((res) => setSessions(res.data || []))
+    Promise.all([
+      SessionService.getAllSessions({ role: "mentee", limit: 100 }).catch((err) => {
+        console.error("Failed to fetch 1:1/senior sessions:", err);
+        return { data: [] } as any;
+      }),
+      SessionService.getMyGroupSessions("mentee").catch((err) => {
+        console.error("Failed to fetch group sessions:", err);
+        return { data: [] } as any;
+      }),
+    ])
+      .then(([sessionsRes, groupRes]) => {
+        const standardSessions = Array.isArray(sessionsRes.data)
+          ? sessionsRes.data
+          : (sessionsRes.data?.sessions || []);
+        const groupSessions = Array.isArray(groupRes.data)
+          ? groupRes.data
+          : (groupRes.data?.sessions || []);
+        const taggedGroups = groupSessions.map((g: any) => ({ ...g, isGroupSession: true }));
+        setSessions([...standardSessions, ...taggedGroups]);
+      })
       .catch(console.error);
   }, [userId]);
 

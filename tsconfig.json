@@ -37,6 +37,7 @@
   ],
   "exclude": [
     "node_modules",
+    "tests",
     "src/features/study-group/components/timer",
     "src/features/study-group/components/todos"
   ]

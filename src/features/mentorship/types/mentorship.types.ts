@@ -34,8 +34,14 @@ export interface MentorResponse {
       previousRoles: {
         title: string;
         company: string;
-        duration: string;
-        _id: string;
+        companyLogo?: string;
+        duration?: string;
+        startDate?: string;
+        endDate?: string;
+        isCurrent?: boolean;
+        employmentType?: string;
+        description?: string;
+        _id?: string;
       }[];
     };
     pricing: Record<string, number>;
@@ -50,6 +56,10 @@ export interface MentorResponse {
     socialProof: {
       linkedinUrl?: string;
       githubUrl?: string;
+      portfolioUrl?: string;
+      twitterUrl?: string;
+      leetcodeUrl?: string;
+      websiteUrl?: string;
     };
     preferences: {
       acceptGroupSessions: boolean;

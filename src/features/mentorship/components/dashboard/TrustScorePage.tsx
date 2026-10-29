@@ -1,5 +1,5 @@
 // mentorDashboard/components/TrustScorePage.tsx
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useMemo } from "react"
 import {
   Shield,
   ShieldCheck,
@@ -20,7 +20,7 @@ import MentorService from "@/lib/api/mentorship.service"
 
 // Achievement badges derived purely from the breakdown scores we already
 // have — no new backend fields, just thresholds on existing data.
-function getAchievements(breakdown: Record<string, number | undefined>) {
+function getAchievements(breakdown: Record<string, number | null | undefined>) {
   const achievements: { label: string; icon: any }[] = []
   if ((breakdown.profileCompleteness ?? 0) >= 100) {
     achievements.push({ label: "Profile Complete", icon: UserCheck })
@@ -89,7 +89,12 @@ const ScoreRing = ({
   )
 }
 
-export default function TrustScorePage() {
+interface TrustScorePageProps {
+  setActivePage?: (page: string, subtab?: string) => void;
+  mentorData?: any;
+}
+
+export default function TrustScorePage({ setActivePage, mentorData }: TrustScorePageProps) {
   const [loading, setLoading] = useState(true)
   const [trustScore, setTrustScore] = useState<any>(null)
   const [error, setError] = useState(false)
@@ -115,15 +120,8 @@ export default function TrustScorePage() {
   }
 
   const syncScore = () => {
-    // Uses the new sync endpoint via backend service update or manual api call
-    // For now we will hit the existing endpoint since we added sync logic inside trustScore.service.ts
-    // Wait, the MentorService does not have sync endpoint yet. Let's import trustScoreService.
     setLoading(true);
     import("@/lib/api/trustScore.service").then(({ trustScoreService }) => {
-      // we need userId, but let's just use the current fetchScore as a fallback if we don't have it, 
-      // or we can use MentorService to add a sync endpoint. 
-      // Actually, mentorController.getTrustScore recalculates automatically if missing. 
-      // Let's add MentorService.syncTrustScore later, for now call api.post
       import("@/lib/api/api.intance").then(({ default: api }) => {
         api.post('/mentorship/trust-score/' + (trustScore?.userId || 'me') + '/sync').then((res) => {
           if (res.data?.data?.trustScore) {
@@ -148,7 +146,57 @@ export default function TrustScorePage() {
   const nextTier = trustScore?.nextTier || null;
   const pointsToNextTier = trustScore?.pointsToNextTier || 0;
   const achievements = getAchievements(trustScore?.breakdown ?? {})
-  const dynamicImprovementTips = trustScore?.improvementSuggestions || [];
+
+  const reviewCount =
+    typeof trustScore?.metrics?.reviewCount === "number"
+      ? trustScore.metrics.reviewCount
+      : typeof trustScore?.metrics?.totalReviews === "number"
+      ? trustScore.metrics.totalReviews
+      : typeof mentorData?.stats?.totalReviews === "number"
+      ? mentorData.stats.totalReviews
+      : 0;
+
+  // Compute tips dynamically from breakdown if backend array is empty
+  const dynamicImprovementTips = useMemo(() => {
+    if (trustScore?.improvementSuggestions && Array.isArray(trustScore.improvementSuggestions) && trustScore.improvementSuggestions.length > 0) {
+      return trustScore.improvementSuggestions;
+    }
+
+    const tips: { text: string; action?: string }[] = [];
+    const isVerified = Boolean(mentorData?.isVerified ?? trustScore?.metrics?.isVerified);
+    const profilePct = trustScore?.breakdown?.profileCompleteness ?? 100;
+    const reliabilityPct = trustScore?.breakdown?.reliability ?? 100;
+
+    if (!isVerified) {
+      tips.push({
+        text: "Complete document and identity verification to earn your trusted mentor badge.",
+        action: "verify",
+      });
+    }
+
+    if (profilePct < 100) {
+      tips.push({
+        text: `Complete the remaining profile sections to reach 100% (currently ${profilePct}%).`,
+        action: "profile",
+      });
+    }
+
+    if (reliabilityPct < 90) {
+      tips.push({
+        text: `Your session reliability is currently ${reliabilityPct}%. Attend upcoming scheduled sessions to rebuild reliability.`,
+        action: "bookings",
+      });
+    }
+
+    if (reviewCount === 0) {
+      tips.push({
+        text: "No reviews yet. Encourage mentees to leave a review after sessions to establish Student Satisfaction.",
+        action: "reviews",
+      });
+    }
+
+    return tips;
+  }, [trustScore, mentorData, reviewCount]);
 
   const overallDisplay = loading
     ? "—"
@@ -310,6 +358,21 @@ export default function TrustScorePage() {
             {breakdownMeta.map((item, idx) => {
               const score = trustScore?.breakdown?.[item.key]
               const numeric = typeof score === "number" ? score : null
+              const isNoReviews = item.key === "studentSatisfaction" && (numeric === null || reviewCount === 0)
+              const displayValue = loading
+                ? "—"
+                : isNoReviews
+                ? "No reviews yet"
+                : numeric === null
+                ? "—"
+                : `${numeric}%`
+
+              const barWidth = loading
+                ? "12%"
+                : isNoReviews || numeric === null
+                ? "0%"
+                : `${numeric}%`
+
               return (
                 <div key={idx}>
                   <div className="flex items-start justify-between mb-2 gap-3">
@@ -326,15 +389,15 @@ export default function TrustScorePage() {
                         </p>
                       </div>
                     </div>
-                    <span className="text-sm font-bold shrink-0" style={{ color: "#4a3728" }}>
-                      {loading ? "—" : numeric === null ? "—" : `${numeric}%`}
+                    <span className={`text-sm font-bold shrink-0 ${isNoReviews ? "text-xs font-medium" : ""}`} style={{ color: isNoReviews ? "#8a7a6a" : "#4a3728" }}>
+                      {displayValue}
                     </span>
                   </div>
                   <div className="w-full h-2.5 rounded-full" style={{ backgroundColor: "#f0e9e1" }}>
                     <div
                       className={`h-2.5 rounded-full transition-all duration-700 ${loading ? "animate-pulse" : ""}`}
                       style={{
-                        width: loading ? "12%" : numeric === null ? "0%" : `${numeric}%`,
+                        width: barWidth,
                         backgroundColor: tier.color,
                       }}
                     />
@@ -356,18 +419,48 @@ export default function TrustScorePage() {
               dynamicImprovementTips.map((tip: any, idx: number) => (
                 <li
                   key={idx}
-                  className="flex items-start gap-3 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9]"
+                  className="flex items-center justify-between gap-3 p-3.5 rounded-xl transition-colors hover:border-[#c9baa9]"
                   style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}
                 >
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: "#f3ece4" }}
-                  >
-                    <Sparkles className="w-4 h-4" style={{ color: "#7a5c3e" }} />
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: "#f3ece4" }}
+                    >
+                      <Sparkles className="w-4 h-4" style={{ color: "#7a5c3e" }} />
+                    </div>
+                    <span className="text-sm pt-1" style={{ color: "#5a4535" }}>
+                      {tip.text}
+                    </span>
                   </div>
-                  <span className="text-sm pt-1" style={{ color: "#5a4535" }}>
-                    {tip.text}
-                  </span>
+
+                  {tip.action === "profile" && (
+                    <button
+                      onClick={() => setActivePage?.("profile")}
+                      className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg text-white transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: "#4a3728" }}
+                    >
+                      Complete profile
+                    </button>
+                  )}
+                  {tip.action === "verify" && (
+                    <button
+                      onClick={() => setActivePage?.("profile", "verification")}
+                      className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg text-white transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: "#4a3728" }}
+                    >
+                      Get verified
+                    </button>
+                  )}
+                  {tip.action === "bookings" && (
+                    <button
+                      onClick={() => setActivePage?.("bookings")}
+                      className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg text-white transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: "#4a3728" }}
+                    >
+                      View bookings
+                    </button>
+                  )}
                 </li>
               ))
             ) : (

@@ -15,7 +15,7 @@ export interface SubmitQueryInput {
     attachments?: string[];
     category?: string;
     priority?: 'normal' | 'high';
-    pricing: QueryPricing;
+    pricing?: QueryPricing;
 }
 
 export interface QueryItem {
@@ -29,7 +29,7 @@ export interface QueryItem {
     status: 'pending' | 'answered' | 'expired';
     priority: 'normal' | 'high';
     category?: string;
-    pricing: QueryPricing;
+    pricing?: QueryPricing;
     followUp?: {
         question: string;
         answer?: string;

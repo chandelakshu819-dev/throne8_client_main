@@ -2,7 +2,7 @@
 import Image from 'next/image';
 import { ArrowUpRight, Clock } from 'lucide-react';
 import { PostAuthorRow } from './PostAuthorRow';
-import { PostEngagement } from './PostEngagement';
+import { PostEngagement } from '../posts/PostEngagement';
 import { Badge } from '../ui';
 import type { ArticlePost } from '@/features/company/type/company.types';
 

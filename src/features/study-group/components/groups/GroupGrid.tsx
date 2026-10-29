@@ -53,7 +53,7 @@ const GroupGrid: React.FC<GroupGridProps> = ({ title, subtitle, sectionKey }) =>
 
   const jeeGroups = useAppSelector(selectFilteredJeeGroups) ?? [];
 
-  const apiGroupMap: Record<SectionKey, GroupResponse[]> = {
+  const apiGroupMap: Record<SectionKey, any[]> = {
     university: universityGroups,
     dsa: placementGroups,
     jee: jeeGroups,

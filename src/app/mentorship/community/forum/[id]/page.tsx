@@ -1,7 +1,7 @@
 // src/app/mentorship/community/forum/[id]/page.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, use } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -22,10 +22,10 @@ const COLORS = {
 export default function ForumThreadPage({
   params,
 }: {
-  params?: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = use(params);
   const routerParams = useParams();
-  const [resolvedId, setResolvedId] = useState<string | null>(null);
 
   const { user, isLoading: authLoading } = useAuth();
   const [thread, setThread] = useState<Forum | null>(null);
@@ -35,22 +35,7 @@ export default function ForumThreadPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Resolve params across Next.js versions (Promise vs Object vs useParams hook)
-  useEffect(() => {
-    if (params) {
-      if (typeof (params as any).then === "function") {
-        (params as Promise<{ id: string }>).then((p) => {
-          if (p?.id) setResolvedId(p.id);
-        });
-      } else if ((params as any).id) {
-        setResolvedId((params as any).id);
-      }
-    } else if (routerParams?.id) {
-      setResolvedId(routerParams.id as string);
-    }
-  }, [params, routerParams]);
-
-  const threadId = resolvedId || (routerParams?.id as string);
+  const threadId = id || (routerParams?.id as string);
 
   useEffect(() => {
     if (!threadId) return;

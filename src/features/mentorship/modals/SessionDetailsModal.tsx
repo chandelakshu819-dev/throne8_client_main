@@ -175,7 +175,7 @@ const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
     if (isGroupSession) {
         const participants: any[] = session.participants ?? [];
         const groupStatus = session.status || 'open';
-        const groupBadge = {
+        const groupBadge = ({
             draft: { bg: '#f3f4f6', color: '#6b7280' },
             open: { bg: '#dcfce7', color: '#15803d' },
             full: { bg: '#fef3c7', color: '#b45309' },
@@ -183,7 +183,7 @@ const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
             completed: { bg: '#f3e8ff', color: '#7c3aed' },
             cancelled: { bg: '#fee2e2', color: '#dc2626' },
             rescheduled: { bg: '#fed7aa', color: '#c2410c' },
-        }[groupStatus] ?? { bg: '#f3f4f6', color: '#6b7280' };
+        } as Record<string, { bg: string; color: string }>)[groupStatus] ?? { bg: '#f3f4f6', color: '#6b7280' };
 
         const isTemplate = !!session.isTemplate || !session.scheduledAt;
         const canStart = (groupStatus === 'open' || groupStatus === 'full') && !isTemplate;

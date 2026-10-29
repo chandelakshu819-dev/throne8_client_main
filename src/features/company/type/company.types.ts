@@ -48,6 +48,8 @@ export interface SocialLinks {
     github?: string;
     website?: string;
     instagram?: string;
+    facebook?: string;
+    youtube?: string;
 }
 
 export interface Address {
@@ -60,6 +62,7 @@ export interface Address {
 export interface CompanyMeta {
     id: string;
     name: string;
+    slug?: string;
     legalName?: string;      
     tagline?: string;        
     description?: string;    

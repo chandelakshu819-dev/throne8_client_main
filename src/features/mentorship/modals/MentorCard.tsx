@@ -6,6 +6,7 @@ import { Mentor } from "@/features/index";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { formatRoleCompany, getRatingDisplay } from "@/shared/utils/mentorFormat";
+import CompanyLogo from "@/features/mentorship/components/CompanyLogo";
 
 interface MentorCardProps {
     mentor: Mentor;
@@ -86,13 +87,23 @@ export default function MentorCard({ mentor }: MentorCardProps) {
                     {mentor.isDummy ? "No Mentor Yet" : mentor.name}
                 </h5>
 
-                {/* Role @ Company (max 2 lines, sentence case) */}
-                <p
+                {/* Role @ Company (max 2 lines, sentence case) with CompanyLogo and truncation */}
+                <div
                     title={formatRoleCompany(mentor.role, mentor.company)}
-                    className="text-[11px] leading-snug text-[#8b7355] font-semibold text-center mb-3 line-clamp-2 min-h-[2.4em]"
+                    className="flex items-center justify-center gap-1.5 mb-3 min-h-[2.4em] px-1"
                 >
-                    {formatRoleCompany(mentor.role, mentor.company)}
-                </p>
+                    {mentor.company && (
+                        <CompanyLogo
+                            src={mentor.companyLogo}
+                            companyName={mentor.company}
+                            size={18}
+                            className="shrink-0"
+                        />
+                    )}
+                    <p className="text-[11px] leading-snug text-[#8b7355] font-semibold text-center line-clamp-2 truncate">
+                        {formatRoleCompany(mentor.role, mentor.company)}
+                    </p>
+                </div>
 
                 {/* Rating */}
                 <div className="flex items-center justify-center gap-1.5 mb-3 min-h-[24px]">

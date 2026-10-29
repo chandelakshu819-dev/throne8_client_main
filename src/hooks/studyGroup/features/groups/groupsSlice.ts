@@ -1,9 +1,10 @@
 // src/hooks/studyGroup/features/groups/groupsSlice.ts
 
 // import { createSlice, createSelector, PayloadAction } from '@reduxjs/toolkit';
-import { Group, GroupTabType, PublicGroup } from '@/app/studyGroup/study/groups/types';
+import { Group, PublicGroup } from '@/features/studyGroup/interface';
+import { GroupTabType } from '@/features/studyGroup/types';
 import { createSlice, createSelector, PayloadAction } from '@reduxjs/toolkit';
-import { ApiGroup, PaginationResult } from './groups.types';
+import { ApiGroup, PaginationResult } from '@/features/studyGroup/interface';
 import { addMemberThunk, attendanceAutoMarkThunk, attendanceCheckInThunk, cancelJoinRequestThunk, createGroupThunk, createLiveRoomThunk, deleteGroupThunk, endLiveRoomThunk, fetchAllUsersThunk, fetchAttendanceCalendarThunk, fetchAttendanceHistoryThunk, fetchAttendancePercentageThunk, fetchAttendanceStatusThunk, fetchAvailableGroupsThunk, fetchGroupActiveLiveRoomThunk, fetchGroupByIdThunk, fetchGroupInviteLinksThunk, fetchGroupMembersThunk, fetchGroupsByCategoryThunk, fetchGroupsThunk, fetchInviteAnalyticsThunk, fetchMyGroupsThunk, fetchPlacementGroupsThunk, fetchPopularGroupsThunk, fetchPublicGroupsThunk, fetchRecommendedGroupsThunk, fetchSocialShareLinksThunk, fetchTopRankedGroupsThunk, fetchTrendingGroupsThunk, fetchUniversityGroupsThunk, fetchUserStreakThunk, generateInviteLinkThunk, generateQRCodeThunk, getGroupPendingRequestsThunk, getJoinRequestStatusThunk, getMemberCountThunk, getMyJoinRequestsThunk, joinGroupThunk, joinLiveRoomThunk, leaveGroupThunk, leaveLiveRoomThunk, removeMemberThunk, respondToJoinRequestThunk, revokeInviteLinkThunk, searchGroupsByTagsThunk, searchGroupsThunk, sendJoinRequestThunk, toggleCameraThunk, toggleMicThunk, toggleScreenShareThunk, updateGroupThunk, validateInviteCodeThunk } from './group.thunks';
 import { AttendanceCalendarResponse, AttendanceHistoryResponse, AttendancePercentageResponse, AttendanceStatusResponse, GroupMember, GroupResponse, InviteAnalyticsResponse, InviteLinkDetail, InviteLinkResponse, JoinRequestStatusResponse, MyRequestsResponse, PendingJoinRequest, QRCodeResponse, SocialShareLinksResponse, TopRankedGroupResponse } from '@/lib/api/studyGroup.service';
 // import type { Group, GroupTabType, PublicGroup } from '../../types';

@@ -162,7 +162,7 @@ export function CompanyHero() {
               ? { Icon: Globe, text: websiteDisplay }
               : null,
           ]
-            .filter(Boolean)
+            .filter((item): item is { Icon: any; text: any } => Boolean(item))
             .map(({ Icon, text }) => (
               <div key={text} className="flex items-center gap-1.5 text-xs font-bold text-[#6b5847]">
                 <Icon className="w-3.5 h-3.5 text-[#9d8876]" />

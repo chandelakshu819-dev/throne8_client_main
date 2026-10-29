@@ -39,6 +39,7 @@ interface UpdateProfileModalProps {
     mentorData: any;
     mentorId: string;
     onUpdateSuccess: (updated: any) => void;
+    initialTab?: string;
 }
 
 type TabKey = "basic" | "expertise" | "social";
@@ -64,6 +65,7 @@ export default function UpdateProfileModal({
     mentorData,
     mentorId,
     onUpdateSuccess,
+    initialTab,
 }: UpdateProfileModalProps) {
 
     // ── Form State ───────────────────────────────────────────
@@ -108,7 +110,10 @@ export default function UpdateProfileModal({
     const [portfolioUrl, setPortfolioUrl] = useState("");
 
     // ── UI State ─────────────────────────────────────────────
-    const [activeTab, setActiveTab] = useState<TabKey>("basic");
+    const validTabs: TabKey[] = ["basic", "expertise", "social"];
+    // In Stage 2, initialTab="experience" is accepted; since Stage 3 will add the full Experience tab & form, it safely falls back to "basic"
+    const resolvedInitialTab: TabKey = (initialTab && validTabs.includes(initialTab as TabKey)) ? (initialTab as TabKey) : "basic";
+    const [activeTab, setActiveTab] = useState<TabKey>(resolvedInitialTab);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
@@ -125,11 +130,11 @@ export default function UpdateProfileModal({
         setLinkedinUrl(mentorData.socialProof?.linkedinUrl ?? "");
         setGithubUrl(mentorData.socialProof?.githubUrl ?? "");
         setPortfolioUrl(mentorData.socialProof?.portfolioUrl ?? "");
-        setActiveTab("basic");
+        setActiveTab((initialTab && validTabs.includes(initialTab as TabKey)) ? (initialTab as TabKey) : "basic");
         setError(null);
         setSuccess(false);
         setDomainOpen(false);
-    }, [mentorData, isOpen]);
+    }, [mentorData, isOpen, initialTab]);
 
     if (!isOpen) return null;
 

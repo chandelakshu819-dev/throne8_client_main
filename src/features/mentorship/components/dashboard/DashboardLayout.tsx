@@ -255,8 +255,8 @@ export default function MentorDashboard(
     });
 
     if (fetchedData && typeof fetchedData === "object" && Object.keys(fetchedData).length > 0) {
-      const hasUpcoming = Array.isArray(fetchedData.upcomingSessions) && fetchedData.upcomingSessions.length > 0;
-      if (!hasUpcoming && fallbackUpcoming.length > 0) {
+      // Only use fallback if backend did not return an upcomingSessions array at all
+      if (!Array.isArray(fetchedData.upcomingSessions) && fallbackUpcoming.length > 0) {
         fetchedData.upcomingSessions = fallbackUpcoming;
         if (fetchedData.stats) {
           fetchedData.stats.upcoming = fallbackUpcoming.filter(
@@ -279,7 +279,8 @@ export default function MentorDashboard(
           totalSessions: mentorData?.stats?.totalSessions ?? mentorData?.stats?.completedSessions ?? 0,
           upcoming: fallbackUpcoming.filter((s: any) => new Date(s.scheduledAt).getTime() >= Date.now()).length,
           rating: mentorData?.stats?.averageRating ?? 0,
-          trustScore: mentorData?.trustScore?.score ?? mentorData?.stats?.trustScore ?? null,
+          trustScore: mentorData?.trustScore?.overall ?? mentorData?.trustScore?.score ?? mentorData?.stats?.trustScore ?? null,
+          thisMonthEarnings: mentorData?.stats?.totalEarnings ?? 0,
         },
         isVerified: Boolean(mentorData?.verification?.isVerified || mentorData?.isVerified),
         upcomingSessions: fallbackUpcoming,

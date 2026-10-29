@@ -177,6 +177,11 @@ export default function ThroneUltraPremium() {
                         "Mentor",
                     role,
                     company,
+                    companyLogo:
+                        m.companyLogo ||
+                        m.experience?.previousRoles?.find((r: any) => r.isCurrent)?.companyLogo ||
+                        m.experience?.previousRoles?.[0]?.companyLogo ||
+                        "",
                     rating: m.stats?.averageRating || 0,
                     sessions:
                         m.stats?.totalSessions ||

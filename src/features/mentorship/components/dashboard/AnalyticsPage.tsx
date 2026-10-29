@@ -59,6 +59,7 @@ interface AnalyticsData {
   popularServices: PopularServiceStat[]
   monthlyEarnings: MonthlyEarningStat[]
   ratingTrend?: RatingTrendStat[]
+  totalBookings?: number
 }
 
 interface AnalyticsPageProps {
@@ -107,7 +108,7 @@ const EarningsTrend = ({ data }: { data: MonthlyEarningStat[] }) => {
         <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#a08070" }} axisLine={false} tickLine={false} />
         <YAxis tick={{ fontSize: 11, fill: "#a08070" }} axisLine={false} tickLine={false} />
         <Tooltip
-          formatter={(value: number) => [`₹${value.toLocaleString()}`, "Earnings"]}
+          formatter={(value) => [`₹${Number(value ?? 0).toLocaleString()}`, "Earnings"]}
           contentStyle={{ borderRadius: 8, border: "1px solid #e0d8cf", fontSize: 12 }}
         />
         <Bar dataKey="amount" radius={[6, 6, 0, 0]} fill="#4a3728" />
@@ -130,7 +131,7 @@ const ServicesDonut = ({
         ))}
       </Pie>
       <Tooltip
-        formatter={(value: number, name: string) => [`${value} bookings`, name]}
+        formatter={(value, name) => [`${Number(value ?? 0)} bookings`, String(name)]}
         contentStyle={{ borderRadius: 8, border: "1px solid #e0d8cf", fontSize: 12 }}
       />
     </PieChart>
@@ -151,7 +152,7 @@ const RatingTrendChart = ({ data }: { data: RatingTrendStat[] }) => {
         <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#a08070" }} axisLine={false} tickLine={false} />
         <YAxis domain={[0, 5]} tick={{ fontSize: 11, fill: "#a08070" }} axisLine={false} tickLine={false} />
         <Tooltip
-          formatter={(value: number) => [`${value} ★`, "Avg rating"]}
+          formatter={(value) => [`${Number(value ?? 0)} ★`, "Avg rating"]}
           contentStyle={{ borderRadius: 8, border: "1px solid #e0d8cf", fontSize: 12 }}
         />
         <Line type="monotone" dataKey="rating" stroke="#4a3728" strokeWidth={2} dot={{ r: 3, fill: "#4a3728" }} />

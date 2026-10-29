@@ -7,6 +7,7 @@ export interface Mentor {
   name: string;
   role?: string;
   company?: string;
+  companyLogo?: string;
   college?: string;
   degree?: string;
   image?: string;

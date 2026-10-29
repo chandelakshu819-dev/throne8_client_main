@@ -31,7 +31,7 @@ export interface Post {
   status?: 'published' | 'draft' | 'scheduled' | 'archived';
   type?: string;
   company?: { _id: string; name: string; logo?: string };
-  author?: { _id: string; firstName: string; lastName: string };
+  author?: { _id: string; firstName: string; lastName: string; title?: string; designation?: string };
   tags?: string[];
   createdAt?: string;
 }

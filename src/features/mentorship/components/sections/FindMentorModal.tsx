@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import SessionService from "@/lib/api/session.service";
 import { useScrollLock } from "@/hooks/useScrollLock";
+import CompanyLogo from "@/features/mentorship/components/CompanyLogo";
 
 const SERVICE_LABELS: Record<string, string> = {
     quick_call: "Quick Call",
@@ -26,6 +27,7 @@ interface MentorItem {
     name: string;
     role: string;
     company: string;
+    companyLogo?: string;
     rating: number;
     sessions: number;
     price: number;
@@ -147,9 +149,22 @@ function MentorCard({ mentor, featured }: { mentor: MentorItem; featured: boolea
             <h3 className="text-base font-bold mb-0.5" style={{ color: featured ? "#7a5c3e" : "#4a3728" }}>
                 {mentor.name || "—"}
             </h3>
-            <p className="text-xs font-semibold tracking-wider uppercase mb-3" style={{ color: "#7a5c3e" }}>
-                {mentor.role}{mentor.company ? ` @ ${mentor.company}` : ""}
-            </p>
+            <div
+                title={mentor.role + (mentor.company ? ` @ ${mentor.company}` : "")}
+                className="flex items-center justify-center gap-1.5 mb-3 max-w-full px-2"
+            >
+                {mentor.company && (
+                    <CompanyLogo
+                        src={mentor.companyLogo}
+                        companyName={mentor.company}
+                        size={16}
+                        className="shrink-0"
+                    />
+                )}
+                <p className="text-xs font-semibold tracking-wider uppercase truncate" style={{ color: "#7a5c3e" }}>
+                    {mentor.role}{mentor.company ? ` @ ${mentor.company}` : ""}
+                </p>
+            </div>
 
             <div className="w-full h-px mb-3" style={{ backgroundColor: "#e0d8cf" }} />
 
