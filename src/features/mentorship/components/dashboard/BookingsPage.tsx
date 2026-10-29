@@ -1,5 +1,5 @@
 //src/features/mentorship/components/dashboard/BookingsPage.tsx
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import SessionService from "@/lib/api/session.service";
 import ProfileService from "@/lib/api/profile.service";
+import AuthService from "@/lib/api/auth.service";
 import { useSocket } from "@/core/realtime/useSocket";
 import MenteeLink from "@/features/mentorship/components/shared/MenteeLink";
 import { getSessionTiming } from "@/features/mentorship/utils/sessionJoin";
@@ -59,9 +60,9 @@ type MentorBookingRow = {
   | "open"
   | "full"
   | "missed";
-  // ✅ NEW: present only on grouped (accepted) group-session rows — one
-  // row per session, carrying the full accepted-participant list instead
-  // of the table spawning a duplicate row per student.
+  // Present only on grouped (accepted) group-session rows: one row per
+  // session, carrying the full accepted-participant list instead of the
+  // table spawning a duplicate row per student.
   enrolledCount?: number;
   maxParticipants?: number;
   participants?: GroupParticipant[];
@@ -157,7 +158,7 @@ type EffectiveStatus =
   | "missed"
   | "ended"; // slot ka time nikal gaya, mentor ne End nahi dabaya, backend ka faisla baaki
 
-// Ek hi jagah decide hota haiki row asal me kis haal me hai (DB status + current time).
+// Ek hi jagah decide hota hai ki row asal me kis haal me hai (DB status + current time).
 // Saare tabs, badges aur buttons isi se chalte hain, isliye "Ended + End Session" jaisa confusion nahi hoga.
 const getEffectiveStatus = (b: MentorBookingRow, nowMs: number): EffectiveStatus => {
   if (b.status === "completed") return "completed";
@@ -173,12 +174,11 @@ const getEffectiveStatus = (b: MentorBookingRow, nowMs: number): EffectiveStatus
 
 
 
-  if (b.status === "in_progress") {
-    // Slot chal raha hai -> In Progress. Slot khatam par mentor ne End nahi dabaya -> Ended.
-    // completed / no_show ka faisla sirf backend karta hai, frontend nahi.
-    return endMs !== null && nowMs >= endMs ? "ended" : "in_progress";
-  }
-
+    if (b.status === "in_progress") {
+      // Slot chal raha hai -> In Progress. Slot khatam par mentor ne End nahi dabaya -> Ended.
+      // completed / no_show ka faisla sirf backend karta hai, frontend nahi.
+      return endMs !== null && nowMs >= endMs ? "ended" : "in_progress";
+    }
 
   // Pending request slot start par hi expire (accept sirf start time tak)
   if (b.status === "pending") {
@@ -198,10 +198,65 @@ const timeOf = (b: MentorBookingRow): number => {
 const byNearestFirst = (a: MentorBookingRow, b: MentorBookingRow) => timeOf(a) - timeOf(b);
 const byLatestFirst = (a: MentorBookingRow, b: MentorBookingRow) => timeOf(b) - timeOf(a);
 
+// ── Mentee photo helpers ────────────────────────────────────
+// Server kabhi full URL bhejta hai, kabhi photoId, kabhi kuch nahi.
+// Teeno cases yahan handle hote hain.
+const isHttpUrl = (v: unknown): v is string => typeof v === "string" && /^https?:\/\//i.test(v.trim());
+
+// Mentee ke user/profile object se direct photo URL nikalo (mentee profile page jaisa logic)
+const pickDirectPhotoUrl = (userData: any): string | null => {
+  const candidates = [
+    userData?.profilePhotoUrl,
+    userData?.profilePic,
+    userData?.profilePhoto?.cloudinarySecureUrl,
+    userData?.avatar?.url,
+    typeof userData?.avatar === "string" ? userData.avatar : "",
+    userData?.photoUrl,
+    userData?.image,
+  ];
+  for (const c of candidates) {
+    if (isHttpUrl(c)) return c.trim();
+  }
+  return null;
+};
+
+const resolveMenteePhoto = async (menteeId: string, hint: string | null): Promise<string | null> => {
+  // 1. Server ne seedha URL diya
+  if (isHttpUrl(hint)) return hint.trim();
+
+  // 2. Server ne photoId diya
+  if (hint) {
+    try {
+      const res: any = await ProfileService.getProfilePhotoById(hint);
+      const url = res?.data?.photo?.cloudinarySecureUrl;
+      if (isHttpUrl(url)) return url;
+    } catch {
+      // fallback neeche
+    }
+  }
+
+  // 3. Kuch nahi mila: mentee ke profile se lao
+  try {
+    const profileRes: any = await AuthService.getUserProfileById(menteeId);
+    const rawData = profileRes?.data ?? profileRes;
+    const userData = rawData?.user || rawData?.data || rawData;
+
+    const direct = pickDirectPhotoUrl(userData);
+    if (direct) return direct;
+
+    if (userData?.profilePhotoId) {
+      const photoRes: any = await ProfileService.getProfilePhotoById(userData.profilePhotoId);
+      const url = photoRes?.data?.photo?.cloudinarySecureUrl;
+      if (isHttpUrl(url)) return url;
+    }
+  } catch {
+    // photo nahi mili: initials dikhte rahenge
+  }
+  return null;
+};
+
 export default function BookingsPage({ mentorData }: BookingProps) {
   const router = useRouter();
-
-
 
   const [bookingTab, setBookingTab] = useState<BookingTab>("all");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -214,6 +269,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   }, []);
   const [allBookings, setAllBookings] = useState<MentorBookingRow[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  // Jin mentees ki photo resolve karne ki koshish ho chuki hai (dobara network call na ho)
+  const attemptedPhotoIds = useRef<Set<string>>(new Set());
   const [loadingData, setLoadingData] = useState(true);
   type BookingActionType = "accept" | "reject" | "start" | "end" | "reschedule";
   const [rowActionsLoading, setRowActionsLoading] = useState<Record<string, BookingActionType>>({});
@@ -265,8 +322,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [detailsBooking, setDetailsBooking] = useState<MentorBookingRow | null>(null);
 
-  // ✅ NEW: Participants modal — "View Participants" on a grouped group
-  // session row.
+  // Participants modal: "View Participants" on a grouped group session row.
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [participantsModalTitle, setParticipantsModalTitle] = useState("");
   const [participantsModalList, setParticipantsModalList] = useState<GroupParticipant[]>([]);
@@ -277,8 +333,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     setShowParticipantsModal(true);
   };
 
-  // ✅ NEW: Attendance modal — shown before completing a group session so
-  // the mentor can mark who actually attended, instead of everyone being
+  // Attendance modal: shown before completing a group session so the
+  // mentor can mark who actually attended, instead of everyone being
   // silently marked "attended".
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [attendanceBooking, setAttendanceBooking] = useState<MentorBookingRow | null>(null);
@@ -331,7 +387,14 @@ export default function BookingsPage({ mentorData }: BookingProps) {
             menteeId: b.menteeId,
             menteeName:
               b.mentee?.fullName || s.bookedMenteeName || s.menteeName || b.bookedBy || "Student",
-            menteeProfilePhoto: b.mentee?.profilePic || s.menteeProfilePhoto || null,
+            // Server alag-alag field me photo bhej sakta hai (URL ya photoId), sabko check karo
+            menteeProfilePhoto:
+              b.mentee?.profilePic ||
+              b.mentee?.profilePhotoUrl ||
+              b.mentee?.profilePhotoId ||
+              b.menteeProfilePhoto ||
+              s.menteeProfilePhoto ||
+              null,
             serviceName: s.title || s.sessionType || "Session",
             scheduledAt: b.scheduledAt || s.scheduledAt,
             slotTime: b.slotTime || s.slotTime,
@@ -345,10 +408,10 @@ export default function BookingsPage({ mentorData }: BookingProps) {
           }))
         );
 
-        // ✅ NEW SHAPE: accepted group-session rows now come back grouped
-        // — one row per session, with a `participants[]` array and
+        // Accepted group-session rows come back grouped: one row per
+        // session, with a `participants[]` array and
         // `enrolledCount`/`maxParticipants` instead of a flat per-mentee
-        // row. No top-level menteeId/menteeName on these anymore.
+        // row. No top-level menteeId/menteeName on these.
         const groupRows: MentorBookingRow[] = ((groupRes?.data as any[]) || []).map((g: any) => ({
           bookingId: g.sessionId,
           sessionId: g.sessionId,
@@ -372,7 +435,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
           actualDuration: g.actualDuration,
         }));
 
-        // Still-pending group join requests stay one row per request —
+        // Still-pending group join requests stay one row per request:
         // the mentor accepts/rejects each individually.
         const groupRequestRows: MentorBookingRow[] = ((groupRequestsRes?.data as any[]) || []).map(
           (g: any) => ({
@@ -380,7 +443,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
             sessionId: g.sessionId,
             menteeId: g.menteeId,
             menteeName: g.menteeName || "Student",
-            menteeProfilePhoto: null,
+            menteeProfilePhoto: g.menteeProfilePhoto || g.profilePic || null,
             serviceName: g.sessionTitle ? `${g.sessionTitle} (Group Session)` : "Group Session",
             scheduledAt: g.scheduledAt,
             slotTime: "",
@@ -418,40 +481,54 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionEnded]);
 
-  // Load profile photos — now also pulls from each grouped row's
-  // `participants[]`, not just top-level menteeId/menteeProfilePhoto.
+  // Mentee photos resolve karo (1:1 rows, group join requests aur grouped
+  // rows ke participants[] sab ke liye).
   useEffect(() => {
-    const mappings: { menteeId: string; photoId: string }[] = [];
+    // menteeId -> server ka diya hua hint (URL / photoId / null)
+    const hints = new Map<string, string | null>();
+
+    const collect = (menteeId?: string, photo?: string | null) => {
+      if (!menteeId) return;
+      if (photoUrls[menteeId]) return;
+      if (attemptedPhotoIds.current.has(menteeId)) return;
+      const prev = hints.get(menteeId);
+      hints.set(menteeId, photo || prev || null);
+    };
 
     allBookings.forEach((b) => {
-      if (b.menteeId && b.menteeProfilePhoto && !photoUrls[b.menteeId]) {
-        mappings.push({ menteeId: b.menteeId, photoId: b.menteeProfilePhoto });
-      }
-      (b.participants || []).forEach((p) => {
-        if (p.menteeId && p.menteeProfilePhoto && !photoUrls[p.menteeId]) {
-          mappings.push({ menteeId: p.menteeId, photoId: p.menteeProfilePhoto });
-        }
-      });
+      collect(b.menteeId, b.menteeProfilePhoto);
+      (b.participants || []).forEach((p) => collect(p.menteeId, p.menteeProfilePhoto));
     });
 
-    const uniqueMappings = Array.from(new Map(mappings.map((m) => [m.menteeId, m])).values());
-    if (uniqueMappings.length === 0) return;
+    if (hints.size === 0) return;
+
+    // Dobara call na ho, isliye pehle hi mark kar do
+    hints.forEach((_, id) => attemptedPhotoIds.current.add(id));
+
+    let cancelled = false;
 
     Promise.all(
-      uniqueMappings.map((m) =>
-        ProfileService.getProfilePhotoById(m.photoId)
-          .then((res: any) => ({ id: m.menteeId, url: res?.data?.photo?.cloudinarySecureUrl }))
-          .catch(() => ({ id: m.menteeId, url: null }))
-      )
+      Array.from(hints.entries()).map(async ([id, hint]) => ({
+        id,
+        url: await resolveMenteePhoto(id, hint),
+      }))
     ).then((results) => {
+      if (cancelled) return;
       setPhotoUrls((prev) => {
-        const newMap = { ...prev };
+        const next = { ...prev };
         results.forEach(({ id, url }) => {
-          if (url) newMap[id] = url;
+          if (url) next[id] = url;
         });
-        return newMap;
+        return next;
       });
     });
+
+    return () => {
+      cancelled = true;
+      // Effect cancel hua to attempt wapas khol do taaki agle run me retry ho
+      hints.forEach((_, id) => attemptedPhotoIds.current.delete(id));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allBookings]);
 
   // ── Booking categories (sab getEffectiveStatus se, har minute nowMs ke saath refresh) ──
@@ -465,8 +542,6 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       missed: [],
       ended: [],
     };
-
-
 
     allBookings.forEach((b) => out[getEffectiveStatus(b, nowMs)].push(b));
     return out;
@@ -698,7 +773,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   };
 
   // Complete a 1:1 booking OR a group session. `attendees` (menteeIds who
-  // actually attended) is only meaningful for group sessions — the
+  // actually attended) is only meaningful for group sessions: the
   // Attendance modal supplies it before this gets called for a group row.
   const handleEnd = async (sessionId: string, bookingId?: string, attendees?: string[]) => {
     const rowKey = bookingId || sessionId;
@@ -795,7 +870,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         }
         await SessionService.cancelGroupSession(cancelSessionId, cancelReason.trim());
 
-
+        
         showToast("Session cancelled successfully", "success");
         setAllBookings((prev) =>
           prev.map((b) =>
@@ -1025,9 +1100,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Date</th>
                   <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Time</th>
                   <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Status</th>
-                  {(
-                    <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Actions</th>
-                  )}
+                  <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Actions</th>
                 </tr>
               </thead>
 
@@ -1040,7 +1113,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   const badgeKey = eff === "upcoming" ? booking.status : eff;
                   const sb = statusBadge[badgeKey] ?? statusBadge.pending;
 
-
+                      
 
                   const isGroupedRow = !!booking.participants; // accepted, session-level row
                   const rowKey = booking.bookingId || booking.sessionId;
@@ -1115,45 +1188,44 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                       </td>
 
                       {/* Actions */}
-                      {(
-                        <td className="px-5 py-3.5">
-                          <div className="flex gap-1.5">
-                            {/* Pending — only real pending join-request rows land here */}
-                            {eff === "pending" && (
-                              <>
-                                <button
-                                  onClick={() => handleConfirm(booking.sessionId, booking.bookingId)}
-                                  disabled={isRowLoading}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50 min-w-[76px]"
-                                  style={{ backgroundColor: "#dcfce7", color: "#15803d" }}
-                                >
-                                  {currentAction === "accept" ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  ) : (
-                                    <Check className="w-3.5 h-3.5" />
-                                  )}
-                                  <span>Accept</span>
-                                </button>
+                      <td className="px-5 py-3.5">
+                        <div className="flex gap-1.5">
+                          {/* Pending: only real pending join-request rows land here */}
+                          {eff === "pending" && (
+                            <>
+                              <button
+                                onClick={() => handleConfirm(booking.sessionId, booking.bookingId)}
+                                disabled={isRowLoading}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50 min-w-[76px]"
+                                style={{ backgroundColor: "#dcfce7", color: "#15803d" }}
+                              >
+                                {currentAction === "accept" ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Check className="w-3.5 h-3.5" />
+                                )}
+                                <span>Accept</span>
+                              </button>
 
-                                <button
-                                  onClick={() => {
-                                    setCancelSessionId(booking.sessionId);
-                                    setCancelBookingId(booking.bookingId);
-                                    setShowCancelModal(true);
-                                  }}
-                                  disabled={isRowLoading}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50 min-w-[76px]"
-                                  style={{ backgroundColor: "#fee2e2", color: "#dc2626" }}
-                                >
-                                  {currentAction === "reject" ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  ) : (
-                                    <XCircle className="w-3.5 h-3.5" />
-                                  )}
-                                  <span>Reject</span>
-                                </button>
-                              </>
-                            )}
+                              <button
+                                onClick={() => {
+                                  setCancelSessionId(booking.sessionId);
+                                  setCancelBookingId(booking.bookingId);
+                                  setShowCancelModal(true);
+                                }}
+                                disabled={isRowLoading}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50 min-w-[76px]"
+                                style={{ backgroundColor: "#fee2e2", color: "#dc2626" }}
+                              >
+                                {currentAction === "reject" ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <XCircle className="w-3.5 h-3.5" />
+                                )}
+                                <span>Reject</span>
+                              </button>
+                            </>
+                          )}
 
                             {/* Upcoming */}
                             {eff === "upcoming" && (
@@ -1163,11 +1235,11 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                                     booking.status === "full" ||
                                     booking.status === "confirmed") &&
                                   !(booking.isTemplate || !booking.scheduledAt) && (() => {
-                                    const timing = getSessionTiming(booking);
-                                    const isWithinWindow = timing.isWithinStartWindow;
+                                    const scheduledTime = booking.scheduledAt ? new Date(booking.scheduledAt).getTime() : 0;
                                     const now = Date.now();
-                                    const isTooEarly = !isNaN(timing.startMs) && now < timing.startMs - 5 * 60 * 1000;
-                                    const isTooLate = !isNaN(timing.endMs) && now > timing.endMs;
+                                    const isTooEarly = now < scheduledTime - 5 * 60 * 1000;
+                                    const isTooLate = now > scheduledTime + 10 * 60 * 1000;
+                                    const isWithinWindow = !isTooEarly && !isTooLate;
 
                                     return (
                                       <div className="flex flex-col items-start gap-0.5">
@@ -1193,70 +1265,54 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                                       </div>
                                     );
                                   })()
-                                ) : (() => {
-                                  const timing = getSessionTiming(booking);
-                                  const isWithinWindow = timing.isWithinStartWindow;
-                                  const now = Date.now();
-                                  const isTooEarly = !isNaN(timing.startMs) && now < timing.startMs - 5 * 60 * 1000;
-                                  const isTooLate = timing.isStale || (!isNaN(timing.endMs) && now > timing.endMs);
-
-                                  return (
-                                    <div className="flex flex-col items-start gap-0.5">
-                                      <button
-                                        onClick={() => openStartModal(booking)}
-                                        disabled={isRowLoading || !isWithinWindow}
-                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                        style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
-                                        title={isTooEarly ? "Available 5 minutes before scheduled start" : isTooLate ? "Window passed" : undefined}
-                                      >
-                                        {currentAction === "start" ? (
-                                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                        ) : (
-                                          <Play className="w-3.5 h-3.5" />
-                                        )}
-                                        <span>Start</span>
-                                      </button>
-                                      {!isWithinWindow && (
-                                        <span className="text-[10px] text-amber-700 whitespace-nowrap">
-                                          {isTooEarly ? "Starts 5m before scheduled time" : "Start window closed"}
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })()}
-
-                                {/* Reschedule not supported for group sessions yet */}
-                                {!booking.isGroupSession && (
+                                ) : (
                                   <button
-                                    onClick={() => {
-                                      setRescheduleSessionId(booking.sessionId);
-                                      setRescheduleBookingId(booking.bookingId);
-                                      setShowRescheduleModal(true);
-                                    }}
+                                    onClick={() => openStartModal(booking)}
                                     disabled={isRowLoading}
                                     className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                    style={{ backgroundColor: "#fed7aa", color: "#c2410c" }}
+                                    style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
                                   >
-                                    <RotateCw className="w-3.5 h-3.5" />
-                                    <span>Reschedule</span>
+                                    {currentAction === "start" ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <Play className="w-3.5 h-3.5" />
+                                    )}
+                                    <span>Start</span>
                                   </button>
                                 )}
 
+                              {/* Reschedule not supported for group sessions yet */}
+                              {!booking.isGroupSession && (
                                 <button
                                   onClick={() => {
-                                    setCancelSessionId(booking.sessionId);
-                                    setCancelBookingId(booking.bookingId);
-                                    setShowCancelModal(true);
+                                    setRescheduleSessionId(booking.sessionId);
+                                    setRescheduleBookingId(booking.bookingId);
+                                    setShowRescheduleModal(true);
                                   }}
                                   disabled={isRowLoading}
                                   className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                  style={{ backgroundColor: "#fee2e2", color: "#dc2626" }}
+                                  style={{ backgroundColor: "#fed7aa", color: "#c2410c" }}
                                 >
-                                  <XCircle className="w-3.5 h-3.5" />
-                                  <span>Cancel</span>
+                                  <RotateCw className="w-3.5 h-3.5" />
+                                  <span>Reschedule</span>
                                 </button>
-                              </>
-                            )}
+                              )}
+
+                              <button
+                                onClick={() => {
+                                  setCancelSessionId(booking.sessionId);
+                                  setCancelBookingId(booking.bookingId);
+                                  setShowCancelModal(true);
+                                }}
+                                disabled={isRowLoading}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                style={{ backgroundColor: "#fee2e2", color: "#dc2626" }}
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                <span>Cancel</span>
+                              </button>
+                            </>
+                          )}
 
                             {/* In Progress */}
                             {(eff === "in_progress" || eff === "ended") && (
@@ -1287,7 +1343,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                               </div>
                             )}
 
-
+                               
                             {/* Completed */}
 
                             {eff === "completed" && (
@@ -1312,29 +1368,28 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                                       <Eye className="w-3.5 h-3.5" style={{ color: "#7a5c3e" }} />
                                     </button>
 
-                                    <button
-                                      onClick={() => handleDownloadReceipt(booking)}
-                                      disabled={downloadingId === booking.bookingId}
-                                      className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4] disabled:opacity-50"
-                                      style={{ border: "1px solid #e0d8cf" }}
-                                      title="Download"
-                                    >
-                                      <Download className="w-3.5 h-3.5" style={{ color: "#7a5c3e" }} />
-                                    </button>
-                                  </>
-                                )}
-                              </>
-                            )}
+                                  <button
+                                    onClick={() => handleDownloadReceipt(booking)}
+                                    disabled={downloadingId === booking.bookingId}
+                                    className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4] disabled:opacity-50"
+                                    style={{ border: "1px solid #e0d8cf" }}
+                                    title="Download"
+                                  >
+                                    <Download className="w-3.5 h-3.5" style={{ color: "#7a5c3e" }} />
+                                  </button>
+                                </>
+                              )}
+                            </>
+                          )}
 
-                            {/* Missed / Cancelled — koi action nahi */}
-                            {(eff === "missed" || eff === "cancelled") && (
-                              <span className="text-xs" style={{ color: "#8a7a6a" }}>
-                                {eff === "missed" ? "Mentee notified (refund / reschedule)" : "—"}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      )}
+                          {/* Missed / Cancelled: koi action nahi */}
+                          {(eff === "missed" || eff === "cancelled") && (
+                            <span className="text-xs" style={{ color: "#8a7a6a" }}>
+                              {eff === "missed" ? "Mentee notified (refund / reschedule)" : "-"}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -1661,7 +1716,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
           document.body
         )}
 
-      {/* ✅ NEW: PARTICIPANTS MODAL */}
+      {/* PARTICIPANTS MODAL */}
       {showParticipantsModal &&
         typeof document !== "undefined" &&
         createPortal(
@@ -1722,7 +1777,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
           document.body
         )}
 
-      {/* ✅ NEW: ATTENDANCE MODAL (End Session flow for group sessions) */}
+      {/* ATTENDANCE MODAL (End Session flow for group sessions) */}
       {showAttendanceModal &&
         attendanceBooking &&
         typeof document !== "undefined" &&
@@ -1731,7 +1786,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
             <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4 max-h-[80vh] flex flex-col" style={{ border: "1px solid #e0d8cf" }}>
               <h3 className="text-lg font-bold mb-1" style={{ color: "#4a3728" }}>Mark Attendance</h3>
               <p className="text-xs mb-4" style={{ color: "#8a7a6a" }}>
-                {attendanceBooking.serviceName} — uncheck anyone who didn't attend before completing.
+                {attendanceBooking.serviceName} - uncheck anyone who didn't attend before completing.
               </p>
 
               <div className="space-y-2 overflow-y-auto flex-1">
