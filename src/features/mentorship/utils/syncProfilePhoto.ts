@@ -81,3 +81,45 @@ export async function syncProfilePhotoToAllRoles(
   await Promise.all(jobs);
   return result;
 }
+
+
+/**
+ * Photo teeno roles se hata deta hai. Kabhi throw nahi karta.
+ */
+export async function removeProfilePhotoFromAllRoles(
+  userId: string | undefined,
+  options: SyncOptions = {}
+): Promise<void> {
+  const skip = new Set<PhotoTarget>(options.skip ?? []);
+  const jobs: Promise<void>[] = [];
+
+  if (!skip.has('account')) {
+    jobs.push(
+      ProfileService.deleteProfilePhoto()
+        .then(() => undefined)
+        .catch((err: any) => console.warn('[PHOTO_SYNC] account delete failed:', err?.message))
+    );
+  }
+
+  if (!skip.has('mentor') && userId) {
+    jobs.push(
+      MentorService.getMentorByUserId(userId, true)
+        .then((mRes: any) => {
+          const mentorId = mRes?.data?.mentorId;
+          if (!mentorId) return;
+          return MentorService.removeProfilePhoto(mentorId).then(() => undefined);
+        })
+        .catch(() => { /* industry mentor nahi hai */ })
+    );
+  }
+
+  if (!skip.has('senior')) {
+    jobs.push(
+      SeniorMentorApplicationService.removeMyProfilePhoto()
+        .then(() => undefined)
+        .catch(() => { /* senior mentor nahi hai */ })
+    );
+  }
+
+  await Promise.all(jobs);
+}

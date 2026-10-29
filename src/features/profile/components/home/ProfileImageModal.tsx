@@ -102,10 +102,13 @@ const ProfileImageModal: React.FC<ProfileImageModalProps> = ({
            
             const uploadedImageUrl = await uploadUserProfileImage(selectedFile).unwrap();
 
-            // ✅ Header avatar turant update
-            if (uploadedImageUrl) {
-                setNavbarProfileImage(uploadedImageUrl);
-            }
+                     // ✅ Header avatar turant update
+                     if (uploadedImageUrl) {
+                        setNavbarProfileImage(uploadedImageUrl);
+                        // Mentor + Senior Mentor me bhi same photo (account already upload ho chuka)
+                        const uid = (syncAuthUser as any)?.userId ?? (syncAuthUser as any)?.id;
+                        await syncProfilePhotoToAllRoles(selectedFile, uid, { skip: ['account'] });
+                    }
 
 
            

@@ -24,6 +24,10 @@ import {
 } from "lucide-react";
 import AuthService from "@/lib/api/auth.service";
 import ProfileService from "@/lib/api/profile.service";
+import {
+  syncProfilePhotoToAllRoles,
+  removeProfilePhotoFromAllRoles,
+} from "@/features/mentorship/utils/syncProfilePhoto";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useNavbarProfileImage } from "@/features/profile/components/home/NavbarProvider";
 import { useProfile } from "@/features/profile/hooks/useProfile";
@@ -267,10 +271,14 @@ export default function UserDashboardProfilePreferencesPage({
         setProfilePhotoUrl(newUrl);
         setFeedback({ type: "success", message: "Profile photo updated successfully!" });
 
-        // Header avatar turant update
-        setNavbarProfileImage(newUrl);
+                // Header avatar turant update
+                setNavbarProfileImage(newUrl);
 
-        fetchAllUserData(true);
+                // Industry Mentor + Senior Mentor me bhi same photo
+                const uid = (syncAuthUser as any)?.userId ?? (syncAuthUser as any)?.id;
+                await syncProfilePhotoToAllRoles(file, uid, { skip: ['account'] });
+        
+                fetchAllUserData(true);
         if (typeof loadProfile === "function") {
           loadProfile();
         }
@@ -281,6 +289,23 @@ export default function UserDashboardProfilePreferencesPage({
     } finally {
       setUploadingPhoto(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+  const handlePhotoRemove = async () => {
+    if (readOnly) return;
+    setUploadingPhoto(true);
+    try {
+      const uid = (syncAuthUser as any)?.userId ?? (syncAuthUser as any)?.id;
+      await removeProfilePhotoFromAllRoles(uid);
+      setProfilePhotoUrl("");
+      setNavbarProfileImage(null);
+      setFeedback({ type: "success", message: "Profile photo removed." });
+      fetchAllUserData(true);
+      if (typeof loadProfile === "function") loadProfile();
+    } catch (err: any) {
+      setFeedback({ type: "error", message: err?.message || "Failed to remove photo" });
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -521,6 +546,16 @@ export default function UserDashboardProfilePreferencesPage({
                     className="hidden"
                     onChange={handlePhotoSelect}
                   />
+                  {profilePhotoUrl && (
+                    <button
+                      onClick={handlePhotoRemove}
+                      disabled={uploadingPhoto}
+                      title="Remove Profile Photo"
+                      className="absolute -top-2 -right-2 w-8 h-8 rounded-xl flex items-center justify-center bg-white text-red-600 border border-red-200 shadow-md hover:scale-105 active:scale-95 transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </>
               )}
             </div>
