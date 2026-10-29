@@ -5,8 +5,8 @@ import { Loader2, Banknote, Copy, X, Undo2 } from "lucide-react";
 import PayoutService, { AdminRefundRow, RefundStatus } from "@/lib/api/payout.service";
 
 const TABS: { key: RefundStatus; label: string; hint: string }[] = [
-  { key: "pending", label: "Pending", hint: "Student ko paisa bhejo, phir Mark Refunded karo" },
-  { key: "refunded", label: "Refunded", hint: "Student ko refund ho chuka hai" },
+  { key: "pending", label: "Pending", hint: "Send the money to the student, then click Mark Refunded" },
+  { key: "refunded", label: "Refunded", hint: "These refunds have been sent to the student" },
 ];
 
 const PAGE_SIZE = 15;
@@ -146,7 +146,7 @@ export default function RefundsView({ onPendingCountChange }: { onPendingCountCh
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center" style={{ color: "#8a7a6a" }}>
                     <Undo2 className="w-9 h-9 mx-auto mb-2 opacity-30" />
-                    Is tab mein koi refund nahi hai.
+                    No refunds in this tab.
                   </td>
                 </tr>
               ) : (
@@ -212,11 +212,11 @@ export default function RefundsView({ onPendingCountChange }: { onPendingCountCh
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl p-6" style={{ backgroundColor: "#fff", border: "2px solid #e0d8cf" }}>
             <div className="flex items-start justify-between mb-3">
-              <h3 className="text-lg font-bold" style={{ color: "#4a3728" }}>Refund bhej diya?</h3>
+              <h3 className="text-lg font-bold" style={{ color: "#4a3728" }}>Refund sent?</h3>
               <button type="button" onClick={() => setPayRow(null)}><X className="w-5 h-5" style={{ color: "#8a7a6a" }} /></button>
             </div>
             <p className="text-sm mb-3" style={{ color: "#4a3728" }}>
-              Student ko <b>{inr(payRow.amount)}</b>{payRow.details?.upiId ? <> (<span className="font-mono">{payRow.details.upiId}</span>)</> : null} bhejne ke baad UTR / transaction ID yahan daalo.
+            After sending <b>{inr(payRow.amount)}</b> to the student{payRow.details?.upiId ? <> (<span className="font-mono">{payRow.details.upiId}</span>)</> : null}, enter the UTR / transaction ID here.
             </p>
             <input
               value={reference}

@@ -5,9 +5,9 @@ import { Loader2, CheckCircle, Wallet, AlertCircle, Copy, X, Banknote } from "lu
 import PayoutService, { AdminPayoutRow, PayoutStatus } from "@/lib/api/payout.service";
 
 const TABS: { key: PayoutStatus; label: string; hint: string }[] = [
-  { key: "held", label: "On hold", hint: "Session ho gaya? Check karke Release karo" },
-  { key: "released", label: "Approved", hint: "Mentor ko paisa bhejo, phir Mark Paid karo" },
-  { key: "paid", label: "Paid", hint: "Mentor ko paisa bhej diya gaya" },
+  { key: "held", label: "On hold", hint: "Session completed? Verify it, then click Release" },
+  { key: "released", label: "Approved", hint: "Send the money to the mentor, then click Mark Paid" },
+  { key: "paid", label: "Paid",hint: "These payouts have been sent to the mentor" },
 ];
 
 const PAGE_SIZE = 15;
@@ -24,7 +24,7 @@ function MethodBlock({ row }: { row: AdminPayoutRow }) {
   if (!m) {
     return (
       <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: "#b91c1c" }}>
-        <AlertCircle className="w-3.5 h-3.5" /> Mentor ne account add nahi kiya
+        <AlertCircle className="w-3.5 h-3.5" /> Mentor has not added a payout account
       </span>
     );
   }
@@ -146,8 +146,8 @@ export default function PayoutsView({ onHeldCountChange }: { onHeldCountChange?:
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: "Entries", value: String(total) },
-          { label: "Mentors ka hissa (80%)", value: inr(sumMentor) },
-          { label: "Platform ka hissa (20%)", value: inr(sumPlatform) },
+          { label: "Platform share (20%)", value: inr(sumPlatform) },   
+          { label: "Platform share (20%)", value: inr(sumPlatform) },       
         ].map((c) => (
           <div key={c.label} className="rounded-2xl p-4" style={{ backgroundColor: "#fff", border: "1px solid #ece4db" }}>
             <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#a3907e" }}>{c.label}</p>
@@ -165,7 +165,7 @@ export default function PayoutsView({ onHeldCountChange }: { onHeldCountChange?:
           <table className="w-full text-sm">
             <thead style={{ backgroundColor: "#fbf7f3" }}>
               <tr>
-                {["Session", "Mentor", "User ne diya", "Mentor ko (80%)", "Platform (20%)", "Payout account", "Status", ""].map((h) => (
+                {["Session", "Mentor", "Paid by user", "Mentor (80%)", "Platform (20%)", "Payout account", "Status", ""].map((h) => (
                   <th key={h} className="px-4 py-3 text-left font-semibold whitespace-nowrap" style={{ color: "#4a3728" }}>{h}</th>
                 ))}
               </tr>
@@ -181,7 +181,7 @@ export default function PayoutsView({ onHeldCountChange }: { onHeldCountChange?:
                 <tr>
                   <td colSpan={8} className="px-4 py-12 text-center" style={{ color: "#8a7a6a" }}>
                     <Wallet className="w-9 h-9 mx-auto mb-2 opacity-30" />
-                    Is tab mein koi payout nahi hai.
+                    No payouts in this tab.
                   </td>
                 </tr>
               ) : (
@@ -268,11 +268,11 @@ export default function PayoutsView({ onHeldCountChange }: { onHeldCountChange?:
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl p-6" style={{ backgroundColor: "#fff", border: "2px solid #e0d8cf" }}>
             <div className="flex items-start justify-between mb-3">
-              <h3 className="text-lg font-bold" style={{ color: "#4a3728" }}>Payout approve karein?</h3>
+              <h3 className="text-lg font-bold" style={{ color: "#4a3728" }}>Approve payout?</h3>
               <button type="button" onClick={() => setConfirmRow(null)}><X className="w-5 h-5" style={{ color: "#8a7a6a" }} /></button>
             </div>
             <p className="text-sm mb-4" style={{ color: "#4a3728" }}>
-              <b>{confirmRow.mentorName}</b> ka <b>{inr(confirmRow.mentorAmount)}</b> release hoga. Pehle confirm kar lo ki session ho chuka hai aur koi dispute nahi hai.
+            <b>{inr(confirmRow.mentorAmount)}</b> will be released to <b>{confirmRow.mentorName}</b>. Please confirm that the session has taken place and there is no dispute.
             </p>
             {actionError && <p className="text-sm mb-3" style={{ color: "#b91c1c" }}>{actionError}</p>}
             <div className="flex gap-3">
@@ -294,11 +294,11 @@ export default function PayoutsView({ onHeldCountChange }: { onHeldCountChange?:
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl p-6" style={{ backgroundColor: "#fff", border: "2px solid #e0d8cf" }}>
             <div className="flex items-start justify-between mb-3">
-              <h3 className="text-lg font-bold" style={{ color: "#4a3728" }}>Payment bhej diya?</h3>
+              <h3 className="text-lg font-bold" style={{ color: "#4a3728" }}>Payment sent?</h3>
               <button type="button" onClick={() => setPaidRow(null)}><X className="w-5 h-5" style={{ color: "#8a7a6a" }} /></button>
             </div>
             <p className="text-sm mb-3" style={{ color: "#4a3728" }}>
-              <b>{paidRow.mentorName}</b> ko <b>{inr(paidRow.mentorAmount)}</b> bhejne ke baad UTR / transaction ID yahan daalo.
+            After sending <b>{inr(paidRow.mentorAmount)}</b> to <b>{paidRow.mentorName}</b>, enter the UTR / transaction ID here.
             </p>
             <input
               value={reference}
