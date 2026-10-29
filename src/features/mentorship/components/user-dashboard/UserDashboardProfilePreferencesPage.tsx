@@ -1,14 +1,11 @@
 "use client";
-
+//src/features/mentorship/components/user-dashboard/UserDashboardProfilePreferencesPage.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  User,
   Mail,
   Phone,
   MapPin,
   Briefcase,
-  GraduationCap,
-  Sparkles,
   Award,
   Bell,
   CheckCircle2,
@@ -20,20 +17,15 @@ import {
   Camera,
   Compass,
   Target,
-  ExternalLink,
   ShieldCheck,
   RefreshCw,
   X,
   Clock,
-  ChevronRight,
-  Info,
 } from "lucide-react";
 import AuthService from "@/lib/api/auth.service";
 import ProfileService from "@/lib/api/profile.service";
-import { syncProfilePhotoToAllRoles } from "@/features/mentorship/utils/syncProfilePhoto";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useNavbarProfileImage } from "@/features/profile/components/home/NavbarProvider";
-import TokenStorage from "@/lib/store/token.storage";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 
 // Design Tokens matching Throne8 Mentee Beige/Brown Theme
@@ -63,6 +55,16 @@ interface UserDashboardProfilePreferencesPageProps {
   onBack?: () => void;
 }
 
+// Server responses alag-alag shape me aa sakte hain, isliye safe extractor
+const extractList = (res: any, keys: string[]): any[] => {
+  const data = res?.data ?? res;
+  for (const key of keys) {
+    if (Array.isArray(data?.[key])) return data[key];
+  }
+  if (Array.isArray(data)) return data;
+  return [];
+};
+
 export default function UserDashboardProfilePreferencesPage({
   user: initialAuthUser,
   setActivePage,
@@ -75,7 +77,6 @@ export default function UserDashboardProfilePreferencesPage({
   const { user: syncAuthUser } = useAuth();
   const setNavbarProfileImage = useNavbarProfileImage();
 
-
   // ==========================================
   // Core State
   // ==========================================
@@ -87,6 +88,7 @@ export default function UserDashboardProfilePreferencesPage({
   const [loadingSkills, setLoadingSkills] = useState(true);
   const [experiences, setExperiences] = useState<any[]>([]);
   const [loadingExperiences, setLoadingExperiences] = useState(true);
+  const [educationList, setEducationList] = useState<any[]>([]);
 
   // Notification Preferences State
   const [notifPrefs, setNotifPrefs] = useState({
@@ -119,95 +121,119 @@ export default function UserDashboardProfilePreferencesPage({
   // ==========================================
   // 1. Data Fetching
   // ==========================================
-  const fetchAllUserData = useCallback(async (isSilent = false) => {
-    if (!isSilent) setLoading(true);
-    else setRefreshing(true);
+  const fetchAllUserData = useCallback(
+    async (isSilent = false) => {
+      if (!isSilent) setLoading(true);
+      else setRefreshing(true);
 
-    try {
-      let userData: any = null;
+      // readOnly mode me mentee ka data dikhana hai, logged-in mentor ka nahi
+      const viewingOtherUser = readOnly && !!menteeId;
 
-      if (readOnly && menteeId) {
-        // Fetch specified mentee profile by menteeId
-        const profileRes = await AuthService.getUserProfileById(menteeId);
-        const rawData = profileRes?.data ?? profileRes;
-        userData = rawData?.user || rawData?.data || rawData;
-      } else {
-        // Authenticated user profile data
-        const profileRes = await AuthService.getUserProfile();
-        userData = profileRes?.data || profileRes;
-      }
+      try {
+        let userData: any = null;
 
-      setProfile(userData);
-
-      // Load notification preferences if present
-      if (userData?.preferences?.notifications) {
-        setNotifPrefs({
-          email: !!userData.preferences.notifications.email,
-          push: !!userData.preferences.notifications.push,
-          sms: !!userData.preferences.notifications.sms,
-        });
-      }
-
-      // Check direct photo URL on user object first
-      const directPhotoUrl =
-        userData?.profilePhotoUrl ||
-        userData?.profilePic ||
-        userData?.profilePhoto?.cloudinarySecureUrl ||
-        userData?.avatar?.url ||
-        (typeof userData?.avatar === "string" ? userData.avatar : "") ||
-        userData?.photoUrl ||
-        userData?.image;
-
-      if (typeof directPhotoUrl === "string" && directPhotoUrl.startsWith("http")) {
-        setProfilePhotoUrl(directPhotoUrl);
-      } else if (userData?.profilePhotoId) {
-        try {
-          const photoRes = await ProfileService.getProfilePhotoById(userData.profilePhotoId);
-          const url = photoRes?.data?.photo?.cloudinarySecureUrl;
-          if (url) setProfilePhotoUrl(url);
-        } catch (err) {
-          console.warn("Could not fetch profile photo:", err);
+        if (viewingOtherUser) {
+          const profileRes = await AuthService.getUserProfileById(menteeId as string);
+          const rawData = profileRes?.data ?? profileRes;
+          userData = rawData?.user || rawData?.data || rawData;
+        } else {
+          const profileRes = await AuthService.getUserProfile();
+          userData = profileRes?.data || profileRes;
         }
-      } else {
-        setProfilePhotoUrl("");
-      }
 
-      // 2. Fetch User Skills
-      setLoadingSkills(true);
-      try {
-        const skillsRes = await ProfileService.getAllSkills(false);
-        const list = skillsRes?.data?.skillsList || skillsRes?.data || [];
-        setSkills(Array.isArray(list) ? list : []);
-      } catch (err) {
-        console.warn("Could not fetch skills:", err);
-        setSkills([]);
-      } finally {
-        setLoadingSkills(false);
-      }
+        setProfile(userData);
 
-      // 3. Fetch User Experiences
-      setLoadingExperiences(true);
-      try {
-        const expRes = await ProfileService.getAllExperiences();
-        const list = expRes?.data?.experiences || expRes?.data || [];
-        setExperiences(Array.isArray(list) ? list : []);
-      } catch (err) {
-        console.warn("Could not fetch experiences:", err);
-        setExperiences([]);
+        // Notification preferences sirf apne profile ke liye relevant hain
+        if (!viewingOtherUser && userData?.preferences?.notifications) {
+          setNotifPrefs({
+            email: !!userData.preferences.notifications.email,
+            push: !!userData.preferences.notifications.push,
+            sms: !!userData.preferences.notifications.sms,
+          });
+        }
+
+        // Profile photo
+        const directPhotoUrl =
+          userData?.profilePhotoUrl ||
+          userData?.profilePic ||
+          userData?.profilePhoto?.cloudinarySecureUrl ||
+          userData?.avatar?.url ||
+          (typeof userData?.avatar === "string" ? userData.avatar : "") ||
+          userData?.photoUrl ||
+          userData?.image;
+
+        if (typeof directPhotoUrl === "string" && directPhotoUrl.startsWith("http")) {
+          setProfilePhotoUrl(directPhotoUrl);
+        } else if (userData?.profilePhotoId) {
+          try {
+            const photoRes = await ProfileService.getProfilePhotoById(userData.profilePhotoId);
+            const url = photoRes?.data?.photo?.cloudinarySecureUrl;
+            if (url) setProfilePhotoUrl(url);
+          } catch (err) {
+            console.warn("Could not fetch profile photo:", err);
+          }
+        } else {
+          setProfilePhotoUrl("");
+        }
+
+        // Target user id: mentee ka (readOnly) ya apna
+        const targetUserId: string | undefined = viewingOtherUser
+          ? (menteeId as string)
+          : undefined;
+
+        // 2. Skills
+        setLoadingSkills(true);
+        try {
+          const skillsRes = targetUserId
+            ? await ProfileService.getSkillsByUserId(targetUserId)
+            : await ProfileService.getAllSkills(false);
+          setSkills(extractList(skillsRes, ["skillsList", "skills"]));
+        } catch (err) {
+          console.warn("Could not fetch skills:", err);
+          setSkills([]);
+        } finally {
+          setLoadingSkills(false);
+        }
+
+        // 3. Experiences
+        setLoadingExperiences(true);
+        try {
+          const expRes = targetUserId
+            ? await ProfileService.getAllExperiencesByUserId(targetUserId)
+            : await ProfileService.getAllExperiences();
+          setExperiences(extractList(expRes, ["experiences", "experienceList"]));
+        } catch (err) {
+          console.warn("Could not fetch experiences:", err);
+          setExperiences([]);
+        } finally {
+          setLoadingExperiences(false);
+        }
+
+        // 4. Education (Education card ke liye fallback)
+        try {
+          const eduRes = targetUserId
+            ? await ProfileService.getAllEducationByUserId(targetUserId, false)
+            : await ProfileService.getAllEducation(false);
+          setEducationList(
+            extractList(eduRes, ["educations", "education", "educationList", "educationRecords"])
+          );
+        } catch (err) {
+          console.warn("Could not fetch education:", err);
+          setEducationList([]);
+        }
+      } catch (error: any) {
+        console.error("Failed to load user profile & preferences:", error);
+        setFeedback({
+          type: "error",
+          message: error?.message || "Failed to load profile data. Please check your connection.",
+        });
       } finally {
-        setLoadingExperiences(false);
+        setLoading(false);
+        setRefreshing(false);
       }
-    } catch (error: any) {
-      console.error("Failed to load user profile & preferences:", error);
-      setFeedback({
-        type: "error",
-        message: error?.message || "Failed to load profile data. Please check your connection.",
-      });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [readOnly, menteeId]);
+    },
+    [readOnly, menteeId]
+  );
 
   useEffect(() => {
     fetchAllUserData();
@@ -241,10 +267,9 @@ export default function UserDashboardProfilePreferencesPage({
         setProfilePhotoUrl(newUrl);
         setFeedback({ type: "success", message: "Profile photo updated successfully!" });
 
-        // ✅ Header avatar turant update
+        // Header avatar turant update
         setNavbarProfileImage(newUrl);
 
-              
         fetchAllUserData(true);
         if (typeof loadProfile === "function") {
           loadProfile();
@@ -291,19 +316,73 @@ export default function UserDashboardProfilePreferencesPage({
   // ==========================================
   // Derived Profile Data
   // ==========================================
-  const firstName = profile?.firstName || (profile?.name ? profile.name.split(" ")[0] : "") || (profile?.fullName ? profile.fullName.split(" ")[0] : "") || (!readOnly ? initialAuthUser?.firstName : "") || "";
-  const lastName = profile?.lastName || (profile?.name ? profile.name.split(" ").slice(1).join(" ") : "") || (profile?.fullName ? profile.fullName.split(" ").slice(1).join(" ") : "") || (!readOnly ? initialAuthUser?.lastName : "") || "";
+  const firstName =
+    profile?.firstName ||
+    (profile?.name ? profile.name.split(" ")[0] : "") ||
+    (profile?.fullName ? profile.fullName.split(" ")[0] : "") ||
+    (!readOnly ? initialAuthUser?.firstName : "") ||
+    "";
+  const lastName =
+    profile?.lastName ||
+    (profile?.name ? profile.name.split(" ").slice(1).join(" ") : "") ||
+    (profile?.fullName ? profile.fullName.split(" ").slice(1).join(" ") : "") ||
+    (!readOnly ? initialAuthUser?.lastName : "") ||
+    "";
   const rawFullName = profile?.name || profile?.fullName || `${firstName} ${lastName}`.trim();
   const fullName = rawFullName || (readOnly ? "Mentee" : "Authenticated User");
-  const initials = `${firstName[0] || (fullName ? fullName[0] : "M")}${lastName[0] || (fullName && fullName.split(" ")[1] ? fullName.split(" ")[1][0] : "")}`.toUpperCase() || "M";
+  const initials =
+    `${firstName[0] || (fullName ? fullName[0] : "M")}${
+      lastName[0] || (fullName && fullName.split(" ")[1] ? fullName.split(" ")[1][0] : "")
+    }`.toUpperCase() || "M";
   const email = profile?.email || (!readOnly ? initialAuthUser?.email : "") || "";
   const phoneNumber = profile?.phoneNumber || "";
   const location = profile?.location || profile?.address || "";
   const pronouns = profile?.pronouns || "";
-  const currentPosition = profile?.currentPosition || profile?.position || profile?.role || profile?.onboarding?.workingProfile?.jobTitle || profile?.onboarding?.fresherProfile?.preferredRole || "";
-  const company = profile?.company || profile?.organization || profile?.onboarding?.workingProfile?.companyName || "";
-  const education = profile?.education || (profile?.onboarding?.studentProfile ? `${profile.onboarding.studentProfile.degree || ""} ${profile.onboarding.studentProfile.fieldOfStudy ? "in " + profile.onboarding.studentProfile.fieldOfStudy : ""} - ${profile.onboarding.studentProfile.collegeName || ""}`.trim() : "");
-  const userType = profile?.onboarding?.userType || profile?.role || "Student";
+
+  // Current experience record (agar currentlyWorking ho, warna sabse pehla)
+  const currentExperience =
+    experiences.find((e) => e?.currentlyWorking) || experiences[0] || null;
+
+  // NOTE: profile.role (system role, jaise "user") ko yahan kabhi use nahi karna
+  const currentPosition =
+    profile?.currentPosition ||
+    profile?.position ||
+    profile?.onboarding?.workingProfile?.jobTitle ||
+    profile?.onboarding?.fresherProfile?.preferredRole ||
+    currentExperience?.currentPosition ||
+    "";
+
+  const company =
+    profile?.company ||
+    profile?.organization ||
+    profile?.onboarding?.workingProfile?.companyName ||
+    currentExperience?.companyName ||
+    "";
+
+  const latestEducation = educationList[0] || null;
+  const educationFromList = latestEducation
+    ? [
+        latestEducation.degree,
+        latestEducation.specialization ? `in ${latestEducation.specialization}` : "",
+        latestEducation.schoolCollegeName ? `- ${latestEducation.schoolCollegeName}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim()
+    : "";
+
+  const education =
+    profile?.education && typeof profile.education === "string"
+      ? profile.education
+      : profile?.onboarding?.studentProfile
+      ? `${profile.onboarding.studentProfile.degree || ""} ${
+          profile.onboarding.studentProfile.fieldOfStudy
+            ? "in " + profile.onboarding.studentProfile.fieldOfStudy
+            : ""
+        } - ${profile.onboarding.studentProfile.collegeName || ""}`.trim()
+      : educationFromList;
+
+  const userType = profile?.onboarding?.userType || "Student";
   const careerInterests = profile?.preferences?.careerInterests || [];
   const mentorshipGoals = profile?.preferences?.mentorshipGoals || [];
 
@@ -334,7 +413,7 @@ export default function UserDashboardProfilePreferencesPage({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-200 hover:bg-[#fbf7f3] mb-3"
               style={{ borderColor: THEME.border, color: THEME.primary }}
             >
-              ← Back
+              Back
             </button>
           )}
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight" style={{ color: THEME.primary }}>
@@ -473,7 +552,10 @@ export default function UserDashboardProfilePreferencesPage({
               </p>
 
               {/* Metadata Badges */}
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-xs mt-2" style={{ color: THEME.textMuted }}>
+              <div
+                className="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-xs mt-2"
+                style={{ color: THEME.textMuted }}
+              >
                 {email && (
                   <span className="flex items-center gap-1.5">
                     <Mail className="w-3.5 h-3.5" />
@@ -517,7 +599,10 @@ export default function UserDashboardProfilePreferencesPage({
         </div>
 
         {/* Extended Details Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-6 pt-6 border-t" style={{ borderColor: THEME.borderLight }}>
+        <div
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-6 pt-6 border-t"
+          style={{ borderColor: THEME.borderLight }}
+        >
           <div className="p-3.5 rounded-xl" style={{ backgroundColor: THEME.surfaceMuted }}>
             <span className="text-xs font-semibold block mb-1" style={{ color: THEME.secondary }}>
               Current Role
@@ -573,7 +658,9 @@ export default function UserDashboardProfilePreferencesPage({
                     Preferred Role
                   </h3>
                   <p className="text-xs" style={{ color: THEME.textMuted }}>
-                    Your primary job title or aspiring target role
+                    {readOnly
+                      ? "Primary job title or aspiring target role"
+                      : "Your primary job title or aspiring target role"}
                   </p>
                 </div>
               </div>
@@ -589,31 +676,46 @@ export default function UserDashboardProfilePreferencesPage({
               )}
             </div>
 
-            <div className="p-4 rounded-xl border mb-3" style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}>
-              <span className="text-xs font-medium uppercase tracking-wider block mb-1" style={{ color: THEME.secondary }}>
+            <div
+              className="p-4 rounded-xl border mb-3"
+              style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}
+            >
+              <span
+                className="text-xs font-medium uppercase tracking-wider block mb-1"
+                style={{ color: THEME.secondary }}
+              >
                 Active Target / Current Role
               </span>
               <p className="text-base font-bold" style={{ color: THEME.primary }}>
                 {currentPosition || (
                   <span className="font-normal italic text-xs" style={{ color: THEME.textMuted }}>
-                    No preferred role saved yet. Click 'Change Role' to set your target position.
+                    {readOnly
+                      ? "No preferred role saved yet."
+                      : "No preferred role saved yet. Click 'Change Role' to set your target position."}
                   </span>
                 )}
               </p>
             </div>
 
-            <div className="text-xs space-y-1" style={{ color: THEME.textMuted }}>
-              <p>• Used by Throne8 to recommend matching mentors in your field.</p>
-              <p>• Changes persist directly to your authenticated backend profile.</p>
-            </div>
+            {!readOnly && (
+              <div className="text-xs space-y-1" style={{ color: THEME.textMuted }}>
+                <p>• Used by Throne8 to recommend matching mentors in your field.</p>
+                <p>• Changes persist directly to your authenticated backend profile.</p>
+              </div>
+            )}
           </div>
 
-          <div className="pt-4 mt-4 border-t flex items-center justify-between text-xs" style={{ borderColor: THEME.borderLight }}>
-            <span style={{ color: THEME.textMuted }}>Field: currentPosition</span>
-            <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-              ✓ Synchronized with Server
-            </span>
-          </div>
+          {!readOnly && (
+            <div
+              className="pt-4 mt-4 border-t flex items-center justify-between text-xs"
+              style={{ borderColor: THEME.borderLight }}
+            >
+              <span style={{ color: THEME.textMuted }}>Field: currentPosition</span>
+              <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                Synchronized with Server
+              </span>
+            </div>
+          )}
         </section>
 
         {/* SECTION 7: Notification Preferences */}
@@ -669,7 +771,10 @@ export default function UserDashboardProfilePreferencesPage({
               {/* Toggle Switches */}
               <div className="space-y-3">
                 {/* Email Notifications */}
-                <div className="flex items-center justify-between p-3 rounded-xl border" style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}>
+                <div
+                  className="flex items-center justify-between p-3 rounded-xl border"
+                  style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}
+                >
                   <div>
                     <h4 className="text-xs font-bold" style={{ color: THEME.primary }}>
                       Email Notifications
@@ -698,7 +803,10 @@ export default function UserDashboardProfilePreferencesPage({
                 </div>
 
                 {/* Push Notifications */}
-                <div className="flex items-center justify-between p-3 rounded-xl border" style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}>
+                <div
+                  className="flex items-center justify-between p-3 rounded-xl border"
+                  style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}
+                >
                   <div>
                     <h4 className="text-xs font-bold" style={{ color: THEME.primary }}>
                       In-App Push Alerts
@@ -727,7 +835,10 @@ export default function UserDashboardProfilePreferencesPage({
                 </div>
 
                 {/* SMS Notifications */}
-                <div className="flex items-center justify-between p-3 rounded-xl border" style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}>
+                <div
+                  className="flex items-center justify-between p-3 rounded-xl border"
+                  style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight }}
+                >
                   <div>
                     <h4 className="text-xs font-bold" style={{ color: THEME.primary }}>
                       SMS Alerts
@@ -757,10 +868,13 @@ export default function UserDashboardProfilePreferencesPage({
               </div>
             </div>
 
-            <div className="pt-4 mt-4 border-t flex items-center justify-between text-xs" style={{ borderColor: THEME.borderLight }}>
+            <div
+              className="pt-4 mt-4 border-t flex items-center justify-between text-xs"
+              style={{ borderColor: THEME.borderLight }}
+            >
               <span style={{ color: THEME.textMuted }}>Endpoint: PUT /auth/update-profile</span>
               <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                ✓ Persisted in DB
+                Persisted in DB
               </span>
             </div>
           </section>
@@ -798,7 +912,9 @@ export default function UserDashboardProfilePreferencesPage({
                 </span>
               </div>
               <p className="text-xs" style={{ color: THEME.textMuted }}>
-                Verified skills linked to your profile from /profile/skills
+                {readOnly
+                  ? "Skills listed on this mentee's profile"
+                  : "Verified skills linked to your profile from /profile/skills"}
               </p>
             </div>
           </div>
@@ -848,7 +964,9 @@ export default function UserDashboardProfilePreferencesPage({
                 onDelete={async () => {
                   try {
                     await ProfileService.deleteSkill(skill.skillId || skill._id);
-                    setSkills((prev) => prev.filter((s) => (s.skillId || s._id) !== (skill.skillId || skill._id)));
+                    setSkills((prev) =>
+                      prev.filter((s) => (s.skillId || s._id) !== (skill.skillId || skill._id))
+                    );
                     setFeedback({ type: "success", message: `Skill "${skill.skillName}" removed.` });
                   } catch (err: any) {
                     setFeedback({ type: "error", message: err?.message || "Failed to delete skill" });
@@ -891,7 +1009,9 @@ export default function UserDashboardProfilePreferencesPage({
                 </span>
               </div>
               <p className="text-xs" style={{ color: THEME.textMuted }}>
-                Your career history fetched from /profile/experience
+                {readOnly
+                  ? "Career history on this mentee's profile"
+                  : "Your career history fetched from /profile/experience"}
               </p>
             </div>
           </div>
@@ -942,7 +1062,9 @@ export default function UserDashboardProfilePreferencesPage({
                 onDelete={async () => {
                   try {
                     await ProfileService.deleteExperience(exp.experienceId || exp._id);
-                    setExperiences((prev) => prev.filter((e) => (e.experienceId || e._id) !== (exp.experienceId || exp._id)));
+                    setExperiences((prev) =>
+                      prev.filter((e) => (e.experienceId || e._id) !== (exp.experienceId || exp._id))
+                    );
                     setFeedback({ type: "success", message: `Experience at ${exp.companyName} removed.` });
                   } catch (err: any) {
                     setFeedback({ type: "error", message: err?.message || "Failed to delete experience" });
@@ -1010,7 +1132,11 @@ export default function UserDashboardProfilePreferencesPage({
                   <span
                     key={idx}
                     className="px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm border"
-                    style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight, color: THEME.primary }}
+                    style={{
+                      backgroundColor: THEME.surfaceMuted,
+                      borderColor: THEME.borderLight,
+                      color: THEME.primary,
+                    }}
                   >
                     {interest}
                   </span>
@@ -1042,7 +1168,9 @@ export default function UserDashboardProfilePreferencesPage({
                     Mentorship Goals
                   </h3>
                   <p className="text-xs" style={{ color: THEME.textMuted }}>
-                    Your objectives for 1:1 mentorship sessions
+                    {readOnly
+                      ? "Objectives for 1:1 mentorship sessions"
+                      : "Your objectives for 1:1 mentorship sessions"}
                   </p>
                 </div>
               </div>
@@ -1072,7 +1200,11 @@ export default function UserDashboardProfilePreferencesPage({
                   <span
                     key={idx}
                     className="px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm border"
-                    style={{ backgroundColor: THEME.surfaceMuted, borderColor: THEME.borderLight, color: THEME.primary }}
+                    style={{
+                      backgroundColor: THEME.surfaceMuted,
+                      borderColor: THEME.borderLight,
+                      color: THEME.primary,
+                    }}
                   >
                     {goal}
                   </span>
@@ -1147,7 +1279,12 @@ export default function UserDashboardProfilePreferencesPage({
           onSuccess={() => {
             setIsAddExpOpen(false);
             setExpToEdit(null);
-            setFeedback({ type: "success", message: expToEdit ? "Work experience updated and saved!" : "Work experience added and saved to server!" });
+            setFeedback({
+              type: "success",
+              message: expToEdit
+                ? "Work experience updated and saved!"
+                : "Work experience added and saved to server!",
+            });
             fetchAllUserData(true);
           }}
         />
@@ -1199,7 +1336,15 @@ export default function UserDashboardProfilePreferencesPage({
 // ==========================================================
 // Subcomponent: Skill Card
 // ==========================================================
-function SkillCard({ skill, onDelete, readOnly }: { skill: any; onDelete: () => Promise<void>; readOnly?: boolean }) {
+function SkillCard({
+  skill,
+  onDelete,
+  readOnly,
+}: {
+  skill: any;
+  onDelete: () => Promise<void>;
+  readOnly?: boolean;
+}) {
   const [deleting, setDeleting] = useState(false);
 
   const getStrengthBadge = (strength: string) => {
@@ -1266,7 +1411,17 @@ function SkillCard({ skill, onDelete, readOnly }: { skill: any; onDelete: () => 
 // ==========================================================
 // Subcomponent: Experience Row
 // ==========================================================
-function ExperienceRow({ exp, onDelete, onEdit, readOnly }: { exp: any; onDelete: () => Promise<void>; onEdit?: () => void; readOnly?: boolean }) {
+function ExperienceRow({
+  exp,
+  onDelete,
+  onEdit,
+  readOnly,
+}: {
+  exp: any;
+  onDelete: () => Promise<void>;
+  onEdit?: () => void;
+  readOnly?: boolean;
+}) {
   const [deleting, setDeleting] = useState(false);
 
   const formatDate = (d?: string) => {
@@ -1308,7 +1463,7 @@ function ExperienceRow({ exp, onDelete, onEdit, readOnly }: { exp: any; onDelete
         <div className="flex items-center gap-1.5 text-xs" style={{ color: THEME.textMuted }}>
           <Clock className="w-3.5 h-3.5" />
           <span>
-            {startStr} – {endStr}
+            {startStr} - {endStr}
           </span>
         </div>
 
@@ -1326,7 +1481,7 @@ function ExperienceRow({ exp, onDelete, onEdit, readOnly }: { exp: any; onDelete
                 className="px-2 py-0.5 rounded-md text-[10px] font-medium"
                 style={{ backgroundColor: THEME.tagBg, color: THEME.secondary }}
               >
-                ✓ {ach}
+                {ach}
               </span>
             ))}
           </div>
@@ -1449,7 +1604,10 @@ function EditProfileModal({
         className="w-full max-w-lg rounded-2xl p-6 border shadow-xl max-h-[90vh] overflow-y-auto"
         style={{ backgroundColor: THEME.cardBg, borderColor: THEME.border }}
       >
-        <div className="flex items-center justify-between pb-4 mb-4 border-b" style={{ borderColor: THEME.borderLight }}>
+        <div
+          className="flex items-center justify-between pb-4 mb-4 border-b"
+          style={{ borderColor: THEME.borderLight }}
+        >
           <h3 className="text-lg font-bold" style={{ color: THEME.primary }}>
             Edit Profile Information
           </h3>
@@ -1659,7 +1817,10 @@ function EditRoleModal({
         className="w-full max-w-md rounded-2xl p-6 border shadow-xl"
         style={{ backgroundColor: THEME.cardBg, borderColor: THEME.border }}
       >
-        <div className="flex items-center justify-between pb-3 mb-4 border-b" style={{ borderColor: THEME.borderLight }}>
+        <div
+          className="flex items-center justify-between pb-3 mb-4 border-b"
+          style={{ borderColor: THEME.borderLight }}
+        >
           <h3 className="text-base font-bold" style={{ color: THEME.primary }}>
             Update Preferred Role
           </h3>
@@ -1731,7 +1892,9 @@ function AddSkillModal({
   onSuccess: () => void;
 }) {
   const [skillName, setSkillName] = useState("");
-  const [skillStrength, setSkillStrength] = useState<"beginner" | "intermediate" | "advanced" | "expert">("intermediate");
+  const [skillStrength, setSkillStrength] = useState<"beginner" | "intermediate" | "advanced" | "expert">(
+    "intermediate"
+  );
   const [yearsOfExperience, setYearsOfExperience] = useState<number>(2);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1767,7 +1930,10 @@ function AddSkillModal({
         className="w-full max-w-md rounded-2xl p-6 border shadow-xl"
         style={{ backgroundColor: THEME.cardBg, borderColor: THEME.border }}
       >
-        <div className="flex items-center justify-between pb-3 mb-4 border-b" style={{ borderColor: THEME.borderLight }}>
+        <div
+          className="flex items-center justify-between pb-3 mb-4 border-b"
+          style={{ borderColor: THEME.borderLight }}
+        >
           <h3 className="text-base font-bold" style={{ color: THEME.primary }}>
             Add New Skill
           </h3>
@@ -1874,7 +2040,7 @@ function AddExperienceModal({
   const formatDateForInput = (d?: string) => {
     if (!d) return "";
     try {
-      return new Date(d).toISOString().split('T')[0];
+      return new Date(d).toISOString().split("T")[0];
     } catch {
       return "";
     }
@@ -1937,7 +2103,7 @@ function AddExperienceModal({
       } else {
         await ProfileService.createExperience(payload);
       }
-      
+
       onSuccess();
     } catch (err: any) {
       console.error("Failed to save experience:", err);
@@ -1953,7 +2119,10 @@ function AddExperienceModal({
         className="w-full max-w-lg rounded-2xl p-6 border shadow-xl max-h-[90vh] overflow-y-auto"
         style={{ backgroundColor: THEME.cardBg, borderColor: THEME.border }}
       >
-        <div className="flex items-center justify-between pb-3 mb-4 border-b" style={{ borderColor: THEME.borderLight }}>
+        <div
+          className="flex items-center justify-between pb-3 mb-4 border-b"
+          style={{ borderColor: THEME.borderLight }}
+        >
           <h3 className="text-base font-bold" style={{ color: THEME.primary }}>
             {initialData ? "Edit Professional Experience" : "Add Professional Experience"}
           </h3>
@@ -2041,7 +2210,11 @@ function AddExperienceModal({
               onChange={(e) => setCurrentlyWorking(e.target.checked)}
               className="rounded"
             />
-            <label htmlFor="currentlyWorking" className="font-medium cursor-pointer" style={{ color: THEME.primary }}>
+            <label
+              htmlFor="currentlyWorking"
+              className="font-medium cursor-pointer"
+              style={{ color: THEME.primary }}
+            >
               I currently work in this role
             </label>
           </div>
@@ -2174,7 +2347,10 @@ function EditListModal({
         className="w-full max-w-md rounded-2xl p-6 border shadow-xl flex flex-col max-h-[90vh]"
         style={{ backgroundColor: THEME.cardBg, borderColor: THEME.border }}
       >
-        <div className="flex items-center justify-between pb-3 mb-4 border-b shrink-0" style={{ borderColor: THEME.borderLight }}>
+        <div
+          className="flex items-center justify-between pb-3 mb-4 border-b shrink-0"
+          style={{ borderColor: THEME.borderLight }}
+        >
           <div>
             <h3 className="text-base font-bold" style={{ color: THEME.primary }}>
               {title}
@@ -2239,7 +2415,10 @@ function EditListModal({
           )}
         </div>
 
-        <div className="pt-3 flex justify-end gap-2 border-t shrink-0" style={{ borderColor: THEME.borderLight }}>
+        <div
+          className="pt-3 flex justify-end gap-2 border-t shrink-0"
+          style={{ borderColor: THEME.borderLight }}
+        >
           <button
             type="button"
             onClick={onClose}

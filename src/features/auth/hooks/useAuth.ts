@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import AuthService from '@/lib/api/auth.service';
 import TokenStorage from '@/lib/store/token.storage';
+import { renewSession } from '@/lib/api/api.intance';
 
 interface UseAuthReturn {
     user: {
@@ -172,7 +173,26 @@ export function useProtectedRoute() {
             if (cancelled) return;
 
             if (!valid) {
-                goToLogin();
+                // If we still have a refresh token in storage, give it an explicit renewal attempt
+                // before destroying the entire session!
+                if (TokenStorage.getRefreshToken()) {
+                    try {
+                        const renewed = await renewSession();
+                        if (renewed && !cancelled) {
+                            const retryValid = await validateSession();
+                            if (retryValid || cancelled) return;
+                            goToLogin();
+                            return;
+                        }
+                    } catch {
+                        // renewSession handles forceLogout if definitely rejected
+                    }
+                }
+
+                // Only clear and redirect if we still have no valid session
+                if (!TokenStorage.isAuthenticated() || !TokenStorage.getRefreshToken()) {
+                    goToLogin();
+                }
             }
         };
 

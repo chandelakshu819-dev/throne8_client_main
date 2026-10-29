@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, Controller, Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -14,7 +14,8 @@ import {
     Image as ImageIcon,
     Users,
     GraduationCap,
-    Award
+    Award,
+    ChevronDown
 } from "lucide-react";
 import SeniorMentorApplicationService, {
     SeniorMentorApplication,
@@ -291,6 +292,168 @@ const getEducationYear = (edu: any): number | undefined => {
     return undefined;
 };
 
+// ============================================================================
+// 5. Themed Combobox (native <datalist> ki jagah)
+//    Native datalist ka dropdown browser draw karta hai, isliye uska color
+//    CSS se change nahi hota. Ye custom dropdown form ke theme me hai:
+//    white bg, #ece7e2 border, #4a3728 text, #f8f6f4 hover.
+// ============================================================================
+
+const MAX_VISIBLE_OPTIONS = 50;
+
+interface ComboboxInputProps {
+    control: Control<FormValues>;
+    name: 'college' | 'degree' | 'fieldOfStudy' | 'currentRole' | 'currentCompany';
+    options: string[];
+    placeholder?: string;
+}
+
+function ComboboxInput({ control, name, options, placeholder }: ComboboxInputProps) {
+    const [open, setOpen] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const listRef = useRef<HTMLUListElement>(null);
+
+    // Bahar click karne par dropdown band
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setOpen(false);
+                setActiveIndex(-1);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Keyboard se navigate karte time active option screen me rahe
+    useEffect(() => {
+        if (activeIndex < 0 || !listRef.current) return;
+        const el = listRef.current.children[activeIndex] as HTMLElement | undefined;
+        el?.scrollIntoView({ block: 'nearest' });
+    }, [activeIndex]);
+
+    return (
+        <Controller
+            control={control}
+            name={name}
+            render={({ field, fieldState }) => {
+                const value = (field.value as string) || '';
+                const query = value.trim().toLowerCase();
+
+                const filtered = (query
+                    ? options.filter((o) => o.toLowerCase().includes(query))
+                    : options
+                ).slice(0, MAX_VISIBLE_OPTIONS);
+
+                const selectOption = (opt: string) => {
+                    field.onChange(opt);
+                    setOpen(false);
+                    setActiveIndex(-1);
+                };
+
+                const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        if (!open) {
+                            setOpen(true);
+                            return;
+                        }
+                        setActiveIndex((prev) => (filtered.length === 0 ? -1 : (prev + 1) % filtered.length));
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setActiveIndex((prev) =>
+                            filtered.length === 0 ? -1 : prev <= 0 ? filtered.length - 1 : prev - 1
+                        );
+                    } else if (e.key === 'Enter') {
+                        if (open && activeIndex >= 0 && filtered[activeIndex]) {
+                            e.preventDefault();
+                            selectOption(filtered[activeIndex]);
+                        }
+                    } else if (e.key === 'Escape') {
+                        setOpen(false);
+                        setActiveIndex(-1);
+                    }
+                };
+
+                return (
+                    <div ref={containerRef} className="relative">
+                        <input
+                            type="text"
+                            ref={field.ref}
+                            name={field.name}
+                            value={value}
+                            autoComplete="off"
+                            placeholder={placeholder}
+                            aria-invalid={fieldState.error ? 'true' : 'false'}
+                            aria-expanded={open}
+                            aria-autocomplete="list"
+                            role="combobox"
+                            onChange={(e) => {
+                                field.onChange(e.target.value);
+                                setOpen(true);
+                                setActiveIndex(-1);
+                            }}
+                            onFocus={() => setOpen(true)}
+                            onBlur={field.onBlur}
+                            onKeyDown={handleKeyDown}
+                            className="w-full px-4 py-3 pr-11 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900"
+                        />
+                        <button
+                            type="button"
+                            tabIndex={-1}
+                            aria-label="Toggle suggestions"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => setOpen((prev) => !prev)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#8a7a6a] hover:text-[#4a3728] transition-colors"
+                        >
+                            <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {open && (
+                            <div className="absolute left-0 right-0 z-30 mt-2 bg-white border border-[#ece7e2] rounded-2xl shadow-xl overflow-hidden">
+                                {filtered.length > 0 ? (
+                                    <ul ref={listRef} role="listbox" className="max-h-60 overflow-y-auto py-1.5">
+                                        {filtered.map((opt, idx) => {
+                                            const isActive = idx === activeIndex;
+                                            return (
+                                                <li
+                                                    key={opt}
+                                                    role="option"
+                                                    aria-selected={isActive}
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        selectOption(opt);
+                                                    }}
+                                                    onMouseEnter={() => setActiveIndex(idx)}
+                                                    className={`px-4 py-2.5 text-sm font-medium cursor-pointer transition-colors ${
+                                                        isActive
+                                                            ? 'bg-[#f8f6f4] text-[#4a3728]'
+                                                            : 'text-slate-700 hover:bg-[#f8f6f4] hover:text-[#4a3728]'
+                                                    }`}
+                                                >
+                                                    {opt}
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                ) : (
+                                    <p className="px-4 py-3 text-xs font-medium text-[#8a7a6a]">
+                                        No matching suggestions. You can keep what you typed.
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                        {fieldState.error && (
+                            <p className="text-red-500 text-xs mt-1">{fieldState.error.message as string}</p>
+                        )}
+                    </div>
+                );
+            }}
+        />
+    );
+}
+
 export default function SeniorMentorApplicationPage() {
     const router = useRouter();
     const [currentStep, setCurrentStep] = useState(1);
@@ -301,7 +464,7 @@ export default function SeniorMentorApplicationPage() {
     const [successMsg, setSuccessMsg] = useState(false);
     const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-    const { register, handleSubmit, trigger, formState: { errors }, setValue, getValues, watch, setError, clearErrors } = useForm<FormValues>({
+    const { register, handleSubmit, trigger, control, formState: { errors }, setValue, getValues, watch, setError, clearErrors } = useForm<FormValues>({
         resolver: zodResolver(createSchema),
         defaultValues: {
             mentorRole: undefined,
@@ -628,8 +791,6 @@ export default function SeniorMentorApplicationPage() {
         );
     }
 
-
-
     if (successMsg) {
         return (
             <div className="min-h-screen bg-[#FAF9F6] p-6 lg:p-12">
@@ -730,13 +891,6 @@ export default function SeniorMentorApplicationPage() {
         <div className="min-h-screen bg-[#FAF9F6] flex items-start justify-center p-6 animate-fade-in overflow-y-auto">
             <div className="max-w-3xl w-full my-6 relative">
                 <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="bg-white rounded-[40px] shadow-2xl relative">
-
-                    {/* Suggestion lists (user inme se chun sakta hai ya khud likh sakta hai) */}
-                    <datalist id="college-list">{collegeOptions.map((o) => <option key={o} value={o} />)}</datalist>
-                    <datalist id="degree-list">{degreeOptions.map((o) => <option key={o} value={o} />)}</datalist>
-                    <datalist id="field-list">{fieldOptions.map((o) => <option key={o} value={o} />)}</datalist>
-                    <datalist id="role-list">{roleOptions.map((o) => <option key={o} value={o} />)}</datalist>
-                    <datalist id="company-list">{companyOptions.map((o) => <option key={o} value={o} />)}</datalist>
 
                     {/* Close Button */}
                     <button
@@ -890,28 +1044,48 @@ export default function SeniorMentorApplicationPage() {
                                     </div>
                                     <div className="md:col-span-2">
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">College / University *</label>
-                                        <input type="text" list="college-list" autoComplete="off" {...register('college')} placeholder="Start typing or pick from suggestions" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
-                                        {errors.college && <p className="text-red-500 text-xs mt-1">{errors.college.message}</p>}
+                                        <ComboboxInput
+                                            control={control}
+                                            name="college"
+                                            options={collegeOptions}
+                                            placeholder="Start typing or pick from suggestions"
+                                        />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Degree *</label>
-                                        <input type="text" list="degree-list" autoComplete="off" {...register('degree')} placeholder="e.g. B.Tech" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
-                                        {errors.degree && <p className="text-red-500 text-xs mt-1">{errors.degree.message}</p>}
+                                        <ComboboxInput
+                                            control={control}
+                                            name="degree"
+                                            options={degreeOptions}
+                                            placeholder="e.g. B.Tech"
+                                        />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Field of Study *</label>
-                                        <input type="text" list="field-list" autoComplete="off" {...register('fieldOfStudy')} placeholder="e.g. Computer Science" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
-                                        {errors.fieldOfStudy && <p className="text-red-500 text-xs mt-1">{errors.fieldOfStudy.message}</p>}
+                                        <ComboboxInput
+                                            control={control}
+                                            name="fieldOfStudy"
+                                            options={fieldOptions}
+                                            placeholder="e.g. Computer Science"
+                                        />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Role <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
-                                        <input type="text" list="role-list" autoComplete="off" {...register('currentRole')} placeholder="e.g. Software Engineer" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
-                                        {errors.currentRole && <p className="text-red-500 text-xs mt-1">{errors.currentRole.message}</p>}
+                                        <ComboboxInput
+                                            control={control}
+                                            name="currentRole"
+                                            options={roleOptions}
+                                            placeholder="e.g. Software Engineer"
+                                        />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Company <span className="text-slate-400 font-normal ml-1">(Optional)</span></label>
-                                        <input type="text" list="company-list" autoComplete="off" {...register('currentCompany')} placeholder="e.g. Google" className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
-                                        {errors.currentCompany && <p className="text-red-500 text-xs mt-1">{errors.currentCompany.message}</p>}
+                                        <ComboboxInput
+                                            control={control}
+                                            name="currentCompany"
+                                            options={companyOptions}
+                                            placeholder="e.g. Google"
+                                        />
                                     </div>
                                 </div>
                                 <div>
