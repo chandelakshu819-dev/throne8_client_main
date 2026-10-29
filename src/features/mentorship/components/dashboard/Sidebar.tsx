@@ -80,7 +80,9 @@ export default function Sidebar({
     .split(" ")
     .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
-    const profilePic = dashboardData?.profilePic || mentorData?.profilePic || null;
+
+  // dashboardData.profilePic backend ki default orange image deta hai, isliye sirf mentorData use karo (profile card jaisa)
+  const profilePic = mentorData?.profilePic || null;
   const rating = Number(
     dashboardData?.stats?.rating ?? dashboardData?.rating ?? mentorData?.stats?.averageRating ?? 0
   );
