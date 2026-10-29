@@ -130,6 +130,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   rescheduled: { bg: "#fef9c3", text: "#854d0e" },
   no_show: { bg: "#fce7f3", text: "#9d174d" },
   refunded: { bg: "#f3e8ff", text: "#7c3aed" },
+  missed: { bg: "#ffedd5", text: "#9a3412" },  
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -142,6 +143,7 @@ const STATUS_LABELS: Record<string, string> = {
   rescheduled: "Rescheduled",
   no_show: "No Show",
   refunded: "Refunded",
+  missed: "Missed",
 };
 
 const SESSION_TYPE_LABELS: Record<string, string> = {
