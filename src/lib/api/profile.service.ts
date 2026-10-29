@@ -335,6 +335,26 @@ class ProfileService {
         }
     }
 
+
+        /**
+    * 🗑️ Delete Active Profile Photo
+    */
+        static async deleteProfilePhoto(): Promise<any> {
+            try {
+                const { data } = await api.delete(`${config?.NEXT_PUBLIC_PROFILE_PHOTO_ENDPOINT || process.env.NEXT_PUBLIC_PROFILE_PHOTO_ENDPOINT}/delete-active-photo`);
+            return data;
+            } catch (error: any) {
+                if (axios.isAxiosError(error)) {
+                    if (error.response?.status === 404) return null; // photo pehle se nahi hai
+                    const apiError = error.response?.data as ApiError;
+                    if (apiError?.message) throw new Error(apiError.message);
+                }
+                throw new Error('Failed to delete profile photo. Please try again.');
+            }
+        }
+    
+    
+
     /**
     * 📸 Get Profile Photo by ID
     */

@@ -143,8 +143,22 @@ class SeniorMentorApplicationService {
     }
   }
 
-  /**
-   * GET /api/v1/mentorship/senior-mentor-applications/user/:userId/profile
+    /**
+   * DELETE /api/v1/mentorship/senior-mentor-applications/me/profile-photo
+   */
+    static async removeMyProfilePhoto(): Promise<SeniorMentorApplication | null> {
+      try {
+        const { data } = await api.delete('/mentorship/senior-mentor-applications/me/profile-photo');
+        clearMyAppCache();
+        return data?.data ?? null;
+      } catch (error: any) {
+        if (error?.response?.status === 404) return null;
+        throw error;
+      }
+    }
+  
+    /**
+     * GET /api/v1/mentorship/senior-mentor-applications/user/:userId/profile
    * Returns a Senior Mentor Application by userId to display as Profile.
    */
   static async getApplicationProfileById(userId: string): Promise<SeniorMentorApplication | null> {

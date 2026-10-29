@@ -22,6 +22,11 @@ import { useNavbarData, useNavbarProfileImage } from "@/features/profile/compone
 import { useProfile } from "@/features/profile/hooks/useProfile";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import SeniorMentorApplicationService from "@/lib/api/seniorMentorApplication.service";
+import {
+  syncProfilePhotoToAllRoles,
+  removeProfilePhotoFromAllRoles,
+} from "@/features/mentorship/utils/syncProfilePhoto";
+
 
 // ============================================================================
 // Constants & Option Lists (Mirrored from original Senior Mentor Application)
@@ -519,12 +524,19 @@ export default function SeniorProfilePage({
       if (!newUrl) throw new Error("Photo upload failed. Please try again.");
 
       setLocalPhoto(newUrl);
+      setImgFallbackLevel(0);
       if (data) {
         const merged = { ...data, profilePhoto: newUrl };
+        
         setData(merged);
         if (onUpdateApplication) onUpdateApplication(merged);
       }
       setNavbarProfileImage(newUrl);
+
+      // Mentee (account) + Industry Mentor me bhi same photo
+      const uid = (data as any)?.userId ?? (user as any)?.userId ?? (user as any)?.id;
+      await syncProfilePhotoToAllRoles(selectedAvatarFile, uid, { skip: ['senior'] });
+
       if (typeof loadProfile === "function") loadProfile();
 
       closeAvatarModal();
@@ -533,6 +545,26 @@ export default function SeniorProfilePage({
       setAvatarError(err?.message || "Failed to update profile photo.");
     } finally {
       setUploadingAvatar(false);
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    try {
+      const uid = (data as any)?.userId ?? (user as any)?.userId ?? (user as any)?.id;
+      await SeniorMentorApplicationService.removeMyProfilePhoto();
+      await removeProfilePhotoFromAllRoles(uid, { skip: ['senior'] });
+      setLocalPhoto(null);
+      setImgFallbackLevel(3); // account photo fallback bhi mat dikhao
+      if (data) {
+        const merged = { ...data, profilePhoto: undefined } as SeniorMentorApplication;
+        setData(merged);
+        if (onUpdateApplication) onUpdateApplication(merged);
+      }
+      setNavbarProfileImage(null);
+      if (typeof loadProfile === "function") loadProfile();
+      showToast("Profile photo removed.");
+    } catch (err: any) {
+      showToast(err?.message || "Failed to remove photo.");
     }
   };
 
@@ -809,6 +841,17 @@ export default function SeniorProfilePage({
                     onChange={onAvatarFileSelected}
                   />
                 </label>
+              )}
+
+{isOwner && isGlobalEditMode && currentPhoto && (
+                <button
+                  type="button"
+                  onClick={handleAvatarRemove}
+                  title="Remove profile photo"
+                  className="absolute -top-1.5 -right-1.5 w-7 h-7 rounded-full flex items-center justify-center shadow-md bg-white border border-red-200 text-red-600 hover:bg-red-50 transition-all"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               )}
 
               {isApproved && (

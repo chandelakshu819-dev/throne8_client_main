@@ -9,6 +9,10 @@ import { MessageCircle, Wrench, GraduationCap, Dumbbell, CheckSquare } from "luc
 import Sidebar from "./Sidebar";
 import DashboardOverviewPage from "./DashboardOverviewPage";
 import MentorService from "@/lib/api/mentorship.service";
+import {
+  syncProfilePhotoToAllRoles,
+  removeProfilePhotoFromAllRoles,
+} from "@/features/mentorship/utils/syncProfilePhoto";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
@@ -477,7 +481,12 @@ export default function MentorDashboard(
         setProfilePhoto(null);
         // Top-right navbar avatar bhi turant update karo
         setNavbarProfileImage(newPic);
-        // Mentor ki photo alag hai — Mentee / Senior Mentor ki photo yahan se change nahi hogi
+        // Mentee (account) + Senior Mentor me bhi same photo
+        syncProfilePhotoToAllRoles(file, userId, { skip: ['mentor'] })
+          .then(() => {
+            if (typeof loadProfile === "function") loadProfile();
+          })
+          .catch(() => undefined);
       })
       .catch((err) => {
         console.error("Failed to update profile photo:", err);
@@ -493,7 +502,12 @@ export default function MentorDashboard(
     if (!mentorData?.mentorId) return;
     try {
       await MentorService.removeProfilePhoto(mentorData.mentorId);
+      // Mentee (account) + Senior Mentor se bhi hatao
+      await removeProfilePhotoFromAllRoles(userId, { skip: ['mentor'] });
+      if (typeof loadProfile === "function") loadProfile();      
       setMentorData((prev: any) => ({ ...prev, profilePic: null }));
+
+
       setDashboardData((prev: any) => (prev ? { ...prev, profilePic: null } : prev));
       setProfilePhoto(null);
       setNavbarProfileImage(null);
