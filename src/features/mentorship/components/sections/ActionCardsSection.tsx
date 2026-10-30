@@ -21,13 +21,15 @@ import { formatCountLabel } from "@/shared/utils/mentorFormat";
 import { useMyRoles } from "@/features/mentorship/hooks/useMentorRole";
 
 
-interface ActionCardsSectionProps {
+export interface ActionCardsSectionProps {
     onBecomeMentorClick: () => void;
     onFindMentorClick: () => void;
     isMentor?: boolean;
     userId?: string;
     /** Real mentors count (page se aata hai). Na ho to number nahi dikhaya jayega. */
     mentorCount?: number;
+    isLoading?: boolean;
+    isLoggedIn?: boolean;
 }
 
 // Senior Mentor = college ke 3rd/4th year students jo juniors ko guide karte hain
@@ -210,6 +212,8 @@ export default function ActionCardsSection({
     isMentor,
     userId,
     mentorCount,
+    isLoading = false,
+    isLoggedIn,
 }: ActionCardsSectionProps) {
     const router = useRouter();
     const { roles } = useMyRoles(!!userId);
@@ -269,17 +273,43 @@ export default function ActionCardsSection({
             String(seniorApplication?.verificationStatus ?? "").toLowerCase()
         );
         
-    const cardCount = 1 + (isMentor ? 0 : 1) + (isSeniorMentorApproved ? 0 : 1);
-    const gridCols =
-        cardCount >= 3
-            ? "grid-cols-1 md:grid-cols-3"
-            : cardCount === 2
-            ? "grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto"
-            : "grid-cols-1 max-w-md mx-auto";
+    // Loading State: Render Skeleton Loader that mimics the final 1-box layout to avoid flicker & layout shift
+    if (isLoading) {
+        return (
+            <section className="w-full px-6 pb-10 min-h-[300px]">
+                <div className="mx-auto w-full max-w-[1160px]">
+                    <div className="mx-auto w-full max-w-md">
+                        <div className="relative min-h-[250px] w-full rounded-[24px] border border-[#e8ddd4] bg-white p-5 shadow-[0_4px_12px_rgba(74,55,40,0.06)] animate-pulse flex flex-col justify-between">
+                            <div>
+                                <div className="mb-3 h-12 w-12 rounded-2xl bg-[#f0e8de]" />
+                                <div className="mb-2 h-3 w-28 rounded bg-[#f0e8de]" />
+                                <div className="mb-2 h-5 w-40 rounded bg-[#f0e8de]" />
+                                <div className="space-y-1.5 mt-2 max-w-[320px]">
+                                    <div className="h-3 w-full rounded bg-[#f0e8de]" />
+                                    <div className="h-3 w-4/5 rounded bg-[#f0e8de]" />
+                                </div>
+                            </div>
+                            <div className="pt-4">
+                                <div className="h-8 w-28 rounded-full bg-[#f0e8de]" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        );
+    }
+
+    // Conditional Rendering:
+    // 1-box layout only when user IS logged in.
+    // 3-box layout only when we are sure user is NOT logged in.
+    const isUserLoggedIn = isLoggedIn !== undefined ? isLoggedIn : Boolean(userId);
+    const gridCols = isUserLoggedIn
+        ? "grid-cols-1 max-w-md mx-auto"
+        : "grid-cols-1 md:grid-cols-3";
 
 
     return (
-        <section className="w-full px-6 pb-10">
+        <section className="w-full px-6 pb-10 min-h-[300px]">
             <div className="mx-auto w-full max-w-[1160px]">
                 <div className={`grid items-stretch gap-5 ${gridCols}`}>
                     {/* FIND MENTOR */}
@@ -294,8 +324,9 @@ export default function ActionCardsSection({
                     />
 
                     {/* BECOME MENTOR (industry professionals) */}
-                    {!isMentor && (
-                        <ActionCard
+                    {!isUserLoggedIn && (
+                        <>
+                            <ActionCard
                             onClick={onBecomeMentorClick}
                             icon={<Users className={ICON_CLASS} />}
                             audience={MENTOR_AUDIENCE}
@@ -303,11 +334,8 @@ export default function ActionCardsSection({
                             description={MENTOR_DESC}
                             cta="Apply Now"
                         />
-                    )}
-
-                    {/* BECOME SENIOR MENTOR (college 3rd/4th year students) */}
-                    {!isSeniorMentorApproved && (
-                    <ActionCard
+                        {/* BECOME SENIOR MENTOR (college 3rd/4th year students) */}
+                            <ActionCard
                         onClick={handleSeniorMentorClick}
                         disabled={seniorLoading}
                         icon={<Star className={ICON_CLASS} />}
@@ -332,7 +360,9 @@ export default function ActionCardsSection({
                         }
                         cta={seniorLoading ? "Loading..." : cta}
                         />
-                        )}
+                        </>
+                    )}
+    
                 </div>
             </div>
         </section>
