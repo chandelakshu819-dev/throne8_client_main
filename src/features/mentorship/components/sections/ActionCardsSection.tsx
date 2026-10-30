@@ -21,13 +21,15 @@ import { formatCountLabel } from "@/shared/utils/mentorFormat";
 import { useMyRoles } from "@/features/mentorship/hooks/useMentorRole";
 
 
-interface ActionCardsSectionProps {
+export interface ActionCardsSectionProps {
     onBecomeMentorClick: () => void;
     onFindMentorClick: () => void;
     isMentor?: boolean;
     userId?: string;
     /** Real mentors count (page se aata hai). Na ho to number nahi dikhaya jayega. */
     mentorCount?: number;
+    isLoading?: boolean;
+    isLoggedIn?: boolean;
 }
 
 // Senior Mentor = college ke 3rd/4th year students jo juniors ko guide karte hain
@@ -210,9 +212,11 @@ export default function ActionCardsSection({
     isMentor,
     userId,
     mentorCount,
+    isLoading = false,
+    isLoggedIn,
 }: ActionCardsSectionProps) {
     const router = useRouter();
-    const { roles } = useMyRoles(!!userId);
+    const { roles, loading: rolesLoading } = useMyRoles(Boolean(userId), userId);
 
     const [seniorApplication, setSeniorApplication] = useState<SeniorMentorApplication | null>(null);
     const [seniorLoading, setSeniorLoading] = useState(false);
@@ -255,35 +259,79 @@ export default function ActionCardsSection({
         seniorLoading
     );
 
-    // Ab mentors me college seniors bhi hain, isliye "industry" word hata diya
     const countLabel = formatCountLabel(mentorCount);
     const findMentorDescription = countLabel
         ? `Connect with ${countLabel} mentors from college and industry. Get personalized 1:1 guidance.`
         : "Connect with mentors from college and industry. Get personalized 1:1 guidance.";
 
-        // Already Senior Mentor (verified application / approved role) -> card hide
-        const isSeniorMentorApproved =
-        roles?.industryMentor === "approved" ||
+    // Loading State: While auth is resolving or logged-in user roles are loading,
+    // render skeleton to prevent premature flash of 3 cards or layout shift.
+    const isRolesLoading = Boolean(userId) && (rolesLoading || seniorLoading);
+    const isSectionLoading = isLoading || isRolesLoading;
 
+    if (isSectionLoading) {
+        return (
+            <section className="w-full px-6 pb-10 min-h-[300px]">
+                <div className="mx-auto w-full max-w-[1160px]">
+                    <div className="mx-auto w-full max-w-md motion-reduce:animate-none animate-pulse">
+                        <div className="relative min-h-[250px] w-full rounded-[24px] border border-[#e8ddd4] bg-white p-5 shadow-[0_4px_12px_rgba(74,55,40,0.06)] flex flex-col justify-between">
+                            <div>
+                                <div className="mb-3 h-12 w-12 rounded-2xl bg-[#f0e8de]" />
+                                <div className="mb-2 h-3 w-28 rounded bg-[#f0e8de]" />
+                                <div className="mb-2 h-5 w-40 rounded bg-[#f0e8de]" />
+                                <div className="space-y-1.5 mt-2 max-w-[320px]">
+                                    <div className="h-3 w-full rounded bg-[#f0e8de]" />
+                                    <div className="h-3 w-4/5 rounded bg-[#f0e8de]" />
+                                </div>
+                            </div>
+                            <div className="pt-4">
+                                <div className="h-8 w-28 rounded-full bg-[#f0e8de]" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        );
+    }
+
+    // Role Verification Checks:
+    // - Industry Mentor: approved/active in Mentor collection
+    const isIndustryMentorApproved =
+        roles?.seniorMentor === "approved" ||
+        (isMentor === true && roles?.seniorMentor !== "pending" && roles?.seniorMentor !== "rejected");
+
+    // - College Mentor: approved/verified in SeniorMentorApplication
+    const isCollegeMentorApproved =
+        roles?.industryMentor === "approved" ||
         ["verified", "approved", "active"].includes(
             String(seniorApplication?.verificationStatus ?? "").toLowerCase()
         );
-        
-    const cardCount = 1 + (isMentor ? 0 : 1) + (isSeniorMentorApproved ? 0 : 1);
+
+    // Required Visibility Matrix:
+    // - Find Mentor: ALWAYS visible
+    // - Become Industry Mentor: Visible UNLESS user is an approved Industry Mentor
+    // - Become College Mentor: Visible UNLESS user is an approved College Mentor
+    const showFindMentor = true;
+    const showIndustryMentor = !isIndustryMentorApproved;
+    const showCollegeMentor = !isCollegeMentorApproved;
+
+    const visibleCardCount =
+        (showFindMentor ? 1 : 0) +
+        (showIndustryMentor ? 1 : 0) +
+        (showCollegeMentor ? 1 : 0);
+
     const gridCols =
-        cardCount >= 3
-            ? "grid-cols-1 md:grid-cols-3"
-            : cardCount === 2
+        visibleCardCount >= 3
+            ? "grid-cols-1 md:grid-cols-3 max-w-[1160px] mx-auto"
+            : visibleCardCount === 2
             ? "grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto"
             : "grid-cols-1 max-w-md mx-auto";
 
-
     return (
-        <section className="w-full px-6 pb-10">
+        <section className="w-full px-6 pb-10 min-h-[300px]">
             <div className="mx-auto w-full max-w-[1160px]">
                 <div className={`grid items-stretch gap-5 ${gridCols}`}>
-                    {/* FIND MENTOR */}
-                    {/* Hero ke "Explore Mentors" se alag dikhe isliye CTA "Get Matched" */}
+                    {/* 1. FIND MENTOR - ALWAYS VISIBLE */}
                     <ActionCard
                         onClick={onFindMentorClick}
                         icon={<Search className={ICON_CLASS} />}
@@ -293,8 +341,8 @@ export default function ActionCardsSection({
                         cta="Get Matched"
                     />
 
-                    {/* BECOME MENTOR (industry professionals) */}
-                    {!isMentor && (
+                    {/* 2. BECOME INDUSTRY MENTOR - Visible to Normal Users & College Mentors */}
+                    {showIndustryMentor && (
                         <ActionCard
                             onClick={onBecomeMentorClick}
                             icon={<Users className={ICON_CLASS} />}
@@ -305,34 +353,34 @@ export default function ActionCardsSection({
                         />
                     )}
 
-                    {/* BECOME SENIOR MENTOR (college 3rd/4th year students) */}
-                    {!isSeniorMentorApproved && (
-                    <ActionCard
-                        onClick={handleSeniorMentorClick}
-                        disabled={seniorLoading}
-                        icon={<Star className={ICON_CLASS} />}
-                        audience={audience}
-                        title={
-                            <span className="flex items-center gap-1.5">
-                                {title}
-                                {statusIcon}
-                            </span>
-                        }
-                        description={
-                            seniorLoading ? (
-                                <div className="space-y-1.5">
-                                    <div className="h-2 w-full animate-pulse rounded bg-[#e8ddd4] transition-colors group-hover:bg-white/15" />
-                                    <div className="h-2 w-4/5 animate-pulse rounded bg-[#e8ddd4] transition-colors group-hover:bg-white/15" />
-                                </div>
-                            ) : seniorError ? (
-                                DEFAULT_SENIOR_DESC
-                            ) : (
-                                description
-                            )
-                        }
-                        cta={seniorLoading ? "Loading..." : cta}
+                    {/* 3. BECOME COLLEGE MENTOR - Visible to Normal Users & Industry Mentors */}
+                    {showCollegeMentor && (
+                        <ActionCard
+                            onClick={handleSeniorMentorClick}
+                            disabled={seniorLoading}
+                            icon={<Star className={ICON_CLASS} />}
+                            audience={audience}
+                            title={
+                                <span className="flex items-center gap-1.5">
+                                    {title}
+                                    {statusIcon}
+                                </span>
+                            }
+                            description={
+                                seniorLoading ? (
+                                    <div className="space-y-1.5">
+                                        <div className="h-2 w-full animate-pulse rounded bg-[#e8ddd4] transition-colors group-hover:bg-white/15" />
+                                        <div className="h-2 w-4/5 animate-pulse rounded bg-[#e8ddd4] transition-colors group-hover:bg-white/15" />
+                                    </div>
+                                ) : seniorError ? (
+                                    DEFAULT_SENIOR_DESC
+                                ) : (
+                                    description
+                                )
+                            }
+                            cta={seniorLoading ? "Loading..." : cta}
                         />
-                        )}
+                    )}
                 </div>
             </div>
         </section>

@@ -1027,7 +1027,7 @@ export default function SeniorMentorApplicationPage() {
                             <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-4">
                                 <Users className="w-8 h-8" />
                             </div>
-                            <h2 className="text-3xl font-black mb-2">Become a Senior Mentor</h2>
+                            <h2 className="text-3xl font-black mb-2">Become a College Mentor</h2>
                             <p className="text-white/80 font-medium">
                                 Empower the community with your advanced industry leadership
                             </p>

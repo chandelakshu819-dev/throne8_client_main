@@ -62,7 +62,7 @@ export default function ThroneUltraPremium() {
     const [mentorsLoading, setMentorsLoading] = useState(true);
 
     const { profileImageUrl, loadProfile } = useProfile();
-    const { user } = useAuth();
+    const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
     useEffect(() => {
         if (user) {
@@ -235,16 +235,21 @@ export default function ThroneUltraPremium() {
                 mentorUserId={user?.userId}
             />
 
-            {/* Hero Section */}
-            <HeroSection mentorData={pageMentorData} />
+            {/* Main Hero & Actions Area - min-height prevents layout shift on reload */}
+            <main className="w-full">
+                {/* Hero Section */}
+                <HeroSection mentorData={pageMentorData} />
 
-            <ActionCardsSection
-                onBecomeMentorClick={() => setShowMentorForm(true)}
-                onFindMentorClick={() => setFindMentorOpen(true)}
-                isMentor={isMentor}
-                userId={user?.userId}
-                mentorCount={mentorsLoading ? undefined : impactStats.mentors}
-            />
+                {/* Action Cards Section with Dynamic Mentor Role Visibility */}
+                <ActionCardsSection
+                    onBecomeMentorClick={() => setShowMentorForm(true)}
+                    onFindMentorClick={() => setFindMentorOpen(true)}
+                    isMentor={isMentor}
+                    userId={user?.userId}
+                    isLoading={authLoading}
+                    mentorCount={mentorsLoading ? undefined : impactStats.mentors}
+                />
+            </main>
 
             <FindMentorModal
                 isOpen={findMentorOpen}
