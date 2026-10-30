@@ -92,19 +92,38 @@ const FIELD_SUGGESTIONS = [
 ];
 
 const ROLE_SUGGESTIONS = [
-    'Software Engineer', 'Senior Software Engineer', 'Software Developer', 'Full Stack Developer',
-    'Frontend Developer', 'Backend Developer', 'DevOps Engineer', 'Cloud Engineer',
-    'Data Scientist', 'Machine Learning Engineer', 'AI Engineer', 'Product Manager',
-    'UI/UX Designer', 'Product Designer', 'Data Analyst', 'Business Analyst',
-    'QA Engineer', 'Security Engineer', 'Solutions Architect', 'Engineering Manager',
+    'Software Engineer', 'Senior Software Engineer', 'Staff Software Engineer', 'Principal Engineer',
+    'Software Developer', 'Associate Software Engineer', 'Software Engineer Intern', 'SDE 1', 'SDE 2', 'SDE 3',
+    'Full Stack Developer', 'Frontend Developer', 'Backend Developer', 'Mobile App Developer',
+    'React Developer', 'Node.js Developer', 'Java Developer', 'Python Developer', 'Web Developer',
+    'DevOps Engineer', 'Site Reliability Engineer', 'Cloud Engineer', 'Cloud Architect',
+    'Data Scientist', 'Data Engineer', 'Data Analyst', 'Machine Learning Engineer', 'AI Engineer',
+    'Business Analyst', 'Business Intelligence Analyst', 'Product Manager', 'Associate Product Manager',
+    'Technical Program Manager', 'Project Manager', 'Scrum Master',
+    'UI/UX Designer', 'Product Designer', 'Graphic Designer',
+    'QA Engineer', 'SDET', 'Security Engineer', 'Cyber Security Analyst', 'Blockchain Developer',
+    'Solutions Architect', 'Technical Architect', 'Engineering Manager', 'Technical Lead', 'Team Lead',
+    'Director of Engineering', 'VP of Engineering', 'CTO', 'Founder', 'Co-Founder',
+    'Technical Consultant', 'System Analyst', 'Database Administrator', 'Network Engineer',
+    'Digital Marketing Manager', 'Content Strategist', 'HR Manager', 'Technical Recruiter',
+    'Freelancer', 'Trainer / Instructor',
 ];
 
 const COMPANY_SUGGESTIONS = [
-    'Google', 'Microsoft', 'Amazon', 'Apple', 'Meta', 'Netflix', 'Adobe', 'Uber', 'Salesforce',
+    'Google', 'Microsoft', 'Amazon', 'Apple', 'Meta', 'Netflix', 'Adobe', 'Uber', 'Salesforce', 'Oracle',
+    'IBM', 'Intel', 'NVIDIA', 'Cisco', 'SAP', 'VMware', 'Atlassian', 'LinkedIn', 'Twitter / X', 'Airbnb',
     'Tata Consultancy Services', 'Infosys', 'Wipro', 'HCL Technologies', 'Tech Mahindra', 'Cognizant',
-    'Accenture', 'Deloitte', 'PwC', 'EY', 'KPMG', 'Goldman Sachs', 'Morgan Stanley', 'JPMorgan Chase',
+    'Capgemini', 'LTIMindtree', 'Mphasis', 'Persistent Systems', 'Zensar', 'Hexaware', 'Coforge',
+    'Accenture', 'Deloitte', 'PwC', 'EY', 'KPMG', 'McKinsey & Company', 'Boston Consulting Group',
+    'Goldman Sachs', 'Morgan Stanley', 'JPMorgan Chase', 'Barclays', 'American Express', 'Visa', 'Mastercard',
     'Flipkart', 'Swiggy', 'Zomato', 'Paytm', 'Razorpay', 'PhonePe', 'CRED', 'Ola', 'Byju\'s',
+    'Meesho', 'Myntra', 'Nykaa', 'Zerodha', 'Groww', 'Freshworks', 'Zoho', 'InMobi', 'Dream11',
+    'Physics Wallah', 'Unacademy', 'upGrad', 'Scaler', 'Coding Ninjas',
+    'Startup', 'Freelance / Self-employed', 'Own Business',
 ];
+
+const MAX_YEARS_OPTION = 40;
+const YEARS_OPTIONS: number[] = Array.from({ length: MAX_YEARS_OPTION }, (_, i) => i + 1);
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -128,17 +147,18 @@ const createSchema = z.object({
         .int()
         .min(1980, "Invalid year")
         .max(new Date().getFullYear() + 10, "Invalid year"),
-    currentRole: z.string().min(2, "Current role is required").max(100),
-    currentCompany: z.string().min(2, "Current company is required").max(100),
+    currentRole: z.string().max(100).refine((v) => !v || v.trim().length >= 2, "Current role must be at least 2 characters").optional(),
+    currentCompany: z.string().max(100).refine((v) => !v || v.trim().length >= 2, "Current company must be at least 2 characters").optional(),
     shortBio: z.string().min(20, "Short bio must be at least 20 characters").max(600),
 
     // Step 2: Professional Details
     linkedinUrl: z.string().url("Valid LinkedIn URL is required").regex(/linkedin\.com/, "Must be a valid LinkedIn URL"),
     githubUrl: z.string().url("Must be a valid URL").regex(/github\.com/, "Must be a valid GitHub URL").optional().or(z.literal('')),
     portfolioUrl: z.string().url("Must be a valid URL").optional().or(z.literal('')),
-    yearsOfExperience: z.number({ invalid_type_error: "Years of experience is required" })
+    yearsOfExperience: z.number({ invalid_type_error: "Invalid years of experience" })
         .min(1, "Minimum 1 year of experience required")
-        .max(50, "Invalid years of experience"),
+        .max(50, "Invalid years of experience")
+        .optional(),
     experienceLevel: z.nativeEnum(ExperienceLevel, { errorMap: () => ({ message: "Please select your experience level" }) }),
     primaryExpertise: z.nativeEnum(Domain, { errorMap: () => ({ message: "Please select your primary expertise" }) }),
 
@@ -181,6 +201,8 @@ const steps = [
 //    Native datalist ka dropdown browser draw karta hai, isliye uska color
 //    CSS se change nahi hota. Ye custom dropdown form ke theme me hai:
 //    white bg, #ece7e2 border, #4a3728 text, #f8f6f4 hover.
+//    Type karke filter kar sakte ho, ya list se option choose kar sakte ho.
+//    Custom text bhi allowed hai (list me na mile to jo type kiya wahi rahega).
 // ============================================================================
 
 const MAX_VISIBLE_OPTIONS = 50;
@@ -225,7 +247,10 @@ function ComboboxInput({ control, name, options, placeholder }: ComboboxInputPro
                 const value = (field.value as string) || '';
                 const query = value.trim().toLowerCase();
 
-                const filtered = (query
+                // Agar value pehle se kisi option ke barabar hai to poori list dikhao,
+                // warna type kiye hue text se filter karo
+                const exactMatch = options.some((o) => o.toLowerCase() === query);
+                const filtered = (query && !exactMatch
                     ? options.filter((o) => o.toLowerCase().includes(query))
                     : options
                 ).slice(0, MAX_VISIBLE_OPTIONS);
@@ -279,6 +304,7 @@ function ComboboxInput({ control, name, options, placeholder }: ComboboxInputPro
                                 setActiveIndex(-1);
                             }}
                             onFocus={() => setOpen(true)}
+                            onClick={() => setOpen(true)}
                             onBlur={field.onBlur}
                             onKeyDown={handleKeyDown}
                             className="w-full px-4 py-3 pr-11 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900"
@@ -300,6 +326,7 @@ function ComboboxInput({ control, name, options, placeholder }: ComboboxInputPro
                                     <ul ref={listRef} role="listbox" className="max-h-60 overflow-y-auto py-1.5">
                                         {filtered.map((opt, idx) => {
                                             const isActive = idx === activeIndex;
+                                            const isSelected = opt.toLowerCase() === query;
                                             return (
                                                 <li
                                                     key={opt}
@@ -310,7 +337,7 @@ function ComboboxInput({ control, name, options, placeholder }: ComboboxInputPro
                                                         selectOption(opt);
                                                     }}
                                                     onMouseEnter={() => setActiveIndex(idx)}
-                                                    className={`px-4 py-2.5 text-sm font-medium cursor-pointer transition-colors ${isActive
+                                                    className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${isSelected ? 'font-bold' : 'font-medium'} ${isActive
                                                             ? 'bg-[#f8f6f4] text-[#4a3728]'
                                                             : 'text-slate-700 hover:bg-[#f8f6f4] hover:text-[#4a3728]'
                                                         }`}
@@ -325,6 +352,168 @@ function ComboboxInput({ control, name, options, placeholder }: ComboboxInputPro
                                         No matching suggestions. You can keep what you typed.
                                     </p>
                                 )}
+                            </div>
+                        )}
+                        {fieldState.error && (
+                            <p className="text-red-500 text-xs mt-1">{fieldState.error.message as string}</p>
+                        )}
+                    </div>
+                );
+            }}
+        />
+    );
+}
+
+// ============================================================================
+// 4. Themed Years of Experience dropdown (number value)
+//    Sirf list se choose hota hai (typing nahi), value number me store hoti hai.
+// ============================================================================
+
+interface YearsSelectProps {
+    control: Control<FormValues>;
+    name: 'yearsOfExperience';
+    options: number[];
+    placeholder?: string;
+}
+
+function YearsSelect({ control, name, options, placeholder }: YearsSelectProps) {
+    const [open, setOpen] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const listRef = useRef<HTMLUListElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setOpen(false);
+                setActiveIndex(-1);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        if (!open || !listRef.current) return;
+        const el = listRef.current.children[activeIndex] as HTMLElement | undefined;
+        el?.scrollIntoView({ block: 'nearest' });
+    }, [activeIndex, open]);
+
+    const formatYears = (n: number) => (n === 1 ? '1 year' : `${n} years`);
+
+    return (
+        <Controller
+            control={control}
+            name={name}
+            render={({ field, fieldState }) => {
+                const current = typeof field.value === 'number' && !Number.isNaN(field.value) ? field.value : null;
+
+                const selectOption = (n: number) => {
+                    field.onChange(n);
+                    setOpen(false);
+                    setActiveIndex(-1);
+                };
+
+                const openList = () => {
+                    setOpen(true);
+                    const idx = current !== null ? options.indexOf(current) : -1;
+                    setActiveIndex(idx);
+                };
+
+                const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        if (!open) {
+                            openList();
+                            return;
+                        }
+                        setActiveIndex((prev) => (prev + 1) % options.length);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        if (!open) {
+                            openList();
+                            return;
+                        }
+                        setActiveIndex((prev) => (prev <= 0 ? options.length - 1 : prev - 1));
+                    } else if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (open && activeIndex >= 0 && options[activeIndex] !== undefined) {
+                            selectOption(options[activeIndex]);
+                        } else {
+                            openList();
+                        }
+                    } else if (e.key === 'Escape') {
+                        setOpen(false);
+                        setActiveIndex(-1);
+                    }
+                };
+
+                return (
+                    <div ref={containerRef} className="relative">
+                        <button
+                            type="button"
+                            ref={field.ref}
+                            name={field.name}
+                            role="combobox"
+                            aria-haspopup="listbox"
+                            aria-expanded={open}
+                            aria-invalid={fieldState.error ? 'true' : 'false'}
+                            onClick={() => (open ? setOpen(false) : openList())}
+                            onBlur={field.onBlur}
+                            onKeyDown={handleKeyDown}
+                            className="w-full px-4 py-3 pr-11 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-left"
+                        >
+                            {current !== null ? (
+                                <span className="text-slate-900">{formatYears(current)}</span>
+                            ) : (
+                                <span className="text-slate-400">{placeholder || 'Select years of experience'}</span>
+                            )}
+                        </button>
+                        <ChevronDown
+                            className={`pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8a7a6a] transition-transform ${open ? 'rotate-180' : ''}`}
+                        />
+
+                        {open && (
+                            <div className="absolute left-0 right-0 z-30 mt-2 bg-white border border-[#ece7e2] rounded-2xl shadow-xl overflow-hidden">
+                                <ul ref={listRef} role="listbox" className="max-h-60 overflow-y-auto py-1.5">
+                                    {current !== null && (
+                                        <li
+                                            role="option"
+                                            aria-selected={false}
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                field.onChange(undefined);
+                                                setOpen(false);
+                                                setActiveIndex(-1);
+                                            }}
+                                            className="px-4 py-2.5 text-sm font-medium cursor-pointer text-[#8a7a6a] hover:bg-[#f8f6f4] hover:text-[#4a3728] border-b border-[#ece7e2]"
+                                        >
+                                            Clear selection
+                                        </li>
+                                    )}
+                                    {options.map((n, idx) => {
+                                        const isActive = idx === activeIndex;
+                                        const isSelected = n === current;
+                                        return (
+                                            <li
+                                                key={n}
+                                                role="option"
+                                                aria-selected={isSelected}
+                                                onMouseDown={(e) => {
+                                                    e.preventDefault();
+                                                    selectOption(n);
+                                                }}
+                                                onMouseEnter={() => setActiveIndex(idx)}
+                                                className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${isSelected ? 'font-bold' : 'font-medium'} ${isActive || isSelected
+                                                        ? 'bg-[#f8f6f4] text-[#4a3728]'
+                                                        : 'text-slate-700 hover:bg-[#f8f6f4] hover:text-[#4a3728]'
+                                                    }`}
+                                            >
+                                                {formatYears(n)}
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
                             </div>
                         )}
                         {fieldState.error && (
@@ -637,14 +826,16 @@ export default function SeniorMentorApplicationPage() {
             formData.append('degree', values.degree);
             formData.append('fieldOfStudy', values.fieldOfStudy);
             formData.append('graduationYear', values.graduationYear.toString());
-            formData.append('currentRole', values.currentRole);
-            formData.append('currentCompany', values.currentCompany);
+            if (values.currentRole?.trim()) formData.append('currentRole', values.currentRole.trim());
+            if (values.currentCompany?.trim()) formData.append('currentCompany', values.currentCompany.trim());
             formData.append('shortBio', values.shortBio);
 
             formData.append('linkedinUrl', values.linkedinUrl);
             if (values.githubUrl) formData.append('githubUrl', values.githubUrl);
             if (values.portfolioUrl) formData.append('portfolioUrl', values.portfolioUrl);
-            formData.append('yearsOfExperience', values.yearsOfExperience.toString());
+            if (typeof values.yearsOfExperience === 'number') {
+                formData.append('yearsOfExperience', values.yearsOfExperience.toString());
+            }
             formData.append('experienceLevel', values.experienceLevel);
             formData.append('primaryExpertise', values.primaryExpertise);
 
@@ -973,12 +1164,12 @@ export default function SeniorMentorApplicationPage() {
                                         <ComboboxInput control={control} name="fieldOfStudy" options={FIELD_SUGGESTIONS} placeholder="e.g. Computer Science" />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Role *</label>
-                                        <ComboboxInput control={control} name="currentRole" options={ROLE_SUGGESTIONS} placeholder="e.g. Software Engineer" />
+                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Role <span className="text-slate-400 font-normal">(Optional)</span></label>
+                                        <ComboboxInput control={control} name="currentRole" options={ROLE_SUGGESTIONS} placeholder="Select or type your role" />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Company *</label>
-                                        <ComboboxInput control={control} name="currentCompany" options={COMPANY_SUGGESTIONS} placeholder="e.g. Google" />
+                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Company <span className="text-slate-400 font-normal">(Optional)</span></label>
+                                        <ComboboxInput control={control} name="currentCompany" options={COMPANY_SUGGESTIONS} placeholder="Select or type your company" />
                                     </div>
                                 </div>
 
@@ -1012,9 +1203,8 @@ export default function SeniorMentorApplicationPage() {
                                         {errors.portfolioUrl && <p className="text-red-500 text-xs mt-1">{errors.portfolioUrl.message}</p>}
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Years of Experience *</label>
-                                        <input type="number" {...register('yearsOfExperience', { valueAsNumber: true })} className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900" />
-                                        {errors.yearsOfExperience && <p className="text-red-500 text-xs mt-1">{errors.yearsOfExperience.message}</p>}
+                                        <label className="block text-sm font-bold text-[#4a3728] mb-2">Years of Experience <span className="text-slate-400 font-normal">(Optional)</span></label>
+                                        <YearsSelect control={control} name="yearsOfExperience" options={YEARS_OPTIONS} placeholder="Select years of experience" />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Experience Level *</label>
