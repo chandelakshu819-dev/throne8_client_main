@@ -15,14 +15,18 @@ import {
     ArrowRight,
     Award,
 } from "lucide-react";
-import Sidebar from "../layout/Sidebar";
 import MentorService, { PublicSeniorMentor } from "@/lib/api/mentorship.service";
 import {
     parseRoleCompany,
     splitSkills,
 } from "@/shared/utils/mentorFormat";
-import CollegeMentorFilters, {
-    useCollegeMentorFilters,
+import {
+    MentorFilterSidebar,
+    MentorTopBar,
+    ActiveFilterChips,
+    CollegeResultsBar,
+    getSkillLabel,
+    useMentorFilters,
     type CollegeView,
 } from "./CollegeMentorFilters";
 
@@ -87,12 +91,7 @@ function MentorAvatar({ image, name }: { image: string; name: string }) {
     );
 }
 
-const formatDisplaySkill = (skill: string): string =>
-    skill
-        .replace(/[_-]+/g, " ")
-        .replace(/\b\w/g, (character) => character.toUpperCase());
-
-// Display-only role formatter: "product-manager" → "Product Manager"
+// Display-only role formatter: "product-manager" -> "Product Manager"
 const formatDisplayRole = (role: string | undefined | null): string => {
     if (!role) return "Mentor";
     return role
@@ -101,6 +100,8 @@ const formatDisplayRole = (role: string | undefined | null): string => {
 };
 
 const GRID_CLASS = "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch";
+// Ek hi sidebar (left) + dono mentor sections (right)
+const ROW_CLASS = "grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-10";
 
 // College mentor ki photo alag-alag field names me aa sakti hai
 const getCollegeMentorImage = (mentor: PublicSeniorMentor): string =>
@@ -131,37 +132,34 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     const router = useRouter();
     const { user } = useAuth();
     const [industryMentors, setIndustryMentors] = useState<MentorData[]>([]);
-    const [filteredIndustryMentors, setFilteredIndustryMentors] = useState<MentorData[]>([]);
     const [collegeMentors, setCollegeMentors] = useState<PublicSeniorMentor[]>([]);
     const [industryStatus, setIndustryStatus] = useState<"loading" | "success" | "error">("loading");
     const [collegeStatus, setCollegeStatus] = useState<"loading" | "success" | "error">("loading");
     const [industryError, setIndustryError] = useState("");
     const [collegeError, setCollegeError] = useState("");
-    const [filtering, setFiltering] = useState(false);
 
-    // 3-column grid → multiples of 3 so rows fill up
+    // 3-column grid -> multiples of 3 so rows fill up
     const COLLEGE_LIMIT = 6;
     const INDUSTRY_LIMIT = 6;
 
     // Show more / pagination states
     const [collegeVisible, setCollegeVisible] = useState(COLLEGE_LIMIT);
     const [showAllIndustryMentors, setShowAllIndustryMentors] = useState(false);
-
-    // College mentor filters (search, skills, college, degree, availability, sort)
-    const collegeFilters = useCollegeMentorFilters(collegeMentors);
-    const filteredCollegeMentors = collegeFilters.filtered;
     const [collegeView, setCollegeView] = useState<CollegeView>("grid");
+    const [filtersOpen, setFiltersOpen] = useState(false); // sirf mobile panel
 
-    // Filter / sort badalte hi list dobara pehle page se
-    const collegeFilterSignature = JSON.stringify(collegeFilters.filters);
+    // EK hi unified filter: Industry aur College dono par lagta hai
+    const filters = useMentorFilters(industryMentors, collegeMentors);
+    const filteredIndustryMentors = filters.filteredIndustry;
+    const filteredCollegeMentors = filters.filteredCollege;
+    const hasActiveFilters = filters.activeCount > 0;
+
+    // Filter / sort badalte hi lists dobara pehle page se
+    const filterSignature = JSON.stringify({ values: filters.values, sort: filters.sort });
     useEffect(() => {
         setCollegeVisible(COLLEGE_LIMIT);
-    }, [collegeFilterSignature]);
-
-    // Industry sidebar filter states
-    const [companySearch, setCompanySearch] = useState("");
-    const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
-    const [selectedExps, setSelectedExps] = useState<string[]>([]);
+        setShowAllIndustryMentors(false);
+    }, [filterSignature]);
 
     const loadIndustryMentors = useCallback(async () => {
         setIndustryStatus("loading");
@@ -209,7 +207,6 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                 };
             });
             setIndustryMentors(mapped);
-            setFilteredIndustryMentors(mapped);
             setIndustryStatus("success");
         } catch (error) {
             setIndustryError(error instanceof Error ? error.message : "Failed to load industry mentors.");
@@ -238,73 +235,6 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         void loadCollegeMentors();
     }, [loadIndustryMentors, loadCollegeMentors]);
 
-    // Domain mapping — sidebar labels → API domain values
-    const DOMAIN_MAP: Record<string, string[]> = {
-        "Tech/Engineering": ["web_development", "interview_prep", "open_source"],
-        "Product/Design": ["product_management", "ui_ux_design"],
-        "Marketing/Growth": ["career_guidance", "entrepreneurship"],
-        "Data Science/AI": ["data_science", "machine_learning"],
-    };
-
-    // Experience mapping — sidebar labels → year ranges
-    const EXP_MAP: Record<string, [number, number]> = {
-        "0-3 Yrs": [0, 3],
-        "3-7 Yrs": [3, 7],
-        "7-12 Yrs": [7, 12],
-        "12+ Yrs": [12, 999],
-    };
-
-    // Sidebar filters ab sirf Industry Mentors par lagte hain.
-    // College Mentors ke apne filters hain (CollegeMentorFilters).
-    const handleApplyFilters = () => {
-        setFiltering(true);
-        setShowAllIndustryMentors(false);
-
-        setTimeout(() => {
-            let industryResult = [...industryMentors];
-
-            // Company search filter
-            if (companySearch.trim()) {
-                const searchLower = companySearch.toLowerCase();
-                industryResult = industryResult.filter(m =>
-                    m.company?.toLowerCase().includes(searchLower) ||
-                    m.name?.toLowerCase().includes(searchLower)
-                );
-            }
-
-            // Domain filter
-            if (selectedDomains.length > 0) {
-                const apiDomains = selectedDomains.flatMap(d => DOMAIN_MAP[d] ?? []);
-                industryResult = industryResult.filter(m =>
-                    m.domains.some((d: string) => apiDomains.includes(d))
-                );
-            }
-
-            // Experience filter
-            if (selectedExps.length > 0) {
-                industryResult = industryResult.filter(m =>
-                    selectedExps.some(exp => {
-                        const [min, max] = EXP_MAP[exp];
-                        return m.expTotal >= min && m.expTotal <= max;
-                    })
-                );
-            }
-
-            setFilteredIndustryMentors(industryResult);
-            setFiltering(false);
-        }, 400);
-    };
-
-    const handleClearFilters = () => {
-        setCompanySearch("");
-        setSelectedDomains([]);
-        setSelectedExps([]);
-        setShowAllIndustryMentors(false);
-        setFilteredIndustryMentors(industryMentors);
-    };
-
-    const isFiltered = Boolean(companySearch || selectedDomains.length > 0 || selectedExps.length > 0);
-
     // Sliced lists for initial view
     const visibleCollegeMentors = filteredCollegeMentors.slice(0, collegeVisible);
     const collegeRemaining = filteredCollegeMentors.length - collegeVisible;
@@ -313,25 +243,25 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         ? filteredIndustryMentors
         : filteredIndustryMentors.slice(0, INDUSTRY_LIMIT);
 
-        const handleNavigate = (mentor: MentorData) => {
-            // Agar mentor khud apni hi profile pe click kar raha hai
-            if (user?.userId && mentor.userId && user.userId === mentor.userId) {
-                router.push(`/mentorship/user-dashboard/${user.userId}`);
-                return;
-            }
-    
-            const slugName = (mentor.name || "mentor").toLowerCase().replace(/\s+/g, "-");
-            router.push(`/mentorship/mentor-card/${slugName}/${mentor.id}`);
-        };
-    
-        // Card ya button, kahin bhi click ho, same page khulna chahiye
-        const handleCardNavigate = (mentor: MentorData, isIndustryCard: boolean) => {
-            if (!isIndustryCard) {
-                router.push(`/mentorship/senior-mentor/${mentor.id}`);
-                return;
-            }
-            handleNavigate(mentor);
-        };
+    const handleNavigate = (mentor: MentorData) => {
+        // Agar mentor khud apni hi profile pe click kar raha hai
+        if (user?.userId && mentor.userId && user.userId === mentor.userId) {
+            router.push(`/mentorship/user-dashboard/${user.userId}`);
+            return;
+        }
+
+        const slugName = (mentor.name || "mentor").toLowerCase().replace(/\s+/g, "-");
+        router.push(`/mentorship/mentor-card/${slugName}/${mentor.id}`);
+    };
+
+    // Card ya button, kahin bhi click ho, same page khulna chahiye
+    const handleCardNavigate = (mentor: MentorData, isIndustryCard: boolean) => {
+        if (!isIndustryCard) {
+            router.push(`/mentorship/senior-mentor/${mentor.id}`);
+            return;
+        }
+        handleNavigate(mentor);
+    };
 
     // Render Industry cards from Mentor records and College cards from approved applications.
     const renderCard = (mentor: MentorData, isIndustryCard: boolean) => {
@@ -341,10 +271,19 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         const hasDegree = Boolean(degree);
         const hasEducation = hasCollege || hasDegree;
 
-        // Skills: "Programming Languages: C++" -> "C++", then pick only as many as fit in ONE row
-        const cleanTags = mentor.tags
-            .map((t) => (isIndustryCard ? t : formatDisplaySkill(t)).replace(/^[^:]{2,40}:\s*/, "").trim())
-            .filter(Boolean);
+        // Skills: "Programming Languages: C++" -> "C++", emoji hata kar, duplicates merge,
+        // phir sirf utne pick karo jo ONE row me fit hon
+        const cleanTags = Array.from(
+            new Set(
+                mentor.tags
+                    .map((t) =>
+                        isIndustryCard
+                            ? t.replace(/^[^:]{2,40}:\s*/, "").trim()
+                            : getSkillLabel(t)
+                    )
+                    .filter(Boolean)
+            )
+        );
         const visibleTags: string[] = [];
         let used = 0;
         for (const tag of cleanTags) {
@@ -368,18 +307,18 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
 
         return (
             <div
-            key={mentor.id}
-            role="link"
-            tabIndex={0}
-            onClick={() => handleCardNavigate(mentor, isIndustryCard)}
-            onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleCardNavigate(mentor, isIndustryCard);
-                }
-            }}
-            className="h-full cursor-pointer rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 relative group bg-[#faf6f1] border border-[#e8ded5] hover:border-[#c4963a]/60 shadow-sm hover:shadow-md"
-        >
+                key={mentor.id}
+                role="link"
+                tabIndex={0}
+                onClick={() => handleCardNavigate(mentor, isIndustryCard)}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleCardNavigate(mentor, isIndustryCard);
+                    }
+                }}
+                className="h-full cursor-pointer rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 relative group bg-[#faf6f1] border border-[#e8ded5] hover:border-[#c4963a]/60 shadow-sm hover:shadow-md"
+            >
                 <div>
                     {/* Avatar */}
                     <div className="flex justify-center mb-2.5">
@@ -393,7 +332,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                         {mentor.name}
                     </h4>
 
-                    {/* Role @ Company — fixed 2-line height so every card lines up */}
+                    {/* Role @ Company - fixed 2-line height so every card lines up */}
                     {isIndustryCard && (
                         <p
                             title={roleLine}
@@ -403,7 +342,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                         </p>
                     )}
 
-                    {/* Rating & Sessions — fixed height */}
+                    {/* Rating & Sessions - fixed height */}
                     {(isIndustryCard || hasRating || mentor.sessions > 0) && (
                         <div className="flex items-center justify-center gap-1.5 text-sm mb-2.5 h-6">
                             {hasRating ? (
@@ -428,7 +367,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                         </div>
                     )}
 
-                    {/* Skills — ONE row only, never wraps; fixed height so all cards match */}
+                    {/* Skills - ONE row only, never wraps; fixed height so all cards match */}
                     <div className="flex flex-nowrap items-center justify-center gap-1 mb-2.5 h-6 overflow-hidden">
                         {visibleTags.map((tag, idx) => (
                             <span
@@ -446,7 +385,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                         )}
                     </div>
 
-                    {/* College & Degree Section — College Mentor cards only; hidden when no data */}
+                    {/* College & Degree Section - College Mentor cards only; hidden when no data */}
                     {!isIndustryCard && hasEducation && (
                         <div className="w-full mb-2">
                             <div className="border-t border-[#e8ded5] mb-2" />
@@ -488,7 +427,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                 </div>
 
                 <div>
-                    {/* Experience footer — Industry cards */}
+                    {/* Experience footer - Industry cards */}
                     {isIndustryCard && expLabel && (
                         <div className="border-t border-[#e8ded5] pt-2.5 mb-2.5 flex items-center justify-center gap-1.5 text-[#2d2015]">
                             <Award className="w-3.5 h-3.5 text-[#c4963a]" />
@@ -496,7 +435,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                         </div>
                     )}
 
-                    {/* Action button — same style on all cards */}
+                    {/* Action button - same style on all cards */}
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
@@ -531,9 +470,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     // List view: College Mentor ke liye compact row
     const renderCollegeListRow = (mentor: PublicSeniorMentor) => {
         const data = toCollegeCardData(mentor);
-        const tags = data.tags
-            .map((t) => formatDisplaySkill(t).replace(/^[^:]{2,40}:\s*/, "").trim())
-            .filter(Boolean);
+        const tags = Array.from(new Set(data.tags.map(getSkillLabel).filter(Boolean)));
         const shownTags = tags.slice(0, 4);
         const extra = tags.length - shownTags.length;
         const subtitle = [data.college?.trim(), data.degree?.trim()].filter(Boolean).join(" · ");
@@ -620,11 +557,9 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         status: "loading" | "success" | "error",
         error: string,
         retry: () => void,
-        empty: boolean,
-        hasActiveFilters: boolean = isFiltered,
-        showFilteringSkeleton: boolean = true
+        empty: boolean
     ) => {
-        if ((showFilteringSkeleton && filtering) || status === "loading") return renderSkeletonGrid();
+        if (status === "loading") return renderSkeletonGrid();
         if (status === "error") {
             return (
                 <div className="rounded-2xl border border-red-200 bg-white p-6 text-center">
@@ -640,133 +575,173 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         }
         if (empty) {
             return (
-                <div className="rounded-2xl border border-[#e8ded5] bg-white p-8 text-center text-sm text-slate-500">
-                    {hasActiveFilters ? "No mentors match these filters." : "No mentors yet."}
+                <div className="rounded-2xl border border-[#e8ded5] bg-white p-8 text-center">
+                    <p className="text-sm font-bold text-[#4a3728]">
+                        {hasActiveFilters ? "No mentors match these filters." : "No mentors yet."}
+                    </p>
+                    {hasActiveFilters && (
+                        <>
+                            <p className="text-xs text-slate-500 mt-1">Try removing a filter or searching something else.</p>
+                            <button
+                                onClick={filters.clearAll}
+                                className="mt-4 rounded-xl bg-[#4a3728] px-5 py-2 text-xs font-bold text-white hover:bg-[#38291e]"
+                            >
+                                Clear all filters
+                            </button>
+                        </>
+                    )}
                 </div>
             );
         }
         return null;
     };
 
+    const showIndustryRow = industryStatus !== "success" || industryMentors.length > 0;
+    const showCollegeRow = collegeStatus !== "success" || collegeMentors.length > 0;
+
+    // Mentor Type filter: sirf ek type dikhana ho to dusra section chhupa do
+    const showIndustrySection = showIndustryRow && filters.values.type !== "college";
+    const showCollegeSection = showCollegeRow && filters.values.type !== "industry";
+
     return (
-        <section className="py-12 px-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-10">
-            {/* LEFT COLUMN: Sidebar (Industry mentors filters) */}
-            <Sidebar
-                companySearch={companySearch}
-                setCompanySearch={setCompanySearch}
-                selectedDomains={selectedDomains}
-                setSelectedDomains={setSelectedDomains}
-                selectedExps={selectedExps}
-                setSelectedExps={setSelectedExps}
-                onApply={handleApplyFilters}
-                onClear={handleClearFilters}
-            />
+        <section className="py-12 px-6 max-w-7xl mx-auto flex flex-col gap-6">
+            {/* Search + Mentor Type (All / Industry / College) */}
+            <MentorTopBar f={filters} onOpenFilters={() => setFiltersOpen(true)} />
 
-            {/* RIGHT COLUMN: Industry and College Mentors */}
-            <div className="flex flex-col gap-10">
-                {(industryStatus !== "success" || industryMentors.length > 0) && (
-                    <section>
-                        <div className="flex items-center gap-3 mb-5">
-                            <div className="w-10 h-10 rounded-full border border-[#4a3728]/20 bg-[#faf6f1] flex items-center justify-center text-[#4a3728] shadow-sm flex-shrink-0">
-                                <Crown className="w-5 h-5 text-[#8b5e3c]" />
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-[#2d2015] tracking-tight">Industry Mentor</h2>
-                                <p className="text-xs text-[#8b7355] mt-0.5">Learn from experienced industry professionals.</p>
-                            </div>
-                        </div>
-                        {renderSectionLoadState(industryStatus, industryError, loadIndustryMentors, filteredIndustryMentors.length === 0) ?? (
-                            <>
-                                <div className={GRID_CLASS}>
-                                    {visibleIndustryMentors.map((mentor) => renderCard(mentor, true))}
+            {/* Lage hue filters ke chips */}
+            <ActiveFilterChips f={filters} />
+
+            <div className={ROW_CLASS}>
+                {/* EK hi sidebar: desktop par left, mobile par full-screen panel */}
+                <MentorFilterSidebar
+                    f={filters}
+                    mobileOpen={filtersOpen}
+                    onMobileClose={() => setFiltersOpen(false)}
+                />
+
+                <div className="min-w-0 flex flex-col gap-12">
+
+                    {/* ───────────── INDUSTRY MENTORS ───────────── */}
+                    {showIndustrySection && (
+                        <section>
+                            <div className="flex items-center justify-between gap-3 mb-5">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full border border-[#4a3728]/20 bg-[#faf6f1] flex items-center justify-center text-[#4a3728] shadow-sm flex-shrink-0">
+                                        <Crown className="w-5 h-5 text-[#8b5e3c]" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-[#2d2015] tracking-tight">Industry Mentor</h2>
+                                        <p className="text-xs text-[#8b7355] mt-0.5">Learn from experienced industry professionals.</p>
+                                    </div>
                                 </div>
-                                {filteredIndustryMentors.length > INDUSTRY_LIMIT && (
-                                    <div className="mt-6">
-                                        <button
-                                            onClick={() => setShowAllIndustryMentors((previous) => !previous)}
-                                            className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] transition-all flex items-center justify-center gap-2"
-                                        >
-                                            <span>{showAllIndustryMentors ? "Show less" : "Show more"}</span>
-                                            <ArrowRight className={`w-4 h-4 ${showAllIndustryMentors ? "-rotate-90" : ""}`} />
-                                        </button>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </section>
-                )}
-
-                {(collegeStatus !== "success" || collegeMentors.length > 0) && (
-                    <section>
-                        <div className="flex items-center gap-3 mb-5">
-                            <div className="w-10 h-10 rounded-full border border-[#4a3728]/20 bg-[#faf6f1] flex items-center justify-center text-[#4a3728] shadow-sm flex-shrink-0">
-                                <Users className="w-5 h-5 text-[#4a3728]" />
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-bold text-[#2d2015] tracking-tight">College Mentor</h2>
-                                <p className="text-xs text-[#8b7355] mt-0.5">Connect with verified college mentors.</p>
-                            </div>
-                        </div>
-
-                        {/* College mentor search / filters / sort / view */}
-                        {collegeStatus === "success" && collegeMentors.length > 0 && (
-                            <CollegeMentorFilters
-                                f={collegeFilters}
-                                resultCount={filteredCollegeMentors.length}
-                                totalCount={collegeMentors.length}
-                                view={collegeView}
-                                onViewChange={setCollegeView}
-                            />
-                        )}
-
-                        {renderSectionLoadState(
-                            collegeStatus,
-                            collegeError,
-                            loadCollegeMentors,
-                            filteredCollegeMentors.length === 0,
-                            collegeFilters.activeCount > 0,
-                            false
-                        ) ?? (
-                            <>
-                                {collegeView === "grid" ? (
-                                    <div className={GRID_CLASS}>
-                                        {visibleCollegeMentors.map((mentor) =>
-                                            renderCard(toCollegeCardData(mentor), false)
+                                {industryStatus === "success" && (
+                                    <span className="text-sm font-bold text-[#2d2015] whitespace-nowrap">
+                                        {filteredIndustryMentors.length} Found
+                                        {hasActiveFilters && (
+                                            <span className="font-medium text-[#8b7355]"> (of {industryMentors.length})</span>
                                         )}
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col gap-3">
-                                        {visibleCollegeMentors.map((mentor) => renderCollegeListRow(mentor))}
-                                    </div>
+                                    </span>
                                 )}
-
-                                {collegeRemaining > 0 ? (
-                                    <div className="mt-6">
-                                        <button
-                                            onClick={() => setCollegeVisible((c) => c + COLLEGE_LIMIT)}
-                                            className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] transition-all flex items-center justify-center gap-2"
-                                        >
-                                            <span>Load more ({collegeRemaining} remaining)</span>
-                                            <ArrowRight className="w-4 h-4 rotate-90" />
-                                        </button>
+                            </div>
+                            {renderSectionLoadState(
+                                industryStatus,
+                                industryError,
+                                loadIndustryMentors,
+                                filteredIndustryMentors.length === 0
+                            ) ?? (
+                                <>
+                                    <div className={GRID_CLASS}>
+                                        {visibleIndustryMentors.map((mentor) => renderCard(mentor, true))}
                                     </div>
-                                ) : (
-                                    filteredCollegeMentors.length > COLLEGE_LIMIT && (
+                                    {filteredIndustryMentors.length > INDUSTRY_LIMIT && (
                                         <div className="mt-6">
                                             <button
-                                                onClick={() => setCollegeVisible(COLLEGE_LIMIT)}
+                                                onClick={() => setShowAllIndustryMentors((previous) => !previous)}
                                                 className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] transition-all flex items-center justify-center gap-2"
                                             >
-                                                <span>Show less</span>
-                                                <ArrowRight className="w-4 h-4 -rotate-90" />
+                                                <span>{showAllIndustryMentors ? "Show less" : "Show more"}</span>
+                                                <ArrowRight className={`w-4 h-4 ${showAllIndustryMentors ? "-rotate-90" : "rotate-90"}`} />
                                             </button>
                                         </div>
-                                    )
-                                )}
-                            </>
-                        )}
-                    </section>
-                )}
+                                    )}
+                                </>
+                            )}
+                        </section>
+                    )}
+
+                    {/* ───────────── COLLEGE MENTORS ───────────── */}
+                    {showCollegeSection && (
+                        <section className="min-w-0">
+                            <div className="flex items-center gap-3 mb-5">
+                                <div className="w-10 h-10 rounded-full border border-[#4a3728]/20 bg-[#faf6f1] flex items-center justify-center text-[#4a3728] shadow-sm flex-shrink-0">
+                                    <Users className="w-5 h-5 text-[#4a3728]" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-[#2d2015] tracking-tight">College Mentor</h2>
+                                    <p className="text-xs text-[#8b7355] mt-0.5">Connect with verified college mentors.</p>
+                                </div>
+                            </div>
+
+                            {/* Result count, sort, grid/list */}
+                            {collegeStatus === "success" && collegeMentors.length > 0 && (
+                                <CollegeResultsBar
+                                    resultCount={filteredCollegeMentors.length}
+                                    totalCount={collegeMentors.length}
+                                    filtersActive={hasActiveFilters}
+                                    sort={filters.sort}
+                                    onSortChange={filters.setSort}
+                                    view={collegeView}
+                                    onViewChange={setCollegeView}
+                                />
+                            )}
+
+                            {renderSectionLoadState(
+                                collegeStatus,
+                                collegeError,
+                                loadCollegeMentors,
+                                collegeStatus === "success" && filteredCollegeMentors.length === 0
+                            ) ?? (
+                                <>
+                                    {collegeView === "grid" ? (
+                                        <div className={GRID_CLASS}>
+                                            {visibleCollegeMentors.map((mentor) =>
+                                                renderCard(toCollegeCardData(mentor), false)
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col gap-3">
+                                            {visibleCollegeMentors.map((mentor) => renderCollegeListRow(mentor))}
+                                        </div>
+                                    )}
+
+                                    {collegeRemaining > 0 ? (
+                                        <div className="mt-6">
+                                            <button
+                                                onClick={() => setCollegeVisible((c) => c + COLLEGE_LIMIT)}
+                                                className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <span>Load more ({collegeRemaining} remaining)</span>
+                                                <ArrowRight className="w-4 h-4 rotate-90" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        filteredCollegeMentors.length > COLLEGE_LIMIT && (
+                                            <div className="mt-6">
+                                                <button
+                                                    onClick={() => setCollegeVisible(COLLEGE_LIMIT)}
+                                                    className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <span>Show less</span>
+                                                    <ArrowRight className="w-4 h-4 -rotate-90" />
+                                                </button>
+                                            </div>
+                                        )
+                                    )}
+                                </>
+                            )}
+                        </section>
+                    )}
+                </div>
             </div>
         </section>
     );
