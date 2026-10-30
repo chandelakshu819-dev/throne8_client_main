@@ -159,16 +159,19 @@ export function getSessionTiming(
   let staleLabel: "Missed" | "Ended" | "Expired" | null = null;
 
   if (rawStatus === "in_progress") {
-    const isLive = hasStartedAt && !isNaN(endMs) && nowMs <= endMs + graceMs;
+    // status in_progress ka matlab mentor start kar chuka hai, startedAt payload me na aaye tab bhi live maano
+    const isLive = !isNaN(endMs) && nowMs <= endMs + graceMs;
     if (isLive) {
       isInProgress = true;
       isStale = false;
     } else {
       isInProgress = false;
       isStale = true;
-      staleLabel = hasStartedAt ? "Ended" : "Missed";
+      staleLabel = "Ended";
     }
   } else if (!isTerminal && !isCompleted) {
+
+    
     if (!isNaN(endMs) && nowMs > endMs) {
       isStale = true;
       if (isPending) {

@@ -1327,6 +1327,23 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                                     Open Meet
                                   </button>
                                 )}
+                                                               {eff === "in_progress" && !booking.isGroupSession && (
+                                  <button
+                                    onClick={() =>
+                                      router.push(
+                                        `/mentorship/mentor-session?sessionId=${encodeURIComponent(booking.sessionId)}&roomId=${encodeURIComponent(
+                                          booking.bookingId
+                                        )}&bookingId=${encodeURIComponent(booking.bookingId)}&role=mentor`
+                                      )
+                                    }
+                                    disabled={isRowLoading}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                    style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
+                                  >
+                                    <Play className="w-3.5 h-3.5" />
+                                    <span>Rejoin</span>
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => handleEndSessionClick(booking)}
                                   disabled={isRowLoading}

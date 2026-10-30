@@ -14,8 +14,12 @@ import {
   RotateCcw,
   Calendar,
   Clock,
+
   Video,
+  Loader2,
   ChevronRight,
+
+
   Wallet,
   Briefcase,
   Share2,
@@ -29,6 +33,11 @@ import {
 } from "@/features/mentorship/utils/sessionJoin"
 import { capitalizeName } from "@/shared/utils/format"
 import ProfileService from "@/lib/api/profile.service"
+import SessionService from "@/lib/api/session.service"
+import { useSocket } from "@/core/realtime/useSocket"
+
+
+
 
 const COLORS = {
   ink: "#4a3728",
@@ -201,8 +210,13 @@ export default function DashboardOverviewPage({
   // Day-filter within Upcoming tab
   const [filterTab, setFilterTab] = useState<"all" | "today" | "tomorrow" | "later">("today")
 
-  // photoId -> resolved cloudinary URL
-  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
+  // Start / Rejoin click ke dauran loading + error
+  const [joiningKey, setJoiningKey] = useState<string | null>(null)
+  const [joinError, setJoinError] = useState<string | null>(null)
+
+
+    // photoId -> resolved cloudinary URL
+    const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
   // Jin photo IDs ki request ja chuki hai (dobara fetch na ho)
   const requestedPhotoIds = useRef<Set<string>>(new Set())
 
@@ -402,7 +416,17 @@ export default function DashboardOverviewPage({
 
   // Upcoming: not terminal, not completed, not stale, end time in the future (or live)
   const upcoming: Session[] = flattenedBookings
-    .filter(({ timing, session }) => timing.isUpcoming && !timing.isStale && session.status !== "available")
+
+  .filter(
+    ({ timing, session }) =>
+      timing.isUpcoming &&
+      !timing.isStale &&
+      session.status !== "available" &&
+      // session ka end time nikalte hi Overview se hata do
+      (isNaN(timing.endMs) || now <= timing.endMs)
+  )
+  
+  
     .map(({ session }) => session)
     .sort(
       (a, b) =>
@@ -418,10 +442,14 @@ export default function DashboardOverviewPage({
     .filter(
       ({ timing, session }) =>
         !timing.isTerminal &&
-        !timing.isCompleted &&
-        timing.isStale &&
-        timing.staleLabel !== "Expired" &&
-        session.status !== "available"
+      !timing.isCompleted &&
+      session.status !== "available" &&
+      timing.staleLabel !== "Expired" &&
+      (timing.isStale ||
+        // in_progress tha, end time nikal gaya par End nahi hua
+        (timing.isInProgress && !isNaN(timing.endMs) && now > timing.endMs))
+
+
     )
     .map(({ session }) => session)
     .sort(
@@ -447,8 +475,30 @@ export default function DashboardOverviewPage({
     }
   }, [upcoming.length, missedNotHeld.length])
 
-  // Loading skeleton
-  if (dashboardLoading && !dashboardData) {
+   // Mentor End kare ya room se wapas aaye: dashboard dobara fetch (in_progress -> completed)
+   const { sessionEnded } = useSocket()
+   useEffect(() => {
+     if (sessionEnded) onRetryDashboard?.()
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [sessionEnded])
+ 
+   useEffect(() => {
+     if (!onRetryDashboard) return
+     const refresh = () => {
+       if (document.visibilityState === "visible") onRetryDashboard()
+     }
+     window.addEventListener("focus", refresh)
+     document.addEventListener("visibilitychange", refresh)
+     return () => {
+       window.removeEventListener("focus", refresh)
+       document.removeEventListener("visibilitychange", refresh)
+     }
+   }, [onRetryDashboard])
+ 
+   // Loading skeleton
+   if (dashboardLoading && !dashboardData) {
+
+
     return (
       <div className="space-y-6 w-full max-w-7xl mx-auto animate-pulse">
         <div className="space-y-2">
@@ -786,7 +836,20 @@ export default function DashboardOverviewPage({
             </div>
           )}
 
+
+{joinError && (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              <span>{joinError}</span>
+              <button type="button" onClick={() => setJoinError(null)} className="font-semibold hover:underline">
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {/* ─── UPCOMING panel content ─────────────────────────────── */}
+
+          
+
           {sessionsPanelTab === "upcoming" && (
             upcoming.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
@@ -846,14 +909,52 @@ export default function DashboardOverviewPage({
                     router.push(`/mentorship/menteeProfile/${menteeId}`)
                   }
 
-                  const handleJoinSession = (e: React.MouseEvent) => {
-                    e.stopPropagation()
-                    if (sessionId) {
-                      router.push(`/mentorship/session-room/${encodeURIComponent(sessionId)}`)
-                    } else {
-                      setActivePage?.("booking")
-                    }
-                  }
+                                    // Session pehle se in_progress hai to "Rejoin", startSession dobara nahi
+                                    const sessionTiming = (s as any).timing as ReturnType<typeof getSessionTiming> | undefined
+                                    const isLive = Boolean(sessionTiming?.isInProgress)
+                                    const rowKey = String(s.bookingId ?? s._id ?? sessionId ?? idx)
+                                    const isJoining = joiningKey === rowKey
+                  
+                                    const handleJoinSession = async (e: React.MouseEvent) => {
+                                      e.stopPropagation()
+                                      if (!sessionId || isJoining) return
+                                      setJoinError(null)
+                                      setJoiningKey(rowKey)
+                                      try {
+                                        if (s.isGroupSession) {
+                                          let meetUrl = s.meetingUrl
+                                          if (!isLive) {
+                                            const res: any = await SessionService.startGroupSession(String(sessionId))
+                                            meetUrl = res?.data?.meeting?.meetingUrl || res?.data?.meetingUrl || meetUrl
+                                            onRetryDashboard?.()
+                                          }
+                                          if (meetUrl) window.open(meetUrl, "_blank", "noopener,noreferrer")
+                                          else setJoinError("Session started, but no meeting link found.")
+                                          return
+                                        }
+                  
+                                        // 1:1: pehli baar -> backend par start, phir mentor-session room
+                                        // (wahin End Session aur Rejoin dono hain)
+                                        let roomId = s.bookingId
+                                        if (!isLive) {
+                                          const res: any = await SessionService.startSession(String(sessionId), s.bookingId)
+                                          roomId = res?.data?.roomId || s.bookingId
+                                          onRetryDashboard?.()
+                                        }
+                                        const qs = new URLSearchParams({
+                                          sessionId: String(sessionId),
+                                          roomId: String(roomId || ""),
+                                          bookingId: String(s.bookingId || ""),
+                                          role: "mentor",
+                                        })
+                                        router.push(`/mentorship/mentor-session?${qs.toString()}`)
+                                      } catch (err: any) {
+                                        setJoinError(err?.message || "Could not start the session. Please try again.")
+                                      } finally {
+                                        setJoiningKey(null)
+                                      }
+                                    }
+
 
                   return (
                     <div
@@ -918,19 +1019,34 @@ export default function DashboardOverviewPage({
                           </span>
                         )}
 
-                        {sessionId && joinInfo.state !== "hidden" && (
+{sessionId && (isLive || joinInfo.state !== "hidden") && (
                           <div className="flex flex-col items-end">
-                            {joinInfo.state === "active" ? (
+                            {isLive ? (
                               <button
                                 type="button"
                                 onClick={handleJoinSession}
-                                title="Session is active, click to join"
-                                className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition-colors shadow-xs cursor-pointer"
+                                disabled={isJoining}
+                                title="Session is live, click to rejoin"
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white transition-colors shadow-xs cursor-pointer disabled:opacity-60"
                               >
-                                <Video className="w-3.5 h-3.5" />
+                                {isJoining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Video className="w-3.5 h-3.5" />}
+                                <span>Rejoin</span>
+                              </button>
+                            ) : joinInfo.state === "active" ? (
+                              <button
+                                type="button"
+                                onClick={handleJoinSession}
+                                disabled={isJoining}
+                                title="Session is active, click to start"
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition-colors shadow-xs cursor-pointer disabled:opacity-60"
+                              >
+                                {isJoining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Video className="w-3.5 h-3.5" />}
                                 <span>Start</span>
                               </button>
                             ) : joinInfo.state === "ended" ? (
+
+
+
                               <button
                                 type="button"
                                 disabled
@@ -988,7 +1104,10 @@ export default function DashboardOverviewPage({
                   const sessionDateInfo = formatSessionDate(s.startTime || s.scheduledAt)
                   // Derive stale label from booking timing
                   const timing = (s as any).timing || getSessionTiming(s, undefined, now)
-                  const staleLabel = (s as any).staleLabel || timing.staleLabel || "Not held"
+
+                  const staleLabel = timing.isInProgress
+                    ? "Ended"
+                    : (s as any).staleLabel || timing.staleLabel || "Not held"
 
                   const staleBadgeClass =
                     staleLabel === "Expired"
