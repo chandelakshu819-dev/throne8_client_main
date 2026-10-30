@@ -62,7 +62,7 @@ export default function ThroneUltraPremium() {
     const [mentorsLoading, setMentorsLoading] = useState(true);
 
     const { profileImageUrl, loadProfile } = useProfile();
-    const { user } = useAuth();
+    const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
     useEffect(() => {
         if (user) {
@@ -235,16 +235,89 @@ export default function ThroneUltraPremium() {
                 mentorUserId={user?.userId}
             />
 
-            {/* Hero Section */}
-            <HeroSection mentorData={pageMentorData} />
+            {/* Main Hero & Actions Area - min-height prevents layout shift on reload */}
+            <main className="w-full min-h-[650px]">
+                {authLoading ? (
+                    /* 1. Loading UI: Skeleton Loader mimicking the authenticated layout */
+                    <div className="w-full max-w-7xl mx-auto pt-20 sm:pt-24 pb-10 px-4 sm:px-6 lg:px-8 motion-reduce:animate-none animate-pulse">
+                        {/* Hero Skeleton */}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center mb-10">
+                            {/* Left Hero Skeleton */}
+                            <div className="lg:col-span-6 flex flex-col justify-center space-y-4">
+                                <div className="h-6 w-48 rounded-full bg-[#e8ddd4]" />
+                                <div className="h-12 w-72 sm:w-80 rounded-xl bg-[#e8ddd4]" />
+                                <div className="space-y-2 max-w-md">
+                                    <div className="h-4 w-full rounded bg-[#e8ddd4]" />
+                                    <div className="h-4 w-3/4 rounded bg-[#e8ddd4]" />
+                                </div>
+                                <div className="pt-2">
+                                    <div className="h-11 w-44 rounded-full bg-[#e8ddd4]" />
+                                </div>
+                            </div>
+                            {/* Right Hero Card Skeleton */}
+                            <div className="lg:col-span-6 flex justify-center lg:justify-end">
+                                <div className="w-full max-w-[420px] h-[190px] rounded-[24px] bg-[#e8ddd4]/60 border border-[#dfd2c6] p-5 flex flex-col justify-between">
+                                    <div className="flex items-center gap-3.5">
+                                        <div className="w-14 h-14 rounded-full bg-[#dfd2c6]" />
+                                        <div className="space-y-2 flex-1">
+                                            <div className="h-4 w-32 rounded bg-[#dfd2c6]" />
+                                            <div className="h-3 w-24 rounded bg-[#dfd2c6]" />
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center pt-2">
+                                        <div className="h-5 w-24 rounded-full bg-[#dfd2c6]" />
+                                        <div className="h-8 w-8 rounded-full bg-[#dfd2c6]" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-            <ActionCardsSection
-                onBecomeMentorClick={() => setShowMentorForm(true)}
-                onFindMentorClick={() => setFindMentorOpen(true)}
-                isMentor={isMentor}
-                userId={user?.userId}
-                mentorCount={mentorsLoading ? undefined : impactStats.mentors}
-            />
+                        {/* Action Card Skeleton (1 Box) */}
+                        <div className="mx-auto w-full max-w-md pt-2">
+                            <div className="min-h-[250px] w-full rounded-[24px] border border-[#e8ddd4] bg-white/70 p-5 shadow-[0_4px_12px_rgba(74,55,40,0.06)] flex flex-col justify-between">
+                                <div>
+                                    <div className="mb-3 h-12 w-12 rounded-2xl bg-[#f0e8de]" />
+                                    <div className="mb-2 h-3 w-28 rounded bg-[#f0e8de]" />
+                                    <div className="mb-2 h-5 w-40 rounded bg-[#f0e8de]" />
+                                    <div className="space-y-1.5 mt-2 max-w-[320px]">
+                                        <div className="h-3 w-full rounded bg-[#f0e8de]" />
+                                        <div className="h-3 w-4/5 rounded bg-[#f0e8de]" />
+                                    </div>
+                                </div>
+                                <div className="pt-4">
+                                    <div className="h-8 w-28 rounded-full bg-[#f0e8de]" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : user ? (
+                    /* 2. Authenticated UI: Level Up Faster Hero Section + 1 Card (Find Mentor) */
+                    <>
+                        <HeroSection mentorData={pageMentorData} />
+                        <ActionCardsSection
+                            onBecomeMentorClick={() => setShowMentorForm(true)}
+                            onFindMentorClick={() => setFindMentorOpen(true)}
+                            isMentor={isMentor}
+                            userId={user.userId}
+                            isLoggedIn={true}
+                            isLoading={false}
+                            mentorCount={mentorsLoading ? undefined : impactStats.mentors}
+                        />
+                    </>
+                ) : (
+                    /* 3. Unauthenticated UI: 3 Cards (Find Mentor, Become Industry Mentor, Become College Mentor) */
+                    <div className="pt-12 sm:pt-16">
+                        <ActionCardsSection
+                            onBecomeMentorClick={() => setShowMentorForm(true)}
+                            onFindMentorClick={() => setFindMentorOpen(true)}
+                            isMentor={false}
+                            isLoggedIn={false}
+                            isLoading={false}
+                            mentorCount={mentorsLoading ? undefined : impactStats.mentors}
+                        />
+                    </div>
+                )}
+            </main>
 
             <FindMentorModal
                 isOpen={findMentorOpen}
