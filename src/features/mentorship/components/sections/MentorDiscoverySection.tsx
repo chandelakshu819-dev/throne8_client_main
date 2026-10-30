@@ -21,6 +21,10 @@ import {
     parseRoleCompany,
     splitSkills,
 } from "@/shared/utils/mentorFormat";
+import CollegeMentorFilters, {
+    useCollegeMentorFilters,
+    type CollegeView,
+} from "./CollegeMentorFilters";
 
 interface MentorDiscoverySectionProps {
     toggleCompare: (id: number) => void;
@@ -98,28 +102,63 @@ const formatDisplayRole = (role: string | undefined | null): string => {
 
 const GRID_CLASS = "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch";
 
+// College mentor ki photo alag-alag field names me aa sakti hai
+const getCollegeMentorImage = (mentor: PublicSeniorMentor): string =>
+    (mentor as any).profilePic ||
+    (mentor as any).profilePhoto ||
+    (mentor as any).profilePhotoUrl ||
+    (mentor as any).user?.profilePic ||
+    "";
+
+// PublicSeniorMentor -> card ke liye MentorData
+const toCollegeCardData = (mentor: PublicSeniorMentor): MentorData => ({
+    id: mentor.id,
+    name: mentor.displayName,
+    role: "",
+    company: "",
+    college: mentor.college,
+    degree: mentor.degree,
+    sessions: mentor.sessionsCount,
+    image: getCollegeMentorImage(mentor),
+    tags: splitSkills(mentor.skills),
+    expTotal: 0,
+    domains: [],
+    acceptsBooking: mentor.sessionId !== null,
+    sessionId: mentor.sessionId,
+});
+
 export default function MentorDiscoverySection({ toggleCompare, compareList }: MentorDiscoverySectionProps) {
     const router = useRouter();
     const { user } = useAuth();
     const [industryMentors, setIndustryMentors] = useState<MentorData[]>([]);
     const [filteredIndustryMentors, setFilteredIndustryMentors] = useState<MentorData[]>([]);
     const [collegeMentors, setCollegeMentors] = useState<PublicSeniorMentor[]>([]);
-    const [filteredCollegeMentors, setFilteredCollegeMentors] = useState<PublicSeniorMentor[]>([]);
     const [industryStatus, setIndustryStatus] = useState<"loading" | "success" | "error">("loading");
     const [collegeStatus, setCollegeStatus] = useState<"loading" | "success" | "error">("loading");
     const [industryError, setIndustryError] = useState("");
     const [collegeError, setCollegeError] = useState("");
     const [filtering, setFiltering] = useState(false);
 
-    // Show more / pagination states for each section
-    const [showAllCollegeMentors, setShowAllCollegeMentors] = useState(false);
-    const [showAllIndustryMentors, setShowAllIndustryMentors] = useState(false);
-
     // 3-column grid → multiples of 3 so rows fill up
     const COLLEGE_LIMIT = 6;
     const INDUSTRY_LIMIT = 6;
 
-    // Filter states
+    // Show more / pagination states
+    const [collegeVisible, setCollegeVisible] = useState(COLLEGE_LIMIT);
+    const [showAllIndustryMentors, setShowAllIndustryMentors] = useState(false);
+
+    // College mentor filters (search, skills, college, degree, availability, sort)
+    const collegeFilters = useCollegeMentorFilters(collegeMentors);
+    const filteredCollegeMentors = collegeFilters.filtered;
+    const [collegeView, setCollegeView] = useState<CollegeView>("grid");
+
+    // Filter / sort badalte hi list dobara pehle page se
+    const collegeFilterSignature = JSON.stringify(collegeFilters.filters);
+    useEffect(() => {
+        setCollegeVisible(COLLEGE_LIMIT);
+    }, [collegeFilterSignature]);
+
+    // Industry sidebar filter states
     const [companySearch, setCompanySearch] = useState("");
     const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
     const [selectedExps, setSelectedExps] = useState<string[]>([]);
@@ -187,7 +226,6 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                 throw new Error("College mentor list response was invalid.");
             }
             setCollegeMentors(response.data);
-            setFilteredCollegeMentors(response.data);
             setCollegeStatus("success");
         } catch (error) {
             setCollegeError(error instanceof Error ? error.message : "Failed to load college mentors.");
@@ -216,15 +254,14 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         "12+ Yrs": [12, 999],
     };
 
+    // Sidebar filters ab sirf Industry Mentors par lagte hain.
+    // College Mentors ke apne filters hain (CollegeMentorFilters).
     const handleApplyFilters = () => {
         setFiltering(true);
-        // Reset show-more states when filters are re-applied
-        setShowAllCollegeMentors(false);
         setShowAllIndustryMentors(false);
 
         setTimeout(() => {
             let industryResult = [...industryMentors];
-            let collegeResult = [...collegeMentors];
 
             // Company search filter
             if (companySearch.trim()) {
@@ -232,10 +269,6 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                 industryResult = industryResult.filter(m =>
                     m.company?.toLowerCase().includes(searchLower) ||
                     m.name?.toLowerCase().includes(searchLower)
-                );
-                collegeResult = collegeResult.filter((mentor) =>
-                    mentor.displayName.toLowerCase().includes(searchLower) ||
-                    mentor.college.toLowerCase().includes(searchLower)
                 );
             }
 
@@ -258,7 +291,6 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
             }
 
             setFilteredIndustryMentors(industryResult);
-            setFilteredCollegeMentors(collegeResult);
             setFiltering(false);
         }, 400);
     };
@@ -267,18 +299,15 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         setCompanySearch("");
         setSelectedDomains([]);
         setSelectedExps([]);
-        setShowAllCollegeMentors(false);
         setShowAllIndustryMentors(false);
         setFilteredIndustryMentors(industryMentors);
-        setFilteredCollegeMentors(collegeMentors);
     };
 
     const isFiltered = Boolean(companySearch || selectedDomains.length > 0 || selectedExps.length > 0);
 
     // Sliced lists for initial view
-    const visibleCollegeMentors = showAllCollegeMentors
-        ? filteredCollegeMentors
-        : filteredCollegeMentors.slice(0, COLLEGE_LIMIT);
+    const visibleCollegeMentors = filteredCollegeMentors.slice(0, collegeVisible);
+    const collegeRemaining = filteredCollegeMentors.length - collegeVisible;
 
     const visibleIndustryMentors = showAllIndustryMentors
         ? filteredIndustryMentors
@@ -499,6 +528,85 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         );
     };
 
+    // List view: College Mentor ke liye compact row
+    const renderCollegeListRow = (mentor: PublicSeniorMentor) => {
+        const data = toCollegeCardData(mentor);
+        const tags = data.tags
+            .map((t) => formatDisplaySkill(t).replace(/^[^:]{2,40}:\s*/, "").trim())
+            .filter(Boolean);
+        const shownTags = tags.slice(0, 4);
+        const extra = tags.length - shownTags.length;
+        const subtitle = [data.college?.trim(), data.degree?.trim()].filter(Boolean).join(" · ");
+
+        return (
+            <div
+                key={mentor.id}
+                role="link"
+                tabIndex={0}
+                onClick={() => handleCardNavigate(data, false)}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleCardNavigate(data, false);
+                    }
+                }}
+                className="group cursor-pointer flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-2xl p-3.5 bg-[#faf6f1] border border-[#e8ded5] hover:border-[#c4963a]/60 shadow-sm hover:shadow-md transition-all duration-300"
+            >
+                <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                    <div className="w-14 h-14 rounded-full overflow-hidden border-[3px] border-[#d4a537] shadow-sm flex items-center justify-center bg-[#f5ede5] shrink-0">
+                        <MentorAvatar image={data.image} name={data.name} />
+                    </div>
+                    <div className="min-w-0">
+                        <h4 className="font-bold text-[15px] text-[#2d2015] truncate">{data.name}</h4>
+                        {subtitle && (
+                            <p className="flex items-center gap-1 text-xs text-[#8b7355] mt-0.5 min-w-0" title={subtitle}>
+                                <Landmark className="w-3.5 h-3.5 shrink-0 text-[#8b5e3c]" />
+                                <span className="truncate">{subtitle}</span>
+                            </p>
+                        )}
+                        {shownTags.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                                {shownTags.map((tag, idx) => (
+                                    <span
+                                        key={`${tag}-${idx}`}
+                                        title={tag}
+                                        className="max-w-[140px] truncate whitespace-nowrap text-[9.5px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white text-[#6b5643] border border-[#ebdcd0]"
+                                    >
+                                        {tag}
+                                    </span>
+                                ))}
+                                {extra > 0 && (
+                                    <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full text-[#8b7355] border border-dashed border-[#c4963a]/50">
+                                        +{extra}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                    {data.sessions > 0 && (
+                        <span className="text-[11px] text-[#8b7355] whitespace-nowrap">
+                            {data.sessions} session{data.sessions === 1 ? "" : "s"}
+                        </span>
+                    )}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleCardNavigate(data, false);
+                        }}
+                        className="py-2 px-4 bg-[#3a2a1e] hover:bg-[#251910] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm whitespace-nowrap"
+                    >
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{data.sessionId ? "Book Free Session" : "View Profile"}</span>
+                        <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
     // Skeleton loader grid
     const renderSkeletonGrid = (count: number = 3) => (
         <div className={GRID_CLASS}>
@@ -512,9 +620,11 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         status: "loading" | "success" | "error",
         error: string,
         retry: () => void,
-        empty: boolean
+        empty: boolean,
+        hasActiveFilters: boolean = isFiltered,
+        showFilteringSkeleton: boolean = true
     ) => {
-        if (filtering || status === "loading") return renderSkeletonGrid();
+        if ((showFilteringSkeleton && filtering) || status === "loading") return renderSkeletonGrid();
         if (status === "error") {
             return (
                 <div className="rounded-2xl border border-red-200 bg-white p-6 text-center">
@@ -531,7 +641,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         if (empty) {
             return (
                 <div className="rounded-2xl border border-[#e8ded5] bg-white p-8 text-center text-sm text-slate-500">
-                    {isFiltered ? "No mentors match these filters." : "No mentors yet."}
+                    {hasActiveFilters ? "No mentors match these filters." : "No mentors yet."}
                 </div>
             );
         }
@@ -540,7 +650,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
 
     return (
         <section className="py-12 px-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-10">
-            {/* LEFT COLUMN: Sidebar (Untouched) */}
+            {/* LEFT COLUMN: Sidebar (Industry mentors filters) */}
             <Sidebar
                 companySearch={companySearch}
                 setCompanySearch={setCompanySearch}
@@ -597,42 +707,61 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                                 <p className="text-xs text-[#8b7355] mt-0.5">Connect with verified college mentors.</p>
                             </div>
                         </div>
-                        {renderSectionLoadState(collegeStatus, collegeError, loadCollegeMentors, filteredCollegeMentors.length === 0) ?? (
+
+                        {/* College mentor search / filters / sort / view */}
+                        {collegeStatus === "success" && collegeMentors.length > 0 && (
+                            <CollegeMentorFilters
+                                f={collegeFilters}
+                                resultCount={filteredCollegeMentors.length}
+                                totalCount={collegeMentors.length}
+                                view={collegeView}
+                                onViewChange={setCollegeView}
+                            />
+                        )}
+
+                        {renderSectionLoadState(
+                            collegeStatus,
+                            collegeError,
+                            loadCollegeMentors,
+                            filteredCollegeMentors.length === 0,
+                            collegeFilters.activeCount > 0,
+                            false
+                        ) ?? (
                             <>
-                                <div className={GRID_CLASS}>
-                                    {visibleCollegeMentors.map((mentor) =>
-                                        renderCard({
-                                            id: mentor.id,
-                                            name: mentor.displayName,
-                                            role: "",
-                                            company: "",
-                                            college: mentor.college,
-                                            degree: mentor.degree,
-                                            sessions: mentor.sessionsCount,
-                                            image:
-                                                (mentor as any).profilePic ||
-                                                (mentor as any).profilePhoto ||
-                                                (mentor as any).profilePhotoUrl ||
-                                                (mentor as any).user?.profilePic ||
-                                                "",
-                                            tags: splitSkills(mentor.skills),
-                                            expTotal: 0,
-                                            domains: [],
-                                            acceptsBooking: mentor.sessionId !== null,
-                                            sessionId: mentor.sessionId,
-                                        }, false)
-                                    )}
-                                </div>
-                                {filteredCollegeMentors.length > COLLEGE_LIMIT && (
+                                {collegeView === "grid" ? (
+                                    <div className={GRID_CLASS}>
+                                        {visibleCollegeMentors.map((mentor) =>
+                                            renderCard(toCollegeCardData(mentor), false)
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col gap-3">
+                                        {visibleCollegeMentors.map((mentor) => renderCollegeListRow(mentor))}
+                                    </div>
+                                )}
+
+                                {collegeRemaining > 0 ? (
                                     <div className="mt-6">
                                         <button
-                                            onClick={() => setShowAllCollegeMentors((previous) => !previous)}
+                                            onClick={() => setCollegeVisible((c) => c + COLLEGE_LIMIT)}
                                             className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] transition-all flex items-center justify-center gap-2"
                                         >
-                                            <span>{showAllCollegeMentors ? "Show less" : "Show more"}</span>
-                                            <ArrowRight className={`w-4 h-4 ${showAllCollegeMentors ? "-rotate-90" : ""}`} />
+                                            <span>Load more ({collegeRemaining} remaining)</span>
+                                            <ArrowRight className="w-4 h-4 rotate-90" />
                                         </button>
                                     </div>
+                                ) : (
+                                    filteredCollegeMentors.length > COLLEGE_LIMIT && (
+                                        <div className="mt-6">
+                                            <button
+                                                onClick={() => setCollegeVisible(COLLEGE_LIMIT)}
+                                                className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <span>Show less</span>
+                                                <ArrowRight className="w-4 h-4 -rotate-90" />
+                                            </button>
+                                        </div>
+                                    )
                                 )}
                             </>
                         )}
