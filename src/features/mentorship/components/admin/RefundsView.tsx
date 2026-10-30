@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Banknote, Copy, X, Undo2 } from "lucide-react";
+import { Loader2, Wallet, Copy, X, Undo2 } from "lucide-react";
 import PayoutService, { AdminRefundRow, RefundStatus } from "@/lib/api/payout.service";
 
 const TABS: { key: RefundStatus; label: string; hint: string }[] = [
-  { key: "pending", label: "Pending", hint: "Send the money to the student, then click Mark Refunded" },
+  { key: "pending", label: "Pending", hint: "Click Proceed to Pay to send the refund to the student's UPI" },
   { key: "refunded", label: "Refunded", hint: "These refunds have been sent to the student" },
 ];
 
@@ -43,7 +43,6 @@ export default function RefundsView({ onPendingCountChange }: { onPendingCountCh
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [payRow, setPayRow] = useState<AdminRefundRow | null>(null);
-  const [reference, setReference] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -65,14 +64,13 @@ export default function RefundsView({ onPendingCountChange }: { onPendingCountCh
     void load();
   }, [load]);
 
-  const doMarkRefunded = async () => {
-    if (!payRow) return;
+  const doProceedToPay = async () => {
+    if (!payRow || busyId) return;
     setBusyId(payRow.bookingId);
     setActionError(null);
     try {
-      await PayoutService.markRefunded(payRow.bookingId, reference.trim());
+      await PayoutService.payRefund(payRow.bookingId);
       setPayRow(null);
-      setReference("");
       await load();
     } catch (e: any) {
       setActionError(e?.message || "Failed.");
@@ -178,11 +176,11 @@ export default function RefundsView({ onPendingCountChange }: { onPendingCountCh
                       {r.status === "pending" && (
                         <button
                           type="button"
-                          onClick={() => { setActionError(null); setReference(""); setPayRow(r); }}
+                          onClick={() => { setActionError(null); setPayRow(r); }}
                           className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white inline-flex items-center gap-1"
                           style={{ backgroundColor: "#2f7d5c" }}
                         >
-                          <Banknote className="w-3.5 h-3.5" /> Mark Refunded
+                          <Wallet className="w-3.5 h-3.5" /> Proceed to Pay
                         </button>
                       )}
                     </td>
@@ -212,28 +210,35 @@ export default function RefundsView({ onPendingCountChange }: { onPendingCountCh
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl p-6" style={{ backgroundColor: "#fff", border: "2px solid #e0d8cf" }}>
             <div className="flex items-start justify-between mb-3">
-              <h3 className="text-lg font-bold" style={{ color: "#4a3728" }}>Refund sent?</h3>
-              <button type="button" onClick={() => setPayRow(null)}><X className="w-5 h-5" style={{ color: "#8a7a6a" }} /></button>
+              <h3 className="text-lg font-bold" style={{ color: "#4a3728" }}>Proceed to Pay</h3>
+              <button type="button" onClick={() => setPayRow(null)} disabled={!!busyId}>
+                <X className="w-5 h-5" style={{ color: "#8a7a6a" }} />
+              </button>
             </div>
+
             <p className="text-sm mb-3" style={{ color: "#4a3728" }}>
-            After sending <b>{inr(payRow.amount)}</b> to the student{payRow.details?.upiId ? <> (<span className="font-mono">{payRow.details.upiId}</span>)</> : null}, enter the UTR / transaction ID here.
+              Refund <b>{inr(payRow.amount)}</b> will be sent automatically to the student:
             </p>
-            <input
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              placeholder="UTR / Transaction ID"
-              className="w-full px-4 py-2.5 rounded-xl text-sm outline-none mb-3"
-              style={{ border: "2px solid #e0d8cf", color: "#4a3728" }}
-            />
+
+            <div className="rounded-xl p-3 mb-3 text-sm space-y-1.5" style={{ backgroundColor: "#fbf7f3", border: "1px solid #ece4db", color: "#4a3728" }}>
+              <p><span style={{ color: "#8a7a6a" }}>Name:</span> {payRow.menteeName || "—"}</p>
+              <p><span style={{ color: "#8a7a6a" }}>UPI ID:</span> <span className="font-mono font-semibold">{payRow.details?.upiId || "—"}</span></p>
+              <p><span style={{ color: "#8a7a6a" }}>Phone:</span> {payRow.details?.phone || "—"}</p>
+            </div>
+
+            {!payRow.details?.upiId && (
+              <p className="text-sm mb-3" style={{ color: "#b91c1c" }}>Student did not provide a UPI ID, so auto-pay is not possible.</p>
+            )}
             {actionError && <p className="text-sm mb-3" style={{ color: "#b91c1c" }}>{actionError}</p>}
+
             <div className="flex gap-3">
-              <button type="button" onClick={() => setPayRow(null)} className="flex-1 py-2.5 rounded-xl font-semibold"
+              <button type="button" onClick={() => setPayRow(null)} disabled={!!busyId} className="flex-1 py-2.5 rounded-xl font-semibold"
                 style={{ border: "1px solid #e0d8cf", color: "#4a3728" }}>Cancel</button>
-              <button type="button" onClick={doMarkRefunded} disabled={reference.trim().length < 3 || busyId === payRow.bookingId}
+              <button type="button" onClick={doProceedToPay} disabled={!payRow.details?.upiId || !!busyId}
                 className="flex-1 py-2.5 rounded-xl font-semibold text-white inline-flex items-center justify-center gap-2 disabled:opacity-50"
                 style={{ backgroundColor: "#2f7d5c" }}>
-                {busyId === payRow.bookingId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Banknote className="w-4 h-4" />}
-                Mark Refunded
+                {busyId === payRow.bookingId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
+                Proceed to Pay
               </button>
             </div>
           </div>

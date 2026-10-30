@@ -122,6 +122,16 @@ class PayoutService {
     }
   }
 
+
+  static async payRefund(bookingId: string): Promise<{ payoutId: string; utr?: string; status: string }> {
+    try {
+      const { data } = await api.post(`/mentorship/admin/refunds/${bookingId}/pay`);
+      return data?.data ?? data;
+    } catch (e) {
+      throw new Error(errMsg(e, "Failed to send refund."));
+    }
+  }
+
   static async markRefunded(bookingId: string, reference: string): Promise<void> {
     try {
       await api.post(`/mentorship/admin/refunds/${bookingId}/mark-refunded`, { reference });
