@@ -306,11 +306,11 @@ export default function MentorDashboard(
 
   // Realtime socket hook: 'notification:new' backend emit karte hi aa jata hai
   // (booking request, session started/confirmed, etc.)
-  const { latestNotification } = useSocket();
+  const { latestNotification } = useSocket('industry-mentor');
 
   const fetchNotifications = useCallback(() => {
     setNotificationsLoading(true);
-    NotificationService.getMentorshipNotifications({ limit: 50 })
+    NotificationService.getMentorshipNotifications({ limit: 50, module: 'industry-mentor' })
       .then((res) => setNotifications(normalizeNotifications(res)))
       .catch((err) => {
         console.error("Failed to fetch notifications:", err);
@@ -330,6 +330,7 @@ export default function MentorDashboard(
   // jo fetched list use karti hai, taaki NotificationPage ka icon lookup dono me match kare.
   useEffect(() => {
     if (!latestNotification) return;
+    if (latestNotification.module && latestNotification.module !== 'industry-mentor') return;
     setNotifications((prev) => {
       const already = (Array.isArray(prev) ? prev : []).some(
         (n) => n._id === latestNotification.notificationId || n.notificationId === latestNotification.notificationId
@@ -364,7 +365,7 @@ export default function MentorDashboard(
     setNotifications((prev) =>
       (Array.isArray(prev) ? prev : []).map((n) => (n._id === id ? { ...n, isRead: true } : n))
     );
-    NotificationService.markMentorshipNotificationRead(id).catch((err) => {
+    NotificationService.markMentorshipNotificationRead(id, 'industry-mentor').catch((err) => {
       console.error("Failed to mark notification as read:", err);
       fetchNotifications();
     });
@@ -372,7 +373,7 @@ export default function MentorDashboard(
 
   const handleMarkAllNotificationsRead = () => {
     setNotifications((prev) => (Array.isArray(prev) ? prev : []).map((n) => ({ ...n, isRead: true })));
-    NotificationService.markAllMentorshipNotificationsRead().catch((err) => {
+    NotificationService.markAllMentorshipNotificationsRead('industry-mentor').catch((err) => {
       console.error("Failed to mark all notifications as read:", err);
       fetchNotifications();
     });

@@ -137,11 +137,11 @@ export default function UserDashboardLayout({
 
   // Realtime socket hook: pushes 'notification:new' and 'session:started'
   // the instant the backend emits them
-  const { latestNotification, sessionStarted } = useSocket();
+  const { latestNotification, sessionStarted } = useSocket('industry-mentor');
 
   const fetchNotifications = useCallback(() => {
     setNotificationsLoading(true);
-    NotificationService.getMentorshipNotifications({ limit: 50 })
+    NotificationService.getMentorshipNotifications({ limit: 50, module: 'industry-mentor' })
       .then((res) => setNotifications(normalizeNotifications(res)))
       .catch((err) => {
         console.error("Failed to fetch notifications:", err);
@@ -190,7 +190,7 @@ export default function UserDashboardLayout({
 
   const handleMarkAllRead = useCallback(async () => {
     try {
-      await NotificationService.markAllMentorshipNotificationsRead();
+      await NotificationService.markAllMentorshipNotificationsRead('industry-mentor');
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     } catch (error) {
       console.error("Failed to mark all as read:", error);
@@ -199,7 +199,7 @@ export default function UserDashboardLayout({
 
   const handleMarkRead = useCallback(async (id: string) => {
     try {
-      await NotificationService.markMentorshipNotificationRead(id);
+      await NotificationService.markMentorshipNotificationRead(id, 'industry-mentor');
       setNotifications((prev) => prev.map((n) => (n._id === id ? { ...n, isRead: true } : n)));
     } catch (error) {
       console.error("Failed to mark as read:", error);
@@ -208,7 +208,7 @@ export default function UserDashboardLayout({
 
   const handleDeleteNotification = useCallback(async (id: string) => {
     try {
-      await NotificationService.deleteMentorshipNotification(id);
+      await NotificationService.deleteMentorshipNotification(id, 'industry-mentor');
       setNotifications((prev) => prev.filter((n) => n._id !== id && n.notificationId !== id));
       return true;
     } catch (error) {

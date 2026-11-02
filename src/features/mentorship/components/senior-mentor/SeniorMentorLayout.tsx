@@ -50,11 +50,11 @@ export default function SeniorMentorLayout({
   // ── Notification states (mentorship-scoped) ─────────────────
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
-  const { latestNotification } = useSocket();
+  const { latestNotification } = useSocket('senior-mentor');
 
   const fetchNotifications = useCallback(() => {
     setNotificationsLoading(true);
-    NotificationService.getMentorshipNotifications({ limit: 50 })
+    NotificationService.getMentorshipNotifications({ limit: 50, module: 'senior-mentor' })
       .then((res) => setNotifications(normalizeNotifications(res)))
       .catch((err) => {
         console.error("Failed to fetch mentorship notifications:", err);
@@ -71,6 +71,7 @@ export default function SeniorMentorLayout({
   // Real-time notification updates via socket
   useEffect(() => {
     if (!latestNotification) return;
+    if (latestNotification.module && latestNotification.module !== 'senior-mentor') return;
     setNotifications((prev) => {
       const already = (Array.isArray(prev) ? prev : []).some(
         (n) => n._id === latestNotification.notificationId || n.notificationId === latestNotification.notificationId
@@ -105,7 +106,7 @@ export default function SeniorMentorLayout({
     setNotifications((prev) =>
       (Array.isArray(prev) ? prev : []).map((n) => (n._id === id || n.notificationId === id ? { ...n, isRead: true } : n))
     );
-    NotificationService.markMentorshipNotificationRead(id).catch((err) => {
+    NotificationService.markMentorshipNotificationRead(id, 'senior-mentor').catch((err) => {
       console.error("Failed to mark notification as read:", err);
       fetchNotifications();
     });
@@ -113,7 +114,7 @@ export default function SeniorMentorLayout({
 
   const handleMarkAllNotificationsRead = () => {
     setNotifications((prev) => (Array.isArray(prev) ? prev : []).map((n) => ({ ...n, isRead: true })));
-    NotificationService.markAllMentorshipNotificationsRead().catch((err) => {
+    NotificationService.markAllMentorshipNotificationsRead('senior-mentor').catch((err) => {
       console.error("Failed to mark all notifications as read:", err);
       fetchNotifications();
     });
