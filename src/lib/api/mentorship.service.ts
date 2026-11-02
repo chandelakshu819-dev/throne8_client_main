@@ -155,6 +155,12 @@ class MentorService {
         }
 
         if (error.response?.status === 401) {
+          console.warn(
+            '[createMentor] 401:',
+            apiError?.message ?? error.message,
+            'from',
+            error.config?.url
+          );
           throw new Error('Session expired. Please login again.');
         }
 

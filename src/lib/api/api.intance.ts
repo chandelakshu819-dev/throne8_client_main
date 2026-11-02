@@ -284,6 +284,16 @@ const refreshAccessToken = (
 ): Promise<string | null> => {
     if (refreshPromise) return refreshPromise;
 
+    // Kisi aur request ne abhi token refresh kar diya: na network call, na circuit-breaker count
+    const freshToken = TokenStorage.getAccessToken();
+    if (
+        freshToken &&
+        !TokenStorage.isTokenExpired() &&
+        (!failedToken || freshToken !== failedToken)
+    ) {
+        return Promise.resolve(freshToken);
+    }
+
     const now = Date.now();
 
     // Cooldown active: server ko dobara mat chhedo
@@ -420,18 +430,31 @@ api.interceptors.response.use(
             ? String(failedHeader).replace(/^Bearer\s+/i, "")
             : null;
 
-        originalRequest._retry = true;
+            originalRequest._retry = true;
 
-        try {
-            const newToken = await refreshAccessToken(failedToken);
+            console.warn(
+                `[api] 401 on ${originalRequest.method?.toUpperCase()} ${originalRequest.url}:`,
+                (error.response?.data as ApiErrorBody | undefined)?.message
+            );
+    
+            try {
+                const newToken = await refreshAccessToken(failedToken);
             if (newToken) {
                 originalRequest.headers.Authorization = `Bearer ${newToken}`;
             }
             return api(originalRequest);
         } catch (refreshError: unknown) {
             handleRefreshFailure(refreshError);
-            // Original error wapas do, taaki caller ko asli request ka 401 dikhe
-            return Promise.reject(error);
+                        // Cooldown ne refresh roka, par agar koi aur request naya token le aayi hai to retry karo
+                        if (refreshError instanceof RefreshCooldownError) {
+                            const latest = TokenStorage.getAccessToken();
+                            if (latest && latest !== failedToken && !TokenStorage.isTokenExpired()) {
+                                originalRequest.headers.Authorization = `Bearer ${latest}`;
+                                return api(originalRequest);
+                            }
+                        }
+                        // Original error wapas do, taaki caller ko asli request ka 401 dikhe
+                        return Promise.reject(error);
         }
     }
 );
