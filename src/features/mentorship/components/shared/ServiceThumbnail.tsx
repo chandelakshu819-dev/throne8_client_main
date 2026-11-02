@@ -64,13 +64,24 @@ export default function ServiceThumbnail({
 
     if (src && !failed) {
         return (
-            <img
-                src={src}
-                alt={alt}
-                draggable={false}
-                onError={() => setFailed(true)}
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            />
+            <div className="absolute inset-0 overflow-hidden bg-[#f4ece1]">
+                {/* blur background: khali jagah bharne ke liye */}
+                <img
+                    src={src}
+                    alt=""
+                    aria-hidden="true"
+                    draggable={false}
+                    className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
+                />
+                {/* asli image: poori dikhegi, crop nahi hogi */}
+                <img
+                    src={src}
+                    alt={alt}
+                    draggable={false}
+                    onError={() => setFailed(true)}
+                    className="relative w-full h-full object-contain"
+                />
+            </div>
         );
     }
 

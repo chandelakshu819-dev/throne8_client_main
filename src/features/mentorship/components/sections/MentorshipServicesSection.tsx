@@ -245,7 +245,7 @@ export default function MentorshipServicesSection({
                                         }}
                                     >
                                         <div className="group flex flex-col w-full bg-white hover:bg-[#FDFBF7] rounded-[20px] sm:rounded-[22px] overflow-hidden border border-[#ece7e2] hover:border-[#8b7355]/40 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-xl transition-all duration-300 hover:-translate-y-1 h-full pointer-events-auto cursor-pointer">
-                                            <div className="relative w-full h-[130px] sm:h-[138px] bg-[#f4ece1] overflow-hidden flex-shrink-0">
+                                            <div className="relative w-full aspect-video bg-[#f4ece1] overflow-hidden flex-shrink-0">
                                                 <ServiceThumbnail
                                                 src={thumbnail}
                                                 alt={service.title}

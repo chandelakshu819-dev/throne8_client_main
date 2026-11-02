@@ -32,7 +32,7 @@ export function ServiceCard({ service, idx = 0, onEdit, onDelete, onMenteeStatus
       style={{ borderColor: '#e0d8cf', boxShadow: '0 4px 20px -4px rgba(74, 55, 40, 0.08)' }}
     >
       <div
-        className="w-full h-32 relative overflow-hidden"
+              className="w-full aspect-video relative overflow-hidden"
         style={{ backgroundColor: '#f3ece4' }}
       >
         <ServiceThumbnail
