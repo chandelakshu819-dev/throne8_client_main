@@ -14,6 +14,7 @@ export interface RealtimeNotification {
     isRead: boolean;
     createdAt: string;
     data?: Record<string, any>;
+    module?: 'senior-mentor' | 'industry-mentor';
 }
 
 export interface SessionStartedEvent {
@@ -43,7 +44,7 @@ export interface SessionReminderEvent {
     minutesLeft: number;
 }
 
-export function useSocket() {
+export function useSocket(module?: 'senior-mentor' | 'industry-mentor') {
     const [socket, setSocket] = useState<Socket | null>(null);
     const [isConnected, setIsConnected] = useState(false);
 
@@ -78,7 +79,12 @@ export function useSocket() {
             const handleConnect = () => {
                 setIsConnected(true);
                 console.log('✅ [useSocket] Connected');
-                socketInstance.emit('notification:get:unread:count');
+                if (module) {
+                    socketInstance.emit('notification:join:module', { module });
+                    socketInstance.emit('notification:get:unread:count', { module });
+                } else {
+                    socketInstance.emit('notification:get:unread:count');
+                }
             };
 
             const handleDisconnect = () => {
@@ -87,12 +93,18 @@ export function useSocket() {
             };
 
             const handleNotificationNew = (payload: RealtimeNotification) => {
+                if (module && payload.module && payload.module !== module) {
+                    return;
+                }
                 console.log('🔔 [useSocket] New notification:', payload);
                 setLatestNotification(payload);
                 setUnreadCount((prev) => prev + 1);
             };
 
-            const handleUnreadCount = (data: { count: number }) => {
+            const handleUnreadCount = (data: { count: number; module?: string }) => {
+                if (module && data.module && data.module !== module) {
+                    return;
+                }
                 setUnreadCount(data.count);
             };
 
@@ -135,6 +147,9 @@ export function useSocket() {
             }
 
             return () => {
+                if (module && socketInstance.connected) {
+                    socketInstance.emit('notification:leave:module', { module });
+                }
                 socketInstance.off('connect', handleConnect);
                 socketInstance.off('disconnect', handleDisconnect);
                 socketInstance.off('notification:new', handleNotificationNew);
@@ -146,7 +161,7 @@ export function useSocket() {
         } catch (error) {
             console.error('❌ [useSocket] Failed to initialize:', error);
         }
-    }, []);
+    }, [module]);
 
 
     return {

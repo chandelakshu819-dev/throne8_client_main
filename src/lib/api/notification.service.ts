@@ -25,7 +25,7 @@ class NotificationService {
     }
 
     // ============================================================
-    // ✅ NEW: MENTORSHIP-SCOPED NOTIFICATIONS
+    // MENTORSHIP-SCOPED NOTIFICATIONS
     // Hits /api/v1/mentorship/notifications — a separate Notification
     // model/collection (booking, session, payment, account, system,
     // promotion, reminder, alert) from the general/profile notifications
@@ -35,7 +35,7 @@ class NotificationService {
     // that router uses PUT (not PATCH) and `/read-all` (not `/mark-all-read`).
     // ============================================================
 
-       // ✅ NEW — maps backend's raw shape (id/status.read/exact type enum) into
+    // Maps backend's raw shape (id/status.read/exact type enum) into
     // the shape NotificationPage.tsx + DashboardLayout.tsx actually expect
     // (_id/isRead/one of "booking"|"review"|"payment"|"message"|"system").
     // Without this, click-to-mark-read silently no-ops (item._id was always
@@ -63,9 +63,22 @@ class NotificationService {
         };
     }
 
-    static async getMentorshipNotifications(params?: { page?: number; limit?: number; unreadOnly?: boolean }): Promise<any> {
+    /**
+     * Fetch notifications for the Senior Mentor dashboard.
+     * ISOLATION: Passes module=senior-mentor so the backend returns ONLY notifications
+     * with data.module === 'senior-mentor'. Without this, all mentorship notifications
+     * (normal booking, forum, session events) would appear in the Senior Mentor screen.
+     */
+    static async getMentorshipNotifications(params?: {
+        page?: number;
+        limit?: number;
+        unreadOnly?: boolean;
+        module?: 'senior-mentor' | 'industry-mentor';
+    }): Promise<any> {
         try {
-            const { data } = await api.get('/mentorship/notifications', { params });
+            const { data } = await api.get('/mentorship/notifications', {
+                params,
+            });
             console.log('📩 [GET_MENTORSHIP_NOTIFICATIONS] Fetched:', data.data);
 
             const rawList = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
@@ -78,10 +91,14 @@ class NotificationService {
         }
     }
 
-    static async markMentorshipNotificationRead(notificationId: string): Promise<any> {
+    static async markMentorshipNotificationRead(
+        notificationId: string,
+        module?: 'senior-mentor' | 'industry-mentor'
+    ): Promise<any> {
         try {
-            // ✅ Backend route is PUT /:id/read, not PATCH
-            const { data } = await api.put(`/mentorship/notifications/${notificationId}/read`);
+            const { data } = await api.put(`/mentorship/notifications/${notificationId}/read`, null, {
+                params: module ? { module } : undefined,
+            });
             return data;
         } catch (error: any) {
             console.error('❌ [MARK_MENTORSHIP_NOTIFICATION_READ] Failed:', error);
@@ -89,10 +106,13 @@ class NotificationService {
         }
     }
 
-    static async markAllMentorshipNotificationsRead(): Promise<any> {
+    static async markAllMentorshipNotificationsRead(
+        module?: 'senior-mentor' | 'industry-mentor'
+    ): Promise<any> {
         try {
-            // ✅ Backend route is PUT /read-all, not PATCH /mark-all-read
-            const { data } = await api.put('/mentorship/notifications/read-all');
+            const { data } = await api.put('/mentorship/notifications/read-all', null, {
+                params: module ? { module } : undefined,
+            });
             return data;
         } catch (error: any) {
             console.error('❌ [MARK_ALL_MENTORSHIP_NOTIFICATIONS_READ] Failed:', error);
@@ -100,13 +120,32 @@ class NotificationService {
         }
     }
 
-    static async deleteMentorshipNotification(notificationId: string): Promise<any> {
+    static async deleteMentorshipNotification(
+        notificationId: string,
+        module?: 'senior-mentor' | 'industry-mentor'
+    ): Promise<any> {
         try {
-            const { data } = await api.delete(`/mentorship/notifications/${notificationId}`);
+            const { data } = await api.delete(`/mentorship/notifications/${notificationId}`, {
+                params: module ? { module } : undefined,
+            });
             return data;
         } catch (error: any) {
             console.error('❌ [DELETE_MENTORSHIP_NOTIFICATION] Failed:', error);
             throw new Error('Failed to delete notification.');
+        }
+    }
+
+    static async getMentorshipUnreadCount(
+        module?: 'senior-mentor' | 'industry-mentor'
+    ): Promise<any> {
+        try {
+            const { data } = await api.get('/mentorship/notifications/unread-count', {
+                params: module ? { module } : undefined,
+            });
+            return data;
+        } catch (error: any) {
+            console.error('❌ [GET_MENTORSHIP_UNREAD_COUNT] Failed:', error);
+            throw new Error('Failed to get mentorship unread count.');
         }
     }
 }
