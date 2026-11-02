@@ -11,7 +11,7 @@ import { getRatingDisplay } from "@/shared/utils/mentorFormat";
 import { cleanText, isMeaningfulText } from "@/shared/utils/textSanitize";
 import { formatPrice, resolveHostInfo } from "@/features/mentorship/utils/sessionCard";
 import { useInfiniteCarousel } from "@/features/mentorship/hooks/useInfiniteCarousel";
-import ServiceThumbnail from "@/features/mentorship/components/shared/ServiceThumbnail";
+import ServiceThumbnail, { getServiceImage } from "@/features/mentorship/components/shared/ServiceThumbnail";
 
 interface MentorshipServicesSectionProps {
     mentorId?: string;
@@ -229,7 +229,7 @@ export default function MentorshipServicesSection({
                                     ? cleanText(service.description, "")
                                     : "";
 
-                                const thumbnail = service.thumbnailImage || service.thumbnail;
+                                const thumbnail = getServiceImage(service);
 
                                 return (
                                     <div
@@ -247,11 +247,12 @@ export default function MentorshipServicesSection({
                                         <div className="group flex flex-col w-full bg-white hover:bg-[#FDFBF7] rounded-[20px] sm:rounded-[22px] overflow-hidden border border-[#ece7e2] hover:border-[#8b7355]/40 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-xl transition-all duration-300 hover:-translate-y-1 h-full pointer-events-auto cursor-pointer">
                                             <div className="relative w-full h-[130px] sm:h-[138px] bg-[#f4ece1] overflow-hidden flex-shrink-0">
                                                 <ServiceThumbnail
-                                                    src={thumbnail}
-                                                    alt={service.title}
-                                                    label={topCategory}
-                                                    tone="brown"
-                                                />
+                                                src={thumbnail}
+                                                alt={service.title}
+                                                label={topCategory}
+                                                tone="brown"
+                                                type={service.sessionType}
+                                            />
 
                                                 <div className="absolute top-2.5 left-2.5 bg-[#4a3728]/75 backdrop-blur-md px-2.5 py-0.5 rounded-full shadow-xs z-10">
                                                     <span className="text-[9px] sm:text-[10px] font-bold text-white uppercase tracking-wider">

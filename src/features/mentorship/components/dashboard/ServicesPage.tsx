@@ -105,7 +105,7 @@ const statusStyle = (status: string) => {
 export const getPriceLabel = (price: number, type: string) => {
   if (!price || price === 0) return 'Free';
   if (type === 'group_session') return `₹${price}/person`;
-  return `₹${price}/hr`;
+  return `₹${price}`;
 };
 
 // Ek baar me kitni cards dikhani hain (baaki "Show all" se khulengi)

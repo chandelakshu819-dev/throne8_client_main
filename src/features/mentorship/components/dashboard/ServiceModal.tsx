@@ -1,5 +1,5 @@
 "use client";
-
+// src/features/mentorship/components/dashboard/ServiceModal.tsx
 import React, { useMemo, useEffect } from 'react';
 import {
     X, DollarSign, Image as ImageIcon, Upload, FileText,
@@ -296,7 +296,7 @@ export default function ServiceModal({
                         </div>
                         <div>
                             <div className="flex items-center justify-between mb-2">
-                                <FieldLabel icon={DollarSign}>Price per Hour</FieldLabel>
+                                <FieldLabel icon={DollarSign}>Price</FieldLabel>
                                 <label className="flex items-center gap-1.5 text-xs font-semibold cursor-pointer" style={{ color: '#7a5c3e' }}>
                                     <input
                                         type="checkbox"

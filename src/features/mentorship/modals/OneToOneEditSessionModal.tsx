@@ -338,7 +338,7 @@ export default function OneToOneEditSessionModal({ isOpen, onClose, session: ini
               <div>
                 <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
                   <DollarSign className="w-5 h-5 inline mr-2" />
-                  Price per Hour
+                  Price
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold" style={{ color: '#7a5c3e' }}>₹</span>
