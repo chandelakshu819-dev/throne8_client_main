@@ -35,6 +35,9 @@ export interface RegistrationData {
 
   // Step 5
   skills?: string[];
+
+  // Optional: code of the friend who shared the signup link
+  referralCode?: string;
 }
 
 

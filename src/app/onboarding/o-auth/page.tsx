@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import AuthService from '@/lib/api/auth.service';
+import { clearReferralCode, getStoredReferralCode } from '@/lib/referral';
 import { useAppDispatch } from '@/core/store/store.hooks';
 import { checkAuthStatus } from '@/hooks/auth';
 import { HOME_PATH } from '@/config/launch';
@@ -177,6 +178,7 @@ export default function GoogleOnboardingPage() {
 
             const cleanData = {
                 idToken,
+                referralCode: getStoredReferralCode(),
                 location: allData.location,
                 phoneNumber: allData.phoneNumber || '',
                 userType,
@@ -205,6 +207,7 @@ export default function GoogleOnboardingPage() {
 
             // NOTE: idToken kabhi console me log mat karo
             await AuthService.googleRegister(cleanData);
+            clearReferralCode();
 
             if (typeof window !== 'undefined') {
                 sessionStorage.removeItem('google_id_token');

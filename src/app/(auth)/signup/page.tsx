@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { Suspense, useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2 } from 'lucide-react';
 import AuthLayout from '@/features/auth/components/layout/AuthLayout';
@@ -14,6 +14,8 @@ import WorkingJobDetails from '@/features/auth/components/WorkingJobDetails';
 import StudentEducation from '@/features/auth/components/StudentEducation';
 import FresherEducationRole from '@/features/auth/components/FresherEducationRole';
 import OTPVerificationForm from '@/features/auth/components/OTPVerificationForm';
+import ReferralCapture from '@/features/auth/components/ReferralCapture';
+import { clearReferralCode, getStoredReferralCode } from '@/lib/referral';
 import { useRegister } from '@/features/auth/hooks/useRegister';
 import { HOME_PATH } from '@/config/launch';
 import { RegistrationData } from '@/features/auth/interface';
@@ -278,6 +280,7 @@ export default function SignupPage() {
       status: parsed.data.userType,
       skills: finalData.skills || [],
       verificationToken: token,
+      referralCode: getStoredReferralCode(),
       ...(parsed.data.userType === 'working' && {
         jobTitle: parsed.data.jobTitle,
         companyName: parsed.data.companyName,
@@ -299,6 +302,7 @@ export default function SignupPage() {
 
     try {
       await register(cleanData);
+      clearReferralCode();
 
       // Brief delay for token/user hydration
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -411,6 +415,11 @@ export default function SignupPage() {
     <AuthLayout>
       <AuthRightContainer>
         <div className="w-full max-w-2xl mx-auto">
+          {/* Remembers ?ref=CODE from the share link and shows the invite note */}
+          <Suspense fallback={null}>
+            <ReferralCapture />
+          </Suspense>
+
           {/* Form steps */}
           {flowStage === 'form' && (
             <>
