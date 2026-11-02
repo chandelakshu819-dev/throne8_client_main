@@ -1,6 +1,10 @@
 import api from "./api.intance";
 
 export type PayoutStatus = "held" | "released" | "paid";
+// "approved" = released + paid together
+export type ApprovedListStatus = "approved" | "released" | "paid";
+
+
 
 export interface PayoutMethod {
   type: "bank" | "upi";
@@ -30,8 +34,10 @@ export interface AdminPayoutRow {
   payoutPaidAt?: string;
   reference?: string;
   payoutMethod: PayoutMethod | null;
-
+  releasedBy?: string; // admin who approved the payout
 }
+
+
 
 export interface MentorPayoutItem {
   paymentId: string;
@@ -87,6 +93,24 @@ class PayoutService {
       };
     } catch (e) {
       throw new Error(errMsg(e, "Failed to load payouts."));
+    }
+  }
+
+
+
+  static async adminListApproved(
+    status: ApprovedListStatus,
+    page = 1,
+    limit = 20
+  ): Promise<{ rows: AdminPayoutRow[]; total: number }> {
+    try {
+      const { data } = await api.get("/mentorship/admin/payouts", { params: { status, page, limit } });
+      return {
+        rows: Array.isArray(data?.data) ? data.data : [],
+        total: data?.meta?.total ?? data?.pagination?.total ?? (data?.data?.length || 0),
+      };
+    } catch (e) {
+      throw new Error(errMsg(e, "Failed to load approved payments."));
     }
   }
 

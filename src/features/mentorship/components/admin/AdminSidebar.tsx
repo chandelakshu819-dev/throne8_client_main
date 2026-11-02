@@ -9,6 +9,7 @@ import {
   Receipt,
   Wallet,
   Undo2,
+  BadgeCheck,
   ChevronRight,
 } from "lucide-react";
 
@@ -32,6 +33,7 @@ const ADMIN_MENU_ITEMS = [
   { id: "community-reports", label: "Community Reports", icon: MessageSquareWarning },
   { id: "payments", label: "Payment Logs", icon: Receipt },
   { id: "payouts", label: "Mentor Payouts", icon: Wallet },
+  { id: "approved-payments", label: "Approved Payments", icon: BadgeCheck },  
   { id: "refunds", label: "Refunds", icon: Undo2 },
 ];
 

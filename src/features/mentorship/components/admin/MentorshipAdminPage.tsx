@@ -24,6 +24,8 @@ import AllReviewsView from "./AllReviewsView";
 import SessionsView from "./SessionsView";
 import PayoutsView from "./PayoutsView";
 import RefundsView from "./RefundsView";
+import ApprovedPaymentsView from "./ApprovedPaymentsView";
+
 
 const inrFormatter = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 2,
@@ -44,6 +46,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   "community-reports": { title: "Community Reports", subtitle: "Review and moderate flagged forum threads and replies" },
   payments: { title: "Payment Logs", subtitle: "Transaction history across the module" },
   payouts: { title: "Mentor Payouts", subtitle: "Approve held earnings and pay mentors" },
+  "approved-payments": { title: "Approved Payments", subtitle: "Payouts approved and released by admin" },  
   refunds: { title: "Refunds", subtitle: "Missed-session refund requests from students" },
 };
 
@@ -410,9 +413,12 @@ export default function MentorshipAdminPage() {
         <PayoutsView onHeldCountChange={(count) => setHeldPayoutCount(count)} />
       )}
 
-      {activePage === "refunds" && (
-        <RefundsView onPendingCountChange={(count) => setPendingRefundCount(count)} />
-      )}
+{activePage === "approved-payments" && <ApprovedPaymentsView />}
+
+{activePage === "refunds" && (
+  <RefundsView onPendingCountChange={(count) => setPendingRefundCount(count)} />
+)}
+
 
       {activePage !== "dashboard" &&
         activePage !== "pending-mentors" &&
@@ -422,8 +428,12 @@ export default function MentorshipAdminPage() {
         activePage !== "all-reviews" &&
         activePage !== "reviews" &&
         activePage !== "sessions" &&
+
         activePage !== "payouts" &&
+        activePage !== "approved-payments" &&
         activePage !== "refunds" && (
+
+          
           <p style={{ color: "#8a7a6a" }}>
             {PAGE_META[activePage]?.title} page — agla step mein banega.
           </p>

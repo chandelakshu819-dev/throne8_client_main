@@ -5,8 +5,11 @@ import { Loader2, CheckCircle, Wallet, AlertCircle, Copy, X, Banknote } from "lu
 import PayoutService, { AdminPayoutRow, PayoutStatus } from "@/lib/api/payout.service";
 
 const TABS: { key: PayoutStatus; label: string; hint: string }[] = [
-  { key: "held", label: "On hold", hint: "Session completed? Verify it, then click Release" },
-  { key: "released", label: "Approved", hint: "Send the money to the mentor, then click Mark Paid" },
+
+  { key: "held", label: "On hold", hint: "Session completed? Verify it, then click Approve & Release. Money is sent to the mentor automatically" },
+  { key: "released", label: "Approved", hint: "Stuck payouts only. If money was sent manually, click Mark Paid" },
+  
+
   { key: "paid", label: "Paid",hint: "These payouts have been sent to the mentor" },
 ];
 
@@ -145,10 +148,10 @@ export default function PayoutsView({ onHeldCountChange }: { onHeldCountChange?:
       {/* Totals for this page */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
-          { label: "Entries", value: String(total) },
-          { label: "Platform share (20%)", value: inr(sumPlatform) },   
-          { label: "Platform share (20%)", value: inr(sumPlatform) },       
-        ].map((c) => (
+                  { label: "Entries", value: String(total) },
+                  { label: "Mentor share (80%)", value: inr(sumMentor) },
+                  { label: "Platform share (20%)", value: inr(sumPlatform) },
+                ].map((c) => (
           <div key={c.label} className="rounded-2xl p-4" style={{ backgroundColor: "#fff", border: "1px solid #ece4db" }}>
             <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#a3907e" }}>{c.label}</p>
             <p className="text-2xl font-bold mt-1" style={{ color: "#4a3728" }}>{c.value}</p>

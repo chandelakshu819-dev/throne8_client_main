@@ -188,6 +188,24 @@ class AdminService {
             throw new Error('Failed to fetch payment logs.');
         }
     }
+
+    static async getApprovedPayments(params: {
+        page?: number;
+        limit?: number;
+        status?: 'approved' | 'released' | 'failed' | string;
+    } = {}): Promise<AdminPaginatedResponse<any[]>> {
+        try {
+            const { data } = await api.get<AdminPaginatedResponse<any[]>>(`${BASE}/approved-payments`, { params });
+            return data;
+        } catch (error: any) {
+            if (axios.isAxiosError(error)) {
+                const apiError = error.response?.data;
+                if (error.response?.status === 403) throw new Error('Admin access required.');
+                if (apiError?.message) throw new Error(apiError.message);
+            }
+            throw new Error('Failed to fetch approved payments.');
+        }
+    }
 }
 
 export default AdminService;
