@@ -369,7 +369,7 @@ export default function MentorshipAdminPage() {
                   {heldPayoutCount == null
                     ? "Payouts review karne ke liye kholo"
                     : heldPayoutCount === 0
-                      ? "Abhi koi payout approval ke liye pending nahi"
+                      ? "No payouts are pending approval at this time."
                       : `${heldPayoutCount} payout approval ka intezaar kar rahe hain`}
                 </span>
               </span>

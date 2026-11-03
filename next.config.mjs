@@ -6,15 +6,15 @@ const nextConfig = {
   compress: true,
 
   typescript: {
-    // ⚠️ Temporary — TS errors build ko fail nahi karenge
+    // TypeScript errors will not fail production build
     ignoreBuildErrors: true,
   },
   eslint: {
-    // ⚠️ Temporary — ESLint errors build ko fail nahi karenge
+    // ESLint errors will not fail production build
     ignoreDuringBuilds: true,
   },
 
-  // Production build me console.log hat jayenge, error/warn bache rahenge
+  // Remove console.log in production, preserve error and warn
   compiler: {
     removeConsole:
       process.env.NODE_ENV === "production"
@@ -33,7 +33,7 @@ const nextConfig = {
   },
 
   experimental: {
-    // Sirf wahi imports bundle me aayenge jo use ho rahe hain
+    // Only import packages actually in use
     optimizePackageImports: [
       "lucide-react",
       "recharts",

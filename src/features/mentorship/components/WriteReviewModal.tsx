@@ -78,7 +78,7 @@ export default function WriteReviewModal({
     } catch (err: any) {
       // backend already gives specific messages like "Review already
       // submitted for this session" or "Can only review completed sessions"
-      setError(err?.response?.data?.message || err?.message || "Review submit nahi ho paya. Try again.");
+      setError(err?.response?.data?.message || err?.message || "Unable to submit your review. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

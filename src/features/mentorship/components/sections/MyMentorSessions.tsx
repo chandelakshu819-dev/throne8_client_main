@@ -329,7 +329,7 @@ function OneOnOneTab({ onReminder, toast }: OneOnOneTabProps) {
             setUpcoming((upcomingRes?.data ?? []) as MenteeSession[]);
             setCompleted((completedRes?.data ?? []) as MenteeSession[]);
         } catch (e: any) {
-            setError(e?.message || "Sessions load nahi ho paaye.");
+            setError(e?.message || "Unable to load sessions. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -464,7 +464,7 @@ function OneOnOneTab({ onReminder, toast }: OneOnOneTabProps) {
             <SectionTitle>Upcoming Sessions</SectionTitle>
             {upcoming.length === 0 ? (
                 <p className="text-sm mb-8" style={{ color: C.muted }}>
-                    Koi upcoming session nahi hai.
+                    No upcoming sessions found.
                 </p>
             ) : (
                 <div className="flex flex-col gap-0 mb-8">
@@ -531,7 +531,7 @@ function OneOnOneTab({ onReminder, toast }: OneOnOneTabProps) {
             <SectionTitle>Completed Sessions</SectionTitle>
             {completed.length === 0 ? (
                 <p className="text-sm" style={{ color: C.muted }}>
-                    Abhi tak koi session complete nahi hui.
+                    No completed sessions yet.
                 </p>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -616,7 +616,7 @@ function QueriesTab({ toast }: QueriesTabProps) {
             const res = await QueryService.getAllQueries({ role: "mentee", limit: 20 });
             setQueries(res.data ?? []);
         } catch (e: any) {
-            setError(e?.message || "Queries load nahi ho payi.");
+            setError(e?.message || "Unable to load queries. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -636,7 +636,7 @@ function QueriesTab({ toast }: QueriesTabProps) {
             setFollowUpText("");
             toast("Follow-up bhej diya gaya.");
         } catch (e: any) {
-            toast(e?.message || "Follow-up submit nahi ho paya.");
+            toast(e?.message || "Unable to submit follow-up. Please try again.");
         } finally {
             setSubmittingFollowUp(false);
         }
@@ -687,7 +687,7 @@ function QueriesTab({ toast }: QueriesTabProps) {
 
             {queries.length === 0 ? (
                 <p className="text-sm" style={{ color: C.muted }}>
-                    Abhi tak koi query nahi bheji.
+                    No queries sent yet.
                 </p>
             ) : (
                 <div className="flex flex-col gap-4">
@@ -924,7 +924,7 @@ function HistoryTab() {
                 if (!cancelled) setSessions((res?.data ?? []) as MenteeSession[]);
             })
             .catch((e: any) => {
-                if (!cancelled) setError(e?.message || "History load nahi ho payi.");
+                if (!cancelled) setError(e?.message || "Unable to load session history. Please try again.");
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -953,7 +953,7 @@ function HistoryTab() {
             <SectionTitle>Completed Sessions</SectionTitle>
             {sessions.length === 0 ? (
                 <p className="text-sm" style={{ color: C.muted }}>
-                    Abhi tak koi session complete nahi hui.
+                    No completed sessions yet.
                 </p>
             ) : (
                 <div className="flex flex-col gap-3">

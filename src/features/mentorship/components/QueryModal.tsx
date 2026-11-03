@@ -42,7 +42,7 @@ const QueryModal: React.FC<QueryModalProps> = ({ mentorId, mentorName, price, on
             onSuccess?.();
             onClose();
         } catch (err: any) {
-            setError(err?.message || "Query submit nahi ho payi. Try again.");
+            setError(err?.message || "Unable to submit your query. Please try again.");
         } finally {
             setSubmitting(false);
         }
