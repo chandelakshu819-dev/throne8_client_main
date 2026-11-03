@@ -103,25 +103,49 @@ const ServiceImageBanner: React.FC<ServiceImageBannerProps> = ({ imageSrc, alt, 
     <div
       style={{
         width: "100%",
-        height: "150px",
+        aspectRatio: "16 / 9",
         borderRadius: "12px",
         overflow: "hidden",
         marginBottom: "12px",
         position: "relative",
+        background: "#f4ece1",
       }}
     >
       {!imgFailed && imageSrc ? (
-        <img
-          src={imageSrc}
-          alt={alt}
-          onError={() => setImgFailed(true)}
-          style={{ width: "100%", height: "150px", objectFit: "cover", display: "block" }}
-        />
+        <>
+          <img
+            src={imageSrc}
+            alt=""
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              transform: "scale(1.1)",
+              filter: "blur(16px)",
+              opacity: 0.6,
+            }}
+          />
+          <img
+            src={imageSrc}
+            alt={alt}
+            onError={() => setImgFailed(true)}
+            style={{
+              position: "relative",
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              display: "block",
+            }}
+          />
+        </>
       ) : (
         <div
           style={{
             width: "100%",
-            height: "150px",
+            height: "100%",
             background: C.grad,
             display: "flex",
             alignItems: "center",

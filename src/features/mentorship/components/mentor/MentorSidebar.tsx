@@ -4,7 +4,7 @@
 //src/features/mentorship/components/mentor/MentorSidebar.tsx
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Camera, Star, Briefcase } from "./Icons";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Bookmark, Flag, GraduationCap, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { C } from "../../types/data";
 import MentorService from "@/lib/api/mentorship.service";
@@ -66,6 +66,8 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
 
     // Camera (change-photo) button sirf tab dikhega jab logged-in user hi is mentor ka owner ho
     const isOwner = !!currentUserId && !!mentorData?.userId && currentUserId === mentorData.userId;
+    // Save / Report sirf logged-in visitor ko dikhenge, owner ko nahi
+    const canInteract = !!currentUserId && !isOwner;
     const router = useRouter();
     const [backHovered, setBackHovered] = useState<boolean>(false);
 
@@ -136,12 +138,22 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
     const totalSessions = mentorData?.stats?.totalSessions;
 
     const currentRole = mentorData?.experience?.currentRole || "Not specified";
-    const experience = mentorData?.experience?.total != null ? `${mentorData.experience.total} years of Experience` : "Experience not specified";
+    const expTotal = mentorData?.experience?.total;
+    const experience =
+        expTotal != null
+            ? `${expTotal} ${Number(expTotal) === 1 ? "year" : "years"} of Experience`
+            : "Experience not specified";
     const sortedRoles = sortRolesNewestFirst(mentorData?.experience?.previousRoles || []);
-    const linkedinUrl = mentorData?.socialProof?.linkedinUrl || "#";
     const skills = mentorData?.skills || [];
     const languages: string[] = mentorData?.languages || [];
     const timezone: string = mentorData?.availability?.timezone || "";
+    const domains: string[] = Array.isArray(mentorData?.domains) ? mentorData.domains.filter(Boolean) : [];
+
+    const college: string = mentorData?.college || "";
+    const degree: string = mentorData?.degree || "";
+    const branch: string = mentorData?.branch || "";
+    const hasEducation = !!(college || degree || branch);
+    const educationLine = [degree, branch].filter(Boolean).join(" · ");
 
     const aboutClampStyle: React.CSSProperties = aboutExpanded
         ? {}
@@ -198,6 +210,30 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
         }
     };
 
+    const closeReport = () => {
+        if (reportSubmitting) return;
+        setReportOpen(false);
+        setReportReason("");
+        setReportError(null);
+        setReportSuccess(false);
+    };
+
+    const iconBtnStyle: React.CSSProperties = {
+        width: "40px",
+        height: "40px",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: "8px",
+        background: "rgba(255, 255, 255, 0.9)",
+        border: "1px solid rgba(255, 255, 255, 0.6)",
+        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.08)",
+        color: C.dark,
+        cursor: "pointer",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+    };
+
     return (
         <div style={{ position: "sticky", top: "100px" }}>
             <div style={{ position: "relative", borderRadius: "24px", overflow: "hidden", boxShadow: "0 20px 60px rgba(74,55,40,0.15)", border: `1px solid ${C.border}` }}>
@@ -211,6 +247,29 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                                 <Camera />
                             </button>
                         </>
+                    )}
+                    {canInteract && (
+                        <div style={{ position: "absolute", top: "16px", right: "16px", zIndex: 10, display: "flex", gap: "8px" }}>
+                            <button
+                                type="button"
+                                onClick={handleToggleSave}
+                                disabled={savingToggle}
+                                aria-label={saved ? "Remove from saved mentors" : "Save mentor"}
+                                title={saved ? "Saved" : "Save mentor"}
+                                style={{ ...iconBtnStyle, opacity: savingToggle ? 0.6 : 1 }}
+                            >
+                                <Bookmark size={18} fill={saved ? C.dark : "none"} />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setReportOpen(true)}
+                                aria-label="Report mentor"
+                                title="Report mentor"
+                                style={iconBtnStyle}
+                            >
+                                <Flag size={18} />
+                            </button>
+                        </div>
                     )}
                     <div style={{ position: "absolute", bottom: "-48px", left: "50%", transform: "translateX(-50%)" }}>
                         <div style={{ position: "relative" }}>
@@ -235,7 +294,21 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                         <span style={{ fontWeight: "bold", color: C.dark }}>{rating}</span>
                     </div>
                     <p style={{ fontSize: "13px", color: C.mid, marginBottom: "4px" }}>{currentRole}</p>
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "20px", background: C.border, fontSize: "12px", color: C.dark, marginBottom: "20px", marginTop: "8px" }}>
+
+                    {domains.length > 0 && (
+                        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "6px", marginTop: "8px" }}>
+                            {domains.map((d) => (
+                                <span
+                                    key={d}
+                                    style={{ padding: "3px 10px", borderRadius: "20px", background: C.border, color: C.dark, fontSize: "11px", fontWeight: 700 }}
+                                >
+                                    {d}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "20px", background: C.border, fontSize: "12px", color: C.dark, marginBottom: "20px", marginTop: "10px" }}>
                         <Briefcase /> {experience}
                     </div>
 
@@ -339,7 +412,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                         )}
                     </div>
 
-                    <div style={{ textAlign: "left" }}>
+                    <div style={{ textAlign: "left", marginBottom: hasEducation ? "20px" : 0 }}>
                         <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "12px" }}>Work Experience</h3>
 
                         {/* Current Role (if specified) */}
@@ -403,8 +476,130 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                             <p style={{ fontSize: "12px", color: C.mid }}>No previous work experience added yet.</p>
                         ) : null}
                     </div>
+
+                    {hasEducation && (
+                        <div style={{ textAlign: "left" }}>
+                            <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "12px" }}>Education</h3>
+                            <div style={{ borderRadius: "12px", padding: "14px", background: C.surface, border: `1px solid ${C.border}` }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                    <div style={{ width: "28px", height: "28px", borderRadius: "8px", background: C.border, color: C.dark, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                        <GraduationCap size={16} />
+                                    </div>
+                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                        {college && (
+                                            <div style={{ fontWeight: "bold", color: C.dark, fontSize: "13px", marginBottom: "2px", overflowWrap: "anywhere" }}>
+                                                {college}
+                                            </div>
+                                        )}
+                                        {educationLine && (
+                                            <div style={{ color: C.mid, fontSize: "12px", fontWeight: 600, overflowWrap: "anywhere" }}>
+                                                {educationLine}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {reportOpen && (
+                <div
+                    onClick={closeReport}
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        background: "rgba(30,20,10,0.55)",
+                        backdropFilter: "blur(4px)",
+                        WebkitBackdropFilter: "blur(4px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 1000,
+                        padding: "16px",
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            background: C.surface,
+                            borderRadius: "20px",
+                            maxWidth: "440px",
+                            width: "100%",
+                            padding: "22px",
+                            border: `1px solid ${C.border}`,
+                            boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+                            textAlign: "left",
+                        }}
+                    >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                            <h3 style={{ fontSize: "17px", fontWeight: 700, color: C.dark, margin: 0 }}>Report mentor</h3>
+                            <button
+                                type="button"
+                                onClick={closeReport}
+                                aria-label="Close"
+                                style={{ background: "none", border: "none", cursor: "pointer", color: C.mid, padding: "4px" }}
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <p style={{ fontSize: "12.5px", color: C.mid, marginBottom: "14px", lineHeight: 1.5 }}>
+                            Tell us what is wrong with this profile. Our team will review it.
+                        </p>
+
+                        {reportSuccess ? (
+                            <div style={{ padding: "12px 14px", borderRadius: "10px", background: "#dcfce7", color: "#15803d", fontSize: "13px", fontWeight: 600 }}>
+                                Report submitted. Thank you.
+                            </div>
+                        ) : (
+                            <>
+                                <textarea
+                                    rows={4}
+                                    value={reportReason}
+                                    onChange={(e) => setReportReason(e.target.value)}
+                                    disabled={reportSubmitting}
+                                    placeholder="Describe the issue (minimum 10 characters)"
+                                    style={{
+                                        width: "100%",
+                                        padding: "10px 12px",
+                                        borderRadius: "10px",
+                                        border: `1px solid ${C.border}`,
+                                        background: C.bg,
+                                        color: C.dark,
+                                        fontSize: "13px",
+                                        resize: "none",
+                                        outline: "none",
+                                    }}
+                                />
+                                {reportError && (
+                                    <div style={{ marginTop: "10px", padding: "8px 12px", borderRadius: "8px", background: "#fee2e2", color: "#dc2626", fontSize: "12.5px", fontWeight: 600 }}>
+                                        {reportError}
+                                    </div>
+                                )}
+                                <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                                    <button
+                                        type="button"
+                                        onClick={closeReport}
+                                        disabled={reportSubmitting}
+                                        style={{ flex: 1, padding: "11px", borderRadius: "10px", fontSize: "13px", fontWeight: 600, background: C.border, color: C.dark, border: "none", cursor: "pointer" }}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleSubmitReport}
+                                        disabled={reportSubmitting}
+                                        style={{ flex: 1, padding: "11px", borderRadius: "10px", fontSize: "13px", fontWeight: 700, background: "#dc2626", color: "#fff", border: "none", cursor: reportSubmitting ? "not-allowed" : "pointer", opacity: reportSubmitting ? 0.6 : 1 }}
+                                    >
+                                        {reportSubmitting ? "Submitting..." : "Submit report"}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
