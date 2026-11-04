@@ -798,10 +798,17 @@ class StudyGroupService {
    */
   static async createGroup(groupData: CreateGroupData): Promise<GroupResponse> {
     try {
-      const { data } = await api.post(
-        `${config.NEXT_PUBLIC_CREATE_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_CREATE_STUDY_GROUP_ENDPOINT}`,
-        groupData
+      // Backend route: POST /api/v1/study-group/groups/create
+      // Pehle env unset hone par URL "undefined" ban jaata tha, aur env ko sirf base
+      // ("/study-group/groups") set karne par POST "/" jaata tha. Dono 404 dete the.
+      // Ab: unset => default, base => "/create" append, full path => as it is.
+      const createUrl = joinUrl(
+        config.NEXT_PUBLIC_CREATE_STUDY_GROUP_ENDPOINT ||
+          process.env.NEXT_PUBLIC_CREATE_STUDY_GROUP_ENDPOINT ||
+          "/study-group/groups",
+        "/create"
       );
+      const { data } = await api.post(createUrl, groupData);
       return data.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {

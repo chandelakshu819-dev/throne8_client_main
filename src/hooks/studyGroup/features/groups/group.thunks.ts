@@ -45,7 +45,9 @@ export const createGroupThunk = createAsyncThunk(
       const group = await StudyGroupService.createGroup(groupData);
       return group;
     } catch (error: any) {
-      return rejectWithValue(error.message || "Failed to create group");
+      return rejectWithValue(
+        error.response?.data?.message || error.message || "Failed to create group"
+      );
     }
   }
 );

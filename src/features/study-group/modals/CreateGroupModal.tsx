@@ -179,6 +179,10 @@ const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       setCreatedGroupId(group.groupId); // save groupId for share APIs
       setStep('success');
       if (onGroupCreated) onGroupCreated(formData, ''); // link will come async
+    } else if (createGroupThunk.rejected.match(response)) {
+      setError(
+        (response.payload as string) || 'Failed to create group. Please try again.'
+      );
     }
   };
 
