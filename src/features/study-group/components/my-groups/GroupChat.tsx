@@ -534,6 +534,13 @@ const GroupChat = ({
     }
   }, [groupId, dispatch]);
 
+  // Refetch doubts every time the doubts tab is activated (keeps data fresh after refresh)
+  useEffect(() => {
+    if (activeTab === "doubts" && groupId) {
+      dispatch(fetchGroupDoubtsThunk({ groupId }));
+    }
+  }, [activeTab, groupId, dispatch]);
+
   // Auto-scroll chat
   useEffect(() => {
     if (activeTab === "chat") {

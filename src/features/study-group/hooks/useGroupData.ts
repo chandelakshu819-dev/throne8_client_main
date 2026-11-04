@@ -189,15 +189,27 @@ export const useGroupData = () => {
     };
   }, [resolveUserIds]);
 
-  const getUserInfoSync = useCallback((userId: string): UserInfo => {
-    return globalUserCache[userId] ?? {
-      userId,
-      name: userId.slice(0, 8) + '...',
-      avatar: null,
-      headline: '',
-      email: '',
-    };
-  }, []);
+  // Accepts a plain userId string, or a populated user object ({ _id | userId | id }).
+  // Pehle sirf string assume hota tha: object aane par `userId.slice` TypeError deta tha
+  // aur poora chat render crash ho jaata tha.
+  const getUserInfoSync = useCallback(
+    (
+      user: string | { _id?: string; userId?: string; id?: string } | null | undefined
+    ): UserInfo => {
+      const userId =
+        typeof user === 'string'
+          ? user
+          : user?.userId ?? user?._id ?? user?.id ?? '';
+      return globalUserCache[userId] ?? {
+        userId,
+        name: userId ? userId.slice(0, 8) + '...' : 'Unknown',
+        avatar: null,
+        headline: '',
+        email: '',
+      };
+    },
+    []
+  );
 
   const fetchGroupMembers = useCallback(async (groupId: string) => {
     try {

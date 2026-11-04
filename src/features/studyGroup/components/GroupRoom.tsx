@@ -1479,8 +1479,10 @@ ADD this block just before your main `return (` statement:
             {/* Members View */}
             {showMembers && !showChat && (
               <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-2">
+                {members.length === 0 && (
+                  <div className="text-center text-xs text-[#6b5847] mt-8">No members yet.</div>
+                )}
                 {members
-                  .filter((m) => m.userId !== currentUserId)
                   .map((member) => (
                     <div
                       key={member.id}
@@ -1510,7 +1512,7 @@ ADD this block just before your main `return (` statement:
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-[#4a3728] text-xs lg:text-sm truncate">
-                            {member.name}
+                            {member.userId === currentUserId ? "You" : member.name}
                           </div>
                           <div className="text-xs text-[#6b5847] tabular-nums">
                             {formatTime(member.studyTime)} • Rank #{member.rank}
@@ -1689,8 +1691,10 @@ ADD this block just before your main `return (` statement:
             {/* Members View */}
             {showMembers && !showChat && (
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {members.length === 0 && (
+                  <div className="text-center text-xs text-[#6b5847] mt-8">No members yet.</div>
+                )}
                 {members
-                  .filter((m) => m.userId !== currentUserId)
                   .map((member) => (
                     <div
                       key={member.id}
@@ -1720,7 +1724,7 @@ ADD this block just before your main `return (` statement:
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-[#4a3728] text-sm">
-                            {member.name}
+                            {member.userId === currentUserId ? "You" : member.name}
                           </div>
                           <div className="text-xs text-[#6b5847] tabular-nums">
                             {formatTime(member.studyTime)} • Rank #{member.rank}

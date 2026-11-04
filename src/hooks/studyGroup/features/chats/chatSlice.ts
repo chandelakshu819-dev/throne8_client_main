@@ -372,6 +372,8 @@ const chatSlice = createSlice({
             state.messagesByGroup[groupId].push({
               ...message,
               messageId,
+              // sender kabhi populated object aata hai: socket handler jaisa string id me normalize
+              sender: message.sender?._id || message.sender,
             });
           }
         }
