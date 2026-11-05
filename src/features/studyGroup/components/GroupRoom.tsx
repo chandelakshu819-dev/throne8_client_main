@@ -30,6 +30,7 @@ import {
   Bell,
   Zap,
   Megaphone,
+  CheckCircle2,
 } from "lucide-react";
 import {
   fetchGroupByIdThunk,
@@ -143,6 +144,15 @@ const SelfVideo: React.FC<{ stream: MediaStream | null; className?: string }> = 
 
 
 
+
+// Desktop header button styles: one size, one theme.
+const HDR_BTN =
+  "inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
+const HDR_PRIMARY = `${HDR_BTN} bg-[#4a3728] text-white shadow-sm hover:bg-[#3a2a1e]`;
+const HDR_WARM = `${HDR_BTN} bg-[#8b7355] text-white shadow-sm hover:bg-[#6b5847]`;
+const HDR_OUTLINE = `${HDR_BTN} border border-[#d4c4b5] bg-white/70 text-[#4a3728] hover:bg-white`;
+const HDR_DANGER_OUTLINE = `${HDR_BTN} border border-red-200 bg-white/70 text-red-600 hover:bg-red-50`;
+const HDR_DANGER = `${HDR_BTN} bg-red-600 text-white shadow-sm hover:bg-red-700`;
 
 const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const router = useRouter();
@@ -773,6 +783,14 @@ ADD this block just before your main `return (` statement:
     console.error("[WebRTC Error]", webrtcError);
   }
 
+  const onlineOthers = members.filter(
+    (m) => m.isOnline && m.userId !== currentUserId
+  );
+  const tileCount = onlineOthers.length + 1;
+  const selfInitials = (user?.name ?? user?.email ?? "Y")
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] flex flex-col z-50">
       {/* Header - Responsive */}
@@ -918,46 +936,45 @@ ADD this block just before your main `return (` statement:
           )}
         </div>
 
-        {/* Desktop Header - Professional & Elegant */}
-        <div className="hidden lg:flex items-center justify-between gap-6 px-6 py-4">
+        {/* Desktop Header */}
+        <div className="hidden lg:flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-3">
           {/* Left Section - Group Identity */}
-          <div className="flex items-center gap-6">
+          <div className="flex min-w-0 items-center gap-4">
             <button
               onClick={() => router.push("/study/my-groups")}
-              className="text-[#6b5847] hover:text-[#4a3728] transition-all text-sm font-medium flex items-center gap-1.5"
+              className="flex shrink-0 items-center gap-1 text-sm font-medium text-[#6b5847] transition-all hover:text-[#4a3728]"
             >
               <ChevronLeft size={18} />
               <span>Back</span>
             </button>
 
-            <div className="h-10 w-px bg-[#d4c4b5]"></div>
+            <div className="h-10 w-px shrink-0 bg-[#d4c4b5]"></div>
 
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl xl:text-2xl font-bold text-[#4a3728] tracking-tight">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="max-w-[240px] truncate text-xl font-bold tracking-tight text-[#4a3728] xl:text-2xl">
                   {groupData.title}
                 </h1>
                 {groupData.leaderId === currentUserId && (
-                  <span className="px-3 py-1 bg-[#8b7355] text-white text-xs font-bold rounded-full uppercase tracking-wider">
+                  <span className="shrink-0 rounded-full bg-[#8b7355] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
                     Host
                   </span>
                 )}
               </div>
-              <p className="text-sm text-[#6b5847] mt-0.5">
+              <p className="max-w-[240px] truncate text-sm text-[#6b5847]">
                 {groupData.category}
               </p>
             </div>
           </div>
 
           {/* Center Section - Live Stats */}
-          <div className="flex items-center gap-8">
-            {/* Session Timer */}
+          <div className="flex shrink-0 items-center gap-6">
             <div className="text-center">
-              <div className="text-xs font-semibold text-[#6b5847] uppercase tracking-wider mb-1">
+              <div className="mb-1 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-[#6b5847]">
                 Session Time
               </div>
               <div
-                className={`text-2xl xl:text-3xl font-bold tabular-nums tracking-tight ${isSessionActive ? "text-green-600" : "text-[#4a3728]"
+                className={`text-2xl font-bold tabular-nums tracking-tight xl:text-3xl ${isSessionActive ? "text-green-600" : "text-[#4a3728]"
                   }`}
               >
                 {formatTime(studyTime)}
@@ -966,15 +983,13 @@ ADD this block just before your main `return (` statement:
 
             <div className="h-12 w-px bg-[#d4c4b5]"></div>
 
-            {/* Online Members */}
             <div className="text-center">
-              <div className="text-xs font-semibold text-[#6b5847] uppercase tracking-wider mb-1">
+              <div className="mb-1 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-[#6b5847]">
                 Active Now
               </div>
-
-              <div className="text-2xl xl:text-3xl font-bold text-[#4a3728] tabular-nums">
+              <div className="text-2xl font-bold tabular-nums text-[#4a3728] xl:text-3xl">
                 {activeCount}
-                <span className="text-lg text-[#6b5847] ml-1">
+                <span className="ml-1 text-lg text-[#6b5847]">
                   / {groupData.currentMemberCount}
                 </span>
               </div>
@@ -982,33 +997,34 @@ ADD this block just before your main `return (` statement:
 
             <div className="h-12 w-px bg-[#d4c4b5]"></div>
 
-            {/* Streak */}
             <div className="text-center">
-              <div className="text-xs font-semibold text-[#6b5847] uppercase tracking-wider mb-1">
+              <div className="mb-1 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-[#6b5847]">
                 Day Streak
               </div>
-              <div className="text-2xl xl:text-3xl font-bold text-[#8b7355] tabular-nums">
+              <div className="text-2xl font-bold tabular-nums text-[#8b7355] xl:text-3xl">
                 {userStreak ?? 0}
               </div>
             </div>
           </div>
 
           {/* Right Section - Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               onClick={() => setShowAnnouncementModal(true)}
-              className="px-4 py-2 bg-white/60 hover:bg-white/80 text-[#6b5847] hover:text-[#4a3728] rounded-lg transition-all text-sm font-medium backdrop-blur-sm border border-[#d4c4b5]"
+              className={HDR_OUTLINE}
             >
+              <Megaphone size={15} />
               Announcements
             </button>
 
-            {/* Desktop header check-in */}
+            {/* Attendance */}
             {attendanceStatus?.hasCheckedInToday ? (
               <button
                 disabled
-                className="px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-semibold opacity-90 cursor-default flex items-center gap-1.5"
+                className={`${HDR_BTN} cursor-default border border-[#c9d4bd] bg-[#e6ece0] text-[#4f6b3a] disabled:opacity-100`}
               >
-                ✅ Checked In
+                <CheckCircle2 size={15} />
+                Checked In
               </button>
             ) : (
               <button
@@ -1022,23 +1038,25 @@ ADD this block just before your main `return (` statement:
                   }
                 }}
                 disabled={attendanceCheckInLoading}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold disabled:opacity-50 transition-all shadow-sm"
+                className={HDR_WARM}
               >
-                {attendanceCheckInLoading ? "Checking In..." : "✅ Check In"}
+                <CheckCircle2 size={15} />
+                {attendanceCheckInLoading ? "Checking In..." : "Check In"}
               </button>
             )}
 
+            {/* Live room */}
             {activeLiveRoom ? (
               <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-600 rounded-full text-xs font-semibold border border-red-500/20 animate-pulse">
-                  <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                <span className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border border-red-500/20 bg-red-500/10 px-3 text-xs font-semibold text-red-600">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-red-500"></span>
                   Live
                 </span>
                 {!isUserInLiveRoom && (
                   <button
                     onClick={handleJoinLiveRoom}
                     disabled={liveRoomActionLoading}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold disabled:opacity-50 transition-all shadow-sm"
+                    className={HDR_WARM}
                   >
                     Enter Room
                   </button>
@@ -1048,7 +1066,7 @@ ADD this block just before your main `return (` statement:
                     <button
                       onClick={handleEndOrLeaveLiveRoom}
                       disabled={liveRoomActionLoading}
-                      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold disabled:opacity-50 transition-all shadow-sm"
+                      className={HDR_DANGER}
                     >
                       End Room
                     </button>
@@ -1058,27 +1076,32 @@ ADD this block just before your main `return (` statement:
               <button
                 onClick={() => setShowLiveRoomModal(true)}
                 disabled={liveRoomActionLoading || activeLiveRoomLoading}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-bold disabled:opacity-50 transition-all shadow-sm"
+                className={HDR_OUTLINE}
               >
+                <Video size={15} />
                 Start Live Room
               </button>
             )}
+
             <button
               onClick={() => router.push(`/study/my-groups/${groupId}/chat`)}
-              className="px-5 py-2.5 bg-[#8b7355] hover:bg-[#6b5847] text-white rounded-lg transition-all text-sm font-bold shadow-sm"
+              className={HDR_OUTLINE}
             >
+              <MessageCircle size={15} />
               Chat Room
             </button>
 
+            {/* Primary action */}
             <button
               onClick={handleToggleSession}
               disabled={timerApiLoading}
-              className={`px-5 py-2.5 rounded-lg font-bold transition-all text-sm shadow-sm disabled:opacity-60 disabled:cursor-not-allowed
-                ${isSessionActive
-                  ? "bg-amber-500 hover:bg-amber-600 text-white"
-                  : "bg-green-600 hover:bg-green-700 text-white"
-                }`}
+              className={
+                isSessionActive
+                  ? `${HDR_BTN} bg-[#b9803f] text-white shadow-sm hover:bg-[#a06e33]`
+                  : HDR_PRIMARY
+              }
             >
+              {isSessionActive ? <Pause size={15} /> : <Play size={15} />}
               {isSessionActive
                 ? "Pause Session"
                 : activeSession?.status === "paused"
@@ -1086,10 +1109,8 @@ ADD this block just before your main `return (` statement:
                 : "Start Session"}
             </button>
 
-            <button
-              onClick={handleLeaveRoom}
-              className="px-4 py-2 text-[#6b5847] hover:text-red-600 transition-all text-sm font-medium"
-            >
+            <button onClick={handleLeaveRoom} className={HDR_DANGER_OUTLINE}>
+              <LogOut size={15} />
               Leave
             </button>
           </div>
@@ -1113,7 +1134,7 @@ ADD this block just before your main `return (` statement:
                         className="absolute inset-0 w-full h-full object-cover" />
 
                     ) : (
-                      <div className="text-5xl">📹</div>
+                      <Video size={40} className="text-white/90" />
                     )}
                   </div>
                 ) : (
@@ -1238,131 +1259,162 @@ ADD this block just before your main `return (` statement:
           </div>
 
           {/* Desktop View - Video Grid */}
-          <div className="hidden lg:grid grid-cols-3 gap-4 max-w-6xl mx-auto">
-            {/* Self Video */}
-            <div className="relative aspect-video bg-gradient-to-br from-[#8b7355] to-[#6b5847] rounded-xl overflow-hidden border-4 border-[#8b7355] shadow-xl">
-              <div className="absolute inset-0 flex items-center justify-center">
-                {camOn ? (
-                  selfStream ? (
-                    <SelfVideo
-                      stream={selfStream}
-                      className="w-full h-full object-cover"
-                    />
+          <div className="hidden lg:flex min-h-full flex-col items-center justify-center gap-6">
+            <div
+              className={`grid w-full gap-4 ${
+                tileCount === 1
+                  ? "max-w-3xl grid-cols-1"
+                  : tileCount === 2
+                  ? "max-w-5xl grid-cols-2"
+                  : "max-w-6xl grid-cols-3"
+              }`}
+            >
+              {/* Self Video */}
+              <div className="relative aspect-video overflow-hidden rounded-xl border-4 border-[#8b7355] bg-gradient-to-br from-[#8b7355] to-[#6b5847] shadow-xl">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  {camOn ? (
+                    selfStream ? (
+                      <SelfVideo
+                        stream={selfStream}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-white/90">
+                        <Video size={36} />
+                        <span className="text-sm font-medium">
+                          Starting camera...
+                        </span>
+                      </div>
+                    )
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <div className="text-6xl">📹</div>
+                    <div className="flex flex-col items-center gap-3 text-center">
+                      {user?.avatar ? (
+                        <img
+                          src={user.avatar}
+                          alt="You"
+                          className="h-24 w-24 rounded-full border-4 border-white/30 object-cover shadow-xl"
+                        />
+                      ) : (
+                        <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-white/30 bg-white/20">
+                          <span className="text-3xl font-bold text-white">
+                            {selfInitials}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5 text-base font-semibold text-white">
+                        <VideoOff size={16} />
+                        Camera Off
+                      </div>
                     </div>
-                  )
-                ) : (
-                  <div className="text-center">
-                    <div className="text-6xl mb-2">👤</div>
-                    <div className="text-white font-semibold">Camera Off</div>
+                  )}
+                </div>
+
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-4 pt-10">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="block truncate text-base font-semibold text-white">
+                        You
+                      </span>
+                      <div className="flex items-center gap-1.5 text-sm tabular-nums text-white/90">
+                        <Clock size={14} />
+                        {formatTime(studyTime)}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 gap-1">
+                      {micOn ? (
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500">
+                          <Mic size={16} className="text-white" />
+                        </div>
+                      ) : (
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500">
+                          <MicOff size={16} className="text-white" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* LIVE only while you are actually inside a live room */}
+                {isUserInLiveRoom && activeLiveRoom && (
+                  <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-red-500 px-2.5 py-1 text-xs font-bold text-white">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white"></span>
+                    LIVE
                   </div>
                 )}
-              </div>
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-white font-semibold text-sm">
-                      You
-                    </span>
-                    <div className="flex items-center gap-1 text-xs text-white/80 tabular-nums">
-                      <Clock size={10} />
-                      {formatTime(studyTime)}
+                {isSessionActive ? (
+                  <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-green-500 px-2.5 py-1 text-xs font-bold text-white">
+                    <div className="h-2 w-2 animate-pulse rounded-full bg-white"></div>
+                    ACTIVE
+                  </div>
+                ) : (
+                  activeSession?.status === "paused" && (
+                    <div className="absolute right-3 top-3 rounded-full bg-amber-500 px-2.5 py-1 text-xs font-bold text-white">
+                      PAUSED
                     </div>
-                  </div>
-                  <div className="flex gap-1">
-                    {micOn ? (
-                      <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                        <Mic size={14} className="text-white" />
-                      </div>
-                    ) : (
-                      <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                        <MicOff size={14} className="text-white" />
-                      </div>
-                    )}
-
-                  </div>
-                </div>
+                  )
+                )}
               </div>
-              <div className="absolute top-3 left-3 px-2 py-1 bg-red-500 rounded-full text-xs font-bold text-white">
-                LIVE
-              </div>
-              {isSessionActive && (
-                <div className="absolute top-3 right-3 px-2 py-1 bg-green-500 rounded-full text-xs font-bold text-white flex items-center gap-1">
-                  <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                  ACTIVE
-                </div>
-              )}
-            </div>
 
-            {/* Other Members — Desktop */}
-            {members
-              .filter((m) => m.isOnline && m.userId !== currentUserId)
-              .map((member) => (
+              {/* Other Members - Desktop */}
+              {onlineOthers.map((member) => (
                 <div
                   key={member.id}
-                  className={`relative aspect-video bg-gradient-to-br from-[#4a3728] to-[#6b5847] rounded-xl overflow-hidden shadow-lg ${member.isSpeaking
-                    ? "ring-4 ring-green-500"
-                    : "border-2 border-[#e0d8cf]"
-                    }`}
+                  className={`relative aspect-video overflow-hidden rounded-xl bg-gradient-to-br from-[#4a3728] to-[#6b5847] shadow-lg ${
+                    member.isSpeaking
+                      ? "ring-4 ring-green-500"
+                      : "border-2 border-[#e0d8cf]"
+                  }`}
                 >
                   <div className="absolute inset-0 flex items-center justify-center">
                     {member.avatar ? (
                       <img
                         src={member.avatar}
                         alt={member.name}
-                        className="w-24 h-24 rounded-full object-cover border-4 border-white/30 shadow-xl"
+                        className="h-24 w-24 rounded-full border-4 border-white/30 object-cover shadow-xl"
                       />
                     ) : (
                       <div className="text-center">
-                        <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-2 border-2 border-white/30">
-                          <span className="text-white font-bold text-2xl">
+                        <div className="mx-auto mb-2 flex h-20 w-20 items-center justify-center rounded-full border-2 border-white/30 bg-white/20">
+                          <span className="text-2xl font-bold text-white">
                             {member.name.slice(0, 2).toUpperCase()}
                           </span>
-                        </div>
-                        <div className="text-white font-semibold text-sm">
-                          {member.name}
                         </div>
                       </div>
                     )}
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-white font-semibold text-sm truncate">
-                          {member.userId === currentUserId
-                            ? "You"
-                            : member.name}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-4 pt-10">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <span className="block truncate text-base font-semibold text-white">
+                          {member.name}
                         </span>
-                        <div className="flex items-center gap-2 text-xs text-white/80">
-                          <div className="flex items-center gap-1 tabular-nums">
-                            <Clock size={10} />
-                            {member.userId === currentUserId
-                              ? formatTime(studyTime)
-                              : formatTime(
-                                memberSessionTimes[member.userId] ?? 0
-                              )}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {member.role === "leader"
-                              ? "👑"
-                              : `#${member.rank}`}
+                        <div className="flex items-center gap-2 text-sm text-white/90">
+                          <div className="flex items-center gap-1.5 tabular-nums">
+                            <Clock size={14} />
+                            {formatTime(memberSessionTimes[member.userId] ?? 0)}
                           </div>
                         </div>
                       </div>
-                      <div className="flex gap-1 shrink-0">
-                        <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                          <MicOff size={14} className="text-white" />
+                      <div className="flex shrink-0 gap-1">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500">
+                          <MicOff size={16} className="text-white" />
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div className="absolute top-3 right-3 px-2 py-1 bg-[#8b7355] rounded-full text-xs font-bold text-white">
-                    {member.role === "leader" ? "👑" : `#${member.rank}`}
+                  <div className="absolute right-3 top-3 rounded-full bg-[#8b7355] px-2.5 py-1 text-xs font-bold text-white">
+                    {member.role === "leader" ? "\u{1F451}" : `#${member.rank}`}
                   </div>
                 </div>
               ))}
+            </div>
+
+            {onlineOthers.length === 0 && (
+              <div className="flex items-center gap-2 rounded-full border border-[#d4c4b5] bg-white/70 px-4 py-2 text-sm text-[#6b5847]">
+                <Users size={16} className="text-[#8b7355]" />
+                Waiting for other members to come online.
+              </div>
+            )}
           </div>
         </div>
 
