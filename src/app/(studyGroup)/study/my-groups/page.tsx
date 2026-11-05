@@ -854,15 +854,15 @@ export default function MyGroups() {
         <div className="bg-white rounded-lg sm:rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 border-2 border-[#e0d8cf]">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
             <div className="flex gap-1.5 sm:gap-2 overflow-x-auto">
-              <button onClick={() => setActiveTab("all")} className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all whitespace-nowrap ${activeTab === "all" ? "bg-linear-to-r from-[#8b7355] to-[#6b5847] text-white shadow-md" : "bg-[#f6ede8] text-[#4a3728] hover:bg-[#e0d8cf]"}`}>
+              <button onClick={() => setActiveTab("all")} className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all whitespace-nowrap ${activeTab === "all" ? "bg-gradient-to-r from-[#8b7355] to-[#6b5847] text-white shadow-md" : "bg-[#f6ede8] text-[#4a3728] hover:bg-[#e0d8cf]"}`}>
                 All Groups ({stats.totalGroups})
               </button>
-              <button onClick={() => setActiveTab("created")} className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all flex items-center gap-1 whitespace-nowrap ${activeTab === "created" ? "bg-linear-to-r from-[#8b7355] to-[#6b5847] text-white shadow-md" : "bg-[#f6ede8] text-[#4a3728] hover:bg-[#e0d8cf]"}`}>
+              <button onClick={() => setActiveTab("created")} className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all flex items-center gap-1 whitespace-nowrap ${activeTab === "created" ? "bg-gradient-to-r from-[#8b7355] to-[#6b5847] text-white shadow-md" : "bg-[#f6ede8] text-[#4a3728] hover:bg-[#e0d8cf]"}`}>
                 <Crown size={14} className="sm:w-4 sm:h-4" />
                 <span className="hidden xs:inline">Created ({stats.createdGroups})</span>
                 <span className="xs:hidden">({stats.createdGroups})</span>
               </button>
-              <button onClick={() => setActiveTab("joined")} className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all flex items-center gap-1 whitespace-nowrap ${activeTab === "joined" ? "bg-linear-to-r from-[#8b7355] to-[#6b5847] text-white shadow-md" : "bg-[#f6ede8] text-[#4a3728] hover:bg-[#e0d8cf]"}`}>
+              <button onClick={() => setActiveTab("joined")} className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all flex items-center gap-1 whitespace-nowrap ${activeTab === "joined" ? "bg-gradient-to-r from-[#8b7355] to-[#6b5847] text-white shadow-md" : "bg-[#f6ede8] text-[#4a3728] hover:bg-[#e0d8cf]"}`}>
                 <UserPlus size={14} className="sm:w-4 sm:h-4" />
                 <span className="hidden xs:inline">Joined ({stats.joinedGroups})</span>
                 <span className="xs:hidden">({stats.joinedGroups})</span>
@@ -900,7 +900,7 @@ export default function MyGroups() {
             <p className="text-sm sm:text-base text-[#6b5847] mb-3 sm:mb-4">
               {searchQuery ? "Try adjusting your search query" : activeTab === "created" ? "You haven't created any groups yet" : "You haven't joined any groups yet"}
             </p>
-            <button className="px-4 sm:px-6 py-2 bg-linear-to-r from-[#8b7355] to-[#6b5847] hover:from-[#6b5847] hover:to-[#4a3728] text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl text-sm sm:text-base">Browse Groups</button>
+            <button className="px-4 sm:px-6 py-2 bg-gradient-to-r from-[#8b7355] to-[#6b5847] hover:from-[#6b5847] hover:to-[#4a3728] text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl text-sm sm:text-base">Browse Groups</button>
           </div>
         )}
 

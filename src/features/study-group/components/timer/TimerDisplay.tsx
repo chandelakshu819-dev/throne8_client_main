@@ -58,7 +58,7 @@ export default function TimerDisplay({ progress }: TimerDisplayProps) {
             key={idx}
             className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-all duration-300 ${
               idx < Math.floor(progress / 12.5)
-                ? 'bg-linear-to-r from-[#4a3728] to-[#6b4e3d] shadow-sm'
+                ? 'bg-gradient-to-r from-[#4a3728] to-[#6b4e3d] shadow-sm'
                 : 'bg-[#e0d8cf]/50'
             }`}
           ></div>

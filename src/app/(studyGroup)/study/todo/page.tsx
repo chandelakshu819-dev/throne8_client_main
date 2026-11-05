@@ -55,7 +55,7 @@ export default function CalendarTodo() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br p-3 mt-26 sm:p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br p-3 sm:p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         <CalendarHeader
           currentDate={currentDate}

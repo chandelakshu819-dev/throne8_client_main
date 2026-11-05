@@ -50,7 +50,7 @@
 //                 onClick={() => onTabChange(id)}
 //                 className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all whitespace-nowrap flex items-center gap-1 ${
 //                   isActive
-//                     ? 'bg-linear-to-r from-[#8b7355] to-[#6b5847] text-white shadow-md'
+//                     ? 'bg-gradient-to-r from-[#8b7355] to-[#6b5847] text-white shadow-md'
 //                     : 'bg-[#f6ede8] text-[#4a3728] hover:bg-[#e0d8cf]'
 //                 }`}
 //               >

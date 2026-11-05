@@ -5,6 +5,17 @@ const config: Config = {
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
+    // `xs` breakpoint pehle define nahi tha, isliye `xs:` wali classes (e.g. `hidden xs:inline`)
+    // kabhi apply nahi hoti thi. Poori list order me di hai (extend nahi) taaki xs
+    // CSS me sm/md/lg se PEHLE aaye aur bade breakpoints ko override na kare.
+    screens: {
+      xs: "475px",
+      sm: "640px",
+      md: "768px",
+      lg: "1024px",
+      xl: "1280px",
+      "2xl": "1536px",
+    },
     extend: {
       colors: {
         background: "var(--background)",

@@ -103,7 +103,7 @@ export default function StudyProgress({ onViewSession }: StudyProgressProps) {
             studySessions.map((session, index) => (
               <div
                 key={index}
-                className="bg-linear-to-r from-[#e0d8cf]/40 to-[#e0d8cf]/20 rounded-lg p-2.5 sm:p-3 border border-[#e0d8cf]/50 flex items-center justify-between"
+                className="bg-gradient-to-r from-[#e0d8cf]/40 to-[#e0d8cf]/20 rounded-lg p-2.5 sm:p-3 border border-[#e0d8cf]/50 flex items-center justify-between"
               >
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-[#4a3728] to-[#6b4e3d] rounded-lg flex items-center justify-center text-[#f6ede8] font-black text-[10px] sm:text-xs">
@@ -147,7 +147,7 @@ export default function StudyProgress({ onViewSession }: StudyProgressProps) {
                 <div
                   key={session.sessionId}
                   onClick={() => setActiveSession(session)}
-                  className="bg-linear-to-r from-[#e0d8cf]/40 to-[#e0d8cf]/20 rounded-lg p-2.5 sm:p-3 border border-[#e0d8cf]/50 flex items-center justify-between cursor-pointer hover:shadow-sm transition-shadow"
+                  className="bg-gradient-to-r from-[#e0d8cf]/40 to-[#e0d8cf]/20 rounded-lg p-2.5 sm:p-3 border border-[#e0d8cf]/50 flex items-center justify-between cursor-pointer hover:shadow-sm transition-shadow"
                 >
                   {/* ADD: hover cross button — top right corner */}
                   <button

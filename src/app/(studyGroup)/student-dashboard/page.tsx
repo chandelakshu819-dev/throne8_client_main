@@ -45,6 +45,7 @@ import {
 import SkeletonLoader from "@/app/loading";
 import { StatsPeriod, MainTab } from "@/features/studyGroup/types";
 import { useGroupData } from "@/features/study-group/hooks/useGroupData";
+import DashboardGroupCard from "@/features/studyGroup/components/DashboardGroupCard";
 
 export default function StudentDashboard() {
   const dispatch = useAppDispatch();
@@ -337,74 +338,9 @@ export default function StudentDashboard() {
                 <h2 className="text-base font-bold text-[#4a3728] mb-3">
                   My Study Groups
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {myGroups.map((group: any) => (
-                    <div
-                      key={group.groupId}
-                      className="border border-[#d4a574]/30 rounded-lg overflow-hidden hover:border-[#8b6f47] transition-colors"
-                    >
-                      <div className="bg-gradient-to-r from-[#4a3728] to-[#8b6f47] p-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-white text-sm mb-1 truncate">
-                              {group.title}
-                            </h3>
-                            <span className="inline-block bg-white/20 text-white px-2 py-0.5 rounded text-xs">
-                              {group.category}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 text-xs bg-white/20 text-white rounded px-2 py-1 ml-2 flex-shrink-0">
-                            <Users className="w-3 h-3" />
-                            <span>{group.currentMemberCount}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="p-3">
-                        {group.description && (
-                          <p className="text-xs text-[#8b6f47] mb-2 line-clamp-2">
-                            {group.description}
-                          </p>
-                        )}
-
-                        <div className="grid grid-cols-2 gap-1.5 mb-3">
-                          <div className="bg-[#faf8f5] rounded p-1.5 text-center">
-                            <p className="text-[10px] text-[#8b6f47]">
-                              Capacity
-                            </p>
-                            <p className="text-xs font-bold text-[#4a3728]">
-                              {group.currentMemberCount}/{group.capacity}
-                            </p>
-                          </div>
-                          <div className="bg-[#faf8f5] rounded p-1.5 text-center">
-                            <p className="text-[10px] text-[#8b6f47]">Role</p>
-                            <p className="text-xs font-bold text-[#4a3728] capitalize">
-                              {group.memberRole || "member"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {group.tags && group.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mb-3">
-                            {group.tags.slice(0, 3).map((tag: any, i: any) => (
-                              <span
-                                key={i}
-                                className="text-[10px] px-1.5 py-0.5 bg-[#faf8f5] text-[#8b6f47] rounded"
-                              >
-                                #{tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        <Link
-                          href={`/study/my-groups/${group.groupId}`}
-                          className="block w-full bg-gradient-to-r from-[#4a3728] to-[#8b6f47] hover:opacity-90 text-white font-medium py-1.5 rounded text-xs transition-all text-center"
-                        >
-                          View Group
-                        </Link>
-                      </div>
-                    </div>
+                    <DashboardGroupCard key={group.groupId} group={group} />
                   ))}
                 </div>
               </div>
