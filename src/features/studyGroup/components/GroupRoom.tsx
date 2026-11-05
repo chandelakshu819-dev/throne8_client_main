@@ -154,6 +154,15 @@ const HDR_OUTLINE = `${HDR_BTN} border border-[#d4c4b5] bg-white/70 text-[#4a372
 const HDR_DANGER_OUTLINE = `${HDR_BTN} border border-red-200 bg-white/70 text-red-600 hover:bg-red-50`;
 const HDR_DANGER = `${HDR_BTN} bg-red-600 text-white shadow-sm hover:bg-red-700`;
 
+// Bottom control bar styles.
+const CTRL_BASE =
+  "relative flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full text-white shadow-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8b7355] focus-visible:ring-offset-2";
+const CTRL_DARK = `${CTRL_BASE} bg-[#4a3728] hover:bg-[#3a2a1e]`;
+const CTRL_TAN = `${CTRL_BASE} bg-[#8b7355] hover:bg-[#6b5847]`;
+const CTRL_RED = `${CTRL_BASE} bg-red-600 hover:bg-red-700`;
+const CTRL_LABEL =
+  "hidden whitespace-nowrap text-xs font-medium text-[#4a3728] sm:block";
+
 const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const router = useRouter();
   const pendingJoinRef = useRef(false);
@@ -1811,119 +1820,141 @@ ADD this block just before your main `return (` statement:
       )}
 
       {/* Bottom Controls - Fixed, Responsive with Glassmorphism */}
-      <div className="backdrop-blur-md bg-white/40 border-t border-[#d4c4b5] shadow-lg px-3 sm:px-4 md:px-6 py-3 sm:py-4 shrink-0 safe-area-bottom">
-        <div className="flex items-center justify-center gap-2 sm:gap-3 md:gap-4">
-          <button
-            onClick={() => {
-              if (showLiveRoomView) {
-                toggleWebRTCMic();
-                getSocket()?.emit("toggle-mic", {
-                  roomId: activeLiveRoom?.roomId,
-                  micOn: !webrtcMicOn,
-                });
-                dispatch(setLocalMic(!webrtcMicOn));
-              } else {
-                dispatch(setLocalMic(!isMicOn));
-              }
-            }}
-            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${micOn
-              ? "bg-[#8b7355] hover:bg-[#6b5847] text-white"
-              : "bg-[#4a3728] hover:bg-[#4a3728] text-white"
-              }`}
-            title={micOn ? "Mute" : "Unmute"}
-          >
-            {micOn ? (
-              <Mic size={20} className="sm:w-6 sm:h-6" />
-            ) : (
-              <MicOff size={20} className="sm:w-6 sm:h-6" />
-            )}
-          </button>
-
-          <button
-            onClick={async () => {
-              if (showLiveRoomView) {
-                await toggleWebRTCCamera();
-                getSocket()?.emit("toggle-camera", {
-                  roomId: activeLiveRoom?.roomId,
-                  cameraOn: !webrtcCameraOn,
-                });
-                dispatch(setLocalCamera(!webrtcCameraOn));
-              } else {
-                await toggleLocalCamera();
-              }
-            }}
-            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${camOn
-              ? "bg-[#8b7355] hover:bg-[#6b5847] text-white"
-              : "bg-[#4a3728] hover:bg-[#4a3728] text-white"
-              }`}
-            title={camOn ? "Turn off camera" : "Turn on camera"}
-          >
-            {camOn ? (
-              <Video size={20} className="sm:w-6 sm:h-6" />
-            ) : (
-              <VideoOff size={20} className="sm:w-6 sm:h-6" />
-            )}
-          </button>
-
-          {/* Notify Button - All devices */}
-          <button
-            onClick={() => setShowNotificationPopup(!showNotificationPopup)}
-            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg bg-[#4a3728] text-white relative"
-            title="Notify inactive members"
-          >
-            <Bell size={20} className="sm:w-6 sm:h-6" />
-            {groupData.currentMemberCount -
-              members.filter((m) => m.isOnline).length >
-              0 && (
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                  <span className="text-[10px] font-bold text-white">
-                    {groupData.currentMemberCount -
-                      members.filter((m) => m.isOnline).length}
-                  </span>
-                </div>
+      <div className="backdrop-blur-md bg-white/40 border-t border-[#d4c4b5] shadow-lg px-3 sm:px-4 md:px-6 py-3 sm:py-3 shrink-0 safe-area-bottom">
+        <div className="flex items-start justify-center gap-2 sm:gap-4 md:gap-5">
+          {/* Mic */}
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              onClick={() => {
+                if (showLiveRoomView) {
+                  toggleWebRTCMic();
+                  getSocket()?.emit("toggle-mic", {
+                    roomId: activeLiveRoom?.roomId,
+                    micOn: !webrtcMicOn,
+                  });
+                  dispatch(setLocalMic(!webrtcMicOn));
+                } else {
+                  dispatch(setLocalMic(!isMicOn));
+                }
+              }}
+              className={micOn ? CTRL_TAN : CTRL_RED}
+              title={micOn ? "Mute" : "Unmute"}
+              aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
+              aria-pressed={!micOn}
+            >
+              {micOn ? (
+                <Mic size={20} className="sm:w-6 sm:h-6" />
+              ) : (
+                <MicOff size={20} className="sm:w-6 sm:h-6" />
               )}
-          </button>
+            </button>
+            <span className={CTRL_LABEL}>{micOn ? "Mute" : "Unmute"}</span>
+          </div>
 
-          {/* Challenge Button - All devices */}
-          <button
-            onClick={handleCreateChallenge}
-            className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg bg-[#4a3728] text-white"
-            title="Start group challenge"
-          >
-            <Zap size={20} className="sm:w-6 sm:h-6" />
-          </button>
+          {/* Camera */}
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              onClick={async () => {
+                if (showLiveRoomView) {
+                  await toggleWebRTCCamera();
+                  getSocket()?.emit("toggle-camera", {
+                    roomId: activeLiveRoom?.roomId,
+                    cameraOn: !webrtcCameraOn,
+                  });
+                  dispatch(setLocalCamera(!webrtcCameraOn));
+                } else {
+                  await toggleLocalCamera();
+                }
+              }}
+              className={camOn ? CTRL_TAN : CTRL_RED}
+              title={camOn ? "Turn off camera" : "Turn on camera"}
+              aria-label={camOn ? "Turn off camera" : "Turn on camera"}
+              aria-pressed={!camOn}
+            >
+              {camOn ? (
+                <Video size={20} className="sm:w-6 sm:h-6" />
+              ) : (
+                <VideoOff size={20} className="sm:w-6 sm:h-6" />
+              )}
+            </button>
+            <span className={CTRL_LABEL}>
+              {camOn ? "Stop Video" : "Start Video"}
+            </span>
+          </div>
 
-          <button
-            onClick={() => {
-              setShowChat(!showChat);
-              if (showMembers && !showChat) {
-                setShowMembers(false);
-              }
-            }}
-            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${showChat
-              ? "bg-[#8b7355] hover:bg-[#6b5847] text-white"
-              : "bg-[#4a3728] hover:bg-[#4a3728] text-white"
-              }`}
-            title="Toggle chat"
-          >
-            <MessageCircle size={20} className="sm:w-6 sm:h-6" />
-          </button>
+          {/* Remind inactive members */}
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              onClick={() => setShowNotificationPopup(!showNotificationPopup)}
+              className={CTRL_DARK}
+              title="Remind inactive members"
+              aria-label="Remind inactive members"
+            >
+              <Bell size={20} className="sm:w-6 sm:h-6" />
+              {groupData.currentMemberCount -
+                members.filter((m) => m.isOnline).length >
+                0 && (
+                  <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500">
+                    <span className="text-[10px] font-bold text-white">
+                      {groupData.currentMemberCount -
+                        members.filter((m) => m.isOnline).length}
+                    </span>
+                  </div>
+                )}
+            </button>
+            <span className={CTRL_LABEL}>Remind</span>
+          </div>
 
-          <button
-            onClick={() => {
-              setShowMembers(!showMembers);
-              if (showChat && !showMembers) {
-                setShowChat(false);
-              }
-            }}
-            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${showMembers
-              ? "bg-[#8b7355] hover:bg-[#6b5847] text-white"
-              : "bg-[#4a3728] hover:bg-[#4a3728] text-white"
-              }`}
-            title="Toggle members"
-          >
-            <Users size={20} className="sm:w-6 sm:h-6" />
-          </button>
+          {/* Group challenge */}
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              onClick={handleCreateChallenge}
+              className={CTRL_DARK}
+              title="Start group challenge"
+              aria-label="Start group challenge"
+            >
+              <Zap size={20} className="sm:w-6 sm:h-6" />
+            </button>
+            <span className={CTRL_LABEL}>Challenge</span>
+          </div>
+
+          {/* Chat side panel */}
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              onClick={() => {
+                setShowChat(!showChat);
+                if (showMembers && !showChat) {
+                  setShowMembers(false);
+                }
+              }}
+              className={showChat ? CTRL_TAN : CTRL_DARK}
+              title="Toggle chat panel"
+              aria-label="Toggle chat panel"
+              aria-pressed={showChat}
+            >
+              <MessageCircle size={20} className="sm:w-6 sm:h-6" />
+            </button>
+            <span className={CTRL_LABEL}>Chat</span>
+          </div>
+
+          {/* Members side panel */}
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              onClick={() => {
+                setShowMembers(!showMembers);
+                if (showChat && !showMembers) {
+                  setShowChat(false);
+                }
+              }}
+              className={showMembers ? CTRL_TAN : CTRL_DARK}
+              title="Toggle members panel"
+              aria-label="Toggle members panel"
+              aria-pressed={showMembers}
+            >
+              <Users size={20} className="sm:w-6 sm:h-6" />
+            </button>
+            <span className={CTRL_LABEL}>Members</span>
+          </div>
         </div>
       </div>
 
