@@ -14,7 +14,6 @@ import TimerDisplay from '@/features/studyGroup/components/TimerDisplay';
 import CustomTimerControls from '@/features/studyGroup/components/CustomTimerControls';
 import SubjectInput from '@/features/studyGroup/components/SubjectInput';
 import TimerControls from '@/features/studyGroup/components/TimerControls';
-import TimerStats from '@/features/studyGroup/components/TimerStats';
 import MotivationalQuote from '@/features/studyGroup/components/MotivationalQuote';
 import StudyProgress from '@/features/studyGroup/components/StudyProgress';
 import { getActiveTimerThunk, getAllSessionsThunk, getTimerStatsThunk, getTodaySessionsThunk, stopTimerThunk } from '@/hooks/studyGroup/features/timer/timer.thunks';
@@ -110,12 +109,12 @@ export default function PomodoroTimer() {
 
   const totalSeconds = tabDuration * 60;
   const remainingSeconds = (minutes || 0) * 60 + (seconds || 0);
-  const progress = ((totalSeconds - remainingSeconds) / totalSeconds) * 100;
+  const progress = Math.min(100, Math.max(0, ((totalSeconds - remainingSeconds) / totalSeconds) * 100));
 
   return (
-    <div className="min-h-screen bg-[#f7f3ee] flex flex-col items-center justify-start p-3 sm:p-4 lg:p-6 lg:justify-center">
+    <div className="min-h-screen bg-[#f7f3ee] px-3 py-5 sm:px-4 sm:py-6 lg:px-8 lg:py-8">
 
-      {/* ADD: Session complete toast */}
+      {/* Session complete toast */}
       {sessionCompleted && (
         <div className="fixed top-4 right-4 bg-[#4a3728] text-[#f6ede8] px-5 py-3 rounded-xl shadow-lg text-sm font-bold z-50 flex items-center gap-2 animate-in">
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -124,29 +123,40 @@ export default function PomodoroTimer() {
           Session completed! Great work
         </div>
       )}
-      <div className="w-full max-w-7xl flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8 items-start justify-center">
 
-        {/* Left Side - Timer */}
-        <div className="w-full lg:flex-1 lg:max-w-lg">
-          <TimerTabs />
-          <TimerDisplay progress={progress} />
-          {activeTab === 'timer' && <CustomTimerControls />}
-          <SubjectInput />
-          <TimerControls />
-          <TimerStats />
+      <div className="mx-auto w-full max-w-6xl">
+        <header className="mb-6">
+          <h1 className="text-2xl font-bold tracking-tight text-[#4a3728] sm:text-3xl">Study Timer</h1>
+          <p className="mt-1 text-sm text-[#6b5847] sm:text-base">
+            Pick a mode, add what you are studying, then press Start. Finished sessions are saved to Today&apos;s Progress.
+          </p>
+        </header>
+
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+
+          {/* Left: the timer */}
+          <section className="overflow-hidden rounded-2xl border border-[#e0d8cf] bg-white shadow-sm">
+            <div className="h-1 bg-gradient-to-r from-[#4a3728] via-[#8b6f47] to-[#d4a574]" />
+            <div className="space-y-6 p-5 sm:p-6">
+              <TimerTabs />
+              <TimerDisplay progress={progress} />
+              {activeTab === 'timer' && <CustomTimerControls />}
+              <SubjectInput />
+              <TimerControls />
+            </div>
+          </section>
+
+          {/* Right: today's progress, then the quote */}
+          <aside className="flex flex-col gap-4">
+            <StudyProgress onViewSession={(id) => setViewingSessionId(id)} />
+            <MotivationalQuote />
+
+            {viewingSessionId && (
+              <div>{/* SessionDetailModal yahan aayega */}</div>
+            )}
+          </aside>
+
         </div>
-
-        {/* Right Side */}
-        <div className='w-full lg:w-auto flex flex-col gap-4 sm:gap-6 mt-4 lg:mt-0'>
-          <MotivationalQuote />
-          {/* <StudyProgress /> */}
-          <StudyProgress onViewSession={(id) => setViewingSessionId(id)} />
-
-          {viewingSessionId && (
-            <div>{/* SessionDetailModal yahan aayega */}</div>
-          )}
-        </div>
-
       </div>
     </div>
   );

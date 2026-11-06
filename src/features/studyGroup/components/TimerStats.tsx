@@ -8,47 +8,31 @@ export default function TimerStats() {
   const [mounted, setMounted] = useState(false);
   const timerStats = useAppSelector(selectTimerStats);
   const todayMinutes = useAppSelector(selectTodayTotalMinutes) ?? 0;
-  const completedSessions = timerStats?.sessionsToday ?? useAppSelector(state => state.timer.completedSessions) ?? 0;
-  const totalStudyTime = todayMinutes;
+  const localCompleted = useAppSelector(state => state.timer.completedSessions) ?? 0;
   const streakCount = useAppSelector(state => state.timer.streakCount) ?? 0; // no streak API yet
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted) {
-    return (
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3 sm:mt-4">
-        <div className="bg-[#f6ede8]/80 backdrop-blur-md rounded-lg sm:rounded-xl p-2.5 sm:p-3 shadow-lg border border-[#e0d8cf]/50 text-center">
-          <div className="text-xl sm:text-2xl font-black text-[#4a3728] mb-0.5">0</div>
-          <div className="text-[10px] sm:text-xs text-[#4a3728]/70 font-bold uppercase">Sessions</div>
-        </div>
-        <div className="bg-[#f6ede8]/80 backdrop-blur-md rounded-lg sm:rounded-xl p-2.5 sm:p-3 shadow-lg border border-[#e0d8cf]/50 text-center">
-          <div className="text-xl sm:text-2xl font-black text-[#4a3728] mb-0.5">0</div>
-          <div className="text-[10px] sm:text-xs text-[#4a3728]/70 font-bold uppercase">Minutes</div>
-        </div>
-        <div className="bg-[#f6ede8]/80 backdrop-blur-md rounded-lg sm:rounded-xl p-2.5 sm:p-3 shadow-lg border border-[#e0d8cf]/50 text-center">
-          <div className="text-xl sm:text-2xl font-black text-[#4a3728] mb-0.5">0</div>
-          <div className="text-[10px] sm:text-xs text-[#4a3728]/70 font-bold uppercase">Streak</div>
-        </div>
-      </div>
-    );
-  }
+  const sessions = mounted ? timerStats?.sessionsToday ?? localCompleted : 0;
+  const minutes = mounted ? todayMinutes : 0;
+  const streak = mounted ? streakCount : 0;
+
+  const items = [
+    { value: sessions, label: 'Sessions' },
+    { value: minutes, label: 'Minutes' },
+    { value: streak, label: 'Day streak' },
+  ];
 
   return (
-    <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3 sm:mt-4">
-      <div className="bg-[#f6ede8]/80 backdrop-blur-md rounded-lg sm:rounded-xl p-2.5 sm:p-3 shadow-lg border border-[#e0d8cf]/50 text-center">
-        <div className="text-xl sm:text-2xl font-black text-[#4a3728] mb-0.5">{completedSessions}</div>
-        <div className="text-[10px] sm:text-xs text-[#4a3728]/70 font-bold uppercase">Sessions</div>
-      </div>
-      <div className="bg-[#f6ede8]/80 backdrop-blur-md rounded-lg sm:rounded-xl p-2.5 sm:p-3 shadow-lg border border-[#e0d8cf]/50 text-center">
-        <div className="text-xl sm:text-2xl font-black text-[#4a3728] mb-0.5">{totalStudyTime}</div>
-        <div className="text-[10px] sm:text-xs text-[#4a3728]/70 font-bold uppercase">Minutes</div>
-      </div>
-      <div className="bg-[#f6ede8]/80 backdrop-blur-md rounded-lg sm:rounded-xl p-2.5 sm:p-3 shadow-lg border border-[#e0d8cf]/50 text-center">
-        <div className="text-xl sm:text-2xl font-black text-[#4a3728] mb-0.5">{streakCount}</div>
-        <div className="text-[10px] sm:text-xs text-[#4a3728]/70 font-bold uppercase">Streak</div>
-      </div>
+    <div className="grid grid-cols-3 gap-2">
+      {items.map(item => (
+        <div key={item.label} className="rounded-xl bg-[#faf6f1] px-2 py-3 text-center">
+          <div className="text-2xl font-bold tabular-nums text-[#4a3728]">{item.value}</div>
+          <div className="text-xs text-[#6b5847]">{item.label}</div>
+        </div>
+      ))}
     </div>
   );
 }

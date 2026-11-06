@@ -19,9 +19,9 @@ export default function CustomTimerControls() {
   };
 
   return (
-    <div className="mb-4 mt-4 sm:mb-6">
-      <label className="block text-xs font-bold text-[#4a3728]/70 uppercase tracking-wider mb-2 sm:mb-3 text-center">
-        Set Duration (Minutes)
+    <div>
+      <label className="mb-2 block text-center text-sm font-semibold text-[#4a3728]">
+        How long? (use + and - to change by 5 minutes)
       </label>
       <div className="flex items-center justify-center gap-3 sm:gap-4">
         <button

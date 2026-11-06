@@ -7,6 +7,7 @@ import { useAppDispatch } from "@/store/hooks";
 import { TimerSessionResponse } from "@/lib/api/studyGroup.service";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import TimerStats from "./TimerStats";
 
 interface StudyProgressProps {
   onViewSession?: (sessionId: string) => void;
@@ -21,6 +22,13 @@ export default function StudyProgress({ onViewSession }: StudyProgressProps) {
     el.setAttribute('id', 'study-progress-modal-root');
     return el;
   });
+
+  const [todayLabel, setTodayLabel] = useState('');
+  useEffect(() => {
+    setTodayLabel(
+      new Date().toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+    );
+  }, []);
 
   const dispatch = useAppDispatch();
   const totalStudyTime = useAppSelector(selectTodayTotalMinutes);
@@ -40,9 +48,9 @@ export default function StudyProgress({ onViewSession }: StudyProgressProps) {
   };
 
   const formatMinutes = (seconds?: number | null) => {
-    if (seconds == null) return '0 min';
-    const mins = Math.round(seconds / 60);
-    return `${mins} min`;
+    if (seconds == null || seconds === 0) return '0 min';
+    if (seconds < 60) return '< 1 min';
+    return `${Math.round(seconds / 60)} min`;
   };
 
   const formatTime = (value?: string | null) => {
@@ -67,130 +75,113 @@ export default function StudyProgress({ onViewSession }: StudyProgressProps) {
 
 
   return (
-    <div className="w-full lg:w-97">
-      <div className="bg-[#f6ede8]/80 backdrop-blur-md rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl border border-[#e0d8cf]/50 lg:sticky lg:top-4">
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <h2 className="text-lg sm:text-xl font-black text-[#4a3728]">Today&apos;s Progress</h2>
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[#4a3728]" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Total Study Time Today */}
-        <div className="bg-gradient-to-r from-[#e0d8cf]/40 to-[#e0d8cf]/20 rounded-lg sm:rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 border border-[#e0d8cf]/50">
-          <div className="text-center">
-            <div className="text-3xl sm:text-4xl font-black text-[#4a3728] mb-1">
-              {totalStudyTime} min
-            </div>
-            <div className="text-xs font-bold text-[#4a3728]/60 uppercase tracking-wider">
-              Total Study Time
-            </div>
-          </div>
-        </div>
-
-        {/* Subject Breakdown */}
-        <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
-          <h3 className="text-xs sm:text-sm font-bold text-[#4a3728] uppercase tracking-wider mb-2 sm:mb-3">
-            Subject Breakdown
-          </h3>
-          {studySessions.length === 0 ? (
-            <div className="text-center py-6 sm:py-8 text-[#4a3728]/40 text-xs sm:text-sm font-semibold">
-              No study sessions yet. Start a timer!
-            </div>
-          ) : (
-            studySessions.map((session, index) => (
-              <div
-                key={index}
-                className="bg-gradient-to-r from-[#e0d8cf]/40 to-[#e0d8cf]/20 rounded-lg p-2.5 sm:p-3 border border-[#e0d8cf]/50 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-[#4a3728] to-[#6b4e3d] rounded-lg flex items-center justify-center text-[#f6ede8] font-black text-[10px] sm:text-xs">
-                    {session.subject.substring(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="text-xs sm:text-sm font-bold text-[#4a3728]">
-                      {session.subject}
-                    </div>
-                    <div className="text-[10px] sm:text-xs text-[#4a3728]/60 font-semibold">
-                      {session.time} minutes
-                    </div>
-                  </div>
-                </div>
-                <div className="text-base sm:text-lg font-black text-[#4a3728]">
-                  {session.time}m
-                </div>
-              </div>
-            ))
+    <div className="w-full">
+      <div className="rounded-2xl border border-[#e0d8cf] bg-white p-5 shadow-sm lg:sticky lg:top-4">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-[#4a3728]">Today&apos;s Progress</h2>
+          {todayLabel && (
+            <span className="rounded-full bg-[#f6ede8] px-2.5 py-1 text-xs font-medium text-[#6b5847]">
+              {todayLabel}
+            </span>
           )}
         </div>
 
+        <TimerStats />
+
+        {/* Subject Breakdown */}
+        <div className="mt-6">
+          <h3 className="mb-2 text-sm font-semibold text-[#4a3728]">Today by subject</h3>
+          {studySessions.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-[#d4c4b5] px-4 py-5 text-center text-sm text-[#6b5847]">
+              Nothing logged today. Press Start to record your first session.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {studySessions.map((session, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between rounded-xl bg-[#faf6f1] p-2.5"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#4a3728] text-xs font-bold text-white">
+                      {session.subject.substring(0, 2).toUpperCase()}
+                    </div>
+                    <span className="truncate text-sm font-semibold text-[#4a3728]">
+                      {session.subject}
+                    </span>
+                  </div>
+                  <span className="ml-3 flex-shrink-0 text-sm font-bold tabular-nums text-[#4a3728]">
+                    {session.time} min
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Recent Sessions */}
-        <div>
-          <h3 className="text-xs sm:text-sm font-bold text-[#4a3728] uppercase tracking-wider mb-2 sm:mb-3">
-            Recent Sessions
-          </h3>
+        <div className="mt-6">
+          <div className="mb-2 flex items-baseline justify-between">
+            <h3 className="text-sm font-semibold text-[#4a3728]">Recent sessions</h3>
+            {allSessions.length > 0 && (
+              <span className="text-xs text-[#6b5847]">Click one for details</span>
+            )}
+          </div>
           {allSessionsLoading ? (
-            <div className="text-center py-6 sm:py-8 text-[#4a3728]/40 text-xs sm:text-sm font-semibold">
-              Loading...
-            </div>
+            <p className="py-5 text-center text-sm text-[#6b5847]">Loading...</p>
           ) : allSessions.length === 0 ? (
-            <div className="text-center py-6 sm:py-8 text-[#4a3728]/40 text-xs sm:text-sm font-semibold">
-              No sessions found.
-            </div>
+            <p className="rounded-xl border border-dashed border-[#d4c4b5] px-4 py-5 text-center text-sm text-[#6b5847]">
+              No sessions yet.
+            </p>
           ) : (
-            <div
-              className="recentsession space-y-2 sm:space-y-3">
+            <div className="recentsession space-y-2">
               {allSessions.map((session) => (
                 <div
                   key={session.sessionId}
                   onClick={() => setActiveSession(session)}
-                  className="bg-gradient-to-r from-[#e0d8cf]/40 to-[#e0d8cf]/20 rounded-lg p-2.5 sm:p-3 border border-[#e0d8cf]/50 flex items-center justify-between cursor-pointer hover:shadow-sm transition-shadow"
+                  className="group relative flex cursor-pointer items-center justify-between rounded-xl bg-[#faf6f1] p-2.5 transition-colors hover:bg-[#f3ebe1]"
                 >
-                  {/* ADD: hover cross button — top right corner */}
                   <button
                     onClick={(e) => {
-                      e.stopPropagation(); // card click se modal na khule
+                      e.stopPropagation(); // do not open the details modal
                       handleDelete(session.sessionId);
                     }}
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#4a3728] text-[#f6ede8] items-center justify-center hidden group-hover:flex transition-all z-10 hover:bg-red-600"
+                    className="absolute -right-1.5 -top-1.5 z-10 hidden h-5 w-5 items-center justify-center rounded-full bg-[#4a3728] text-[#f6ede8] transition-colors hover:bg-red-600 group-hover:flex"
                     title="Delete session"
+                    aria-label="Delete session"
                   >
-                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
-                  {/* Left: Icon box + name + duration */}
-                  <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-[#4a3728] to-[#6b4e3d] rounded-lg flex items-center justify-center text-[#f6ede8] font-black text-[10px] sm:text-xs shrink-0">
+
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#4a3728] text-xs font-bold text-white">
                       {(session.subject || 'NA').substring(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-xs sm:text-sm font-bold text-[#4a3728] truncate">
-                        {session.subject || 'No subject'}
+                      <div className="truncate text-sm font-semibold text-[#4a3728]">
+                        {session.subject || 'Untitled session'}
                       </div>
-                      <div className="text-[10px] sm:text-xs text-[#4a3728]/60 font-semibold">
-                        {formatMinutes(session.duration)} · {formatTime(session.startTime)} 
-                        {/* — {formatTime(session.endTime)} */}
+                      <div className="text-xs text-[#6b5847]">
+                        {formatMinutes(session.duration)} · {formatTime(session.startTime)}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className={`text-[9px] sm:text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-md ${session.status === 'completed'
-                      ? 'bg-green-100 text-green-700'
-                      : session.status === 'active'
-                        ? 'bg-blue-100 text-blue-700'
+                  <span
+                    className={`ml-2 flex-shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold capitalize ${
+                      session.status === 'completed'
+                        ? 'bg-green-100 text-green-700'
+                        : session.status === 'active'
+                        ? 'bg-sky-100 text-sky-700'
                         : session.status === 'paused'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-[#e0d8cf]/60 text-[#4a3728]/60'
-                      }`}>
-                      {session.status}
-                    </span>
-                  </div>
-
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-[#e0d8cf]/60 text-[#4a3728]/70'
+                    }`}
+                  >
+                    {session.status}
+                  </span>
                 </div>
               ))}
             </div>

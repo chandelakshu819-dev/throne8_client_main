@@ -7,76 +7,89 @@ interface TimerDisplayProps {
   progress: number;
 }
 
+const RADIUS = 88;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
 export default function TimerDisplay({ progress }: TimerDisplayProps) {
   const [mounted, setMounted] = useState(false);
-  
-  const { minutes, seconds, isBreakMode, activeTab } = useAppSelector(state => ({
-    minutes: state.timer.minutes,
-    seconds: state.timer.seconds,
-    isBreakMode: state.timer.isBreakMode,
-    activeTab: state.timer.activeTab,
-  }));
-  
+  const minutesStore = useAppSelector(state => state.timer.minutes);
+  const secondsStore = useAppSelector(state => state.timer.seconds);
+  const isBreakModeStore = useAppSelector(state => state.timer.isBreakMode);
+  const activeTabStore = useAppSelector(state => state.timer.activeTab);
   const completedSessions = useAppSelector(state => state.timer.completedSessions);
+  const isActiveStore = useAppSelector(state => state.timer.isActive);
+  const activeSession = useAppSelector(state => state.timer.activeSession);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted) {
-    return (
-      <div className="bg-[#f6ede8]/80 backdrop-blur-md rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl border border-[#e0d8cf]/50 relative overflow-hidden">
-        <div className="absolute -top-10 -right-10 w-24 h-24 sm:w-32 sm:h-32 bg-gradient-to-br from-[#8b6f47]/10 to-transparent rounded-full blur-2xl"></div>
-        <div className="absolute -bottom-10 -left-10 w-24 h-24 sm:w-32 sm:h-32 bg-gradient-to-br from-[#6b4e3d]/10 to-transparent rounded-full blur-2xl"></div>
-        <div className="flex justify-center gap-1.5 sm:gap-2 mb-3 sm:mb-4 relative">
-          {[...Array(8)].map((_, idx) => (
-            <div key={idx} className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#e0d8cf]/50"></div>
-          ))}
-        </div>
-        <div className="text-center mb-4 sm:mb-6 relative">
-          <div className="text-5xl sm:text-6xl md:text-7xl font-black text-[#4a3728] tracking-tight mb-1">
-            25:00
-          </div>
-          <div className="text-xs font-bold text-[#4a3728]/60 uppercase tracking-wider">
-            Pomodoro Session
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Same markup on server and first client render, so use defaults until mounted.
+  const minutes = mounted ? minutesStore || 0 : 25;
+  const seconds = mounted ? secondsStore || 0 : 0;
+  const isBreakMode = mounted ? isBreakModeStore : false;
+  const activeTab = mounted ? activeTabStore || 'pomodoro' : 'pomodoro';
+  const isActive = mounted ? isActiveStore : false;
+  const isPaused = mounted && !isActive && activeSession?.status === 'paused';
+  const pct = mounted ? Math.min(100, Math.max(0, progress || 0)) : 0;
+
+  const label = isBreakMode
+    ? completedSessions % 4 === 0
+      ? 'Long break'
+      : 'Short break'
+    : activeTab === 'pomodoro'
+    ? 'Pomodoro session'
+    : activeTab === 'focus'
+    ? 'Focus session'
+    : 'Custom session';
+
+  // One clear sentence about what is happening and what to do next.
+  const status = isActive
+    ? { text: isBreakMode ? 'Break running. Rest and come back soon.' : 'Running. Stay focused.', dot: 'bg-green-500', pill: 'bg-green-50 text-green-800 border-green-200' }
+    : isPaused
+    ? { text: 'Paused. Press Resume to continue.', dot: 'bg-amber-500', pill: 'bg-amber-50 text-amber-800 border-amber-200' }
+    : isBreakMode
+    ? { text: 'Break ready. Press Start when you want it to begin.', dot: 'bg-sky-500', pill: 'bg-sky-50 text-sky-800 border-sky-200' }
+    : { text: 'Ready. Press Start when you are set.', dot: 'bg-[#8b7355]', pill: 'bg-[#f6ede8] text-[#4a3728] border-[#e0d8cf]' };
 
   return (
-    <div className="bg-[#f6ede8]/80 backdrop-blur-md rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl border border-[#e0d8cf]/50 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute -top-10 -right-10 w-24 h-24 sm:w-32 sm:h-32 bg-gradient-to-br from-[#8b6f47]/10 to-transparent rounded-full blur-2xl"></div>
-      <div className="absolute -bottom-10 -left-10 w-24 h-24 sm:w-32 sm:h-32 bg-gradient-to-br from-[#6b4e3d]/10 to-transparent rounded-full blur-2xl"></div>
-
-      {/* Progress Dots */}
-      <div className="flex justify-center gap-1.5 sm:gap-2 mb-3 sm:mb-4 relative">
-        {[...Array(8)].map((_, idx) => (
+    <div className="flex flex-col items-center">
+      <div className="relative h-56 w-56 sm:h-64 sm:w-64">
+        <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90" aria-hidden="true">
+          <circle cx="100" cy="100" r={RADIUS} fill="none" stroke="#efe6dc" strokeWidth="10" />
+          <circle
+            cx="100"
+            cy="100"
+            r={RADIUS}
+            fill="none"
+            stroke={isBreakMode ? '#5f8f6b' : '#4a3728'}
+            strokeWidth="10"
+            strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={CIRCUMFERENCE * (1 - pct / 100)}
+            className="transition-[stroke-dashoffset] duration-1000 ease-linear"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
           <div
-            key={idx}
-            className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-all duration-300 ${
-              idx < Math.floor(progress / 12.5)
-                ? 'bg-gradient-to-r from-[#4a3728] to-[#6b4e3d] shadow-sm'
-                : 'bg-[#e0d8cf]/50'
-            }`}
-          ></div>
-        ))}
+            className="text-5xl font-black tabular-nums tracking-tight text-[#4a3728] sm:text-6xl"
+            role="timer"
+            aria-live="off"
+          >
+            {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+          </div>
+          <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-[#6b5847]">
+            {label}
+          </div>
+        </div>
       </div>
 
-      {/* Timer Display */}
-      <div className="text-center mb-4 sm:mb-6 relative">
-        <div className="text-5xl sm:text-6xl md:text-7xl font-black text-[#4a3728] tracking-tight mb-1">
-          {String(minutes || 0).padStart(2, '0')}:{String(seconds || 0).padStart(2, '0')}
-        </div>
-        <div className="text-xs font-bold text-[#4a3728]/60 uppercase tracking-wider">
-          {isBreakMode ? (
-            completedSessions % 4 === 0 ? 'Long Break' : 'Short Break'
-          ) : (
-            `${(activeTab || 'pomodoro').charAt(0).toUpperCase() + (activeTab || 'pomodoro').slice(1)} Session`
-          )}
-        </div>
+      <div
+        className={`mt-4 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium ${status.pill}`}
+        aria-live="polite"
+      >
+        <span className={`h-2 w-2 rounded-full ${status.dot} ${isActive ? 'animate-pulse' : ''}`} />
+        {status.text}
       </div>
     </div>
   );

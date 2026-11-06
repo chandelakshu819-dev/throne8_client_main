@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useAppDispatch, useAppSelector } from "@/core/store/store.hooks";
-// import { toggleTimer, resetTimer } from '@/hooks/studyGroup/features/timer/timerSlice';
 import { resetTimer } from "@/hooks/studyGroup/features/timer/timerSlice";
 import {
   startTimerThunk,
@@ -14,6 +13,7 @@ import {
   getTimerStatsThunk,
   getActiveTimerThunk,
 } from "@/hooks/studyGroup/features/timer/timer.thunks";
+import { Play, Pause, RotateCcw, Square, ListTodo } from "lucide-react";
 
 export default function TimerControls() {
   const dispatch = useAppDispatch();
@@ -22,24 +22,7 @@ export default function TimerControls() {
   const subject = useAppSelector((state) => state.timer.subject);
   const selectedGoalId = useAppSelector((state) => state.timer.selectedGoalId);
   const activeSession = useAppSelector((state) => state.timer.activeSession);
-
-  // const handleStart = async () => {
-  //   if (!isActive) {
-  //     if (!activeSession) {
-  //       await dispatch(
-  //         startTimerThunk({
-  //           subject: subject || undefined,
-  //           goalId: selectedGoalId || undefined, // ADD
-  //         })
-  //       );
-  //     } else if (activeSession.status === "paused") {
-  //       await dispatch(resumeTimerThunk());
-  //     }
-  //   } else {
-  //     await dispatch(pauseTimerThunk());
-  //   }
-  //   dispatch(toggleTimer());
-  // };
+  const apiLoading = useAppSelector((state) => state.timer.apiLoading);
 
   const handleStart = async () => {
     let result: any;
@@ -79,93 +62,45 @@ export default function TimerControls() {
     dispatch(resetTimer());
   };
 
-  const handleTodoRedirect = () => {
-    router.push("/study/todo");
-  };
+  const isPaused = !isActive && activeSession?.status === "paused";
+  const primaryLabel = isActive ? "Pause" : isPaused ? "Resume" : "Start";
+  const PrimaryIcon = isActive ? Pause : Play;
 
   return (
-    <div className="flex flex-wrap justify-center gap-2 sm:gap-3 relative">
-      {/* Todo Button */}
-      <button
-        onClick={handleTodoRedirect}
-        className="px-3 sm:px-4 py-2 sm:py-2.5 bg-[#e0d8cf]/60 hover:bg-[#e0d8cf]/80 text-[#4a3728] rounded-lg font-bold text-xs sm:text-sm transition-all duration-300 hover:scale-105 shadow-md flex items-center gap-1.5"
-      >
-        <svg
-          className="w-3.5 h-3.5 sm:w-4 sm:h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+    <div className="space-y-3">
+      <div className="flex gap-3">
+        <button
+          onClick={handleStart}
+          disabled={apiLoading}
+          className={`flex h-12 flex-1 items-center justify-center gap-2 rounded-xl text-base font-semibold text-white shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+            isActive ? "bg-[#b9803f] hover:bg-[#a06e33]" : "bg-[#4a3728] hover:bg-[#3a2a1e]"
+          }`}
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-          />
-        </svg>
-        <span className="hidden lg:inline">Todo</span>
-      </button>
+          <PrimaryIcon size={18} fill="currentColor" />
+          {primaryLabel}
+        </button>
 
-      {/* Start/Pause Button */}
-      <button
-        onClick={handleStart}
-        className="px-5 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-[#4a3728] to-[#6b4e3d] hover:from-[#6b4e3d] hover:to-[#8b6f47] text-[#f6ede8] rounded-lg font-black text-xs sm:text-sm transition-all duration-300 hover:scale-105 shadow-lg flex items-center gap-2"
-      >
-        {isActive ? (
-          <>
-            <svg
-              className="w-3.5 h-3.5 sm:w-4 sm:h-4"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-            </svg>
-            Pause
-          </>
-        ) : activeSession?.status === "paused" ? (
-          <>
-            <svg
-              className="w-3.5 h-3.5 sm:w-4 sm:h-4"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M8 5v14l11-7z" />
-            </svg>
-            resume
-          </>
-        ) : (
-          <>
-            <svg
-              className="w-3.5 h-3.5 sm:w-4 sm:h-4"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M8 5v14l11-7z" />
-            </svg>
-            start
-          </>
-        )}
-      </button>
-
-      {/* Reset Button */}
-      <button
-        onClick={handleReset}
-        className="px-3 sm:px-4 py-2 sm:py-2.5 bg-[#e0d8cf]/60 hover:bg-[#e0d8cf]/80 text-[#4a3728] rounded-lg font-bold text-xs sm:text-sm transition-all duration-300 hover:scale-105 shadow-md flex items-center gap-1.5"
-      >
-        <svg
-          className="w-3.5 h-3.5 sm:w-4 sm:h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+        <button
+          onClick={handleReset}
+          disabled={apiLoading}
+          title={
+            activeSession
+              ? "Stop the timer and save this session (sessions under 30 seconds are discarded)"
+              : "Reset the clock"
+          }
+          className="flex h-12 items-center justify-center gap-2 rounded-xl border border-[#d4c4b5] bg-white px-5 text-sm font-semibold text-[#4a3728] transition-colors hover:bg-[#f6ede8] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-          />
-        </svg>
-        <span className="hidden lg:inline">Reset</span>
+          {activeSession ? <Square size={15} fill="currentColor" /> : <RotateCcw size={15} />}
+          {activeSession ? "End session" : "Reset"}
+        </button>
+      </div>
+
+      <button
+        onClick={() => router.push("/study/todo")}
+        className="mx-auto flex items-center gap-1.5 text-sm text-[#6b5847] transition-colors hover:text-[#4a3728]"
+      >
+        <ListTodo size={16} />
+        Need a task list? Open Todo
       </button>
     </div>
   );

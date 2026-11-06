@@ -11,6 +11,7 @@ import JoinGroupModal from '@/features/study-group/modals/joinGroupModal';
 import { useGroupData } from '@/features/study-group/hooks/useGroupData';
 import { useRouter } from 'next/navigation';
 import {generateMemberAvatars} from '../helper';
+import { CardShell, GROUP_BTN_PRIMARY, GROUP_BTN_DISABLED } from './GroupSectionUI';
 // ─── Component ───────────────────────────────
 interface GroupCardProps {
   // group: Group;
@@ -99,10 +100,8 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden border border-gray-200 hover:border-[#d4a574]">
-      <div className="h-1 bg-gradient-to-r from-[#4a3728] via-[#8b6f47] to-[#d4a574]" />
-
-      <div className="p-4">
+    <>
+      <CardShell>
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
@@ -155,14 +154,14 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
         </div>
 
         <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="bg-gray-50 rounded-lg p-2">
+          <div className="bg-[#faf6f1] rounded-lg p-2">
             <div className="flex items-center gap-1.5 mb-1">
               <Clock className="w-3.5 h-3.5 text-[#8b6f47]" />
               <span className="text-xs text-gray-600">Goal</span>
             </div>
             <p className="text-lg font-bold text-[#4a3728]">{group.goalHours}h</p>
           </div>
-          <div className="bg-gray-50 rounded-lg p-2">
+          <div className="bg-[#faf6f1] rounded-lg p-2">
             <div className="flex items-center gap-1.5 mb-1">
               <TrendingUp className="w-3.5 h-3.5 text-[#8b6f47]" />
               <span className="text-xs text-gray-600">Attendance</span>
@@ -193,17 +192,16 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
             />
           </div>
         </div>
-        <button
-          onClick={handleJoinClick}
-          disabled={(isFull && !isMember) || isThisGroupJoining}
-          className={`w-full font-semibold py-2.5 rounded-lg text-sm transition-all duration-300 shadow-sm hover:shadow-md ${isFull && !isMember
-            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            : 'bg-gradient-to-r from-[#4a3728] to-[#8b6f47] hover:from-[#8b6f47] hover:to-[#4a3728] text-white'
-            }`}
-        >
-          {isMember ? 'Open Group' : isFull ? 'Full' : isThisGroupJoining ? 'Joining...' : 'Join Group'}
-        </button>
-      </div>
+        <div className="mt-auto pt-1">
+          <button
+            onClick={handleJoinClick}
+            disabled={(isFull && !isMember) || isThisGroupJoining}
+            className={isFull && !isMember ? GROUP_BTN_DISABLED : `${GROUP_BTN_PRIMARY} disabled:opacity-60`}
+          >
+            {isMember ? 'Open Group' : isFull ? 'Full' : isThisGroupJoining ? 'Joining...' : 'Join Group'}
+          </button>
+        </div>
+      </CardShell>
       {
         joinSuccess && (
           <div className="fixed bottom-6 right-6 z-50 bg-green-500 text-white px-5 py-3 rounded-xl shadow-xl text-sm font-semibold">
@@ -229,7 +227,7 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
             existingRequest={existingRequest}  // ADD
           />
         )}
-    </div >
+    </>
   );
 };
 

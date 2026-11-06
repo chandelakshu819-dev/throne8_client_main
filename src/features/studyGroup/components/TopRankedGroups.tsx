@@ -1,102 +1,137 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
-import { TrendingUp, Users, Award, ChevronUp, ChevronDown } from "lucide-react";
+import { TrendingUp, Users, Award, Trophy } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { selectJoinLoading, selectTopRankedGroups, selectTopRankedGroupsLoading } from "@/hooks/studyGroup/features/groups/groupsSlice";
 import { useGroupData } from "@/features/study-group/hooks/useGroupData";
 import SkeletonLoader from "@/app/loading";
 import { joinGroupThunk, sendJoinRequestThunk } from "@/hooks/studyGroup/features/groups/group.thunks";
 import JoinGroupModal from "@/features/study-group/modals/joinGroupModal";
+import {
+  CardShell,
+  GROUP_BTN_PRIMARY,
+  GROUP_GRID,
+  SectionHeader,
+  ShowMoreButton,
+} from "./GroupSectionUI";
 
 
 /* ===================== CARD ===================== */
-const GroupCard = ({
+const TopRankedCard = ({
   group,
   onJoinClick,
 }: {
   group: any;
   onJoinClick: (group: any) => void;
 }) => {
-  const spotsLeft = group.capacity - (group.currentMemberCount ?? group.members ?? 0);
-  const { getJoinRequestForGroup, addJoinRequestToCache } = useGroupData();
+  const [imgFailed, setImgFailed] = useState(false);
+  const memberCount = group.currentMemberCount ?? group.members ?? 0;
+  const spotsLeft = group.capacity - memberCount;
+  const pct = group.capacity
+    ? Math.min(100, Math.round((memberCount / group.capacity) * 100))
+    : 0;
+  const attendance = group.minAttendancePercent ?? group.attendanceAvg ?? 75;
+  const hasRealLeader = group.leader && !/^Leader \d+$/.test(group.leader);
+  const subtitle = hasRealLeader
+    ? `Led by ${group.leader}`
+    : group.category || "Study group";
 
   return (
-    <div className="relative backdrop-blur-xl bg-white/70 shadow-xl rounded-2xl p-5 hover:shadow-2xl transition-all duration-300 border-2 border-white/60 h-full">
-      <div className="absolute -left-4 -top-4 w-20 h-24 rounded-xl overflow-hidden shadow-xl border-4 border-white">
-        <Image
-          src={group.imgUrl}
-          alt={group.leader}
-          width={80}
-          height={96}
-          className="object-cover w-full h-full"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src =
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(group.leader)}&background=8b7355&color=fff&size=400`;
-          }}
-        />
-      </div>
-
-      <div className="absolute -top-3 -right-3 w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl shadow-lg flex items-center justify-center border-2 border-white">
-        <span className="text-white font-bold text-sm">#{group.rank}</span>
-      </div>
-
-      <div className="ml-16 text-right pt-2">
-        <h2 className="text-base text-[#4a3728] font-bold mb-1 leading-tight">{group.title}</h2>
-        <p className="text-xs text-[#8b7355] mb-3 flex items-center justify-end gap-1">
-          <Award className="w-3 h-3" />
-          <span className="italic">{group.leader}</span>
-        </p>
-
-        <div className="space-y-2 mb-3">
-          <div className="flex items-center justify-between backdrop-blur-sm bg-[#fff8f0]/80 px-3 py-2 rounded-lg border border-white/40">
-            <div className="flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-[#8b7355]" />
-              <span className="text-xs text-[#8b7355] font-medium">Attendance</span>
-            </div>
-            <span className="text-sm font-bold text-[#4a3728]">
-              {group.minAttendancePercent ?? group.attendanceAvg ?? 75}%
-            </span>
+    <CardShell>
+      {/* Header: avatar, title, rank */}
+      <div className="flex items-start gap-3">
+        {group.imgUrl && !imgFailed ? (
+          <img
+            src={group.imgUrl}
+            alt={group.leader}
+            onError={() => setImgFailed(true)}
+            className="h-12 w-12 flex-shrink-0 rounded-full border-2 border-[#e0d8cf] object-cover"
+          />
+        ) : (
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#f6ede8] text-lg font-bold text-[#4a3728]">
+            {(group.title || "G").charAt(0).toUpperCase()}
           </div>
+        )}
 
-          <div className="flex items-center justify-between backdrop-blur-sm bg-[#fff8f0]/80 px-3 py-2 rounded-lg border border-white/40">
-            <div className="flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-[#8b7355]" />
-              <span className="text-xs text-[#8b7355] font-medium">Members</span>
-            </div>
-            <span className="text-sm font-bold text-[#4a3728]">
-              {group.currentMemberCount}/{group.capacity}
-            </span>
-          </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-lg font-bold text-[#4a3728]">
+            {group.title}
+          </h3>
+          <p className="flex items-center gap-1 text-xs text-[#6b5847]">
+            <Award className="h-3 w-3 flex-shrink-0 text-[#8b7355]" />
+            <span className="truncate">{subtitle}</span>
+          </p>
         </div>
 
-        <div className="mb-3">
-          {spotsLeft > 0 ? (
-            <span className="inline-block bg-green-500/10 text-green-700 font-semibold text-xs px-3 py-1.5 rounded-full border border-green-500/20">
-              {spotsLeft} spots left
-            </span>
-          ) : (
-            <span className="inline-block bg-red-500/10 text-red-600 font-semibold text-xs px-3 py-1.5 rounded-full border border-red-500/20">
-              Full
-            </span>
-          )}
-        </div>
+        <span
+          className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-bold text-white shadow-sm ${
+            group.rank <= 3
+              ? "bg-gradient-to-br from-amber-400 to-orange-500"
+              : "bg-[#8b7355]"
+          }`}
+        >
+          #{group.rank}
+        </span>
+      </div>
 
+      {/* Stats */}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="rounded-lg bg-[#faf6f1] p-2">
+          <div className="mb-1 flex items-center gap-1.5">
+            <TrendingUp className="h-3.5 w-3.5 text-[#8b6f47]" />
+            <span className="text-xs text-gray-600">Attendance</span>
+          </div>
+          <p className="text-lg font-bold text-[#4a3728]">{attendance}%</p>
+        </div>
+        <div className="rounded-lg bg-[#faf6f1] p-2">
+          <div className="mb-1 flex items-center gap-1.5">
+            <Users className="h-3.5 w-3.5 text-[#8b6f47]" />
+            <span className="text-xs text-gray-600">Members</span>
+          </div>
+          <p className="text-lg font-bold text-[#4a3728]">
+            {memberCount}/{group.capacity}
+          </p>
+        </div>
+      </div>
+
+      {/* Capacity bar */}
+      <div className="mt-3 mb-4">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-xs font-medium text-gray-600">
+            {memberCount}/{group.capacity} joined
+          </span>
+          <span
+            className={`text-xs font-medium ${
+              spotsLeft > 0 ? "text-green-700" : "text-red-600"
+            }`}
+          >
+            {spotsLeft > 0 ? `${spotsLeft} left` : "Full"}
+          </span>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-[#8b6f47] to-[#4a3728] transition-all duration-500"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="mt-auto pt-1">
         <button
           onClick={() => {
             if (group.isMember) {
-              console.log("Navigating to group room for groupId:", group.groupId || group.id);
               window.location.href = `/study/my-groups/${group.groupId || group.id}`;
               return;
             }
             onJoinClick(group);
           }}
-          className="w-full bg-gradient-to-r from-[#8b7355] to-[#6b5847] hover:from-[#6b5847] hover:to-[#4a3728] text-white px-4 py-2.5 rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20">
-          {group.isMember ? 'Open Group' : 'Join Group'}
+          className={GROUP_BTN_PRIMARY}
+        >
+          {group.isMember ? "Open Group" : "Join Group"}
         </button>
       </div>
-    </div>
+    </CardShell>
   );
 };
 
@@ -217,40 +252,24 @@ export default function TopRankedGroups() {
   if (topThreeGroups.length === 0) return null;
 
   return (
-    <div className="py-8 sm:py-10 lg:py-12">
-      <div className="max-w-7xl mx-auto space-y-8 sm:space-y-10">
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#4a3728]">
-            Top Ranked Groups
-          </h1>
-          <p className="text-[#6b5847] text-sm sm:text-base">
-            Join the most active and successful study communities
-          </p>
-        </div>
+    <section className="mx-auto w-full max-w-7xl">
+      <SectionHeader
+        icon={<Trophy size={22} />}
+        title="Top Ranked Groups"
+        subtitle="Join the most active and successful study communities"
+      />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 px-4">
-          {displayedGroups.map(group => (
-            <div key={group.id} className="max-w-[320px] mx-auto w-full">
-              <GroupCard group={group} onJoinClick={handleJoinClick} />
-            </div>
-          ))}
-        </div>
-
-        {hasMoreGroups && (
-          <div className="flex justify-center mt-8">
-            <button
-              onClick={() => setShowAll(prev => !prev)}
-              className="px-6 py-3 bg-gradient-to-r from-[#8b7355] to-[#6b5847] hover:from-[#6b5847] hover:to-[#4a3728] text-white rounded-xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 border border-white/20"
-            >
-              {showAll ? (
-                <>Show Less <ChevronUp size={18} /></>
-              ) : (
-                <>Show More <ChevronDown size={18} /></>
-              )}
-            </button>
+      <div className={GROUP_GRID}>
+        {displayedGroups.map(group => (
+          <div key={group.id} className="h-full">
+            <TopRankedCard group={group} onJoinClick={handleJoinClick} />
           </div>
-        )}
+        ))}
       </div>
+
+      {hasMoreGroups && (
+        <ShowMoreButton expanded={showAll} onClick={() => setShowAll(prev => !prev)} />
+      )}
 
       {joinSuccess && (
         <div className="fixed bottom-6 right-6 z-50 bg-green-500 text-white px-5 py-3 rounded-xl shadow-xl text-sm font-semibold animate-pulse">
@@ -274,6 +293,6 @@ export default function TopRankedGroups() {
           existingRequest={joinModalGroup ? getJoinRequestForGroup(joinModalGroup.groupId || '') : null}
         />
       )}
-    </div>
+    </section>
   )
 }

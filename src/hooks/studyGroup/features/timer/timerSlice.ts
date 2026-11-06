@@ -204,6 +204,10 @@ const timerSlice = createSlice({
       state.subject = action.payload;
     },
 
+    setSelectedGoalId: (state, action: PayloadAction<string | null>) => {
+      state.selectedGoalId = action.payload;
+    },
+
     setCustomMinutes: (state, action: PayloadAction<number>) => {
       state.customMinutes = action.payload;
       if (state.activeTab === "timer" && !state.isActive) {
@@ -670,6 +674,7 @@ export const {
   toggleTimer,
   resetTimer,
   setSubject,
+  setSelectedGoalId,
   setCustomMinutes,
   addStudySession,
   completeSession,

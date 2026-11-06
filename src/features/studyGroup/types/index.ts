@@ -5,7 +5,7 @@ export type StatsPeriod = '7days' | '30days' | '90days';
 
 export type GroupTabType = 'all' | 'created' | 'joined';
 
-export type SectionKey = 'university' | 'dsa' | 'jee';
+export type SectionKey = 'university' | 'dsa' | 'jee' | 'public';
 
 
 export type GroupStats = {
