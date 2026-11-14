@@ -136,6 +136,40 @@ const STATS_INTERVAL_MS = 3000;
 /** Reconnect backoff: [500ms, 1s, 2s, 4s, 8s] */
 const BACKOFF = [500, 1000, 2000, 4000, 8000];
 
+/** Failed/disconnected link: ICE-restart on the SAME connection this many times before rebuilding it. */
+const ICE_RESTARTS_BEFORE_REBUILD = 2;
+
+/**
+ * Per-peer negotiation bookkeeping ("perfect negotiation" pattern).
+ *
+ * pcId        – random id of OUR current RTCPeerConnection to this peer. Sent inside every
+ *               offer / answer / ICE candidate (the server relays those objects untouched),
+ *               so the other side can tell "same connection, renegotiating" apart from
+ *               "brand-new connection" (page reload, full rebuild). A new RTCPeerConnection has
+ *               a new DTLS identity and cannot be renegotiated into the old one, so the other
+ *               side must rebuild too.
+ * remotePcId  – the pcId the other side is currently using (learned from their offer/answer).
+ * polite      – decided by userId order so both sides always pick opposite roles. On a
+ *               collision (both sent an offer) the polite side rolls back and accepts theirs;
+ *               the impolite side ignores theirs.
+ */
+interface PeerMeta {
+  pcId: string;
+  remotePcId: string | null;
+  polite: boolean;
+  makingOffer: boolean;
+  ignoreOffer: boolean;
+  settingRemoteAnswer: boolean;
+  remoteStream: MediaStream;
+}
+
+type QueuedCandidate = RTCIceCandidateInit & { pcId?: string };
+
+const newPcId = (): string =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
 // ─── Helpers ──────────────────────────────────────────────────
 
 function buildPeerConfig(): RTCConfiguration {
@@ -223,7 +257,10 @@ export function useLiveRoom({
   const audioAnalysers = useRef<Map<string, AnalyserNode>>(new Map());
   const reconnectTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const retryCount = useRef<Map<string, number>>(new Map());
-  const iceCandidateQueue = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+  const iceCandidateQueue = useRef<Map<string, QueuedCandidate[]>>(new Map());
+  const peerMeta = useRef<Map<string, PeerMeta>>(new Map());
+  const signalQueue = useRef<Map<string, Promise<unknown>>>(new Map());
+  const scheduleReconnectRef = useRef<(peerId: string) => void>(() => {});
   const isMounted = useRef(true);
 
   // ── State ─────────────────────────────────────────────────
@@ -251,183 +288,6 @@ export function useLiveRoom({
     []
   );
 
-  const removePeer = useCallback((socketId: string) => {
-    if (!isMounted.current) return;
-
-    // Close PC
-    const pc = peerConnections.current.get(socketId);
-    if (pc) {
-      pc.onicecandidate = null;
-      pc.ontrack = null;
-      pc.onconnectionstatechange = null;
-      pc.close();
-      peerConnections.current.delete(socketId);
-    }
-
-    // Clear stats / reconnect timers
-    const timer = reconnectTimers.current.get(socketId);
-    if (timer) { clearTimeout(timer); reconnectTimers.current.delete(socketId); }
-    retryCount.current.delete(socketId);
-    iceCandidateQueue.current.delete(socketId);
-    audioAnalysers.current.delete(socketId);
-
-    setPeers((prev) => {
-      const next = new Map(prev);
-      next.delete(socketId);
-      return next;
-    });
-  }, []);
-
-  // ── Create RTCPeerConnection ──────────────────────────────
-  const createPeerConnection = useCallback(
-    (socketId: string, peerUserId: string, peerUserName?: string): RTCPeerConnection => {
-      // Tear down existing if any
-      const existing = peerConnections.current.get(socketId);
-      if (existing) {
-        existing.close();
-        peerConnections.current.delete(socketId);
-      }
-
-      const pc = new RTCPeerConnection(buildPeerConfig());
-      peerConnections.current.set(socketId, pc);
-
-      // Add local tracks
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((track) => {
-          pc.addTrack(track, localStreamRef.current!);
-        });
-      }
-
-      // Remote track received
-      pc.ontrack = (event) => {
-        const [remoteStream] = event.streams;
-        updatePeer(socketId, { stream: remoteStream });
-
-        // Voice activity detection on remote stream
-        setupVAD(socketId, remoteStream);
-      };
-
-         // ICE candidate — send to remote peer via signaling.
-      // Server (liveRoomHandler.ts) routes by userId, not socketId.
-      pc.onicecandidate = (event) => {
-        if (!event.candidate) return;
-        const socket = getSocket();
-        socket?.emit('webrtc-ice-candidate', {
-          roomId,
-          targetUserId: peerUserId,
-          candidate: event.candidate,
-        });
-      };
-
-      // ICE restart on failure
-      pc.onicecandidateerror = (event) => {
-        // Only log in dev; don't alert user — ICE will recover
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('[ICE error]', event);
-        }
-      };
-
-            // Extra safety net — Safari doesn't always fire onconnectionstatechange reliably
-            pc.oniceconnectionstatechange = () => {
-              if (pc.iceConnectionState === 'failed') {
-                scheduleReconnect(socketId, peerUserId, peerUserName);
-              }
-            };
-      
-          
-
-      // Connection state machine
-      pc.onconnectionstatechange = () => {
-        const state = pc.connectionState;
-        updatePeer(socketId, { connectionState: state });
-
-        if (state === 'failed') {
-          scheduleReconnect(socketId, peerUserId, peerUserName);
-        }
-
-        if (state === 'disconnected') {
-          // Give 5s for ICE restart before declaring failed
-          setTimeout(() => {
-            if (pc.connectionState === 'disconnected') {
-              scheduleReconnect(socketId, peerUserId, peerUserName);
-            }
-          }, 5000);
-        }
-
-        if (state === 'connected') {
-          // Reset retry counter on success
-          retryCount.current.set(socketId, 0);
-        }
-      };
-
-      // Initialise peer entry in state
-      setPeers((prev) => {
-        const next = new Map(prev);
-        if (!next.has(socketId)) {
-          next.set(socketId, {
-            socketId,
-            userId: peerUserId,
-            userName: peerUserName,
-            stream: null,
-            cameraOn: true,
-            micOn: true,
-            isSpeaking: false,
-            quality: 'good',
-            connectionState: 'new',
-          });
-        }
-        return next;
-      });
-
-      return pc;
-    },
-    [roomId, updatePeer]
-  );
-
-  // ── Reconnect with exponential backoff ───────────────────
-  const scheduleReconnect = useCallback(
-    (socketId: string, peerUserId: string, peerUserName?: string) => {
-      const count = retryCount.current.get(socketId) ?? 0;
-      if (count >= BACKOFF.length) {
-        // Max retries — give up, remove peer
-        removePeer(socketId);
-        onPeerLeft?.(socketId);
-        return;
-      }
-
-      const delay = BACKOFF[count];
-      retryCount.current.set(socketId, count + 1);
-
-      const timer = setTimeout(async () => {
-        if (!isMounted.current) return;
-        const pc = createPeerConnection(socketId, peerUserId, peerUserName);
-
-        try {
-          // ICE restart offer
-          const offer = await pc.createOffer({ iceRestart: true });
-          await pc.setLocalDescription(offer);
-
-          const socket = getSocket();
-          // Server routes only by targetUserId (see liveRoomHandler.ts) — the old
-          // targetSocketId field here was silently dropped by the `if (!targetUserId...)`
-          // guard, so reconnect offers never reached the peer. `socketId` in this
-          // function is actually the userId (peerConnections is keyed by userId
-          // throughout this file), so it's safe to reuse directly.
-          socket?.emit('webrtc-offer', {
-            roomId,
-            targetUserId: socketId,
-            offer,
-          });
-        } catch (err) {
-          console.error('[WebRTC] ICE restart failed', err);
-        }
-      }, delay);
-
-      reconnectTimers.current.set(socketId, timer);
-    },
-    [roomId, createPeerConnection, removePeer, onPeerLeft]
-  );
-
   // ── Voice Activity Detection ─────────────────────────────
   const setupVAD = useCallback((socketId: string, stream: MediaStream) => {
     try {
@@ -445,6 +305,322 @@ export function useLiveRoom({
       // VAD is best-effort; don't break on failure
     }
   }, []);
+
+  // ── Peer connections ─────────────────────────────────────
+  // NOTE: the Maps below are keyed by the REMOTE USER'S ID (older names in this file
+  // say "socketId", but it has always been the userId).
+
+  /** Close and forget the RTCPeerConnection for a peer (no React state changes). */
+  const closeLink = useCallback((peerId: string) => {
+    const pc = peerConnections.current.get(peerId);
+    if (pc) {
+      pc.onicecandidate = null;
+      pc.ontrack = null;
+      pc.onconnectionstatechange = null;
+      pc.oniceconnectionstatechange = null;
+      pc.onnegotiationneeded = null;
+      try { pc.close(); } catch { /* already closed */ }
+      peerConnections.current.delete(peerId);
+    }
+    peerMeta.current.delete(peerId);
+  }, []);
+
+  const removePeer = useCallback((peerId: string) => {
+    if (!isMounted.current) return;
+
+    closeLink(peerId);
+
+    // Clear reconnect timers / queues
+    const timer = reconnectTimers.current.get(peerId);
+    if (timer) { clearTimeout(timer); reconnectTimers.current.delete(peerId); }
+    retryCount.current.delete(peerId);
+    iceCandidateQueue.current.delete(peerId);
+    audioAnalysers.current.delete(peerId);
+    signalQueue.current.delete(peerId);
+
+    setPeers((prev) => {
+      const next = new Map(prev);
+      next.delete(peerId);
+      return next;
+    });
+  }, [closeLink]);
+
+  /** Run signaling work for one peer strictly one-at-a-time (offers/answers must not interleave). */
+  const runSerial = useCallback((peerId: string, task: () => Promise<void>) => {
+    const prev = signalQueue.current.get(peerId) ?? Promise.resolve();
+    const next = prev.then(task).catch((err) => console.error('[WebRTC] signaling task failed', err));
+    signalQueue.current.set(peerId, next);
+    return next;
+  }, []);
+
+  /** The local track that should currently be sent for a kind (screen share wins for video). */
+  const currentTrackFor = useCallback((kind: 'audio' | 'video'): MediaStreamTrack | null => {
+    if (kind === 'video') {
+      const screenTrack = screenStreamRef.current?.getVideoTracks()[0];
+      if (screenTrack && screenTrack.readyState === 'live') return screenTrack;
+    }
+    const local = localStreamRef.current;
+    const track = kind === 'audio' ? local?.getAudioTracks()[0] : local?.getVideoTracks()[0];
+    return track ?? null;
+  }, []);
+
+  /**
+   * Give a connection a send+receive slot for BOTH audio and video, and plug our current
+   * local tracks (or nothing) into them.
+   *
+   * Why: if a connection only contains the tracks we happen to have at join time, a user who
+   * joins with camera/mic off creates an offer with no media lines, so they can never receive
+   * anyone (issue 1), and turning a device on later has no slot to go into (issue 2).
+   * With the slots always present, enabling a device later is just `replaceTrack`, which
+   * needs no renegotiation.
+   *
+   * createMissing=false is for the answering side: its slots come from the remote offer.
+   */
+  const attachLocalMedia = useCallback(
+    async (pc: RTCPeerConnection, createMissing: boolean) => {
+      const pending: Promise<void>[] = [];
+      for (const kind of ['audio', 'video'] as const) {
+        let transceiver = pc
+          .getTransceivers()
+          .find((t) => t.receiver.track.kind === kind && t.direction !== 'stopped');
+        if (!transceiver) {
+          if (!createMissing) continue;
+          transceiver = pc.addTransceiver(kind, { direction: 'sendrecv' });
+        } else if (transceiver.direction !== 'sendrecv') {
+          transceiver.direction = 'sendrecv';
+        }
+        const track = currentTrackFor(kind);
+        if (transceiver.sender.track !== track) {
+          pending.push(
+            transceiver.sender.replaceTrack(track).catch((err) => {
+              console.warn(`[WebRTC] replaceTrack(${kind}) failed`, err);
+            })
+          );
+        }
+      }
+      await Promise.all(pending);
+    },
+    [currentTrackFor]
+  );
+
+  /** Push the current local tracks (camera / mic / screen) into every peer connection. */
+  const syncLocalMediaToPeers = useCallback(async () => {
+    await Promise.all(
+      Array.from(peerConnections.current.values()).map((pc) => attachLocalMedia(pc, true))
+    );
+  }, [attachLocalMedia]);
+
+  /** Create + send an offer for a peer (used by negotiationneeded and manual ICE restart). */
+  const negotiate = useCallback(
+    async (peerId: string, pc: RTCPeerConnection, iceRestart = false) => {
+      const meta = peerMeta.current.get(peerId);
+      if (!meta || peerConnections.current.get(peerId) !== pc) return; // replaced meanwhile
+      const socket = getSocket();
+      if (!socket) return;
+
+      try {
+        meta.makingOffer = true;
+        const offer = await pc.createOffer(iceRestart ? { iceRestart: true } : undefined);
+        // An incoming offer got applied while we were building ours: drop ours.
+        // The browser fires negotiationneeded again once we're stable.
+        if (pc.signalingState !== 'stable') return;
+        await pc.setLocalDescription(offer);
+
+        socket.emit('webrtc-offer', {
+          roomId,
+          targetUserId: peerId,
+          offer: { type: offer.type, sdp: offer.sdp, pcId: meta.pcId },
+        });
+      } catch (err) {
+        console.error('[WebRTC] createOffer failed', err);
+      } finally {
+        meta.makingOffer = false;
+      }
+    },
+    [roomId]
+  );
+
+  /** Add queued ICE candidates that belong to the remote connection we're now talking to. */
+  const flushIceQueue = useCallback(
+    async (peerId: string, pc: RTCPeerConnection, remotePcId: string | null) => {
+      const queued = iceCandidateQueue.current.get(peerId) ?? [];
+      iceCandidateQueue.current.delete(peerId);
+      for (const { pcId: candidatePcId, ...init } of queued) {
+        if (candidatePcId && remotePcId && candidatePcId !== remotePcId) continue; // stale
+        await pc.addIceCandidate(init).catch(() => {});
+      }
+    },
+    []
+  );
+
+  // ── Create RTCPeerConnection ──────────────────────────────
+  // initiator=true  → we start the negotiation (adds audio+video slots → negotiationneeded).
+  // initiator=false → we're answering; slots come from the remote offer (see attachLocalMedia).
+  const createPeerConnection = useCallback(
+    (
+      peerId: string,
+      peerUserName: string | undefined,
+      { initiator }: { initiator: boolean }
+    ): RTCPeerConnection => {
+      // Replace any existing connection to this peer
+      const hadExisting = peerConnections.current.has(peerId);
+      closeLink(peerId);
+      if (hadExisting) updatePeer(peerId, { stream: null, connectionState: 'new' });
+
+      const pc = new RTCPeerConnection(buildPeerConfig());
+      const meta: PeerMeta = {
+        pcId: newPcId(),
+        remotePcId: null,
+        polite: userId > peerId,
+        makingOffer: false,
+        ignoreOffer: false,
+        settingRemoteAnswer: false,
+        remoteStream: new MediaStream(),
+      };
+      peerConnections.current.set(peerId, pc);
+      peerMeta.current.set(peerId, meta);
+
+      // Remote track received. Peers may send without an msid (slots exist before they have a
+      // camera/mic), so don't rely on event.streams: collect every track into one stream.
+      pc.ontrack = (event) => {
+        const track = event.track;
+        if (!meta.remoteStream.getTracks().includes(track)) {
+          meta.remoteStream.addTrack(track);
+        }
+        updatePeer(peerId, { stream: meta.remoteStream });
+
+        // Voice activity detection on the remote audio
+        if (track.kind === 'audio') setupVAD(peerId, new MediaStream([track]));
+      };
+
+      // ICE candidate — send to remote peer via signaling.
+      // Server (liveRoomHandler.ts) routes by userId, not socketId.
+      pc.onicecandidate = (event) => {
+        if (!event.candidate) return;
+        const socket = getSocket();
+        socket?.emit('webrtc-ice-candidate', {
+          roomId,
+          targetUserId: peerId,
+          candidate: { ...event.candidate.toJSON(), pcId: meta.pcId },
+        });
+      };
+
+      pc.onicecandidateerror = (event) => {
+        // Only log in dev; don't alert user — ICE will recover
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[ICE error]', event);
+        }
+      };
+
+      // Browsers fire this whenever slots/tracks change in a way that needs a new offer
+      // (first connection, ICE restart, a slot added later, ...).
+      pc.onnegotiationneeded = () => {
+        void negotiate(peerId, pc);
+      };
+
+      // Extra safety net — Safari doesn't always fire onconnectionstatechange reliably
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === 'failed') {
+          scheduleReconnectRef.current(peerId);
+        }
+      };
+
+      // Connection state machine
+      pc.onconnectionstatechange = () => {
+        const state = pc.connectionState;
+        updatePeer(peerId, { connectionState: state });
+
+        if (state === 'failed') {
+          scheduleReconnectRef.current(peerId);
+        }
+
+        if (state === 'disconnected') {
+          // Give 5s for ICE to recover on its own before we step in
+          setTimeout(() => {
+            if (pc.connectionState === 'disconnected') {
+              scheduleReconnectRef.current(peerId);
+            }
+          }, 5000);
+        }
+
+        if (state === 'connected') {
+          // Reset retry counter on success
+          retryCount.current.set(peerId, 0);
+        }
+      };
+
+      // Initialise peer entry in state
+      setPeers((prev) => {
+        const next = new Map(prev);
+        if (!next.has(peerId)) {
+          next.set(peerId, {
+            socketId: peerId,
+            userId: peerId,
+            userName: peerUserName,
+            stream: null,
+            cameraOn: true,
+            micOn: true,
+            isSpeaking: false,
+            quality: 'good',
+            connectionState: 'new',
+          });
+        }
+        return next;
+      });
+
+      if (initiator) void attachLocalMedia(pc, true);
+
+      return pc;
+    },
+    [roomId, userId, updatePeer, closeLink, setupVAD, negotiate, attachLocalMedia]
+  );
+
+  // ── Reconnect with exponential backoff ───────────────────
+  // 1) First tries: ICE restart on the SAME connection (cheap, and the other side just sees a
+  //    normal renegotiation, so there is nothing to tear down).
+  // 2) After ICE_RESTARTS_BEFORE_REBUILD tries: build a brand-new connection. The other side
+  //    notices the new pcId in our offer and rebuilds its end too.
+  // If both sides retry at the same moment, perfect negotiation (polite/impolite) resolves it.
+  const scheduleReconnect = useCallback(
+    (peerId: string) => {
+      if (reconnectTimers.current.has(peerId)) return; // one retry at a time per peer
+
+      const count = retryCount.current.get(peerId) ?? 0;
+      if (count >= BACKOFF.length) {
+        // Max retries — give up, remove peer
+        removePeer(peerId);
+        onPeerLeft?.(peerId);
+        return;
+      }
+
+      retryCount.current.set(peerId, count + 1);
+
+      const timer = setTimeout(() => {
+        reconnectTimers.current.delete(peerId);
+        if (!isMounted.current) return;
+
+        const pc = peerConnections.current.get(peerId);
+        if (!pc) return; // peer was removed meanwhile
+        if (pc.connectionState === 'connected') return; // recovered by itself
+
+        const rebuild = count >= ICE_RESTARTS_BEFORE_REBUILD || pc.signalingState === 'closed';
+        if (!rebuild) {
+          if (typeof (pc as any).restartIce === 'function') {
+            (pc as any).restartIce(); // fires negotiationneeded → offer with new ICE credentials
+          } else {
+            void negotiate(peerId, pc, true);
+          }
+          return;
+        }
+
+        createPeerConnection(peerId, undefined, { initiator: true });
+      }, BACKOFF[count]);
+
+      reconnectTimers.current.set(peerId, timer);
+    },
+    [createPeerConnection, negotiate, removePeer, onPeerLeft]
+  );
+  scheduleReconnectRef.current = scheduleReconnect;
 
   // Poll VAD and update isSpeaking
   useEffect(() => {
@@ -519,16 +695,8 @@ export function useLiveRoom({
 
 
 
-        // Add tracks to all existing PCs (re-join scenario)
-        peerConnections.current.forEach((pc) => {
-          stream.getTracks().forEach((track) => {
-            // Avoid duplicate senders
-            const alreadyAdded = pc.getSenders().some(
-              (s) => s.track?.id === track.id
-            );
-            if (!alreadyAdded) pc.addTrack(track, stream);
-          });
-        });
+        // Plug the tracks into every existing connection's audio/video slots
+        await syncLocalMediaToPeers();
 
         return stream;
       }
@@ -555,7 +723,7 @@ export function useLiveRoom({
         setIsConnecting(false);
       }
     },
-    []
+    [syncLocalMediaToPeers]
   );
 
   // ── Toggle camera ─────────────────────────────────────────
@@ -641,22 +809,15 @@ const toggleCamera = useCallback(async () => {
         const newTrack = newStream.getVideoTracks()[0];
         stream.addTrack(newTrack);
 
-        // Replace or add track in all senders
-        for (const pc of peerConnections.current.values()) {
-          const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-          if (sender) {
-            await sender.replaceTrack(newTrack);
-          } else {
-            pc.addTrack(newTrack, stream);
-          }
-        }
+        // Send it to everyone through each connection's video slot
+        await syncLocalMediaToPeers();
         setIsCameraOn(true);
       } catch (err) {
         setError('Could not re-enable camera.');
       }
     }
   }
-}, [startLocalStream, isMicOn, isCameraOn]);
+}, [startLocalStream, syncLocalMediaToPeers, isMicOn, isCameraOn]);
 
   // ── Toggle mic ────────────────────────────────────────────
   // const toggleMic = useCallback(() => {
@@ -701,14 +862,8 @@ const toggleMic = useCallback(async () => {
         const newTrack = newStream.getAudioTracks()[0];
         if (newTrack) {
           stream.addTrack(newTrack);
-          for (const pc of peerConnections.current.values()) {
-            const sender = pc.getSenders().find((s) => s.track?.kind === 'audio');
-            if (sender) {
-              await sender.replaceTrack(newTrack);
-            } else {
-              pc.addTrack(newTrack, stream);
-            }
-          }
+          // Send it to everyone through each connection's audio slot
+          await syncLocalMediaToPeers();
           setIsMicOn(true);
         }
       } catch (err) {
@@ -716,53 +871,45 @@ const toggleMic = useCallback(async () => {
       }
     }
   }
-}, [startLocalStream, isCameraOn, isMicOn]);
+}, [startLocalStream, syncLocalMediaToPeers, isCameraOn, isMicOn]);
 
   // ── Screen share ──────────────────────────────────────────
+  const stopScreenShare = useCallback(async () => {
+    screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+    screenStreamRef.current = null;
+    // Back to the camera track (or to "nothing" if the camera was never on)
+    await syncLocalMediaToPeers();
+    setIsScreenSharing(false);
+  }, [syncLocalMediaToPeers]);
+
   const toggleScreenShare = useCallback(async () => {
     if (isScreenSharing) {
-      // Stop screen share, restore camera
-      const screenTrack = screenStreamRef.current?.getVideoTracks()[0];
-      screenTrack?.stop();
-      screenStreamRef.current = null;
+      await stopScreenShare();
+      return;
+    }
 
-      const cameraTrack = localStreamRef.current?.getVideoTracks()[0];
-      if (cameraTrack) {
-        for (const pc of peerConnections.current.values()) {
-          const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-          if (sender) await sender.replaceTrack(cameraTrack);
-        }
-      }
-      setIsScreenSharing(false);
-    } else {
-      try {
-        const screenStream = await (navigator.mediaDevices as any).getDisplayMedia({
-          video: { displaySurface: 'monitor' },
-          audio: false,
-        });
-        screenStreamRef.current = screenStream;
-        const screenTrack = screenStream.getVideoTracks()[0];
+    try {
+      const screenStream = await (navigator.mediaDevices as any).getDisplayMedia({
+        video: { displaySurface: 'monitor' },
+        audio: false,
+      });
+      screenStreamRef.current = screenStream;
+      const screenTrack = screenStream.getVideoTracks()[0];
 
-        // Replace video track in all peers
-        for (const pc of peerConnections.current.values()) {
-          const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-          if (sender) await sender.replaceTrack(screenTrack);
-        }
+      // Auto-stop when user clicks browser "Stop sharing"
+      screenTrack.onended = () => {
+        void stopScreenShare();
+      };
 
-        // Auto-stop when user clicks browser "Stop sharing"
-        screenTrack.onended = () => {
-          setIsScreenSharing(false);
-          screenStreamRef.current = null;
-        };
-
-        setIsScreenSharing(true);
-      } catch (err: any) {
-        if (err.name !== 'NotAllowedError') {
-          setError('Screen share failed.');
-        }
+      // Uses each connection's video slot, so it also works when the camera was never on
+      await syncLocalMediaToPeers();
+      setIsScreenSharing(true);
+    } catch (err: any) {
+      if (err.name !== 'NotAllowedError') {
+        setError('Screen share failed.');
       }
     }
-  }, [isScreenSharing]);
+  }, [isScreenSharing, stopScreenShare, syncLocalMediaToPeers]);
 
   // ── Join live room ────────────────────────────────────────
   // const joinRoom = useCallback(
@@ -911,8 +1058,10 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
     screenStreamRef.current = null;
 
     // Close all PCs
-    peerConnections.current.forEach((pc) => pc.close());
+    Array.from(peerConnections.current.keys()).forEach((peerId) => closeLink(peerId));
     peerConnections.current.clear();
+    peerMeta.current.clear();
+    signalQueue.current.clear();
 
     // Clear all timers
     reconnectTimers.current.forEach((t) => clearTimeout(t));
@@ -934,7 +1083,7 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
     setIsCameraOn(false);
     setIsMicOn(false);
     setIsScreenSharing(false);
-  }, [roomId]);
+  }, [roomId, closeLink]);
 
   // ── Socket event handlers ─────────────────────────────────
   useEffect(() => {
@@ -944,7 +1093,9 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
        // ── Another user joined → we initiate offer ──
         // Server's 'user-joined-room' payload is { userId, userName, timestamp } — no socketId.
     // socketId only shows up when this fn is reused from room-participants-list.
-    const handleUserJoined = async ({
+    // Called for each peer already in the room when WE join (room-participants-list).
+    // Only the newcomer starts negotiating; existing peers just answer.
+    const connectToPeer = ({
       userId: remoteUserId,
       userName: remoteUserName,
       socketId: remoteSocketId,
@@ -955,19 +1106,15 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
     }) => {
       if (!isMounted.current || !remoteUserId || remoteUserId === userId) return;
 
-      const pc = createPeerConnection(remoteUserId, remoteUserId, remoteUserName);
-
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        socket.emit('webrtc-offer', {
-          roomId,
-          targetUserId: remoteUserId,
-          offer,
-        });
-      } catch (err) {
-        console.error('[WebRTC] createOffer failed', err);
+      // Keep a healthy or still-connecting link; only build one when there isn't one.
+      const existing = peerConnections.current.get(remoteUserId);
+      const usable =
+        !!existing &&
+        existing.signalingState !== 'closed' &&
+        existing.connectionState !== 'failed' &&
+        existing.connectionState !== 'closed';
+      if (!usable) {
+        createPeerConnection(remoteUserId, remoteUserName, { initiator: true });
       }
 
       onPeerJoined?.({
@@ -1032,66 +1179,92 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
 
 
     // ── Receive offer → send answer ──
-        // Server sends { fromUserId, roomId, offer } only.
-        const handleOffer = async ({
-          fromUserId,
-          offer,
-        }: {
-          fromUserId: string;
-          roomId?: string;
-          offer: RTCSessionDescriptionInit;
-        }) => {
-          if (!isMounted.current || !fromUserId) return;
-    
-          const pc = createPeerConnection(fromUserId, fromUserId, undefined);
-    
-          try {
-            await pc.setRemoteDescription(new RTCSessionDescription(offer));
-            
-            const queued = iceCandidateQueue.current.get(fromUserId) || [];
-            for (const c of queued) {
-              await pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
-            }
-            iceCandidateQueue.current.delete(fromUserId);
+    // Server sends { fromUserId, roomId, offer } only (offer carries our extra pcId field).
+    const handleOffer = ({
+      fromUserId,
+      offer,
+    }: {
+      fromUserId: string;
+      roomId?: string;
+      offer: RTCSessionDescriptionInit & { pcId?: string };
+    }) =>
+      runSerial(fromUserId, async () => {
+        if (!isMounted.current || !fromUserId || !offer?.sdp) return;
 
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-    
-            socket.emit('webrtc-answer', {
-              roomId,
-              targetUserId: fromUserId,
-              answer,
-            });
-          } catch (err) {
-            console.error('[WebRTC] answer failed', err);
-          }
-        };
+        const incomingPcId = offer.pcId ?? null;
+        let pc = peerConnections.current.get(fromUserId);
+        let meta = peerMeta.current.get(fromUserId);
+
+        // The other side is on a different RTCPeerConnection than the one we know (reload or
+        // full rebuild). Its DTLS identity changed, so our old connection can't take this
+        // offer: start over with a clean one.
+        const remoteRebuilt =
+          !!meta && !!incomingPcId && !!meta.remotePcId && meta.remotePcId !== incomingPcId;
+
+        if (!pc || !meta || pc.signalingState === 'closed' || remoteRebuilt) {
+          pc = createPeerConnection(fromUserId, undefined, { initiator: false });
+          meta = peerMeta.current.get(fromUserId)!;
+        }
+
+        // Perfect negotiation: if both sides offered at the same time, the impolite side
+        // ignores the incoming offer, the polite side rolls back its own and accepts it.
+        const readyForOffer =
+          !meta.makingOffer && (pc.signalingState === 'stable' || meta.settingRemoteAnswer);
+        meta.ignoreOffer = !meta.polite && !readyForOffer;
+        if (meta.ignoreOffer) return;
+
+        try {
+          meta.remotePcId = incomingPcId ?? meta.remotePcId;
+          await pc.setRemoteDescription({ type: offer.type, sdp: offer.sdp });
+          await flushIceQueue(fromUserId, pc, meta.remotePcId);
+
+          // Our slots come from their offer; put our camera/mic into them before answering
+          await attachLocalMedia(pc, false);
+
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+
+          socket.emit('webrtc-answer', {
+            roomId,
+            targetUserId: fromUserId,
+            answer: { type: answer.type, sdp: answer.sdp, pcId: meta.pcId, forPcId: incomingPcId },
+          });
+        } catch (err) {
+          console.error('[WebRTC] answer failed', err);
+        }
+      });
 
     // ── Receive answer ──
-    const handleAnswer = async ({
+    const handleAnswer = ({
       fromUserId,
       answer,
     }: {
       fromUserId: string;
-      answer: RTCSessionDescriptionInit;
-    }) => {
-      const pc = peerConnections.current.get(fromUserId);
-      if (!pc) return;
+      answer: RTCSessionDescriptionInit & { pcId?: string; forPcId?: string | null };
+    }) =>
+      runSerial(fromUserId, async () => {
+        const pc = peerConnections.current.get(fromUserId);
+        const meta = peerMeta.current.get(fromUserId);
+        if (!pc || !meta || !answer?.sdp) return;
 
-      try {
+        // Answer to a connection we have already replaced
+        if (answer.forPcId && answer.forPcId !== meta.pcId) return;
+        // Answer from a different remote connection than the one we're negotiating with
+        if (answer.pcId && meta.remotePcId && answer.pcId !== meta.remotePcId) return;
         // Guard against invalid state (e.g., duplicate answer)
         if (pc.signalingState !== 'have-local-offer') return;
-        await pc.setRemoteDescription(new RTCSessionDescription(answer));
 
-        const queued = iceCandidateQueue.current.get(fromUserId) || [];
-        for (const c of queued) {
-          await pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {});
+        try {
+          meta.settingRemoteAnswer = true;
+          meta.remotePcId = answer.pcId ?? meta.remotePcId;
+          await pc.setRemoteDescription({ type: answer.type, sdp: answer.sdp });
+          await flushIceQueue(fromUserId, pc, meta.remotePcId);
+        } catch (err) {
+          console.error('[WebRTC] setRemoteDescription (answer) failed', err);
+        } finally {
+          meta.settingRemoteAnswer = false;
         }
-        iceCandidateQueue.current.delete(fromUserId);
-      } catch (err) {
-        console.error('[WebRTC] setRemoteDescription (answer) failed', err);
-      }
-    };
+      });
 
     // ── Receive ICE candidate ──
     const handleIceCandidate = async ({
@@ -1099,9 +1272,15 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
       candidate,
     }: {
       fromUserId: string;
-      candidate: RTCIceCandidateInit;
+      candidate: QueuedCandidate;
     }) => {
+      if (!candidate) return;
       const pc = peerConnections.current.get(fromUserId);
+      const meta = peerMeta.current.get(fromUserId);
+      const { pcId: candidatePcId, ...init } = candidate;
+
+      // Candidate from a remote connection we've already moved on from
+      if (meta?.remotePcId && candidatePcId && candidatePcId !== meta.remotePcId) return;
 
       if (!pc || !pc.remoteDescription) {
         const queued = iceCandidateQueue.current.get(fromUserId) || [];
@@ -1111,9 +1290,10 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
       }
 
       try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        await pc.addIceCandidate(init);
       } catch (err) {
-        // Benign in some race conditions — ignore
+        // Benign in some race conditions (e.g. an offer we deliberately ignored) — ignore
+        if (!meta?.ignoreOffer) console.warn('[WebRTC] addIceCandidate failed', err);
       }
     };
 
@@ -1171,7 +1351,7 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
       // For each existing participant, initiate offer
       participants.forEach((p) => {
         if (p.socketId === socket.id) return; // skip self
-        handleUserJoined(p);
+        connectToPeer(p);
       });
 
       // Warn if SFU threshold exceeded
@@ -1231,6 +1411,9 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
     leaveRoom,
     createPeerConnection,
     removePeer,
+    attachLocalMedia,
+    flushIceQueue,
+    runSerial,
     onPeerJoined,
     onPeerLeft,
   ]);
