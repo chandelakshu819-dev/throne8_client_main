@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import StudyGroupService, {
   type GroupStreakLeaderboardResponse,
+  type GroupChallengeResponse,
 } from "@/lib/api/studyGroup.service";
 
 interface GroupChallengeModalProps {
@@ -45,20 +46,40 @@ const CHALLENGES: Array<{
     title: "Speed Challenge",
     description: "Who can study 2 hours fastest?",
     Icon: Timer,
-    tint: "from-purple-50 to-purple-100 text-purple-500",
-    available: false,
+    tint: "from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 text-purple-500",
+    available: true,
   },
   {
     id: "daily",
     title: "Daily Goal Race",
     description: "First to hit 8 hours today wins",
     Icon: Target,
-    tint: "from-amber-50 to-amber-100 text-amber-500",
-    available: false,
+    tint: "from-amber-50 to-amber-100 hover:from-amber-100 hover:to-amber-200 text-amber-500",
+    available: true,
   },
 ];
 
 const MEDALS = ["🥇", "🥈", "🥉"];
+
+const TITLES: Record<ChallengeId, string> = {
+  streak: "Streak Battle",
+  speed: "Speed Challenge",
+  daily: "Daily Goal Race",
+};
+
+/** 4980 -> "1h 23m", 300 -> "5m", 0 -> "0m" */
+const formatDuration = (totalSeconds: number) => {
+  const s = Math.max(0, Math.round(totalSeconds || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+};
+
+const formatClock = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : "";
 
 export default function GroupChallengeModal({
   isOpen,
@@ -70,6 +91,7 @@ export default function GroupChallengeModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<GroupStreakLeaderboardResponse | null>(null);
+  const [raceData, setRaceData] = useState<GroupChallengeResponse | null>(null);
 
   const loadStreaks = useCallback(async () => {
     setLoading(true);
@@ -84,16 +106,54 @@ export default function GroupChallengeModal({
     }
   }, [groupId]);
 
-  // Load standings when Streak Battle is opened
+  // Speed Challenge and Daily Goal Race share one loader
+  const loadRace = useCallback(
+    async (challenge: "speed" | "daily") => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await StudyGroupService.getGroupChallenge(
+          groupId,
+          challenge
+        );
+        setRaceData(result);
+      } catch (err: any) {
+        setError(err?.message || "Could not load the standings.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [groupId]
+  );
+
+  const refresh = () => {
+    if (selected === "streak") loadStreaks();
+    else if (selected === "speed" || selected === "daily") loadRace(selected);
+  };
+
+  // Load standings when a challenge is opened
   useEffect(() => {
-    if (isOpen && selected === "streak") loadStreaks();
-  }, [isOpen, selected, loadStreaks]);
+    if (!isOpen) return;
+    if (selected === "streak") loadStreaks();
+    else if (selected === "speed" || selected === "daily") {
+      setRaceData(null);
+      loadRace(selected);
+    }
+  }, [isOpen, selected, loadStreaks, loadRace]);
+
+  // Keep the race standings live while the modal is open
+  useEffect(() => {
+    if (!isOpen || (selected !== "speed" && selected !== "daily")) return;
+    const id = setInterval(() => loadRace(selected), 60000);
+    return () => clearInterval(id);
+  }, [isOpen, selected, loadRace]);
 
   // Reset when the modal closes
   useEffect(() => {
     if (!isOpen) {
       setSelected(null);
       setData(null);
+      setRaceData(null);
       setError(null);
     }
   }, [isOpen]);
@@ -106,6 +166,10 @@ export default function GroupChallengeModal({
   };
 
   const leaderboard = Array.isArray(data?.leaderboard) ? data!.leaderboard : [];
+  const raceBoard = Array.isArray(raceData?.leaderboard)
+    ? raceData!.leaderboard
+    : [];
+  const isRace = selected === "speed" || selected === "daily";
 
   return (
     <div
@@ -123,15 +187,15 @@ export default function GroupChallengeModal({
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-bold text-[#4a3728]">
-              {selected === "streak" ? "Streak Battle" : "Group Challenge"}
+              {selected ? TITLES[selected] : "Group Challenge"}
             </h3>
             <p className="text-xs text-[#6b5847]">
               Compete and motivate each other
             </p>
           </div>
-          {selected === "streak" && (
+          {selected !== null && (
             <button
-              onClick={loadStreaks}
+              onClick={refresh}
               disabled={loading}
               title="Refresh"
               className="p-2 rounded-full hover:bg-black/5 text-[#6b5847] disabled:opacity-50"
@@ -244,6 +308,102 @@ export default function GroupChallengeModal({
               <p className="mt-3 text-xs text-[#6b5847] text-center">
                 {data.myRank ? `Your rank: #${data.myRank} · ` : ""}
                 {data.totalMembers ?? leaderboard.length} members in the group
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Speed Challenge / Daily Goal Race standings */}
+        {isRace && (
+          <div className="mb-5">
+            <p className="text-xs text-[#6b5847] mb-3">
+              {selected === "speed"
+                ? "Shortest time from your first session today to 2 hours of study wins."
+                : "First member to study 8 hours today wins."}
+            </p>
+
+            {loading && !raceData && (
+              <div className="flex items-center justify-center py-10 text-[#6b5847]">
+                <Loader2 className="animate-spin mr-2" size={18} /> Loading
+                standings...
+              </div>
+            )}
+
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            {raceData && raceData.winnerId && (
+              <div className="mb-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800 text-center">
+                🏆{" "}
+                {raceBoard[0]?.isCurrentUser
+                  ? "You are leading!"
+                  : `${nameFor(raceBoard[0].userId, raceBoard[0].userName)} is leading`}
+              </div>
+            )}
+
+            {raceBoard.length > 0 && (
+              <ul className="space-y-2">
+                {raceBoard.map((entry, index) => (
+                  <li
+                    key={entry.userId}
+                    className={`rounded-xl px-3 py-2.5 border ${
+                      entry.isCurrentUser
+                        ? "bg-amber-50 border-amber-300"
+                        : "bg-white border-[#ece7e2]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 text-center font-bold text-[#4a3728]">
+                        {entry.reached
+                          ? MEDALS[index] ?? `#${entry.rank}`
+                          : `#${entry.rank}`}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-[#4a3728] truncate">
+                          {nameFor(entry.userId, entry.userName)}
+                          {entry.isCurrentUser && (
+                            <span className="ml-1 text-xs text-amber-600">
+                              (you)
+                            </span>
+                          )}
+                          {entry.isStudying && (
+                            <span className="ml-2 text-[10px] font-bold uppercase text-green-600">
+                              studying now
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-[#6b5847]">
+                          {entry.reached
+                            ? selected === "speed"
+                              ? `Done in ${formatDuration(entry.elapsedSeconds ?? 0)} · ${formatClock(entry.reachedAt)}`
+                              : `Reached at ${formatClock(entry.reachedAt)}`
+                            : `${formatDuration(entry.studiedSeconds)} of ${formatDuration(raceData!.targetSeconds)}`}
+                        </div>
+                      </div>
+                      <div className="font-bold text-sm text-[#4a3728]">
+                        {entry.reached ? "✓" : `${entry.progressPercent}%`}
+                      </div>
+                    </div>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-[#ece7e2] overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          entry.reached ? "bg-green-500" : "bg-amber-400"
+                        }`}
+                        style={{ width: `${entry.progressPercent}%` }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {raceData && (
+              <p className="mt-3 text-xs text-[#6b5847] text-center">
+                {raceData.myRank ? `Your rank: #${raceData.myRank} · ` : ""}
+                {raceData.totalMembers} members · resets at midnight
               </p>
             )}
           </div>
