@@ -200,7 +200,7 @@ export default function WeeklyTracker() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <div className="rounded-xl border border-[#e0d8cf] bg-white/60 p-4 sm:p-5">
 
         <h2 className="text-lg font-bold text-[#4a3728]">Weekly plan</h2>

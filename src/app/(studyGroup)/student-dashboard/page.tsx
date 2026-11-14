@@ -46,6 +46,8 @@ import SkeletonLoader from "@/app/loading";
 import { StatsPeriod, MainTab } from "@/features/studyGroup/types";
 import { useGroupData } from "@/features/study-group/hooks/useGroupData";
 import DashboardGroupCard from "@/features/studyGroup/components/DashboardGroupCard";
+import { STUDY_PAGE_WRAP } from "@/features/study-group/constants/pageLayout";
+import BackButton from "@/features/study-group/components/BackButton";
 
 export default function StudentDashboard() {
   const dispatch = useAppDispatch();
@@ -87,8 +89,9 @@ export default function StudentDashboard() {
     })) ?? [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#faf8f5] to-[#f5f1ea] p-3 md:p-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-[#faf8f5] to-[#f5f1ea] pt-20 pb-3 md:pb-4">
+      <div className={STUDY_PAGE_WRAP}>
+        <BackButton className="mb-4" />
         {error && (
           <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
             Couldn't load some dashboard data: {error}

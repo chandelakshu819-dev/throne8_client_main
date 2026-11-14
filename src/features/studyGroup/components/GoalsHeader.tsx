@@ -118,7 +118,7 @@ export default function GoalsHeader() {
   ];
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       {/* Page title + main action */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
