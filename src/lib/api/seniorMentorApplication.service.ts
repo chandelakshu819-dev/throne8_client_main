@@ -50,6 +50,50 @@ export interface SeniorMentorApplication {
   updatedAt: string;
 }
 
+// ── Admin (college mentor review) types ───────────────────────────────────────
+// The admin list returns raw application documents (seniorMentorId, no `applicationId`).
+export interface CollegeMentorApplication extends Omit<SeniorMentorApplication, 'applicationId'> {
+  seniorMentorId: string;
+  profilePhoto?: string;
+  profileCompletion?: number;
+}
+
+export interface CollegeMentorStats {
+  total: number;
+  pending: number;
+  under_review: number;
+  verified: number;
+  rejected: number;
+}
+
+export interface CollegeMentorListParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  mentorRole?: string;
+  primaryExpertise?: string;
+  search?: string;
+  /** ISO 8601 — applied on/after */
+  from?: string;
+  /** ISO 8601 — applied on/before */
+  to?: string;
+}
+
+export interface CollegeMentorListResponse {
+  data: CollegeMentorApplication[];
+  meta?: { page: number; limit: number; total: number; totalPages: number };
+  pagination?: { page: number; limit: number; total: number; totalPages: number };
+}
+
+const ADMIN_BASE = '/mentorship/senior-mentor-applications';
+
+function adminErrorMessage(error: any, fallback: string): Error {
+  if (error?.response?.status === 403) return new Error('Admin access required.');
+  const apiMessage = error?.response?.data?.message;
+  if (apiMessage) return new Error(apiMessage);
+  return new Error(fallback);
+}
+
 // ── "My application" cache + in-flight dedupe ─────────────────────────────────
 // Many components (navbar, dropdown, dashboards) call getMyApplication() at the
 // same time. They now share ONE network request, and the result is reused for
@@ -174,6 +218,58 @@ class SeniorMentorApplicationService {
     const { data } = await api.patch('/mentorship/senior-mentor-applications/me', updates);
     clearMyAppCache();
     return data?.data;
+  }
+
+  // ── Admin: college mentor review ────────────────────────────────────────────
+
+  /** GET /senior-mentor-applications — admin list with filters + pagination. */
+  static async adminList(params: CollegeMentorListParams = {}): Promise<CollegeMentorListResponse> {
+    try {
+      const { data } = await api.get(ADMIN_BASE, { params });
+      return data;
+    } catch (error: any) {
+      throw adminErrorMessage(error, 'Failed to fetch college mentors.');
+    }
+  }
+
+  /** GET /senior-mentor-applications/stats — counts per verification status. */
+  static async adminStats(): Promise<CollegeMentorStats> {
+    try {
+      const { data } = await api.get(`${ADMIN_BASE}/stats`);
+      return data?.data;
+    } catch (error: any) {
+      throw adminErrorMessage(error, 'Failed to fetch college mentor stats.');
+    }
+  }
+
+  /** POST /senior-mentor-applications/:id/under-review */
+  static async adminMarkUnderReview(seniorMentorId: string): Promise<CollegeMentorApplication> {
+    try {
+      const { data } = await api.post(`${ADMIN_BASE}/${seniorMentorId}/under-review`);
+      return data?.data;
+    } catch (error: any) {
+      throw adminErrorMessage(error, 'Failed to mark application as under review.');
+    }
+  }
+
+  /** POST /senior-mentor-applications/:id/approve */
+  static async adminApprove(seniorMentorId: string): Promise<CollegeMentorApplication> {
+    try {
+      const { data } = await api.post(`${ADMIN_BASE}/${seniorMentorId}/approve`);
+      return data?.data;
+    } catch (error: any) {
+      throw adminErrorMessage(error, 'Failed to approve application.');
+    }
+  }
+
+  /** POST /senior-mentor-applications/:id/reject */
+  static async adminReject(seniorMentorId: string, reason: string): Promise<CollegeMentorApplication> {
+    try {
+      const { data } = await api.post(`${ADMIN_BASE}/${seniorMentorId}/reject`, { reason });
+      return data?.data;
+    } catch (error: any) {
+      throw adminErrorMessage(error, 'Failed to reject application.');
+    }
   }
 }
 
