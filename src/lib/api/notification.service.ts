@@ -96,7 +96,7 @@ class NotificationService {
         module?: 'senior-mentor' | 'industry-mentor'
     ): Promise<any> {
         try {
-            const { data } = await api.put(`/mentorship/notifications/${notificationId}/read`, null, {
+            const { data } = await api.put(`/mentorship/notifications/${notificationId}/read`, {}, {
                 params: module ? { module } : undefined,
             });
             return data;
@@ -110,7 +110,7 @@ class NotificationService {
         module?: 'senior-mentor' | 'industry-mentor'
     ): Promise<any> {
         try {
-            const { data } = await api.put('/mentorship/notifications/read-all', null, {
+            const { data } = await api.put('/mentorship/notifications/read-all', {}, {
                 params: module ? { module } : undefined,
             });
             return data;
