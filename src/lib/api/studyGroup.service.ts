@@ -721,6 +721,34 @@ export interface GroupStreakLeaderboardResponse {
   totalMembers: number;
 }
 
+export interface GroupChallengeEntry {
+  userId: string;
+  userName?: string;
+  userAvatar?: string;
+  studiedSeconds: number;
+  progressPercent: number;
+  reached: boolean;
+  reachedAt: string | null;
+  /** Speed challenge: seconds from first session today to reaching the target */
+  elapsedSeconds: number | null;
+  isStudying: boolean;
+  rank: number;
+  isCurrentUser: boolean;
+}
+
+export interface GroupChallengeResponse {
+  groupId: string;
+  challenge: "speed" | "daily";
+  targetSeconds: number;
+  dayStart: string;
+  dayEnd: string;
+  leaderboard: GroupChallengeEntry[];
+  winnerId: string | null;
+  myRank: number | null;
+  totalMembers: number;
+  generatedAt: string;
+}
+
 class StudyGroupService {
   // =======================================================================================
   // ===========================GROUP ROUTES================================================
@@ -1579,6 +1607,34 @@ class StudyGroupService {
         error?.response?.data?.message ||
           error?.message ||
           "Failed to fetch group streak leaderboard"
+      );
+    }
+  }
+
+  /**
+   * Speed Challenge / Daily Goal Race standings for today.
+   * Lives under the streak base path so no new env variable is needed.
+   */
+  static async getGroupChallenge(
+    groupId: string,
+    challenge: "speed" | "daily",
+    limit: number = 50
+  ): Promise<GroupChallengeResponse> {
+    try {
+      const base =
+        process.env.NEXT_PUBLIC_STUDY_GROUP_STREAK_ENDPOINT ||
+        "/study-group/streak";
+      const { data: res } = await api.get(
+        joinUrl(base, `/group-challenge/${groupId}/${challenge}`),
+        // tzOffset lets the server decide where "today" starts for this user
+        { params: { limit, tzOffset: new Date().getTimezoneOffset() } }
+      );
+      return res.data;
+    } catch (error: any) {
+      throw new Error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to fetch challenge standings"
       );
     }
   }
