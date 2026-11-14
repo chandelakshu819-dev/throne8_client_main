@@ -252,7 +252,7 @@ export default function TopRankedGroups() {
   if (topThreeGroups.length === 0) return null;
 
   return (
-    <section className="mx-auto w-full max-w-7xl">
+    <section className="w-full">
       <SectionHeader
         icon={<Trophy size={22} />}
         title="Top Ranked Groups"
