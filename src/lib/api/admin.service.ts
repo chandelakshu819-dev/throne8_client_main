@@ -50,6 +50,10 @@ class AdminService {
         limit?: number;
         status?: string;
         search?: string;
+        /** ISO 8601 — mentors who applied on/after this moment */
+        from?: string;
+        /** ISO 8601 — mentors who applied on/before this moment */
+        to?: string;
     } = {}): Promise<AdminPaginatedResponse<any[]>> {
         try {
             const { data } = await api.get<AdminPaginatedResponse<any[]>>(`${BASE}/mentors`, { params });
