@@ -308,16 +308,27 @@ export default function MentorDashboard(
   // (booking request, session started/confirmed, etc.)
   const { latestNotification } = useSocket('industry-mentor');
 
-  const fetchNotifications = useCallback(() => {
-    setNotificationsLoading(true);
-    NotificationService.getMentorshipNotifications({ limit: 50, module: 'industry-mentor' })
-      .then((res) => setNotifications(normalizeNotifications(res)))
-      .catch((err) => {
-        console.error("Failed to fetch notifications:", err);
-        setNotifications([]);
-      })
-      .finally(() => setNotificationsLoading(false));
-  }, []);
+   // Jo ids user ne read kar di hain, unhe yaad rakho taaki refetch unhe wapas unread na kare
+   const readIdsRef = useRef<Set<string>>(new Set());
+
+   const fetchNotifications = useCallback(() => {
+     setNotificationsLoading(true);
+     NotificationService.getMentorshipNotifications({ limit: 50, module: 'industry-mentor' })
+       .then((res) =>
+         setNotifications(
+           normalizeNotifications(res).map((n: any) => ({
+             ...n,
+             isRead: n.isRead || readIdsRef.current.has(n._id),
+           }))
+         )
+       )
+       .catch((err) => {
+         console.error("Failed to fetch notifications:", err);
+         setNotifications((prev) => (Array.isArray(prev) ? prev : []));
+       })
+       .finally(() => setNotificationsLoading(false));
+   }, []);
+
 
   useEffect(() => {
     if (!userId) return;
@@ -362,22 +373,27 @@ export default function MentorDashboard(
   }, [latestNotification]);
 
   const handleMarkNotificationRead = (id: string) => {
+    readIdsRef.current.add(id);
     setNotifications((prev) =>
       (Array.isArray(prev) ? prev : []).map((n) => (n._id === id ? { ...n, isRead: true } : n))
     );
     NotificationService.markMentorshipNotificationRead(id, 'industry-mentor').catch((err) => {
-      console.error("Failed to mark notification as read:", err);
-      fetchNotifications();
+      // refetch hata diya: wahi unread wapas la raha tha
+      console.error("Failed to mark notification as read:", err?.response?.status, err);
     });
   };
 
   const handleMarkAllNotificationsRead = () => {
-    setNotifications((prev) => (Array.isArray(prev) ? prev : []).map((n) => ({ ...n, isRead: true })));
+    setNotifications((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      list.forEach((n) => readIdsRef.current.add(n._id));
+      return list.map((n) => ({ ...n, isRead: true }));
+    });
     NotificationService.markAllMentorshipNotificationsRead('industry-mentor').catch((err) => {
-      console.error("Failed to mark all notifications as read:", err);
-      fetchNotifications();
+      console.error("Failed to mark all notifications as read:", err?.response?.status, err);
     });
   };
+  
 
   useEffect(() => {
     if (!userId) return;

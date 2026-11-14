@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { AlertCircle, Loader2 } from "lucide-react";
 import SeniorMentorApplicationService, { SeniorMentorApplication } from "@/lib/api/seniorMentorApplication.service";
@@ -52,13 +52,22 @@ export default function SeniorMentorLayout({
   const [notificationsLoading, setNotificationsLoading] = useState(true);
   const { latestNotification } = useSocket('senior-mentor');
 
+  const readIdsRef = useRef<Set<string>>(new Set());
+
   const fetchNotifications = useCallback(() => {
     setNotificationsLoading(true);
     NotificationService.getMentorshipNotifications({ limit: 50, module: 'senior-mentor' })
-      .then((res) => setNotifications(normalizeNotifications(res)))
+      .then((res) =>
+        setNotifications(
+          normalizeNotifications(res).map((n: any) => ({
+            ...n,
+            isRead: n.isRead || readIdsRef.current.has(n._id),
+          }))
+        )
+      )
       .catch((err) => {
         console.error("Failed to fetch mentorship notifications:", err);
-        setNotifications([]);
+        setNotifications((prev) => (Array.isArray(prev) ? prev : []));
       })
       .finally(() => setNotificationsLoading(false));
   }, []);
@@ -103,20 +112,23 @@ export default function SeniorMentorLayout({
   }, [latestNotification]);
 
   const handleMarkNotificationRead = (id: string) => {
+    readIdsRef.current.add(id);
     setNotifications((prev) =>
       (Array.isArray(prev) ? prev : []).map((n) => (n._id === id || n.notificationId === id ? { ...n, isRead: true } : n))
     );
     NotificationService.markMentorshipNotificationRead(id, 'senior-mentor').catch((err) => {
-      console.error("Failed to mark notification as read:", err);
-      fetchNotifications();
+      console.error("Failed to mark notification as read:", err?.response?.status, err);
     });
   };
 
   const handleMarkAllNotificationsRead = () => {
-    setNotifications((prev) => (Array.isArray(prev) ? prev : []).map((n) => ({ ...n, isRead: true })));
+    setNotifications((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      list.forEach((n) => readIdsRef.current.add(n._id));
+      return list.map((n) => ({ ...n, isRead: true }));
+    });
     NotificationService.markAllMentorshipNotificationsRead('senior-mentor').catch((err) => {
-      console.error("Failed to mark all notifications as read:", err);
-      fetchNotifications();
+      console.error("Failed to mark all notifications as read:", err?.response?.status, err);
     });
   };
 
