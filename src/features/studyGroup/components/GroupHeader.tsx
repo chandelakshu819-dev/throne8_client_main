@@ -13,7 +13,7 @@ const GroupHeader = () => {
 
   return (
     <div className="relative overflow-visible py-4 sm:py-6 lg:py-8">
-      <section className="max-w-7xl mx-auto relative">
+      <section className="w-full relative">
         <div className="backdrop-blur-2xl bg-white/40 border-2 border-white/60 rounded-3xl shadow-xs overflow-visible">
           <div className="flex flex-col lg:flex-row gap-6 lg:gap-10 items-center justify-between px-6 sm:px-8 lg:px-10 py-6 sm:py-8 lg:py-10 relative">
 

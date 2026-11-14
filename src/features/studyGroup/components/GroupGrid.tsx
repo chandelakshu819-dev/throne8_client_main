@@ -89,7 +89,7 @@ const GroupGrid: React.FC<GroupGridProps> = ({ title, subtitle, sectionKey, icon
   if (isLoading) return <SkeletonLoader count={3} />;
 
   return (
-    <section className="mx-auto w-full max-w-7xl">
+    <section className="w-full">
       <SectionHeader title={title} subtitle={subtitle} icon={icon} />
 
       {/* Cards Grid */}

@@ -17,6 +17,7 @@ import TimerControls from '@/features/studyGroup/components/TimerControls';
 import MotivationalQuote from '@/features/studyGroup/components/MotivationalQuote';
 import StudyProgress from '@/features/studyGroup/components/StudyProgress';
 import { getActiveTimerThunk, getAllSessionsThunk, getTimerStatsThunk, getTodaySessionsThunk, stopTimerThunk } from '@/hooks/studyGroup/features/timer/timer.thunks';
+import { STUDY_PAGE_WRAP } from "@/features/study-group/constants/pageLayout";
 
 export default function PomodoroTimer() {
   const dispatch = useAppDispatch();
@@ -112,7 +113,7 @@ export default function PomodoroTimer() {
   const progress = Math.min(100, Math.max(0, ((totalSeconds - remainingSeconds) / totalSeconds) * 100));
 
   return (
-    <div className="min-h-screen bg-[#f7f3ee] px-3 py-5 sm:px-4 sm:py-6 lg:px-8 lg:py-8">
+    <div className="min-h-screen bg-[#f7f3ee] py-5 sm:py-6 lg:py-8">
 
       {/* Session complete toast */}
       {sessionCompleted && (
@@ -124,7 +125,7 @@ export default function PomodoroTimer() {
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-6xl">
+      <div className={STUDY_PAGE_WRAP}>
         <header className="mb-6">
           <h1 className="text-2xl font-bold tracking-tight text-[#4a3728] sm:text-3xl">Study Timer</h1>
           <p className="mt-1 text-sm text-[#6b5847] sm:text-base">

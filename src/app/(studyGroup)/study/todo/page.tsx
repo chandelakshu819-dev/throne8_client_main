@@ -11,6 +11,7 @@ import {
   fetchUpcomingTasksThunk,
   fetchOverdueTasksThunk,
 } from "@/hooks/studyGroup/features/todo/todo.thunks";
+import { STUDY_PAGE_WRAP } from "@/features/study-group/constants/pageLayout";
 
 export default function CalendarTodo() {
   const dispatch = useAppDispatch();
@@ -55,8 +56,8 @@ export default function CalendarTodo() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br p-3 sm:p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br py-3 sm:py-4 md:py-6">
+      <div className={STUDY_PAGE_WRAP}>
         <CalendarHeader
           currentDate={currentDate}
           view={view}

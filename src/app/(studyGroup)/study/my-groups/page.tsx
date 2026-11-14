@@ -20,6 +20,7 @@ import { getTimerStatsThunk } from "@/hooks/studyGroup/features/timer/timer.thun
 import { GroupVisibility } from "@/lib/api/studyGroup.service";
 import { useGroupData } from "@/features/study-group/hooks/useGroupData";
 import { FormData, Group, Member, SettingsModalProps } from "@/features/study-group/interface";
+import { STUDY_PAGE_WRAP } from "@/features/study-group/constants/pageLayout";
 
 
 
@@ -825,8 +826,8 @@ export default function MyGroups() {
 
 
   return (
-    <div className="min-h-screen w-full p-3 sm:p-4 md:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen w-full py-3 sm:py-4 md:py-6 lg:py-8">
+      <div className={STUDY_PAGE_WRAP}>
         <div className="mb-4 sm:mb-6 md:mb-8">
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#4a3728] mb-1 sm:mb-2">My Study Groups</h1>
           <p className="text-sm sm:text-base text-[#6b5847]">Manage and track your study groups</p>
