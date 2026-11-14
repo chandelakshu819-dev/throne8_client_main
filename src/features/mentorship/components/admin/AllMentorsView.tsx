@@ -112,6 +112,45 @@ export interface MentorListItem {
   updatedAt: string;
 }
 
+type DatePreset = "all" | "7" | "10" | "30" | "custom";
+
+const DATE_PRESETS: Array<{ key: DatePreset; label: string }> = [
+  { key: "all", label: "All time" },
+  { key: "7", label: "Last 7 days" },
+  { key: "10", label: "Last 10 days" },
+  { key: "30", label: "Last 30 days" },
+  { key: "custom", label: "Custom range" },
+];
+
+// YYYY-MM-DD in the browser's local timezone (what <input type="date"> uses)
+const toInputDate = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const formatAppliedDate = (iso?: string) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+const daysAgoLabel = (iso?: string) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfThat = new Date(d);
+  startOfThat.setHours(0, 0, 0, 0);
+  const diff = Math.round((startOfToday.getTime() - startOfThat.getTime()) / 86400000);
+  if (diff <= 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  return `${diff} days ago`;
+};
+
 export default function AllMentorsView() {
   const [mentors, setMentors] = useState<MentorListItem[]>([]);
   const [photosMap, setPhotosMap] = useState<Record<string, string>>({});
@@ -121,6 +160,9 @@ export default function AllMentorsView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [fromDate, setFromDate] = useState(""); // YYYY-MM-DD
+  const [toDate, setToDate] = useState(""); // YYYY-MM-DD
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState<number | null>(null);
@@ -144,15 +186,49 @@ export default function AllMentorsView() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  const hasDateFilter = Boolean(fromDate || toDate);
+  const invalidRange = Boolean(fromDate && toDate && fromDate > toDate);
+
+  const applyPreset = (preset: DatePreset) => {
+    setDatePreset(preset);
+    setPage(1);
+    if (preset === "all") {
+      setFromDate("");
+      setToDate("");
+    } else if (preset !== "custom") {
+      const days = Number(preset);
+      const from = new Date();
+      from.setDate(from.getDate() - days);
+      setFromDate(toInputDate(from));
+      setToDate(toInputDate(new Date()));
+    }
+  };
+
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("");
+    setDatePreset("all");
+    setFromDate("");
+    setToDate("");
+    setPage(1);
+  };
+
   const fetchMentors = useCallback(async () => {
+    if (fromDate && toDate && fromDate > toDate) return; // invalid range, wait for the user to fix it
     setLoading(true);
     setError(null);
     try {
+      // Local-day boundaries -> ISO (UTC) so IST users get correct day cut-offs
+      const fromIso = fromDate ? new Date(`${fromDate}T00:00:00`).toISOString() : undefined;
+      const toIso = toDate ? new Date(`${toDate}T23:59:59.999`).toISOString() : undefined;
+
       const res = await AdminService.getAllMentors({
         page,
         limit: 10,
         status: statusFilter || undefined,
         search: debouncedSearch || undefined,
+        from: fromIso,
+        to: toIso,
       });
 
       const list = res.data || [];
@@ -190,7 +266,7 @@ export default function AllMentorsView() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, debouncedSearch]);
+  }, [page, statusFilter, debouncedSearch, fromDate, toDate]);
 
   useEffect(() => {
     fetchMentors();
@@ -349,6 +425,36 @@ export default function AllMentorsView() {
             </select>
           </div>
 
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs font-semibold text-[#4a3728]">From:</label>
+            <input
+              type="date"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setDatePreset("custom");
+                setPage(1);
+              }}
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-[#e0d8cf] bg-[#fbf7f3] text-[#4a3728] focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs font-semibold text-[#4a3728]">To:</label>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setDatePreset("custom");
+                setPage(1);
+              }}
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-[#e0d8cf] bg-[#fbf7f3] text-[#4a3728] focus:outline-none"
+            />
+          </div>
+
           <div className="text-xs font-medium text-[#8a7a6a]">
             Total:{" "}
             <span className="font-bold text-[#4a3728]">
@@ -365,6 +471,40 @@ export default function AllMentorsView() {
           >
             Refresh
           </button>
+        </div>
+
+        {/* Applied-date quick ranges */}
+        <div className="w-full flex flex-wrap items-center gap-2 pt-1">
+          <span className="text-[11px] font-semibold text-[#8a7a6a]">Applied:</span>
+          {DATE_PRESETS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => applyPreset(p.key)}
+              className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${
+                datePreset === p.key
+                  ? "bg-[#4a3728] text-white border-[#4a3728]"
+                  : "bg-[#fbf7f3] text-[#5c4a3a] border-[#e0d8cf] hover:bg-[#f3ece4]"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+          {hasDateFilter && !error && total !== null && !invalidRange && (
+            <span className="ml-auto text-[11px] text-[#8a7a6a]">
+              <span className="font-bold text-[#4a3728]">{total}</span> mentor{total === 1 ? "" : "s"} applied
+              {fromDate && toDate
+                ? ` between ${formatAppliedDate(`${fromDate}T00:00:00`)} and ${formatAppliedDate(`${toDate}T00:00:00`)}`
+                : fromDate
+                ? ` since ${formatAppliedDate(`${fromDate}T00:00:00`)}`
+                : ` until ${formatAppliedDate(`${toDate}T00:00:00`)}`}
+            </span>
+          )}
+          {invalidRange && (
+            <span className="ml-auto text-[11px] text-red-700">
+              &quot;From&quot; date must be before &quot;To&quot; date.
+            </span>
+          )}
         </div>
       </div>
 
@@ -404,18 +544,14 @@ export default function AllMentorsView() {
           {!error && mentors.length === 0 ? (
             <div className="text-center py-16 text-[#8a7a6a] text-sm space-y-2">
               <div>
-                {searchQuery || statusFilter
+                {searchQuery || statusFilter || hasDateFilter
                   ? "No mentors found matching your filters."
                   : "No mentors found."}
               </div>
-              {(searchQuery || statusFilter) && (
+              {(searchQuery || statusFilter || hasDateFilter) && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setStatusFilter("");
-                    setPage(1);
-                  }}
+                  onClick={clearAllFilters}
                   className="text-xs text-[#7a5c3e] hover:underline font-semibold"
                 >
                   Clear filters
@@ -429,6 +565,7 @@ export default function AllMentorsView() {
                 <tr className="border-b border-[#ece4db] bg-[#faf6f1] text-[#7a5c3e]">
                   <th className="py-3 px-4 font-semibold">Mentor</th>
                   <th className="py-3 px-4 font-semibold">Current Role</th>
+                  <th className="py-3 px-4 font-semibold">Applied on</th>
                   <th className="py-3 px-4 font-semibold">Status</th>
                   <th className="py-3 px-4 font-semibold">Experience</th>
                   <th className="py-3 px-4 font-semibold">Rating</th>
@@ -534,6 +671,16 @@ export default function AllMentorsView() {
                             <ExternalLink className="w-2.5 h-2.5" />
                           </a>
                         )}
+                      </td>
+
+                      {/* Applied on */}
+                      <td className="py-3.5 px-4 align-top whitespace-nowrap">
+                        <div className="font-medium text-[#4a3728]">
+                          {formatAppliedDate(mentor.createdAt)}
+                        </div>
+                        <div className="text-[10px] text-[#8a7a6a]">
+                          {daysAgoLabel(mentor.createdAt)}
+                        </div>
                       </td>
 
                       {/* Status */}

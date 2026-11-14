@@ -228,7 +228,14 @@ export default function ServiceModal({
                                         className="hidden"
                                         onChange={(e) => {
                                             const file = e.target.files?.[0];
-                                            if (file) setFormData({ ...formData, thumbnailImage: file });
+                                            if (file) {
+                                                if (file.size > 5 * 1024 * 1024) {
+                                                    alert('Image must be smaller than 5MB.');
+                                                    e.target.value = '';
+                                                    return;
+                                                }
+                                                setFormData({ ...formData, thumbnailImage: file });
+                                            }                                            
                                         }}
                                         disabled={isSaving}
                                     />
@@ -253,7 +260,14 @@ export default function ServiceModal({
                                         className="hidden"
                                         onChange={(e) => {
                                             const file = e.target.files?.[0];
-                                            if (file) setFormData({ ...formData, thumbnailImage: file });
+                                            if (file) {
+                                                if (file.size > 5 * 1024 * 1024) {
+                                                    alert('Image must be smaller than 5MB.');
+                                                    e.target.value = '';
+                                                    return;
+                                                }
+                                                setFormData({ ...formData, thumbnailImage: file });
+                                            }
                                         }}
                                         disabled={isSaving}
                                     />
