@@ -154,6 +154,11 @@ const HDR_OUTLINE = `${HDR_BTN} border border-[#d4c4b5] bg-white/70 text-[#4a372
 const HDR_DANGER_OUTLINE = `${HDR_BTN} border border-red-200 bg-white/70 text-red-600 hover:bg-red-50`;
 const HDR_DANGER = `${HDR_BTN} bg-red-600 text-white shadow-sm hover:bg-red-700`;
 
+// Study reminder popup: default text the host can edit before sending.
+const DEFAULT_REMINDER_MESSAGE =
+  "Hey study buddy! 📚 Your group is in session right now. Join us and let's crush our goals together! 💪";
+const REMINDER_MAX_LENGTH = 200;
+
 // Bottom control bar styles.
 const CTRL_BASE =
   "relative flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full text-white shadow-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8b7355] focus-visible:ring-offset-2";
@@ -195,6 +200,9 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const timerAnchorRef = useRef<{ baseSeconds: number; anchorTimestamp: number } | null>(null);
   const [showNotificationPopup, setShowNotificationPopup] =
     useState<boolean>(false);
+  const [reminderMessage, setReminderMessage] = useState<string>(
+    DEFAULT_REMINDER_MESSAGE
+  );
   const [showChallengeModal, setShowChallengeModal] = useState<boolean>(false);
   const [showAnnouncementModal, setShowAnnouncementModal] =
     useState<boolean>(false);
@@ -601,8 +609,11 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   };
 
   const handleSendNotification = (): void => {
-    alert("Study reminder sent to all inactive members! 📚");
+    const text = reminderMessage.trim();
+    if (!text) return;
+    alert(`Study reminder sent to all inactive members!\n\n"${text}"`);
     setShowNotificationPopup(false);
+    setReminderMessage(DEFAULT_REMINDER_MESSAGE);
   };
 
   const handleCreateChallenge = (): void => {
@@ -1983,12 +1994,37 @@ ADD this block just before your main `return (` statement:
             </div>
 
             <div className="bg-[#f6ede8] rounded-lg p-4 mb-4">
-              <p className="text-sm text-[#4a3728] mb-2">
-                <span className="font-semibold">Message to send:</span>
-              </p>
-              <p className="text-sm text-[#6b5847] italic">
-                &ldquo;Hey study buddy! 📚 Your group is in session right now. Join us
-                and let&apos;s crush our goals together! 💪&rdquo;
+              <div className="mb-2 flex items-center justify-between">
+                <label
+                  htmlFor="reminder-message"
+                  className="text-sm font-semibold text-[#4a3728]"
+                >
+                  Message to send:
+                </label>
+                {reminderMessage !== DEFAULT_REMINDER_MESSAGE && (
+                  <button
+                    type="button"
+                    onClick={() => setReminderMessage(DEFAULT_REMINDER_MESSAGE)}
+                    className="text-xs font-medium text-[#8b7355] hover:text-[#4a3728] underline"
+                  >
+                    Reset to default
+                  </button>
+                )}
+              </div>
+              <textarea
+                id="reminder-message"
+                value={reminderMessage}
+                onChange={(e) =>
+                  setReminderMessage(
+                    e.target.value.slice(0, REMINDER_MAX_LENGTH)
+                  )
+                }
+                rows={4}
+                maxLength={REMINDER_MAX_LENGTH}
+                className="w-full resize-none rounded-lg border-2 border-[#e0d8cf] bg-white px-3 py-2 text-sm text-[#4a3728] outline-none focus:border-[#8b7355]"
+              />
+              <p className="mt-1 text-right text-xs text-[#6b5847]">
+                {reminderMessage.length}/{REMINDER_MAX_LENGTH}
               </p>
             </div>
 
@@ -2010,7 +2046,8 @@ ADD this block just before your main `return (` statement:
               </button>
               <button
                 onClick={handleSendNotification}
-                className="flex-1 px-4 py-2.5 bg-[#8b7355] hover:bg-[#6b5847] text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+                disabled={!reminderMessage.trim()}
+                className="flex-1 px-4 py-2.5 bg-[#8b7355] hover:bg-[#6b5847] text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Send size={16} />
                 Send Reminder
