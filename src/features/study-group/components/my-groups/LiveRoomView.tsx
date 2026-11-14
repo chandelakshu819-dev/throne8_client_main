@@ -120,6 +120,22 @@ const VideoElement = memo(({
 });
 VideoElement.displayName = 'VideoElement';
 
+// Plays a remote participant's sound whether or not their camera is on.
+// (The <video> tile only exists while their camera is on, so it can't be what plays audio.)
+const AudioElement = memo(({ stream }: { stream: MediaStream | null }) => {
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (el.srcObject !== stream) el.srcObject = stream;
+    if (stream) el.play().catch(() => { /* blocked until the user interacts; joining was a click */ });
+  }, [stream]);
+
+  return <audio ref={audioRef} autoPlay />;
+});
+AudioElement.displayName = 'AudioElement';
+
 // ─── Avatar fallback ───────────────────────────────────────────
 
 const AvatarFallback = memo(({
@@ -187,10 +203,12 @@ const PeerTile = memo(({
       onClick={() => onPin(peer.socketId)}
     >
       {/* Video or avatar */}
+      {/* Sound always comes from the audio element, so the video stays muted */}
+      <AudioElement stream={peer.stream} />
       {hasVideo ? (
         <VideoElement
           stream={peer.stream}
-          isMuted={false}
+          isMuted={true}
           className="w-full h-full object-cover"
         />
       ) : (
