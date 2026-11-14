@@ -969,9 +969,6 @@ const groupsSlice = createSlice({
           totalActiveTime: 0,
           isActive: true,
         };
-        if (state.userStreak === 0) {
-          state.userStreak = 1;
-        }
       })
       .addCase(attendanceCheckInThunk.rejected, (state, action) => {
         state.attendanceCheckInLoading = false;
@@ -997,9 +994,6 @@ const groupsSlice = createSlice({
             totalActiveTime: 0,
             isActive: true,
           };
-        }
-        if (state.userStreak === 0) {
-          state.userStreak = 1;
         }
       })
       .addCase(attendanceAutoMarkThunk.rejected, (state, action) => {

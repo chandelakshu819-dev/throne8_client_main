@@ -655,9 +655,12 @@ export const toggleScreenShareThunk = createAsyncThunk(
 
 export const attendanceCheckInThunk = createAsyncThunk(
   "groups/attendance/checkIn",
-  async (notes: string | undefined, { rejectWithValue }) => {
+  async (notes: string | undefined, { rejectWithValue, dispatch }) => {
     try {
-      return await StudyGroupService.attendanceCheckIn(notes);
+      const result = await StudyGroupService.attendanceCheckIn(notes);
+      // The server updates the streak on check-in; read the real value instead of guessing
+      dispatch(fetchUserStreakThunk());
+      return result;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to check in");
     }
@@ -671,10 +674,13 @@ export const attendanceAutoMarkThunk = createAsyncThunk(
       reason,
       studyHours,
     }: { reason: "study_session" | "task_completion"; studyHours?: number },
-    { rejectWithValue }
+    { rejectWithValue, dispatch }
   ) => {
     try {
-      return await StudyGroupService.attendanceAutoMark(reason, studyHours);
+      const result = await StudyGroupService.attendanceAutoMark(reason, studyHours);
+      // The server updates the streak on auto-mark; read the real value instead of guessing
+      dispatch(fetchUserStreakThunk());
+      return result;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to auto-mark attendance");
     }
