@@ -22,6 +22,7 @@ import SeniorMentorApplicationService, {
   CollegeMentorApplication,
   CollegeMentorDocumentType,
   CollegeMentorStats,
+  isPlaceholderStorageUrl,
 } from "@/lib/api/seniorMentorApplication.service";
 import { safeUrl } from "@/shared/utils/mentorFormat";
 
@@ -167,20 +168,6 @@ function TagList({ items }: { items?: string[] }) {
     </div>
   );
 }
-
-/**
- * Placeholder storage hosts (e.g. "mock-s3-bucket.s3.amazonaws.com") come from
- * seed/test data: the bucket does not exist, so the file was never stored and
- * opening it only shows an S3 "NoSuchBucket" XML error.
- */
-const isPlaceholderStorageUrl = (raw?: string): boolean => {
-  if (!raw) return false;
-  try {
-    return /^mock[-_.]/i.test(new URL(raw).hostname);
-  } catch {
-    return false;
-  }
-};
 
 /** Resume / Proof: asks the backend for a signed URL, then opens the real document. */
 function DocButton({

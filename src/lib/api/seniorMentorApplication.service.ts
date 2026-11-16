@@ -125,7 +125,53 @@ function clearMyAppCache(): void {
 }
 
 // ── Service ───────────────────────────────────────────────────────────────────
+const safeHost = (u: string): string => {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return '';
+  }
+};
+
+/** Seed / placeholder storage host (e.g. mock-s3-bucket.s3.amazonaws.com): file was never stored. */
+export const isPlaceholderStorageUrl = (raw?: string | null): boolean =>
+  !!raw && /^mock[-_.]/i.test(safeHost(raw));
+
 class SeniorMentorApplicationService {
+  /** GET /senior-mentor-applications/me/documents/:type - owner: signed URL for own resume / proof. */
+  static async getMyDocumentUrl(type: 'resume' | 'proof', fallbackUrl?: string): Promise<string> {
+    try {
+      const { data } = await api.get(`${ADMIN_BASE}/me/documents/${type}`);
+      const url = data?.data?.url;
+      if (!url) throw new Error('Document url not available.');
+      return url as string;
+    } catch (error: any) {
+      if (error?.response?.status === 404 && fallbackUrl && !isPlaceholderStorageUrl(fallbackUrl)) {
+        return fallbackUrl;
+      }
+      throw adminErrorMessage(error, 'Could not open document.');
+    }
+  }
+
+  /** PUT /senior-mentor-applications/me/documents - owner: re-upload resume and/or proof document. */
+  static async updateMyDocuments(files: {
+    resume?: File;
+    proofDocument?: File;
+  }): Promise<SeniorMentorApplication | null> {
+    try {
+      const formData = new FormData();
+      if (files.resume) formData.append('resume', files.resume);
+      if (files.proofDocument) formData.append('proofDocument', files.proofDocument);
+      const { data } = await api.put(`${ADMIN_BASE}/me/documents`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      clearMyAppCache();
+      return data?.data ?? null;
+    } catch (error: any) {
+      throw adminErrorMessage(error, 'Failed to upload document.');
+    }
+  }
+
   /**
    * GET /api/v1/mentorship/senior-mentor-applications/me
    * Returns the current user's Senior Mentor application, or null if none.
@@ -348,7 +394,9 @@ class SeniorMentorApplicationService {
     } catch (error: any) {
       // Older backend builds have no /documents/:type route (404 "Route ... not found").
       // Open the URL stored on the application instead of showing an error.
-      if (error?.response?.status === 404 && fallbackUrl) return fallbackUrl;
+      if (error?.response?.status === 404 && fallbackUrl && !isPlaceholderStorageUrl(fallbackUrl)) {
+        return fallbackUrl;
+      }
       throw adminErrorMessage(error, 'Could not open document.');
     }
   }

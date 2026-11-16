@@ -21,7 +21,7 @@ import { useAppSelector } from "@/core/store/store.hooks";
 import { useNavbarData, useNavbarProfileImage } from "@/features/profile/components/home/NavbarProvider";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import SeniorMentorApplicationService from "@/lib/api/seniorMentorApplication.service";
+import SeniorMentorApplicationService, { isPlaceholderStorageUrl } from "@/lib/api/seniorMentorApplication.service";
 import {
   syncProfilePhotoToAllRoles,
   removeProfilePhotoFromAllRoles,
@@ -105,6 +105,108 @@ export const POPULAR_SKILLS_SUGGESTIONS = [
 interface SeniorProfilePageProps {
   seniorData: SeniorMentorApplication | null;
   onUpdateApplication?: (updated: SeniorMentorApplication) => void;
+}
+
+/**
+ * Resume / Proof link. Private S3 / Cloudinary raw files do not open from a plain href,
+ * so owners get a signed URL from the backend. Placeholder (mock bucket) files are shown
+ * as unavailable, and the owner can re-upload them.
+ */
+function DocumentLink({
+  type,
+  label,
+  url,
+  isOwner,
+  onReuploaded,
+  onMessage,
+}: {
+  type: "resume" | "proof";
+  label: string;
+  url: string;
+  isOwner: boolean;
+  onReuploaded: (app: SeniorMentorApplication) => void;
+  onMessage: (msg: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const btn =
+    "flex items-center gap-2 px-4 py-2 bg-white border border-[#d0c4b5] rounded-xl shadow-xs text-sm font-bold text-[#4a3728] hover:bg-[#f3ece4] transition-colors focus:ring-2 focus:ring-[#4a3728] outline-none";
+
+  const open = async () => {
+    setBusy(true);
+    const tab = window.open("", "_blank");
+    try {
+      const target = isOwner
+        ? await SeniorMentorApplicationService.getMyDocumentUrl(type, url)
+        : url;
+      if (tab) {
+        tab.opener = null;
+        tab.location.href = target;
+      } else {
+        window.open(target, "_blank", "noopener");
+      }
+    } catch (e: any) {
+      tab?.close();
+      onMessage(e?.message || "Could not open document.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reupload = async (file?: File) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const updated = await SeniorMentorApplicationService.updateMyDocuments(
+        type === "resume" ? { resume: file } : { proofDocument: file }
+      );
+      if (updated) onReuploaded(updated);
+      onMessage(`${label} uploaded successfully!`);
+    } catch (e: any) {
+      onMessage(e?.message || "Upload failed.");
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const accept = type === "resume" ? ".pdf,.doc,.docx" : ".pdf,.png,.jpg,.jpeg";
+
+  if (isPlaceholderStorageUrl(url)) {
+    return (
+      <div className="flex flex-col gap-1">
+        <button type="button" disabled className={`${btn} opacity-60 cursor-not-allowed`}>
+          <FileText className="w-4 h-4" /> {label}
+        </button>
+        <span className="text-[11px] text-[#b45309]">File not available.</span>
+        {isOwner && (
+          <>
+            <input
+              ref={fileRef}
+              type="file"
+              accept={accept}
+              className="hidden"
+              onChange={(e) => reupload(e.target.files?.[0])}
+            />
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => fileRef.current?.click()}
+              className="text-[11px] font-bold text-[#4a3728] underline text-left disabled:opacity-60"
+            >
+              {busy ? "Uploading..." : "Re-upload"}
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <button type="button" onClick={open} disabled={busy} className={`${btn} disabled:opacity-60`}>
+      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} {label}
+    </button>
+  );
 }
 
 const EmptyValue = () => <span className="italic text-sm text-[#b0a090]">Not set</span>;
@@ -1486,24 +1588,30 @@ export default function SeniorProfilePage({
                 </a>
               )}
               {resumeUrl && (
-                <a
-                  href={resumeUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-[#d0c4b5] rounded-xl shadow-xs text-sm font-bold text-[#4a3728] hover:bg-[#f3ece4] transition-colors focus:ring-2 focus:ring-[#4a3728] outline-none"
-                >
-                  <FileText className="w-4 h-4" /> Resume PDF
-                </a>
+                <DocumentLink
+                  type="resume"
+                  label="Resume PDF"
+                  url={resumeUrl}
+                  isOwner={isOwner}
+                  onMessage={showToast}
+                  onReuploaded={(app) => {
+                    setData(app);
+                    if (onUpdateApplication) onUpdateApplication(app);
+                  }}
+                />
               )}
               {proofDocumentUrl && (
-                <a
-                  href={proofDocumentUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-[#d0c4b5] rounded-xl shadow-xs text-sm font-bold text-[#4a3728] hover:bg-[#f3ece4] transition-colors focus:ring-2 focus:ring-[#4a3728] outline-none"
-                >
-                  <FileText className="w-4 h-4" /> Proof Document
-                </a>
+                <DocumentLink
+                  type="proof"
+                  label="Proof Document"
+                  url={proofDocumentUrl}
+                  isOwner={isOwner}
+                  onMessage={showToast}
+                  onReuploaded={(app) => {
+                    setData(app);
+                    if (onUpdateApplication) onUpdateApplication(app);
+                  }}
+                />
               )}
             </div>
           </SectionCard>
