@@ -22,6 +22,7 @@ import SeniorMentorApplicationService, {
   CollegeMentorApplication,
   CollegeMentorDocumentType,
   CollegeMentorStats,
+  isPlaceholderStorageUrl,
 } from "@/lib/api/seniorMentorApplication.service";
 import { safeUrl } from "@/shared/utils/mentorFormat";
 
@@ -174,11 +175,14 @@ function DocButton({
   type,
   label,
   color,
+  fallbackUrl,
 }: {
   seniorMentorId: string;
   type: CollegeMentorDocumentType;
   label: string;
   color: string;
+  /** Stored document URL, used if the backend has no signed-URL route. */
+  fallbackUrl?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -189,7 +193,7 @@ function DocButton({
     // Open the tab on click so popup blockers don't stop it.
     const tab = window.open("", "_blank");
     try {
-      const url = await SeniorMentorApplicationService.adminGetDocumentUrl(seniorMentorId, type);
+      const url = await SeniorMentorApplicationService.adminGetDocumentUrl(seniorMentorId, type, fallbackUrl);
       if (tab) {
         tab.opener = null;
         tab.location.href = url;
@@ -203,6 +207,26 @@ function DocButton({
       setBusy(false);
     }
   };
+
+  if (isPlaceholderStorageUrl(fallbackUrl)) {
+    return (
+      <div className="flex flex-col">
+        <button
+          type="button"
+          disabled
+          title="This file was never stored, so it cannot be opened."
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e0d8cf] opacity-60 cursor-not-allowed"
+          style={{ color }}
+        >
+          <span>{label}</span>
+          <FileText className="w-3 h-3" />
+        </button>
+        <span className="text-[10px] mt-1 text-[#b45309]">
+          File not available - applicant needs to re-upload.
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col">
@@ -299,10 +323,29 @@ export default function CollegeMentorsView({ onPendingCountChange }: CollegeMent
         to: toIso,
       });
 
-      const list = res.data || [];
-      const totalCount = res.meta?.total ?? res.pagination?.total ?? list.length;
-      const totalPages =
+      let list = res.data || [];
+      let totalCount = res.meta?.total ?? res.pagination?.total ?? list.length;
+      let totalPages =
         res.meta?.totalPages ?? res.pagination?.totalPages ?? Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+      // Safety net: older backend builds ignore `from` / `to` / `mentorRole`
+      // and return everything. Re-apply them here so the table always matches
+      // the selected filters. A no-op when the backend already filtered.
+      if (fromIso || toIso || roleFilter) {
+        const fromMs = fromIso ? new Date(fromIso).getTime() : -Infinity;
+        const toMs = toIso ? new Date(toIso).getTime() : Infinity;
+        const matching = list.filter((app) => {
+          const t = new Date(app.createdAt).getTime();
+          const inRange = !isNaN(t) && t >= fromMs && t <= toMs;
+          const roleOk = !roleFilter || app.mentorRole === roleFilter;
+          return inRange && roleOk;
+        });
+        if (matching.length !== list.length) {
+          list = matching;
+          totalCount = matching.length;
+          totalPages = 1;
+        }
+      }
 
       setItems(list);
       setTotal(totalCount);
@@ -952,10 +995,10 @@ export default function CollegeMentorsView({ onPendingCountChange }: CollegeMent
                     );
                   })}
                   {selected.resumeUrl && (
-                    <DocButton seniorMentorId={selected.seniorMentorId} type="resume" label="Resume" color="#7a5c3e" />
+                    <DocButton seniorMentorId={selected.seniorMentorId} type="resume" label="Resume" color="#7a5c3e" fallbackUrl={selected.resumeUrl} />
                   )}
                   {selected.proofDocumentUrl && (
-                    <DocButton seniorMentorId={selected.seniorMentorId} type="proof" label="Proof document" color="#7a5c3e" />
+                    <DocButton seniorMentorId={selected.seniorMentorId} type="proof" label="Proof document" color="#7a5c3e" fallbackUrl={selected.proofDocumentUrl} />
                   )}
                 </div>
               </div>

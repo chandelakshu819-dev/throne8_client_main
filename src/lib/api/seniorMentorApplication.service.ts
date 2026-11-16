@@ -90,10 +90,24 @@ export interface CollegeMentorListResponse {
 const ADMIN_BASE = '/mentorship/senior-mentor-applications';
 
 function adminErrorMessage(error: any, fallback: string): Error {
+  if (error?.response?.status === 401) return new Error('Session expired. Please log in again.');
   if (error?.response?.status === 403) return new Error('Admin access required.');
   const apiMessage = error?.response?.data?.message;
   if (apiMessage) return new Error(apiMessage);
-  return new Error(fallback);
+
+  // No HTTP response at all => network down, timeout, or CORS block.
+  if (!error?.response) {
+    const base = error?.config?.baseURL || '(unknown API URL)';
+    const reason = error?.code === 'ECONNABORTED' ? 'timed out' : 'could not be reached';
+    return new Error(
+      `${fallback} Server ${reason} at ${base}. Check the backend is running, ` +
+        'NEXT_PUBLIC_API_BASE_URL, and that this origin is allowed by CORS.'
+    );
+  }
+  if (error.response.status === 404) {
+    return new Error(`${fallback} Endpoint not found (404) - backend may be running an older build.`);
+  }
+  return new Error(`${fallback} (HTTP ${error.response.status})`);
 }
 
 // ── "My application" cache + in-flight dedupe ─────────────────────────────────
@@ -111,7 +125,53 @@ function clearMyAppCache(): void {
 }
 
 // ── Service ───────────────────────────────────────────────────────────────────
+const safeHost = (u: string): string => {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return '';
+  }
+};
+
+/** Seed / placeholder storage host (e.g. mock-s3-bucket.s3.amazonaws.com): file was never stored. */
+export const isPlaceholderStorageUrl = (raw?: string | null): boolean =>
+  !!raw && /^mock[-_.]/i.test(safeHost(raw));
+
 class SeniorMentorApplicationService {
+  /** GET /senior-mentor-applications/me/documents/:type - owner: signed URL for own resume / proof. */
+  static async getMyDocumentUrl(type: 'resume' | 'proof', fallbackUrl?: string): Promise<string> {
+    try {
+      const { data } = await api.get(`${ADMIN_BASE}/me/documents/${type}`);
+      const url = data?.data?.url;
+      if (!url) throw new Error('Document url not available.');
+      return url as string;
+    } catch (error: any) {
+      if (error?.response?.status === 404 && fallbackUrl && !isPlaceholderStorageUrl(fallbackUrl)) {
+        return fallbackUrl;
+      }
+      throw adminErrorMessage(error, 'Could not open document.');
+    }
+  }
+
+  /** PUT /senior-mentor-applications/me/documents - owner: re-upload resume and/or proof document. */
+  static async updateMyDocuments(files: {
+    resume?: File;
+    proofDocument?: File;
+  }): Promise<SeniorMentorApplication | null> {
+    try {
+      const formData = new FormData();
+      if (files.resume) formData.append('resume', files.resume);
+      if (files.proofDocument) formData.append('proofDocument', files.proofDocument);
+      const { data } = await api.put(`${ADMIN_BASE}/me/documents`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      clearMyAppCache();
+      return data?.data ?? null;
+    } catch (error: any) {
+      throw adminErrorMessage(error, 'Failed to upload document.');
+    }
+  }
+
   /**
    * GET /api/v1/mentorship/senior-mentor-applications/me
    * Returns the current user's Senior Mentor application, or null if none.
@@ -234,14 +294,60 @@ class SeniorMentorApplicationService {
     }
   }
 
-  /** GET /senior-mentor-applications/stats — counts per verification status. */
+  /**
+   * GET /senior-mentor-applications/stats — counts per verification status.
+   * Falls back to counting through the list endpoint (meta.total per status)
+   * when the backend build does not have /stats yet.
+   */
   static async adminStats(): Promise<CollegeMentorStats> {
     try {
       const { data } = await api.get(`${ADMIN_BASE}/stats`);
-      return data?.data;
+      if (data?.data && typeof data.data.total === 'number') {
+        return data.data as CollegeMentorStats;
+      }
+      throw new Error('Unexpected stats response.');
     } catch (error: any) {
-      throw adminErrorMessage(error, 'Failed to fetch college mentor stats.');
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        throw adminErrorMessage(error, 'Failed to fetch college mentor stats.');
+      }
+      try {
+        return await SeniorMentorApplicationService.adminStatsFromList();
+      } catch {
+        throw adminErrorMessage(error, 'Failed to fetch college mentor stats.');
+      }
     }
+  }
+
+  /** Real counts from the list endpoint: one limit=1 request per status. */
+  private static async adminStatsFromList(): Promise<CollegeMentorStats> {
+    const statuses = [
+      ApplicationStatus.PENDING,
+      ApplicationStatus.UNDER_REVIEW,
+      ApplicationStatus.VERIFIED,
+      ApplicationStatus.REJECTED,
+    ] as const;
+
+    const countFor = async (status?: string): Promise<number> => {
+      const { data } = await api.get(ADMIN_BASE, { params: { status, page: 1, limit: 1 } });
+      return Number(data?.meta?.total ?? data?.pagination?.total ?? data?.data?.length ?? 0);
+    };
+
+    // `total` comes from an unfiltered query, NOT the sum of the four statuses:
+    // legacy records can carry a non-standard status (e.g. "active") and would
+    // otherwise be missed from the total.
+    const [total, pending, under_review, verified, rejected] = await Promise.all([
+      countFor(),
+      ...statuses.map((status) => countFor(status)),
+    ]);
+
+    return {
+      total,
+      pending,
+      under_review,
+      verified,
+      rejected,
+    };
   }
 
   /** POST /senior-mentor-applications/:id/under-review */
@@ -277,7 +383,8 @@ class SeniorMentorApplicationService {
   /** GET /senior-mentor-applications/:id/documents/:type — short-lived signed URL for resume / proof. */
   static async adminGetDocumentUrl(
     seniorMentorId: string,
-    type: CollegeMentorDocumentType
+    type: CollegeMentorDocumentType,
+    fallbackUrl?: string
   ): Promise<string> {
     try {
       const { data } = await api.get(`${ADMIN_BASE}/${seniorMentorId}/documents/${type}`);
@@ -285,6 +392,11 @@ class SeniorMentorApplicationService {
       if (!url) throw new Error('Document url not available.');
       return url as string;
     } catch (error: any) {
+      // Older backend builds have no /documents/:type route (404 "Route ... not found").
+      // Open the URL stored on the application instead of showing an error.
+      if (error?.response?.status === 404 && fallbackUrl && !isPlaceholderStorageUrl(fallbackUrl)) {
+        return fallbackUrl;
+      }
       throw adminErrorMessage(error, 'Could not open document.');
     }
   }
