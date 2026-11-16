@@ -312,11 +312,8 @@ const timerSlice = createSlice({
       state.isBreakMode = false;
       state.seconds = 0;
       state.minutes = state.settings?.pomodoroMinutes ?? 25;
-
-      if (state.settings?.autoStartPomodoros) {
-        state.isActive = true;
-        state.sessionStartTime = Date.now();
-      }
+      // The next session is started by the page through startTimerThunk, so it
+      // exists on the server and its time is saved.
     },
 
     // User chose "Resume" on the unfinished-session prompt: put the clock where
@@ -472,7 +469,6 @@ const timerSlice = createSlice({
             (sum, s) => sum + Math.round((s.duration ?? 0) / 60),
             0
           );
-          state.completedSessions += 1;
         }
       })
       .addCase(stopTimerThunk.rejected, (state, action) => {
