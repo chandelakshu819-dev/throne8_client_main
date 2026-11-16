@@ -37,6 +37,9 @@ import { getSocket } from '@/core/realtime/socket.client';
 export type ConnectionQuality = 'excellent' | 'good' | 'poor' | 'disconnected';
 export type RoomMode = 'p2p' | 'sfu';
 
+// Must stay well under the server's 120s presence TTL
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
 export interface RoomEndedInfo {
   sessionId?: string;
   bookingId?: string;
@@ -253,6 +256,8 @@ export function useLiveRoom({
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const statsTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Presence heartbeat: server drops a participant after ~120s without 'liveroom:heartbeat'
+  const heartbeatTimerRef = useRef<NodeJS.Timeout | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioAnalysers = useRef<Map<string, AnalyserNode>>(new Map());
   const reconnectTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -1051,6 +1056,11 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
     const socket = getSocket();
     socket?.emit('leave-live-room', { roomId });
 
+    if (heartbeatTimerRef.current) {
+      clearInterval(heartbeatTimerRef.current);
+      heartbeatTimerRef.current = null;
+    }
+
     // Stop all media
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     screenStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -1348,6 +1358,17 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
     }: {
       participants: Array<{ socketId: string; userId: string; userName?: string }>;
     }) => {
+      // The server only sends this to the joiner, so it marks "we are in the room".
+      // Start the presence heartbeat here so it works for every join path
+      // (the group page emits join-live-room directly, bypassing joinRoom).
+      // The server prunes participants after ~120s without a heartbeat.
+      if (roomId && !heartbeatTimerRef.current) {
+        heartbeatTimerRef.current = setInterval(() => {
+          const hbSocket = getSocket();
+          if (hbSocket?.connected) hbSocket.emit('liveroom:heartbeat', { roomId });
+        }, HEARTBEAT_INTERVAL_MS);
+      }
+
       // For each existing participant, initiate offer
       participants.forEach((p) => {
         if (p.socketId === socket.id) return; // skip self

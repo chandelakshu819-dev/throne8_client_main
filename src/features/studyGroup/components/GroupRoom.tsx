@@ -344,6 +344,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     activeSpeakers,
     roomMode,
     error: webrtcError,
+    roomEnded,
     joinRoom: joinWebRTCRoom,
     leaveRoom: leaveWebRTCRoom,
     toggleCamera: toggleWebRTCCamera,
@@ -366,6 +367,14 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   useEffect(() => {
     leaveWebRTCRoomRef.current = leaveWebRTCRoom;
   }, [leaveWebRTCRoom]);
+
+  // Host ended the live room: close the room view for everyone else and
+  // refresh the group's active room so the Join button disappears.
+  useEffect(() => {
+    if (!roomEnded) return;
+    setShowLiveRoomView(false);
+    if (groupId) dispatch(fetchGroupActiveLiveRoomThunk(groupId));
+  }, [roomEnded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const camOn = showLiveRoomView ? webrtcCameraOn : isCameraOn;
   const micOn = showLiveRoomView ? webrtcMicOn : isMicOn;
