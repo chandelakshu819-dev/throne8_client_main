@@ -5,7 +5,8 @@ import {
   decrementTime,
   completeSession,
   startBreak,
-  endBreak
+  endBreak,
+  resetTimer
 } from '@/hooks/studyGroup/features/timer/timerSlice';
 import { useEffect, useRef, useState } from 'react';
 
@@ -32,7 +33,7 @@ export default function PomodoroTimer() {
   const completedSessions = useAppSelector(state => state.timer.completedSessions);
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
-  const justCompleted = useRef(false);
+  const finishing = useRef(false);
 
   useEffect(() => {
     dispatch(getActiveTimerThunk());
@@ -40,69 +41,57 @@ export default function PomodoroTimer() {
     dispatch(getTimerStatsThunk());
   }, [dispatch]);
 
+  // Tick once a second, but never at 0:00. The finish step below handles that.
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    if (!isActive || (minutes === 0 && seconds === 0)) return;
+    const interval = setInterval(() => dispatch(decrementTime()), 1000);
+    return () => clearInterval(interval);
+  }, [isActive, minutes, seconds, dispatch]);
 
-    if (isActive) {
-      interval = setInterval(() => {
-        if (minutes === 0 && seconds === 0) {
-          if (!justCompleted.current) {
-            justCompleted.current = true;
-            handleTimerComplete();
-          }
-          return;
-        }
-        if (minutes === 0 && seconds === 1) {
-          dispatch(decrementTime());
-          if (!justCompleted.current) {
-            justCompleted.current = true;
-            setTimeout(() => handleTimerComplete(), 100);
-          }
-          return;
-        }
-
-        justCompleted.current = false;
-        dispatch(decrementTime());
-      }, 1000);
+  // Finish step. It runs once per countdown: the flag stays set while the clock
+  // is at 0:00 (including while the stop request is in flight) and is only
+  // cleared when the clock shows time again (break started, clock reset).
+  useEffect(() => {
+    if (minutes !== 0 || seconds !== 0) {
+      finishing.current = false;
+      return;
     }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    if (!isActive || finishing.current) return;
+    finishing.current = true;
+    handleTimerComplete();
   }, [isActive, minutes, seconds]);
 
-  const handleTimerComplete = () => {
-    justCompleted.current = false;
+  const handleTimerComplete = async () => {
+    // A break ending is local only; there is no server session to stop
+    if (activeTab === 'pomodoro' && isBreakMode) {
+      dispatch(endBreak());
+      return;
+    }
+
+    const result: any = await dispatch(stopTimerThunk(undefined));
+
+    if (result.meta.requestStatus !== 'fulfilled') {
+      // Could not save: put the clock back and re-sync with the server
+      dispatch(resetTimer());
+      dispatch(getActiveTimerThunk());
+      return;
+    }
+
+    setSessionCompleted(true);
+    setTimeout(() => setSessionCompleted(false), 4000);
+    dispatch(completeSession());
 
     if (activeTab === 'pomodoro') {
-      if (isBreakMode) {
-        dispatch(endBreak());
-      } else {
-        dispatch(stopTimerThunk(undefined)).then((result: any) => {
-          if (result.meta.requestStatus === 'fulfilled') {
-            setSessionCompleted(true);
-            setTimeout(() => setSessionCompleted(false), 4000);
-          }
-          dispatch(completeSession());
-          const isLongBreak = (completedSessions + 1) % 4 === 0;
-          dispatch(startBreak(isLongBreak ? 'long' : 'short'));
-          dispatch(getTodaySessionsThunk());
-          dispatch(getTimerStatsThunk());
-          dispatch(getAllSessionsThunk({ limit: 10 }));
-        });
-      }
+      const isLongBreak = (completedSessions + 1) % 4 === 0;
+      dispatch(startBreak(isLongBreak ? 'long' : 'short'));
     } else {
-      dispatch(stopTimerThunk(undefined)).then((result: any) => {
-        if (result.meta.requestStatus === 'fulfilled') {
-          setSessionCompleted(true);
-          setTimeout(() => setSessionCompleted(false), 4000);
-        }
-        dispatch(completeSession());
-        dispatch(getTodaySessionsThunk());
-        dispatch(getTimerStatsThunk());
-        dispatch(getAllSessionsThunk({ limit: 10 }));
-      });
+      // Back to the chosen length so Start does not run a 0:00 session
+      dispatch(resetTimer());
     }
+
+    dispatch(getTodaySessionsThunk());
+    dispatch(getTimerStatsThunk());
+    dispatch(getAllSessionsThunk({ limit: 10 }));
   };
 
   const tabDuration = activeTab === 'timer'
