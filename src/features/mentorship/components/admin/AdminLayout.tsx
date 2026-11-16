@@ -7,6 +7,7 @@ interface AdminLayoutProps {
   activePage: string;
   setActivePage: (page: string) => void;
   pendingMentorCount?: number;
+  pendingCollegeMentorCount?: number;
   reportedReviewCount?: number;
   communityReportCount?: number;
   heldPayoutCount?: number;
@@ -20,6 +21,7 @@ export default function AdminLayout({
   activePage,
   setActivePage,
   pendingMentorCount = 0,
+  pendingCollegeMentorCount = 0,
   reportedReviewCount = 0,
   communityReportCount = 0,
   heldPayoutCount = 0,
@@ -37,6 +39,7 @@ export default function AdminLayout({
         activePage={activePage}
         setActivePage={setActivePage}
         pendingMentorCount={pendingMentorCount}
+        pendingCollegeMentorCount={pendingCollegeMentorCount}
         reportedReviewCount={reportedReviewCount}
         communityReportCount={communityReportCount}
         heldPayoutCount={heldPayoutCount}

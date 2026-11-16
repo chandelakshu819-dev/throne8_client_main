@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   UserCheck,
   Users,
+  GraduationCap,
   CalendarClock,
   Star,
   Flag,
@@ -17,6 +18,7 @@ interface AdminSidebarProps {
   activePage: string;
   setActivePage: (page: string) => void;
   pendingMentorCount?: number;
+  pendingCollegeMentorCount?: number;
   reportedReviewCount?: number;
   communityReportCount?: number;
   heldPayoutCount?: number;
@@ -27,6 +29,7 @@ const ADMIN_MENU_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "pending-mentors", label: "Pending Mentors", icon: UserCheck },
   { id: "all-mentors", label: "All Mentors", icon: Users },
+  { id: "college-mentors", label: "College Mentors", icon: GraduationCap },
   { id: "sessions", label: "Sessions", icon: CalendarClock },
   { id: "all-reviews", label: "All Reviews", icon: Star },
   { id: "reported-reviews", label: "Reported Reviews", icon: Flag },
@@ -42,6 +45,7 @@ export default function AdminSidebar({
   activePage,
   setActivePage,
   pendingMentorCount = 0,
+  pendingCollegeMentorCount = 0,
   reportedReviewCount = 0,
   communityReportCount = 0,
   heldPayoutCount = 0,
@@ -68,6 +72,7 @@ export default function AdminSidebar({
             const isActive = activePage === item.id;
             const badgeCount =
               item.id === "pending-mentors" ? pendingMentorCount :
+              item.id === "college-mentors" ? pendingCollegeMentorCount :
               item.id === "reported-reviews" ? reportedReviewCount :
               item.id === "community-reports" ? communityReportCount :
               item.id === "payouts" ? heldPayoutCount :

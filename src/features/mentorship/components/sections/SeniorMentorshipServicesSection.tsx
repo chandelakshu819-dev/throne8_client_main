@@ -124,7 +124,7 @@ export default function SeniorMentorshipServicesSection() {
                     <div className="w-16 h-16 bg-[#f4ece1] text-[#8b7355] rounded-full flex items-center justify-center mb-4">
                         <Calendar className="w-7 h-7" />
                     </div>
-                    <h2 className="text-xl sm:text-2xl font-black text-[#2d2116] mb-2">Explore Senior Mentorship</h2>
+                    <h2 className="text-xl sm:text-2xl font-black text-[#2d2116] mb-2">Explore College Mentorship</h2>
                     <p className="text-[#8e847c] text-sm max-w-md mx-auto">
                         No Senior Mentor sessions available right now. Check back soon for exclusive 1-to-1 sessions with industry leaders.
                     </p>
@@ -141,10 +141,10 @@ export default function SeniorMentorshipServicesSection() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-3.5">
                     <div>
                         <div className="inline-flex items-center px-3 py-0.5 bg-[#f4ece1] rounded-full text-[#4a3728] text-[11px] font-bold uppercase tracking-wider mb-2">
-                            SENIOR MENTORSHIP
+                            COLLEGE MENTORSHIP
                         </div>
                         <h2 className="text-2xl sm:text-3xl md:text-[34px] font-black tracking-tight text-[#2d2116] leading-tight">
-                            Learn from Senior Mentors
+                            Learn from College Mentors
                         </h2>
                         <p className="text-[#8e847c] text-xs sm:text-sm font-medium mt-1 max-w-2xl">
                             Book focused 1-to-1 sessions with experienced professionals and industry experts.

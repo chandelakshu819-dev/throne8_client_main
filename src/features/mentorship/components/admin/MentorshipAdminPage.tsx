@@ -16,9 +16,11 @@ import AdminLayout from "./AdminLayout";
 import AdminService from "@/lib/api/admin.service";
 import CommunityService from "@/lib/api/community.service";
 import PayoutService from "@/lib/api/payout.service";
+import SeniorMentorApplicationService from "@/lib/api/seniorMentorApplication.service";
 import CommunityReportsView from "./CommunityReportsView";
 import PendingMentorsView from "./PendingMentorsView";
 import AllMentorsView from "./AllMentorsView";
+import CollegeMentorsView from "./CollegeMentorsView";
 import ReportedReviewsView from "./ReportedReviewsView";
 import AllReviewsView from "./AllReviewsView";
 import SessionsView from "./SessionsView";
@@ -39,6 +41,7 @@ const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Mentorship module overview" },
   "pending-mentors": { title: "Pending Mentors", subtitle: "Applications waiting for approval" },
   "all-mentors": { title: "All Mentors", subtitle: "Manage active and suspended mentors" },
+  "college-mentors": { title: "College Mentors", subtitle: "Review and manage senior mentor and alumni applications" },
   sessions: { title: "Sessions", subtitle: "All booked mentorship sessions" },
   reviews: { title: "All Reviews", subtitle: "Every review submitted by mentees" },
   "all-reviews": { title: "All Reviews", subtitle: "Every review submitted by mentees" },
@@ -222,6 +225,7 @@ export default function MentorshipAdminPage() {
   const [loading, setLoading] = useState(true);
   // null = not loaded / failed to load (no badge shown)
   const [pendingMentorCount, setPendingMentorCount] = useState<number | null>(null);
+  const [pendingCollegeMentorCount, setPendingCollegeMentorCount] = useState<number | null>(null);
   const [reportedReviewCount, setReportedReviewCount] = useState<number | null>(null);
   const [communityReportCount, setCommunityReportCount] = useState<number | null>(null);
   const [heldPayoutCount, setHeldPayoutCount] = useState<number | null>(null);
@@ -240,17 +244,27 @@ export default function MentorshipAdminPage() {
       reason instanceof Error ? reason.message : String(reason);
 
     try {
-      const [dashboardRes, pendingRes, reportedRes, communityRes, payoutRes, refundRes] = await Promise.allSettled([
+      const [dashboardRes, pendingRes, reportedRes, communityRes, payoutRes, refundRes, collegeRes] = await Promise.allSettled([
         AdminService.getDashboardStats(),
         AdminService.getPendingMentors({ page: 1, limit: 1 }),
         AdminService.getReportedReviews({ page: 1, limit: 1 }),
         CommunityService.listCommunityReports({ page: 1, limit: 1, status: "pending" }),
         PayoutService.adminList("held", 1, 1),
         PayoutService.adminListRefunds("pending", 1, 1),
+        SeniorMentorApplicationService.adminStats(),
       ]);
 
       if (!isMountedRef.current) return;
       const failures: string[] = [];
+
+      // College mentor badge is informational: on failure just hide it (no error banner)
+      if (collegeRes.status === "fulfilled") {
+        setPendingCollegeMentorCount(
+          (collegeRes.value?.pending ?? 0) + (collegeRes.value?.under_review ?? 0)
+        );
+      } else {
+        setPendingCollegeMentorCount(null);
+      }
 
       if (dashboardRes.status === "fulfilled") {
         setStats(dashboardRes.value.data);
@@ -316,6 +330,7 @@ export default function MentorshipAdminPage() {
       activePage={activePage}
       setActivePage={handleSetActivePage}
       pendingMentorCount={pendingMentorCount ?? undefined}
+      pendingCollegeMentorCount={pendingCollegeMentorCount ?? undefined}
       reportedReviewCount={reportedReviewCount ?? undefined}
       communityReportCount={communityReportCount ?? undefined}
       heldPayoutCount={heldPayoutCount ?? undefined}
@@ -391,6 +406,12 @@ export default function MentorshipAdminPage() {
 
       {activePage === "all-mentors" && <AllMentorsView />}
 
+      {activePage === "college-mentors" && (
+        <CollegeMentorsView
+          onPendingCountChange={(count) => setPendingCollegeMentorCount(count)}
+        />
+      )}
+
       {activePage === "community-reports" && (
         <CommunityReportsView
           onReportCountChange={(count) => setCommunityReportCount(count)}
@@ -423,6 +444,7 @@ export default function MentorshipAdminPage() {
       {activePage !== "dashboard" &&
         activePage !== "pending-mentors" &&
         activePage !== "all-mentors" &&
+        activePage !== "college-mentors" &&
         activePage !== "community-reports" &&
         activePage !== "reported-reviews" &&
         activePage !== "all-reviews" &&
