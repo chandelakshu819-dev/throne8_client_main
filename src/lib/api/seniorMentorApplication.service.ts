@@ -90,10 +90,24 @@ export interface CollegeMentorListResponse {
 const ADMIN_BASE = '/mentorship/senior-mentor-applications';
 
 function adminErrorMessage(error: any, fallback: string): Error {
+  if (error?.response?.status === 401) return new Error('Session expired. Please log in again.');
   if (error?.response?.status === 403) return new Error('Admin access required.');
   const apiMessage = error?.response?.data?.message;
   if (apiMessage) return new Error(apiMessage);
-  return new Error(fallback);
+
+  // No HTTP response at all => network down, timeout, or CORS block.
+  if (!error?.response) {
+    const base = error?.config?.baseURL || '(unknown API URL)';
+    const reason = error?.code === 'ECONNABORTED' ? 'timed out' : 'could not be reached';
+    return new Error(
+      `${fallback} Server ${reason} at ${base}. Check the backend is running, ` +
+        'NEXT_PUBLIC_API_BASE_URL, and that this origin is allowed by CORS.'
+    );
+  }
+  if (error.response.status === 404) {
+    return new Error(`${fallback} Endpoint not found (404) - backend may be running an older build.`);
+  }
+  return new Error(`${fallback} (HTTP ${error.response.status})`);
 }
 
 // ── "My application" cache + in-flight dedupe ─────────────────────────────────

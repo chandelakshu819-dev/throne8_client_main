@@ -168,6 +168,20 @@ function TagList({ items }: { items?: string[] }) {
   );
 }
 
+/**
+ * Placeholder storage hosts (e.g. "mock-s3-bucket.s3.amazonaws.com") come from
+ * seed/test data: the bucket does not exist, so the file was never stored and
+ * opening it only shows an S3 "NoSuchBucket" XML error.
+ */
+const isPlaceholderStorageUrl = (raw?: string): boolean => {
+  if (!raw) return false;
+  try {
+    return /^mock[-_.]/i.test(new URL(raw).hostname);
+  } catch {
+    return false;
+  }
+};
+
 /** Resume / Proof: asks the backend for a signed URL, then opens the real document. */
 function DocButton({
   seniorMentorId,
@@ -206,6 +220,26 @@ function DocButton({
       setBusy(false);
     }
   };
+
+  if (isPlaceholderStorageUrl(fallbackUrl)) {
+    return (
+      <div className="flex flex-col">
+        <button
+          type="button"
+          disabled
+          title="This file was never stored, so it cannot be opened."
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e0d8cf] opacity-60 cursor-not-allowed"
+          style={{ color }}
+        >
+          <span>{label}</span>
+          <FileText className="w-3 h-3" />
+        </button>
+        <span className="text-[10px] mt-1 text-[#b45309]">
+          File not available - applicant needs to re-upload.
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col">
