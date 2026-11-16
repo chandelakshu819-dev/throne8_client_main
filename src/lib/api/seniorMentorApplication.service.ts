@@ -79,6 +79,8 @@ export interface CollegeMentorListParams {
   to?: string;
 }
 
+export type CollegeMentorDocumentType = 'resume' | 'proof';
+
 export interface CollegeMentorListResponse {
   data: CollegeMentorApplication[];
   meta?: { page: number; limit: number; total: number; totalPages: number };
@@ -269,6 +271,21 @@ class SeniorMentorApplicationService {
       return data?.data;
     } catch (error: any) {
       throw adminErrorMessage(error, 'Failed to reject application.');
+    }
+  }
+
+  /** GET /senior-mentor-applications/:id/documents/:type — short-lived signed URL for resume / proof. */
+  static async adminGetDocumentUrl(
+    seniorMentorId: string,
+    type: CollegeMentorDocumentType
+  ): Promise<string> {
+    try {
+      const { data } = await api.get(`${ADMIN_BASE}/${seniorMentorId}/documents/${type}`);
+      const url = data?.data?.url;
+      if (!url) throw new Error('Document url not available.');
+      return url as string;
+    } catch (error: any) {
+      throw adminErrorMessage(error, 'Could not open document.');
     }
   }
 }

@@ -20,6 +20,7 @@ import {
 import SeniorMentorApplicationService, {
   ApplicationStatus,
   CollegeMentorApplication,
+  CollegeMentorDocumentType,
   CollegeMentorStats,
 } from "@/lib/api/seniorMentorApplication.service";
 import { safeUrl } from "@/shared/utils/mentorFormat";
@@ -163,6 +164,59 @@ function TagList({ items }: { items?: string[] }) {
           {prettify(item)}
         </span>
       ))}
+    </div>
+  );
+}
+
+/** Resume / Proof: asks the backend for a signed URL, then opens the real document. */
+function DocButton({
+  seniorMentorId,
+  type,
+  label,
+  color,
+}: {
+  seniorMentorId: string;
+  type: CollegeMentorDocumentType;
+  label: string;
+  color: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const open = async () => {
+    setErr("");
+    setBusy(true);
+    // Open the tab on click so popup blockers don't stop it.
+    const tab = window.open("", "_blank");
+    try {
+      const url = await SeniorMentorApplicationService.adminGetDocumentUrl(seniorMentorId, type);
+      if (tab) {
+        tab.opener = null;
+        tab.location.href = url;
+      } else {
+        window.open(url, "_blank", "noopener");
+      }
+    } catch (e: any) {
+      tab?.close();
+      setErr(e?.message || "Could not open document");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={open}
+        disabled={busy}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e0d8cf] hover:bg-[#fbf7f3] disabled:opacity-60 disabled:cursor-not-allowed"
+        style={{ color }}
+      >
+        <span>{label}</span>
+        {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+      </button>
+      {err && <span className="text-[10px] mt-1 text-red-600">{err}</span>}
     </div>
   );
 }
@@ -879,8 +933,6 @@ export default function CollegeMentorsView({ onPendingCountChange }: CollegeMent
                     { label: "LinkedIn", url: selected.linkedinUrl, color: "#2563eb", icon: ExternalLink },
                     { label: "GitHub", url: selected.githubUrl, color: "#4a3728", icon: ExternalLink },
                     { label: "Portfolio", url: selected.portfolioUrl, color: "#0f766e", icon: ExternalLink },
-                    { label: "Resume", url: selected.resumeUrl, color: "#7a5c3e", icon: FileText },
-                    { label: "Proof document", url: selected.proofDocumentUrl, color: "#7a5c3e", icon: FileText },
                   ].map((link) => {
                     const href = safeUrl(link.url);
                     if (!href) return null;
@@ -899,6 +951,12 @@ export default function CollegeMentorsView({ onPendingCountChange }: CollegeMent
                       </a>
                     );
                   })}
+                  {selected.resumeUrl && (
+                    <DocButton seniorMentorId={selected.seniorMentorId} type="resume" label="Resume" color="#7a5c3e" />
+                  )}
+                  {selected.proofDocumentUrl && (
+                    <DocButton seniorMentorId={selected.seniorMentorId} type="proof" label="Proof document" color="#7a5c3e" />
+                  )}
                 </div>
               </div>
 
