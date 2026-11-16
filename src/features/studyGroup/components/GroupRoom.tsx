@@ -105,6 +105,7 @@ import {
   createLiveRoomSchema,
   type CreateLiveRoomInput,
 } from "@/features/study-group/validators/liveroom.validation";
+import { LIVE_ROOM_MAX_PARTICIPANTS } from "@/features/study-group/constants/liveRoom";
 import { getSocket } from "@/core/realtime/socket.client";
 import { useLiveRoom } from "@/core/webrtc/useLiveRoom";
 import LiveRoomView from "./LiveRoomView";
@@ -281,6 +282,8 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const [liveRoomTitle, setLiveRoomTitle] = useState("");
   const [liveRoomError, setLiveRoomError] = useState("");
   const [showLiveRoomView, setShowLiveRoomView] = useState(false);
+  // True while Start/Join Live Room is running, so a double click can't start two joins
+  const liveRoomJoinInFlight = useRef(false);
   const isUserInLiveRoom = showLiveRoomView;
   const rawOnlineMembers = useAppSelector(selectOnlineMembers(groupId));
   const onlineMembers = useMemo(() => {
@@ -346,6 +349,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     error: webrtcError,
     roomEnded,
     joinRoom: joinWebRTCRoom,
+    requestJoin: requestWebRTCJoin,
     leaveRoom: leaveWebRTCRoom,
     toggleCamera: toggleWebRTCCamera,
     toggleMic: toggleWebRTCMic,
@@ -441,12 +445,14 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const handleStartLiveRoom = async (): Promise<void> => {
     const parsed = createLiveRoomSchema.safeParse({
       title: liveRoomTitle || `${groupData?.title ?? "Study"} - Live Session`,
-      maxParticipants: 50,
+      maxParticipants: LIVE_ROOM_MAX_PARTICIPANTS,
     });
     if (!parsed.success) {
       setLiveRoomError(parsed.error.errors[0].message);
       return;
     }
+    if (liveRoomJoinInFlight.current || showLiveRoomView) return;
+    liveRoomJoinInFlight.current = true;
     try {
       // 1. Room create karo
       const createdRoom = await dispatch(
@@ -482,28 +488,35 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       const stream = await startLocalStream(userCam, userMic);
       if (!stream) return;
 
-      // 4. Socket join — direct, stale hook bypass
+      // 4. Socket join — wait for the server's answer (accepted / room full / not allowed)
       const socket = getSocket();
       if (!socket?.connected) {
+        leaveWebRTCRoom(); // stop the camera/mic we just opened
         alert("Socket not connected");
         return;
       }
-      socket.emit("join-live-room", {
-        roomId,
-        userId: currentUserId,
-        userName: user?.name ?? user?.email ?? "User",
-      });
+      const joined = await requestWebRTCJoin({ cameraOn: userCam, micOn: userMic });
+      if (joined.status !== "ok") {
+        leaveWebRTCRoom(); // stop the camera/mic we just opened
+        await dispatch(leaveLiveRoomThunk(roomId)).unwrap().catch(() => {}); // undo the HTTP join
+        setLiveRoomError(joined.message);
+        return;
+      }
 
       setShowLiveRoomView(true);
     } catch (err: any) {
       setLiveRoomError(
         typeof err === "string" ? err : "Failed to start live room"
       );
+    } finally {
+      liveRoomJoinInFlight.current = false;
     }
   };
 
   const handleJoinLiveRoom = async (): Promise<void> => {
     if (!activeLiveRoom?.roomId) return;
+    if (liveRoomJoinInFlight.current || showLiveRoomView) return;
+    liveRoomJoinInFlight.current = true;
     const roomId = activeLiveRoom.roomId;
 
     const userCam = isCameraOn;
@@ -523,21 +536,26 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       const stream = await startLocalStream(userCam, userMic);
       if (!stream) return;
 
-      // 3. Socket se directly join karo — stale hook bypass
+      // 3. Socket join — wait for the server's answer (accepted / room full / not allowed)
       const socket = getSocket();
       if (!socket?.connected) {
+        leaveWebRTCRoom(); // stop the camera/mic we just opened
         alert("Socket not connected");
         return;
       }
-      socket.emit("join-live-room", {
-        roomId,
-        userId: currentUserId,
-        userName: user?.name ?? user?.email ?? "User",
-      });
+      const joined = await requestWebRTCJoin({ cameraOn: userCam, micOn: userMic });
+      if (joined.status !== "ok") {
+        leaveWebRTCRoom(); // stop the camera/mic we just opened
+        await dispatch(leaveLiveRoomThunk(roomId)).unwrap().catch(() => {}); // undo the HTTP join
+        alert(joined.message);
+        return;
+      }
 
       setShowLiveRoomView(true);
     } catch (err: any) {
       alert(err || "Failed to join live room");
+    } finally {
+      liveRoomJoinInFlight.current = false;
     }
   };
 

@@ -1,11 +1,17 @@
 //src/lib/validations/studyGroup/liveroom.validation.ts
 
 import { z } from 'zod';
+import { LIVE_ROOM_MAX_PARTICIPANTS } from '../constants/liveRoom';
 
 export const createLiveRoomSchema = z.object({
   title: z.string().trim().min(3, 'Title must be at least 3 characters').max(100, 'Title cannot exceed 100 characters'),
   description: z.string().trim().max(500).optional().or(z.literal('')),
-  maxParticipants: z.number().int().min(2).max(100).default(50),
+  maxParticipants: z
+    .number()
+    .int()
+    .min(2)
+    .max(LIVE_ROOM_MAX_PARTICIPANTS, `A live room can hold at most ${LIVE_ROOM_MAX_PARTICIPANTS} people`)
+    .default(LIVE_ROOM_MAX_PARTICIPANTS),
   settings: z.object({
     allowCamera: z.boolean().default(true),
     allowMic: z.boolean().default(true),
@@ -18,7 +24,12 @@ export const createLiveRoomSchema = z.object({
 export const updateLiveRoomSchema = z.object({
   title: z.string().trim().min(3).max(100).optional(),
   description: z.string().trim().max(500).optional().or(z.literal('')),
-  maxParticipants: z.number().int().min(2).max(100).optional(),
+  maxParticipants: z
+    .number()
+    .int()
+    .min(2)
+    .max(LIVE_ROOM_MAX_PARTICIPANTS, `A live room can hold at most ${LIVE_ROOM_MAX_PARTICIPANTS} people`)
+    .optional(),
   settings: z.object({
     allowCamera: z.boolean().optional(),
     allowMic: z.boolean().optional(),
