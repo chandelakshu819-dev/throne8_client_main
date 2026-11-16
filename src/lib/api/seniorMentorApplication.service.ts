@@ -234,14 +234,54 @@ class SeniorMentorApplicationService {
     }
   }
 
-  /** GET /senior-mentor-applications/stats — counts per verification status. */
+  /**
+   * GET /senior-mentor-applications/stats — counts per verification status.
+   * Falls back to counting through the list endpoint (meta.total per status)
+   * when the backend build does not have /stats yet.
+   */
   static async adminStats(): Promise<CollegeMentorStats> {
     try {
       const { data } = await api.get(`${ADMIN_BASE}/stats`);
-      return data?.data;
+      if (data?.data && typeof data.data.total === 'number') {
+        return data.data as CollegeMentorStats;
+      }
+      throw new Error('Unexpected stats response.');
     } catch (error: any) {
-      throw adminErrorMessage(error, 'Failed to fetch college mentor stats.');
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        throw adminErrorMessage(error, 'Failed to fetch college mentor stats.');
+      }
+      try {
+        return await SeniorMentorApplicationService.adminStatsFromList();
+      } catch {
+        throw adminErrorMessage(error, 'Failed to fetch college mentor stats.');
+      }
     }
+  }
+
+  /** Real counts from the list endpoint: one limit=1 request per status. */
+  private static async adminStatsFromList(): Promise<CollegeMentorStats> {
+    const statuses = [
+      ApplicationStatus.PENDING,
+      ApplicationStatus.UNDER_REVIEW,
+      ApplicationStatus.VERIFIED,
+      ApplicationStatus.REJECTED,
+    ] as const;
+
+    const [pending, under_review, verified, rejected] = await Promise.all(
+      statuses.map(async (status) => {
+        const { data } = await api.get(ADMIN_BASE, { params: { status, page: 1, limit: 1 } });
+        return Number(data?.meta?.total ?? data?.pagination?.total ?? data?.data?.length ?? 0);
+      })
+    );
+
+    return {
+      total: pending + under_review + verified + rejected,
+      pending,
+      under_review,
+      verified,
+      rejected,
+    };
   }
 
   /** POST /senior-mentor-applications/:id/under-review */

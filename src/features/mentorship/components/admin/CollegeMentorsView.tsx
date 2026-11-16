@@ -299,10 +299,29 @@ export default function CollegeMentorsView({ onPendingCountChange }: CollegeMent
         to: toIso,
       });
 
-      const list = res.data || [];
-      const totalCount = res.meta?.total ?? res.pagination?.total ?? list.length;
-      const totalPages =
+      let list = res.data || [];
+      let totalCount = res.meta?.total ?? res.pagination?.total ?? list.length;
+      let totalPages =
         res.meta?.totalPages ?? res.pagination?.totalPages ?? Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+      // Safety net: older backend builds ignore `from` / `to` / `mentorRole`
+      // and return everything. Re-apply them here so the table always matches
+      // the selected filters. A no-op when the backend already filtered.
+      if (fromIso || toIso || roleFilter) {
+        const fromMs = fromIso ? new Date(fromIso).getTime() : -Infinity;
+        const toMs = toIso ? new Date(toIso).getTime() : Infinity;
+        const matching = list.filter((app) => {
+          const t = new Date(app.createdAt).getTime();
+          const inRange = !isNaN(t) && t >= fromMs && t <= toMs;
+          const roleOk = !roleFilter || app.mentorRole === roleFilter;
+          return inRange && roleOk;
+        });
+        if (matching.length !== list.length) {
+          list = matching;
+          totalCount = matching.length;
+          totalPages = 1;
+        }
+      }
 
       setItems(list);
       setTotal(totalCount);
