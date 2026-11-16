@@ -45,6 +45,7 @@ export interface QueryItem {
     mentor?: {
         firstName?: string;
         lastName?: string;
+        photoUrl?: string | null;
         profilePhotoId?: string | null;
     };
 }
@@ -64,11 +65,8 @@ interface PaginatedResponse<T = any> extends ApiResponse<T> {
     };
 }
 
-// ✅ FIX: every call below was missing the `/mentorship` prefix that the
-// backend's Mentorship module routes are actually mounted under
-// (see routes/index.ts — router.use('/queries', queryRoutes) is itself
-// nested inside the Mentorship router). That's why POST /api/v1/queries/submit
-// was 404ing — the real path is /api/v1/mentorship/queries/submit.
+// Backend ke Mentorship module ke routes `/mentorship` prefix ke neeche mounted
+// hain, isliye har call ko ye prefix chahiye.
 const BASE = '/mentorship/queries';
 
 class QueryService {
