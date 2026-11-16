@@ -2,6 +2,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import CoverPhotoModal from './CoverPhotoModal';
+import { optimizeByPreset } from '@/shared/utils/cloudinary';
 
 interface ProfileBannerProps {
     bannerImage: string;
@@ -23,8 +24,8 @@ const ProfileBanner: React.FC<ProfileBannerProps> = ({
         bannerImage && bannerImage.trim() !== '' ? bannerImage : ''
     );
 
-    // ✅ Jab bannerImage prop change ho (naye user ki profile pe navigate hone par),
-    // currentBannerImage ko turant sync/reset karo — warna purana banner flash hota hai
+    // Jab bannerImage prop change ho (naye user ki profile pe navigate hone par),
+    // currentBannerImage ko turant sync/reset karo, warna purana banner flash hota hai
     useEffect(() => {
         setCurrentBannerImage(bannerImage && bannerImage.trim() !== '' ? bannerImage : '');
     }, [bannerImage]);
@@ -49,32 +50,31 @@ const ProfileBanner: React.FC<ProfileBannerProps> = ({
 
     return (
         <>
-                        <div className="relative h-56 sm:h-64 w-full rounded-t-2xl overflow-hidden bg-[#e8dfd7]">
+            <div className="relative h-56 sm:h-64 w-full rounded-t-2xl overflow-hidden bg-[#e8dfd7]">
                 {hasCustomBanner ? (
                     <img
-                        src={currentBannerImage}
+                        // State me raw URL rehta hai, sirf render par optimize hota hai
+                        src={optimizeByPreset(currentBannerImage, 'cover')}
                         alt="Banner"
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                            // ✅ Agar upload ki hui image bhi load fail ho jaye,
-                            // to hardcoded default pe mat jao — bas hide kar do.
+                            // Upload ki hui image bhi load fail ho jaye to
+                            // hardcoded default pe mat jao, bas hide kar do.
                             (e.target as HTMLImageElement).style.display = 'none';
                         }}
                     />
                 ) : (
-                    // ✅ Koi banner upload nahi kiya gaya — plain placeholder, koi fixed photo nahi
+                    // Koi banner upload nahi kiya gaya, plain placeholder
                     <div className="w-full h-full bg-gradient-to-r from-[#e8dfd7] to-[#d8ccc0]" />
                 )}
 
                 <div className="absolute inset-0 bg-gradient-to-t from-[#4a3728]/40 to-transparent"></div>
 
                 <div className="absolute top-4 left-4 rounded-2xl border-2 border-white/30 text-white/90 text-xs font-medium bg-black/30 px-3 py-1 backdrop-blur-md shadow-sm">
-                    ✨ Professional Networker
+                    Professional Networker
                 </div>
 
-                {/* ✅ FIX: black/emoji edit button hataya, ab ProfileHeader ke edit
-                    button jaisa hi clean white pill — SVG pencil icon + "Edit" label,
-                    proper contrast + shadow, theme (#4a3728) ke saath match karta hai */}
+                {/* Edit button: clean white pill, SVG pencil icon + "Edit" label */}
                 {isOwnProfile && (
                     <button
                         onClick={handleEdit}

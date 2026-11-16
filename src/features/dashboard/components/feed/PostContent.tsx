@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { renderFormattedContent, renderFormattedLine } from '@/shared/utils/postContentFormat';
 import AnalyticsService from '@/lib/api/analytics.service';
+import { optimizeByPreset } from '@/shared/utils/cloudinary';
 
 const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) => {
   const [expanded, setExpanded] = useState(false);
@@ -19,18 +20,17 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
     ? renderFormattedContent(content)
     : renderFormattedLine(firstLine);
 
-  // ✅ Multi-image support (LinkedIn-style collage grid)
+  // Multi-image support (LinkedIn-style collage grid)
   const images: any[] = post.images || [];
   const imageCount = images.length;
 
-  // ✅ Har case (2 / 3 / 4 / 5+) ke liye sahi grid layout:
+  // Grid layout per case:
   // 1 photo  -> full width, natural height
   // 2 photos -> 2 columns, 1 row, equal height
   // 3 photos -> left tile bada (2 rows span), right side 2 tiles stacked
   // 4 photos -> 2x2 grid, equal tiles
-  // 5+ photos -> same 2x2 grid, sirf 4 tiles dikhte hain — 4th tile pe
-  //              "+N" overlay baaki count dikhata hai (5 photos => "+1",
-  //              6 photos => "+2", waghera)
+  // 5+ photos -> same 2x2 grid, sirf 4 tiles dikhte hain, 4th tile pe
+  //              "+N" overlay baaki count dikhata hai
   const getGridColsClass = (): string => {
     if (imageCount <= 1) return 'grid-cols-1';
     return 'grid-cols-2';
@@ -53,8 +53,6 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
     }
 
     if (imageCount === 2) {
-      // ✅ 2 photos: dono ek row mein, poori decent height ke saath
-      // (pehle 150px tha jo squished dikhta tha)
       classes.push('h-[240px] sm:h-[320px]');
       return classes.join(' ');
     }
@@ -62,10 +60,7 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
     if (imageCount === 3) {
       const isFirstOfThree = index === 0;
       if (isFirstOfThree) {
-        // ✅ FIX: pehle yahan h-[150px] bhi push ho raha tha jo
-        // row-span-2 ke against conflict karta tha aur tile chhoti
-        // reh jaati thi. Ab h-full — apni poori spanned row-height
-        // (dono rows + gap) fill karega.
+        // row-span-2 ke saath h-full: apni poori spanned row-height fill karega
         classes.push('row-span-2 h-full');
       } else {
         classes.push('h-[150px]', 'sm:h-[190px]');
@@ -115,7 +110,7 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
     );
   };
 
-  // ✅ SPACING FIX: mb-2 → mb-1 — content text ke baad gap tight kiya
+  // SPACING FIX: mb-2 -> mb-1, content text ke baad gap tight
   const contentTextClass = [
     'text-base',
     'font-medium',
@@ -127,12 +122,12 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
     .filter(Boolean)
     .join(' ');
 
-  // ✅ SPACING FIX: mb-4 → mb-2 — "Read more" button ke baad gap tight kiya
+  // SPACING FIX: mb-4 -> mb-2, "Read more" button ke baad gap tight
   const readMoreClass = isDarkMode
     ? 'text-sm font-semibold mb-2 text-slate-300 hover:text-white'
     : 'text-sm font-semibold mb-2 text-[#6b5643] hover:text-[#4a3728]';
 
-  // ✅ SPACING FIX: mb-6 → mb-3 — image grid ke neeche gap tight kiya
+  // SPACING FIX: mb-6 -> mb-3, image grid ke neeche gap tight
   const imageGridClass = [
     'mb-3',
     'rounded-2xl',
@@ -146,12 +141,14 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
     .filter(Boolean)
     .join(' ');
 
-  // ✅ FIX: 5+ photos ho toh bhi sirf 4 tiles render hongi (pehle
-  // slice(0,5) tha jo 5-tile ka broken/odd grid banata tha). 4th tile
-  // pe hi "+N" overlay lagega, N = baaki bachi hui photos.
+  // 5+ photos ho toh bhi sirf 4 tiles render hongi, 4th tile pe
+  // "+N" overlay (N = baaki bachi hui photos)
   const visibleCount = Math.min(imageCount, 4);
   const visibleImages = images.slice(0, visibleCount);
   const extraCount = imageCount - visibleCount;
+
+  // Single image bada dikhta hai, grid tiles chhote
+  const imagePreset = imageCount === 1 ? 'post' : 'thumbnail';
 
   return (
     <>
@@ -171,8 +168,10 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
             return (
               <div key={img.mediaId || i} className={getTileClass(i)}>
                 <img
-                  src={img.cloudinarySecureUrl}
+                  src={optimizeByPreset(img.cloudinarySecureUrl, imagePreset)}
                   alt={'Post image ' + (i + 1)}
+                  loading="lazy"
+                  decoding="async"
                   className={`w-full ${imageCount === 1 ? 'h-auto max-h-[650px] object-contain rounded-2xl' : 'h-full object-cover'} hover:scale-[1.01] transition-transform duration-500`}
                 />
                 {isOverlayTile && (
@@ -189,7 +188,6 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
       {post.videos && post.videos.length > 0 && (
         <div
           onClick={handleVideoContainerClick}
-          // ✅ SPACING FIX: mb-6 → mb-3
           className={`mb-3 rounded-2xl overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-[#efe9e1]'} w-full h-80 flex justify-center cursor-pointer`}
         >
           <video
@@ -204,7 +202,6 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
       {post.documents && post.documents.length > 0 && (
         <div
           onClick={handleDocumentContainerClick}
-          // ✅ SPACING FIX: mb-6 → mb-3
           className="mb-3 bg-gradient-to-br from-[#e0d8cf]/40 to-[#f6ede8]/30 border border-[#e0d8cf]/50 p-4 rounded-2xl flex items-center justify-between gap-4"
         >
           <div className="flex items-center gap-3 min-w-0">
@@ -225,7 +222,7 @@ const PostContent = ({ post, isDarkMode }: { post: any; isDarkMode: boolean }) =
               <p className="text-xs text-[#4a3728]/60">
                 {post.documents[0].fileSize
                   ? (post.documents[0].fileSize / 1024).toFixed(0) + ' KB'
-                  : '—'}{' '}
+                  : '-'}{' '}
                 · {post.documents[0].format?.toUpperCase() || 'PDF'}
               </p>
             </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { selectTimerStats, selectTodayTotalMinutes } from "@/hooks/studyGroup/features/timer/timerSlice";
+import { selectUserStreak } from "@/hooks/studyGroup/features/groups/groupsSlice";
 import { useAppSelector } from "@/store/hooks";
 import { useState, useEffect } from 'react';
 
@@ -8,14 +9,14 @@ export default function TimerStats() {
   const [mounted, setMounted] = useState(false);
   const timerStats = useAppSelector(selectTimerStats);
   const todayMinutes = useAppSelector(selectTodayTotalMinutes) ?? 0;
-  const localCompleted = useAppSelector(state => state.timer.completedSessions) ?? 0;
-  const streakCount = useAppSelector(state => state.timer.streakCount) ?? 0; // no streak API yet
+  // Real streak from /study-group/streak/current (the same one the groups pages use)
+  const streakCount = useAppSelector(selectUserStreak) ?? 0;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const sessions = mounted ? timerStats?.sessionsToday ?? localCompleted : 0;
+  const sessions = mounted ? timerStats?.sessionsToday ?? 0 : 0;
   const minutes = mounted ? todayMinutes : 0;
   const streak = mounted ? streakCount : 0;
 

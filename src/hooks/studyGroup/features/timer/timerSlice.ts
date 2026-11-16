@@ -55,6 +55,9 @@ interface TimerState {
   lastStudyDate: string | null;
 
   activeSession: TimerSessionResponse | null;
+  // Session found on the server when the page loaded or a Start was rejected.
+  // The user must resume or discard it before a new session can start.
+  unfinishedSession: TimerSessionResponse | null;
   activeGroupId: string | null;
   groupStudyTimes: Record<string, number>; // groupId => seconds spent in that group
   activeSessionLoading: boolean;
@@ -103,6 +106,7 @@ const initialState: TimerState = {
   lastStudyDate: null, // ADD after lastStudyDate: null,
 
   activeSession: null,
+  unfinishedSession: null,
   activeSessionLoading: false,
 
   allSessions: [],
@@ -308,11 +312,32 @@ const timerSlice = createSlice({
       state.isBreakMode = false;
       state.seconds = 0;
       state.minutes = state.settings?.pomodoroMinutes ?? 25;
+      // The next session is started by the page through startTimerThunk, so it
+      // exists on the server and its time is saved.
+    },
 
-      if (state.settings?.autoStartPomodoros) {
-        state.isActive = true;
-        state.sessionStartTime = Date.now();
-      }
+    // User chose "Resume" on the unfinished-session prompt: put the clock where
+    // the server session actually is. The paused -> active server call is
+    // dispatched by the prompt component.
+    continueUnfinishedSession: (state) => {
+      const session = state.unfinishedSession;
+      state.unfinishedSession = null;
+      if (!session) return;
+
+      const total =
+        state.activeTab === "pomodoro"
+          ? (state.settings?.pomodoroMinutes ?? 25) * 60
+          : state.activeTab === "focus"
+            ? (state.settings?.focusMinutes ?? 45) * 60
+            : state.customMinutes * 60;
+      const elapsed = Math.max(0, Math.floor(session.elapsedTime ?? 0));
+      const remaining = Math.max(total - elapsed, 0);
+
+      state.isBreakMode = false;
+      state.minutes = Math.floor(remaining / 60);
+      state.seconds = remaining % 60;
+      state.sessionStartTime = Date.now() - elapsed * 1000;
+      state.isActive = session.status === "active";
     },
 
     setSessionStartTime: (state, action: PayloadAction<number | null>) => {
@@ -353,6 +378,7 @@ const timerSlice = createSlice({
       .addCase(startTimerThunk.fulfilled, (state, action) => {
         state.apiLoading = false;
         state.activeSession = { ...(action.payload as any), status: "active" };
+        state.unfinishedSession = null;
         state.isActive = true;
         state.sessionStartTime = Date.now();
       })
@@ -417,6 +443,7 @@ const timerSlice = createSlice({
       .addCase(stopTimerThunk.fulfilled, (state, action) => {
         state.apiLoading = false;
         state.activeSession = null;
+        state.unfinishedSession = null;
         state.isActive = false;
         state.sessionStartTime = null;
         // Add to local studySessions for UI
@@ -442,7 +469,6 @@ const timerSlice = createSlice({
             (sum, s) => sum + Math.round((s.duration ?? 0) / 60),
             0
           );
-          state.completedSessions += 1;
         }
       })
       .addCase(stopTimerThunk.rejected, (state, action) => {
@@ -458,6 +484,7 @@ const timerSlice = createSlice({
       .addCase(cancelTimerThunk.fulfilled, (state) => {
         state.apiLoading = false;
         state.activeSession = null;
+        state.unfinishedSession = null;
         state.isActive = false;
         state.sessionStartTime = null;
       })
@@ -531,27 +558,18 @@ const timerSlice = createSlice({
 
         const raw: any = action.payload;
         const status = raw ? String(raw.status ?? "").toLowerCase() : "";
+        const isUnfinished = !!raw && (status === "active" || status === "paused");
+
         state.activeSession = raw ? { ...raw, status } : null;
 
-        if (raw && (status === "active" || status === "paused")) {
-          state.isActive = status === "active";
-
-          const tab = state.activeTab;
-          const total =
-            tab === "pomodoro"
-              ? 25 * 60
-              : tab === "focus"
-                ? 45 * 60
-                : state.customMinutes * 60;
-
-          if (raw.elapsedTime) {
-            const elapsedSeconds = Math.floor(raw.elapsedTime);
-            const remaining = Math.max(total - elapsedSeconds, 0);
-            state.minutes = Math.floor(remaining / 60);
-            state.seconds = remaining % 60;
-          }
-        } else if (!state.isBreakMode) {
+        if (isUnfinished) {
+          // Do not touch the clock or start ticking: the user decides on the
+          // unfinished-session prompt whether to resume or discard it.
+          state.unfinishedSession = { ...raw, status };
           state.isActive = false;
+        } else {
+          state.unfinishedSession = null;
+          if (!state.isBreakMode) state.isActive = false;
         }
       })
       .addCase(getActiveTimerThunk.rejected, (state) => {
@@ -640,6 +658,8 @@ interface StateWithTimer {
 
 export const selectActiveSession = (state: StateWithTimer) =>
   state.timer.activeSession;
+export const selectUnfinishedSession = (state: StateWithTimer) =>
+  state.timer.unfinishedSession;
 export const selectActiveSessionLoading = (state: StateWithTimer) =>
   state.timer.activeSessionLoading;
 export const selectAllTimerSessions = (state: StateWithTimer) =>
@@ -680,6 +700,7 @@ export const {
   completeSession,
   startBreak,
   endBreak,
+  continueUnfinishedSession,
   setSessionStartTime,
   updateSettings,
   setActiveGroupForTimer,
