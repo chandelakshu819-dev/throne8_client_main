@@ -23,8 +23,11 @@ export default function TimerControls() {
   const selectedGoalId = useAppSelector((state) => state.timer.selectedGoalId);
   const activeSession = useAppSelector((state) => state.timer.activeSession);
   const apiLoading = useAppSelector((state) => state.timer.apiLoading);
+  const unfinishedSession = useAppSelector((state) => state.timer.unfinishedSession);
 
   const handleStart = async () => {
+    // An old session is waiting on the prompt: it must be resumed or discarded first
+    if (unfinishedSession) return;
     let result: any;
 
     if (!isActive) {
@@ -71,7 +74,7 @@ export default function TimerControls() {
       <div className="flex gap-3">
         <button
           onClick={handleStart}
-          disabled={apiLoading}
+          disabled={apiLoading || !!unfinishedSession}
           className={`flex h-12 flex-1 items-center justify-center gap-2 rounded-xl text-base font-semibold text-white shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
             isActive ? "bg-[#b9803f] hover:bg-[#a06e33]" : "bg-[#4a3728] hover:bg-[#3a2a1e]"
           }`}
@@ -82,7 +85,7 @@ export default function TimerControls() {
 
         <button
           onClick={handleReset}
-          disabled={apiLoading}
+          disabled={apiLoading || !!unfinishedSession}
           title={
             activeSession
               ? "Stop the timer and save this session (sessions under 30 seconds are discarded)"

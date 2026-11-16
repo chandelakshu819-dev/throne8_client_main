@@ -14,6 +14,7 @@ import TimerDisplay from '@/features/studyGroup/components/TimerDisplay';
 import CustomTimerControls from '@/features/studyGroup/components/CustomTimerControls';
 import SubjectInput from '@/features/studyGroup/components/SubjectInput';
 import TimerControls from '@/features/studyGroup/components/TimerControls';
+import UnfinishedSessionPrompt from '@/features/studyGroup/components/UnfinishedSessionPrompt';
 import MotivationalQuote from '@/features/studyGroup/components/MotivationalQuote';
 import StudyProgress from '@/features/studyGroup/components/StudyProgress';
 import { getActiveTimerThunk, getAllSessionsThunk, getTimerStatsThunk, getTodaySessionsThunk, stopTimerThunk } from '@/hooks/studyGroup/features/timer/timer.thunks';
@@ -139,6 +140,7 @@ export default function PomodoroTimer() {
           <section className="overflow-hidden rounded-2xl border border-[#e0d8cf] bg-white shadow-sm">
             <div className="h-1 bg-gradient-to-r from-[#4a3728] via-[#8b6f47] to-[#d4a574]" />
             <div className="space-y-6 p-5 sm:p-6">
+              <UnfinishedSessionPrompt />
               <TimerTabs />
               <TimerDisplay progress={progress} />
               {activeTab === 'timer' && <CustomTimerControls />}
