@@ -174,11 +174,14 @@ function DocButton({
   type,
   label,
   color,
+  fallbackUrl,
 }: {
   seniorMentorId: string;
   type: CollegeMentorDocumentType;
   label: string;
   color: string;
+  /** Stored document URL, used if the backend has no signed-URL route. */
+  fallbackUrl?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -189,7 +192,7 @@ function DocButton({
     // Open the tab on click so popup blockers don't stop it.
     const tab = window.open("", "_blank");
     try {
-      const url = await SeniorMentorApplicationService.adminGetDocumentUrl(seniorMentorId, type);
+      const url = await SeniorMentorApplicationService.adminGetDocumentUrl(seniorMentorId, type, fallbackUrl);
       if (tab) {
         tab.opener = null;
         tab.location.href = url;
@@ -971,10 +974,10 @@ export default function CollegeMentorsView({ onPendingCountChange }: CollegeMent
                     );
                   })}
                   {selected.resumeUrl && (
-                    <DocButton seniorMentorId={selected.seniorMentorId} type="resume" label="Resume" color="#7a5c3e" />
+                    <DocButton seniorMentorId={selected.seniorMentorId} type="resume" label="Resume" color="#7a5c3e" fallbackUrl={selected.resumeUrl} />
                   )}
                   {selected.proofDocumentUrl && (
-                    <DocButton seniorMentorId={selected.seniorMentorId} type="proof" label="Proof document" color="#7a5c3e" />
+                    <DocButton seniorMentorId={selected.seniorMentorId} type="proof" label="Proof document" color="#7a5c3e" fallbackUrl={selected.proofDocumentUrl} />
                   )}
                 </div>
               </div>

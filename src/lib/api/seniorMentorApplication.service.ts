@@ -268,15 +268,21 @@ class SeniorMentorApplicationService {
       ApplicationStatus.REJECTED,
     ] as const;
 
-    const [pending, under_review, verified, rejected] = await Promise.all(
-      statuses.map(async (status) => {
-        const { data } = await api.get(ADMIN_BASE, { params: { status, page: 1, limit: 1 } });
-        return Number(data?.meta?.total ?? data?.pagination?.total ?? data?.data?.length ?? 0);
-      })
-    );
+    const countFor = async (status?: string): Promise<number> => {
+      const { data } = await api.get(ADMIN_BASE, { params: { status, page: 1, limit: 1 } });
+      return Number(data?.meta?.total ?? data?.pagination?.total ?? data?.data?.length ?? 0);
+    };
+
+    // `total` comes from an unfiltered query, NOT the sum of the four statuses:
+    // legacy records can carry a non-standard status (e.g. "active") and would
+    // otherwise be missed from the total.
+    const [total, pending, under_review, verified, rejected] = await Promise.all([
+      countFor(),
+      ...statuses.map((status) => countFor(status)),
+    ]);
 
     return {
-      total: pending + under_review + verified + rejected,
+      total,
       pending,
       under_review,
       verified,
@@ -317,7 +323,8 @@ class SeniorMentorApplicationService {
   /** GET /senior-mentor-applications/:id/documents/:type — short-lived signed URL for resume / proof. */
   static async adminGetDocumentUrl(
     seniorMentorId: string,
-    type: CollegeMentorDocumentType
+    type: CollegeMentorDocumentType,
+    fallbackUrl?: string
   ): Promise<string> {
     try {
       const { data } = await api.get(`${ADMIN_BASE}/${seniorMentorId}/documents/${type}`);
@@ -325,6 +332,9 @@ class SeniorMentorApplicationService {
       if (!url) throw new Error('Document url not available.');
       return url as string;
     } catch (error: any) {
+      // Older backend builds have no /documents/:type route (404 "Route ... not found").
+      // Open the URL stored on the application instead of showing an error.
+      if (error?.response?.status === 404 && fallbackUrl) return fallbackUrl;
       throw adminErrorMessage(error, 'Could not open document.');
     }
   }
