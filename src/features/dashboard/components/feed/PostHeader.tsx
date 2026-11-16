@@ -4,10 +4,12 @@ import { useRouter } from 'next/navigation';
 import PostMenuDropdown from './PostMenuDropdown';
 import ConnectionService from '@/lib/api/connection.service';
 import DefaultAvatar from '@/shared/uiComponents/DefaultAvatar';
+import { optimizeByPreset } from '@/shared/utils/cloudinary';
 
 type ConnectionStatus = 'self' | 'connected' | 'pending_sent' | 'pending_received' | 'none';
 
-// ✅ NEW: mood → emoji map, LinkedIn/Facebook style "is feeling 😊 happy"
+// mood -> emoji map, LinkedIn/Facebook style "is feeling happy"
+// (ye UI feature ka data hai, isliye yahan emoji rakhe hain)
 const MOOD_EMOJI_MAP: Record<string, string> = {
   happy: '😊',
   thoughtful: '🤔',
@@ -30,7 +32,7 @@ const PostHeader = ({
   const [isSending, setIsSending] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
-  // ✅ Listen for connection requests sent anywhere in the app & check pending status
+  // Listen for connection requests sent anywhere in the app & check pending status
   React.useEffect(() => {
     if (!post.userId || !currentUserId || isOwnPost) return;
 
@@ -89,7 +91,7 @@ const PostHeader = ({
       setConnectionStatus('pending_sent');
       window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId: post.userId } }));
     } catch (error: any) {
-      console.error('❌ Connect failed:', error.message);
+      console.error('Connect failed:', error.message);
       if (error.message?.includes('already exists')) {
         setConnectionStatus('pending_sent');
         window.dispatchEvent(new CustomEvent('connection-request:sent', { detail: { targetUserId: post.userId } }));
@@ -122,7 +124,7 @@ const PostHeader = ({
 
   const showDefaultAvatar = !post.avatar || avatarLoadError;
 
-  // ✅ NEW: build the "is feeling 😊 happy" fragment if mood exists
+  // build the "is feeling happy" fragment if mood exists
   const moodEmoji = post.mood ? MOOD_EMOJI_MAP[post.mood] : null;
   const moodLabel = post.mood
     ? post.mood.charAt(0).toUpperCase() + post.mood.slice(1)
@@ -132,21 +134,23 @@ const PostHeader = ({
     <div className="flex items-center justify-between mb-6">
       <div className="flex items-center space-x-4">
         {showDefaultAvatar ? (
-  <div
-    onClick={handleProfileClick}
-    className="w-14 h-14 cursor-pointer"
-  >
-    <DefaultAvatar className="w-full h-full" rounded="2xl" />
-  </div>
-) : (
-  <img
-    src={post.avatar}
-    alt={post.user}
-    onClick={handleProfileClick}
-    onError={() => setAvatarLoadError(true)}
-    className="w-14 h-14 rounded-2xl object-cover border-2 border-[#6b5643] cursor-pointer"
-  />
-)}
+          <div
+            onClick={handleProfileClick}
+            className="w-14 h-14 cursor-pointer"
+          >
+            <DefaultAvatar className="w-full h-full" rounded="2xl" />
+          </div>
+        ) : (
+          <img
+            src={optimizeByPreset(post.avatar, 'avatar')}
+            alt={post.user}
+            loading="lazy"
+            decoding="async"
+            onClick={handleProfileClick}
+            onError={() => setAvatarLoadError(true)}
+            className="w-14 h-14 rounded-2xl object-cover border-2 border-[#6b5643] cursor-pointer"
+          />
+        )}
         <div>
           <div className="flex items-center gap-3 flex-wrap">
             <h4
@@ -154,7 +158,7 @@ const PostHeader = ({
               className={`text-lg font-bold cursor-pointer hover:underline ${isDarkMode ? 'text-white' : 'text-[#4a3728]'}`}
             >
               {post.user}
-              {/* ✅ NEW: mood shown right after name, LinkedIn/Facebook style */}
+              {/* mood shown right after name, LinkedIn/Facebook style */}
               {moodEmoji && (
                 <span className={`text-sm font-normal ml-1 ${isDarkMode ? 'text-slate-300' : 'text-[#4a3728]/70'}`}>
                   is feeling {moodEmoji} {moodLabel}
