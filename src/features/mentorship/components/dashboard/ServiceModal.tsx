@@ -3,61 +3,53 @@
 import React, { useMemo, useEffect } from 'react';
 import {
     X, DollarSign, Image as ImageIcon, Upload, FileText,
-    Briefcase, Clock, Users, AlertCircle
+    Briefcase, Clock, Users, AlertCircle, Trash2
 } from 'lucide-react';
 import { Video, MessageSquare, Package } from 'lucide-react';
 
-// NOTE: `emoji` kept only for backward-compat with callers that still pass it in
-// via the `service` prop — it is not rendered anywhere in this file anymore.
 const MAX_DESCRIPTION_LENGTH = 500;
-
-// Local datetime-local string banata hai (browser's local timezone me),
-// toISOString() (UTC) use karne se IST users ke liye time 5:30 hrs shift ho jaata tha.
-const toLocalDatetimeString = (date: Date) => {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
 const serviceTypes = [
     {
         name: 'quick_call', label: 'Quick Call', icon: Video,
         description: 'Quick 30-minute call for specific questions',
-        emoji: '⚡', needsDescription: false, needsParticipants: false,
+        needsDescription: false, needsParticipants: false,
     },
     {
         name: 'deep_dive', label: 'Deep Dive', icon: Video,
         description: 'In-depth 60-minute session for detailed discussion',
-        emoji: '🎯', needsDescription: true, needsParticipants: false,
+        needsDescription: true, needsParticipants: false,
     },
     {
         name: 'resume_review', label: 'Resume Review', icon: FileText,
         description: 'Professional resume review with ATS scoring',
-        emoji: '📄', needsDescription: true, needsParticipants: false,
+        needsDescription: true, needsParticipants: false,
     },
     {
         name: 'mock_interview', label: 'Mock Interview', icon: MessageSquare,
         description: 'Practice interview with real-time feedback',
-        emoji: '🎤', needsDescription: true, needsParticipants: false,
+        needsDescription: true, needsParticipants: false,
     },
     {
         name: 'career_planning', label: 'Career Planning', icon: Briefcase,
         description: 'Comprehensive career planning and roadmap',
-        emoji: '🗺️', needsDescription: true, needsParticipants: false,
+        needsDescription: true, needsParticipants: false,
     },
     {
         name: 'portfolio_review', label: 'Portfolio Review', icon: ImageIcon,
         description: 'Portfolio review for designers and developers',
-        emoji: '💼', needsDescription: true, needsParticipants: false,
+        needsDescription: true, needsParticipants: false,
     },
     {
         name: 'ask_query', label: 'Ask a Query', icon: MessageSquare,
         description: 'Text-based async query (no live call)',
-        emoji: '❓', needsDescription: false, needsParticipants: false,
+        needsDescription: false, needsParticipants: false,
     },
     {
         name: 'group_session', label: 'Group Session', icon: Users,
         description: 'Group session with multiple participants',
-        emoji: '👥', needsDescription: true, needsParticipants: true,
+        needsDescription: true, needsParticipants: true,
     },
 ];
 
@@ -79,17 +71,16 @@ const bufferTimeOptions = [
     { value: '10', label: '10 Min' }, { value: '15', label: '15 Min' },
 ];
 
-// ✅ NEW: "Ask a Query" service ke liye response time — mentee ko clarity
-// milti hai ki mentor kitne din me uski text-query ka jawab dega.
+// "Ask a Query" service ke liye response time
 const responseTimeOptions = [
     { value: '1', label: '1 Day' },
     { value: '2', label: '2 Days' },
     { value: '3', label: '3 Days' },
 ];
 
-// ── Props ──────────────────────────────────────────────────
+// -- Props --
 interface ServiceModalProps {
-    service: { name: string; description: string; emoji: string };
+    service: { name: string; description: string; emoji?: string };
     onClose: () => void;
     formData: any;
     setFormData: (data: any) => void;
@@ -98,9 +89,7 @@ interface ServiceModalProps {
     saveError?: string | null;
     fieldErrors?: Record<string, string>;
     isEditMode?: boolean;
-    // ✅ NEW: mentor ki Availability me jo slot-duration set hai (30/45/60 min),
-    // parent (ServicesPage) se pass hoga — isse Duration field ab free number
-    // nahi, balki usi slot duration se connected dropdown banega.
+    // Mentor ki Availability me set slot-duration, parent se pass hota hai
     availableDurations?: number[];
 }
 
@@ -125,10 +114,7 @@ export default function ServiceModal({
     isEditMode = false,
     availableDurations = [15, 30, 45, 60],
 }: ServiceModalProps) {
-    // ✅ NEW: modal khulte hi (ya jab availableDurations change ho) agar
-    // formData.duration khaali hai ya availableDurations me nahi hai,
-    // to pehla valid option auto-select kar do — taaki service hamesha
-    // mentor ki actual availability slot-duration ke according bane.
+    // Duration hamesha mentor ki availability ke valid option me rahe
     useEffect(() => {
         const durations = formData?.serviceType === 'group_session'
             ? availableDurations.filter((d) => d >= 30)
@@ -141,8 +127,7 @@ export default function ServiceModal({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [availableDurations, formData?.serviceType]);
 
-    // ✅ NEW: "Ask a Query" select hote hi response time default 1 Day
-    // set kar do agar pehle se koi valid value nahi hai.
+    // "Ask a Query" select hote hi response time default 1 Day
     useEffect(() => {
         if (formData?.serviceType !== 'ask_query') return;
         if (!formData?.responseTime) {
@@ -156,11 +141,7 @@ export default function ServiceModal({
     const needsParticipants = currentServiceType?.needsParticipants ?? true;
     const ServiceIcon = currentServiceType?.icon || FileText;
 
-    // ✅ FIX: backend's createGroupSessionValidator requires duration >= 30
-    // (Joi.number().min(30).max(180)), but availableDurations' default
-    // ([15, 30, 45, 60]) always included 15 min — selecting it always got
-    // rejected with a generic "Validation failed" the user couldn't debug.
-    // Group sessions now only ever offer durations the backend actually accepts.
+    // Backend group session ke liye duration >= 30 hi accept karta hai
     const effectiveDurations = formData?.serviceType === 'group_session'
         ? availableDurations.filter((d) => d >= 30)
         : availableDurations;
@@ -183,13 +164,34 @@ export default function ServiceModal({
         };
     }, [thumbnailPreview, formData?.thumbnailImage]);
 
+    // Image choose / change
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > MAX_IMAGE_SIZE) {
+            alert('Image must be smaller than 5MB.');
+            e.target.value = '';
+            return;
+        }
+
+        setFormData({ ...formData, thumbnailImage: file, removeThumbnailImage: false });
+        // Reset taaki same file dobara choose karne par bhi onChange chale
+        e.target.value = '';
+    };
+
+    // Image remove: preview clear + backend ko batane ke liye flag
+    const handleImageRemove = () => {
+        setFormData({ ...formData, thumbnailImage: null, removeThumbnailImage: true });
+    };
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-                       <div
+            <div
                 className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden"
                 style={{ border: '1px solid #e0d8cf' }}
             >
-                {/* Header — static, does not scroll */}
+                {/* Header - static, does not scroll */}
                 <div className="flex justify-between items-start p-6 pb-4 shrink-0" style={{ borderBottom: '1px solid #f0ebe4' }}>
                     <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#f3ece4' }}>
@@ -211,39 +213,45 @@ export default function ServiceModal({
                     </button>
                 </div>
 
-                {/* Body — only this part scrolls */}
+                {/* Body - only this part scrolls */}
                 <div className="space-y-5 overflow-y-auto p-6 pt-5">
 
-
-
                     {/* Image Upload */}
-                    <div className="rounded-xl border border-dashed relative overflow-hidden" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', minHeight: thumbnailPreview ? '180px' : 'auto' }}>
+                    <div
+                        className="rounded-xl border border-dashed relative overflow-hidden"
+                        style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', minHeight: thumbnailPreview ? '180px' : 'auto' }}
+                    >
                         {thumbnailPreview ? (
-                            <div className="relative group" style={{ height: '180px' }}>
+                            <div className="relative" style={{ height: '180px' }}>
                                 <img src={thumbnailPreview} alt="Preview" className="w-full h-full object-cover" />
-                                <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                                    <input
-                                        type="file"
-                                        accept="image/jpeg,image/png,image/webp"
-                                        className="hidden"
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) {
-                                                if (file.size > 5 * 1024 * 1024) {
-                                                    alert('Image must be smaller than 5MB.');
-                                                    e.target.value = '';
-                                                    return;
-                                                }
-                                                setFormData({ ...formData, thumbnailImage: file });
-                                            }                                            
-                                        }}
-                                        disabled={isSaving}
-                                    />
-                                    <div className="text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2" style={{ backgroundColor: '#4a3728' }}>
+
+                                {/* Hamesha visible controls (hover pe depend nahi) */}
+                                <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 p-3 bg-gradient-to-t from-black/60 to-transparent">
+                                    <label
+                                        className={`cursor-pointer text-white px-3.5 py-2 rounded-lg text-sm font-semibold inline-flex items-center gap-2 ${isSaving ? 'opacity-50 pointer-events-none' : ''}`}
+                                        style={{ backgroundColor: '#4a3728' }}
+                                    >
+                                        <input
+                                            type="file"
+                                            accept="image/jpeg,image/png,image/webp"
+                                            className="hidden"
+                                            onChange={handleImageSelect}
+                                            disabled={isSaving}
+                                        />
                                         <Upload className="w-4 h-4" />
-                                        Change Image
-                                    </div>
-                                </label>
+                                        Change
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={handleImageRemove}
+                                        disabled={isSaving}
+                                        className="px-3.5 py-2 rounded-lg text-sm font-semibold inline-flex items-center gap-2 bg-white disabled:opacity-50 hover:bg-red-50 transition-colors"
+                                        style={{ color: '#dc2626' }}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                        Remove
+                                    </button>
+                                </div>
                             </div>
                         ) : (
                             <div className="text-center py-8 px-6">
@@ -251,24 +259,16 @@ export default function ServiceModal({
                                     <ImageIcon className="w-6 h-6" style={{ color: '#7a5c3e' }} />
                                 </div>
                                 <p className="text-sm font-semibold mb-1" style={{ color: '#4a3728' }}>Upload service image</p>
-                                <p className="text-xs mb-4" style={{ color: '#8a7a6a' }}>Optional — helps your service stand out</p>
-                                <label className="cursor-pointer text-white px-4 py-2 rounded-lg text-sm font-semibold inline-flex items-center gap-2"
-                                    style={{ backgroundColor: '#4a3728' }}>
+                                <p className="text-xs mb-4" style={{ color: '#8a7a6a' }}>Optional - helps your service stand out</p>
+                                <label
+                                    className="cursor-pointer text-white px-4 py-2 rounded-lg text-sm font-semibold inline-flex items-center gap-2"
+                                    style={{ backgroundColor: '#4a3728' }}
+                                >
                                     <input
                                         type="file"
                                         accept="image/jpeg,image/png,image/webp"
                                         className="hidden"
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) {
-                                                if (file.size > 5 * 1024 * 1024) {
-                                                    alert('Image must be smaller than 5MB.');
-                                                    e.target.value = '';
-                                                    return;
-                                                }
-                                                setFormData({ ...formData, thumbnailImage: file });
-                                            }
-                                        }}
+                                        onChange={handleImageSelect}
                                         disabled={isSaving}
                                     />
                                     <Upload className="w-4 h-4" />
@@ -342,9 +342,6 @@ export default function ServiceModal({
                         </div>
                     </div>
 
-    
-                
-
                     {/* Description */}
                     {needsDescription && (
                         <div>
@@ -373,8 +370,8 @@ export default function ServiceModal({
                         </div>
                     )}
 
-                                                                        {/* Portfolio URL */}
-                                                                        {formData?.serviceType === 'portfolio_review' && (
+                    {/* Portfolio URL */}
+                    {formData?.serviceType === 'portfolio_review' && (
                         <div>
                             <FieldLabel icon={Package}>Portfolio URL</FieldLabel>
                             <input
@@ -392,9 +389,7 @@ export default function ServiceModal({
                         </div>
                     )}
 
-                    {/* ✅ NEW: Response Time — sirf "Ask a Query" service ke liye.
-                        Mentee ko saaf pata chalega ki mentor kitne din me uski
-                        text-query ka jawab dega. */}
+                    {/* Response Time - sirf "Ask a Query" service ke liye */}
                     {formData?.serviceType === 'ask_query' && (
                         <div>
                             <FieldLabel icon={Clock}>Response Time</FieldLabel>
@@ -419,7 +414,6 @@ export default function ServiceModal({
                                     );
                                 })}
                             </div>
-                         
                         </div>
                     )}
 
@@ -442,7 +436,7 @@ export default function ServiceModal({
                         </div>
                     )}
 
-                    {/* Google Meet Link — required for Group Sessions */}
+                    {/* Google Meet Link - required for Group Sessions */}
                     {formData?.serviceType === 'group_session' && (
                         <div>
                             <FieldLabel icon={Video}>Google Meet link</FieldLabel>
@@ -464,76 +458,69 @@ export default function ServiceModal({
                         </div>
                     )}
 
-
-                   
-                   
-
-
-                                               {/* Duration & Participants — Duration hidden for "Ask a Query"
-                                        since it's async text, no live call happens */}
-                                    {formData?.serviceType !== 'ask_query' && (
-                                    <div className={`grid ${needsParticipants ? 'grid-cols-3' : 'grid-cols-1'} gap-4`}>
-                                    <div>
-                            <FieldLabel icon={Clock}>Duration (min)</FieldLabel>
-                            <div className="flex flex-wrap gap-2">
-                                {effectiveDurations.map(min => {
-                                    const isActive = Number(formData?.duration) === min;
-                                    return (
-                                        <button
-                                            key={min}
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, duration: min })}
-                                            disabled={isSaving}
-                                            className="px-4 py-2 rounded-lg text-sm font-semibold border transition-colors disabled:opacity-50"
-                                            style={{
-                                                borderColor: isActive ? '#4a3728' : '#e0d8cf',
-                                                backgroundColor: isActive ? '#4a3728' : '#fbf7f3',
-                                                color: isActive ? '#fff' : '#4a3728',
-                                            }}
-                                        >
-                                            {min} min
-                                        </button>
-                                    );
-                                })}
+                    {/* Duration & Participants - Duration hidden for "Ask a Query" (async text, no live call) */}
+                    {formData?.serviceType !== 'ask_query' && (
+                        <div className={`grid ${needsParticipants ? 'grid-cols-3' : 'grid-cols-1'} gap-4`}>
+                            <div>
+                                <FieldLabel icon={Clock}>Duration (min)</FieldLabel>
+                                <div className="flex flex-wrap gap-2">
+                                    {effectiveDurations.map(min => {
+                                        const isActive = Number(formData?.duration) === min;
+                                        return (
+                                            <button
+                                                key={min}
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, duration: min })}
+                                                disabled={isSaving}
+                                                className="px-4 py-2 rounded-lg text-sm font-semibold border transition-colors disabled:opacity-50"
+                                                style={{
+                                                    borderColor: isActive ? '#4a3728' : '#e0d8cf',
+                                                    backgroundColor: isActive ? '#4a3728' : '#fbf7f3',
+                                                    color: isActive ? '#fff' : '#4a3728',
+                                                }}
+                                            >
+                                                {min} min
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                        {needsParticipants && (
-                            <>
-                                <div>
-                                    <FieldLabel icon={Users}>Min Participants</FieldLabel>
-                                    <input
-                                        type="number"
-                                        placeholder="1"
-                                        className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
-                                        style={inputStyle(fieldErrors?.minParticipants)}
-                                        value={formData?.minParticipants || ''}
-                                        onChange={(e) => setFormData({ ...formData, minParticipants: e.target.value })}
-                                        disabled={isSaving}
-                                    />
-                                    {fieldErrors?.minParticipants && (
-                                        <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.minParticipants}</p>
-                                    )}
-                                </div>
-                                <div>
-                                    <FieldLabel icon={Users}>Max Participants</FieldLabel>
-                                    <input
-                                        type="number"
-                                        placeholder="10"
-                                        className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
-                                        style={inputStyle(fieldErrors?.maxParticipants)}
-                                        value={formData?.maxParticipants || ''}
-                                        onChange={(e) => setFormData({ ...formData, maxParticipants: e.target.value })}
-                                        disabled={isSaving}
-                                    />
-                                    {fieldErrors?.maxParticipants && (
-                                        <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.maxParticipants}</p>
-                                    )}
-                                </div>
-                            </>
-                        )}
-                    </div>
+                            {needsParticipants && (
+                                <>
+                                    <div>
+                                        <FieldLabel icon={Users}>Min Participants</FieldLabel>
+                                        <input
+                                            type="number"
+                                            placeholder="1"
+                                            className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                            style={inputStyle(fieldErrors?.minParticipants)}
+                                            value={formData?.minParticipants || ''}
+                                            onChange={(e) => setFormData({ ...formData, minParticipants: e.target.value })}
+                                            disabled={isSaving}
+                                        />
+                                        {fieldErrors?.minParticipants && (
+                                            <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.minParticipants}</p>
                                         )}
-
+                                    </div>
+                                    <div>
+                                        <FieldLabel icon={Users}>Max Participants</FieldLabel>
+                                        <input
+                                            type="number"
+                                            placeholder="10"
+                                            className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                            style={inputStyle(fieldErrors?.maxParticipants)}
+                                            value={formData?.maxParticipants || ''}
+                                            onChange={(e) => setFormData({ ...formData, maxParticipants: e.target.value })}
+                                            disabled={isSaving}
+                                        />
+                                        {fieldErrors?.maxParticipants && (
+                                            <p className="text-xs mt-1 font-medium" style={{ color: '#dc2626' }}>{fieldErrors.maxParticipants}</p>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
 
                     {/* Follow-up Settings */}
                     <div className="p-4 rounded-xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
@@ -610,7 +597,7 @@ export default function ServiceModal({
                                 : (isEditMode ? "Update Service" : "Create Service")}
                         </button>
                     </div>
-                    </div>
+                </div>
             </div>
         </div>
     );

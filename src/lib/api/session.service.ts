@@ -2,7 +2,7 @@ import config from "@/config/env.config";
 import api from "./api.intance";
 import SeniorSessionService from "./seniorSession.service";
 
-// ── Types ──────────────────────────────────────────────────
+// -- Types --
 export interface CreateSessionInput {
     sessionType: string;
     scheduledAt: string;
@@ -42,7 +42,7 @@ interface ApiResponse {
     data: any;
 }
 
-// ── Analytics Types ────────────────────────────────────────
+// -- Analytics Types --
 export interface PopularService {
     _id: string; // e.g., "1_ON_1"
     count: number;
@@ -92,7 +92,7 @@ export interface BookSessionInput {
     };
 }
 
-// ── Group join-request status (mentee's own request state) ──
+// -- Group join-request status (mentee's own request state) --
 export interface GroupJoinRequestStatus {
     sessionId: string;
     menteeId: string;
@@ -104,9 +104,8 @@ export interface GroupJoinRequestStatus {
 
 class SessionService {
 
-    // ── GROUP SESSIONS base endpoint ────────────────────────
-    // Falls back to a sane default path if not defined in env config,
-    // same pattern as every other *_ENDPOINT fallback in this file.
+    // -- GROUP SESSIONS base endpoint --
+    // Env config me na ho to default path use hota hai.
     private static readonly GROUP_SESSIONS_ENDPOINT =
         (config as any).NEXT_PUBLIC_GROUP_SESSIONS_ENDPOINT
         || (process.env as any).NEXT_PUBLIC_GROUP_SESSIONS_ENDPOINT
@@ -118,7 +117,11 @@ class SessionService {
             Object.entries(input).forEach(([key, value]) => {
                 if (value !== undefined) {
                     if (key === 'thumbnailImage') {
-                        formData.append(key, value as File);
+                        // Sirf asli File append hoti hai. null / '' (image removed)
+                        // append karne se backend ko "null" string chali jaati thi.
+                        if (value instanceof File) {
+                            formData.append(key, value);
+                        }
                     } else if (typeof value === 'object') {
                         formData.append(key, JSON.stringify(value));
                     } else {
@@ -156,7 +159,7 @@ class SessionService {
         }
     }
 
-    // ── GET MENTOR ANALYTICS ───────────────────────────────
+    // -- GET MENTOR ANALYTICS --
     static async getMentorAnalytics(mentorId: string): Promise<AnalyticsResponse> {
         try {
             const { data } = await api.get<AnalyticsResponse>(
@@ -182,11 +185,11 @@ class SessionService {
         }
     }
 
-    // ── GET ALL SESSIONS FROM DB (admin only — no mentor/user filter) ──
+    // -- GET ALL SESSIONS FROM DB (admin only, no mentor/user filter) --
     static async getAllSessionsFromDB(
-      filters: { page?: number; limit?: number; mentorId?: string } = {}
-      ): Promise<ApiResponse> {
-            try {
+        filters: { page?: number; limit?: number; mentorId?: string } = {}
+    ): Promise<ApiResponse> {
+        try {
             const { data } = await api.get<ApiResponse>(
                 `${config.NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_GET_ALL_DB_ENDPOINT}`,
                 { params: filters }
@@ -198,9 +201,8 @@ class SessionService {
         }
     }
 
-    // ── GET UPCOMING SESSIONS (mentor/user-scoped, real mentee data) ───
-    // Backend derives the user from the auth token — no userId param
-    // needed here, just role.
+    // -- GET UPCOMING SESSIONS (mentor/user-scoped, real mentee data) --
+    // Backend user ko auth token se nikalta hai, sirf role chahiye.
     static async getUpcomingSessions(params: { role?: "mentor" | "mentee"; limit?: number } = {}): Promise<ApiResponse> {
         try {
             const endpoint = config.NEXT_PUBLIC_SESSIONS_UPCOMING_ENDPOINT
@@ -216,7 +218,7 @@ class SessionService {
         }
     }
 
-    // ── GET PAST SESSIONS (mentor/user-scoped, real mentee data) ───
+    // -- GET PAST SESSIONS (mentor/user-scoped, real mentee data) --
     static async getPastSessions(params: { role?: "mentor" | "mentee"; limit?: number; page?: number } = {}): Promise<ApiResponse> {
         try {
             const endpoint = config.NEXT_PUBLIC_SESSIONS_PAST_ENDPOINT
@@ -232,7 +234,7 @@ class SessionService {
         }
     }
 
-    // ── GET SESSION BY ID ──────────────────────────────────
+    // -- GET SESSION BY ID --
     static async getSessionById(sessionId: string, intent?: string): Promise<ApiResponse> {
         try {
             const { data } = await api.get<ApiResponse>(
@@ -241,7 +243,7 @@ class SessionService {
             );
             return data;
         } catch (error: any) {
-            // If standard session is not found, check if it is a Senior Mentor session
+            // Standard session na mile to Senior Mentor session check karo
             if (error?.response?.status === 404) {
                 try {
                     const seniorRes = await SeniorSessionService.getSessionById(sessionId);
@@ -260,8 +262,8 @@ class SessionService {
         }
     }
 
-    // ── JOIN SESSION ───────────────────────────────────────
-    // Validates the session against backend data and returns session info with real room URL
+    // -- JOIN SESSION --
+    // Session ko backend data se validate karke real room URL return karta hai
     static async joinSession(sessionId: string, _bookingId?: string): Promise<{ session: any; roomUrl: string }> {
         try {
             const res = await SessionService.getSessionById(sessionId);
@@ -274,7 +276,7 @@ class SessionService {
         }
     }
 
-    // ── GET ALL SESSIONS ───────────────────────────────────
+    // -- GET ALL SESSIONS --
     static async getAllSessions(filters: SessionFilters = {}): Promise<ApiResponse> {
         try {
             const endpoint = config.NEXT_PUBLIC_SESSIONS_GET_ALL_ENDPOINT
@@ -340,11 +342,9 @@ class SessionService {
 
     static async updateSession(sessionId: string, payload: Record<string, any>): Promise<ApiResponse> {
         try {
-            // Always send multipart/form-data (even without a new image).
-            // The backend's uploadSingle('thumbnailImage') middleware chain only
-            // reliably parses multipart requests on this route — plain JSON PUT
-            // requests were causing a 500. Sending FormData consistently avoids
-            // that, matching the working behavior of createSession.
+            // Hamesha multipart/form-data bhejo (naya image na ho tab bhi).
+            // Backend ka uploadSingle('thumbnailImage') middleware is route par
+            // sirf multipart reliably parse karta hai, plain JSON PUT par 500 aata tha.
             const formData = new FormData();
             Object.entries(payload).forEach(([key, value]) => {
                 if (value === undefined || value === null) return;
@@ -352,10 +352,11 @@ class SessionService {
                     if (value instanceof File) {
                         formData.append(key, value);
                     }
-                    // if it's a string (existing URL, unchanged), skip — don't send it back
+                    // String (existing URL, unchanged) ho to skip karo
                 } else if (typeof value === 'object') {
                     formData.append(key, JSON.stringify(value));
                 } else {
+                    // removeThumbnailImage: true yahan "true" string ban kar jaata hai
                     formData.append(key, String(value));
                 }
             });
@@ -396,28 +397,26 @@ class SessionService {
         }
     }
 
-
-        // ── MENTEE: missed booking ka 100% refund ──────────────
-
-        static async refundMissedSession(
-            sessionId: string,
-            bookingId: string,
-            refundDetails?: { email: string; phone?: string; upiId?: string; note?: string }
-        ): Promise<ApiResponse> {
-            try {
-                const { data } = await api.post<ApiResponse>(
-                    `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/refund-missed`,
-                    { bookingId, refundDetails }
-                );
-                return data;
-            } catch (error: any) {
-                throw new Error(error?.response?.data?.message || "Failed to process refund.");
-            }
+    // -- MENTEE: missed booking ka 100% refund --
+    static async refundMissedSession(
+        sessionId: string,
+        bookingId: string,
+        refundDetails?: { email: string; phone?: string; upiId?: string; note?: string }
+    ): Promise<ApiResponse> {
+        try {
+            const { data } = await api.post<ApiResponse>(
+                `${config.NEXT_PUBLIC_SESSIONS_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_ENDPOINT}/${sessionId}/refund-missed`,
+                { bookingId, refundDetails }
+            );
+            return data;
+        } catch (error: any) {
+            throw new Error(error?.response?.data?.message || "Failed to process refund.");
         }
-    
-        // ── GET SESSION RECEIPT (for completed booking's Download/View) ────
-    // Fetches real booking data (mentee name, price, payment status,
-    // completedAt) to build the receipt shown/downloaded from BookingsPage.
+    }
+
+    // -- GET SESSION RECEIPT (completed booking ke Download/View ke liye) --
+    // Real booking data (mentee name, price, payment status, completedAt)
+    // fetch karta hai, BookingsPage ki receipt banane ke liye.
     static async getSessionReceipt(sessionId: string, bookingId?: string): Promise<ApiResponse> {
         try {
             const { data } = await api.get<ApiResponse>(
@@ -433,15 +432,15 @@ class SessionService {
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    // GROUP SESSIONS — mentor Booking dashboard integration
-    // ══════════════════════════════════════════════════════════════════
+    // ==================================================================
+    // GROUP SESSIONS - mentor Booking dashboard integration
+    // ==================================================================
 
-    // ── GET all group-session participants for the logged-in mentor ────
-    // Backend already shapes each row like a 1:1 booking row
+    // -- GET all group-session participants for the logged-in mentor --
+    // Backend har row ko 1:1 booking row jaisa shape deta hai
     // (bookingId, sessionId, menteeId, menteeName, menteeProfilePhoto,
-    // serviceName, scheduledAt, status, isGroupSession: true) so
-    // BookingsPage.tsx can flatten/merge it directly with 1:1 bookings.
+    // serviceName, scheduledAt, status, isGroupSession: true), taaki
+    // BookingsPage.tsx unhe seedha merge kar sake.
     static async getMentorGroupSessionParticipants(): Promise<ApiResponse> {
         try {
             const { data } = await api.get<ApiResponse>(
@@ -454,7 +453,7 @@ class SessionService {
         }
     }
 
-    // ── START a group session (mentor only) ─────────────────
+    // -- START a group session (mentor only) --
     static async startGroupSession(sessionId: string): Promise<ApiResponse> {
         try {
             const { data } = await api.post<ApiResponse>(
@@ -467,7 +466,7 @@ class SessionService {
         }
     }
 
-    // ── COMPLETE a group session (mentor only) ──────────────
+    // -- COMPLETE a group session (mentor only) --
     static async completeGroupSession(
         sessionId: string,
         payload: { actualDuration?: number; attendees?: string[]; wasSuccessful?: boolean } = {}
@@ -484,7 +483,7 @@ class SessionService {
         }
     }
 
-    // ── ATTEND a group session (accepted mentee while in_progress) ──
+    // -- ATTEND a group session (accepted mentee while in_progress) --
     static async markGroupAttendance(sessionId: string): Promise<ApiResponse> {
         try {
             const { data } = await api.post<ApiResponse>(
@@ -497,7 +496,7 @@ class SessionService {
         }
     }
 
-    // ── CANCEL a group session (mentor only) ────────────────
+    // -- CANCEL a group session (mentor only) --
     static async cancelGroupSession(sessionId: string, reason: string): Promise<ApiResponse> {
         try {
             const { data } = await api.post<ApiResponse>(
@@ -511,13 +510,13 @@ class SessionService {
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    // GROUP SESSIONS — join-request flow (mentee side + mentor decisions)
-    // ══════════════════════════════════════════════════════════════════
+    // ==================================================================
+    // GROUP SESSIONS - join-request flow (mentee side + mentor decisions)
+    // ==================================================================
 
-    // ── MENTEE: send a request to join a group session (PENDING) ───────
-    // Maps to POST /group-sessions/:id/join (backend also aliases /request).
-    // Does NOT confirm a seat — mentor must accept first.
+    // -- MENTEE: join request bhejo (PENDING) --
+    // POST /group-sessions/:id/join (backend /request alias bhi deta hai).
+    // Seat confirm nahi hoti, pehle mentor accept karega.
     static async joinGroupSession(sessionId: string, transactionId?: string): Promise<ApiResponse> {
         try {
             const { data } = await api.post<ApiResponse>(
@@ -533,11 +532,9 @@ class SessionService {
         }
     }
 
-    // ── Get the logged-in user's own group sessions (mentor OR mentee) ──
-    // Maps to GET /group-sessions/my-sessions?role=mentee. For a mentee this
-    // returns full GroupSession docs they've requested/joined — used by
-    // UserDashboardMyBookingsPage.tsx to merge group sessions into the
-    // combined bookings view alongside 1:1 sessions.
+    // -- Logged-in user ke apne group sessions (mentor ya mentee) --
+    // GET /group-sessions/my-sessions?role=mentee. UserDashboardMyBookingsPage.tsx
+    // isse group sessions ko 1:1 sessions ke saath merge karta hai.
     static async getMyGroupSessions(role: "mentor" | "mentee" = "mentee"): Promise<ApiResponse> {
         try {
             const { data } = await api.get<ApiResponse>(
@@ -551,10 +548,9 @@ class SessionService {
         }
     }
 
-    // ── MENTEE: get my own join-request status for a session ───────────
-    // Maps to GET /group-sessions/:id/request. Backend 404s when the
-    // mentee has never requested to join — that's a normal "not requested
-    // yet" state, not an error, so it resolves to null instead of throwing.
+    // -- MENTEE: apna join-request status --
+    // GET /group-sessions/:id/request. Request kabhi nahi bheji to backend 404 deta hai,
+    // wo normal state hai, isliye error ke bajay null return hota hai.
     static async getMyGroupJoinRequestStatus(sessionId: string): Promise<GroupJoinRequestStatus | null> {
         try {
             const { data } = await api.get<ApiResponse>(
@@ -568,9 +564,8 @@ class SessionService {
         }
     }
 
-    // ── MENTOR: all PENDING join requests across my group sessions ─────
-    // Maps to GET /group-sessions/mentor/join-requests. Powers the
-    // Pending tab / Pending stat card in BookingsPage.tsx.
+    // -- MENTOR: apne saare group sessions ki PENDING join requests --
+    // GET /group-sessions/mentor/join-requests. BookingsPage.tsx ke Pending tab ke liye.
     static async getMentorGroupJoinRequests(): Promise<ApiResponse> {
         try {
             const { data } = await api.get<ApiResponse>(
@@ -583,8 +578,8 @@ class SessionService {
         }
     }
 
-    // ── MENTOR: accept a pending join request → mentee becomes participant ──
-    // Maps to PATCH /group-sessions/:id/requests/:menteeId/accept.
+    // -- MENTOR: pending join request accept karo, mentee participant ban jaata hai --
+    // PATCH /group-sessions/:id/requests/:menteeId/accept.
     static async acceptGroupJoinRequest(sessionId: string, menteeId: string): Promise<ApiResponse> {
         try {
             const { data } = await api.patch<ApiResponse>(
@@ -597,8 +592,8 @@ class SessionService {
         }
     }
 
-    // ── MENTOR: reject a pending join request ───────────────────────────
-    // Maps to PATCH /group-sessions/:id/requests/:menteeId/reject.
+    // -- MENTOR: pending join request reject karo --
+    // PATCH /group-sessions/:id/requests/:menteeId/reject.
     static async rejectGroupJoinRequest(sessionId: string, menteeId: string): Promise<ApiResponse> {
         try {
             const { data } = await api.patch<ApiResponse>(
