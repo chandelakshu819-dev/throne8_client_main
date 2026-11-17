@@ -57,6 +57,8 @@ const SeniorBookingDetailsStep: React.FC<SeniorBookingDetailsStepProps> = ({
     }, [userProfileData, user]);
 
     const canContinue = Boolean(formData.name.trim() && formData.email.trim() && formData.phone.trim());
+
+    // 16px font: iPhone par input focus par auto-zoom nahi hota
     const inputStyle: React.CSSProperties = {
         width: "100%",
         padding: "12px 16px",
@@ -64,7 +66,7 @@ const SeniorBookingDetailsStep: React.FC<SeniorBookingDetailsStepProps> = ({
         border: `1px solid ${C.border}`,
         background: C.bg,
         color: C.dark,
-        fontSize: "14px",
+        fontSize: "16px",
         boxSizing: "border-box",
         outline: "none",
     };
@@ -77,24 +79,28 @@ const SeniorBookingDetailsStep: React.FC<SeniorBookingDetailsStepProps> = ({
     const { selectedDate, selectedTime, currentMonth } = calendarData;
 
     return (
-        <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px" }}>
-            <div style={{ maxWidth: "700px", margin: "0 auto", borderRadius: "24px", padding: "40px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)" }}>
-                <div style={{ marginBottom: "16px" }}>
+        <div className="min-h-screen w-full px-3 py-4 sm:px-4 sm:py-8" style={{ background: C.bg }}>
+            <div
+                className="mx-auto w-full max-w-[700px] rounded-2xl p-4 sm:rounded-3xl sm:p-8 lg:p-10"
+                style={{ background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)" }}
+            >
+                <div className="mb-4">
                     <button
                         onClick={onBack}
                         disabled={isSubmitting}
-                        style={{ background: "transparent", border: `1px solid ${C.border}`, cursor: isSubmitting ? "not-allowed" : "pointer", color: C.dark, display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "14px", fontWeight: 600, padding: "8px 16px", borderRadius: "8px" }}
+                        className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold"
+                        style={{ background: "transparent", border: `1px solid ${C.border}`, cursor: isSubmitting ? "not-allowed" : "pointer", color: C.dark }}
                     >
                         <ArrowLeft /> Back
                     </button>
                 </div>
-                <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>Your Details</h2>
-                <p style={{ color: C.mid, fontSize: "13px", marginBottom: "24px" }}>Please fill in your information to complete the booking</p>
+                <h2 className="mb-1 text-xl font-bold sm:text-[22px]" style={{ color: C.dark }}>Your Details</h2>
+                <p className="mb-5 text-[13px] sm:mb-6" style={{ color: C.mid }}>Please fill in your information to complete the booking</p>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
+                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
                     {FIELDS.map(({ label, name, type, placeholder }) => (
-                        <div key={name}>
-                            <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: C.dark, marginBottom: "6px" }}>{label}</label>
+                        <div key={name} className="min-w-0">
+                            <label className="mb-1.5 block text-[13px] font-semibold" style={{ color: C.dark }}>{label}</label>
                             <input
                                 type={type}
                                 name={name}
@@ -107,16 +113,16 @@ const SeniorBookingDetailsStep: React.FC<SeniorBookingDetailsStepProps> = ({
                     ))}
                 </div>
 
-                <div style={{ borderRadius: "16px", padding: "20px", background: C.bg, border: `1px solid ${C.border}`, marginBottom: "24px" }}>
-                    <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "12px" }}>Session Summary</h3>
+                <div className="mb-6 rounded-2xl p-4 sm:p-5" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+                    <h3 className="mb-3 font-bold" style={{ color: C.dark }}>Session Summary</h3>
                     {([
                         ["Service", serviceTitle],
                         ["Date", `${selectedDate} ${MONTHS[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`],
                         ["Time", selectedTime ? formatSlotRange(selectedTime.split(" - ")[0]) : ""],
                     ] as [string, string][]).map(([label, value]) => (
-                        <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: C.dark, marginBottom: "5px" }}>
-                            <span style={{ color: C.mid }}>{label}:</span>
-                            <span style={{ fontWeight: 500 }}>{value}</span>
+                        <div key={label} className="mb-1.5 flex justify-between gap-4 text-[13px]" style={{ color: C.dark }}>
+                            <span className="shrink-0" style={{ color: C.mid }}>{label}:</span>
+                            <span className="min-w-0 break-words text-right font-medium">{value}</span>
                         </div>
                     ))}
                 </div>

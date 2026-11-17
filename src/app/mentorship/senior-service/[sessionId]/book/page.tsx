@@ -1,4 +1,5 @@
 "use client";
+//src/app/mentorship/senior-service/[sessionId]/book/page.tsx
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -36,7 +37,7 @@ export default function SeniorServiceBookingPage() {
 
     useEffect(() => {
         if (!sessionId) return;
-        
+
         SeniorSessionService.getSessionById(sessionId)
             .then(res => {
                 const data = res?.data || res?.session || res;
@@ -68,8 +69,8 @@ export default function SeniorServiceBookingPage() {
 
     if (error || !service) {
         return (
-            <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center gap-4">
-                <p className="text-red-500 font-medium">{error || "Service not found"}</p>
+            <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center gap-4 px-4 text-center">
+                <p className="text-red-500 font-medium break-words">{error || "Service not found"}</p>
                 <button onClick={() => router.back()} className="px-6 py-2 bg-[#4a3728] text-white rounded-xl text-sm font-bold">
                     Go Back
                 </button>
@@ -81,9 +82,8 @@ export default function SeniorServiceBookingPage() {
     // to match SeniorAvailability.mentorId, falling back to mentor.userId or mentor.mentorId.
     const effectiveMentorId: string = service?.mentorId || mentor?.userId || mentor?.mentorId || "";
 
-    // Minimum Presentational Adapter for reused steps.
-    // DO NOT pass the full `service` object into these generic generic steps 
-    // to shield the application from architectural mismatches.
+    // Minimum presentational adapter for reused steps.
+    // Full `service` object ko in generic steps mein pass nahi karte.
     const presentationServiceAdapter = {
         id: service.sessionId || service._id,
         title: service.title,
@@ -96,13 +96,13 @@ export default function SeniorServiceBookingPage() {
         .filter((b: any) => ['pending', 'upcoming', 'confirmed', 'in_progress'].includes(b.status))
         .map((b: any) => {
             const d = new Date(b.scheduledAt);
-            d.setMinutes(d.getMinutes() + 330); 
+            d.setMinutes(d.getMinutes() + 330);
             const y = d.getUTCFullYear();
             const m = String(d.getUTCMonth() + 1).padStart(2, "0");
             const day = String(d.getUTCDate()).padStart(2, "0");
-            
+
             return {
-                slotTime: b.slotTime, 
+                slotTime: b.slotTime,
                 dateStr: `${y}-${m}-${day}`
             };
         });
@@ -146,23 +146,23 @@ export default function SeniorServiceBookingPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#FAF9F6] text-[#4a3728] font-sans pb-20">
+        <div className="min-h-screen w-full overflow-x-hidden bg-[#FAF9F6] text-[#4a3728] font-sans pb-28 lg:pb-20">
             <GlobalStyles />
             <Navigation currentUserId={user?.userId} activeTimezone="IST (UTC+5:30)" />
-            
-            <main className="max-w-7xl mx-auto px-4 pt-16">
-                
+
+            <main className="mx-auto w-full max-w-7xl px-0 sm:px-4 pt-14 sm:pt-16">
+
                 {bookingStep === "calendar" && (
-                    <CalendarStep 
-                        mentorId={effectiveMentorId} 
-                        selectedService={presentationServiceAdapter} 
+                    <CalendarStep
+                        mentorId={effectiveMentorId}
+                        selectedService={presentationServiceAdapter}
                         seniorBookedSlots={activeSeniorBookings}
                         isSeniorService={true}
-                        onBack={() => router.push(`/mentorship/senior-service/${sessionId}`)} 
-                        onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }} 
+                        onBack={() => router.push(`/mentorship/senior-service/${sessionId}`)}
+                        onContinue={(d) => { setCalendarData(d); setBookingStep("details"); }}
                     />
                 )}
-                
+
                 {bookingStep === "details" && calendarData && (
                     <SeniorBookingDetailsStep
                         serviceTitle={service.title}
@@ -172,21 +172,21 @@ export default function SeniorServiceBookingPage() {
                         onContinue={bookSeniorSession}
                     />
                 )}
-                
+
                 {bookingStep === "confirmation" && (
-                    <ConfirmationStep 
-                        selectedService={presentationServiceAdapter} 
-                        calendarData={calendarData} 
-                        formData={formData} 
+                    <ConfirmationStep
+                        selectedService={presentationServiceAdapter}
+                        calendarData={calendarData}
+                        formData={formData}
                         bookingResponse={bookingResponse}
-                        onReset={resetBooking} 
+                        onReset={resetBooking}
                     />
                 )}
 
                 {toastMsg && (
-                    <Toast 
-                        message={toastMsg.message} 
-                        onClose={() => setToastMsg(null)} 
+                    <Toast
+                        message={toastMsg.message}
+                        onClose={() => setToastMsg(null)}
                     />
                 )}
             </main>

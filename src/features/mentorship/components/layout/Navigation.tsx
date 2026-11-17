@@ -4,7 +4,6 @@
 import React, { useEffect, useState } from "react";
 import { LogOut } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
-import SearchBar from "@/features/profile/components/home/SearchBar";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfileData } from "@/features/profile/hooks/useProfileData";
 import { useNavbarData } from "@/features/profile/components/home/NavbarProvider";
@@ -23,6 +22,8 @@ interface NavigationProps {
   currentUserId?: string;
   isMentor?: boolean;
   mentorUserId?: string;
+  // Mobile par neeche tab bar dikhana hai ya nahi (default: haan)
+  showMobileNav?: boolean;
 }
 
 const ALL_NAV_ITEMS = [
@@ -66,6 +67,7 @@ export default function Navigation({
   currentUserId,
   isMentor = false,
   mentorUserId,
+  showMobileNav = true,
 }: NavigationProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -174,88 +176,133 @@ export default function Navigation({
   };
 
   return (
-    <nav className="fixed top-0 left-0 w-full bg-[#F6EDE8] text-[#4a3728] border-b border-[#E5D9CE] shadow-sm z-50">
-      <div className="w-full px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center h-16 gap-2 w-full justify-between">
-          {/* Left: Throne8 Wordmark */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <BrandWordmark href={HOME_PATH} />
-          </div>
+    <>
+      <nav className="fixed top-0 left-0 z-50 w-full border-b border-[#E5D9CE] bg-[#F6EDE8] text-[#4a3728] shadow-sm">
+        <div className="w-full px-3 sm:px-6 lg:px-8">
+          <div className="flex h-14 w-full items-center justify-between gap-2 sm:h-16">
+            {/* Left: Throne8 Wordmark */}
+            <div className="flex min-w-0 flex-shrink-0 items-center gap-2">
+              <BrandWordmark href={HOME_PATH} />
+            </div>
 
-          {/* Middle: Navigation Items */}
-          <div className="hidden lg:flex items-center justify-center gap-1 flex-1 min-w-0 h-16">
+            {/* Middle: Navigation Items (desktop) */}
+            <div className="hidden h-16 min-w-0 flex-1 items-center justify-center gap-1 lg:flex">
+              {NAV_ITEMS.map((item) => {
+                const active = isActive(item);
+                return (
+                  <button
+                    key={item}
+                    onClick={() => handleNavigation(item)}
+                    className={`relative flex min-w-[60px] flex-col items-center justify-center gap-0.5
+                                rounded-xl px-3 py-1.5 transition-colors duration-200
+                                ${
+                                  active
+                                    ? "bg-[#4a3728] text-[#F6EDE8]"
+                                    : "text-[#4a3728]/70 hover:bg-[#EFE3D8] hover:text-[#4a3728]"
+                                }`}
+                  >
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={active ? 2.1 : 1.8}
+                        d={getIconPath(item)}
+                      />
+                    </svg>
+                    <span className="whitespace-nowrap text-[10px] font-medium leading-none">
+                      {getShortLabel(item)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Right: Profile Dropdown + Sign Out */}
+            <div className="ml-auto flex min-w-0 flex-shrink-0 items-center gap-2">
+              <div className="min-w-0">
+                <ProfileDropdown
+                  user={user}
+                  isAuthenticated={!!user}
+                  profileImageUrl={
+                    navbarProfileData?.profileImage || profileImageUrl
+                  }
+                  fullName={fullName || undefined}
+                />
+              </div>
+
+              {/* Sign Out: sirf logged-in user ko dikhao */}
+              {user && (
+                <button
+                  onClick={handleSignOut}
+                  disabled={isLoggingOut}
+                  title="Sign Out"
+                  aria-label="Sign Out"
+                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#E5D9CE] bg-white px-2.5 py-2 text-xs font-semibold text-[#B4442E] transition-colors hover:bg-[#FBEAE6] disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="hidden sm:inline">
+                    {isLoggingOut ? "Signing out..." : "Sign Out"}
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Mobile / tablet bottom tab bar (lg se neeche) */}
+      {showMobileNav && (
+        <div
+          className="fixed bottom-0 left-0 z-50 w-full border-t border-[#E5D9CE] bg-[#F6EDE8] lg:hidden"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
+          <div className="flex w-full items-stretch justify-between overflow-x-auto px-1">
             {NAV_ITEMS.map((item) => {
               const active = isActive(item);
               return (
                 <button
                   key={item}
                   onClick={() => handleNavigation(item)}
-                  className={`relative flex flex-col items-center justify-center gap-0.5
-                                               px-3 py-1.5 rounded-xl min-w-[60px]
-                                               transition-colors duration-200
-                                               ${
-                                                 active
-                                                   ? "bg-[#4a3728] text-[#F6EDE8]"
-                                                   : "text-[#4a3728]/70 hover:text-[#4a3728] hover:bg-[#EFE3D8]"
-                                               }`}
+                  className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 transition-colors
+                              ${
+                                active
+                                  ? "text-[#4a3728]"
+                                  : "text-[#4a3728]/60 hover:text-[#4a3728]"
+                              }`}
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                  <span
+                    className={`flex h-7 w-10 items-center justify-center rounded-full ${
+                      active ? "bg-[#4a3728] text-[#F6EDE8]" : ""
+                    }`}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={active ? 2.1 : 1.8}
-                      d={getIconPath(item)}
-                    />
-                  </svg>
-                  <span className="text-[10px] font-medium leading-none whitespace-nowrap">
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={active ? 2.1 : 1.8}
+                        d={getIconPath(item)}
+                      />
+                    </svg>
+                  </span>
+                  <span className="w-full truncate text-center text-[10px] font-medium leading-none">
                     {getShortLabel(item)}
                   </span>
                 </button>
               );
             })}
           </div>
-
-          {/* Right: Search Bar + Timezone Badge + Profile Dropdown */}
-          <div className="flex items-center gap-2.5 flex-shrink-0 ml-auto">
-            {/* Search sirf tab jab profile feature on ho (search result profile page kholta hai) */}
-            {/* {isFeatureEnabled("profile") && (
-              <div className="hidden sm:flex items-center flex-shrink-0 w-36 xl:w-52 rounded-full bg-white border border-[#E5D9CE] focus-within:border-[#4a3728] transition-colors px-1">
-                <SearchBar currentUserId={targetUserId} />
-              </div>
-            )} */}
-
-            {/* Profile Dropdown */}
-            <ProfileDropdown
-              user={user}
-              isAuthenticated={!!user}
-              profileImageUrl={
-                navbarProfileData?.profileImage || profileImageUrl
-              }
-              fullName={fullName || undefined}
-            />
-
-            {/* Sign Out: sirf logged-in user ko dikhao */}
-            {user && (
-              <button
-                onClick={handleSignOut}
-                disabled={isLoggingOut}
-                title="Sign Out"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-[#E5D9CE] bg-white text-[#B4442E] text-xs font-semibold hover:bg-[#FBEAE6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">
-                  {isLoggingOut ? "Signing out..." : "Sign Out"}
-                </span>
-              </button>
-            )}
-          </div>
         </div>
-      </div>
-    </nav>
+      )}
+    </>
   );
 }
