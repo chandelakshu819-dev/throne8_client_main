@@ -12,8 +12,8 @@ import {
   Check
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/core/store/store.hooks";
-import { updateGroup, deleteGroup, leaveGroup, selectMyGroups, selectMyGroupsLoading, selectGroupMembers, selectGroupMembersLoading, selectAllUsers, selectAllUsersLoading, selectPendingRequests, selectPendingRequestsLoading, selectRespondToRequestLoading, selectAttendanceStatus, selectAttendancePercentage } from "@/hooks/studyGroup/features/groups/groupsSlice";
-import { deleteGroupThunk, fetchAllUsersThunk, fetchAttendancePercentageThunk, fetchAttendanceStatusThunk, fetchMyGroupsThunk, getGroupPendingRequestsThunk, leaveGroupThunk, removeMemberThunk, respondToJoinRequestThunk, updateGroupThunk } from "@/hooks/studyGroup/features/groups/group.thunks";
+import { updateGroup, deleteGroup, leaveGroup, selectMyGroups, selectMyGroupsLoading, selectGroupMembers, selectGroupMembersLoading, selectAllUsers, selectAllUsersLoading, selectPendingRequests, selectPendingRequestsLoading, selectRespondToRequestLoading, selectAttendanceStatus, selectAttendancePercentage, selectUserStreak } from "@/hooks/studyGroup/features/groups/groupsSlice";
+import { deleteGroupThunk, fetchAllUsersThunk, fetchUserStreakThunk, fetchAttendancePercentageThunk, fetchAttendanceStatusThunk, fetchMyGroupsThunk, getGroupPendingRequestsThunk, leaveGroupThunk, removeMemberThunk, respondToJoinRequestThunk, updateGroupThunk } from "@/hooks/studyGroup/features/groups/group.thunks";
 import {useAuth} from "@/features/auth/hooks/useAuth";
 import { selectTimerStats } from "@/hooks/studyGroup/features/timer/timerSlice";
 import { getTimerStatsThunk } from "@/hooks/studyGroup/features/timer/timer.thunks";
@@ -37,6 +37,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
   const pendingRequestsMap = useAppSelector(selectPendingRequests);
   const pendingRequestsLoading = useAppSelector(selectPendingRequestsLoading);
   const respondLoading = useAppSelector(selectRespondToRequestLoading);
+  const timerStats = useAppSelector(selectTimerStats);
+  const attendancePercentage = useAppSelector(selectAttendancePercentage);
+  const userStreak = useAppSelector(selectUserStreak);
 
   // Current group ki pending requests
   const pendingRequests = pendingRequestsMap[(group as any)?.groupId] ?? [];
@@ -129,6 +132,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
     if (isOpen && group) {
       fetchEnrichedMembers((group as any).groupId);
       dispatch(fetchAllUsersThunk());
+      dispatch(fetchUserStreakThunk());
       if ((group as any).leaderId === userId) {
         dispatch(getGroupPendingRequestsThunk({ groupId: (group as any).groupId }));
       }
@@ -643,7 +647,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
             <div className="bg-[#f6ede8] rounded-lg p-3 sm:p-4">
               <h3 className="font-semibold text-[#4a3728] mb-2 sm:mb-3 text-sm sm:text-base">Group Information</h3>
               <div className="space-y-2 text-xs sm:text-sm">
-                {[['Category', group.category], ['Daily Goal', `${group.goalHours} hours`], ['Capacity', `${group.members}/${group.capacity}`], ['Visibility', group.visibility], ['Camera', group.cameraRequired ? 'Required' : 'Optional'], ['Joined', group.joinedDate]].map(([l, v]) => (
+                {[
+                  ['Category', group.category || '—'],
+                  ['Admin', group.leaderId === userId ? 'You' : (getUserInfo(group.leaderId)?.name || '—')],
+                  ['Daily Goal', group.goalHours ? `${group.goalHours} hours` : '—'],
+                  ['Capacity', `${groupMembers.length || (group as any).currentMemberCount || group.members || 0}/${group.capacity ?? '—'}`],
+                  ['Visibility', group.visibility || '—'],
+                  ['Camera', group.cameraRequired ? 'Required' : 'Optional'],
+                  ['Joined', (() => {
+                    const mine = groupMembers.find((m: any) => m.userId === userId) as any;
+                    const joined = mine?.joinedAt || group.joinedDate;
+                    return joined ? new Date(joined).toLocaleDateString() : '—';
+                  })()],
+                ].map(([l, v]) => (
                   <div key={l} className="flex justify-between gap-2"><span className="text-[#6b5847]">{l}:</span><span className="font-semibold text-[#4a3728] text-right">{v}</span></div>
                 ))}
               </div>
@@ -651,7 +667,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
             <div className="bg-[#f6ede8] rounded-lg p-3 sm:p-4">
               <h3 className="font-semibold text-[#4a3728] mb-2 sm:mb-3 text-sm sm:text-base">Your Stats</h3>
               <div className="space-y-2 text-xs sm:text-sm">
-                {[['Study Time', `${group.studyTime} hours`], ['Attendance', `${group.attendance}%`], ['Streak', `${group.streak} days`], ['Rank', `#${group.rank}`]].map(([l, v]) => (
+                {[
+                  ['Total Study Time', timerStats ? `${(timerStats.totalDurationInHours ?? 0).toFixed(1)} hours` : '—'],
+                  ['Overall Attendance', attendancePercentage?.overallPercentage != null ? `${attendancePercentage.overallPercentage.toFixed(1)}%` : '—'],
+                  ['Day Streak', `${userStreak ?? 0} days`],
+                  ['Rank', group.rank ? `#${group.rank}` : '—'],
+                ].map(([l, v]) => (
                   <div key={l} className="flex justify-between gap-2"><span className="text-[#6b5847]">{l}:</span><span className="font-semibold text-[#4a3728]">{v}</span></div>
                 ))}
               </div>
