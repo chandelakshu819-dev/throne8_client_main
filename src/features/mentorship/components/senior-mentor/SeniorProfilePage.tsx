@@ -548,9 +548,9 @@ export default function SeniorProfilePage({
       } else if (section === "links") {
         if (
           draftLinkedin &&
-          !/^https?:\/\/(www\.)?linkedin\.com\/.+/i.test(draftLinkedin.trim())
+          !/^https?:\/\/([a-z]{2,3}\.)?linkedin\.com\/(in|pub)\/[^\s/?#]+\/?([?#]\S*)?$/i.test(draftLinkedin.trim())
         ) {
-          throw new Error("Please enter a valid LinkedIn URL (e.g. https://linkedin.com/in/...).");
+          throw new Error("Please enter your LinkedIn profile URL (e.g. https://www.linkedin.com/in/username), not the LinkedIn feed or home page.");
         }
         if (
           draftGithub &&
