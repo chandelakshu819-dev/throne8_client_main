@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Clock, FileText, User, Image as ImageIcon } from 'lucide-react';
 import SeniorSessionService from '@/lib/api/seniorSession.service';
 
@@ -25,6 +25,8 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
     const [outcomesText, setOutcomesText] = useState('');
     const [prereqText, setPrereqText] = useState('');
     const [image, setImage] = useState<File | null>(null);
+    // Thumbnail preview: naya chosen file ka local preview (ya edit me purani saved image)
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [customCategory, setCustomCategory] = useState('');
     const [editCategory, setEditCategory] = useState('');
     const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
@@ -52,6 +54,19 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
             setPrereqText((es.prerequisites || []).join('\n'));
         }
     }, [editSession]);
+
+    useEffect(() => {
+        if (!image) {
+            setImagePreview(null);
+            return;
+        }
+        const url = URL.createObjectURL(image);
+        setImagePreview(url);
+        return () => URL.revokeObjectURL(url);
+    }, [image]);
+
+    const existingThumbnail: string | null = (editSession as any)?.thumbnailImage || null;
+    const previewSrc = imagePreview || existingThumbnail;
 
     const getTitlePlaceholder = (cat: string) => {
         if (cat.includes('Technical') || cat.includes('DSA')) return 'e.g. DSA Problem Solving & Interview Prep';
@@ -156,12 +171,17 @@ export default function CreateOneToOneSession({ category, onClose, onSuccess, ed
                             Service Thumbnail (Optional)
                         </div>
                         <label className="w-full h-32 flex flex-col items-center justify-center border-2 border-dashed border-[#e0d8cf] hover:border-[#4a3728] rounded-[16px] bg-[#fbf7f3] cursor-pointer transition-colors group relative overflow-hidden">
-                           {image ? (
-                             <div className="flex flex-col items-center gap-2">
-                               <ImageIcon className="w-6 h-6 text-[#4a3728]" />
-                               <span className="text-sm font-bold text-[#4a3728] text-center px-4 max-w-full truncate">{image.name}</span>
-                               <span className="text-xs text-[#8a7a6a] font-medium">Click to change</span>
-                             </div>
+                           {previewSrc ? (
+                             <>
+                               <img src={previewSrc} alt="Thumbnail preview" className="absolute inset-0 w-full h-full object-cover" />
+                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                                 <span className="text-sm font-bold text-white text-center px-4 max-w-full truncate">{image ? image.name : 'Current thumbnail'}</span>
+                                 <span className="text-xs text-white/90 font-medium">Click to change</span>
+                               </div>
+                               {image && (
+                                 <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-[#16a34a] text-white text-[11px] font-bold shadow">Image selected ✓</span>
+                               )}
+                             </>
                            ) : (
                              <>
                                <ImageIcon className="w-6 h-6 text-[#8a7a6a] group-hover:text-[#4a3728] mb-2 transition-colors" />
