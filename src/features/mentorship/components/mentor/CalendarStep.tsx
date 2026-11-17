@@ -1,7 +1,6 @@
 // feature  / mentorship /components/mentor-profile/mentor/CalendarStep.tsx
 "use client";
 
-
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, ArrowLeft } from "./Icons";
@@ -212,10 +211,8 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                 })
                 .catch(() => setAvailability([]));
         } else {
-            // Use getMentorAvailability — the same endpoint the Availability dashboard uses.
+            // Use getMentorAvailability: same endpoint the Availability dashboard uses.
             // This correctly scopes results to THIS mentor and THIS month.
-            // getAllAvailabilityFromDB is a global endpoint (limit:100 across ALL mentors)
-            // and cannot guarantee this mentor's records are included.
             AvailabilityService.getMentorAvailability(mentorId, { startDate, endDate })
                 .then((res: any) => {
                     // Response shape: { data: { availabilities: [...] } }
@@ -266,7 +263,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
             if (!a?.date) return false;
             const d = new Date(a.date);
             if (isNaN(d.getTime())) return false;
-            
+
             const y = d.getFullYear();
             const m = String(d.getMonth() + 1).padStart(2, "0");
             const day = String(d.getDate()).padStart(2, "0");
@@ -300,48 +297,59 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
     }, [year, month]);
 
     return (
-        <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px" }}>
-            <div style={{ maxWidth: "960px", margin: "0 auto", borderRadius: "24px", padding: "40px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)" }}>
-                <div style={{ marginBottom: "16px" }}>
+        <div className="min-h-screen w-full px-3 py-4 sm:px-4 sm:py-8" style={{ background: C.bg }}>
+            <div
+                className="mx-auto w-full max-w-[960px] rounded-2xl p-4 sm:rounded-3xl sm:p-8 lg:p-10"
+                style={{ background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)" }}
+            >
+                <div className="mb-4">
                     <button
                         onClick={onBack}
-                        style={{
-                            background: "transparent",
-                            border: `1px solid ${C.border}`,
-                            cursor: "pointer",
-                            color: C.dark,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            padding: "8px 16px",
-                            borderRadius: "8px",
-                        }}
+                        className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold"
+                        style={{ background: "transparent", border: `1px solid ${C.border}`, cursor: "pointer", color: C.dark }}
                     >
                         <ArrowLeft /> Back
                     </button>
                 </div>
-                <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>Select Date &amp; Time</h2>
-                <p style={{ color: C.mid, fontSize: "13px", marginBottom: "24px" }}>Booking: {selectedService?.title}{serviceDuration > 0 ? ` (${serviceDuration} min)` : ""}</p>
-                {/* 2-Column Grid Layout */}
-                <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 350px) 1fr", gap: "48px", alignItems: "start" }}>
+                <h2 className="mb-1 text-xl font-bold sm:text-[22px]" style={{ color: C.dark }}>Select Date &amp; Time</h2>
+                <p className="mb-5 break-words text-[13px] sm:mb-6" style={{ color: C.mid }}>
+                    Booking: {selectedService?.title}{serviceDuration > 0 ? ` (${serviceDuration} min)` : ""}
+                </p>
+
+                {/* Mobile: stack, Desktop: 2 column */}
+                <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(280px,350px)_1fr] lg:gap-12">
                     {/* LEFT COLUMN - CALENDAR */}
-                    <div style={{ maxWidth: "350px", width: "100%" }}>
+                    <div className="w-full min-w-0 lg:max-w-[350px]">
                         {/* Month Nav */}
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                            <button className="text-[#4a3728]" onClick={() => setCurrentMonth(new Date(year, month - 1))} style={{ padding: "8px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.bg, cursor: "pointer" }}><ChevronLeft /></button>
-                            <span style={{ fontWeight: "bold", color: C.dark, fontSize: "16px" }}>{MONTHS[month]} {year}</span>
-                            <button className="text-[#4a3728]" onClick={() => setCurrentMonth(new Date(year, month + 1))} style={{ padding: "8px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.bg, cursor: "pointer" }}><ChevronRight /></button>
+                        <div className="mb-4 flex items-center justify-between">
+                            <button
+                                className="text-[#4a3728]"
+                                onClick={() => setCurrentMonth(new Date(year, month - 1))}
+                                aria-label="Previous month"
+                                style={{ padding: "8px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.bg, cursor: "pointer" }}
+                            >
+                                <ChevronLeft />
+                            </button>
+                            <span className="text-base font-bold" style={{ color: C.dark }}>{MONTHS[month]} {year}</span>
+                            <button
+                                className="text-[#4a3728]"
+                                onClick={() => setCurrentMonth(new Date(year, month + 1))}
+                                aria-label="Next month"
+                                style={{ padding: "8px", borderRadius: "8px", border: `1px solid ${C.border}`, background: C.bg, cursor: "pointer" }}
+                            >
+                                <ChevronRight />
+                            </button>
                         </div>
 
                         {/* Day Labels */}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: "4px", marginBottom: "8px" }}>
-                            {DAYS.map((d) => <div key={d} style={{ textAlign: "center", fontSize: "12px", fontWeight: 600, color: C.mid, padding: "4px 0" }}>{d}</div>)}
+                        <div className="mb-2 grid grid-cols-7 gap-1">
+                            {DAYS.map((d) => (
+                                <div key={d} className="py-1 text-center text-[11px] font-semibold sm:text-xs" style={{ color: C.mid }}>{d}</div>
+                            ))}
                         </div>
 
                         {/* Day Cells */}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: "4px", marginBottom: "32px" }}>
+                        <div className="mb-6 grid grid-cols-7 gap-1 lg:mb-8">
                             {Array.from({ length: startingDay }).map((_, i) => <div key={`e${i}`} />)}
                             {Array.from({ length: daysInMonth }).map((_, i) => {
                                 const day: number = i + 1;
@@ -355,6 +363,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                                         key={day}
                                         disabled={isPast}
                                         onClick={() => !isPast && setSelectedDate(day)}
+                                        className="text-sm"
                                         style={{
                                             aspectRatio: "1",
                                             borderRadius: "8px",
@@ -387,27 +396,29 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                     </div>
 
                     {/* RIGHT COLUMN - TIME SLOTS & BUTTON */}
-                    <div>
-                        <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "20px", fontSize: "16px" }}>Total Available Time Slots: {availableSlotsCount}</h3>
+                    <div className="min-w-0">
+                        <h3 className="mb-4 text-base font-bold sm:mb-5" style={{ color: C.dark }}>
+                            Total Available Time Slots: {availableSlotsCount}
+                        </h3>
 
                         {!selectedDate && (
-                            <p className="text-[#4a3728] font-bold" style={{ textAlign: "center", fontSize: "18px", padding: "16px", background: C.bg, borderRadius: "8px" }}>
+                            <p className="rounded-lg p-4 text-center text-base font-bold text-[#4a3728] sm:text-lg" style={{ background: C.bg }}>
                                 Please select a Date to see Available Slots
                             </p>
                         )}
 
                         {selectedDate && noAvailability && (
-                            <p className="text-[#4a3728] font-bold" style={{ textAlign: "center", fontSize: "18px", padding: "16px", background: C.bg, borderRadius: "8px" }}>
+                            <p className="rounded-lg p-4 text-center text-base font-bold text-[#4a3728] sm:text-lg" style={{ background: C.bg }}>
                                 No Availability Set for {MONTHS[month]} {selectedDate}, {year} by the Mentor.
                             </p>
                         )}
                         {selectedDate && !noAvailability && allGeneratedSlots.length === 0 && (
-                            <p className="text-[#4a3728] font-bold" style={{ textAlign: "center", fontSize: "18px", padding: "16px", background: C.bg, borderRadius: "8px" }}>
+                            <p className="rounded-lg p-4 text-center text-base font-bold text-[#4a3728] sm:text-lg" style={{ background: C.bg }}>
                                 No {serviceDuration > 0 ? `${serviceDuration}-minute ` : ""}slots configured for {MONTHS[month]} {selectedDate}, {year}.
                             </p>
                         )}
                         {selectedDate && !noAvailability && allGeneratedSlots.length > 0 && (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px", marginBottom: "24px" }}>
+                            <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3">
                                 {allGeneratedSlots.map((slot) => {
                                     const time = `${slot.startTime} - ${slot.endTime}`;
                                     const isDisabled = slot.isBooked || slot.isBlocked || slot.status === 'full' || slot.status === 'booked' || slot.status === 'past';
@@ -421,6 +432,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                                             onClick={() => !isDisabled && setSelectedTime(time)}
                                             style={{
                                                 padding: "10px 8px",
+                                                minHeight: "44px",
                                                 borderRadius: "8px",
                                                 fontSize: "13px",
                                                 fontWeight: 500,
@@ -458,13 +470,16 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                         )}
 
                         {selectedDate && selectedTime && (
-                            <button onClick={() => onContinue({
-                                selectedDate,
-                                selectedTime,
-                                currentMonth,
-                                availabilityId: selectedAvailabilityId,
-                                slotTime: selectedTime,
-                            })} style={{ ...btnPrimary, width: "100%", padding: "14px", borderRadius: "12px", fontSize: "15px" }}>
+                            <button
+                                onClick={() => onContinue({
+                                    selectedDate,
+                                    selectedTime,
+                                    currentMonth,
+                                    availabilityId: selectedAvailabilityId,
+                                    slotTime: selectedTime,
+                                })}
+                                style={{ ...btnPrimary, width: "100%", padding: "14px", borderRadius: "12px", fontSize: "15px" }}
+                            >
                                 Continue to Details →
                             </button>
                         )}
