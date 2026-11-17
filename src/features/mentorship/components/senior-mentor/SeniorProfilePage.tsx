@@ -418,6 +418,11 @@ export default function SeniorProfilePage({
   const [draftLinkedin, setDraftLinkedin] = useState("");
   const [draftGithub, setDraftGithub] = useState("");
   const [draftPortfolio, setDraftPortfolio] = useState("");
+  // Resume / Proof document — edit mode me naya file choose karne ke liye
+  const [draftResumeFile, setDraftResumeFile] = useState<File | null>(null);
+  const [draftProofFile, setDraftProofFile] = useState<File | null>(null);
+  const resumeInputRef = useRef<HTMLInputElement>(null);
+  const proofInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize draft values when entering a section edit
   const startEditSection = (section: string) => {
@@ -461,6 +466,8 @@ export default function SeniorProfilePage({
       setDraftLinkedin(data.linkedinUrl || "");
       setDraftGithub(data.githubUrl || "");
       setDraftPortfolio(data.portfolioUrl || "");
+      setDraftResumeFile(null);
+      setDraftProofFile(null);
     }
   };
 
@@ -554,9 +561,32 @@ export default function SeniorProfilePage({
         payload.linkedinUrl = draftLinkedin.trim();
         payload.githubUrl = draftGithub.trim();
         payload.portfolioUrl = draftPortfolio.trim();
+
+        const MAX_DOC_SIZE = 10 * 1024 * 1024; // 10MB
+        if (draftResumeFile) {
+          if (!/\.(pdf|doc|docx)$/i.test(draftResumeFile.name)) {
+            throw new Error("Resume must be a PDF, DOC or DOCX file.");
+          }
+          if (draftResumeFile.size > MAX_DOC_SIZE) throw new Error("Resume must be under 10MB.");
+        }
+        if (draftProofFile) {
+          if (!/\.(pdf|png|jpe?g)$/i.test(draftProofFile.name)) {
+            throw new Error("Proof document must be a PDF, PNG or JPG file.");
+          }
+          if (draftProofFile.size > MAX_DOC_SIZE) throw new Error("Proof document must be under 10MB.");
+        }
       }
 
       setSavingSection(section);
+      // Links section me agar naya Resume / Proof choose kiya hai to pehle wo upload karo
+      if (section === "links" && (draftResumeFile || draftProofFile)) {
+        await SeniorMentorApplicationService.updateMyDocuments({
+          ...(draftResumeFile ? { resume: draftResumeFile } : {}),
+          ...(draftProofFile ? { proofDocument: draftProofFile } : {}),
+        });
+        setDraftResumeFile(null);
+        setDraftProofFile(null);
+      }
       const updated = await SeniorMentorApplicationService.updateMyApplication(payload);
       setData(updated);
       if (onUpdateApplication) onUpdateApplication(updated);
@@ -1552,6 +1582,74 @@ export default function SeniorProfilePage({
                     placeholder="https://yourportfolio.com"
                     className="w-full px-3.5 py-2 bg-[#fbf7f3] border border-[#e0d8cf] rounded-xl text-xs font-semibold text-[#4a3728] outline-none focus:ring-2 focus:ring-[#4a3728]"
                   />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold uppercase text-[#a08070] block mb-1">
+                    Resume (PDF / DOC / DOCX)
+                  </label>
+                  <input
+                    ref={resumeInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => setDraftResumeFile(e.target.files?.[0] || null)}
+                  />
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => resumeInputRef.current?.click()}
+                      className="flex items-center gap-2 px-3.5 py-2 bg-[#fbf7f3] border border-[#e0d8cf] rounded-xl text-xs font-bold text-[#4a3728] hover:bg-[#f3ece4] transition-colors"
+                    >
+                      <FileText className="w-4 h-4" /> {draftResumeFile ? "Change file" : resumeUrl ? "Replace file" : "Upload file"}
+                    </button>
+                    <span className="text-xs text-[#7a5c3e] break-all">
+                      {draftResumeFile ? draftResumeFile.name : resumeUrl ? "Current file uploaded" : "No file chosen"}
+                    </span>
+                    {draftResumeFile && (
+                      <button
+                        type="button"
+                        onClick={() => { setDraftResumeFile(null); if (resumeInputRef.current) resumeInputRef.current.value = ""; }}
+                        className="text-[11px] font-bold text-[#dc2626] underline"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#a08070] mt-1">Max 10MB. Leave empty to keep the existing resume.</p>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold uppercase text-[#a08070] block mb-1">
+                    Proof Document (PDF / PNG / JPG)
+                  </label>
+                  <input
+                    ref={proofInputRef}
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    className="hidden"
+                    onChange={(e) => setDraftProofFile(e.target.files?.[0] || null)}
+                  />
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => proofInputRef.current?.click()}
+                      className="flex items-center gap-2 px-3.5 py-2 bg-[#fbf7f3] border border-[#e0d8cf] rounded-xl text-xs font-bold text-[#4a3728] hover:bg-[#f3ece4] transition-colors"
+                    >
+                      <FileText className="w-4 h-4" /> {draftProofFile ? "Change file" : proofDocumentUrl ? "Replace file" : "Upload file"}
+                    </button>
+                    <span className="text-xs text-[#7a5c3e] break-all">
+                      {draftProofFile ? draftProofFile.name : proofDocumentUrl ? "Current file uploaded" : "No file chosen"}
+                    </span>
+                    {draftProofFile && (
+                      <button
+                        type="button"
+                        onClick={() => { setDraftProofFile(null); if (proofInputRef.current) proofInputRef.current.value = ""; }}
+                        className="text-[11px] font-bold text-[#dc2626] underline"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#a08070] mt-1">Max 10MB. Leave empty to keep the existing proof document.</p>
                 </div>
               </div>
             }
