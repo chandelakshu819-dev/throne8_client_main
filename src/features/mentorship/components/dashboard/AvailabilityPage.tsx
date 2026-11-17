@@ -431,7 +431,7 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
       if (selectedDate !== null) {
         return `${existingRecordForSelectedDate ? "Update" : "Save"} ${selectedDate} ${monthNames[currentDate.getMonth()].slice(0, 3)}`;
       }
-      if (pendingDays.length === 0) return "Select a date";
+      if (pendingDays.length === 0) return "Save";
       const names = pendingDays.map((d: any) => d.day.slice(0, 3));
       return pendingDays.length <= 2
         ? `Save all ${names.join(" & ")} · ${monthNames[currentDate.getMonth()].slice(0, 3)}`
