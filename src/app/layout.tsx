@@ -5,6 +5,7 @@ import "remixicon/fonts/remixicon.css";
 import ReduxProvider from "@/store/providers/ReduxProvider";
 import NavbarProvider from "@/features/profile/components/home/NavbarProvider";
 import MentorshipCallProvider from "@/providers/MentorshipCallProvider";
+import LiveRoomNotificationProvider from "@/providers/LiveRoomNotificationProvider";
 import AuthProvider from "@/providers/AuthProvider";
 
 export const metadata: Metadata = {
@@ -27,7 +28,9 @@ export default function RootLayout({
         <ReduxProvider>
           <AuthProvider>
             <MentorshipCallProvider>
-              <NavbarProvider>{children}</NavbarProvider>
+              <LiveRoomNotificationProvider>
+                <NavbarProvider>{children}</NavbarProvider>
+              </LiveRoomNotificationProvider>
             </MentorshipCallProvider>
           </AuthProvider>
         </ReduxProvider>

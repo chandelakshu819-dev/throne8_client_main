@@ -285,6 +285,30 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   // True while Start/Join Live Room is running, so a double click can't start two joins
   const liveRoomJoinInFlight = useRef(false);
   const isUserInLiveRoom = showLiveRoomView;
+
+  // Live room started / ended by the host (socket only): update this page at once
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleLiveStarted = (payload: { groupId?: string }) => {
+      if (payload?.groupId !== groupId) return;
+      dispatch(fetchGroupActiveLiveRoomThunk(groupId));
+    };
+    const handleLiveEnded = (payload: { groupId?: string }) => {
+      if (payload?.groupId !== groupId) return;
+      leaveWebRTCRoomRef.current?.();
+      setShowLiveRoomView(false);
+      dispatch(clearActiveLiveRoom());
+    };
+
+    socket.on("live-room:started", handleLiveStarted);
+    socket.on("live-room:ended", handleLiveEnded);
+    return () => {
+      socket.off("live-room:started", handleLiveStarted);
+      socket.off("live-room:ended", handleLiveEnded);
+    };
+  }, [groupId, dispatch]);
   const rawOnlineMembers = useAppSelector(selectOnlineMembers(groupId));
   const onlineMembers = useMemo(() => {
     if (currentUserId && !rawOnlineMembers.includes(currentUserId)) {
