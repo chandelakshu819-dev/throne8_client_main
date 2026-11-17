@@ -1,6 +1,6 @@
-// components/mentor-profile/booking/ConfirmationStep.tsx
-
+//src/features/mentorship/components/mentor/ConfirmationStep.tsx
 import React from "react";
+import { CheckCircle2, Download, Mail, CalendarPlus } from "lucide-react";
 import { MONTHS, C, btnPrimary, formatSlotRange } from "../../types/data";
 import type { Service, CalendarData, FormData } from "../../types/types";
 
@@ -18,8 +18,6 @@ const ConfirmationStep: React.FC<ConfirmationStepProps> = ({ selectedService, ca
     const year: number | undefined = calendarData?.currentMonth.getFullYear();
 
     // Derive backend status explicitly. Fall back to implicit confirmation if no payload.
-    // The backend payload might be { success: true, data: { ... bookings: [{status: "pending"...}] } }
-    // Or just { status: "pending" } depending on object wrapping. It adds it to the end of bookings usually.
     let derivedStatus = "confirmed"; // traditional fallback
     if (bookingResponse) {
         // SeniorMentor returns session in data, bookings inside data.bookings
@@ -40,11 +38,11 @@ const ConfirmationStep: React.FC<ConfirmationStepProps> = ({ selectedService, ca
         ...(formData?.email ? ([["Email:", formData.email]] as [string, string][]) : []),
         ...(!isRes ? ([
             ["Status:", (
-                <span style={{ 
-                    background: isPending ? "#fff3e0" : "#e8f5e9", 
-                    color: isPending ? "#e65100" : "#2e7d32", 
-                    padding: "4px 8px", borderRadius: "12px", 
-                    fontSize: "12px", fontWeight: "bold" 
+                <span style={{
+                    background: isPending ? "#fff3e0" : "#e8f5e9",
+                    color: isPending ? "#e65100" : "#2e7d32",
+                    padding: "4px 8px", borderRadius: "12px",
+                    fontSize: "12px", fontWeight: "bold"
                 }}>
                     {isPending ? "Pending" : "Upcoming"}
                 </span>
@@ -53,37 +51,56 @@ const ConfirmationStep: React.FC<ConfirmationStepProps> = ({ selectedService, ca
     ];
 
     return (
-        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg, padding: "32px 16px" }}>
-            <div style={{ maxWidth: "480px", width: "100%", borderRadius: "24px", padding: "48px 40px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)", textAlign: "center" }}>
-                <div style={{ fontSize: "64px", marginBottom: "16px" }}>{isRes ? "📥" : "✅"}</div>
-                <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "8px" }}>
-                    {isRes ? "Download Ready! 🎉" : (isPending ? "Booking Request Sent! 🎉" : "Booking Confirmed! 🎉")}
+        <div className="flex min-h-screen w-full items-center justify-center px-3 py-6 sm:px-4 sm:py-8" style={{ background: C.bg }}>
+            <div
+                className="w-full max-w-[480px] rounded-2xl p-5 text-center sm:rounded-3xl sm:p-10"
+                style={{ background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(74,55,40,0.15)" }}
+            >
+                <div className="mb-4 flex justify-center">
+                    {isRes ? (
+                        <Download className="h-14 w-14 sm:h-16 sm:w-16" style={{ color: C.dark }} />
+                    ) : (
+                        <CheckCircle2 className="h-14 w-14 sm:h-16 sm:w-16" style={{ color: "#2e7d32" }} />
+                    )}
+                </div>
+                <h2 className="mb-2 text-xl font-bold sm:text-[22px]" style={{ color: C.dark }}>
+                    {isRes ? "Download Ready!" : (isPending ? "Booking Request Sent!" : "Booking Confirmed!")}
                 </h2>
-                <p style={{ color: C.mid, marginBottom: "24px", fontSize: "14px" }}>
+                <p className="mb-6 text-sm" style={{ color: C.mid }}>
                     {isRes ? "Your resource is ready to download" : (isPending ? "Your session request has been successfully submitted." : "Your session has been successfully booked")}
                 </p>
 
-                <div style={{ borderRadius: "16px", padding: "20px", background: C.bg, border: `1px solid ${C.border}`, marginBottom: "20px", textAlign: "left" }}>
-                    <h3 style={{ fontWeight: "bold", color: C.dark, marginBottom: "12px" }}>{isRes ? "Resource Details" : "Booking Details"}</h3>
+                <div className="mb-5 rounded-2xl p-4 text-left sm:p-5" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+                    <h3 className="mb-3 font-bold" style={{ color: C.dark }}>{isRes ? "Resource Details" : "Booking Details"}</h3>
                     {rows.map(([k, v]) => (
-                        <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: C.dark, marginBottom: "5px" }}>
-                            <span style={{ color: C.mid }}>{k}</span><span style={{ fontWeight: 500 }}>{v}</span>
+                        <div key={k} className="mb-1.5 flex items-start justify-between gap-4 text-[13px]" style={{ color: C.dark }}>
+                            <span className="shrink-0" style={{ color: C.mid }}>{k}</span>
+                            <span className="min-w-0 break-words text-right font-medium">{v}</span>
                         </div>
                     ))}
                 </div>
 
-                <div style={{ borderRadius: "12px", padding: "14px 16px", background: "#e8f5e9", border: "1px solid #c8e6c9", marginBottom: "24px", textAlign: "left" }}>
+                <div className="mb-6 rounded-xl p-3.5 text-left sm:px-4" style={{ background: "#e8f5e9", border: "1px solid #c8e6c9" }}>
                     {isRes ? (
-                        <p style={{ margin: 0, fontSize: "13px", color: "#2e7d32" }}>📥 Your download will begin shortly</p>
+                        <p className="m-0 flex items-start gap-2 text-[13px]" style={{ color: "#2e7d32" }}>
+                            <Download className="mt-0.5 h-4 w-4 shrink-0" />
+                            <span>Your download will begin shortly</span>
+                        </p>
                     ) : (
                         <>
-                            <p style={{ margin: "0 0 6px 0", fontSize: "13px", color: "#2e7d32" }}>📧 A confirmation email has been sent to {formData?.email}</p>
-                            <p style={{ margin: 0, fontSize: "13px", color: "#2e7d32" }}>📅 Add this session to your calendar to get reminded</p>
+                            <p className="mb-1.5 flex items-start gap-2 text-[13px]" style={{ color: "#2e7d32" }}>
+                                <Mail className="mt-0.5 h-4 w-4 shrink-0" />
+                                <span className="min-w-0 break-words">A confirmation email has been sent to {formData?.email}</span>
+                            </p>
+                            <p className="m-0 flex items-start gap-2 text-[13px]" style={{ color: "#2e7d32" }}>
+                                <CalendarPlus className="mt-0.5 h-4 w-4 shrink-0" />
+                                <span>Add this session to your calendar to get reminded</span>
+                            </p>
                         </>
                     )}
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div className="flex flex-col gap-2.5">
                     <button onClick={onReset} style={{ ...btnPrimary, width: "100%", padding: "14px", borderRadius: "12px", fontSize: "15px" }}>
                         {isRes ? "Get Another Resource" : "View My Booking"}
                     </button>

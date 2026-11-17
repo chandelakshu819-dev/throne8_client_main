@@ -618,8 +618,8 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
                 <button
                   type="button"
                   onClick={handleSaveConfig}
-                  disabled={isSaving || !selectedDateStr}
-                  title={!selectedDateStr ? "Select a date on the calendar first" : "Save changes"}
+                  disabled={isSaving}
+                  title="Save changes"
                   className="px-3.5 py-1.5 rounded-lg text-white text-xs font-bold flex items-center gap-1.5 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90"
                   style={{ backgroundColor: "#4a3728" }}
                 >
