@@ -168,10 +168,20 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
         }
       });
    
+     // ✅ NEW: "last saved" snapshot of the weekly pattern. Jab koi din ON kiya
+     // jaye (ya uska time badla jaye) to wo snapshot se alag ho jata hai —
+     // isi se pata chalta hai ki kaun-kaun se din ke liye poore mahine ki
+     // availability save karna baaki hai (Save button tab bhi active rahe,
+     // chahe calendar se koi date select na ho).
+     const [savedSchedule, setSavedSchedule] = useState<any[]>(weekSchedule);
+
      // Jab mentorData baad me (async) load ho, tab bhi backend se sync kar do
      useEffect(() => {
        const fromBackend = buildScheduleFromBackend();
-       if (fromBackend) setWeekSchedule(fromBackend);
+       if (fromBackend) {
+         setWeekSchedule(fromBackend);
+         setSavedSchedule(fromBackend);
+       }
        // eslint-disable-next-line react-hooks/exhaustive-deps
      }, [mentorData?.availability]);
    
@@ -393,6 +403,41 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
     // sirf ANDAR WALE box (scheduleListRef) ko scroll karo — page/window
     // scroll ko bilkul touch nahi karte (scrollIntoView use nahi kiya,
     // kyunki wo ancestor page ko bhi scroll kar sakta hai).
+    // ✅ NEW: weekdays jo ON hain aur jinka pattern last-saved snapshot se
+    // alag hai (naya ON kiya ya time badla). Inhi ke liye "Save month" chalega.
+    const daySignature = (d: any) =>
+      d
+        ? JSON.stringify({
+            enabled: !!d.enabled,
+            ranges: (d.timeRanges || []).map((r: any) => [r.startTime, r.endTime]),
+          })
+        : "";
+    const pendingDays = useMemo(
+      () =>
+        weekSchedule.filter(
+          (d: any) =>
+            d.enabled &&
+            daySignature(d) !== daySignature(savedSchedule.find((s: any) => s.day === d.day))
+        ),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [weekSchedule, savedSchedule]
+    );
+    // Save tab active hoga jab: (a) calendar se date select ho, YA (b) koi
+    // din toggle ON / edit hua ho aur uska month-save pending ho.
+    const canSave = selectedDate !== null || pendingDays.length > 0;
+    // (function hai, value nahi: monthNames niche define hota hai)
+    const getSaveButtonLabel = () => {
+      if (isSaving) return "Saving...";
+      if (selectedDate !== null) {
+        return `${existingRecordForSelectedDate ? "Update" : "Save"} ${selectedDate} ${monthNames[currentDate.getMonth()].slice(0, 3)}`;
+      }
+      if (pendingDays.length === 0) return "Select a date";
+      const names = pendingDays.map((d: any) => d.day.slice(0, 3));
+      return pendingDays.length <= 2
+        ? `Save all ${names.join(" & ")} · ${monthNames[currentDate.getMonth()].slice(0, 3)}`
+        : `Save ${pendingDays.length} days · ${monthNames[currentDate.getMonth()].slice(0, 3)}`;
+    };
+
     const dayRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const scheduleListRef = useRef<HTMLDivElement>(null);
 
@@ -498,10 +543,16 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
           });
           setSaveMessage({ type: "success", text: `Created for ${date.toDateString()} (${slots.length} slots)` });
         }
+        // ✅ NEW: sirf is weekday ko "saved" mark karo — baaki pending days
+        // (jinka month-save baaki hai) dirty hi rahenge.
+        setSavedSchedule(prev => prev.map((d: any) => (d.day === dayName ? daySched : d)));
       } else {
-        const enabledDaySchedules = weekSchedule.filter(d => d.enabled);
+        // ✅ NEW: date select nahi hai → sirf wahi din save hote hain jo ab
+        // toggle ON / edit kiye gaye hain (poore mahine ke us weekday ki
+        // saari dates), na ki hamesha saare enabled days.
+        const enabledDaySchedules = pendingDays;
         if (enabledDaySchedules.length === 0) {
-          setSaveMessage({ type: "error", text: "Enable at least one day." });
+          setSaveMessage({ type: "error", text: "Turn on a day (or pick a date) first." });
           return;
         }
         const y = currentDate.getFullYear();
@@ -535,9 +586,14 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
 
         const tasks: Promise<any>[] = [];
         let datesQueued = 0;
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
 
         for (let day = 1; day <= lastDay; day++) {
           const dateObj = new Date(y, currentDate.getMonth(), day);
+          // ✅ NEW: beeti hui dates aur blocked dates ko bulk save me skip karo
+          if (dateObj < todayStart) continue;
+          if (existingRecordByDay.get(day)?.isDateBlocked) continue;
           const weekday = dateObj.toLocaleDateString("en-US", { weekday: "long" });
           const sched: any = dayNameToSchedule.get(weekday);
           if (!sched) continue;
@@ -572,10 +628,21 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
 
         const results = await Promise.all(tasks);
         const failed = results.filter((r: any) => r?.__failed).length;
-        setSaveMessage({
-          type: failed > 0 ? "error" : "success",
-          text: `Bulk: ${datesQueued - failed} saved, ${failed} failed`,
-        });
+        const dayLabel = enabledDaySchedules.map((d: any) => d.day + "s").join(", ");
+        if (datesQueued === 0) {
+          setSaveMessage({ type: "error", text: `No upcoming ${dayLabel} left in ${monthNames[currentDate.getMonth()]}.` });
+        } else {
+          setSaveMessage({
+            type: failed > 0 ? "error" : "success",
+            text: failed > 0
+              ? `${dayLabel}: ${datesQueued - failed} saved, ${failed} failed`
+              : `All ${dayLabel} of ${monthNames[currentDate.getMonth()]} saved (${datesQueued} dates)`,
+          });
+        }
+        // Poora success hone par hi in days ko "saved" mark karo, warna retry ho sake.
+        if (failed === 0) {
+          setSavedSchedule(prev => prev.map((d: any) => enabledDaySchedules.find((p: any) => p.day === d.day) || d));
+        }
       }
       await fetchMonthAvailability();
       await fetchStats();
@@ -967,21 +1034,19 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                 // pehle "Save Month" (bulk save) hamesha enabled tha, jisse
                 // mentor galti se poore mahine ke liye save kar deti thi
                 // bina specific date pe click kiye.
-                disabled={isSaving || selectedDate === null}
+                disabled={isSaving || !canSave}
                 title={
-                  selectedDate === null
-                    ? "Select a date on the calendar first"
-                    : `Save availability for ${selectedDate} ${monthNames[currentDate.getMonth()]}`
+                  selectedDate !== null
+                    ? `Save availability for ${selectedDate} ${monthNames[currentDate.getMonth()]}`
+                    : pendingDays.length > 0
+                    ? `Save ${pendingDays.map((d: any) => d.day + "s").join(", ")} for all of ${monthNames[currentDate.getMonth()]}`
+                    : "Turn on a day, or select a date on the calendar"
                 }
                 className="px-3.5 py-1.5 rounded-lg text-white text-xs font-bold flex items-center gap-1.5 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90"
                 style={{ backgroundColor: '#4a3728' }}
               >
                                     <Check className="w-3.5 h-3.5" />
-                {isSaving
-                  ? "Saving..."
-                  : selectedDate
-                  ? `${existingRecordForSelectedDate ? "Update" : "Save"} ${selectedDate} ${monthNames[currentDate.getMonth()].slice(0, 3)}`
-                  : "Select a date"}
+                {getSaveButtonLabel()}
               </button>
               </div>
             </div>
