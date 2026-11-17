@@ -422,9 +422,9 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
       // eslint-disable-next-line react-hooks/exhaustive-deps
       [weekSchedule, savedSchedule]
     );
-    // Save tab active hoga jab: (a) calendar se date select ho, YA (b) koi
-    // din toggle ON / edit hua ho aur uska month-save pending ho.
-    const canSave = selectedDate !== null || pendingDays.length > 0;
+    // Save button ab hamesha active hai — date select karna zaroori nahi.
+    // Date select nahi hai to pending days (ya pending na ho to saare ON days)
+    // poore mahine ke liye save hote hain.
     // (function hai, value nahi: monthNames niche define hota hai)
     const getSaveButtonLabel = () => {
       if (isSaving) return "Saving...";
@@ -550,9 +550,10 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
         // ✅ NEW: date select nahi hai → sirf wahi din save hote hain jo ab
         // toggle ON / edit kiye gaye hain (poore mahine ke us weekday ki
         // saari dates), na ki hamesha saare enabled days.
-        const enabledDaySchedules = pendingDays;
+        const enabledDaySchedules =
+          pendingDays.length > 0 ? pendingDays : weekSchedule.filter((d: any) => d.enabled);
         if (enabledDaySchedules.length === 0) {
-          setSaveMessage({ type: "error", text: "Turn on a day (or pick a date) first." });
+          setSaveMessage({ type: "error", text: "Turn on at least one day first." });
           return;
         }
         const y = currentDate.getFullYear();
@@ -1030,17 +1031,14 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
               <button
                 type="button"
                 onClick={handleSaveAvailability}
-                // ✅ FIX: date select kiye bina button disable rahega —
-                // pehle "Save Month" (bulk save) hamesha enabled tha, jisse
-                // mentor galti se poore mahine ke liye save kar deti thi
-                // bina specific date pe click kiye.
-                disabled={isSaving || !canSave}
+                // date select karna ab zaroori nahi — validation hata di gayi
+                disabled={isSaving}
                 title={
                   selectedDate !== null
                     ? `Save availability for ${selectedDate} ${monthNames[currentDate.getMonth()]}`
                     : pendingDays.length > 0
                     ? `Save ${pendingDays.map((d: any) => d.day + "s").join(", ")} for all of ${monthNames[currentDate.getMonth()]}`
-                    : "Turn on a day, or select a date on the calendar"
+                    : "Save weekly schedule"
                 }
                 className="px-3.5 py-1.5 rounded-lg text-white text-xs font-bold flex items-center gap-1.5 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90"
                 style={{ backgroundColor: '#4a3728' }}
