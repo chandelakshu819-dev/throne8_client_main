@@ -24,6 +24,10 @@ import { STUDY_PAGE_WRAP } from "@/features/study-group/constants/pageLayout";
 
 
 
+// The API sends isCreator for the logged-in user; fall back to comparing leaderId
+const isGroupLeader = (g: any, uid?: string): boolean =>
+  !!g && (g.isCreator === true || (!!uid && g.leaderId === uid));
+
 // ─── SettingsModal (100% unchanged) ───────────────────────────
 const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, group, onUpdate, onDelete, onLeave }) => {
   const dispatch = useAppDispatch();
@@ -133,7 +137,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
       fetchEnrichedMembers((group as any).groupId);
       dispatch(fetchAllUsersThunk());
       dispatch(fetchUserStreakThunk());
-      if ((group as any).leaderId === userId) {
+      if (isGroupLeader(group, userId)) {
         dispatch(getGroupPendingRequestsThunk({ groupId: (group as any).groupId }));
       }
     }
@@ -146,13 +150,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
       <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-5xl my-4 sm:my-8 max-h-[95vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-[#e0d8cf] p-3 sm:p-4 flex justify-between items-start sm:items-center rounded-t-xl sm:rounded-t-2xl z-10">
           <div className="flex-1 min-w-0 pr-2">
-            <h2 className="text-lg sm:text-xl font-bold text-[#4a3728] truncate">{group.leaderId === userId ? 'Group Management' : 'Group Info'}</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-[#4a3728] truncate">{isGroupLeader(group, userId) ? 'Group Management' : 'Group Info'}</h2>
             <p className="text-xs sm:text-sm text-[#6b5847] truncate">{group.title}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0 p-1"><X size={20} className="sm:w-6 sm:h-6" /></button>
         </div>
 
-        {group.leaderId === userId ? (
+        {isGroupLeader(group, userId) ? (
           <>
             <div className="border-b border-[#e0d8cf] bg-[#f6ede8] px-2 sm:px-4 overflow-x-auto">
               <div
@@ -295,7 +299,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
                               </div>
                             </div>
 
-                            {(group as any).leaderId === userId && member.userId !== userId && (
+                            {isGroupLeader(group, userId) && member.userId !== userId && (
 
                               <button
                                 onClick={() => handleRemoveMember(member.userId)}
@@ -649,7 +653,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
               <div className="space-y-2 text-xs sm:text-sm">
                 {[
                   ['Category', group.category || '—'],
-                  ['Admin', group.leaderId === userId ? 'You' : (getUserInfo(group.leaderId)?.name || '—')],
+                  ['Admin', isGroupLeader(group, userId) ? 'You' : (group.leaderId ? (getUserInfo(group.leaderId)?.name || '—') : '—')],
                   ['Daily Goal', group.goalHours ? `${group.goalHours} hours` : '—'],
                   ['Capacity', `${groupMembers.length || (group as any).currentMemberCount || group.members || 0}/${group.capacity ?? '—'}`],
                   ['Visibility', group.visibility || '—'],
@@ -709,7 +713,7 @@ const GroupCard: React.FC<GroupCardProps> = ({ userId, group, timerStats, groupS
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h3 className="text-base sm:text-lg font-bold text-[#4a3728] break-words">{group.title}</h3>
-            {group.leaderId === userId && (
+            {isGroupLeader(group, userId) && (
               <div className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 bg-[#8b7355] rounded-full flex-shrink-0">
                 <Crown size={10} className="sm:w-3 sm:h-3 text-white" />
                 <span className="text-[10px] sm:text-xs font-bold text-white">Creator</span>
@@ -770,7 +774,7 @@ const GroupCard: React.FC<GroupCardProps> = ({ userId, group, timerStats, groupS
         </span>
       </div>
       <button onClick={(e) => { e.stopPropagation(); onSettingsClick(group); }} className="px-2 sm:px-3 py-1 sm:py-1.5 bg-[#f6ede8] hover:bg-[#e0d8cf] text-[#4a3728] rounded-lg text-[10px] sm:text-xs font-semibold transition-all flex items-center gap-1">
-        <Settings size={12} className="sm:w-[14px] sm:h-[14px]" /><span className="hidden xs:inline">{group.leaderId === userId ? 'Manage' : 'Info'}</span>
+        <Settings size={12} className="sm:w-[14px] sm:h-[14px]" /><span className="hidden xs:inline">{isGroupLeader(group, userId) ? 'Manage' : 'Info'}</span>
       </button>
     </div>
   </div>
@@ -823,16 +827,16 @@ export default function MyGroups() {
       group.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (group.description ?? '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesTab = activeTab === "all" ||
-      (activeTab === "created" && group.leaderId === user?.userId) ||
-      (activeTab === "joined" && group.leaderId !== user?.userId);
+      (activeTab === "created" && isGroupLeader(group, user?.userId)) ||
+      (activeTab === "joined" && !isGroupLeader(group, user?.userId));
     return matchesSearch && matchesTab;
   });
 
 
   const stats = {
     totalGroups: groups.length,
-    createdGroups: groups.filter(g => g.leaderId === user?.userId).length,
-    joinedGroups: groups.filter(g => g.leaderId !== user?.userId).length,
+    createdGroups: groups.filter(g => isGroupLeader(g, user?.userId)).length,
+    joinedGroups: groups.filter(g => !isGroupLeader(g, user?.userId)).length,
     totalStudyHours: timerStats?.totalDurationInHours ?? 0,
     avgAttendance: attendancePercentage?.overallPercentage ?? 0,
   };
