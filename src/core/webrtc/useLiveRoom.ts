@@ -37,6 +37,9 @@ import { getSocket } from '@/core/realtime/socket.client';
 export type ConnectionQuality = 'excellent' | 'good' | 'poor' | 'disconnected';
 export type RoomMode = 'p2p' | 'sfu';
 
+// Must stay well under the server's 120s presence TTL
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
 export interface RoomEndedInfo {
   sessionId?: string;
   bookingId?: string;
@@ -165,6 +168,11 @@ interface PeerMeta {
 
 type QueuedCandidate = RTCIceCandidateInit & { pcId?: string };
 
+/** Result of asking the server to let us into the room. */
+export type JoinOutcome =
+  | { status: 'ok' }
+  | { status: 'rejected' | 'timeout'; message: string };
+
 const newPcId = (): string =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
@@ -253,6 +261,10 @@ export function useLiveRoom({
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const statsTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Presence heartbeat: server drops a participant after ~120s without 'liveroom:heartbeat'
+  const heartbeatTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const joinedRef = useRef(false);
+  const joinInFlightRef = useRef<Promise<JoinOutcome> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioAnalysers = useRef<Map<string, AnalyserNode>>(new Map());
   const reconnectTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -460,7 +472,10 @@ export function useLiveRoom({
     (
       peerId: string,
       peerUserName: string | undefined,
-      { initiator }: { initiator: boolean }
+      {
+        initiator,
+        initialState,
+      }: { initiator: boolean; initialState?: { cameraOn?: boolean; micOn?: boolean } }
     ): RTCPeerConnection => {
       // Replace any existing connection to this peer
       const hadExisting = peerConnections.current.has(peerId);
@@ -558,8 +573,11 @@ export function useLiveRoom({
             userId: peerId,
             userName: peerUserName,
             stream: null,
-            cameraOn: true,
-            micOn: true,
+            // Unknown until the server / the peer tells us: assume OFF rather than showing a
+            // "camera on" tile with no video. The real state arrives with the participants list
+            // or the peer's own announcement right after they join.
+            cameraOn: initialState?.cameraOn ?? false,
+            micOn: initialState?.micOn ?? false,
             isSpeaking: false,
             quality: 'good',
             connectionState: 'new',
@@ -933,14 +951,76 @@ const toggleMic = useCallback(async () => {
   //   [roomId, userId, userName, startLocalStream]
   // );
 
-// REPLACE WITH:
-const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<boolean> => {
+  // ── Join (socket handshake) ──────────────────────────────
+  // requestJoin asks the server to put us in the room and WAITS for its answer
+  // (accepted = participants list, refused = error event, or a timeout).
+  //   • Safe to call twice: while a join is running everyone shares the same attempt, and once
+  //     we're in it does nothing. (The page used to emit join-live-room by hand, so a double
+  //     click sent two joins.)
+  //   • After a successful join it tells the room our camera/mic state, so others don't have to
+  //     guess it (they used to assume "on" for everybody).
+  const requestJoin = useCallback(
+    (opts: { cameraOn?: boolean; micOn?: boolean } = {}): Promise<JoinOutcome> => {
+      if (joinedRef.current) return Promise.resolve({ status: 'ok' });
+      if (joinInFlightRef.current) return joinInFlightRef.current;
 
+      const socket = getSocket();
+      if (!socket) {
+        return Promise.resolve({
+          status: 'rejected',
+          message: 'Socket not available. Please refresh the page.',
+        });
+      }
 
+      const attempt = new Promise<JoinOutcome>((resolve) => {
+        const cleanup = () => {
+          clearTimeout(timer);
+          socket.off('room-participants-list', onList);
+          socket.off('error', onError);
+        };
+        const onList = (p: { roomId?: string; canonicalRoomId?: string; effectiveRoomId?: string }) => {
+          if (p?.roomId && p.roomId !== roomId && p.canonicalRoomId !== roomId && p.effectiveRoomId !== roomId) return;
+          cleanup();
+          resolve({ status: 'ok' });
+        };
+        const onError = (p: { event?: string; message?: string }) => {
+          if (p?.event !== 'join-live-room') return;
+          cleanup();
+          const message = p.message?.includes('not a member of this group')
+            ? 'Unable to join the room. Please verify your session.'
+            : p.message || 'Could not join the room.';
+          resolve({ status: 'rejected', message });
+        };
+        const timer = setTimeout(() => {
+          cleanup();
+          resolve({ status: 'timeout', message: 'Connection timed out. Please try again.' });
+        }, 8000);
+
+        socket.on('room-participants-list', onList);
+        socket.on('error', onError);
+        socket.emit('join-live-room', { roomId, userId, userName });
+      })
+        .then((outcome) => {
+          if (outcome.status === 'ok') {
+            joinedRef.current = true;
+            socket.emit('toggle-camera', { roomId, cameraOn: !!opts.cameraOn });
+            socket.emit('toggle-mic', { roomId, micOn: !!opts.micOn });
+          }
+          return outcome;
+        })
+        .finally(() => {
+          joinInFlightRef.current = null;
+        });
+
+      joinInFlightRef.current = attempt;
+      return attempt;
+    },
+    [roomId, userId, userName]
+  );
+
+  const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<boolean> => {
     console.log('[LiveRoom] joinRoom called', { roomId, userId, userName });
     setRoomEnded(null); // naye join pe purana "ended" state reset
-    
-    
 
     // Guard: roomId empty hone par join mat karo
     if (!roomId) {
@@ -981,42 +1061,14 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
       return false;
     }
 
-    // REPLACE WITH:
     console.log('[LiveRoom] Emitting join-live-room with roomId:', roomId);
+    const joinResult = await requestJoin({ cameraOn: withCamera, micOn: withMic });
 
-    // Server accept kare to 'room-participants-list' bhejta hai, reject kare to
-    // 'error' (event: 'join-live-room'). Dono me se ek ka wait karo.
-    const joinResult = await new Promise<'ok' | 'rejected' | 'timeout'>((resolve) => {
-      const cleanup = () => {
-        clearTimeout(timer);
-        socket.off('room-participants-list', onList);
-        socket.off('error', onError);
-      };
-      const onList = (p: { roomId?: string; canonicalRoomId?: string; effectiveRoomId?: string }) => {
-        if (p?.roomId && p.roomId !== roomId && p.canonicalRoomId !== roomId && p.effectiveRoomId !== roomId) return;
-        cleanup();
-        resolve('ok');
-      };
-      const onError = (p: { event?: string; message?: string }) => {
-        if (p?.event !== 'join-live-room') return;
-        cleanup();
-        const msg = p.message?.includes('not a member of this group')
-          ? 'Unable to join the room. Please verify your session.'
-          : (p.message || 'Could not join the room.');
-        setError(msg);
-        resolve('rejected');
-      };
-      const timer = setTimeout(() => {
-        cleanup();
-        resolve('timeout');
-      }, 8000);
-
-      socket.on('room-participants-list', onList);
-      socket.on('error', onError);
-      socket.emit('join-live-room', { roomId, userId, userName });
-    });
-
-    if (joinResult === 'rejected') {
+    if (joinResult.status !== 'ok') {
+      if (joinResult.status === 'timeout') {
+        console.error('[LiveRoom] join-live-room: timeout, treating as failed');
+        setPeers(new Map());
+      }
       // getUserMedia ho chuka tha: camera/mic light band karo
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
@@ -1024,32 +1076,26 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
       setIsCameraOn(false);
       setIsMicOn(false);
       setIsConnecting(false);
-      return false;
-    }
-    if (joinResult === 'timeout') {
-      console.error('[LiveRoom] join-live-room: timeout, treating as failed');
-      localStreamRef.current?.getTracks().forEach((t) => t.stop());
-      localStreamRef.current = null;
-      setLocalStream(null);
-      setPeers(new Map());
-      setIsCameraOn(false);
-      setIsMicOn(false);
-      setIsConnecting(false);
-      setError('Connection timed out. Please try again.');
+      setError(joinResult.message);
       return false;
     }
 
-
-    
     setIsConnecting(false);
     return true;
-  }, [roomId, userId, userName, startLocalStream]);
+  }, [roomId, userId, userName, startLocalStream, requestJoin]);
   
 
   // ── Leave live room ───────────────────────────────────────
   const leaveRoom = useCallback(() => {
     const socket = getSocket();
     socket?.emit('leave-live-room', { roomId });
+    joinedRef.current = false;
+    joinInFlightRef.current = null;
+
+    if (heartbeatTimerRef.current) {
+      clearInterval(heartbeatTimerRef.current);
+      heartbeatTimerRef.current = null;
+    }
 
     // Stop all media
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
@@ -1099,10 +1145,14 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
       userId: remoteUserId,
       userName: remoteUserName,
       socketId: remoteSocketId,
+      camOn: remoteCamOn,
+      micOn: remoteMicOn,
     }: {
       userId: string;
       userName?: string;
       socketId?: string;
+      camOn?: boolean;
+      micOn?: boolean;
     }) => {
       if (!isMounted.current || !remoteUserId || remoteUserId === userId) return;
 
@@ -1114,7 +1164,17 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
         existing.connectionState !== 'failed' &&
         existing.connectionState !== 'closed';
       if (!usable) {
-        createPeerConnection(remoteUserId, remoteUserName, { initiator: true });
+        createPeerConnection(remoteUserId, remoteUserName, {
+          initiator: true,
+          initialState: { cameraOn: remoteCamOn, micOn: remoteMicOn },
+        });
+      }
+      // The list is the server's current snapshot: it also corrects a peer we already know
+      if (remoteCamOn !== undefined || remoteMicOn !== undefined) {
+        updatePeer(remoteUserId, {
+          ...(remoteCamOn !== undefined ? { cameraOn: remoteCamOn } : {}),
+          ...(remoteMicOn !== undefined ? { micOn: remoteMicOn } : {}),
+        });
       }
 
       onPeerJoined?.({
@@ -1122,8 +1182,8 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
         userId: remoteUserId,
         userName: remoteUserName,
         stream: null,
-        cameraOn: true,
-        micOn: true,
+        cameraOn: !!remoteCamOn,
+        micOn: !!remoteMicOn,
         isSpeaking: false,
         quality: 'good',
         connectionState: 'new',
@@ -1140,9 +1200,13 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
     const handlePeerAnnounced = ({
       userId: remoteUserId,
       userName: remoteUserName,
+      cameraOn: announcedCam,
+      micOn: announcedMic,
     }: {
       userId: string;
       userName?: string;
+      cameraOn?: boolean;
+      micOn?: boolean;
     }) => {
       if (!isMounted.current || !remoteUserId || remoteUserId === userId) return;
 
@@ -1154,8 +1218,8 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
             userId: remoteUserId,
             userName: remoteUserName,
             stream: null,
-            cameraOn: true,
-            micOn: true,
+            cameraOn: !!announcedCam, // real state follows via user-camera-toggle / mic-toggle
+            micOn: !!announcedMic,
             isSpeaking: false,
             quality: 'good',
             connectionState: 'new',
@@ -1169,8 +1233,8 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
         userId: remoteUserId,
         userName: remoteUserName,
         stream: null,
-        cameraOn: true,
-        micOn: true,
+        cameraOn: !!announcedCam,
+        micOn: !!announcedMic,
         isSpeaking: false,
         quality: 'good',
         connectionState: 'new',
@@ -1346,8 +1410,25 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
     const handleRoomParticipants = ({
       participants,
     }: {
-      participants: Array<{ socketId: string; userId: string; userName?: string }>;
+      participants: Array<{
+        socketId: string;
+        userId: string;
+        userName?: string;
+        camOn?: boolean;
+        micOn?: boolean;
+      }>;
     }) => {
+      // The server only sends this to the joiner, so it marks "we are in the room".
+      // Start the presence heartbeat here so it works for every join path
+      // (the group page emits join-live-room directly, bypassing joinRoom).
+      // The server prunes participants after ~120s without a heartbeat.
+      if (roomId && !heartbeatTimerRef.current) {
+        heartbeatTimerRef.current = setInterval(() => {
+          const hbSocket = getSocket();
+          if (hbSocket?.connected) hbSocket.emit('liveroom:heartbeat', { roomId });
+        }, HEARTBEAT_INTERVAL_MS);
+      }
+
       // For each existing participant, initiate offer
       participants.forEach((p) => {
         if (p.socketId === socket.id) return; // skip self
@@ -1414,6 +1495,7 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
     attachLocalMedia,
     flushIceQueue,
     runSerial,
+    updatePeer,
     onPeerJoined,
     onPeerLeft,
   ]);
@@ -1458,6 +1540,7 @@ const joinRoom = useCallback(async (withCamera = true, withMic = true): Promise<
 
     // Actions
     joinRoom,
+    requestJoin,
     leaveRoom,
     toggleCamera,
     toggleMic,

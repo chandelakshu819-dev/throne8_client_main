@@ -11,6 +11,7 @@ import {
   Star,
 } from "lucide-react";
 import QueryService, { QueryItem } from "@/lib/api/query.service";
+import { optimizeByPreset } from "@/shared/utils/cloudinary";
 
 type QueryTab = "all" | "pending" | "answered" | "expired";
 
@@ -42,6 +43,9 @@ export default function UserDashboardQueriesPage() {
 
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Mentor photo load fail hone par initial fallback dikhane ke liye
+  const [photoErrors, setPhotoErrors] = useState<Record<string, boolean>>({});
 
   // Follow-up modal
   const [followUpTarget, setFollowUpTarget] = useState<string | null>(null);
@@ -141,7 +145,13 @@ export default function UserDashboardQueriesPage() {
       closeFeedbackModal();
       await fetchQueries();
     } catch (err: any) {
-      alert(err.message || "Failed to submit feedback.");
+      if (String(err?.message || "").toLowerCase().includes("already")) {
+        // Pehle se rating saved hai, modal band karke list refresh karo
+        closeFeedbackModal();
+        await fetchQueries();
+      } else {
+        alert(err.message || "Failed to submit feedback.");
+      }
     } finally {
       setActionLoading(null);
     }
@@ -265,16 +275,30 @@ export default function UserDashboardQueriesPage() {
             {currentQueries.map((q) => {
               const sb = statusBadge[q.status] ?? statusBadge.pending;
               const canAskFollowUp = q.status === "answered" && !q.followUp?.question;
-              const canGiveFeedback = q.status === "answered" && !q.feedback;
+              const rating = q.feedback?.rating ?? 0;
+              const canGiveFeedback = q.status === "answered" && !rating;
 
               return (
                 <div key={q.queryId} className="p-5 flex gap-4 transition-colors hover:bg-[#fbf7f3]">
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-                    style={{ backgroundColor: "#4a3728" }}
-                  >
-                    {mentorName(q)[0]?.toUpperCase() ?? "?"}
-                  </div>
+                  {q.mentor?.photoUrl && !photoErrors[q.queryId] ? (
+                    <img
+                      src={optimizeByPreset(q.mentor.photoUrl, "avatar")}
+                      alt={mentorName(q)}
+                      loading="lazy"
+                      onError={() =>
+                        setPhotoErrors((prev) => ({ ...prev, [q.queryId]: true }))
+                      }
+                      className="w-10 h-10 rounded-full object-cover shrink-0"
+                      style={{ border: "1px solid #e0d8cf" }}
+                    />
+                  ) : (
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+                      style={{ backgroundColor: "#4a3728" }}
+                    >
+                      {mentorName(q)[0]?.toUpperCase() ?? "?"}
+                    </div>
+                  )}
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-3 mb-1.5">
@@ -317,19 +341,19 @@ export default function UserDashboardQueriesPage() {
                       </div>
                     )}
 
-                    {q.feedback && (
+                    {rating > 0 && (
                       <div className="flex items-center gap-1.5 mt-1">
                         {Array(5).fill(0).map((_, i) => (
                           <Star
                             key={i}
                             className="w-3.5 h-3.5"
                             style={{
-                              fill: i < q.feedback!.rating ? '#c9a87c' : 'none',
-                              color: i < q.feedback!.rating ? '#c9a87c' : '#d8cec4',
+                              fill: i < rating ? '#c9a87c' : 'none',
+                              color: i < rating ? '#c9a87c' : '#d8cec4',
                             }}
                           />
                         ))}
-                        {q.feedback.comment && (
+                        {q.feedback?.comment && (
                           <span className="text-xs ml-1" style={{ color: "#8a7a6a" }}>"{q.feedback.comment}"</span>
                         )}
                       </div>

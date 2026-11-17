@@ -2,7 +2,8 @@
 
 import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
 import {
-  decrementTime,
+  setMinutes,
+  setSeconds,
   completeSession,
   startBreak,
   endBreak,
@@ -46,12 +47,39 @@ export default function PomodoroTimer() {
     dispatch(fetchUserStreakThunk());
   }, [dispatch]);
 
-  // Tick once a second, but never at 0:00. The finish step below handles that.
+  // Clock-based countdown. Counting 1-second ticks drifts (every tick re-creates the
+  // interval, and browsers slow timers in background tabs), so a 5 min session ran
+  // 6+ min. Instead we keep an absolute end time and derive the remaining seconds
+  // from the real clock. The finish step below handles 0:00.
+  const remainingRef = useRef(0);
+  remainingRef.current = (minutes || 0) * 60 + (seconds || 0);
+  const endAtRef = useRef<number | null>(null);
+  const lastShownRef = useRef<number | null>(null);
+
   useEffect(() => {
-    if (!isActive || (minutes === 0 && seconds === 0)) return;
-    const interval = setInterval(() => dispatch(decrementTime()), 1000);
+    if (!isActive) {
+      endAtRef.current = null;
+      lastShownRef.current = null;
+      return;
+    }
+    const interval = setInterval(() => {
+      const now = Date.now();
+      // First tick, or the store was changed from outside (break started, re-sync
+      // with the server, reset): restart the end time from what the store shows.
+      if (endAtRef.current === null || remainingRef.current !== lastShownRef.current) {
+        endAtRef.current = now + remainingRef.current * 1000;
+        lastShownRef.current = remainingRef.current;
+      }
+      const left = Math.max(0, Math.ceil((endAtRef.current - now) / 1000));
+      if (left !== lastShownRef.current) {
+        lastShownRef.current = left;
+        // seconds first: the in-between state is never 0:00, so the finish step can't fire early
+        dispatch(setSeconds(left % 60));
+        dispatch(setMinutes(Math.floor(left / 60)));
+      }
+    }, 250);
     return () => clearInterval(interval);
-  }, [isActive, minutes, seconds, dispatch]);
+  }, [isActive, dispatch]);
 
   // Finish step. It runs once per countdown: the flag stays set while the clock
   // is at 0:00 (including while the stop request is in flight) and is only

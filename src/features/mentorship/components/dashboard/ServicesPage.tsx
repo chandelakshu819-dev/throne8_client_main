@@ -1,11 +1,10 @@
 "use client";
 //src/features/mentorship/components/dashboard/ServicesPage.tsx
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import {
   Briefcase, Users, Clock, Star, Plus, Video, MessageSquare,
-  Package, FileText, RefreshCw, ClipboardList, CheckCircle2,
-  MoreVertical, Pencil, Trash2, X, ArrowUpDown, AlertCircle, Search, ArrowLeft
+  Package, FileText, RefreshCw, ClipboardList,
+  Trash2, X, ArrowUpDown, AlertCircle, Search, ArrowLeft
 } from 'lucide-react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import ServiceModal from './ServiceModal';
@@ -28,24 +27,20 @@ interface ServicesPageProps {
   handleCreateService: () => void;
 }
 
-// NOTE: `emoji` kept only because ServiceModal still expects it as a prop.
-// It is no longer rendered anywhere in this file — `icon` (lucide component) is used instead.
+// `icon` (lucide component) use hota hai, emoji ab kahin render nahi hota.
 export const serviceTypes = [
-  { name: 'quick_call', label: 'Quick Call', icon: Video, description: 'Quick 30-minute call', emoji: '⚡', accent: '#2563eb' },
-  { name: 'deep_dive', label: 'Deep Dive', icon: Video, description: 'In-depth 60-minute session', emoji: '🎯', accent: '#7c3aed' },
-  { name: 'resume_review', label: 'Resume Review', icon: FileText, description: 'Professional resume review', emoji: '📄', accent: '#d97706' },
-  { name: 'mock_interview', label: 'Mock Interview', icon: MessageSquare, description: 'Practice interview', emoji: '🎤', accent: '#0d9488' },
-  { name: 'career_planning', label: 'Career Planning', icon: Briefcase, description: 'Career roadmap planning', emoji: '🗺️', accent: '#4338ca' },
-  { name: 'portfolio_review', label: 'Portfolio Review', icon: Package, description: 'Portfolio review', emoji: '💼', accent: '#db2777' },
-  { name: 'ask_query', label: 'Ask a Query', icon: MessageSquare, description: 'Text-based async query', emoji: '❓', accent: '#b45309' },
-  { name: 'group_session', label: 'Group Session', icon: Users, description: 'Group learning sessions', emoji: '👥', accent: '#15803d' },
+  { name: 'quick_call', label: 'Quick Call', icon: Video, description: 'Quick 30-minute call', accent: '#2563eb' },
+  { name: 'deep_dive', label: 'Deep Dive', icon: Video, description: 'In-depth 60-minute session', accent: '#7c3aed' },
+  { name: 'resume_review', label: 'Resume Review', icon: FileText, description: 'Professional resume review', accent: '#d97706' },
+  { name: 'mock_interview', label: 'Mock Interview', icon: MessageSquare, description: 'Practice interview', accent: '#0d9488' },
+  { name: 'career_planning', label: 'Career Planning', icon: Briefcase, description: 'Career roadmap planning', accent: '#4338ca' },
+  { name: 'portfolio_review', label: 'Portfolio Review', icon: Package, description: 'Portfolio review', accent: '#db2777' },
+  { name: 'ask_query', label: 'Ask a Query', icon: MessageSquare, description: 'Text-based async query', accent: '#b45309' },
+  { name: 'group_session', label: 'Group Session', icon: Users, description: 'Group learning sessions', accent: '#15803d' },
 ];
 
-// ✅ FIX: har service type select karne par ek FRESH blank form banega —
-// pehle `{ ...formData, serviceType: type.name }` sirf serviceType field
-// change karta tha, baaki saari purani values (naam, description, price,
-// Free checkbox, duration, etc.) doosre service type ke form me bhi carry
-// ho jaati thi. Ab poora object reset hoga, sirf naya serviceType set hoga.
+// Har service type select karne par ek FRESH blank form banta hai,
+// taaki purani values doosre service type me carry na hon.
 const getDefaultFormData = (serviceType: string = '') => ({
   serviceType,
   serviceName: '',
@@ -62,13 +57,12 @@ const getDefaultFormData = (serviceType: string = '') => ({
   maxParticipants: '',
   portfolioUrl: '',
   thumbnailImage: '',
+  removeThumbnailImage: false,
   responseTime: '',
   meetingUrl: '',
-  // ✅ CHANGED: group_session ab hamesha availability-based hai — koi
-  // Fixed Date & Time option nahi bacha, isliye isTemplate hamesha true.
+  // group_session ab hamesha availability-based hai, isliye isTemplate hamesha true.
   isTemplate: true,
 });
-
 
 // Local datetime-local string banata hai (browser's local timezone me),
 // toISOString() (UTC) use karne se IST users ke liye time 5:30 hrs shift ho jaata tha.
@@ -99,9 +93,9 @@ const statusStyle = (status: string) => {
   }
 };
 
-// ── Price unit helper ───────────────────────────────────
-// group_session is priced per-person, everything else is per-hour.
-// Free (0) always just shows "Free" regardless of type.
+// -- Price unit helper --
+// group_session per-person priced hai, baaki sab per-hour.
+// Free (0) hamesha "Free" dikhata hai.
 export const getPriceLabel = (price: number, type: string) => {
   if (!price || price === 0) return 'Free';
   if (type === 'group_session') return `₹${price}/person`;
@@ -135,7 +129,7 @@ export default function ServicesPage({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // ── API state ─────────────────────────────────────────
+  // -- API state --
   const [apiSessions, setApiSessions] = useState<any[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [apiGroupSessions, setApiGroupSessions] = useState<any[]>([]);
@@ -145,24 +139,18 @@ export default function ServicesPage({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  // ✅ FIX: dropdown ab backdrop ke saath hi document.body me portal
-  // hoga (neeche dekho) — isliye ab uski local "absolute right-0 top-8"
-  // positioning kaam nahi karegi. Iski jagah "..." button ke bounding
-  // rect se fixed top/left coordinates yahan store karte hain.
-  const [menuAnchorRect, setMenuAnchorRect] = useState<{ top: number; left: number } | null>(null);  
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingSession, setEditingSession] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  // ✅ NEW: styled popup ke liye — jab delete block ho (active bookings/participants ki wajah se)
+  // Delete block hone par (active bookings/participants) styled popup ke liye
   const [blockedDeleteMessage, setBlockedDeleteMessage] = useState<string | null>(null);
 
-
-  // ── Edit Session Modal state ───────────────────────────────────
+  // -- Edit Session Modal state --
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<any>(null);
   const [modalMode, setModalMode] = useState<'view' | 'edit'>('edit');
-  // ── Sort state (client-side only, no backend impact) ───
+  // -- Sort state (client-side only, no backend impact) --
   const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -201,12 +189,12 @@ export default function ServicesPage({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchQuery, searchOpen]);
 
-  // ── Stats from API (Service Offerings, not bookings) ─
+  // -- Stats from API (Service Offerings, not bookings) --
   const totalServicesOffered = apiSessions.length + apiGroupSessions.length;
   const activeServicesCount =
     apiSessions.filter(s => s.status !== 'cancelled' && s.status !== 'draft').length +
     apiGroupSessions.filter(g => g.status !== 'cancelled' && g.status !== 'draft').length;
-  const avgRating = "—";   // review API se aayega baad me
+  const avgRating = "-";   // review API se aayega baad me
 
   useEffect(() => {
     if (mentorData?.mentorId) {
@@ -215,7 +203,7 @@ export default function ServicesPage({
     }
   }, [mentorData?.mentorId]);
 
-  // ── Fetch all group sessions ──────────────────────────
+  // -- Fetch all group sessions --
   const fetchGroupSessions = async () => {
     setGroupSessionsLoading(true);
     setGroupSessionsError(null);
@@ -235,7 +223,7 @@ export default function ServicesPage({
     }
   };
 
-  // ── Fetch all sessions ────────────────────────────────
+  // -- Fetch all sessions --
   const fetchAllSessions = async () => {
     setSessionsLoading(true);
     try {
@@ -250,7 +238,7 @@ export default function ServicesPage({
     }
   };
 
-  // ── Update session status ──────────────────────────
+  // -- Update session status --
   const handleUpdateSessionStatus = async (sessionId: string, newStatus: string, bookingId?: string) => {
     try {
       if (newStatus === 'confirmed') {
@@ -262,45 +250,43 @@ export default function ServicesPage({
     }
   };
 
-    // ── Edit service: prefill formData & open modal ────────
-    const handleEditService = (service: any) => {
-      const raw = apiSessions.find((s: any) => s.sessionId === service.sessionId);
-      if (!raw) return;
+  // -- Edit service: prefill formData & open modal --
+  const handleEditService = (service: any) => {
+    const raw = apiSessions.find((s: any) => s.sessionId === service.sessionId);
+    if (!raw) return;
 
-      const type = serviceTypes.find(t => t.name === raw.sessionType) || null;
-      setSelectedServiceType(type);
-      setFormData({
-        ...formData,
-        serviceType: raw.sessionType,
-        serviceName: raw.title,
-        description: raw.description || '',
-        topic: raw.topic || '',
-        price: raw.pricing?.basePrice ?? raw.pricePerPerson ?? '',
-        scheduledAt: raw.scheduledAt ? toLocalDatetimeString(new Date(raw.scheduledAt)) : '',
-        duration: raw.duration ?? '',
-        followUpPeriod: String(raw.followUp?.periodDays ?? '24'),
-        // 🔧 FIX: both branches used to return '1' regardless of the actual
-        // stored value, so edit mode always showed "follow-up allowed" as
-        // true even when it was false in the DB. Now it reflects raw data.
-        followUpAllowed: raw.followUp?.allowed ? '1' : '0',
-        bufferTime: String(raw.bufferTimeMinutes ?? '5'),
-        minParticipants: raw.minParticipants ?? '',
-        maxParticipants: raw.maxParticipants ?? '',
-        portfolioUrl: raw.portfolioUrl || '',
-        thumbnailImage: raw.thumbnailImage || raw.image || raw.thumbnailUrl || '',
-        meetingUrl: raw.meeting?.meetingUrl || raw.meetingUrl || '',
-      });
+    const type = serviceTypes.find(t => t.name === raw.sessionType) || null;
+    setSelectedServiceType(type);
+    setFormData({
+      ...formData,
+      serviceType: raw.sessionType,
+      serviceName: raw.title,
+      description: raw.description || '',
+      topic: raw.topic || '',
+      price: raw.pricing?.basePrice ?? raw.pricePerPerson ?? '',
+      scheduledAt: raw.scheduledAt ? toLocalDatetimeString(new Date(raw.scheduledAt)) : '',
+      duration: raw.duration ?? '',
+      followUpPeriod: String(raw.followUp?.periodDays ?? '24'),
+      // Stored value reflect hoti hai, hamesha '1' nahi.
+      followUpAllowed: raw.followUp?.allowed ? '1' : '0',
+      bufferTime: String(raw.bufferTimeMinutes ?? '5'),
+      minParticipants: raw.minParticipants ?? '',
+      maxParticipants: raw.maxParticipants ?? '',
+      portfolioUrl: raw.portfolioUrl || '',
+      thumbnailImage: raw.thumbnailImage || raw.image || raw.thumbnailUrl || '',
+      removeThumbnailImage: false,
+      meetingUrl: raw.meeting?.meetingUrl || raw.meetingUrl || '',
+    });
 
+    setEditingSession(raw);
+    setIsEditMode(true);
+    setSaveError(null);
+    setFieldErrors({});
+    setShowServiceForm(true);
+    setOpenMenuId(null);
+  };
 
-      setEditingSession(raw);
-      setIsEditMode(true);
-      setSaveError(null);
-      setFieldErrors({});
-      setShowServiceForm(true);
-      setOpenMenuId(null);
-    };
-
-         // ── Delete service: validate, then open the styled confirm modal ──
+  // -- Delete service: validate, then open the styled confirm modal --
   const handleDeleteService = (service: any) => {
     setOpenMenuId(null);
     if (!service.sessionId) return;
@@ -325,19 +311,15 @@ export default function ServicesPage({
     setDeleteTarget(service);
   };
 
-  // ── Actually perform the delete after modal confirmation ──
+  // -- Actually perform the delete after modal confirmation --
   const confirmDeleteService = async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
       if (deleteTarget.type === 'group_session') {
         await MentorService.deleteGroupSession(deleteTarget.sessionId);
-        // ✅ FIX: group sessions apiGroupSessions me rehte hain — apiSessions
-        // se ALAG state array. Pehle sirf fetchAllSessions() call hota tha,
-        // jo apiSessions refresh karta hai — group session ka card tab tak
-        // screen pe dikhta rehta tha jab tak page reload na ho, isliye
-        // Delete "kaam nahi kar raha" lagta tha jabki backend me delete ho
-        // chuka hota tha.
+        // Group sessions apiGroupSessions me rehte hain (apiSessions se alag),
+        // isliye unhe alag se refresh karna zaroori hai.
         await fetchGroupSessions();
       } else {
         await SessionService.deleteSession(deleteTarget.sessionId);
@@ -351,15 +333,15 @@ export default function ServicesPage({
     }
   };
 
-    // ── Create/Update session via API ──────────────────────
-    const handleCreateServiceWithApi = async () => {
-      const errors = validateSessionForm(formData);
-      if (Object.keys(errors).length > 0) {
-        setFieldErrors(errors);
-        setSaveError("Please fix the errors below.");
-        return;
-      }
-      setFieldErrors({});
+  // -- Create/Update session via API --
+  const handleCreateServiceWithApi = async () => {
+    const errors = validateSessionForm(formData);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setSaveError("Please fix the errors below.");
+      return;
+    }
+    setFieldErrors({});
 
     if (!mentorData?.mentorId) {
       setSaveError("Mentor data not loaded. Please refresh.");
@@ -370,11 +352,7 @@ export default function ServicesPage({
     setSaveError(null);
 
     try {
-            // ✅ FIX: yeh hamesha "abhi se +10 min" fallback deta tha kyunki
-      // ServiceModal me pehle scheduledAt field hi nahi tha (1:1 sessions
-      // ke liye yeh fallback abhi bhi lagta hai — unke liye alag se date
-      // picker chahiye hoga, lekin group session ab apna scheduledAt
-      // Fix 1 ke naye field se properly deta hai).
+      // 1:1 sessions ke liye abhi "abhi se +10 min" fallback lagta hai.
       const scheduledAtISO = new Date(formData.scheduledAt || Date.now() + 10 * 60 * 1000).toISOString();
       const isGroupTemplateMode = formData.serviceType === "group_session" && !!formData.isTemplate;
 
@@ -388,9 +366,6 @@ export default function ServicesPage({
           };
           await MentorService.updateGroupSession(editingSession.sessionId, groupUpdatePayload);
         } else {
-          // ⚠️ Backend service layer (mentorshipSessionService.updateSession)
-          // only allows: title, description, notes, thumbnailImage.
-          // Price/schedule/duration edits aren't supported by the backend yet.
           const updatePayload: Record<string, any> = {
             title: formData.serviceName,
             description: formData.description || "",
@@ -405,22 +380,22 @@ export default function ServicesPage({
           };
           if (formData.thumbnailImage && typeof formData.thumbnailImage !== 'string') {
             updatePayload.thumbnailImage = formData.thumbnailImage;
+          } else if (formData.removeThumbnailImage && !formData.thumbnailImage) {
+            // User ne image hata di, backend ko batao ki purani delete kare
+            updatePayload.removeThumbnailImage = true;
           }
           await SessionService.updateSession(editingSession.sessionId, updatePayload);
         }
 
-               // ✅ NEW: Service ka Duration ab Availability page ke default
-        // slot-duration me bhi sync hoga — agli baar naye slots isi
-        // duration ke banenge. Ye fail ho bhi jaaye to service save
-        // block nahi hona chahiye, isliye alag try/catch me hai.
+        // Service ka Duration Availability ke default slot-duration me sync hota hai.
+        // Fail ho to service save block nahi hona chahiye.
         try {
           const newDuration = Number(formData.duration) || 30;
           await MentorService.updateMentorAvailability(mentorData.mentorId, {
             slotDuration: newDuration,
           });
-          // ✅ FIX: mentorData prop parent me refresh nahi hota, isliye
-          // AvailabilityPage ko turant naya duration batao — localStorage
-          // (remount ke liye) + custom event (same-mount live update ke liye).
+          // mentorData prop parent me refresh nahi hota, isliye AvailabilityPage ko
+          // localStorage (remount ke liye) + custom event (live update ke liye) se batao.
           try { localStorage.setItem("mentor_slotDuration", String(newDuration)); } catch {}
           window.dispatchEvent(new CustomEvent("mentorSlotDurationUpdated", { detail: newDuration }));
         } catch (syncErr: any) {
@@ -438,11 +413,7 @@ export default function ServicesPage({
       }
 
       if (formData.serviceType === "group_session") {
-        // ✅ FIX: template mode (mentees availability se slot chunte hain)
-        // me scheduledAt bilkul bhejte hi nahi — backend Joi validator
-        // (isTemplate: true -> scheduledAt optional) isi ke liye hai.
-        // Fixed-date mode me formData.scheduledAt (ab ServiceModal me
-        // asli datetime input se aata hai) use hota hai.
+        // Template mode me scheduledAt bheja hi nahi jaata (mentees availability se slot chunte hain).
         const groupSessionInput: CreateGroupSessionInput = {
           title: formData.serviceName,
           description: formData.description || "",
@@ -456,7 +427,7 @@ export default function ServicesPage({
           bufferTimeMinutes: Number(formData.bufferTime) || 0,
           followUp: {
             allowed: formData.followUpAllowed !== undefined && Number(formData.followUpAllowed) > 0,
-            // ✅ FIX: convert hours-based dropdown value to days (backend caps at 30 days)
+            // Dropdown hours me hai, backend days chahta hai (max 30)
             periodDays: Math.max(0, Math.round((Number(formData.followUpPeriod) || 0) / 24)),
           },
           thumbnailImage: formData.thumbnailImage,
@@ -468,10 +439,8 @@ export default function ServicesPage({
 
       } else {
         const isFree = !!formData.isFree || Number(formData.price) === 0;
-        // ✅ NEW: "Ask a Query" me response time ko description ke saath
-        // jod diya, kyunki is service type ka apna alag description field
-        // nahi hai (needsDescription: false) — mentee ko yahi se pata
-        // chalega ki mentor kitne din me jawab dega.
+        // "Ask a Query" me response time description ke saath jud jaata hai,
+        // kyunki is type ka apna description field nahi hai.
         const responseTimeSuffix = formData.serviceType === 'ask_query' && formData.responseTime
           ? `Response time: ${formData.responseTime} ${Number(formData.responseTime) > 1 ? 'Days' : 'Day'}`
           : "";
@@ -486,10 +455,7 @@ export default function ServicesPage({
           ...(formData.serviceType === "career_planning" ? { targetCompany: "General", targetRole: "General" } : {}),
           duration: Number(formData.duration) || 60,
           followUp: {
-            // ✅ FIX: dropdown values are in HOURS (24/48/72/96/120), but the
-            // backend's `periodDays` field expects DAYS with a max of 30.
-            // Sending raw hours (e.g. 96 for "4 Days") blew past that limit
-            // and caused "Validation failed" for every option except 24 Hours.
+            // Dropdown hours me hai (24/48/72/96/120), backend `periodDays` days me chahta hai (max 30).
             allowed: formData.followUpAllowed !== undefined && Number(formData.followUpAllowed) > 0,
             periodDays: Math.max(0, Math.round((Number(formData.followUpPeriod) || 0) / 24)),
           },
@@ -509,8 +475,7 @@ export default function ServicesPage({
         await SessionService.createSession(sessionInput);
       }
 
-         // ✅ NEW: same sync — service create hote hi Availability ka default
-      // slot-duration bhi is Duration ke according update ho jaata hai.
+      // Service create hote hi Availability ka default slot-duration bhi sync hota hai.
       try {
         const newDuration = Number(formData.duration) || 30;
         await MentorService.updateMentorAvailability(mentorData.mentorId, {
@@ -530,7 +495,7 @@ export default function ServicesPage({
       setSelectedServiceType(null);
       setFormData(getDefaultFormData());
 
-      // ✅ NEW: service create hone ke baad Availability tab par redirect
+      // Service create hone ke baad Availability tab par redirect
       const params = new URLSearchParams(searchParams.toString());
       params.set('tab', 'availability');
       params.delete('subtab');
@@ -543,15 +508,12 @@ export default function ServicesPage({
     }
   };
 
-  // ── Merge API + local services for display ─────────────
+  // -- Merge API + local services for display --
   const apiSessionTitles = new Set(apiSessions.map((s: any) => s.title));
 
   const displayServices = [
     ...apiSessions.map((s: any) => {
       const bookings = s.bookings ?? [];
-      // 🔧 FIX: this used to be hardcoded to 0 for every card, so the
-      // "X sessions completed" line never reflected reality even though the
-      // badges above it (pending/confirmed/done) computed it correctly.
       const completedSessions = bookings.filter((b: any) => b.status === 'completed').length;
       return {
         name: s.title,
@@ -562,18 +524,10 @@ export default function ServicesPage({
         sessionId: s.sessionId,
         status: s.status,
         bookings,
-        // ✅ NEW: duration API se nahi aa rahi thi cards tak, isliye
-        // "X min" card par kabhi dikhta hi nahi tha (sirf edit modal me
-        // formData.duration alag se set hota tha).
         duration: s.duration ?? 0,
-        // 🔧 FIX: this was never being read from the API response, so the
-        // card always fell back to the icon placeholder even when a
-        // thumbnail had actually been uploaded and saved.
         thumbnailImage: s.thumbnailImage || s.image || s.thumbnailUrl || null,
         isApi: true,
-        // ✅ NEW: needed by the "Most recent" sort — without this, every
-        // card's date fell back to 0 and the sort became a no-op, so new
-        // services never actually moved to the top.
+        // "Most recent" sort ke liye zaroori
         createdAt: s.createdAt || null,
         scheduledAt: s.scheduledAt || null,
       };
@@ -595,7 +549,7 @@ export default function ServicesPage({
       })),
   ];
 
-  // ── Apply client-side sort (display only) ──
+  // -- Apply client-side sort (display only) --
   const sortedServices = [...displayServices].sort((a, b) => {
     switch (sortBy) {
       case 'price_high':
@@ -604,18 +558,17 @@ export default function ServicesPage({
         return (a.price || 0) - (b.price || 0);
       case 'name':
         return a.name.localeCompare(b.name);
-        case 'recent':
-          default: {
-            // naya session sabse upar — createdAt fallback scheduledAt pe,
-            // dono na ho to order same rakho
-            const aDate = new Date((a as any).createdAt || (a as any).scheduledAt || 0).getTime();
-            const bDate = new Date((b as any).createdAt || (b as any).scheduledAt || 0).getTime();
-            return bDate - aDate;
-          }
+      case 'recent':
+      default: {
+        // Naya session sabse upar, createdAt fallback scheduledAt
+        const aDate = new Date((a as any).createdAt || (a as any).scheduledAt || 0).getTime();
+        const bDate = new Date((b as any).createdAt || (b as any).scheduledAt || 0).getTime();
+        return bDate - aDate;
+      }
     }
   });
 
-  // ── Search + 6-card limit ──
+  // -- Search + 6-card limit --
   const normalizedQuery = (isSearchView ? urlSearchQuery : debouncedQuery).trim().toLowerCase();
   const filteredServices = normalizedQuery
     ? sortedServices.filter((s: any) => {
@@ -625,8 +578,8 @@ export default function ServicesPage({
           .some((v: string) => String(v).toLowerCase().includes(normalizedQuery));
       })
     : sortedServices;
-    // Group sessions par bhi wahi search (title / description / topic / "group session")
-    const filteredGroupSessions = normalizedQuery
+  // Group sessions par bhi wahi search (title / description / topic / "group session")
+  const filteredGroupSessions = normalizedQuery
     ? apiGroupSessions.filter((g: any) =>
         [g.title, g.description, g.topic, 'group session']
           .filter(Boolean)
@@ -640,7 +593,6 @@ export default function ServicesPage({
   const visibleGroupSessions = (isSearchView || showAllGroupSessions)
     ? filteredGroupSessions
     : filteredGroupSessions.slice(0, INITIAL_VISIBLE_COUNT);
-
 
   const formatGroupDate = (dateString?: string) => {
     if (!dateString) return "Date not available";
@@ -660,7 +612,7 @@ export default function ServicesPage({
     }
   };
 
-  // ── Render ─────────────────────────────────────────────
+  // -- Render --
   return (
     <>
       <div className="space-y-8 animate-fadeIn">
@@ -675,10 +627,10 @@ export default function ServicesPage({
                   router.push(`${pathname}?${params.toString()}`);
                 }}
                 className="self-start flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2"
-                style={{ 
-                  backgroundColor: '#fbf7f3', 
+                style={{
+                  backgroundColor: '#fbf7f3',
                   color: '#4a3728',
-                  border: '1px solid #e0d8cf' 
+                  border: '1px solid #e0d8cf'
                 }}
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -746,259 +698,259 @@ export default function ServicesPage({
         ) : (
           <>
             {/* Header */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm" style={{ backgroundColor: '#4a3728' }}>
-                <Briefcase className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight" style={{ color: '#4a3728' }}>My Services</h2>
-                <p style={{ color: '#8a7a6a' }} className="text-sm">Manage your offerings</p>
-              </div>
-            </div>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm" style={{ backgroundColor: '#4a3728' }}>
+                    <Briefcase className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold tracking-tight" style={{ color: '#4a3728' }}>My Services</h2>
+                    <p style={{ color: '#8a7a6a' }} className="text-sm">Manage your offerings</p>
+                  </div>
+                </div>
 
-            <div className="flex items-center gap-3">
-              {/* Desktop Search Input */}
-              <div
-                className="hidden sm:flex items-center gap-2 px-3.5 py-2.5 rounded-xl border bg-white w-60 md:w-64 transition-all focus-within:ring-2 focus-within:ring-[#7a5c3e]/20"
-                style={{ borderColor: '#e0d8cf' }}
-              >
-                <Search className="w-4 h-4 shrink-0" style={{ color: '#8a7a6a' }} />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setShowAllServices(false);
-                    setShowAllGroupSessions(false);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
+                <div className="flex items-center gap-3">
+                  {/* Desktop Search Input */}
+                  <div
+                    className="hidden sm:flex items-center gap-2 px-3.5 py-2.5 rounded-xl border bg-white w-60 md:w-64 transition-all focus-within:ring-2 focus-within:ring-[#7a5c3e]/20"
+                    style={{ borderColor: '#e0d8cf' }}
+                  >
+                    <Search className="w-4 h-4 shrink-0" style={{ color: '#8a7a6a' }} />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setShowAllServices(false);
+                        setShowAllGroupSessions(false);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setSearchQuery('');
+                          setSearchOpen(false);
+                          (e.target as HTMLElement).blur();
+                        }
+                        if (e.key === 'Enter' && searchQuery.trim()) {
+                          const params = new URLSearchParams(searchParams.toString());
+                          params.set('tab', 'services_search');
+                          params.set('q', searchQuery.trim());
+                          router.push(`${pathname}?${params.toString()}`);
+                        }
+                      }}
+                      placeholder="Search services..."
+                      aria-label="Search services"
+                      className="w-full text-sm outline-none bg-transparent placeholder-[#8a7a6a]"
+                      style={{ color: '#4a3728' }}
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        aria-label="Clear search"
+                        className="p-0.5 hover:bg-[#f3ece4] rounded-md transition-colors shrink-0"
+                      >
+                        <X className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Mobile Search Icon Button */}
+                  <button
+                    onClick={() => setSearchOpen(!searchOpen)}
+                    aria-label="Search services"
+                    className="sm:hidden flex items-center justify-center w-10 h-10 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
+                    style={{ color: '#7a5c3e', border: '1.5px solid #e0d8cf', backgroundColor: '#fff' }}
+                  >
+                    <Search className="w-4 h-4" />
+                  </button>
+
+                  {/* Refresh Button */}
+                  <button
+                    onClick={fetchAllSessions}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
+                    style={{ color: '#7a5c3e', border: '1.5px solid #e0d8cf', backgroundColor: '#fff' }}
+                  >
+                    <RefreshCw className={`w-4 h-4 ${sessionsLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              {/* Mobile Expanded Search Bar */}
+              {searchOpen && (
+                <div
+                  className="sm:hidden flex items-center gap-2 px-3.5 py-2.5 rounded-xl border bg-white w-full transition-all animate-fadeIn"
+                  style={{ borderColor: '#e0d8cf' }}
+                >
+                  <Search className="w-4 h-4 shrink-0" style={{ color: '#8a7a6a' }} />
+                  <input
+                    autoFocus
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setShowAllServices(false);
+                      setShowAllGroupSessions(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setSearchQuery('');
+                        setSearchOpen(false);
+                      }
+                      if (e.key === 'Enter' && searchQuery.trim()) {
+                        const params = new URLSearchParams(searchParams.toString());
+                        params.set('tab', 'services_search');
+                        params.set('q', searchQuery.trim());
+                        router.push(`${pathname}?${params.toString()}`);
+                      }
+                    }}
+                    placeholder="Search services..."
+                    aria-label="Search services"
+                    className="w-full text-sm outline-none bg-transparent placeholder-[#8a7a6a]"
+                    style={{ color: '#4a3728' }}
+                  />
+                  <button
+                    onClick={() => {
                       setSearchQuery('');
                       setSearchOpen(false);
-                      (e.target as HTMLElement).blur();
-                    }
-                    if (e.key === 'Enter' && searchQuery.trim()) {
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.set('tab', 'services_search');
-                      params.set('q', searchQuery.trim());
-                      router.push(`${pathname}?${params.toString()}`);
-                    }
-                  }}
-                  placeholder="Search services..."
-                  aria-label="Search services"
-                  className="w-full text-sm outline-none bg-transparent placeholder-[#8a7a6a]"
-                  style={{ color: '#4a3728' }}
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    aria-label="Clear search"
-                    className="p-0.5 hover:bg-[#f3ece4] rounded-md transition-colors shrink-0"
-                  >
-                    <X className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
-                  </button>
-                )}
-              </div>
-
-              {/* Mobile Search Icon Button */}
-              <button
-                onClick={() => setSearchOpen(!searchOpen)}
-                aria-label="Search services"
-                className="sm:hidden flex items-center justify-center w-10 h-10 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
-                style={{ color: '#7a5c3e', border: '1.5px solid #e0d8cf', backgroundColor: '#fff' }}
-              >
-                <Search className="w-4 h-4" />
-              </button>
-
-              {/* Refresh Button */}
-              <button
-                onClick={fetchAllSessions}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
-                style={{ color: '#7a5c3e', border: '1.5px solid #e0d8cf', backgroundColor: '#fff' }}
-              >
-                <RefreshCw className={`w-4 h-4 ${sessionsLoading ? 'animate-spin' : ''}`} />
-                Refresh
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile Expanded Search Bar */}
-          {searchOpen && (
-            <div
-              className="sm:hidden flex items-center gap-2 px-3.5 py-2.5 rounded-xl border bg-white w-full transition-all animate-fadeIn"
-              style={{ borderColor: '#e0d8cf' }}
-            >
-              <Search className="w-4 h-4 shrink-0" style={{ color: '#8a7a6a' }} />
-              <input
-                autoFocus
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setShowAllServices(false);
-                  setShowAllGroupSessions(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    setSearchQuery('');
-                    setSearchOpen(false);
-                  }
-                  if (e.key === 'Enter' && searchQuery.trim()) {
-                    const params = new URLSearchParams(searchParams.toString());
-                    params.set('tab', 'services_search');
-                    params.set('q', searchQuery.trim());
-                    router.push(`${pathname}?${params.toString()}`);
-                  }
-                }}
-                placeholder="Search services..."
-                aria-label="Search services"
-                className="w-full text-sm outline-none bg-transparent placeholder-[#8a7a6a]"
-                style={{ color: '#4a3728' }}
-              />
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setSearchOpen(false);
-                }}
-                aria-label="Close search"
-                className="p-1 hover:bg-[#f3ece4] rounded-md transition-colors shrink-0"
-              >
-                <X className="w-4 h-4" style={{ color: '#8a7a6a' }} />
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Stats — real service offerings from API */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { icon: Briefcase, label: 'Services Offered', value: (sessionsLoading || groupSessionsLoading) ? '—' : String(totalServicesOffered), accent: '#2563eb' },
-            { icon: Clock, label: 'Active Services', value: (sessionsLoading || groupSessionsLoading) ? '—' : String(activeServicesCount), accent: '#15803d' },
-            { icon: Star, label: 'Avg Rating', value: avgRating, accent: '#d97706' },
-          ].map(({ icon: Icon, label, value, accent }) => (
-            <div
-              key={label}
-              className="flex items-center gap-4 p-4 rounded-2xl bg-white border"
-              style={{ borderColor: '#e0d8cf' }}
-            >
-              <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                style={{ backgroundColor: `${accent}1A` }}
-              >
-                <Icon className="w-5 h-5" style={{ color: accent }} />
-              </div>
-              <div>
-                <p className="text-xs mb-0.5" style={{ color: '#8a7a6a' }}>{label}</p>
-                <p className="text-xl font-bold leading-none" style={{ color: '#4a3728' }}>{value}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Service Type Selector + Preview */}
-        <div className="grid grid-cols-12 gap-5">
-          <div className="col-span-12 lg:col-span-3">
-            <nav className="space-y-1.5">
-              {serviceTypes.map((type, idx) => {
-                const Icon = type.icon;
-                const isActive = selectedServiceType?.name === type.name;
-                return (
-                  <button
-                  key={idx}
-                  onClick={() => {
-                    setSelectedServiceType(type);
-                    setFormData(getDefaultFormData(type.name));
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150"
-                    style={{
-                      backgroundColor: isActive ? '#4a3728' : 'transparent',
-                      color: isActive ? '#fff' : '#5c4a3a',
                     }}
+                    aria-label="Close search"
+                    className="p-1 hover:bg-[#f3ece4] rounded-md transition-colors shrink-0"
                   >
-                    <span
-                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: isActive ? 'rgba(255,255,255,0.15)' : `${type.accent}1A` }}
-                    >
-                      <Icon className="w-4 h-4" style={{ color: isActive ? '#fff' : type.accent }} />
-                    </span>
-                    <span className="flex-1 text-left">{type.label}</span>
-                    {isActive && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    <X className="w-4 h-4" style={{ color: '#8a7a6a' }} />
                   </button>
-                );
-              })}
-            </nav>
-          </div>
+                </div>
+              )}
+            </div>
 
-          <div className="col-span-12 lg:col-span-9">
-            <div
-              className="rounded-2xl border flex flex-col items-center justify-center text-center px-8"
-              style={{ borderColor: '#e0d8cf', minHeight: '360px', backgroundColor: '#fbf7f3' }}
-            >
-              {selectedServiceType ? (
-                <>
+            {/* Stats - real service offerings from API */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { icon: Briefcase, label: 'Services Offered', value: (sessionsLoading || groupSessionsLoading) ? '-' : String(totalServicesOffered), accent: '#2563eb' },
+                { icon: Clock, label: 'Active Services', value: (sessionsLoading || groupSessionsLoading) ? '-' : String(activeServicesCount), accent: '#15803d' },
+                { icon: Star, label: 'Avg Rating', value: avgRating, accent: '#d97706' },
+              ].map(({ icon: Icon, label, value, accent }) => (
+                <div
+                  key={label}
+                  className="flex items-center gap-4 p-4 rounded-2xl bg-white border"
+                  style={{ borderColor: '#e0d8cf' }}
+                >
                   <div
-                    className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6"
-                    style={{ backgroundColor: `${selectedServiceType.accent}1A` }}
+                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: `${accent}1A` }}
                   >
-                    <selectedServiceType.icon className="w-9 h-9" style={{ color: selectedServiceType.accent }} />
+                    <Icon className="w-5 h-5" style={{ color: accent }} />
                   </div>
-                  <h3 className="text-2xl font-bold mb-2" style={{ color: '#4a3728' }}>
-                    Create {selectedServiceType.label}
-                  </h3>
-                  <p className="text-base max-w-sm mb-8" style={{ color: '#8a7a6a' }}>
-                    {selectedServiceType.description}
-                  </p>
-                  <button
-                    onClick={() => { setSaveError(null); setShowServiceForm(true); }}
-                    className="text-white px-7 py-3.5 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 font-semibold"
-                    style={{ backgroundColor: '#4a3728' }}
-                  >
-                    <Plus className="w-5 h-5" />
-                    Add {selectedServiceType.label}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div
-                    className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6"
-                    style={{ backgroundColor: '#f3ece4' }}
-                  >
-                    <ClipboardList className="w-9 h-9" style={{ color: '#8a7a6a' }} />
+                  <div>
+                    <p className="text-xs mb-0.5" style={{ color: '#8a7a6a' }}>{label}</p>
+                    <p className="text-xl font-bold leading-none" style={{ color: '#4a3728' }}>{value}</p>
                   </div>
-                  <h3 className="text-xl font-bold mb-2" style={{ color: '#4a3728' }}>Select a service type</h3>
-                  <p className="text-sm max-w-xs mb-6" style={{ color: '#8a7a6a' }}>
-                    Choose one from the list on the left to get started.
-                  </p>
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    {serviceTypes.slice(0, 4).map((type) => {
-                      const Icon = type.icon;
-                      return (
-                        <button
-                        key={type.name}
+                </div>
+              ))}
+            </div>
+
+            {/* Service Type Selector + Preview */}
+            <div className="grid grid-cols-12 gap-5">
+              <div className="col-span-12 lg:col-span-3">
+                <nav className="space-y-1.5">
+                  {serviceTypes.map((type, idx) => {
+                    const Icon = type.icon;
+                    const isActive = selectedServiceType?.name === type.name;
+                    return (
+                      <button
+                        key={idx}
                         onClick={() => {
                           setSelectedServiceType(type);
                           setFormData(getDefaultFormData(type.name));
                         }}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border transition-colors hover:bg-[#f3ece4]"
-                          style={{ borderColor: '#e0d8cf', color: '#5c4a3a', backgroundColor: '#fff' }}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150"
+                        style={{
+                          backgroundColor: isActive ? '#4a3728' : 'transparent',
+                          color: isActive ? '#fff' : '#5c4a3a',
+                        }}
+                      >
+                        <span
+                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: isActive ? 'rgba(255,255,255,0.15)' : `${type.accent}1A` }}
                         >
-                          <Icon className="w-3.5 h-3.5" style={{ color: type.accent }} />
-                          {type.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
+                          <Icon className="w-4 h-4" style={{ color: isActive ? '#fff' : type.accent }} />
+                        </span>
+                        <span className="flex-1 text-left">{type.label}</span>
+                        {isActive && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+
+              <div className="col-span-12 lg:col-span-9">
+                <div
+                  className="rounded-2xl border flex flex-col items-center justify-center text-center px-8"
+                  style={{ borderColor: '#e0d8cf', minHeight: '360px', backgroundColor: '#fbf7f3' }}
+                >
+                  {selectedServiceType ? (
+                    <>
+                      <div
+                        className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6"
+                        style={{ backgroundColor: `${selectedServiceType.accent}1A` }}
+                      >
+                        <selectedServiceType.icon className="w-9 h-9" style={{ color: selectedServiceType.accent }} />
+                      </div>
+                      <h3 className="text-2xl font-bold mb-2" style={{ color: '#4a3728' }}>
+                        Create {selectedServiceType.label}
+                      </h3>
+                      <p className="text-base max-w-sm mb-8" style={{ color: '#8a7a6a' }}>
+                        {selectedServiceType.description}
+                      </p>
+                      <button
+                        onClick={() => { setSaveError(null); setShowServiceForm(true); }}
+                        className="text-white px-7 py-3.5 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 font-semibold"
+                        style={{ backgroundColor: '#4a3728' }}
+                      >
+                        <Plus className="w-5 h-5" />
+                        Add {selectedServiceType.label}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6"
+                        style={{ backgroundColor: '#f3ece4' }}
+                      >
+                        <ClipboardList className="w-9 h-9" style={{ color: '#8a7a6a' }} />
+                      </div>
+                      <h3 className="text-xl font-bold mb-2" style={{ color: '#4a3728' }}>Select a service type</h3>
+                      <p className="text-sm max-w-xs mb-6" style={{ color: '#8a7a6a' }}>
+                        Choose one from the list on the left to get started.
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        {serviceTypes.slice(0, 4).map((type) => {
+                          const Icon = type.icon;
+                          return (
+                            <button
+                              key={type.name}
+                              onClick={() => {
+                                setSelectedServiceType(type);
+                                setFormData(getDefaultFormData(type.name));
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border transition-colors hover:bg-[#f3ece4]"
+                              style={{ borderColor: '#e0d8cf', color: '#5c4a3a', backgroundColor: '#fff' }}
+                            >
+                              <Icon className="w-3.5 h-3.5" style={{ color: type.accent }} />
+                              {type.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        </>
+          </>
         )}
 
-        {/* Current Services — real API data */}
+        {/* Current Services - real API data */}
         <div>
           <div className="flex items-start sm:items-center justify-between mb-6 flex-col sm:flex-row gap-4">
             <div>
@@ -1017,10 +969,9 @@ export default function ServicesPage({
               {sessionsLoading && (
                 <span className="text-xs font-semibold px-3 py-1 rounded-full"
                   style={{ backgroundColor: '#f3ece4', color: '#7a5c3e' }}>
-                  Loading…
+                  Loading...
                 </span>
               )}
-
 
               {sortedServices.length > 1 && (
                 <div className="relative">
@@ -1056,7 +1007,6 @@ export default function ServicesPage({
               )}
             </div>
           </div>
-
 
           {!sessionsLoading && sortedServices.length === 0 ? (
             <div className="text-center py-14 rounded-2xl border" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
@@ -1097,11 +1047,11 @@ export default function ServicesPage({
             </div>
           ) : (
             <>
-            <div 
-              className="grid gap-6"
-              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
-            >
-              {visibleServices.map((service, idx) => {
+              <div
+                className="grid gap-6"
+                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
+              >
+                {visibleServices.map((service, idx) => {
                   return (
                     <ServiceCard
                       key={service.sessionId || idx}
@@ -1115,19 +1065,19 @@ export default function ServicesPage({
                       }}
                     />
                   );
-              })}
-            </div>
-            {filteredServices.length > INITIAL_VISIBLE_COUNT && (
-              <div className="flex justify-center mt-6">
-                <button
-                  onClick={() => setShowAllServices((v) => !v)}
-                  className="px-6 py-2.5 rounded-xl text-sm font-semibold border transition-colors hover:bg-[#f3ece4]"
-                  style={{ borderColor: '#e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
-                >
-                  {showAllServices ? 'Show less' : `Show all services (${filteredServices.length})`}
-                </button>
+                })}
               </div>
-            )}
+              {filteredServices.length > INITIAL_VISIBLE_COUNT && (
+                <div className="flex justify-center mt-6">
+                  <button
+                    onClick={() => setShowAllServices((v) => !v)}
+                    className="px-6 py-2.5 rounded-xl text-sm font-semibold border transition-colors hover:bg-[#f3ece4]"
+                    style={{ borderColor: '#e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
+                  >
+                    {showAllServices ? 'Show less' : `Show all services (${filteredServices.length})`}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -1141,7 +1091,7 @@ export default function ServicesPage({
                 {isSearchView ? "Your matching group sessions" : "Manage your upcoming group learning sessions"}
               </p>
             </div>
-            
+
             <div className="flex items-center gap-3 self-end sm:self-auto">
               {isSearchView && (
                 <span className="text-sm font-semibold" style={{ color: '#7a5c3e' }}>
@@ -1151,69 +1101,68 @@ export default function ServicesPage({
             </div>
           </div>
 
-            {groupSessionsLoading ? (
-              <div className="flex items-center justify-center p-16 border-2 border-dashed rounded-3xl" style={{ borderColor: '#e0d8cf', backgroundColor: '#fcfaf8', minHeight: '320px' }}>
-                <span className="flex items-center gap-3 text-xl font-semibold animate-pulse" style={{ color: '#7a5c3e' }}>
-                  <RefreshCw className="w-6 h-6 animate-spin" />
-                  Loading group sessions...
-                </span>
+          {groupSessionsLoading ? (
+            <div className="flex items-center justify-center p-16 border-2 border-dashed rounded-3xl" style={{ borderColor: '#e0d8cf', backgroundColor: '#fcfaf8', minHeight: '320px' }}>
+              <span className="flex items-center gap-3 text-xl font-semibold animate-pulse" style={{ color: '#7a5c3e' }}>
+                <RefreshCw className="w-6 h-6 animate-spin" />
+                Loading group sessions...
+              </span>
+            </div>
+          ) : groupSessionsError ? (
+            <div className="flex flex-col items-center justify-center p-16 border-2 border-dashed rounded-3xl" style={{ borderColor: '#e0d8cf', backgroundColor: '#fcfaf8', minHeight: '320px' }}>
+              <div className="w-16 h-16 mb-4 rounded-full flex items-center justify-center bg-red-100">
+                <AlertCircle className="w-8 h-8 text-red-600" />
               </div>
-            ) : groupSessionsError ? (
-              <div className="flex flex-col items-center justify-center p-16 border-2 border-dashed rounded-3xl" style={{ borderColor: '#e0d8cf', backgroundColor: '#fcfaf8', minHeight: '320px' }}>
-                <div className="w-16 h-16 mb-4 rounded-full flex items-center justify-center bg-red-100">
-                  <span className="text-3xl">⚠️</span>
-                </div>
-                <p className="text-xl font-bold text-red-600 mb-6">{groupSessionsError}</p>
+              <p className="text-xl font-bold text-red-600 mb-6">{groupSessionsError}</p>
+              <button
+                onClick={fetchGroupSessions}
+                className="px-8 py-3 rounded-2xl text-white font-bold transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
+                style={{ backgroundColor: '#4a3728' }}
+              >
+                Retry Fetching
+              </button>
+            </div>
+          ) : apiGroupSessions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 px-4 rounded-2xl" style={{ backgroundColor: '#fcfaf8', border: '1px solid #e0d8cf' }}>
+              <div className="w-12 h-12 mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f3ece4' }}>
+                <Users className="w-5 h-5" style={{ color: '#8a7a6a' }} />
+              </div>
+              <h4 className="text-base font-bold text-center" style={{ color: '#4a3728' }}>No group sessions</h4>
+              <p className="text-sm text-center max-w-sm mt-1" style={{ color: '#8a7a6a' }}>
+                Create your first group session to start teaching multiple mentees.
+              </p>
+            </div>
+          ) : filteredGroupSessions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 px-4 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
+              <div className="w-12 h-12 mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f3ece4' }}>
+                <Users className="w-5 h-5" style={{ color: '#8a7a6a' }} />
+              </div>
+              <p className="text-base font-bold" style={{ color: '#4a3728' }}>No group sessions found</p>
+              <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
+                No group sessions matched your search for '{isSearchView ? urlSearchQuery : searchQuery}'.
+              </p>
+              {isSearchView && (
                 <button
-                  onClick={fetchGroupSessions}
-                  className="px-8 py-3 rounded-2xl text-white font-bold transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
-                  style={{ backgroundColor: '#4a3728' }}
+                  onClick={() => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    params.set('tab', 'services');
+                    params.delete('q');
+                    router.push(`${pathname}?${params.toString()}`);
+                  }}
+                  className="mt-5 px-5 py-2 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
+                  style={{ border: '1.5px solid #e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
                 >
-                  Retry Fetching
+                  Back to Services
                 </button>
-              </div>
-            ) : apiGroupSessions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 px-4 rounded-2xl" style={{ backgroundColor: '#fcfaf8', border: '1px solid #e0d8cf' }}>
-                <div className="w-12 h-12 mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f3ece4' }}>
-                  <Users className="w-5 h-5" style={{ color: '#8a7a6a' }} />
-                </div>
-                <h4 className="text-base font-bold text-center" style={{ color: '#4a3728' }}>No group sessions</h4>
-                <p className="text-sm text-center max-w-sm mt-1" style={{ color: '#8a7a6a' }}>
-                  Create your first group session to start teaching multiple mentees.
-                </p>
-              </div>
-            ) : filteredGroupSessions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 px-4 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
-                <div className="w-12 h-12 mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f3ece4' }}>
-                  <Users className="w-5 h-5" style={{ color: '#8a7a6a' }} />
-                </div>
-                <p className="text-base font-bold" style={{ color: '#4a3728' }}>No group sessions found</p>
-                <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
-                  No group sessions matched your search for '{isSearchView ? urlSearchQuery : searchQuery}'.
-                </p>
-                {isSearchView && (
-                  <button
-                    onClick={() => {
-                      const params = new URLSearchParams(searchParams.toString());
-                      params.set('tab', 'services');
-                      params.delete('q');
-                      router.push(`${pathname}?${params.toString()}`);
-                    }}
-                    className="mt-5 px-5 py-2 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
-                    style={{ border: '1.5px solid #e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
-                  >
-                    Back to Services
-                  </button>
-                )}
-              </div>
-                      ) : (
-                        <>
-                        <div 
-                          className="grid gap-6"
-                          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
-                        >
-                          {visibleGroupSessions.map((group, idx) => {
-
+              )}
+            </div>
+          ) : (
+            <>
+              <div
+                className="grid gap-6"
+                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
+              >
+                {visibleGroupSessions.map((group, idx) => {
                   return (
                     <GroupSessionCard
                       key={group.sessionId || group.id || idx}
@@ -1223,7 +1172,7 @@ export default function ServicesPage({
                         setModalMode('edit');
                         setIsEditModalOpen(true);
                       }}
-                      onDelete={() => handleDeleteService({...group, type: 'group_session'})}
+                      onDelete={() => handleDeleteService({ ...group, type: 'group_session' })}
                       onMenteeStatus={(grp) => {
                         setSelectedSession({ ...grp, isGroupSession: true });
                         setModalMode('view');
@@ -1244,21 +1193,18 @@ export default function ServicesPage({
                   </button>
                 </div>
               )}
-              </>
-            )}
-          </div>
-
+            </>
+          )}
+        </div>
       </div>
 
-          {/* Modal */}
-          {showServiceForm && (
+      {/* Modal */}
+      {showServiceForm && (
         <ServiceModal
           service={{
             name: isEditMode ? (editingSession?.title || 'Edit Service') : 'New Service',
             description: isEditMode ? 'Update your service offering' : 'Create a new service offering',
-            emoji: selectedServiceType?.emoji || '📋',
           }}
-
           onClose={() => {
             setShowServiceForm(false);
             setSaveError(null);
@@ -1288,8 +1234,8 @@ export default function ServicesPage({
         session={selectedSession}
         onStatusChange={handleUpdateSessionStatus}
         onRefresh={() => {
-            fetchAllSessions();
-            fetchGroupSessions();
+          fetchAllSessions();
+          fetchGroupSessions();
         }}
       />
 
@@ -1344,7 +1290,7 @@ export default function ServicesPage({
         </div>
       )}
 
-      {/* ✅ NEW: styled replacement for the browser's native alert() popup */}
+      {/* Styled replacement for the browser's native alert() popup */}
       {blockedDeleteMessage && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
           <div
