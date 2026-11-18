@@ -32,7 +32,7 @@ interface ServicesSectionProps {
   bookedSessionIds: string[];
   currentUserId: string;
   mentorName?: string;
-  // ✅ NEW: when the mentee arrives here via a "Join Session" deep-link
+  // NEW: when the mentee arrives here via a "Join Session" deep-link
   // from the group-session detail page (?serviceId=<sessionId>), this
   // carries that sessionId so the matching group session's detail modal
   // opens automatically instead of forcing the mentee to re-find and
@@ -197,12 +197,12 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   const [sessions, setSessions] = useState<any[]>([]);
   const [groupSessions, setGroupSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  // ✅ joinedIds means "I have an active (pending or accepted) request with
-  // this session" — an optimistic flag used only until fetchGroupSessions()
+  // joinedIds means "I have an active (pending or accepted) request with
+  // this session" - an optimistic flag used only until fetchGroupSessions()
   // returns the real participant row with its actual requestStatus.
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
 
-  // ✅ NEW: "Read more/less" toggle state for long service descriptions.
+  // NEW: "Read more/less" toggle state for long service descriptions.
   // Tracks which session cards currently have their description expanded.
   const [expandedDescIds, setExpandedDescIds] = useState<string[]>([]);
   const toggleDescExpanded = (sessionId: string) => {
@@ -212,22 +212,22 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   };
 
 
-  // ✅ NEW: detail modal state for a clicked group session card
+  // NEW: detail modal state for a clicked group session card
   const [detailGroup, setDetailGroup] = useState<any | null>(null);
   const [groupActionBusy, setGroupActionBusy] = useState(false);
   const [groupActionError, setGroupActionError] = useState<string | null>(null);
   const [, forceTick] = useState(0);
 
-  // ✅ NEW: tracks whether we've already auto-opened the modal for the
+  // NEW: tracks whether we've already auto-opened the modal for the
   // current deepLinkSessionId, so it doesn't keep re-opening every time
   // groupSessions refreshes (e.g. right after the mentee sends a request).
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
 
-    // ✅ NEW: mentee's own queries (Query model) — used so ask_query status
+  // NEW: mentee's own queries (Query model) - used so ask_query status
   // reflects Query.status ("pending"/"answered"), not the stale Booking status.
   const [myQueries, setMyQueries] = useState<QueryItem[]>([]);
 
-  // ── Waitlist ──
+  // Waitlist
   const [waitlistEntries, setWaitlistEntries] = useState<Record<string, any>>({});
   const [waitlistTarget, setWaitlistTarget] = useState<any | null>(null);
   const [leavingId, setLeavingId] = useState<string | null>(null);
@@ -251,19 +251,19 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
         setWaitlistEntries(map);
       })
       .catch(() => setWaitlistEntries({}));
-    }, [mentorId, currentUserId]);
-  
-    // ✅ NEW: fetch mentee's own queries so ask_query cards show the real
-    // Query.status instead of the stale Booking status.
-    useEffect(() => {
-      if (!mentorId || !currentUserId) return;
-      QueryService.getAllQueries({ role: "mentee", limit: 50 })
-        .then((res) => {
-          const all = (res.data ?? []) as QueryItem[];
-          setMyQueries(all.filter((q) => q.mentorId === mentorId));
-        })
-        .catch(() => setMyQueries([]));
-    }, [mentorId, currentUserId]);
+  }, [mentorId, currentUserId]);
+
+  // NEW: fetch mentee's own queries so ask_query cards show the real
+  // Query.status instead of the stale Booking status.
+  useEffect(() => {
+    if (!mentorId || !currentUserId) return;
+    QueryService.getAllQueries({ role: "mentee", limit: 50 })
+      .then((res) => {
+        const all = (res.data ?? []) as QueryItem[];
+        setMyQueries(all.filter((q) => q.mentorId === mentorId));
+      })
+      .catch(() => setMyQueries([]));
+  }, [mentorId, currentUserId]);
 
   const handleJoinWaitlist = async (session: any, note: string) => {
     const res = await MentorService.joinWaitlist({
@@ -320,7 +320,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     setLoading(true);
 
     Promise.allSettled([
-    SessionService.getMentorSessions(mentorId),
+      SessionService.getMentorSessions(mentorId),
       fetchGroupSessions(),
     ]).then(([sessionsRes]) => {
       if (sessionsRes.status === "fulfilled") {
@@ -344,9 +344,9 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     return () => clearInterval(interval);
   }, [detailGroup]);
 
-  // ✅ NEW: auto-open the detail modal for the group session named in
+  // NEW: auto-open the detail modal for the group session named in
   // ?serviceId= once groupSessions has loaded. Runs once per
-  // deepLinkSessionId — if the match isn't in this mentor's session list
+  // deepLinkSessionId - if the match isn't in this mentor's session list
   // (wrong id, or the session was removed), it just does nothing instead
   // of erroring.
   useEffect(() => {
@@ -370,9 +370,9 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       ? []
       : sessions.filter((s) => (SESSION_TYPE_FILTER[s.sessionType] || s.sessionType) === activeFilter);
 
-      const showGroupSessions = activeFilter === "All" || activeFilter === "Group Session";
-  // ✅ FIX: previously this dropped any group session whose status wasn't
-  // 'open' (or undefined) from the "All" tab — including sessions the
+  const showGroupSessions = activeFilter === "All" || activeFilter === "Group Session";
+  // FIX: previously this dropped any group session whose status wasn't
+  // 'open' (or undefined) from the "All" tab, including sessions the
   // mentee already has a stake in (pending request, accepted seat). That
   // meant an accepted mentee lost visibility of their own session the
   // moment it filled up ('full') or started ('in_progress') unless they
@@ -386,37 +386,32 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
         return !!myParticipant;
       });
 
-    const getServiceFromSession = (session: any): Service => ({
-      id: session.sessionId,
-      type: SESSION_TYPE_LABEL[session.sessionType] || "1:1 Call",
-      title: session.title,
-      duration: `${session.duration} Min`,
-      originalPrice: null,
-      price: session.pricing?.basePrice === 0 ? "Free" : session.pricing?.basePrice,
-      popular: false,
-    });
-  
-    // ✅ NEW: availability-based group session ("template") ko Service shape
-    // mein convert karta hai taaki onServiceClick() ko wahi 1:1 flow ki tarah
-    // "calendar" bookingStep pe bheja ja sake — CalendarStep already generic
-    // hai (sirf mentorId + duration use karta hai), isliye koi extra change
-    // uss file mein nahi chahiye.
-    const getServiceFromGroupTemplate = (group: any): Service => {
-      const pricePerPerson = group.pricing?.pricePerPerson ?? group.pricePerPerson ?? 0;
-      return {
-        id: group.sessionId,
-        type: "GroupSession",
-        title: group.title,
-        duration: `${group.duration} Min`,
-        originalPrice: null,
-        price: pricePerPerson === 0 ? "Free" : pricePerPerson,
-        popular: false,
-      };
-    };
+  const getServiceFromSession = (session: any): Service => ({
+    id: session.sessionId,
+    type: SESSION_TYPE_LABEL[session.sessionType] || "1:1 Call",
+    title: session.title,
+    duration: `${session.duration} Min`,
+    originalPrice: null,
+    price: session.pricing?.basePrice === 0 ? "Free" : session.pricing?.basePrice,
+    popular: false,
+  });
 
-  const getIcon = (sessionType: string): string => {
-    if (sessionType === "group_session") return "👥";
-    return "";
+  // NEW: availability-based group session ("template") ko Service shape
+  // mein convert karta hai taaki onServiceClick() ko wahi 1:1 flow ki tarah
+  // "calendar" bookingStep pe bheja ja sake - CalendarStep already generic
+  // hai (sirf mentorId + duration use karta hai), isliye koi extra change
+  // uss file mein nahi chahiye.
+  const getServiceFromGroupTemplate = (group: any): Service => {
+    const pricePerPerson = group.pricing?.pricePerPerson ?? group.pricePerPerson ?? 0;
+    return {
+      id: group.sessionId,
+      type: "GroupSession",
+      title: group.title,
+      duration: `${group.duration} Min`,
+      originalPrice: null,
+      price: pricePerPerson === 0 ? "Free" : pricePerPerson,
+      popular: false,
+    };
   };
 
   const closeGroupDetail = () => {
@@ -424,10 +419,10 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     setGroupActionError(null);
   };
 
-  // ✅ FIX: this is now the single place a join request is actually sent
-  // from — only reachable after the user has opened the detail modal (seen
+  // FIX: this is now the single place a join request is actually sent
+  // from - only reachable after the user has opened the detail modal (seen
   // date/time/duration/seats) and pressed "Join Group" there.
-  // ✅ FIX: was calling MentorService.joinGroupSession() — the OLD
+  // FIX: was calling MentorService.joinGroupSession() - the OLD
   // direct-join method that adds the mentee as a participant immediately,
   // with no mentor approval step. Switched to
   // MentorService.requestToJoinGroupSession(), which creates a pending
@@ -469,27 +464,39 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   const hasAnyResults = filtered.length > 0 || (showGroupSessions && visibleGroupSessions.length > 0);
 
   return (
-    <div style={{ borderRadius: "24px", padding: "32px", marginBottom: "24px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 8px 32px rgba(74,55,40,0.08)" }}>
+    <div
+      className="w-full min-w-0 p-4 sm:p-8"
+      style={{ borderRadius: "24px", marginBottom: "24px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 8px 32px rgba(74,55,40,0.08)" }}
+    >
       <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>
         Available Services
       </h2>
       <p style={{ color: C.mid, fontSize: "13px", marginBottom: "20px" }}>Discover our mentorship offerings designed for your success</p>
 
-      <div style={{ display: "flex", gap: "10px", marginBottom: "24px", flexWrap: "wrap" }}>
+      {/* Filter chips: mobile par chhote padding, wrap ho jaate hain */}
+      <div className="mb-6 flex flex-wrap gap-2 sm:gap-2.5">
         {dynamicFilters.map((f) => (
-          <button key={f} onClick={() => setActiveFilter(f)} style={{
-            padding: "10px 20px", borderRadius: "20px", fontWeight: 500, fontSize: "14px", cursor: "pointer",
-            background: activeFilter === f ? C.grad : C.border,
-            color: activeFilter === f ? "#fff" : C.dark,
-            border: activeFilter === f ? "none" : `1px solid ${C.muted}`,
-            boxShadow: activeFilter === f ? "0 8px 20px rgba(74,55,40,0.3)" : "none",
-            transform: activeFilter === f ? "scale(1.05)" : "scale(1)",
-            transition: "all 0.3s",
-          }}>{f}</button>
+          <button
+            key={f}
+            onClick={() => setActiveFilter(f)}
+            className="px-3.5 py-2 text-[13px] sm:px-5 sm:py-2.5 sm:text-sm"
+            style={{
+              borderRadius: "20px", fontWeight: 500, cursor: "pointer",
+              background: activeFilter === f ? C.grad : C.border,
+              color: activeFilter === f ? "#fff" : C.dark,
+              border: activeFilter === f ? "none" : `1px solid ${C.muted}`,
+              boxShadow: activeFilter === f ? "0 8px 20px rgba(74,55,40,0.3)" : "none",
+              transform: activeFilter === f ? "scale(1.05)" : "scale(1)",
+              transition: "all 0.3s",
+            }}
+          >
+            {f}
+          </button>
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+      {/* Cards: mobile par 1 column, tablet/desktop par 2 columns */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
 
         {loading && (
           <>
@@ -507,38 +514,38 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           </div>
         )}
 
-               {!loading && filtered.map((session) => {
+        {!loading && filtered.map((session) => {
           const svc = getServiceFromSession(session);
           const myBookings = session.bookings?.filter(
             (b: any) => b.menteeId === currentUserId
           ) ?? [];
           const latestBooking = myBookings[myBookings.length - 1];
-          // ✅ NEW — ask_query ke liye asli status Query model se lo, Booking se nahi
+          // NEW: ask_query ke liye asli status Query model se lo, Booking se nahi
           const latestQuery = session.sessionType === "ask_query"
-          ? [...myQueries]
-              .filter((q) => (q as any).sessionId === session.sessionId) // TODO: confirm correct field on QueryItem
-              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
-          : undefined;
+            ? [...myQueries]
+                .filter((q) => (q as any).sessionId === session.sessionId) // TODO: confirm correct field on QueryItem
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+            : undefined;
           const wl = waitlistEntries[session.sessionId];
           return (
             <div key={session.sessionId}
-            style={{
-              borderRadius: "16px", padding: "20px", background: C.bg,
-              border: `1px solid ${C.border}`, position: "relative",
-              boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
-            }}>
-            <ServiceImageBanner
-              imageSrc={getServiceImage(session)}
-              alt={session.title}
-              icon={<Sparkles size={24} color="#ffffff" style={{ opacity: 0.6 }} />}
-            />
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-              <span>{getIcon(session.sessionType)}</span>
-              <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "12px", background: C.border, color: C.dark }}>
-                {SESSION_TYPE_FILTER[session.sessionType] || session.sessionType}
-              </span>
-            </div>
-              <h3 style={{ fontWeight: "bold", color: C.dark, fontSize: "14px", marginBottom: "8px", lineHeight: "1.4" }}>{session.title}</h3>
+              className="min-w-0 p-4 sm:p-5"
+              style={{
+                borderRadius: "16px", background: C.bg,
+                border: `1px solid ${C.border}`, position: "relative",
+                boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
+              }}>
+              <ServiceImageBanner
+                imageSrc={getServiceImage(session)}
+                alt={session.title}
+                icon={<Sparkles size={24} color="#ffffff" style={{ opacity: 0.6 }} />}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "12px", background: C.border, color: C.dark }}>
+                  {SESSION_TYPE_FILTER[session.sessionType] || session.sessionType}
+                </span>
+              </div>
+              <h3 style={{ fontWeight: "bold", color: C.dark, fontSize: "14px", marginBottom: "8px", lineHeight: "1.4", overflowWrap: "anywhere" }}>{session.title}</h3>
               {session.description && (() => {
                 const isExpanded = expandedDescIds.includes(session.sessionId);
                 const isLong = session.description.length > 100;
@@ -559,21 +566,22 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
               <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
                 <Clock /> {session.duration} Min
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              {/* flexWrap: chhoti screen par price aur buttons ek ke neeche ek aa jaayein */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
                 <span style={{ fontWeight: "bold", color: session.pricing?.basePrice === 0 ? "#10b981" : C.dark, fontSize: "15px" }}>
                   {session.pricing?.basePrice === 0 ? "Free" : `₹${session.pricing?.basePrice}`}
                 </span>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
-                {session.sessionType === "ask_query" ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px", maxWidth: "100%" }}>
+                  {session.sessionType === "ask_query" ? (
                     latestQuery && latestQuery.status === "pending" && (
                       <div style={{ fontSize: "10px", fontWeight: 700, color: "#10b981", textAlign: "right" }}>
-                        ✅ Your query is pending a reply
+                        Your query is pending a reply
                       </div>
                     )
                   ) : (
                     latestBooking && (latestBooking.status === "confirmed" || latestBooking.status === "pending") && (
                       <div style={{ fontSize: "10px", fontWeight: 700, color: "#10b981", textAlign: "right" }}>
-                        {latestBooking.status === "confirmed" ? "✅ You have a confirmed session" : "✅ You have a session pending confirmation"}
+                        {latestBooking.status === "confirmed" ? "You have a confirmed session" : "You have a session pending confirmation"}
                       </div>
                     )
                   )}
@@ -585,10 +593,10 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: "12px", fontWeight: 700, color: wl.status === "notified" ? "#10b981" : C.dark }}>
                         {wl.status === "notified"
-                          ? "🎉 Slot available — book now"
-                          : `⏳ On waitlist · #${wl.queuePosition ?? "-"}`}
+                          ? "Slot available, book now"
+                          : `On waitlist · #${wl.queuePosition ?? "-"}`}
                       </div>
-                      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "8px" }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "flex-end", marginTop: "8px" }}>
                         {wl.status === "notified" && (
                           <button
                             onClick={() => onServiceClick(svc)}
@@ -611,7 +619,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                       </div>
                     </div>
                   ) : (
-                    <div style={{ display: "flex", gap: "8px" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "8px" }}>
                       <button onClick={() => onServiceClick(svc)} style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}>
                         {latestBooking ? "Book Another Slot" : "Book"}
                       </button>
@@ -633,10 +641,10 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           );
         })}
 
-        {/* ✅ Group session cards — clicking anywhere on the card (including
+        {/* Group session cards - clicking anywhere on the card (including
             the action button) only OPENS the detail modal. No API call
             happens from here. The modal is where the user sees the
-            date/time/duration/seat-count and then explicitly confirms —
+            date/time/duration/seat-count and then explicitly confirms;
             only that confirm click sends the join request. */}
         {!loading && showGroupSessions && visibleGroupSessions.map((group) => {
           const seatsLeft = (group.maxParticipants ?? 0) - (group.currentParticipants ?? 0);
@@ -646,8 +654,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
           const pricePerPerson = group.pricing?.pricePerPerson ?? group.pricePerPerson ?? 0;
           const statusMeta = myRequestStatus ? REQUEST_STATUS_META[myRequestStatus] : undefined;
 
-                                   // ✅ CHANGED: card click always opens the detail modal
-          // first (same as fixed-date sessions) — the slot picker
+          // CHANGED: card click always opens the detail modal
+          // first (same as fixed-date sessions) - the slot picker
           // (CalendarStep) now only opens from the "Select a Slot" button
           // inside that modal, not directly from the card.
           const isTemplate = !!group.isTemplate;
@@ -655,13 +663,12 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
             setDetailGroup(group);
           };
 
-
-
           return (
             <div key={group.sessionId}
               onClick={openGroupSession}
+              className="min-w-0 p-4 sm:p-5"
               style={{
-                borderRadius: "16px", padding: "20px", background: C.bg,
+                borderRadius: "16px", background: C.bg,
                 border: `1px solid ${C.border}`, position: "relative",
                 boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
                 cursor: "pointer",
@@ -681,8 +688,8 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                 alt={group.title}
                 icon={<Users size={24} color="#ffffff" style={{ opacity: 0.6 }} />}
               />
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                <span>👥</span>
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "8px" }}>
+                <Users size={14} color={C.dark} />
                 <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "12px", background: C.border, color: C.dark }}>
                   Group Session
                 </span>
@@ -692,7 +699,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   </span>
                 )}
               </div>
-              <h3 style={{ fontWeight: "bold", color: C.dark, fontSize: "14px", marginBottom: "8px", lineHeight: "1.4" }}>
+              <h3 style={{ fontWeight: "bold", color: C.dark, fontSize: "14px", marginBottom: "8px", lineHeight: "1.4", overflowWrap: "anywhere" }}>
                 {group.title}
               </h3>
               {group.description && (() => {
@@ -712,19 +719,19 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   </p>
                 );
               })()}
-              <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: C.mid, marginBottom: "4px" }}>
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px", fontSize: "12px", color: C.mid, marginBottom: "4px" }}>
                 <Clock /> {formatGroupDate(group.scheduledAt)} · {group.duration} Min
               </div>
               <div style={{ fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
                 {seatsLeft > 0 ? `${seatsLeft} seats available` : "Session full"} · {group.currentParticipants ?? 0}/{group.maxParticipants ?? 0} enrolled
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
                 <span style={{ fontWeight: "bold", color: pricePerPerson === 0 ? "#10b981" : C.dark, fontSize: "15px" }}>
                   {pricePerPerson === 0 ? "Free" : `₹${pricePerPerson}/person`}
                 </span>
                 {isTemplate ? (
-                  // ✅ CHANGED: opens the detail modal instead of jumping
-                  // straight to the slot picker — the slot picker now opens
+                  // CHANGED: opens the detail modal instead of jumping
+                  // straight to the slot picker - the slot picker now opens
                   // from inside the modal's "Select a Slot" button. Label
                   // switches to "Book Another Slot" once the mentee has
                   // already booked at least one slot for this template.
@@ -737,19 +744,16 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                   >
                     {bookedSessionIds.includes(group.sessionId) ? "Book Another Slot" : "View Details"}
                   </button>
-                               ) : statusMeta ? (
-                                <div style={{ fontSize: "12px", fontWeight: 700, color: statusMeta.fg }}>
-                                  {myRequestStatus === "pending" && "⏳ "}
-                                  {myRequestStatus === "accepted" && "✅ "}
-                                  {myRequestStatus === "rejected" && "❌ "}
-                                  {statusMeta.label}
-                                </div>
-                              ) : seatsLeft <= 0 ? (
+                ) : statusMeta ? (
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: statusMeta.fg }}>
+                    {statusMeta.label}
+                  </div>
+                ) : seatsLeft <= 0 ? (
                   <span style={{ fontSize: "12px", fontWeight: 700, color: C.mid }}>Full</span>
                 ) : (
-                  // ✅ FIX: used to call handleJoinGroupSession() directly,
+                  // FIX: used to call handleJoinGroupSession() directly,
                   // which fired MentorService.joinGroupSession() (old
-                  // direct-join) the instant it was clicked — no details
+                  // direct-join) the instant it was clicked - no details
                   // screen, no confirmation. It now only opens the same
                   // detail modal the card click opens; the request is sent
                   // from inside that modal instead.
@@ -767,7 +771,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
             </div>
           );
         })}
-          </div>
+      </div>
 
       {/* ================= Group Session Detail Modal ================= */}
       {detailGroup && (
@@ -787,34 +791,35 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
         />
       )}
 
-{waitlistTarget && (
-  <WaitlistModal
-    service={{
-      title: waitlistTarget.title,
-      sessionType: waitlistTarget.sessionType,
-      duration: waitlistTarget.duration,
-      price: waitlistTarget.pricing?.basePrice,
-    }}
-    mentorName={mentorName}
-    onClose={() => setWaitlistTarget(null)}
-    onConfirm={(note) => handleJoinWaitlist(waitlistTarget, note)}
-  />
-)}
+      {waitlistTarget && (
+        <WaitlistModal
+          service={{
+            title: waitlistTarget.title,
+            sessionType: waitlistTarget.sessionType,
+            duration: waitlistTarget.duration,
+            price: waitlistTarget.pricing?.basePrice,
+          }}
+          mentorName={mentorName}
+          onClose={() => setWaitlistTarget(null)}
+          onConfirm={(note) => handleJoinWaitlist(waitlistTarget, note)}
+        />
+      )}
 
-{toast && (
-  <div
-    style={{
-      position: "fixed", top: 20, right: 20, zIndex: 9999, padding: "12px 16px", borderRadius: 12,
-      fontSize: 13, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-      background: toast.type === "success" ? "#dcfce7" : "#fee2e2",
-      color: toast.type === "success" ? "#15803d" : "#dc2626",
-      border: `1px solid ${toast.type === "success" ? "#86efac" : "#fca5a5"}`,
-    }}
-  >
-    {toast.msg}
-  </div>
-)}
-</div>
+      {toast && (
+        <div
+          className="left-3 right-3 sm:left-auto sm:right-5"
+          style={{
+            position: "fixed", top: 20, zIndex: 9999, padding: "12px 16px", borderRadius: 12,
+            fontSize: 13, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+            background: toast.type === "success" ? "#dcfce7" : "#fee2e2",
+            color: toast.type === "success" ? "#15803d" : "#dc2626",
+            border: `1px solid ${toast.type === "success" ? "#86efac" : "#fca5a5"}`,
+          }}
+        >
+          {toast.msg}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -900,7 +905,7 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
           overflow: "hidden",
         }}
       >
-        {/* 📌 Static (Fixed) Pinned Close Button */}
+        {/* Static (fixed) pinned close button */}
         <button
           onClick={onClose}
           style={{
@@ -929,7 +934,7 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
           <X size={18} />
         </button>
 
-        {/* 📜 Inner Scrollable Content Wrapper */}
+        {/* Inner scrollable content wrapper */}
         <div
           style={{
             flex: 1,
@@ -970,7 +975,7 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
             </span>
           </div>
 
-          <h2 style={{ fontSize: "19px", fontWeight: 700, color: C.dark, marginBottom: "6px", lineHeight: "1.35" }}>
+          <h2 style={{ fontSize: "19px", fontWeight: 700, color: C.dark, marginBottom: "6px", lineHeight: "1.35", overflowWrap: "anywhere" }}>
             {detailGroup.title}
           </h2>
 
@@ -990,7 +995,7 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
           {scheduledDate && (
             <div style={{
               background: C.bg, borderRadius: "14px", padding: "14px 16px", border: `1px solid ${C.border}`,
-              marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between",
+              marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px",
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <Calendar size={16} color={C.dark} />
@@ -1034,7 +1039,7 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
               )}
               {isPending && (
                 <div style={{ fontSize: "12px", color: C.mid, marginTop: "6px", lineHeight: "1.5" }}>
-                  Join request sent. Waiting for mentor approval — you'll be notified once it's reviewed.
+                  Join request sent. Waiting for mentor approval - you'll be notified once it's reviewed.
                 </div>
               )}
               {isRejected && (
@@ -1084,19 +1089,19 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
           )}
 
           <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
-            <div style={{ flex: 1, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
+            <div style={{ flex: 1, minWidth: 0, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
               <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px", color: C.mid }}><Clock /></div>
               <div style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>{detailGroup.duration} min</div>
               <div style={{ fontSize: "10px", color: C.mid }}>Duration</div>
             </div>
-            <div style={{ flex: 1, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
+            <div style={{ flex: 1, minWidth: 0, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
               <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px", color: C.mid }}><IndianRupee size={15} /></div>
               <div style={{ fontSize: "13px", fontWeight: 700, color: pricePerPerson === 0 ? "#10b981" : C.dark }}>
                 {pricePerPerson === 0 ? "Free" : `₹${pricePerPerson}`}
               </div>
               <div style={{ fontSize: "10px", color: C.mid }}>Per person</div>
             </div>
-            <div style={{ flex: 1, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
+            <div style={{ flex: 1, minWidth: 0, background: C.bg, borderRadius: "12px", padding: "12px", border: `1px solid ${C.border}`, textAlign: "center" }}>
               <div style={{ display: "flex", justifyContent: "center", marginBottom: "4px", color: C.mid }}><Users size={15} /></div>
               <div style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>
                 {detailGroup.currentParticipants ?? 0}/{detailGroup.maxParticipants ?? 0}
@@ -1111,7 +1116,7 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
                 <ClipboardList size={15} color={C.dark} />
                 <span style={{ fontSize: "13px", fontWeight: 700, color: C.dark }}>Agenda</span>
               </div>
-              <div style={{ background: C.bg, borderRadius: "12px", padding: "12px 14px", border: `1px solid ${C.border}`, fontSize: "12.5px", color: C.dark, lineHeight: "1.5" }}>
+              <div style={{ background: C.bg, borderRadius: "12px", padding: "12px 14px", border: `1px solid ${C.border}`, fontSize: "12.5px", color: C.dark, lineHeight: "1.5", overflowWrap: "anywhere" }}>
                 {detailGroup.agenda}
               </div>
             </div>
@@ -1136,7 +1141,7 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
           )}
         </div>
 
-        {/* 🔘 Sticky Fixed Footer */}
+        {/* Sticky fixed footer */}
         <div style={{ padding: "16px 20px", borderTop: `1px solid ${C.border}`, background: C.surface, display: "flex", gap: "10px", flexShrink: 0 }}>
           <button onClick={onClose} style={{ flex: 1, padding: "12px", borderRadius: "12px", fontSize: "13.5px", fontWeight: 600, background: C.border, color: C.dark, border: "none", cursor: "pointer" }}>
             Close
@@ -1175,7 +1180,7 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
                   cursor: groupActionBusy ? "not-allowed" : "pointer", opacity: groupActionBusy ? 0.6 : 1,
                 }}
               >
-                {groupActionBusy ? "Cancelling..." : "⏳ Cancel Request"}
+                {groupActionBusy ? "Cancelling..." : "Cancel Request"}
               </button>
             ) : seatsLeft > 0 ? (
               <button
@@ -1193,7 +1198,7 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
           )}
         </div>
       </div>
-      </div>,
+    </div>,
     document.body
   );
 };
