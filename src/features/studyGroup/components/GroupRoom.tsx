@@ -589,14 +589,16 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       activeLiveRoom.host?._id === currentUserId ||
       activeLiveRoom.host === currentUserId;
 
+    // Ask first: cancelling must leave the host in the call
+    if (isHost && !window.confirm("End the live room for everyone?")) return;
+
     try {
-      // 1. WebRTC cleanup first
+      // 1. WebRTC cleanup
       leaveWebRTCRoom();
       setShowLiveRoomView(false);
 
       // 2. HTTP leave/end
       if (isHost) {
-        if (!window.confirm("End the live room for everyone?")) return;
         await dispatch(endLiveRoomThunk(activeLiveRoom.roomId)).unwrap();
       } else {
         await dispatch(leaveLiveRoomThunk(activeLiveRoom.roomId)).unwrap();
