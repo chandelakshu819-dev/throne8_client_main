@@ -24,6 +24,10 @@ export const createMentorSchema = z.object({
     .refine(
       (val: any) => val.includes('linkedin.com'),
       'Must be a LinkedIn URL'
+    )
+    .refine(
+      (val: any) => /^https?:\/\/([a-z]{2,3}\.)?linkedin\.com\/(in|pub)\/[^\s/?#]+\/?([?#]\S*)?$/i.test(val.trim()),
+      'Please enter your LinkedIn profile URL (e.g. https://www.linkedin.com/in/username), not the feed or home page.'
     ),
 
   githubUrl: z

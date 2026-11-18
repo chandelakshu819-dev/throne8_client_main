@@ -251,8 +251,8 @@ const createSchema = z.object({
         .string()
         .min(1, "LinkedIn profile URL is required.")
         .regex(
-            /^(https?:\/\/)?(www\.)?linkedin\.com\/.+/i,
-            "Please provide a valid LinkedIn profile URL (e.g. https://linkedin.com/in/username)."
+            /^(https?:\/\/)?([a-z]{2,3}\.)?linkedin\.com\/(in|pub)\/[^\s/?#]+\/?([?#]\S*)?$/i,
+            "Please provide your LinkedIn profile URL (e.g. https://linkedin.com/in/username), not the feed or home page."
         ),
     githubUrl: z
         .string()

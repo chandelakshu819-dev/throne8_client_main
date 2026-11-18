@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import AdminService from "@/lib/api/admin.service";
 import ProfileService from "@/lib/api/profile.service";
-import { safeUrl } from "@/shared/utils/mentorFormat";
+import { safeUrl, safeLinkedInUrl } from "@/shared/utils/mentorFormat";
 
 interface MentorAvatarProps {
   photoUrl?: string | null;
@@ -441,9 +441,9 @@ export default function PendingMentorsView({ onCountChange }: PendingMentorsView
                         <div className="text-[#4a3728] font-medium">
                           {mentor.experience?.currentRole || "Not specified"}
                         </div>
-                        {safeUrl(mentor.socialProof?.linkedinUrl) && (
+                        {safeLinkedInUrl(mentor.socialProof?.linkedinUrl) && (
                           <a
-                            href={safeUrl(mentor.socialProof?.linkedinUrl)!}
+                            href={safeLinkedInUrl(mentor.socialProof?.linkedinUrl)!}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-[10px] text-[#2563eb] hover:underline mt-0.5"
@@ -723,9 +723,9 @@ export default function PendingMentorsView({ onCountChange }: PendingMentorsView
                   External Profiles & Links
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {safeUrl(selectedMentor.socialProof?.linkedinUrl) && (
+                  {safeLinkedInUrl(selectedMentor.socialProof?.linkedinUrl) && (
                     <a
-                      href={safeUrl(selectedMentor.socialProof?.linkedinUrl)!}
+                      href={safeLinkedInUrl(selectedMentor.socialProof?.linkedinUrl)!}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e0d8cf] text-[#2563eb] hover:bg-[#fbf7f3]"
@@ -778,7 +778,7 @@ export default function PendingMentorsView({ onCountChange }: PendingMentorsView
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
-                  {!safeUrl(selectedMentor.socialProof?.linkedinUrl) &&
+                  {!safeLinkedInUrl(selectedMentor.socialProof?.linkedinUrl) &&
                     !safeUrl(selectedMentor.socialProof?.githubUrl) &&
                     !safeUrl(selectedMentor.socialProof?.portfolioUrl) &&
                     !safeUrl(selectedMentor.socialProof?.twitterUrl) &&

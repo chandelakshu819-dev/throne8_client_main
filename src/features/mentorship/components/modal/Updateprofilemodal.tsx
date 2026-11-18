@@ -220,6 +220,7 @@ export default function UpdateProfileModal({
         if (domains.length === 0) { setError("Select at least 1 domain."); setActiveTab("expertise"); return; }
         if (skills.length === 0) { setError("Add at least 1 skill."); setActiveTab("expertise"); return; }
         if (languages.length === 0) { setError("Add at least 1 language."); setActiveTab("experience"); return; }
+        if (linkedinUrl.trim() && !/^https?:\/\/([a-z]{2,3}\.)?linkedin\.com\/(in|pub)\/[^\s/?#]+\/?([?#]\S*)?$/i.test(linkedinUrl.trim())) { setError("Please enter your LinkedIn profile URL (e.g. https://www.linkedin.com/in/username), not the LinkedIn feed or home page."); setActiveTab("social"); return; }
 
         setSaving(true);
         try {

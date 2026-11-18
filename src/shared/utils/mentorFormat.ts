@@ -119,6 +119,30 @@ export function safeUrl(raw?: string | null): string | null {
 }
 
 /**
+ * Cleans a LinkedIn profile URL to its canonical form:
+ *   https://www.linkedin.com/in/<username>/
+ * Drops tracking params (utm_*, trk, originalSubdomain...), hash, regional
+ * subdomains (in.linkedin.com) and adds the protocol when it is missing.
+ * Returns null when the value is not a LinkedIn profile (/in/ or /pub/).
+ */
+export function safeLinkedInUrl(raw?: string | null): string | null {
+    if (!raw || typeof raw !== "string") return null;
+    let trimmed = raw.trim();
+    if (!trimmed) return null;
+    if (!/^https?:\/\//i.test(trimmed)) trimmed = `https://${trimmed}`;
+    try {
+        const parsed = new URL(trimmed);
+        const host = parsed.hostname.toLowerCase();
+        if (host !== "linkedin.com" && !host.endsWith(".linkedin.com")) return null;
+        const m = parsed.pathname.match(/^\/(in|pub)\/([^/]+)/i);
+        if (!m) return null;
+        return `https://www.linkedin.com/${m[1].toLowerCase()}/${m[2]}/`;
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Shared domain rule (same as server): hostname matches domain or ends with ".<domain>"
  */
 export function isDomainAllowed(url: string, allowedDomains?: string[]): boolean {

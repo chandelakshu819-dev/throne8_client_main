@@ -24,7 +24,7 @@ import SeniorMentorApplicationService, {
   CollegeMentorStats,
   isPlaceholderStorageUrl,
 } from "@/lib/api/seniorMentorApplication.service";
-import { safeUrl } from "@/shared/utils/mentorFormat";
+import { safeUrl, safeLinkedInUrl } from "@/shared/utils/mentorFormat";
 
 interface CollegeMentorsViewProps {
   /** Number of applications waiting for admin action (pending + under review) */
@@ -977,7 +977,7 @@ export default function CollegeMentorsView({ onPendingCountChange }: CollegeMent
                     { label: "GitHub", url: selected.githubUrl, color: "#4a3728", icon: ExternalLink },
                     { label: "Portfolio", url: selected.portfolioUrl, color: "#0f766e", icon: ExternalLink },
                   ].map((link) => {
-                    const href = safeUrl(link.url);
+                    const href = link.label === "LinkedIn" ? safeLinkedInUrl(link.url) : safeUrl(link.url);
                     if (!href) return null;
                     const Icon = link.icon;
                     return (
