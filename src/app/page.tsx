@@ -24,7 +24,8 @@ export default function Home() {
       }
       router.replace(HOME_PATH);
     } else {
-      router.replace('/login');
+      // Logged-out user ko pehle Mentorship page dikhao (login nahi)
+      router.replace('/mentorship');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isLoading]);
