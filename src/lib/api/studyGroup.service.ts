@@ -3178,6 +3178,19 @@ class StudyGroupService {
     }
   }
 
+  /** Live rooms running in any of my groups (fallback for the global Join banner). */
+  static async getMyActiveLiveRooms(): Promise<any[]> {
+    try {
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT, "/my-active")}`
+      );
+      return Array.isArray(res?.data) ? res.data : [];
+    } catch {
+      // Silent: this is only a fallback check
+      return [];
+    }
+  }
+
   static async getGroupActiveLiveRoom(groupId: string): Promise<any> {
     try {
       const { data: res } = await api.get(
