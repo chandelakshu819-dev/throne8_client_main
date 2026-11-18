@@ -291,7 +291,7 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
             onClick={() => setSuccessBanner(null)}
             className="text-xs font-bold hover:opacity-75 px-2 py-1"
           >
-            ✕
+            Close
           </button>
         </div>
       )}
@@ -409,8 +409,18 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
               const matchedSession = sessionMap.get(r.sessionId);
               const mentorName = r.mentor?.firstName && r.mentor?.lastName ? `${r.mentor.firstName} ${r.mentor.lastName}` : matchedSession?.mentorName || "Mentor";
               const photo = r.mentor?.profilePhotoId || matchedSession?.mentorProfilePhoto;
-              const sessionTitle = matchedSession?.title || "Mentorship Session";
-              const sessionDate = formatDateStr(matchedSession?.startTime || matchedSession?.scheduledAt || r.createdAt);
+
+              // Query review: session nahi hai, isliye question dikhao
+              const isQueryReview = (r as any).type === "query";
+              const queryQuestion = ((r as any).query?.question as string | undefined) || "";
+              const sessionTitle = isQueryReview
+                ? (queryQuestion ? `Query: ${queryQuestion}` : "Mentor query")
+                : matchedSession?.title || "Mentorship Session";
+              const sessionDate = isQueryReview
+                ? formatDateStr(r.createdAt)
+                : formatDateStr(matchedSession?.startTime || matchedSession?.scheduledAt || r.createdAt);
+              const showVerified = !!r.isVerified && !isQueryReview;
+
               const reviewId = r.reviewId || r._id || r.id || `rev-${idx}`;
               const rating = r.rating || 0;
               const comment = r.comment || "No written feedback provided.";
@@ -445,7 +455,7 @@ export default function UserDashboardReviewsPage({ sessions: propSessions = [] }
                           <p className="text-sm font-bold truncate" style={{ color: COLORS.ink }}>
                             {mentorName}
                           </p>
-                          {r.isVerified && (
+                          {showVerified && (
                             <span
                               className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
                               style={{ backgroundColor: COLORS.chip, color: COLORS.accent }}

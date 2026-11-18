@@ -97,18 +97,21 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-    // ✅ NEW: ?book=true&serviceId=<id> aane par seedha calendar step kholo
+    // NEW: ?book=true&serviceId=<id> aane par seedha calendar step kholo
     useEffect(() => {
         if (!deepLinkBook || !deepLinkServiceId || autoBookHandled.current) return;
         autoBookHandled.current = true;
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const matchesId = (s: any) =>
             String(s?.sessionId || s?._id || s?.id || "") === String(deepLinkServiceId);
 
         // 1) Pehle isi mentor ke sessions me dhoondo (ServicesSection wahi source use karta hai,
         //    isliye ye sabse reliable hai). 2) Na mile to getSessionById try karo.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const loadSession = async (): Promise<any | null> => {
             try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const listRes: any = await SessionService.getMentorSessions(mentorId);
                 const list = Array.isArray(listRes) ? listRes : listRes?.data ?? [];
                 const found = Array.isArray(list) ? list.find(matchesId) : null;
@@ -117,6 +120,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                 console.warn("[MentorProfile] getMentorSessions failed", e);
             }
             try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const res: any = await SessionService.getSessionById(deepLinkServiceId);
                 return res?.data || res?.session || res || null;
             } catch (e) {
@@ -126,6 +130,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
         };
 
         loadSession()
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .then((session: any) => {
                 const sessionId = session?.sessionId || session?._id || session?.id;
 
@@ -214,25 +219,33 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
     if (bookingStep === "confirmation") return <ConfirmationStep selectedService={selectedService} calendarData={calendarData} formData={formData} onReset={resetBooking} />;
 
     return (
-        <div style={{ minHeight: "100vh", background: C.bg }}>
+        // overflow-x-hidden: koi bhi child galti se bada ho to page side me scroll na ho
+        <div className="w-full overflow-x-hidden" style={{ minHeight: "100vh", background: C.bg }}>
             {bookingSuccessMsg && (
-                <div style={{
-                    position: "fixed", top: 20, right: 20, zIndex: 3000, padding: "14px 20px",
-                    borderRadius: "12px", fontSize: "14px", fontWeight: 600, color: "#15803d",
-                    background: "#dcfce7", border: "1px solid #86efac", boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                }}>
+                <div
+                    className="left-3 right-3 sm:left-auto sm:right-5"
+                    style={{
+                        position: "fixed", top: 20, zIndex: 3000, padding: "14px 20px",
+                        borderRadius: "12px", fontSize: "14px", fontWeight: 600, color: "#15803d",
+                        background: "#dcfce7", border: "1px solid #86efac", boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                    }}
+                >
                     {bookingSuccessMsg}
                 </div>
             )}
-            <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "88px 16px 24px" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: "24px", alignItems: "start" }}>
-                    <MentorSidebar
-                        mentorData={mentorData}
-                        currentUserId={user?.userId}
-                        onBack={() => router.back()}
-                        onEditClick={() => setEditModalOpen(true)}
-                    />
-                    <div>
+
+            {/* Mobile: 1 column (pehle profile card, phir services). Desktop (lg+): 340px sidebar + baaki jagah services */}
+            <div className="mx-auto w-full max-w-[1400px] px-3 pb-6 pt-[80px] sm:px-4 sm:pt-[88px]">
+                <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-6">
+                    <div className="min-w-0">
+                        <MentorSidebar
+                            mentorData={mentorData}
+                            currentUserId={user?.userId}
+                            onBack={() => router.back()}
+                            onEditClick={() => setEditModalOpen(true)}
+                        />
+                    </div>
+                    <div className="min-w-0">
                         <ServicesSection
                             onServiceClick={handleServiceClick}
                             mentorId={mentorId}

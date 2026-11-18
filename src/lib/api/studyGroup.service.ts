@@ -1195,6 +1195,55 @@ class StudyGroupService {
   }
 
   /**
+   * 📊 GET MEMBER STATS (leader only)
+   * GET /member/:groupId/members/stats
+   * Real attendance % and warning count for every active member.
+   */
+  static async getGroupMemberStats(groupId: string): Promise<{
+    members: {
+      userId: string;
+      role: string;
+      attendancePercentage: number | null;
+      totalDays: number;
+      warningCount: number;
+    }[];
+    averageAttendance: number | null;
+    warnedMembers: number;
+  }> {
+    try {
+      const { data } = await api.get(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT}/${groupId}/members/stats`
+      );
+      return data.data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const msg = error.response?.data?.message;
+        if (msg) throw new Error(msg);
+      }
+      throw new Error("Failed to load member stats.");
+    }
+  }
+
+  /**
+   * ⚠️ WARN MEMBER (leader or moderator)
+   * POST /member/:groupId/warn/:userId   body: { reason }
+   */
+  static async warnMember(groupId: string, userId: string, reason: string): Promise<void> {
+    try {
+      await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT}/${groupId}/warn/${userId}`,
+        { reason }
+      );
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const msg = error.response?.data?.message;
+        if (msg) throw new Error(msg);
+      }
+      throw new Error("Failed to warn member.");
+    }
+  }
+
+  /**
    * 🔢 GET MEMBER COUNT
    * GET /:groupId/member-count
    */
@@ -3126,6 +3175,19 @@ class StudyGroupService {
         if (msg) throw new Error(msg);
       }
       throw new Error("Failed to fetch live room.");
+    }
+  }
+
+  /** Live rooms running in any of my groups (fallback for the global Join banner). */
+  static async getMyActiveLiveRooms(): Promise<any[]> {
+    try {
+      const { data: res } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_LIVE_ROOMS_ENDPOINT, "/my-active")}`
+      );
+      return Array.isArray(res?.data) ? res.data : [];
+    } catch {
+      // Silent: this is only a fallback check
+      return [];
     }
   }
 

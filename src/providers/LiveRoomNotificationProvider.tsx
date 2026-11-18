@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getSocket } from '@/core/realtime/socket.client';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import StudyGroupService from '@/lib/api/studyGroup.service';
 
 interface LiveRoomStartedPayload {
   roomId: string;
@@ -22,6 +23,7 @@ interface LiveRoomEndedPayload {
 }
 
 const AUTO_HIDE_MS = 60_000;
+const POLL_INTERVAL_MS = 15_000;
 
 /**
  * Global "live session started" banner for study groups.
@@ -49,21 +51,27 @@ export default function LiveRoomNotificationProvider({ children }: { children: R
     setLive(null);
   };
 
+  // Keep latest pathname in a ref so route changes don't tear down the listeners
+  const pathnameRef = useRef(pathname);
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
+
   useEffect(() => {
     if (!isAuthenticated || !user?.userId) return;
-    const socket = getSocket();
-    if (!socket) return;
+    let cancelled = false;
+    let attachedSocket: ReturnType<typeof getSocket> = null;
 
-    const handleStarted = (payload: LiveRoomStartedPayload) => {
+    const show = (payload: LiveRoomStartedPayload) => {
       if (!payload?.roomId || !payload?.groupId) return;
       if (payload.hostId && payload.hostId === user.userId) return;
 
-      // De-dupe repeated events for the same room
+      // De-dupe: socket event and polling can report the same room
       if (lastRoomIdRef.current === payload.roomId) return;
       lastRoomIdRef.current = payload.roomId;
 
       // Already on this group's page: the page shows its own Join button
-      if (pathname?.includes(`/study/my-groups/${payload.groupId}`)) return;
+      if (pathnameRef.current?.includes(`/study/my-groups/${payload.groupId}`)) return;
 
       clearHideTimer();
       setLive(payload);
@@ -82,14 +90,54 @@ export default function LiveRoomNotificationProvider({ children }: { children: R
       });
     };
 
-    socket.on('live-room:started', handleStarted);
-    socket.on('live-room:ended', handleEnded);
+    // Fallback: ask the server which rooms are live (missed socket event / offline / reconnect)
+    const checkLiveRooms = async () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      const rooms = await StudyGroupService.getMyActiveLiveRooms();
+      if (cancelled) return;
+
+      if (rooms.length > 0) {
+        show(rooms[0]);
+      } else {
+        // Nothing live anymore: drop a banner whose "ended" event we missed
+        lastRoomIdRef.current = null;
+        dismiss();
+      }
+    };
+
+    // The socket may not exist yet at first render, so (re)try attaching on every tick
+    const attachSocket = () => {
+      const socket = getSocket();
+      if (!socket || socket === attachedSocket) return;
+      attachedSocket = socket;
+      socket.on('live-room:started', show);
+      socket.on('live-room:ended', handleEnded);
+      socket.on('connect', checkLiveRooms);
+    };
+
+    attachSocket();
+    void checkLiveRooms();
+
+    const timer = setInterval(() => {
+      attachSocket();
+      void checkLiveRooms();
+    }, POLL_INTERVAL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void checkLiveRooms();
+    };
+    document.addEventListener('visibilitychange', onVisible);
 
     return () => {
-      socket.off('live-room:started', handleStarted);
-      socket.off('live-room:ended', handleEnded);
+      cancelled = true;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      if (attachedSocket) {
+        attachedSocket.off('live-room:started', show);
+        attachedSocket.off('live-room:ended', handleEnded);
+        attachedSocket.off('connect', checkLiveRooms);
+      }
     };
-  }, [isAuthenticated, user?.userId, pathname]);
+  }, [isAuthenticated, user?.userId]);
 
   useEffect(() => clearHideTimer, []);
 

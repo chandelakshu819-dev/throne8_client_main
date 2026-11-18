@@ -117,9 +117,12 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
         </button>
     );
 
+    // Sticky sirf desktop (lg+) par. Mobile par sticky hone se card content ke upar chipak jata hai.
+    const wrapperClass = "w-full min-w-0 lg:sticky lg:top-[100px]";
+
     if (!mentorData) {
         return (
-            <div style={{ position: "sticky", top: "100px" }}>
+            <div className={wrapperClass}>
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                 <div style={{ position: "relative", borderRadius: "24px", padding: "60px 24px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", background: C.bg, border: `1px solid ${C.border}` }}>
                     {backButton}
@@ -235,7 +238,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
     };
 
     return (
-        <div style={{ position: "sticky", top: "100px" }}>
+        <div className={wrapperClass}>
             <div style={{ position: "relative", borderRadius: "24px", overflow: "hidden", boxShadow: "0 20px 60px rgba(74,55,40,0.15)", border: `1px solid ${C.border}` }}>
 
                 <div style={{ position: "relative", height: "120px", background: backgroundImage ? `url(${backgroundImage}) center/cover` : C.grad }}>
@@ -287,13 +290,17 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                     </div>
                 </div>
 
-                <div style={{ background: C.bg, padding: "60px 24px 28px", textAlign: "center" }}>
-                    <h1 style={{ fontSize: "20px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>{name}</h1>
+                {/* Horizontal padding mobile par 16px, sm+ par 24px */}
+                <div
+                    className="px-4 sm:px-6"
+                    style={{ background: C.bg, paddingTop: "60px", paddingBottom: "28px", textAlign: "center" }}
+                >
+                    <h1 style={{ fontSize: "20px", fontWeight: "bold", color: C.dark, marginBottom: "4px", overflowWrap: "anywhere" }}>{name}</h1>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", marginBottom: "10px" }}>
                         <Star filled style={{ color: "#f59e0b" }} />
                         <span style={{ fontWeight: "bold", color: C.dark }}>{rating}</span>
                     </div>
-                    <p style={{ fontSize: "13px", color: C.mid, marginBottom: "4px" }}>{currentRole}</p>
+                    <p style={{ fontSize: "13px", color: C.mid, marginBottom: "4px", overflowWrap: "anywhere" }}>{currentRole}</p>
 
                     {domains.length > 0 && (
                         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "6px", marginTop: "8px" }}>
@@ -308,7 +315,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                         </div>
                     )}
 
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "20px", background: C.border, fontSize: "12px", color: C.dark, marginBottom: "20px", marginTop: "10px" }}>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "6px 14px", borderRadius: "20px", background: C.border, fontSize: "12px", color: C.dark, marginBottom: "20px", marginTop: "10px", maxWidth: "100%" }}>
                         <Briefcase /> {experience}
                     </div>
 
@@ -346,17 +353,17 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                     </div>
 
                     {(languages.length > 0 || timezone) && (
-                        <div style={{ display: "flex", gap: "10px", marginBottom: "20px", textAlign: "left" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "20px", textAlign: "left" }}>
                             {languages.length > 0 && (
-                                <div style={{ flex: 1, borderRadius: "12px", padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}` }}>
+                                <div style={{ flex: "1 1 120px", minWidth: 0, borderRadius: "12px", padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}` }}>
                                     <div style={{ fontSize: "10px", color: C.mid, marginBottom: "4px", textTransform: "uppercase", fontWeight: 700 }}>Languages</div>
-                                    <div style={{ fontSize: "12px", color: C.dark, fontWeight: 600 }}>{languages.join(", ")}</div>
+                                    <div style={{ fontSize: "12px", color: C.dark, fontWeight: 600, overflowWrap: "anywhere" }}>{languages.join(", ")}</div>
                                 </div>
                             )}
                             {timezone && (
-                                <div style={{ flex: 1, borderRadius: "12px", padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}` }}>
+                                <div style={{ flex: "1 1 120px", minWidth: 0, borderRadius: "12px", padding: "10px 12px", background: C.surface, border: `1px solid ${C.border}` }}>
                                     <div style={{ fontSize: "10px", color: C.mid, marginBottom: "4px", textTransform: "uppercase", fontWeight: 700 }}>Timezone</div>
-                                    <div style={{ fontSize: "12px", color: C.dark, fontWeight: 600 }}>{timezone}</div>
+                                    <div style={{ fontSize: "12px", color: C.dark, fontWeight: 600, overflowWrap: "anywhere" }}>{timezone}</div>
                                 </div>
                             )}
                         </div>
@@ -466,7 +473,7 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                                                 )}
                                                 {w.location && <div style={{ fontSize: "11px", color: C.mid, marginBottom: "2px" }}>{w.location}</div>}
                                                 {durationLabel && <div style={{ fontSize: "11px", color: C.mid, marginBottom: "6px" }}>{durationLabel}</div>}
-                                                {w.description && <div style={{ fontSize: "12px", color: C.dark, lineHeight: "1.5" }}>{w.description}</div>}
+                                                {w.description && <div style={{ fontSize: "12px", color: C.dark, lineHeight: "1.5", overflowWrap: "anywhere" }}>{w.description}</div>}
                                             </div>
                                         </div>
                                     </div>

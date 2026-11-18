@@ -17,9 +17,9 @@ import { deleteGroupThunk, fetchAllUsersThunk, fetchUserStreakThunk, fetchAttend
 import {useAuth} from "@/features/auth/hooks/useAuth";
 import { selectTimerStats } from "@/hooks/studyGroup/features/timer/timerSlice";
 import { getTimerStatsThunk } from "@/hooks/studyGroup/features/timer/timer.thunks";
-import { GroupVisibility } from "@/lib/api/studyGroup.service";
+import StudyGroupService, { GroupVisibility } from "@/lib/api/studyGroup.service";
 import { useGroupData } from "@/features/study-group/hooks/useGroupData";
-import { FormData, Group, Member, SettingsModalProps } from "@/features/study-group/interface";
+import { FormData, Group, SettingsModalProps } from "@/features/study-group/interface";
 import { STUDY_PAGE_WRAP } from "@/features/study-group/constants/pageLayout";
 
 
@@ -75,12 +75,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
     }
   }, [(group as any)?.groupId]);
 
-  const [members, setMembers] = useState<Member[]>([
-    { id: 1, name: "Priya Sharma", avatar: "👩‍🎓", joinedDate: "2024-01-10", studyTime: 145, attendance: 95, streak: 15, rank: 1, violations: 0, lastActive: "2 hours ago" },
-    { id: 2, name: "Rahul Kumar", avatar: "👨‍💻", joinedDate: "2024-01-12", studyTime: 98, attendance: 78, streak: 8, rank: 4, violations: 2, lastActive: "1 day ago" },
-    { id: 3, name: "Ananya Gupta", avatar: "👩‍💼", joinedDate: "2024-01-08", studyTime: 167, attendance: 92, streak: 20, rank: 2, violations: 0, lastActive: "30 mins ago" },
-    { id: 4, name: "Vikram Singh", avatar: "👨‍🔬", joinedDate: "2024-01-15", studyTime: 72, attendance: 65, streak: 5, rank: 6, violations: 3, lastActive: "3 days ago" },
-  ]);
+  // Real attendance % and warning count per member (leader only, from the server)
+  const [memberStats, setMemberStats] = useState<{
+    members: { userId: string; role: string; attendancePercentage: number | null; totalDays: number; warningCount: number }[];
+    averageAttendance: number | null;
+    warnedMembers: number;
+  } | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  const loadMemberStats = async (groupId: string): Promise<void> => {
+    setStatsLoading(true);
+    try {
+      setMemberStats(await StudyGroupService.getGroupMemberStats(groupId));
+    } catch {
+      setMemberStats(null);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const categories: string[] = [
     'JEE Aspirant', 'NEET Aspirant', 'UPSC Preparation', 'College Student',
@@ -120,8 +132,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
       .catch((err: any) => alert(err));
   };
 
-  const handleKickMember = (memberId: number, memberName: string): void => { if (window.confirm(`Are you sure you want to remove ${memberName} from the group?`)) { setMembers(members.filter(m => m.id !== memberId)); } };
-  const handleWarnMember = (memberId: number, memberName: string): void => { if (window.confirm(`Send a warning to ${memberName}?`)) { alert(`Warning sent to ${memberName}`); } };
+  const handleWarnMember = async (targetUserId: string, memberName: string): Promise<void> => {
+    const reason = window.prompt(`Reason for warning ${memberName}?`);
+    if (!reason || !reason.trim()) return;
+    try {
+      await StudyGroupService.warnMember((group as any).groupId, targetUserId, reason.trim());
+      await loadMemberStats((group as any).groupId);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to warn member');
+    }
+  };
 
 
   const getUserInfo = (userId: string) => {
@@ -138,6 +158,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
       dispatch(fetchAllUsersThunk());
       dispatch(fetchUserStreakThunk());
       if (isGroupLeader(group, userId)) {
+        loadMemberStats((group as any).groupId);
         dispatch(getGroupPendingRequestsThunk({ groupId: (group as any).groupId }));
       }
     }
@@ -180,9 +201,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
                     {[
 
                       { label: 'Total Members', value: (group as any).currentMemberCount ?? groupMembers.length },
-                      { label: 'Avg Attendance', value: `${Math.round(members.reduce((acc, m) => acc + m.attendance, 0) / members.length)}%` },
+                      { label: 'Avg Attendance', value: statsLoading ? '…' : memberStats?.averageAttendance != null ? `${memberStats.averageAttendance}%` : '—' },
                       { label: 'Visibility', value: group.visibility },
-                      { label: 'Violations', value: members.filter(m => m.violations > 0).length },
+                      { label: 'Warned Members', value: statsLoading ? '…' : (memberStats?.warnedMembers ?? 0) },
                     ].map(({ label, value }) => (
                       <div key={label} className="bg-[#f6ede8] rounded-lg p-2 sm:p-3 border border-[#e0d8cf]">
                         <div className="text-xl sm:text-2xl font-bold text-[#4a3728]">{value}</div>
@@ -232,26 +253,46 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
                   </div>
                   <div>
                     <h3 className="text-xs sm:text-sm font-bold text-[#4a3728] mb-2">Needs Attention</h3>
-                    {members.filter(m => m.attendance < 80 || m.violations > 0).length > 0 ? (
-                      <div className="space-y-2">
-                        {members.filter(m => m.attendance < 80 || m.violations > 0).map((member) => (
-                          <div key={member.id} className="flex items-center gap-2 p-2 bg-[#f6ede8] rounded-lg border border-[#e0d8cf] text-sm">
-                            <div className="text-base sm:text-lg">{member.avatar}</div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-[#4a3728] text-xs sm:text-sm truncate">{member.name}</div>
-                              <div className="text-[10px] sm:text-xs text-[#6b5847]">
-                                {member.attendance < 80 && `${member.attendance}% attendance`}
-                                {member.attendance < 80 && member.violations > 0 && ' • '}
-                                {member.violations > 0 && `${member.violations} violation(s)`}
+                    {(() => {
+                      const needsAttention = (memberStats?.members ?? []).filter(
+                        (m) =>
+                          m.role !== 'leader' &&
+                          ((m.attendancePercentage !== null && m.attendancePercentage < 80) || m.warningCount > 0)
+                      );
+                      if (statsLoading) {
+                        return <div className="text-xs text-[#6b5847] text-center py-2">Loading...</div>;
+                      }
+                      if (needsAttention.length === 0) {
+                        return <div className="text-center py-3 sm:py-4 text-xs sm:text-sm text-[#6b5847] bg-[#f6ede8] rounded-lg">All members performing well</div>;
+                      }
+                      return (
+                        <div className="space-y-2">
+                          {needsAttention.map((member) => {
+                            const info = getUserInfo(member.userId);
+                            return (
+                              <div key={member.userId} className="flex items-center gap-2 p-2 bg-[#f6ede8] rounded-lg border border-[#e0d8cf] text-sm">
+                                {info.avatar ? (
+                                  <img src={info.avatar} alt={info.name} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                                ) : (
+                                  <div className="w-7 h-7 rounded-full bg-[#e0d8cf] flex items-center justify-center text-[#4a3728] text-xs font-bold flex-shrink-0">
+                                    {info.name.slice(0, 2).toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-[#4a3728] text-xs sm:text-sm truncate">{info.name}</div>
+                                  <div className="text-[10px] sm:text-xs text-[#6b5847]">
+                                    {member.attendancePercentage !== null && member.attendancePercentage < 80 && `${member.attendancePercentage}% attendance`}
+                                    {member.attendancePercentage !== null && member.attendancePercentage < 80 && member.warningCount > 0 && ' • '}
+                                    {member.warningCount > 0 && `${member.warningCount} warning(s)`}
+                                  </div>
+                                </div>
+                                <button onClick={() => handleWarnMember(member.userId, info.name)} className="px-2 py-1 bg-[#8b7355] hover:bg-[#6b5847] text-white rounded text-xs font-semibold flex-shrink-0">Warn</button>
                               </div>
-                            </div>
-                            <button onClick={() => handleWarnMember(member.id, member.name)} className="px-2 py-1 bg-[#8b7355] hover:bg-[#6b5847] text-white rounded text-xs font-semibold flex-shrink-0">Warn</button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-3 sm:py-4 text-xs sm:text-sm text-[#6b5847] bg-[#f6ede8] rounded-lg">All members performing well</div>
-                    )}
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )}

@@ -104,7 +104,26 @@ export interface UseLiveRoomOptions {
 // ]
 
 // useLiveRoom.ts – ICE_SERVERS array
+// Your own TURN server (recommended for production). Set in the client env:
+//   NEXT_PUBLIC_TURN_URLS=turn:turn.example.com:3478,turns:turn.example.com:443?transport=tcp
+//   NEXT_PUBLIC_TURN_USERNAME=...   NEXT_PUBLIC_TURN_CREDENTIAL=...
+// When set it is tried first; the public relays below stay as a fallback.
+const CUSTOM_TURN_URLS = (process.env.NEXT_PUBLIC_TURN_URLS || '')
+  .split(',')
+  .map((u) => u.trim())
+  .filter(Boolean);
+const CUSTOM_TURN_SERVERS: RTCIceServer[] = CUSTOM_TURN_URLS.length
+  ? [
+      {
+        urls: CUSTOM_TURN_URLS,
+        username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+        credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
+      },
+    ]
+  : [];
+
 const ICE_SERVERS: RTCIceServer[] = [
+  ...CUSTOM_TURN_SERVERS,
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   {
@@ -701,14 +720,26 @@ export function useLiveRoom({
             : false,
         };
 
-        const stream =
-          !camera && !mic
-            ? new MediaStream()
-            : await navigator.mediaDevices.getUserMedia(constraints);
+        let stream: MediaStream;
+        let cameraGranted = camera;
+        if (!camera && !mic) {
+          stream = new MediaStream();
+        } else {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+          } catch (firstErr: any) {
+            // Camera missing or busy (e.g. already used by another tab/app): still join with the mic
+            const cameraProblem = ['NotFoundError', 'NotReadableError', 'OverconstrainedError', 'AbortError'];
+            if (!(camera && mic && cameraProblem.includes(firstErr?.name))) throw firstErr;
+            console.warn('[LiveRoom] camera unavailable, joining with microphone only', firstErr?.name);
+            stream = await navigator.mediaDevices.getUserMedia({ audio: constraints.audio, video: false });
+            cameraGranted = false;
+          }
+        }
         console.log('[LiveRoom] getUserMedia success', stream.getTracks().map(t => t.kind));
         localStreamRef.current = stream;
         setLocalStream(stream);
-        setIsCameraOn(camera);
+        setIsCameraOn(cameraGranted);
         setIsMicOn(mic);
 
 
@@ -960,7 +991,10 @@ const toggleMic = useCallback(async () => {
   //   • After a successful join it tells the room our camera/mic state, so others don't have to
   //     guess it (they used to assume "on" for everybody).
   const requestJoin = useCallback(
-    (opts: { cameraOn?: boolean; micOn?: boolean } = {}): Promise<JoinOutcome> => {
+    (opts: { roomId?: string; cameraOn?: boolean; micOn?: boolean } = {}): Promise<JoinOutcome> => {
+      // The caller may pass the room id explicitly: right after creating a room, this hook's own
+      // `roomId` is still '' (state has not re-rendered yet), and an empty id is silently ignored by the server.
+      const targetRoomId = opts.roomId || roomId;
       if (joinedRef.current) return Promise.resolve({ status: 'ok' });
       if (joinInFlightRef.current) return joinInFlightRef.current;
 
@@ -979,7 +1013,7 @@ const toggleMic = useCallback(async () => {
           socket.off('error', onError);
         };
         const onList = (p: { roomId?: string; canonicalRoomId?: string; effectiveRoomId?: string }) => {
-          if (p?.roomId && p.roomId !== roomId && p.canonicalRoomId !== roomId && p.effectiveRoomId !== roomId) return;
+          if (p?.roomId && p.roomId !== targetRoomId && p.canonicalRoomId !== targetRoomId && p.effectiveRoomId !== targetRoomId) return;
           cleanup();
           resolve({ status: 'ok' });
         };
@@ -998,13 +1032,13 @@ const toggleMic = useCallback(async () => {
 
         socket.on('room-participants-list', onList);
         socket.on('error', onError);
-        socket.emit('join-live-room', { roomId, userId, userName });
+        socket.emit('join-live-room', { roomId: targetRoomId, userId, userName });
       })
         .then((outcome) => {
           if (outcome.status === 'ok') {
             joinedRef.current = true;
-            socket.emit('toggle-camera', { roomId, cameraOn: !!opts.cameraOn });
-            socket.emit('toggle-mic', { roomId, micOn: !!opts.micOn });
+            socket.emit('toggle-camera', { roomId: targetRoomId, cameraOn: !!opts.cameraOn });
+            socket.emit('toggle-mic', { roomId: targetRoomId, micOn: !!opts.micOn });
           }
           return outcome;
         })
@@ -1062,7 +1096,10 @@ const toggleMic = useCallback(async () => {
     }
 
     console.log('[LiveRoom] Emitting join-live-room with roomId:', roomId);
-    const joinResult = await requestJoin({ cameraOn: withCamera, micOn: withMic });
+    const joinResult = await requestJoin({
+      cameraOn: withCamera && stream.getVideoTracks().length > 0,
+      micOn: withMic && stream.getAudioTracks().length > 0,
+    });
 
     if (joinResult.status !== 'ok') {
       if (joinResult.status === 'timeout') {
