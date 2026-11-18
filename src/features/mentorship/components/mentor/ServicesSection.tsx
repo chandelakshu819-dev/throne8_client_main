@@ -21,6 +21,7 @@ import {
 import { SERVICES, FILTERS, C, btnPrimary } from "../../types/data";
 import type { Service } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
+import AuthService from "@/lib/api/auth.service";
 import MentorService from "@/lib/api/mentorship.service";
 import WaitlistModal from "../modal/WaitlistModal";
 import QueryService, { QueryItem } from "@/lib/api/query.service";
@@ -323,8 +324,15 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     if (!mentorId) return;
     setLoading(true);
 
+    // Logged-out visitor ko bhi mentor ki services dikhni chahiye (login sirf Book par chahiye).
+    // Private endpoint 401 deta hai, isliye logged-out par sanitized public endpoint use karo.
+    // AuthService se sync check: hook state load hone ka wait nahi karna padta.
+    const fetchSessions = AuthService.isAuthenticated()
+      ? SessionService.getMentorSessions(mentorId)
+      : SessionService.getPublicMentorSessions(mentorId);
+
     Promise.allSettled([
-      SessionService.getMentorSessions(mentorId),
+      fetchSessions,
       fetchGroupSessions(),
     ]).then(([sessionsRes]) => {
       if (sessionsRes.status === "fulfilled") {
