@@ -286,10 +286,27 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const liveRoomJoinInFlight = useRef(false);
   const isUserInLiveRoom = showLiveRoomView;
 
-  // Live room started / ended by the host (socket only): update this page at once
+  // Latest active room, readable from the listeners below without re-subscribing
+  const activeLiveRoomRef = useRef(activeLiveRoom);
   useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
+    activeLiveRoomRef.current = activeLiveRoom;
+  }, [activeLiveRoom]);
+
+  // Live room started / ended by the host: update this page at once.
+  // Socket events are the fast path. Because a socket can be missing at first render,
+  // offline, or reconnecting, we also re-check the server on reconnect, when the tab becomes
+  // visible again, and every 15s, so "host ended" always reaches everyone.
+  useEffect(() => {
+    if (!groupId) return;
+    let cancelled = false;
+    let attached: ReturnType<typeof getSocket> = null;
+
+    // Leave the call (stop camera/mic, close peers) and drop the room from the page
+    const closeCall = () => {
+      leaveWebRTCRoomRef.current?.();
+      setShowLiveRoomView(false);
+      dispatch(clearActiveLiveRoom());
+    };
 
     const handleLiveStarted = (payload: { groupId?: string }) => {
       if (payload?.groupId !== groupId) return;
@@ -297,16 +314,58 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     };
     const handleLiveEnded = (payload: { groupId?: string }) => {
       if (payload?.groupId !== groupId) return;
-      leaveWebRTCRoomRef.current?.();
-      setShowLiveRoomView(false);
-      dispatch(clearActiveLiveRoom());
+      closeCall();
     };
 
-    socket.on("live-room:started", handleLiveStarted);
-    socket.on("live-room:ended", handleLiveEnded);
+    const resync = async () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      try {
+        const room = await StudyGroupService.getGroupActiveLiveRoom(groupId);
+        if (cancelled) return;
+        const current = activeLiveRoomRef.current;
+
+        if (!room) {
+          // Server confirms no live room: we missed the "ended" event
+          if (current) closeCall();
+          return;
+        }
+        if (current && current.roomId !== room.roomId) closeCall(); // old room ended, a new one started
+        if (!current || current.roomId !== room.roomId) {
+          dispatch(fetchGroupActiveLiveRoomThunk(groupId));
+        }
+      } catch {
+        // Network blip: keep the current state rather than kicking anyone out of the call
+      }
+    };
+
+    const attachSocket = () => {
+      const socket = getSocket();
+      if (!socket || socket === attached) return;
+      attached = socket;
+      socket.on("live-room:started", handleLiveStarted);
+      socket.on("live-room:ended", handleLiveEnded);
+      socket.on("connect", resync);
+    };
+
+    attachSocket();
+    const timer = setInterval(() => {
+      attachSocket();
+      void resync();
+    }, 15_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void resync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
-      socket.off("live-room:started", handleLiveStarted);
-      socket.off("live-room:ended", handleLiveEnded);
+      cancelled = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      if (attached) {
+        attached.off("live-room:started", handleLiveStarted);
+        attached.off("live-room:ended", handleLiveEnded);
+        attached.off("connect", resync);
+      }
     };
   }, [groupId, dispatch]);
   const rawOnlineMembers = useAppSelector(selectOnlineMembers(groupId));
@@ -545,6 +604,13 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
 
     const userCam = isCameraOn;
     const userMic = isMicOn;
+    // A host "leaving" ends the room for everyone, so never use the leave call to undo a host's join
+    const joiningAsHost =
+      activeLiveRoom.host?._id === currentUserId || activeLiveRoom.host === currentUserId;
+    const undoHttpJoin = async () => {
+      if (joiningAsHost) return;
+      await dispatch(leaveLiveRoomThunk(roomId)).unwrap().catch(() => {});
+    };
 
     try {
       // 1. HTTP join
@@ -558,19 +624,23 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       // 2. Media get karo
       stopPreview();
       const stream = await startLocalStream(userCam, userMic);
-      if (!stream) return;
+      if (!stream) {
+        await undoHttpJoin(); // no camera/mic access: don't stay registered as a participant
+        return;
+      }
 
       // 3. Socket join — wait for the server's answer (accepted / room full / not allowed)
       const socket = getSocket();
       if (!socket?.connected) {
         leaveWebRTCRoom(); // stop the camera/mic we just opened
+        await undoHttpJoin();
         alert("Socket not connected");
         return;
       }
       const joined = await requestWebRTCJoin({ cameraOn: userCam, micOn: userMic });
       if (joined.status !== "ok") {
         leaveWebRTCRoom(); // stop the camera/mic we just opened
-        await dispatch(leaveLiveRoomThunk(roomId)).unwrap().catch(() => {}); // undo the HTTP join
+        await undoHttpJoin(); // undo the HTTP join
         alert(joined.message);
         return;
       }
@@ -578,6 +648,8 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       setShowLiveRoomView(true);
     } catch (err: any) {
       alert(err || "Failed to join live room");
+      // The room may have just ended (stale Join button): refresh so the button goes away
+      if (groupId) dispatch(fetchGroupActiveLiveRoomThunk(groupId));
     } finally {
       liveRoomJoinInFlight.current = false;
     }
