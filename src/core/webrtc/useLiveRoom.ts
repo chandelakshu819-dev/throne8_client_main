@@ -991,7 +991,10 @@ const toggleMic = useCallback(async () => {
   //   • After a successful join it tells the room our camera/mic state, so others don't have to
   //     guess it (they used to assume "on" for everybody).
   const requestJoin = useCallback(
-    (opts: { cameraOn?: boolean; micOn?: boolean } = {}): Promise<JoinOutcome> => {
+    (opts: { roomId?: string; cameraOn?: boolean; micOn?: boolean } = {}): Promise<JoinOutcome> => {
+      // The caller may pass the room id explicitly: right after creating a room, this hook's own
+      // `roomId` is still '' (state has not re-rendered yet), and an empty id is silently ignored by the server.
+      const targetRoomId = opts.roomId || roomId;
       if (joinedRef.current) return Promise.resolve({ status: 'ok' });
       if (joinInFlightRef.current) return joinInFlightRef.current;
 
@@ -1010,7 +1013,7 @@ const toggleMic = useCallback(async () => {
           socket.off('error', onError);
         };
         const onList = (p: { roomId?: string; canonicalRoomId?: string; effectiveRoomId?: string }) => {
-          if (p?.roomId && p.roomId !== roomId && p.canonicalRoomId !== roomId && p.effectiveRoomId !== roomId) return;
+          if (p?.roomId && p.roomId !== targetRoomId && p.canonicalRoomId !== targetRoomId && p.effectiveRoomId !== targetRoomId) return;
           cleanup();
           resolve({ status: 'ok' });
         };
@@ -1029,13 +1032,13 @@ const toggleMic = useCallback(async () => {
 
         socket.on('room-participants-list', onList);
         socket.on('error', onError);
-        socket.emit('join-live-room', { roomId, userId, userName });
+        socket.emit('join-live-room', { roomId: targetRoomId, userId, userName });
       })
         .then((outcome) => {
           if (outcome.status === 'ok') {
             joinedRef.current = true;
-            socket.emit('toggle-camera', { roomId, cameraOn: !!opts.cameraOn });
-            socket.emit('toggle-mic', { roomId, micOn: !!opts.micOn });
+            socket.emit('toggle-camera', { roomId: targetRoomId, cameraOn: !!opts.cameraOn });
+            socket.emit('toggle-mic', { roomId: targetRoomId, micOn: !!opts.micOn });
           }
           return outcome;
         })

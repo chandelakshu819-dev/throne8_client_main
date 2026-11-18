@@ -678,20 +678,32 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       // 3. Media
       stopPreview();
       const stream = await startLocalStream(userCam, userMic);
-      if (!stream) return;
+      if (!stream) {
+        // Never leave a started room behind with nobody connected to it
+        await dispatch(endLiveRoomThunk(roomId)).unwrap().catch(() => {});
+        alert("Could not access your camera/microphone. Allow access in the browser and try again.");
+        return;
+      }
 
       // 4. Socket join — wait for the server's answer (accepted / room full / not allowed)
       const socket = getSocket();
       if (!socket?.connected) {
         leaveWebRTCRoom(); // stop the camera/mic we just opened
+        await dispatch(endLiveRoomThunk(roomId)).unwrap().catch(() => {});
         alert("Socket not connected");
         return;
       }
-      const joined = await requestWebRTCJoin({ cameraOn: userCam, micOn: userMic });
+      // Pass the new room id: the hook's own roomId is still '' until the page re-renders
+      const joined = await requestWebRTCJoin({
+        roomId,
+        cameraOn: userCam && stream.getVideoTracks().length > 0,
+        micOn: userMic && stream.getAudioTracks().length > 0,
+      });
       if (joined.status !== "ok") {
         leaveWebRTCRoom(); // stop the camera/mic we just opened
-        await dispatch(leaveLiveRoomThunk(roomId)).unwrap().catch(() => {}); // undo the HTTP join
-        setLiveRoomError(joined.message);
+        // The host is the only one in a room they just started: end it (a host "leave" ends it anyway)
+        await dispatch(endLiveRoomThunk(roomId)).unwrap().catch(() => {});
+        alert(joined.message);
         return;
       }
 
