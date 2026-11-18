@@ -24,7 +24,7 @@ import SeniorMentorshipServicesSection from "@/features/mentorship/components/se
 import GroupSessionsSection from "@/features/mentorship/components/sections/GroupSessionsSection";
 import MentorshipFooter from "@/features/mentorship/components/layout/MentorshipFooter";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { useParams, useSearchParams, usePathname } from "next/navigation";
+import { useParams, useSearchParams, usePathname, useRouter } from "next/navigation";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 import MentorService from "@/lib/api/mentorship.service";
 import FindMentorModal from "@/features/mentorship/components/sections/FindMentorModal";
@@ -41,17 +41,10 @@ export default function ThroneUltraPremium() {
     const params = useParams();
     const searchParams = useSearchParams();
     const pathname = usePathname();
+    const router = useRouter();
     const rawUserId = (params?.userid || (params as any)?.userId) as string;
     const userId = rawUserId && rawUserId !== "undefined" ? rawUserId : "";
     const [findMentorOpen, setFindMentorOpen] = useState(false);
-
-    // Auto-open BecomeMentorModal when navigated here from ProfileDropdown
-    // "Apply to unlock" link (?openMentorForm=true)
-    useEffect(() => {
-        if (searchParams?.get("openMentorForm") === "true") {
-            setShowMentorForm(true);
-        }
-    }, [searchParams]);
 
     // Mentor Data for the landing page mentor
     const [pageMentorData, setPageMentorData] = useState<any>(null);
@@ -63,6 +56,22 @@ export default function ThroneUltraPremium() {
 
     const { profileImageUrl, loadProfile } = useProfile();
     const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+
+    // Auto-open BecomeMentorModal when navigated here from ProfileDropdown
+    // "Apply to unlock" link (?openMentorForm=true)
+    // Sirf logged-in user ke liye. Logged out ho to pehle login par bhejo.
+    useEffect(() => {
+        if (searchParams?.get("openMentorForm") !== "true") return;
+        if (authLoading) return;
+        if (isAuthenticated) {
+            setShowMentorForm(true);
+        } else {
+            router.replace(
+                `/login?redirect=${encodeURIComponent("/mentorship?openMentorForm=true")}`
+            );
+        }
+    }, [searchParams, authLoading, isAuthenticated, router]);
+
 
     useEffect(() => {
         if (user) {
@@ -247,6 +256,7 @@ export default function ThroneUltraPremium() {
                     isMentor={isMentor}
                     userId={user?.userId}
                     isLoading={authLoading}
+                    isLoggedIn={isAuthenticated}
                     mentorCount={mentorsLoading ? undefined : impactStats.mentors}
                 />
             </main>
@@ -262,7 +272,7 @@ export default function ThroneUltraPremium() {
             <BecomeMentorModal
                 profileImage={profileImageUrl}
                 currentUserId={user?.userId}
-                isOpen={showMentorForm}
+                isOpen={showMentorForm && isAuthenticated}
                 onClose={() => {
                     setShowMentorForm(false);
                     // clear ?openMentorForm so the next "Apply to unlock" click re-triggers the effect

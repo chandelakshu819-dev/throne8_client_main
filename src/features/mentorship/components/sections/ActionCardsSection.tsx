@@ -218,6 +218,14 @@ export default function ActionCardsSection({
     const router = useRouter();
     const { roles, loading: rolesLoading } = useMyRoles(Boolean(userId), userId);
 
+    // Logged in? (page se isLoggedIn aaye to wahi, warna userId se)
+    const loggedIn = isLoggedIn ?? Boolean(userId);
+
+    // Login page par bhejo; login ke baad user wapas `target` par aayega.
+    const redirectToLogin = (target: string) => {
+        router.push(`/login?redirect=${encodeURIComponent(target)}`);
+    };
+
     const [seniorApplication, setSeniorApplication] = useState<SeniorMentorApplication | null>(null);
     const [seniorLoading, setSeniorLoading] = useState(false);
     const [seniorError, setSeniorError] = useState(false);
@@ -244,7 +252,21 @@ export default function ActionCardsSection({
         };
     }, [userId]);
 
+    // Industry Mentor: login nahi hai to form mat kholo, login par bhejo.
+    // Login ke baad /mentorship?openMentorForm=true par aakar form khud khulega.
+    const handleIndustryMentorClick = () => {
+        if (!loggedIn) {
+            redirectToLogin("/mentorship?openMentorForm=true");
+            return;
+        }
+        onBecomeMentorClick();
+    };
+
     const handleSeniorMentorClick = () => {
+        if (!loggedIn) {
+            redirectToLogin("/mentorship/senior-mentor-application");
+            return;
+        }
         if (seniorLoading) return;
 
         if (seniorApplication?.verificationStatus === ApplicationStatus.VERIFIED) {
@@ -344,7 +366,7 @@ export default function ActionCardsSection({
                     {/* 2. BECOME INDUSTRY MENTOR - Visible to Normal Users & College Mentors */}
                     {showIndustryMentor && (
                         <ActionCard
-                            onClick={onBecomeMentorClick}
+                            onClick={handleIndustryMentorClick}
                             icon={<Users className={ICON_CLASS} />}
                             audience={MENTOR_AUDIENCE}
                             title="Become Industry Mentor"
