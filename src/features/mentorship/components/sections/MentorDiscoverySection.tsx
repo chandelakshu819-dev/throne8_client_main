@@ -443,21 +443,19 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                         }}
                         className="w-full py-2 px-3 bg-[#3a2a1e] hover:bg-[#251910] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
-                        {isIndustryCard && !mentor.acceptsBooking ? (
+                        {/* Industry mentor: availability set ho ya na ho, "Book Session" hi dikhao;
+                            uski saari services mentor page par dikhti hain. College mentor: sirf tab
+                            "View Profile" jab uski koi bookable service nahi hai. */}
+                        {!isIndustryCard && !mentor.sessionId ? (
                             <>
                                 <Eye className="w-3.5 h-3.5" />
                                 <span>View Profile</span>
+                                <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
                             </>
                         ) : (
                             <>
                                 <Calendar className="w-3.5 h-3.5" />
-                                <span>
-                                    {!isIndustryCard
-                                        ? mentor.sessionId
-                                            ? "Book Free Session"
-                                            : "View Profile"
-                                        : "Book Session"}
-                                </span>
+                                <span>{isIndustryCard ? "Book Session" : "Book Free Session"}</span>
                                 <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
                             </>
                         )}

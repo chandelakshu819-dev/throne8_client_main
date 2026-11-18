@@ -51,3 +51,11 @@ export const resolveSafeRedirect = (raw: string | null | undefined): string | nu
 };
 
 export const isExternalUrl = (target: string): boolean => /^https?:\/\//i.test(target);
+
+/**
+ * Login page URL jo login ke baad user ko `target` par wapas bhejta hai.
+ * `target` same-site path hona chahiye (query string allowed), jaise
+ * "/mentorship/senior-service/abc/book".
+ */
+export const buildLoginRedirectUrl = (target: string): string =>
+    `/login?redirect=${encodeURIComponent(target)}`;

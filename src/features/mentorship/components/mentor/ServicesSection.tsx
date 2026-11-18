@@ -38,6 +38,9 @@ interface ServicesSectionProps {
   // opens automatically instead of forcing the mentee to re-find and
   // re-click the same card they just came from.
   deepLinkSessionId?: string;
+  // Logged-out user ne login-required action (waitlist / group join) dabaya to parent
+  // use login par bhejta hai; login ke baad user isi page par wapas aata hai.
+  onRequireLogin?: (opts?: { serviceId?: string; autoBook?: boolean }) => void;
 }
 
 // Session type ko display label me map karo
@@ -192,6 +195,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   currentUserId,
   mentorName = "",
   deepLinkSessionId,
+  onRequireLogin,
 }) => {
   const [activeFilter, setActiveFilter] = useState<string>("All");
   const [sessions, setSessions] = useState<any[]>([]);
@@ -429,6 +433,11 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   // request that only becomes a real seat once the mentor accepts it.
   const handleJoinFromModal = async () => {
     if (!detailGroup) return;
+    // Logged-out user: login par bhejo, wapas aane par yahi group session modal khulega (?serviceId=).
+    if (!currentUserId && onRequireLogin) {
+      onRequireLogin({ serviceId: detailGroup.sessionId });
+      return;
+    }
     setGroupActionBusy(true);
     setGroupActionError(null);
     try {
@@ -624,7 +633,13 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
                         {latestBooking ? "Book Another Slot" : "Book"}
                       </button>
                       <button
-                        onClick={() => setWaitlistTarget(session)}
+                        onClick={() => {
+                          if (!currentUserId && onRequireLogin) {
+                            onRequireLogin();
+                            return;
+                          }
+                          setWaitlistTarget(session);
+                        }}
                         style={{
                           padding: "8px 18px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
                           background: "transparent", color: C.dark, border: `1.5px solid ${C.dark}`,

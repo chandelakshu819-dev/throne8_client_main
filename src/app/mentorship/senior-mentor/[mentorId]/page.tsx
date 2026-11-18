@@ -5,10 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, Clock, GraduationCap, Landmark } from "lucide-react";
 import MentorService, { PublicSeniorMentor } from "@/lib/api/mentorship.service";
 import SeniorSessionService, { SeniorDiscoverySession } from "@/lib/api/seniorSession.service";
-import SeniorAvailabilityService from "@/lib/api/seniorAvailability.service";
+import AuthService from "@/lib/api/auth.service";
 import { GlobalStyles, Navigation } from "@/features/index";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import ServiceThumbnail from "@/features/mentorship/components/shared/ServiceThumbnail";
+import { buildLoginRedirectUrl } from "@/shared/utils/safeRedirect";
 
 type LoadStatus = "loading" | "success" | "error";
 
@@ -16,13 +17,6 @@ function displayLabel(value: string): string {
     return value
         .replace(/[_-]+/g, " ")
         .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function localDateKey(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
 }
 
 function ProfileAvatar({ profile }: { profile: PublicSeniorMentor }) {
@@ -98,43 +92,11 @@ export default function SeniorMentorPublicProfilePage() {
                     session.sessionType === "one_to_one" &&
                     session.status !== "cancelled"
             );
-            if (eligibleSessions.length === 0) {
-                setSessions([]);
-                setSessionsStatus("success");
-                return;
-            }
-
-            const start = new Date();
-            const end = new Date(start);
-            end.setDate(end.getDate() + 365);
-            const startDate = localDateKey(start);
-            const endDate = localDateKey(end);
-            const availabilityByDuration = new Map<number, Promise<boolean>>();
-
-            for (const session of eligibleSessions) {
-                if (!availabilityByDuration.has(session.duration)) {
-                    availabilityByDuration.set(
-                        session.duration,
-                        SeniorAvailabilityService.getMonthlyAvailability(
-                            mentorId,
-                            startDate,
-                            endDate,
-                            session.duration
-                        ).then((days) => days.some((day) => day.availableSlots > 0))
-                    );
-                }
-            }
-
-            const availabilityResults = await Promise.all(
-                Array.from(availabilityByDuration.entries()).map(async ([duration, available]) => [
-                    duration,
-                    await available,
-                ] as const)
-            );
-            const availableDurations = new Set(
-                availabilityResults.filter(([, available]) => available).map(([duration]) => duration)
-            );
-            setSessions(eligibleSessions.filter((session) => availableDurations.has(session.duration)));
+            // NOTE: Services ko mentor ki availability se filter NAHI karte.
+            // Mentor ne availability set ki ho ya na ho, uski saari active
+            // one-to-one services dikhni chahiye. Slot selection calendar step
+            // (/book page) mein hota hai, wahan "no availability" message aata hai.
+            setSessions(eligibleSessions);
             setSessionsStatus("success");
         } catch (error) {
             setSessionsError(error instanceof Error ? error.message : "Failed to load available sessions.");
@@ -359,7 +321,17 @@ export default function SeniorMentorPublicProfilePage() {
                                                     <div className="mt-auto pt-5">
                                                         <button
                                                             type="button"
-                                                            onClick={() => router.push(`/mentorship/senior-service/${encodeURIComponent(session.sessionId)}/book`)}
+                                                            onClick={() => {
+                                                                const bookPath = `/mentorship/senior-service/${encodeURIComponent(session.sessionId)}/book`;
+                                                                // Services sabko dikhti hain, par booking ke liye login zaroori hai.
+                                                                // Logged-out user ko login par bhejo; login ke baad wapas isi service ke book page par aayega.
+                                                                // (AuthService se sync check, taaki hook state load hone se pehle bhi sahi chale)
+                                                                if (!AuthService.isAuthenticated()) {
+                                                                    router.push(buildLoginRedirectUrl(bookPath));
+                                                                    return;
+                                                                }
+                                                                router.push(bookPath);
+                                                            }}
                                                             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#4a3728] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#38291e]"
                                                         >
                                                             <Calendar className="h-4 w-4" />
