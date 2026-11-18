@@ -17,6 +17,7 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import AuthService from "@/lib/api/auth.service";
 import ProfileService from "@/lib/api/profile.service";
 import MentorService from "@/lib/api/mentorship.service";
+import { safeLinkedInUrl } from "@/shared/utils/mentorFormat";
 
 interface MenteeUserData {
   userId?: string;
@@ -133,7 +134,7 @@ function MenteeProfileCard({ user, application, photoUrl, bannerUrl }: MenteePro
   const languages = application?.languages || (user.preferences?.language ? [user.preferences.language] : []);
   const timezone = application?.availability?.timezone || user.preferences?.timezone || "";
 
-  const linkedinUrl = application?.socialProof?.linkedinUrl;
+  const linkedinUrl = safeLinkedInUrl(application?.socialProof?.linkedinUrl) || application?.socialProof?.linkedinUrl;
   const githubUrl = application?.socialProof?.githubUrl;
   const portfolioUrl = application?.socialProof?.portfolioUrl || application?.socialProof?.websiteUrl;
   const twitterUrl = application?.socialProof?.twitterUrl;
