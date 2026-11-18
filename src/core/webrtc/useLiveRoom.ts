@@ -104,7 +104,26 @@ export interface UseLiveRoomOptions {
 // ]
 
 // useLiveRoom.ts – ICE_SERVERS array
+// Your own TURN server (recommended for production). Set in the client env:
+//   NEXT_PUBLIC_TURN_URLS=turn:turn.example.com:3478,turns:turn.example.com:443?transport=tcp
+//   NEXT_PUBLIC_TURN_USERNAME=...   NEXT_PUBLIC_TURN_CREDENTIAL=...
+// When set it is tried first; the public relays below stay as a fallback.
+const CUSTOM_TURN_URLS = (process.env.NEXT_PUBLIC_TURN_URLS || '')
+  .split(',')
+  .map((u) => u.trim())
+  .filter(Boolean);
+const CUSTOM_TURN_SERVERS: RTCIceServer[] = CUSTOM_TURN_URLS.length
+  ? [
+      {
+        urls: CUSTOM_TURN_URLS,
+        username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+        credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
+      },
+    ]
+  : [];
+
 const ICE_SERVERS: RTCIceServer[] = [
+  ...CUSTOM_TURN_SERVERS,
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   {
@@ -701,14 +720,26 @@ export function useLiveRoom({
             : false,
         };
 
-        const stream =
-          !camera && !mic
-            ? new MediaStream()
-            : await navigator.mediaDevices.getUserMedia(constraints);
+        let stream: MediaStream;
+        let cameraGranted = camera;
+        if (!camera && !mic) {
+          stream = new MediaStream();
+        } else {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+          } catch (firstErr: any) {
+            // Camera missing or busy (e.g. already used by another tab/app): still join with the mic
+            const cameraProblem = ['NotFoundError', 'NotReadableError', 'OverconstrainedError', 'AbortError'];
+            if (!(camera && mic && cameraProblem.includes(firstErr?.name))) throw firstErr;
+            console.warn('[LiveRoom] camera unavailable, joining with microphone only', firstErr?.name);
+            stream = await navigator.mediaDevices.getUserMedia({ audio: constraints.audio, video: false });
+            cameraGranted = false;
+          }
+        }
         console.log('[LiveRoom] getUserMedia success', stream.getTracks().map(t => t.kind));
         localStreamRef.current = stream;
         setLocalStream(stream);
-        setIsCameraOn(camera);
+        setIsCameraOn(cameraGranted);
         setIsMicOn(mic);
 
 
@@ -1062,7 +1093,10 @@ const toggleMic = useCallback(async () => {
     }
 
     console.log('[LiveRoom] Emitting join-live-room with roomId:', roomId);
-    const joinResult = await requestJoin({ cameraOn: withCamera, micOn: withMic });
+    const joinResult = await requestJoin({
+      cameraOn: withCamera && stream.getVideoTracks().length > 0,
+      micOn: withMic && stream.getAudioTracks().length > 0,
+    });
 
     if (joinResult.status !== 'ok') {
       if (joinResult.status === 'timeout') {

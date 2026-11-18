@@ -106,7 +106,7 @@ import {
   type CreateLiveRoomInput,
 } from "@/features/study-group/validators/liveroom.validation";
 import { LIVE_ROOM_MAX_PARTICIPANTS } from "@/features/study-group/constants/liveRoom";
-import { getSocket } from "@/core/realtime/socket.client";
+import { getSocket, initializeSocket } from "@/core/realtime/socket.client";
 import { useLiveRoom } from "@/core/webrtc/useLiveRoom";
 import LiveRoomView from "./LiveRoomView";
 import GroupChallengeModal from "./GroupChallengeModal";
@@ -455,6 +455,115 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     leaveWebRTCRoomRef.current = leaveWebRTCRoom;
   }, [leaveWebRTCRoom]);
 
+  const joinWebRTCRoomRef = useRef(joinWebRTCRoom);
+  useEffect(() => {
+    joinWebRTCRoomRef.current = joinWebRTCRoom;
+  }, [joinWebRTCRoom]);
+
+  // Camera/mic state as of the latest render (read when the connection drops)
+  const callPrefsRef = useRef({ cam: true, mic: true });
+  callPrefsRef.current = { cam: webrtcCameraOn, mic: webrtcMicOn };
+
+  // Network drop while in the call: show "Reconnecting...", then re-join automatically
+  // (same behaviour as the mentorship call). Gives up after a grace period.
+  const [liveReconnecting, setLiveReconnecting] = useState(false);
+  useEffect(() => {
+    if (!showLiveRoomView || !groupId) return;
+    const socket = getSocket();
+    if (!socket) return;
+
+    const RECONNECT_GRACE_MS = 30_000;
+    let dropTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnecting = false;
+    let busy = false;
+    let prefs = { ...callPrefsRef.current };
+
+    const clearDropTimer = () => {
+      if (dropTimer) clearTimeout(dropTimer);
+      dropTimer = null;
+    };
+    const stopReconnecting = () => {
+      clearDropTimer();
+      reconnecting = false;
+      setLiveReconnecting(false);
+    };
+    // Leave the call view; the Join button comes back if the room is still live
+    const dropToJoinButton = (message?: string) => {
+      stopReconnecting();
+      leaveWebRTCRoomRef.current?.();
+      setShowLiveRoomView(false);
+      dispatch(fetchGroupActiveLiveRoomThunk(groupId));
+      if (message) alert(message);
+    };
+
+    const onDisconnect = (reason: string) => {
+      if (reason === "io client disconnect") return; // we did it ourselves
+      prefs = { ...callPrefsRef.current };
+      reconnecting = true;
+      setLiveReconnecting(true);
+      if (reason === "io server disconnect") socket.connect();
+      clearDropTimer();
+      dropTimer = setTimeout(() => {
+        if (reconnecting) {
+          dropToJoinButton("Connection lost. Press Join to re-enter the live room.");
+        }
+      }, RECONNECT_GRACE_MS);
+    };
+
+    const onConnect = async () => {
+      if (!reconnecting || busy) return;
+      busy = true;
+      clearDropTimer();
+      try {
+        // The server forgot our old socket, so the others removed us: first check the room is still live
+        let room: any;
+        try {
+          room = await StudyGroupService.getGroupActiveLiveRoom(groupId);
+        } catch {
+          dropToJoinButton("Connection lost. Press Join to re-enter the live room.");
+          return;
+        }
+        const current = activeLiveRoomRef.current;
+        if (!room || !current || room.roomId !== current.roomId) {
+          stopReconnecting();
+          leaveWebRTCRoomRef.current?.();
+          setShowLiveRoomView(false);
+          dispatch(clearActiveLiveRoom());
+          if (room) dispatch(fetchGroupActiveLiveRoomThunk(groupId));
+          return;
+        }
+
+        // Re-register (the room may have freed our seat) and rebuild every link from scratch
+        await dispatch(
+          joinLiveRoomThunk({
+            roomId: room.roomId,
+            options: { cameraOn: prefs.cam, micOn: prefs.mic },
+          })
+        ).unwrap();
+        leaveWebRTCRoomRef.current?.();
+        const ok = await joinWebRTCRoomRef.current(prefs.cam, prefs.mic);
+        if (ok) {
+          stopReconnecting();
+        } else {
+          dropToJoinButton("Could not reconnect to the live room. Press Join to try again.");
+        }
+      } catch {
+        dropToJoinButton("Could not reconnect to the live room. Press Join to try again.");
+      } finally {
+        busy = false;
+      }
+    };
+
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect", onConnect);
+    return () => {
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect", onConnect);
+      clearDropTimer();
+      setLiveReconnecting(false);
+    };
+  }, [showLiveRoomView, groupId, dispatch]);
+
   // Host ended the live room: close the room view for everyone else and
   // refresh the group's active room so the Join button disappears.
   useEffect(() => {
@@ -629,15 +738,37 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
         return;
       }
 
-      // 3. Socket join — wait for the server's answer (accepted / room full / not allowed)
-      const socket = getSocket();
+      // 3. Socket join. Like the mentorship call, give a reconnecting socket a few seconds
+      //    instead of failing at once.
+      let socket = getSocket();
+      if (socket && !socket.connected) {
+        try {
+          socket = initializeSocket(); // wakes a socket that gave up reconnecting
+        } catch {
+          /* keep the current socket */
+        }
+        if (!socket.connected) {
+          const sock = socket;
+          await new Promise<void>((resolve) => {
+            const t = setTimeout(resolve, 5000);
+            sock.once("connect", () => {
+              clearTimeout(t);
+              resolve();
+            });
+          });
+        }
+      }
       if (!socket?.connected) {
         leaveWebRTCRoom(); // stop the camera/mic we just opened
         await undoHttpJoin();
-        alert("Socket not connected");
+        alert("Could not reach the live server. Check your connection and try again.");
         return;
       }
-      const joined = await requestWebRTCJoin({ cameraOn: userCam, micOn: userMic });
+      // Tell the others what we really have (camera may be missing/busy -> mic only)
+      const joined = await requestWebRTCJoin({
+        cameraOn: userCam && stream.getVideoTracks().length > 0,
+        micOn: userMic && stream.getAudioTracks().length > 0,
+      });
       if (joined.status !== "ok") {
         leaveWebRTCRoom(); // stop the camera/mic we just opened
         await undoHttpJoin(); // undo the HTTP join
@@ -2417,6 +2548,15 @@ ADD this block just before your main `return (` statement:
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {showLiveRoomView && liveReconnecting && (
+        <div
+          role="status"
+          className="fixed left-1/2 top-4 z-[110] -translate-x-1/2 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-lg"
+        >
+          Connection lost. Reconnecting…
         </div>
       )}
 
