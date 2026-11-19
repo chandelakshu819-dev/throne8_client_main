@@ -623,16 +623,15 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
                   className="save-btn px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
                   style={{ backgroundColor: '#fbf7f3', color: '#4a3728', border: '2px solid #4a3728' }}
                 >
-                  <Check className="w-4 h-4" />
                   {isSaving
   ? "Saving..."
   : selectedDateStr
   ? `Save ${Number(selectedDateStr.split("-")[2])} ${MONTH_NAMES[Number(selectedDateStr.split("-")[1]) - 1].slice(0, 3)}`
   : "Save Changes"}
                 </button>
-                {/* Save button: border style + halka hover */}
+                {/* Save button: border style, hover par brown fill */}
                 <style>{`
-                  .save-btn:hover:not(:disabled) { background-color: #f3ece4 !important; }
+                  .save-btn:hover:not(:disabled) { background-color: #4a3728 !important; color: #ffffff !important; }
                 `}</style>
               </div>
             </div>
