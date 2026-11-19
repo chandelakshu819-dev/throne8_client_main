@@ -11,6 +11,8 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 
 import SeniorSessionService from "@/lib/api/seniorSession.service";
 import MentorService from "@/lib/api/mentorship.service";
+import AuthService from "@/lib/api/auth.service";
+import { buildLoginRedirectUrl } from "@/shared/utils/safeRedirect";
 
 // Helpers
 const toArray = (value: any): string[] => {
@@ -57,8 +59,18 @@ export default function SeniorServiceDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Service detail (backend par auth-protected) ke liye login zaroori hai.
+    // Logged-out user ko login par bhejo; login ke baad isi page par wapas aayega.
     useEffect(() => {
         if (!sessionId) return;
+        if (!AuthService.isAuthenticated()) {
+            router.replace(buildLoginRedirectUrl(`/mentorship/senior-service/${encodeURIComponent(sessionId)}`));
+        }
+    }, [sessionId, router]);
+
+    useEffect(() => {
+        if (!sessionId) return;
+        if (!AuthService.isAuthenticated()) return;
 
         SeniorSessionService.getSessionById(sessionId)
             .then(res => {
@@ -165,7 +177,14 @@ export default function SeniorServiceDetailsPage() {
     const mentorExp = mentor?.experience?.total ? `${mentor.experience.total}+ Years` : "";
     const mentorSubtitle = [mentorRole, mentorCompany].filter(Boolean).join(" @ ");
 
-    const handleBookSession = () => router.push(`/mentorship/senior-service/${sessionId}/book`);
+    const handleBookSession = () => {
+        const bookPath = `/mentorship/senior-service/${sessionId}/book`;
+        if (!AuthService.isAuthenticated()) {
+            router.push(buildLoginRedirectUrl(bookPath));
+            return;
+        }
+        router.push(bookPath);
+    };
 
     return (
         <div className="min-h-screen w-full overflow-x-hidden bg-[#fbf8f4] text-[#2d2116] font-sans selection:bg-[#4a3426] selection:text-white pb-28 lg:pb-20">

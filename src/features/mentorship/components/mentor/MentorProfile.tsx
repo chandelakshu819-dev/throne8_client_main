@@ -18,6 +18,8 @@ import UpdateProfileModal from "../modal/Updateprofilemodal";
 import MentorService from "@/lib/api/mentorship.service";
 import SessionService from "@/lib/api/session.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import AuthService from "@/lib/api/auth.service";
+import { buildLoginRedirectUrl } from "@/shared/utils/safeRedirect";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type LocalBookingStep = BookingStep | "query";
@@ -85,7 +87,25 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
         }
     }, [mentorData, user?.userId]);
 
+    // Logged-out user ko login par bhejo; login ke baad isi mentor page par wapas aayega.
+    // autoBook=true => ?book=true&serviceId=... (upar wala deep-link effect seedha booking step khol deta hai)
+    // autoBook=false + serviceId => ?serviceId=... (group session ka detail modal khulta hai)
+    const redirectToLogin = (opts?: { serviceId?: string; autoBook?: boolean }): void => {
+        const params = new URLSearchParams();
+        if (opts?.serviceId) params.set("serviceId", opts.serviceId);
+        if (opts?.autoBook) params.set("book", "true");
+        const query = params.toString();
+        const target = `${window.location.pathname}${query ? `?${query}` : ""}`;
+        router.push(buildLoginRedirectUrl(target));
+    };
+
     const handleServiceClick = (service: Service): void => {
+        // Services sabko dikhti hain, par book karne ke liye login zaroori hai.
+        // AuthService se sync check: deep-link effect ke stale closure (user abhi null) mein bhi sahi chalta hai.
+        if (!AuthService.isAuthenticated()) {
+            redirectToLogin({ serviceId: String(service.id), autoBook: true });
+            return;
+        }
         setSelectedService(service);
         setBookingStep(
             service.type === "Query"
@@ -253,6 +273,7 @@ const MentorProfile: React.FC<MentorProfileProps> = ({
                             currentUserId={user?.userId || ""}
                             mentorName={`${mentorData?.user?.firstName ?? ""} ${mentorData?.user?.lastName ?? ""}`.trim()}
                             deepLinkSessionId={deepLinkServiceId}
+                            onRequireLogin={redirectToLogin}
                         />
                         <ReviewsSection mentorId={mentorId} />
                     </div>

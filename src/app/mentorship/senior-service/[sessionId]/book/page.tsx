@@ -8,6 +8,8 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 
 import SeniorSessionService from "@/lib/api/seniorSession.service";
 import MentorService from "@/lib/api/mentorship.service";
+import AuthService from "@/lib/api/auth.service";
+import { buildLoginRedirectUrl } from "@/shared/utils/safeRedirect";
 
 import CalendarStep from "@/features/mentorship/components/mentor/CalendarStep";
 import ConfirmationStep from "@/features/mentorship/components/mentor/ConfirmationStep";
@@ -35,8 +37,21 @@ export default function SeniorServiceBookingPage() {
     const [bookingResponse, setBookingResponse] = useState<any>(null);
     const [isBooking, setIsBooking] = useState(false);
 
+    // Booking ke liye login zaroori hai. Direct link / purane tab se aaye
+    // logged-out user ko login par bhejo, login ke baad yahin wapas aayega.
     useEffect(() => {
         if (!sessionId) return;
+        if (!AuthService.isAuthenticated()) {
+            router.replace(
+                buildLoginRedirectUrl(`/mentorship/senior-service/${encodeURIComponent(sessionId)}/book`)
+            );
+        }
+    }, [sessionId, router]);
+
+    useEffect(() => {
+        if (!sessionId) return;
+        // Logged-out user par API call mat karo (401 aayega), upar wala effect login par bhej dega.
+        if (!AuthService.isAuthenticated()) return;
 
         SeniorSessionService.getSessionById(sessionId)
             .then(res => {

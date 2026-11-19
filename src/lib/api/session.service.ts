@@ -159,6 +159,21 @@ class SessionService {
         }
     }
 
+    // -- GET MENTOR SESSIONS (PUBLIC) --
+    // Logged-out visitors ke liye: mentor ki services dikhane ke liye (bookings/mentee/payment data nahi aata).
+    // Login sirf book karte waqt zaroori hai.
+    static async getPublicMentorSessions(mentorId: string): Promise<ApiResponse> {
+        try {
+            const { data } = await api.get<ApiResponse>(
+                `${config.NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT}/${mentorId}/public`
+            );
+            return data;
+        } catch (error: any) {
+            console.error("[GET_PUBLIC_MENTOR_SESSIONS] Failed", error?.response?.data || error?.message);
+            throw new Error(error?.response?.data?.message || "Failed to fetch mentor sessions.");
+        }
+    }
+
     // -- GET MENTOR ANALYTICS --
     static async getMentorAnalytics(mentorId: string): Promise<AnalyticsResponse> {
         try {
