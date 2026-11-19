@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { GlobalStyles, Navigation } from "@/features/index";
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import TokenStorage from "@/lib/store/token.storage";
+import { buildLoginRedirectUrl } from "@/shared/utils/safeRedirect";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 const toSlug = (first?: string, last?: string) =>
@@ -85,6 +87,14 @@ export default function ServiceDetailsPage() {
     // ─── 1. Fetch Session Details ──────────────────────────────────────────
     useEffect(() => {
         if (!serviceId) return;
+
+        // Logged-out user (direct link / back button) -> login par bhejo,
+        // login ke baad isi service page par wapas aayega.
+        if (!TokenStorage.isAuthenticated()) {
+            router.replace(buildLoginRedirectUrl(`/mentorship/service/${serviceId}`));
+            return;
+        }
+
         setLoading(true);
         SessionService.getSessionById(serviceId)
             .then((res: any) => {
@@ -105,10 +115,16 @@ export default function ServiceDetailsPage() {
                         setLoading(false);
                     })
                     .catch(() => {
+                        // Session expire ho gaya ho to error ke bajay login par bhejo
+                        if (!TokenStorage.isAuthenticated()) {
+                            router.replace(buildLoginRedirectUrl(`/mentorship/service/${serviceId}`));
+                            return;
+                        }
                         setError("Failed to load service details.");
                         setLoading(false);
                     });
             });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [serviceId]);
 
     // ─── 2. Fetch Mentor Profile ───────────────────────────────────────────

@@ -6,6 +6,7 @@ import PublicServicesService from "@/lib/api/publicServices.service";
 import MentorService from "@/lib/api/mentorship.service";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { goToServiceDetails } from "@/features/mentorship/utils/serviceNavigation";
 import { buildMentorProfileUrl } from "@/shared/utils/mentor.util";
 import { getRatingDisplay } from "@/shared/utils/mentorFormat";
 import { cleanText, isMeaningfulText } from "@/shared/utils/textSanitize";
@@ -115,7 +116,7 @@ export default function MentorshipServicesSection({
     }, []);
 
     const handleServiceClick = (serviceId: string) => {
-        router.push(`/mentorship/service/${serviceId}`);
+        goToServiceDetails(router, serviceId);
     };
 
     const displayItems = buildDisplayItems(services);

@@ -2665,7 +2665,12 @@ export default function SeniorMentorApplicationPage() {
                             ) : (
                                 <button
                                     type="submit"
-                                    disabled={isSubmitting}
+                                    disabled={isSubmitting || (isSeniorStudent && !acceptFreePolicy)}
+                                    title={
+                                        isSeniorStudent && !acceptFreePolicy
+                                            ? 'Please tick the checkbox above to enable submission'
+                                            : undefined
+                                    }
                                     className="px-8 sm:px-10 min-h-[48px] bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all shadow-lg flex items-center gap-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
                                     {isSubmitting ? (
