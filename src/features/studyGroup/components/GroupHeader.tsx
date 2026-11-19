@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import React, { useState } from 'react';
+import { usePublicGroupStats, formatStat } from '@/features/studyGroup/hooks/usePublicGroupStats';
 import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
 import { setBrowseSearchQuery as setSearchQuery, selectBrowseSearchQuery as selectSearchQuery } from '@/hooks/studyGroup/features/groups/groupsSlice';
 import SearchDropdown from '@/features/study-group/components/study/dropdown';
@@ -10,6 +11,8 @@ const GroupHeader = () => {
   const searchQuery = useAppSelector(selectSearchQuery);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  // Real numbers from the server; null while loading or if the request failed
+  const stats = usePublicGroupStats();
 
   return (
     <div className="relative overflow-visible py-4 sm:py-6 lg:py-8">
@@ -96,9 +99,9 @@ const GroupHeader = () => {
               {/* Stats */}
               <div className="flex flex-wrap gap-3 mt-2">
                 {[
-                  { value: '500+', label: 'Active Groups' },
-                  { value: '10K+', label: 'Members' },
-                  { value: '50+', label: 'Subjects' },
+                  { value: formatStat(stats?.activeGroups), label: 'Active Groups' },
+                  { value: formatStat(stats?.members), label: 'Members' },
+                  { value: formatStat(stats?.subjects), label: 'Subjects' },
                 ].map((stat, index) => (
                   <div
                     key={index}
@@ -151,7 +154,7 @@ const GroupHeader = () => {
                   <div className="absolute inset-0 w-4 h-4 bg-green-500 rounded-full animate-ping opacity-75" />
                 </div>
                 <div className="text-sm">
-                  <span className="font-extrabold text-[#4a3728] text-lg">250+</span>{' '}
+                  <span className="font-extrabold text-[#4a3728] text-lg">{formatStat(stats?.studyingNow)}</span>{' '}
                   <span className="text-[#6b5847] font-semibold">Studying Now</span>
                 </div>
               </div>

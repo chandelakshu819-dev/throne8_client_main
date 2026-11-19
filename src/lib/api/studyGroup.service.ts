@@ -749,6 +749,14 @@ export interface GroupChallengeResponse {
   generatedAt: string;
 }
 
+export interface PublicGroupStats {
+  activeGroups: number;
+  totalGroups: number;
+  members: number;
+  subjects: number;
+  studyingNow: number;
+}
+
 class StudyGroupService {
   // =======================================================================================
   // ===========================GROUP ROUTES================================================
@@ -889,6 +897,25 @@ class StudyGroupService {
         if (msg) throw new Error(msg);
       }
       throw new Error("Failed to fetch top ranked groups.");
+    }
+  }
+
+  /**
+   * Public aggregate numbers for the Groups page header
+   * GET {studygroup base url}/groups/stats  (no login needed)
+   */
+  static async getPublicStats(): Promise<PublicGroupStats> {
+    try {
+      const { data } = await api.get(
+        `${joinUrl(config.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_ENDPOINT, "/stats")}`
+      );
+      return data.data;
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const msg = error.response?.data?.message;
+        if (msg) throw new Error(msg);
+      }
+      throw new Error("Failed to fetch group stats.");
     }
   }
 

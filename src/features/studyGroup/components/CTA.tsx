@@ -2,6 +2,7 @@
 
 import CreateGroupModal from "@/features/study-group/modals/CreateGroupModal";
 import { UserPlus, ArrowRight, CheckCircle } from "lucide-react";
+import { usePublicGroupStats, formatStat } from "@/features/studyGroup/hooks/usePublicGroupStats";
 
 // import { useAppDispatch, useAppSelector } from "../../../../lib/redux/hooks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -10,6 +11,7 @@ import { openCreateModal, closeCreateModal, selectIsCreateModalOpen } from "@/ho
 export default function CTA() {
   const dispatch = useAppDispatch();
   const isModalOpen = useAppSelector(selectIsCreateModalOpen);
+  const stats = usePublicGroupStats(); // real numbers, same source as the page header
 
   return (
     <>
@@ -83,16 +85,16 @@ export default function CTA() {
           <div className="mt-8 p-8 border-t border-[#e0d8cf]">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <div className="text-3xl font-bold text-[#4a3728]">2,500+</div>
+                <div className="text-3xl font-bold text-[#4a3728]">{formatStat(stats?.totalGroups)}</div>
                 <div className="text-sm text-[#6b5847] mt-1">Groups Created</div>
               </div>
               <div>
-                <div className="text-3xl font-bold text-[#4a3728]">15,000+</div>
+                <div className="text-3xl font-bold text-[#4a3728]">{formatStat(stats?.members)}</div>
                 <div className="text-sm text-[#6b5847] mt-1">Active Members</div>
               </div>
               <div>
-                <div className="text-3xl font-bold text-[#4a3728]">85%</div>
-                <div className="text-sm text-[#6b5847] mt-1">Success Rate</div>
+                <div className="text-3xl font-bold text-[#4a3728]">{formatStat(stats?.studyingNow)}</div>
+                <div className="text-sm text-[#6b5847] mt-1">Studying Now</div>
               </div>
             </div>
           </div>
