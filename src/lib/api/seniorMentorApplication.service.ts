@@ -12,9 +12,15 @@ export enum ApplicationStatus {
 export const MIN_HELP_AREAS = 3;
 export const MAX_HELP_AREAS = 7;
 
+/** Student Senior Mentors must complete this many free sessions before charging. Keep equal to the backend value. */
+export const FREE_SESSIONS_REQUIRED = 50;
+
 // ── Shape of the application returned by GET /me ──────────────────────────────
 export interface SeniorMentorApplication {
-  applicationId: string;
+  /** Backend returns `seniorMentorId` (and `id` as an alias). `applicationId` is kept for older callers. */
+  applicationId?: string;
+  seniorMentorId?: string;
+  id?: string;
   userId: string;
   mentorRole: 'senior_mentor' | 'alumni';
   fullName: string;
@@ -45,9 +51,19 @@ export interface SeniorMentorApplication {
   verifiedAt?: string;
   verifiedBy?: string;
   rejectionReason?: string;
+  freePolicyAcceptedAt?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Progress towards unlocking paid services (GET /me/free-session-progress). */
+export interface FreeSessionProgress {
+  appliesToUser: boolean;
+  required: number;
+  completed: number;
+  remaining: number;
+  isUnlocked: boolean;
 }
 
 // ── Admin (college mentor review) types ───────────────────────────────────────
@@ -177,9 +193,7 @@ class SeniorMentorApplicationService {
    * Returns the current user's Senior Mentor application, or null if none.
    * Cached for 30s and de-duplicated across concurrent callers.
    */
-  static getMyApplication(
-    forceFresh: boolean = false
-  ): Promise<SeniorMentorApplication | null> {
+  static getMyApplication(forceFresh: boolean = false): Promise<SeniorMentorApplication | null> {
     if (forceFresh) clearMyAppCache();
 
     if (_myAppCache && Date.now() - _myAppCache.at < MY_APP_TTL_MS) {
@@ -211,6 +225,21 @@ class SeniorMentorApplicationService {
   /** Manually clear the cached "my application". */
   static invalidateMyApplicationCache(): void {
     clearMyAppCache();
+  }
+
+  /**
+   * GET /api/v1/mentorship/senior-mentor-applications/me/free-session-progress
+   * How many free sessions a student Senior Mentor has completed.
+   * Returns null when the user has no application.
+   */
+  static async getFreeSessionProgress(): Promise<FreeSessionProgress | null> {
+    try {
+      const { data } = await api.get(`${ADMIN_BASE}/me/free-session-progress`);
+      return data?.data ?? null;
+    } catch (error: any) {
+      if (error?.response?.status === 404) return null;
+      throw error;
+    }
   }
 
   /**
@@ -249,22 +278,22 @@ class SeniorMentorApplicationService {
     }
   }
 
-    /**
+  /**
    * DELETE /api/v1/mentorship/senior-mentor-applications/me/profile-photo
    */
-    static async removeMyProfilePhoto(): Promise<SeniorMentorApplication | null> {
-      try {
-        const { data } = await api.delete('/mentorship/senior-mentor-applications/me/profile-photo');
-        clearMyAppCache();
-        return data?.data ?? null;
-      } catch (error: any) {
-        if (error?.response?.status === 404) return null;
-        throw error;
-      }
+  static async removeMyProfilePhoto(): Promise<SeniorMentorApplication | null> {
+    try {
+      const { data } = await api.delete('/mentorship/senior-mentor-applications/me/profile-photo');
+      clearMyAppCache();
+      return data?.data ?? null;
+    } catch (error: any) {
+      if (error?.response?.status === 404) return null;
+      throw error;
     }
-  
-    /**
-     * GET /api/v1/mentorship/senior-mentor-applications/user/:userId/profile
+  }
+
+  /**
+   * GET /api/v1/mentorship/senior-mentor-applications/user/:userId/profile
    * Returns a Senior Mentor Application by userId to display as Profile.
    */
   static async getApplicationProfileById(userId: string): Promise<SeniorMentorApplication | null> {
@@ -275,8 +304,11 @@ class SeniorMentorApplicationService {
   /**
    * PATCH /api/v1/mentorship/senior-mentor-applications/me
    * Update the current user's Senior Mentor profile fields.
+   * Updating a rejected application sends it back to the review queue (pending).
    */
-  static async updateMyApplication(updates: Partial<SeniorMentorApplication>): Promise<SeniorMentorApplication> {
+  static async updateMyApplication(
+    updates: Partial<SeniorMentorApplication>
+  ): Promise<SeniorMentorApplication> {
     const { data } = await api.patch('/mentorship/senior-mentor-applications/me', updates);
     clearMyAppCache();
     return data?.data;
