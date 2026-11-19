@@ -6,6 +6,7 @@ import TrustedCompanies from "../TrustedCompanies";
 import { TOP_COMPANIES, TOP_COMPANIES_ROW2 } from "../../constants/mock.data";
 import { MANUAL_COMPANIES } from "../../constants/manualCompanies";
 import { parseRoleCompany } from "@/shared/utils/mentorFormat";
+import { groupMentorsByCompany } from "../../utils/companyGrouping";
 
 interface CompanyLogosSectionProps {
     mentors?: any[];
@@ -34,28 +35,27 @@ const pickColor = (name: string) => {
 
 export default function CompanyLogosSection({ mentors = [] }: CompanyLogosSectionProps) {
     const companies = useMemo(() => {
-        // 1) Real mentors ki companies + mentor count
-        const map = new Map<string, { name: string; count: number }>();
-        mentors.forEach((m: any) => {
-            const { company } = parseRoleCompany(m?.experience?.currentRole, m?.title, m?.company);
-            const key = norm(company);
-            if (INVALID.has(key)) return;
-            const entry = map.get(key);
-            if (entry) entry.count += 1;
-            else map.set(key, { name: company, count: 1 });
-        });
+        // 1) Real mentors ki companies + mentor count.
+        //    Mentors with companyRef group by company id (stored logo); old name-only
+        //    mentors merge into the group that has the same normalized name.
+        const groups = groupMentorsByCompany(
+            mentors.map((m: any) => ({
+                ref: m?.companyRef,
+                legacyName: parseRoleCompany(m?.experience?.currentRole, m?.title, m?.company).company,
+            })),
+            INVALID
+        );
 
-        const real = Array.from(map.entries())
-            .sort((a, b) => b[1].count - a[1].count || a[1].name.localeCompare(b[1].name))
-            .map(([key, v]) => {
-                const brand = KNOWN_BRANDS[key];
-                return {
-                    name: v.name,
-                    count: v.count,
-                    color: brand?.color ?? pickColor(v.name),
-                    svg: brand?.svg,
-                };
-            });
+        const real = groups.map((g) => {
+            const brand = KNOWN_BRANDS[norm(g.name)];
+            return {
+                name: g.name,
+                count: g.count,
+                color: brand?.color ?? pickColor(g.name),
+                svg: brand?.svg,
+                storedLogoUrl: g.logoUrl,
+            };
+        });
 
         // 2) Manual companies (jo real list mein pehle se nahi hain)
         const seen = new Set(real.map((c) => norm(c.name)));

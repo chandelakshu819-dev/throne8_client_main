@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api/auth.service";
 import config from "@/config/env.config";
+import CompanyAutocomplete from "../../shared/CompanyAutocomplete";
+import type { CompanyRef } from "../../../services/company.service";
 
 // ── Constants ────────────────────────────────────────────────
 const DOMAINS_OPTIONS = [
@@ -72,6 +74,8 @@ export default function UpdateProfileModal({
     const [title, setTitle] = useState("");
     const [bio, setBio] = useState("");
     const [currentRole, setCurrentRole] = useState("");
+    const [companyText, setCompanyText] = useState("");
+    const [selectedCompany, setSelectedCompany] = useState<CompanyRef | null>(null);
     const [experienceTotal, setExperienceTotal] = useState<number>(1);
     const [domains, setDomains] = useState<string[]>([]);
     const [skills, setSkills] = useState<string[]>([]);
@@ -124,6 +128,8 @@ export default function UpdateProfileModal({
         setTitle(mentorData.title ?? "");
         setBio(mentorData.bio ?? "");
         setCurrentRole(mentorData.experience?.currentRole ?? "");
+        setCompanyText(mentorData.companyRef?.name ?? (typeof mentorData.company === "string" ? mentorData.company : "") ?? "");
+        setSelectedCompany(mentorData.companyRef?.id ? mentorData.companyRef : null);
         setExperienceTotal(mentorData.experience?.total ?? 1);
         setDomains(mentorData.domains ?? []);
         setSkills(mentorData.skills ?? []);
@@ -197,6 +203,12 @@ export default function UpdateProfileModal({
                     total: experienceTotal,
                     currentRole,
                 },
+                // Only sent when the mentor picked a company from the list (backend keeps legacy text in sync)
+                ...(selectedCompany?.id &&
+                    selectedCompany.id !== mentorData?.companyRef?.id && {
+                        mentorCompanyId: selectedCompany.id,
+                        company: selectedCompany.name,
+                    }),
                 socialProof: {
                     linkedinUrl,
                     ...(githubUrl && { githubUrl }),
@@ -309,6 +321,23 @@ export default function UpdateProfileModal({
                                     value={currentRole}
                                     onChange={(e) => setCurrentRole(e.target.value)}
                                     placeholder="e.g. Backend and Technical Engineer"
+                                    className={inputCls}
+                                />
+                            </Field>
+
+                            <Field label="Company">
+                                <CompanyAutocomplete
+                                    value={companyText}
+                                    selected={selectedCompany}
+                                    onTextChange={(v) => {
+                                        setSelectedCompany(null);
+                                        setCompanyText(v);
+                                    }}
+                                    onSelect={(c) => {
+                                        setSelectedCompany(c);
+                                        setCompanyText(c.name);
+                                    }}
+                                    placeholder="Search your company, e.g. Google"
                                     className={inputCls}
                                 />
                             </Field>

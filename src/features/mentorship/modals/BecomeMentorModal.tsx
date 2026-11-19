@@ -18,11 +18,12 @@ import { useExperienceData } from "@/features/profile/hooks/useExperienceData";
 import { useEducationData } from "@/features/profile/hooks/useEducationData";
 import AutocompleteInput from "@/features/mentorship/components/shared/AutocompleteInput";
 import { useFieldSuggestions } from "@/features/mentorship/hooks/useFieldSuggestions";
+import CompanyAutocomplete from "@/features/mentorship/components/shared/CompanyAutocomplete";
+import type { CompanyRef } from "@/features/mentorship/services/company.service";
 
 
 import {
     ROLE_SUGGESTIONS,
-    COMPANY_SUGGESTIONS,
     COLLEGE_SUGGESTIONS,
     DEGREE_SUGGESTIONS,
     BRANCH_SUGGESTIONS,
@@ -66,6 +67,7 @@ export default function BecomeMentorModal({
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [agreements, setAgreements] = useState([false, false, false]);
     const [agreementError, setAgreementError] = useState(false);
+    const [selectedCompany, setSelectedCompany] = useState<CompanyRef | null>(null);
     const [isRedirecting, setIsRedirecting] = useState(false);
     const [domainInput, setDomainInput] = useState('');
     
@@ -99,7 +101,6 @@ export default function BecomeMentorModal({
     const watchedDomains = watch('domains');
     const domainOptions = searchDomains(domainInput).map((d) => DOMAIN_LABELS[d]);
     const roleOptions = useFieldSuggestions('role', watch('currentRole') || '', ROLE_SUGGESTIONS);
-    const companyOptions = useFieldSuggestions('company', watch('company') || '', COMPANY_SUGGESTIONS);
     const collegeOptions = useFieldSuggestions('college', watch('college') || '', COLLEGE_SUGGESTIONS);
     const degreeOptions = useFieldSuggestions('degree', watch('degree') || '', DEGREE_SUGGESTIONS);
     const branchOptions = useFieldSuggestions('branch', watch('branch') || '', BRANCH_SUGGESTIONS);
@@ -285,7 +286,8 @@ export default function BecomeMentorModal({
                 skills: formData.skills,
                 experienceTotal: formData.experienceTotal,
                 currentRole: formData.currentRole,
-                company: formData.company,
+                company: selectedCompany?.name || formData.company,
+                mentorCompanyId: selectedCompany?.id,
                 college: formData.college,
                 degree: formData.degree,
                 branch: formData.branch,
@@ -509,12 +511,18 @@ export default function BecomeMentorModal({
                                     {/* Company */}
                                     <div>
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Company *</label>
-                                        <AutocompleteInput
+                                        <CompanyAutocomplete
     value={watch('company') || ''}
-    onChange={(v) => setValue('company', v, { shouldValidate: false })}
-    onSelect={(v) => setValue('company', v, { shouldValidate: true })}
-    suggestions={companyOptions}
-    placeholder="Google"
+    selected={selectedCompany}
+    onTextChange={(v) => {
+        setSelectedCompany(null);
+        setValue('company', v, { shouldValidate: false });
+    }}
+    onSelect={(c) => {
+        setSelectedCompany(c);
+        setValue('company', c.name, { shouldValidate: true });
+    }}
+    placeholder="Search your company, e.g. Google"
     className={inputClass}
 />
                                         {errors.company && (

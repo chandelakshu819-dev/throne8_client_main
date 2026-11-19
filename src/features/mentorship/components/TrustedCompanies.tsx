@@ -59,6 +59,7 @@ const BRAND_LOGOS: Record<string, { label: string; src: string }> = {
   wipro: { label: "Wipro", src: "https://www.google.com/s2/favicons?domain=wipro.com&sz=128" },
 };
 const withRealLogo = (c: any) => {
+  if (c?.storedLogoUrl) return c; // stored (autocomplete) logo wins over hardcoded brands
   const brand = BRAND_LOGOS[brandKey(c?.name)];
   if (!brand) return c;
   return {

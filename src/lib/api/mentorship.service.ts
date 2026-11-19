@@ -85,6 +85,7 @@ class MentorService {
     experienceTotal: number;
     currentRole: string;
     company: string;
+    mentorCompanyId?: string;
     college: string;
     degree: string;
     branch: string;
@@ -98,6 +99,7 @@ class MentorService {
       formData.append('title', payload.title);
       formData.append('bio', payload.bio);
       formData.append('company', payload.company);
+      if (payload.mentorCompanyId) formData.append('mentorCompanyId', payload.mentorCompanyId);
       formData.append('college', payload.college);
       formData.append('degree', payload.degree);
       formData.append('branch', payload.branch);

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 interface CompanyBigCardProps {
   company: {
@@ -6,11 +6,18 @@ interface CompanyBigCardProps {
     color: string;
     svg?: string;
     logoUrl?: string;
+    /** Logo we store for this company (mentor-company autocomplete). Highest priority. */
+    storedLogoUrl?: string;
     count?: number;
   };
 }
 
 export default function CompanyBigCard({ company }: CompanyBigCardProps) {
+  // Logo priority: stored logo -> old SVG -> manual logoUrl -> letter circle
+  const [storedFailed, setStoredFailed] = useState(false);
+  useEffect(() => setStoredFailed(false), [company.storedLogoUrl]);
+  const useStored = Boolean(company.storedLogoUrl) && !storedFailed;
+
   return (
     <div className="flex-shrink-0 w-[172px] h-[172px] sm:w-[178px] sm:h-[178px] group/card relative select-none">
       {/* Soft Hover Glow */}
@@ -96,9 +103,19 @@ export default function CompanyBigCard({ company }: CompanyBigCardProps) {
             group-hover/card:scale-110
           "
           style={{ color: company.color }}
-          {...(company.svg ? { dangerouslySetInnerHTML: { __html: company.svg } } : {})}
+          {...(!useStored && company.svg ? { dangerouslySetInnerHTML: { __html: company.svg } } : {})}
         >
-          {company.svg ? null : company.logoUrl ? (
+          {useStored ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={company.storedLogoUrl}
+              alt={company.name}
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              onError={() => setStoredFailed(true)}
+              className="w-full h-full object-contain"
+            />
+          ) : company.svg ? null : company.logoUrl ? (
             <img
               src={company.logoUrl}
               alt={company.name}
