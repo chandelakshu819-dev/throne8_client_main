@@ -145,7 +145,8 @@ export default function LiveRoomNotificationProvider({ children }: { children: R
     if (!live) return;
     const groupId = live.groupId;
     dismiss();
-    router.push(`/study/my-groups/${groupId}`);
+    // joinLive=1: the group page joins the live room by itself (no extra Enter Room click)
+    router.push(`/study/my-groups/${groupId}?joinLive=1`);
   };
 
   return (
