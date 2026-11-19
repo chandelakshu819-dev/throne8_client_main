@@ -7,7 +7,8 @@ import { MyRequestsResponse } from "@/lib/api/studyGroup.service";
 interface JoinGroupModalProps {
   group: { groupId: string; title: string; visibility: string };
   onClose: () => void;
-  onJoin: (joinCode: string) => Promise<void>;
+  /** @deprecated join codes were removed — private groups use leader approval */
+  onJoin?: (joinCode: string) => Promise<void>;
   onRequest: (message: string) => Promise<void>;
   isLoading: boolean;
   existingRequest?: MyRequestsResponse | null; // ADD
@@ -15,27 +16,12 @@ interface JoinGroupModalProps {
 
 
 export default function JoinGroupModal({
-  group, onClose, onJoin, onRequest, isLoading, existingRequest
+  group, onClose, onRequest, isLoading, existingRequest
 }: JoinGroupModalProps) {
-  const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState('');
-  const [mode, setMode] = useState<'code' | 'request'>('code');
   const [requested, setRequested] = useState(false);
   // State add karo component ke andar
   const [requestMessage, setRequestMessage] = useState('');
-
-  const handleJoin = async () => {
-    if (joinCode.length !== 8) {
-      setError('Join code must be 8 characters');
-      return;
-    }
-    setError('');
-    try {
-      await onJoin(joinCode.toUpperCase());
-    } catch (err: any) {
-      setError(err.message || 'Invalid join code');
-    }
-  };
 
   const handleRequest = async () => {
     setError('');
@@ -77,60 +63,8 @@ export default function JoinGroupModal({
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-5 bg-[#f6ede8] rounded-xl p-1">
-          <button
-            onClick={() => setMode('code')}
-            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${mode === 'code'
-              ? 'bg-white text-[#4a3728] shadow-sm'
-              : 'text-[#8b7355]'
-              }`}
-          >
-            Enter Join Code
-          </button>
-          <button
-            onClick={() => setMode('request')}
-            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${mode === 'request'
-              ? 'bg-white text-[#4a3728] shadow-sm'
-              : 'text-[#8b7355]'
-              }`}
-          >
-            Request Access
-          </button>
-        </div>
-
-        {/* Code Mode */}
-        {mode === 'code' && (
-          <div className="space-y-4">
-            <p className="text-sm text-[#6b5847]">
-              Enter the 8-character join code shared by the group leader.
-            </p>
-            <input
-              type="text"
-              maxLength={8}
-              value={joinCode}
-              onChange={(e) => {
-                setJoinCode(e.target.value.toUpperCase());
-                setError('');
-              }}
-              placeholder="e.g. ABC12XYZ"
-              className="w-full px-4 py-3 rounded-xl border-2 border-[#e0d8cf] bg-white/80 text-[#4a3728] placeholder-[#c4b5a5] font-mono text-center tracking-[0.3em] text-lg focus:outline-none focus:border-[#8b7355] transition-colors uppercase"
-            />
-            {error && (
-              <p className="text-red-500 text-xs text-center">{error}</p>
-            )}
-            <button
-              onClick={handleJoin}
-              disabled={isLoading || joinCode.length !== 8}
-              className="w-full bg-gradient-to-r from-[#8b7355] to-[#6b5847] hover:from-[#6b5847] hover:to-[#4a3728] disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-semibold text-sm shadow-lg transition-all duration-300"
-            >
-              {isLoading ? 'Joining...' : 'Join Group'}
-            </button>
-          </div>
-        )}
-
         {/* Request Mode */}
-        {mode === 'request' && (
+        {(
           <div className="space-y-4">
             {/* Already requested — show status */}
             {existingRequest && existingRequest.status === 'pending' ? (
@@ -199,7 +133,7 @@ export default function JoinGroupModal({
               /* Fresh request */
               <>
                 <p className="text-sm text-[#6b5847]">
-                  Don't have a join code? Send a request to the group leader.
+                  This is a private group. Send a request and the group leader will review it.
                 </p>
                 <textarea
                   value={requestMessage}

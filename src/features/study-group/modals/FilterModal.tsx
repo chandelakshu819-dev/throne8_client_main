@@ -10,6 +10,7 @@ import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
 import {
   searchGroupsThunk,
   joinGroupThunk,
+  sendJoinRequestThunk,
 } from '@/hooks/studyGroup/features/groups/group.thunks';
 import {
   selectSearchResults,
@@ -244,13 +245,14 @@ const FilterModal: React.FC<FilterModalProps> = ({ isOpen, onClose, onApply }) =
     }
   };
 
-  const handlePrivateJoin = async (joinCode: string) => {
+  // Private groups: send a join request; the group leader approves or rejects it
+  const handleRequestAccess = async (message: string) => {
     if (!joinModalGroup) return;
-    const result = await dispatch(joinGroupThunk({ groupId: joinModalGroup.groupId, joinCode }));
-    if (joinGroupThunk.fulfilled.match(result)) {
-      setJoinModalGroup(null);
-    } else {
-      throw new Error((result.payload as string) || 'Invalid join code');
+    const result = await dispatch(
+      sendJoinRequestThunk({ groupId: joinModalGroup.groupId, message })
+    );
+    if (!sendJoinRequestThunk.fulfilled.match(result)) {
+      throw new Error((result.payload as string) || 'Failed to send request');
     }
   };
 
@@ -497,8 +499,7 @@ const FilterModal: React.FC<FilterModalProps> = ({ isOpen, onClose, onApply }) =
         <JoinGroupModal
           group={joinModalGroup}
           onClose={() => setJoinModalGroup(null)}
-          onJoin={handlePrivateJoin}
-          onRequest={async () => { await new Promise(r => setTimeout(r, 800)); }}
+          onRequest={handleRequestAccess}
           isLoading={joiningGroupId === joinModalGroup?.groupId}
         />
       )}
