@@ -86,6 +86,9 @@ export interface UpdateGroupData {
 }
 
 export interface JoinGroupData {
+  /** Invite-link code — lets the user join a private group without leader approval */
+  inviteCode?: string;
+  /** @deprecated join codes were replaced by leader approval */
   joinCode?: string;
 }
 
@@ -1059,7 +1062,7 @@ class StudyGroupService {
         }
         if (error.response?.status === 400) {
           throw new Error(
-            error.response?.data?.message || "Invalid join code."
+            error.response?.data?.message || "Invalid or expired invite link."
           );
         }
         if (error.response?.status === 401) {

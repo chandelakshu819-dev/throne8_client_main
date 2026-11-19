@@ -120,11 +120,11 @@ export const fetchGroupMembersThunk = createAsyncThunk(
 export const joinGroupThunk = createAsyncThunk(
   "groups/join",
   async (
-    { groupId, joinCode }: { groupId: string; joinCode?: string },
+    { groupId, inviteCode }: { groupId: string; inviteCode?: string; joinCode?: string },
     { rejectWithValue }
   ) => {
     try {
-      const group = await StudyGroupService.joinGroup(groupId, { joinCode });
+      const group = await StudyGroupService.joinGroup(groupId, { inviteCode });
       return group;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to join group");

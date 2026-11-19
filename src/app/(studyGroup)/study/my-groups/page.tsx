@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/core/store/store.hooks";
 import { updateGroup, deleteGroup, leaveGroup, selectMyGroups, selectMyGroupsLoading, selectGroupMembers, selectGroupMembersLoading, selectAllUsers, selectAllUsersLoading, selectPendingRequests, selectPendingRequestsLoading, selectRespondToRequestLoading, selectAttendanceStatus, selectAttendancePercentage, selectUserStreak } from "@/hooks/studyGroup/features/groups/groupsSlice";
-import { deleteGroupThunk, fetchAllUsersThunk, fetchUserStreakThunk, fetchAttendancePercentageThunk, fetchAttendanceStatusThunk, fetchMyGroupsThunk, getGroupPendingRequestsThunk, leaveGroupThunk, removeMemberThunk, respondToJoinRequestThunk, updateGroupThunk } from "@/hooks/studyGroup/features/groups/group.thunks";
+import { deleteGroupThunk, fetchAllUsersThunk, fetchUserStreakThunk, fetchAttendancePercentageThunk, fetchAttendanceStatusThunk, fetchMyGroupsThunk, generateInviteLinkThunk, getGroupPendingRequestsThunk, leaveGroupThunk, removeMemberThunk, respondToJoinRequestThunk, updateGroupThunk } from "@/hooks/studyGroup/features/groups/group.thunks";
 import {useAuth} from "@/features/auth/hooks/useAuth";
 import { selectTimerStats } from "@/hooks/studyGroup/features/timer/timerSlice";
 import { getTimerStatsThunk } from "@/hooks/studyGroup/features/timer/timer.thunks";
@@ -130,6 +130,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
         }
       })
       .catch((err: any) => alert(err));
+  };
+
+  const handleCopyInviteLink = async (): Promise<void> => {
+    try {
+      const res: any = await dispatch(
+        generateInviteLinkThunk({ groupId: (group as any).groupId, options: { expiresInHours: 168 } })
+      ).unwrap();
+      await navigator.clipboard.writeText(res.inviteLink);
+      alert('Invite link copied! It works for 7 days and lets people join without approval.');
+    } catch (err: any) {
+      alert(typeof err === 'string' ? err : err?.message || 'Failed to create invite link');
+    }
   };
 
   const handleWarnMember = async (targetUserId: string, memberName: string): Promise<void> => {
@@ -533,29 +545,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
                       </div>
                     )}
 
-                    {/* Join Code */}
+                    {/* Private group: approval + invite link */}
                     {formData.visibility == GroupVisibility.PRIVATE ?
                       <div className="pt-3 border-t border-[#e0d8cf]">
                         <label className="block text-xs font-semibold text-[#4a3728] mb-1.5 uppercase tracking-wide">
-                          Join Code
+                          Invite Link
                         </label>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={(group as any).joinCode ?? 'N/A'}
-                            readOnly
-                            className="flex-1 px-3 py-2 border-2 border-[#e0d8cf] rounded-lg text-xs text-[#4a3728] bg-[#f6ede8] cursor-default font-mono tracking-widest"
-                          />
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText((group as any).joinCode ?? '');
-                              alert('Join code copied!');
-                            }}
-                            className="px-3 py-2 bg-[#8b7355] text-white rounded-lg text-xs font-semibold hover:bg-[#6b5847] transition-all flex-shrink-0"
-                          >
-                            Copy
-                          </button>
-                        </div>
+                        <p className="text-xs text-[#6b5847] mb-2">
+                          People who ask to join need your approval (see Join Requests below).
+                          Anyone with an invite link joins instantly, so share it only with people you trust.
+                        </p>
+                        <button
+                          onClick={handleCopyInviteLink}
+                          className="px-3 py-2 bg-[#8b7355] text-white rounded-lg text-xs font-semibold hover:bg-[#6b5847] transition-all"
+                        >
+                          Copy invite link (valid 7 days)
+                        </button>
                       </div> : ""}
 
                     {/* Join Requests */}
