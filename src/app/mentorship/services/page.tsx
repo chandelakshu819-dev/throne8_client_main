@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Filter, Calendar, ArrowRight, User, GraduationCap, Clock, IndianRupee } from "lucide-react";
 import SessionService from "@/lib/api/session.service";
+import { goToServiceDetails } from "@/features/mentorship/utils/serviceNavigation";
 import MentorService from "@/lib/api/mentorship.service";
 
 // Define basic interface for services to avoid any
@@ -98,7 +99,7 @@ export default function GlobalServicesMarketplace() {
     }, []);
 
     const handleServiceClick = (serviceId: string) => {
-        router.push(`/mentorship/service/${serviceId}`);
+        goToServiceDetails(router, serviceId);
     };
 
     // Extract dynamic dropdown options safely

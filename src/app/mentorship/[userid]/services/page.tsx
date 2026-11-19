@@ -4,6 +4,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import SessionService from "@/lib/api/session.service";
+import { goToServiceDetails } from "@/features/mentorship/utils/serviceNavigation";
 import MentorService from "@/lib/api/mentorship.service";
 import { ArrowLeft, User, Calendar, SlidersHorizontal, X } from "lucide-react";
 import { GlobalStyles, Navigation } from "@/features/index";
@@ -49,7 +50,7 @@ export default function MentorServicesPage() {
     }, [mentorId]);
 
     const handleServiceClick = (serviceId: string) => {
-        router.push(`/mentorship/service/${serviceId}`);
+        goToServiceDetails(router, serviceId);
     };
 
     // --- Dynamic Options Generation ---
