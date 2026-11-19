@@ -16,13 +16,17 @@ import {
   User,
   Menu,
   X,
+  Bell,
 } from "lucide-react";
+
+import StudyGroupNotificationService from "@/lib/api/studyGroupNotification.service";
 
 type SidebarItem = {
   name: string;
   path?: string;
   action?: "filter" | "create";
   icon: React.ReactNode;
+  badge?: number;
 };
 
 const StudySidebar = () => {
@@ -36,11 +40,27 @@ const StudySidebar = () => {
   // ✅ mobile sidebar state
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  // ✅ unread study-group notifications (badge)
+  const [unreadCount, setUnreadCount] = useState(0);
+
   // ✅ hydration fix
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // ✅ Load unread count on mount, on every route change, and every 60s.
+  // Failures are silent so the sidebar never breaks because of notifications.
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      StudyGroupNotificationService.getUnreadCount()
+        .then((n) => { if (!cancelled) setUnreadCount(n); })
+        .catch(() => {});
+    load();
+    const timer = setInterval(load, 60_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [pathname]);
 
   // ✅ Close mobile sidebar when route changes
   useEffect(() => {
@@ -98,6 +118,12 @@ const StudySidebar = () => {
           name: "Create Group",
           action: "create" as const,
           icon: <UserPlus size={18} />,
+        },
+        {
+          name: "Notifications",
+          path: "/study/notifications",
+          icon: <Bell size={18} />,
+          badge: unreadCount,
         },
       ],
     },
@@ -173,6 +199,11 @@ const StudySidebar = () => {
                 >
                   <span className="flex-shrink-0">{item.icon}</span>
                   <span className="text-sm lg:text-base font-medium">{item.name}</span>
+                  {!!(item as SidebarItem).badge && (
+                    <span className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center">
+                      {(item as SidebarItem).badge! > 99 ? "99+" : (item as SidebarItem).badge}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
