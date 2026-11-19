@@ -1045,9 +1045,10 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
               >
                 {getSaveButtonLabel()}
               </button>
-              {/* Save button: border style, hover par brown fill */}
+              {/* Save button: border + permanent brown ring, hover par brown fill */}
                 <style>{`
-                  .save-btn:hover:not(:disabled) { background-color: #4a3728 !important; color: #ffffff !important; }
+                  .save-btn { box-shadow: 0 0 0 4px rgba(74,55,40,0.22), 0 2px 8px rgba(74,55,40,0.25); }
+                  .save-btn:hover:not(:disabled) { background-color: #4a3728 !important; color: #ffffff !important; box-shadow: 0 0 0 5px rgba(74,55,40,0.35), 0 3px 10px rgba(74,55,40,0.35); }
                 `}</style>
               </div>
             </div>

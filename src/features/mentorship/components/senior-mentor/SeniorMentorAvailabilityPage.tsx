@@ -629,9 +629,10 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
   ? `Save ${Number(selectedDateStr.split("-")[2])} ${MONTH_NAMES[Number(selectedDateStr.split("-")[1]) - 1].slice(0, 3)}`
   : "Save Changes"}
                 </button>
-                {/* Save button: border style, hover par brown fill */}
+                {/* Save button: border + permanent brown ring, hover par brown fill */}
                 <style>{`
-                  .save-btn:hover:not(:disabled) { background-color: #4a3728 !important; color: #ffffff !important; }
+                  .save-btn { box-shadow: 0 0 0 4px rgba(74,55,40,0.22), 0 2px 8px rgba(74,55,40,0.25); }
+                  .save-btn:hover:not(:disabled) { background-color: #4a3728 !important; color: #ffffff !important; box-shadow: 0 0 0 5px rgba(74,55,40,0.35), 0 3px 10px rgba(74,55,40,0.35); }
                 `}</style>
               </div>
             </div>
