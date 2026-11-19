@@ -130,7 +130,25 @@ const AudioElement = memo(({ stream }: { stream: MediaStream | null }) => {
     const el = audioRef.current;
     if (!el) return;
     if (el.srcObject !== stream) el.srcObject = stream;
-    if (stream) el.play().catch(() => { /* blocked until the user interacts; joining was a click */ });
+    if (!stream) return;
+
+    const tryPlay = () => {
+      el.muted = false;
+      el.play().catch(() => { /* still blocked: retried on the next click or track change */ });
+    };
+    tryPlay();
+
+    // The remote mic can start sending after the element was attached (their track unmutes later),
+    // and browsers may block autoplay until the user clicks: retry on both.
+    const tracks = stream.getAudioTracks();
+    tracks.forEach((t) => t.addEventListener('unmute', tryPlay));
+    stream.addEventListener('addtrack', tryPlay);
+    window.addEventListener('pointerdown', tryPlay, { once: true });
+    return () => {
+      tracks.forEach((t) => t.removeEventListener('unmute', tryPlay));
+      stream.removeEventListener('addtrack', tryPlay);
+      window.removeEventListener('pointerdown', tryPlay);
+    };
   }, [stream]);
 
   return <audio ref={audioRef} autoPlay />;

@@ -2,7 +2,7 @@
 "use client";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
     Crown,
@@ -28,6 +28,7 @@ import {
     getSkillLabel,
     useMentorFilters,
     type CollegeView,
+    type CollegeSort,
 } from "./CollegeMentorFilters";
 
 interface MentorDiscoverySectionProps {
@@ -52,6 +53,13 @@ interface MentorData {
     domains: string[];
     acceptsBooking: boolean;
     sessionId?: string | null;
+    // Performance ranking ke liye extra fields
+    completedSessions?: number;
+    cancelledSessions?: number;
+    completionRate?: number;
+    reviewCount?: number;
+    trustScore?: number;
+    lastActiveAt?: string;
 }
 
 const MAX_TAGS = 3;
@@ -128,6 +136,96 @@ const toCollegeCardData = (mentor: PublicSeniorMentor): MentorData => ({
     sessionId: mentor.sessionId,
 });
 
+/* ───────────────────────── PERFORMANCE SCORE ───────────────────────── */
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Recent activity: 0 se 1 (aaj = 1, 30 din baad = 0)
+const recencyFactor = (dateStr?: string): number => {
+    if (!dateStr) return 0;
+    const t = new Date(dateStr).getTime();
+    if (Number.isNaN(t)) return 0;
+    const days = (Date.now() - t) / DAY_MS;
+    if (days <= 0) return 1;
+    if (days >= 30) return 0;
+    return 1 - days / 30;
+};
+
+// Industry mentor score (0 se ~100)
+const industryPerformanceScore = (m: MentorData): number => {
+    const completed = m.completedSessions ?? m.sessions ?? 0;
+    const rating = m.rating ?? 0;
+    const reviews = m.reviewCount ?? 0;
+
+    // 1. Completed sessions (sabse zyada weight, log scale taaki ek mentor sab par haavi na ho)
+    const sessionsScore = Math.min(Math.log1p(completed) / Math.log1p(50), 1) * 40;
+
+    // 2. Rating, reviews ke confidence ke saath (5 reviews pe full weight)
+    const ratingScore = (rating / 5) * Math.min(reviews / 5, 1) * 20;
+
+    // 3. Trust score (0-100)
+    const trustScore = Math.min(Math.max(m.trustScore ?? 0, 0), 100) * 0.15;
+
+    // 4. Reliability: completion rate, cancellations kam hon
+    const totalForRate = completed + (m.cancelledSessions ?? 0);
+    const reliabilityScore =
+        totalForRate > 0 ? Math.min(Math.max(m.completionRate ?? 100, 0), 100) * 0.1 : 0;
+
+    // 5. Recent activity (last 30 din)
+    const activityScore = recencyFactor(m.lastActiveAt) * 10;
+
+    // 6. Booking open hai to chhota boost
+    const bookingBoost = m.acceptsBooking ? 3 : 0;
+
+    // 7. Naye mentor (abhi koi session/rating nahi) ko thoda boost taaki hamesha neeche na dabe
+    const newBoost = completed === 0 && rating === 0 ? 5 : 0;
+
+    return sessionsScore + ratingScore + trustScore + reliabilityScore + activityScore + bookingBoost + newBoost;
+};
+
+// College mentor score: sessions + rating (agar API de) + booking open + recent activity
+const collegePerformanceScore = (m: PublicSeniorMentor): number => {
+    const sessions = Number(m.sessionsCount) || 0;
+    const rating = Number((m as any).averageRating ?? (m as any).rating) || 0;
+    const reviews = Number((m as any).totalReviews ?? (m as any).reviewCount) || 0;
+    const lastActive = (m as any).lastActiveAt || (m as any).updatedAt;
+
+    const sessionsScore = Math.min(Math.log1p(sessions) / Math.log1p(50), 1) * 55;
+    const ratingScore = (rating / 5) * Math.min(reviews / 5, 1) * 20;
+    const activityScore = recencyFactor(lastActive) * 10;
+    const bookingBoost = m.sessionId ? 10 : 0; // session open hai to upar
+    const newBoost = sessions === 0 ? 5 : 0;
+
+    return sessionsScore + ratingScore + activityScore + bookingBoost + newBoost;
+};
+
+// Dono sections ke liye ek hi sort logic
+function sortByMode<T>(
+    list: T[],
+    sort: CollegeSort,
+    getName: (item: T) => string,
+    getSessions: (item: T) => number,
+    getScore: (item: T) => number
+): T[] {
+    const copy = [...list];
+    switch (sort) {
+        case "popular":
+            return copy.sort(
+                (a, b) => getSessions(b) - getSessions(a) || getName(a).localeCompare(getName(b))
+            );
+        case "name_asc":
+            return copy.sort((a, b) => getName(a).localeCompare(getName(b)));
+        case "name_desc":
+            return copy.sort((a, b) => getName(b).localeCompare(getName(a)));
+        case "recommended":
+        default:
+            // Recommended = performance ranking
+            return copy.sort(
+                (a, b) => getScore(b) - getScore(a) || getName(a).localeCompare(getName(b))
+            );
+    }
+}
+
 export default function MentorDiscoverySection({ toggleCompare, compareList }: MentorDiscoverySectionProps) {
     const router = useRouter();
     const { user } = useAuth();
@@ -150,8 +248,33 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
 
     // EK hi unified filter: Industry aur College dono par lagta hai
     const filters = useMentorFilters(industryMentors, collegeMentors);
-    const filteredIndustryMentors = filters.filteredIndustry;
-    const filteredCollegeMentors = filters.filteredCollege;
+
+    // Industry aur College dono sections ek hi sort follow karte hain.
+    // Default "Recommended" = performance ke hisaab se.
+    const filteredIndustryMentors = useMemo(
+        () =>
+            sortByMode(
+                filters.filteredIndustry as MentorData[],
+                filters.sort,
+                (m) => m.name,
+                (m) => m.completedSessions ?? m.sessions ?? 0,
+                industryPerformanceScore
+            ),
+        [filters.filteredIndustry, filters.sort]
+    );
+
+    const filteredCollegeMentors = useMemo(
+        () =>
+            sortByMode(
+                filters.filteredCollege,
+                filters.sort,
+                (m) => String(m.displayName ?? ""),
+                (m) => Number(m.sessionsCount) || 0,
+                collegePerformanceScore
+            ),
+        [filters.filteredCollege, filters.sort]
+    );
+
     const hasActiveFilters = filters.activeCount > 0;
 
     // Filter / sort badalte hi lists dobara pehle page se
@@ -183,6 +306,11 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                 const college = typeof mentor.college === "string" ? mentor.college.trim() : undefined;
                 const degree = typeof mentor.degree === "string" ? mentor.degree.trim() : undefined;
 
+                const completedSessions =
+                    Number(mentor.stats?.completedSessions) ||
+                    Number(mentor.trustScore?.metrics?.totalCompletedSessions) ||
+                    0;
+
                 return {
                     id: String(mentor.mentorId),
                     userId: mentor.userId,
@@ -204,6 +332,13 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                     expTotal: totalExp,
                     domains: Array.isArray(mentor.domains) ? mentor.domains : [],
                     acceptsBooking: Boolean(mentor.pricing?.quickCall || mentor.availability?.autoAcceptBookings || mentor.availability?.daysAvailable?.length),
+                    // Performance fields
+                    completedSessions,
+                    cancelledSessions: Number(mentor.stats?.cancelledSessions) || 0,
+                    completionRate: Number(mentor.stats?.completionRate ?? 100),
+                    reviewCount: Number(mentor.stats?.totalReviews) || 0,
+                    trustScore: Number(mentor.trustScore?.overall) || 0,
+                    lastActiveAt: mentor.updatedAt,
                 };
             });
             setIndustryMentors(mapped);

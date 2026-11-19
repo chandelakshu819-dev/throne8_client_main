@@ -179,6 +179,57 @@ const formatFileSize = (bytes: number): string => {
     return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 };
 
+// ---------------------------------------------------------------------------
+// File validation (single source of truth for all three uploads)
+// ---------------------------------------------------------------------------
+
+interface FileRule {
+    label: string;
+    maxSizeBytes: number;
+    allowedExtensions: string[];
+    allowedMimeTypes: string[];
+}
+
+const PHOTO_RULE: FileRule = {
+    label: 'Profile photo',
+    maxSizeBytes: MAX_FILE_SIZE,
+    allowedExtensions: PHOTO_ALLOWED_EXTENSIONS,
+    allowedMimeTypes: PHOTO_ALLOWED_MIME_TYPES,
+};
+
+const RESUME_RULE: FileRule = {
+    label: 'Resume',
+    maxSizeBytes: MAX_FILE_SIZE,
+    allowedExtensions: RESUME_ALLOWED_EXTENSIONS,
+    allowedMimeTypes: RESUME_ALLOWED_MIME_TYPES,
+};
+
+const PROOF_RULE: FileRule = {
+    label: 'Proof of experience',
+    maxSizeBytes: MAX_FILE_SIZE,
+    allowedExtensions: PROOF_ALLOWED_EXTENSIONS,
+    allowedMimeTypes: PROOF_ALLOWED_MIME_TYPES,
+};
+
+const EMPTY_FILE_MESSAGE =
+    'This file is empty (0 B). This usually happens when the file is not fully downloaded on your phone (for example from WhatsApp, Google Drive or email). Please download it completely and select it again.';
+
+/** Returns a clear English message if the file has a problem, otherwise null. */
+const validateFileForUpload = (file: File, rule: FileRule): string | null => {
+    if (!file.size) {
+        return `The file "${file.name}" is empty (0 B). This usually happens when the file is not fully downloaded on your phone (for example from WhatsApp, Google Drive or email). Please download it completely and select it again.`;
+    }
+    if (file.size > rule.maxSizeBytes) {
+        return `The file "${file.name}" is ${formatFileSize(file.size)}, which is more than the ${rule.maxSizeBytes / (1024 * 1024)} MB limit. Please choose a smaller file.`;
+    }
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const typeOk = rule.allowedMimeTypes.includes(file.type) || rule.allowedExtensions.includes(ext);
+    if (!typeOk) {
+        return `The file "${file.name}" has an unsupported format. Please upload one of these formats: ${rule.allowedExtensions.map((e) => e.toUpperCase()).join(', ')}.`;
+    }
+    return null;
+};
+
 const normalizeUrl = (url: string | undefined): string => {
     if (!url || typeof url !== 'string') return '';
     const trimmed = url.trim();
@@ -207,6 +258,7 @@ const createSchema = z.object({
     profilePhotoFile: z
         .any()
         .refine((file) => file instanceof File, "Profile photo is required. Please upload your photo.")
+        .refine((file: File) => !file || file.size > 0, EMPTY_FILE_MESSAGE)
         .refine((file: File) => !file || file.size <= MAX_FILE_SIZE, "Profile photo must be 5 MB or smaller.")
         .refine(
             (file: File) => !file || isPhotoValid(file),
@@ -313,6 +365,7 @@ const createSchema = z.object({
     resumeFile: z
         .any()
         .refine((file) => file instanceof File, "Resume is required. Please upload your resume.")
+        .refine((file: File) => !file || file.size > 0, EMPTY_FILE_MESSAGE)
         .refine((file: File) => !file || file.size <= MAX_FILE_SIZE, "Resume file size must be 5 MB or smaller.")
         .refine(
             (file: File) => !file || isResumeValid(file),
@@ -324,6 +377,7 @@ const createSchema = z.object({
             (file) => file instanceof File,
             "Proof of experience is required. Please upload your verification document."
         )
+        .refine((file: File) => !file || file.size > 0, EMPTY_FILE_MESSAGE)
         .refine((file: File) => !file || file.size <= MAX_FILE_SIZE, "Proof document file size must be 5 MB or smaller.")
         .refine(
             (file: File) => !file || isProofValid(file),
@@ -365,6 +419,13 @@ const steps = [
         fields: ['resumeFile', 'proofDocumentFile'],
     },
 ];
+
+/** Server field names -> form field names */
+const SERVER_FIELD_MAP: Record<string, keyof FormValues> = {
+    resume: 'resumeFile',
+    proofDocument: 'proofDocumentFile',
+    profilePhoto: 'profilePhotoFile',
+};
 
 // ============================================================================
 // 3. Themed Combobox
@@ -723,20 +784,16 @@ function DocumentUploadField({
     const validateAndSetFile = (file: File) => {
         setLocalError(null);
 
-        // Check size
-        if (file.size > maxSizeBytes) {
-            const sizeMsg = `File size exceeds ${maxSizeBytes / (1024 * 1024)} MB limit (${formatFileSize(file.size)}). Please choose a smaller file.`;
-            setLocalError(sizeMsg);
-            return;
-        }
-
-        // Check format
-        const ext = file.name.split('.').pop()?.toLowerCase() || '';
-        const isTypeMatch = allowedMimeTypes.includes(file.type) || allowedExtensions.includes(ext);
-
-        if (!isTypeMatch) {
-            const typeMsg = `Unsupported file format. Please upload one of the following formats: ${allowedExtensions.map((e) => e.toUpperCase()).join(', ')}.`;
-            setLocalError(typeMsg);
+        const problem = validateFileForUpload(file, {
+            label,
+            maxSizeBytes,
+            allowedExtensions,
+            allowedMimeTypes,
+        });
+        if (problem) {
+            setLocalError(problem);
+            // Allow selecting the same file again after the user fixes it
+            if (inputRef.current) inputRef.current.value = '';
             return;
         }
 
@@ -876,8 +933,8 @@ function DocumentUploadField({
             )}
 
             {displayedError && (
-                <div className="flex items-center gap-1.5 text-red-500 text-xs mt-2 font-medium">
-                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                <div className="flex items-start gap-1.5 text-red-500 text-xs mt-2 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                     <span>{displayedError}</span>
                 </div>
             )}
@@ -951,10 +1008,10 @@ export default function SeniorMentorApplicationPage() {
     const motivationValue = watch('motivation') || '';
     const adviceValue = watch('adviceToJuniorSelf') || '';
 
-    // Auto-dismiss toast after 5s
+    // Auto-dismiss toast after 5s (errors stay longer so users can read long messages)
     useEffect(() => {
         if (!toast) return;
-        const timer = setTimeout(() => setToast(null), 5000);
+        const timer = setTimeout(() => setToast(null), toast.type === 'error' ? 10000 : 5000);
         return () => clearTimeout(timer);
     }, [toast]);
 
@@ -1103,7 +1160,9 @@ export default function SeniorMentorApplicationPage() {
                                     clearTimeout(photoTimer);
                                     if (!isMounted || timedOutRef.current) return;
                                     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-                                    if (blob.size <= 5 * 1024 * 1024 && allowedTypes.includes(blob.type)) {
+                                    if (blob.size === 0) {
+                                        if (!timedOutRef.current) setPhotoHint('Existing profile photo could not be loaded (empty file). Please upload a new photo.');
+                                    } else if (blob.size <= 5 * 1024 * 1024 && allowedTypes.includes(blob.type)) {
                                         const ext = blob.type === 'image/png' ? 'png' : 'jpg';
                                         photoFile = new File([blob], `profile-photo.${ext}`, { type: blob.type });
                                     } else if (blob.size > 5 * 1024 * 1024) {
@@ -1279,6 +1338,39 @@ export default function SeniorMentorApplicationPage() {
             setErrorMsg('');
             setToast(null);
 
+            // Pre-flight: re-check all three files so the user knows exactly which one is wrong
+            const fileChecks: {
+                field: 'profilePhotoFile' | 'resumeFile' | 'proofDocumentFile';
+                step: number;
+                rule: FileRule;
+                file: unknown;
+            }[] = [
+                { field: 'profilePhotoFile', step: 1, rule: PHOTO_RULE, file: values.profilePhotoFile },
+                { field: 'resumeFile', step: 5, rule: RESUME_RULE, file: values.resumeFile },
+                { field: 'proofDocumentFile', step: 5, rule: PROOF_RULE, file: values.proofDocumentFile },
+            ];
+
+            const fileProblems = fileChecks
+                .map((c) => ({
+                    field: c.field,
+                    step: c.step,
+                    message:
+                        c.file instanceof File
+                            ? validateFileForUpload(c.file, c.rule)
+                            : `${c.rule.label} is required. Please upload it.`,
+                }))
+                .filter((p): p is { field: typeof p.field; step: number; message: string } => !!p.message);
+
+            if (fileProblems.length > 0) {
+                fileProblems.forEach((p) => setError(p.field, { type: 'manual', message: p.message }));
+                setCurrentStep(Math.min(...fileProblems.map((p) => p.step)));
+                const preflightMsg = `Unable to submit your application. ${fileProblems.map((p) => p.message).join(' ')}`;
+                setErrorMsg(preflightMsg);
+                setToast({ type: 'error', message: preflightMsg });
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
+
             const formData = new FormData();
 
             // Step 1: Personal Information
@@ -1296,7 +1388,7 @@ export default function SeniorMentorApplicationPage() {
             formData.append('linkedinUrl', normalizeUrl(values.linkedinUrl));
             if (values.githubUrl?.trim()) formData.append('githubUrl', normalizeUrl(values.githubUrl));
             if (values.portfolioUrl?.trim()) formData.append('portfolioUrl', normalizeUrl(values.portfolioUrl));
-            if (typeof values.yearsOfExperience === 'number') {
+            if (typeof values.yearsOfExperience === 'number' && !Number.isNaN(values.yearsOfExperience)) {
                 formData.append('yearsOfExperience', values.yearsOfExperience.toString());
             }
             formData.append('experienceLevel', values.experienceLevel);
@@ -1353,38 +1445,43 @@ export default function SeniorMentorApplicationPage() {
         } catch (error: any) {
             console.error('[SENIOR_MENTOR_APP] Submission failed:', error);
             const resp = error?.response?.data;
+            const status: number | undefined = error?.response?.status;
             let reason = 'Please review the highlighted fields and try again.';
 
-            if (Array.isArray(resp?.errors) && resp.errors.length > 0) {
-                resp.errors.forEach((err: { field: string; message: string }) => {
-                    if (err.field) {
-                        const targetField =
-                            err.field === 'resume'
-                                ? 'resumeFile'
-                                : err.field === 'proofDocument'
-                                    ? 'proofDocumentFile'
-                                    : err.field === 'profilePhoto'
-                                        ? 'profilePhotoFile'
-                                        : (err.field as keyof FormValues);
+            type ServerFieldError = { field?: string; param?: string; path?: string; message?: string; msg?: string };
 
-                        setError(targetField, {
-                            type: 'server',
-                            message: err.message || 'Invalid value',
-                        });
-                    }
+            if (Array.isArray(resp?.errors) && resp.errors.length > 0) {
+                const serverErrors = resp.errors as ServerFieldError[];
+
+                serverErrors.forEach((err) => {
+                    const rawField = err.field || err.param || err.path;
+                    if (!rawField) return;
+                    const targetField = (SERVER_FIELD_MAP[rawField] || rawField) as keyof FormValues;
+                    setError(targetField, {
+                        type: 'server',
+                        message: err.message || err.msg || 'Invalid value',
+                    });
                 });
 
-                const firstErr = resp.errors[0];
-                reason = firstErr.message || `${firstErr.field} is invalid.`;
-                const stepWithErr = steps.find((s) =>
-                    (s.fields as string[]).includes(firstErr.field) ||
-                    (firstErr.field === 'resume' && s.id === 5) ||
-                    (firstErr.field === 'proofDocument' && s.id === 5) ||
-                    (firstErr.field === 'profilePhoto' && s.id === 1)
-                );
-                if (stepWithErr) {
-                    setCurrentStep(stepWithErr.id);
-                }
+                reason = serverErrors
+                    .map((e) => e.message || e.msg || `${e.field || e.param || e.path} is invalid.`)
+                    .join(' ');
+
+                const firstRaw = serverErrors[0].field || serverErrors[0].param || serverErrors[0].path || '';
+                const firstField = String(SERVER_FIELD_MAP[firstRaw] || firstRaw);
+                const stepWithErr = steps.find((s) => (s.fields as string[]).includes(firstField));
+                if (stepWithErr) setCurrentStep(stepWithErr.id);
+            } else if (!error?.response) {
+                reason = 'Could not reach the server. Please check your internet connection and try again.';
+            } else if (status === 413) {
+                reason = 'Your files are too large to upload together. Please use smaller files (max 5 MB each).';
+            } else if (resp?.message && status && status < 500) {
+                reason = resp.message;
+            } else if (resp?.message && /temporary|try again|right now/i.test(resp.message)) {
+                // Our own friendly server message (for example storage temporarily unavailable)
+                reason = resp.message;
+            } else if (status && status >= 500) {
+                reason = 'Something went wrong on our server. This is not caused by your data or files. Please try again in a few minutes. If it keeps happening, please contact support.';
             } else if (resp?.message) {
                 reason = resp.message;
             } else if (resp?.error?.message) {
@@ -1544,17 +1641,17 @@ export default function SeniorMentorApplicationPage() {
         <div className="min-h-screen bg-[#FAF9F6] flex items-start justify-center p-4 sm:p-6 lg:p-8 overflow-y-auto">
             {toast && (
                 <div
-                    className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-semibold transition-all ${toast.type === 'error'
+                    className={`fixed top-5 right-5 left-5 sm:left-auto sm:max-w-md z-50 flex items-start gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-semibold transition-all ${toast.type === 'error'
                         ? 'bg-red-50 text-red-800 border-red-200'
                         : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                         }`}
                 >
                     {toast.type === 'error' ? (
-                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                     ) : (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
                     )}
-                    <span>{toast.message}</span>
+                    <span className="break-words min-w-0">{toast.message}</span>
                     <button
                         type="button"
                         onClick={() => setToast(null)}
@@ -1624,9 +1721,9 @@ export default function SeniorMentorApplicationPage() {
                     {/* Step Body */}
                     <div className="p-6 sm:p-10">
                         {errorMsg && (
-                            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-sm font-semibold flex items-center gap-3">
-                                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-                                <span>{errorMsg}</span>
+                            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-sm font-semibold flex items-start gap-3">
+                                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                                <span className="break-words min-w-0">{errorMsg}</span>
                             </div>
                         )}
 
@@ -1731,25 +1828,19 @@ export default function SeniorMentorApplicationPage() {
                                                         accept="image/jpeg,image/png"
                                                         onChange={(e) => {
                                                             const file = e.target.files?.[0];
-                                                            if (file) {
-                                                                if (file.size > MAX_FILE_SIZE) {
-                                                                    setError('profilePhotoFile', {
-                                                                        type: 'manual',
-                                                                        message: 'Profile photo size exceeds 5 MB. Please upload a smaller image.',
-                                                                    });
-                                                                    return;
-                                                                }
-                                                                if (!isPhotoValid(file)) {
-                                                                    setError('profilePhotoFile', {
-                                                                        type: 'manual',
-                                                                        message: 'Unsupported format. Please upload a JPG or PNG image.',
-                                                                    });
-                                                                    return;
-                                                                }
-                                                                clearErrors('profilePhotoFile');
-                                                                isPrefilledPhotoRef.current = false;
-                                                                setValue('profilePhotoFile', file as any, { shouldValidate: true, shouldDirty: true });
+                                                            if (!file) return;
+
+                                                            const problem = validateFileForUpload(file, PHOTO_RULE);
+                                                            if (problem) {
+                                                                setError('profilePhotoFile', { type: 'manual', message: problem });
+                                                                e.target.value = '';
+                                                                return;
                                                             }
+
+                                                            clearErrors('profilePhotoFile');
+                                                            setPhotoHint(null);
+                                                            isPrefilledPhotoRef.current = false;
+                                                            setValue('profilePhotoFile', file as any, { shouldValidate: true, shouldDirty: true });
                                                         }}
                                                     />
                                                 </label>

@@ -10,6 +10,12 @@ import {
 // Must match AUTH_COOKIE_NAME in lib/store/token.storage.ts
 const AUTH_COOKIE_NAME = 'throne8_auth';
 
+// Logged-out user ko pehle ye page dikhana hai (throne8.com kholne par)
+const PUBLIC_LANDING_PATH = '/mentorship';
+
+// Ye exact paths bina login ke khule rahenge (sub-pages protected hi rahenge)
+const PUBLIC_EXACT_PATHS = [PUBLIC_LANDING_PATH];
+
 // Routes that require authentication
 const PROTECTED_PREFIXES = [
     '/dashboard',
@@ -33,7 +39,14 @@ const AUTH_ONLY_PREFIXES = [
     '/forgot-my-password',
 ];
 
+function isPublicExactPath(pathname: string): boolean {
+    const normalized =
+        pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+    return PUBLIC_EXACT_PATHS.includes(normalized);
+}
+
 function isProtectedPath(pathname: string): boolean {
+    if (isPublicExactPath(pathname)) return false;
     return PROTECTED_PREFIXES.some(
         (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
     );
@@ -51,8 +64,9 @@ export function proxy(request: NextRequest) {
     const isLoggedIn = request.cookies.get(AUTH_COOKIE_NAME)?.value === '1';
 
     // Case -1: Root "/" -> server par hi redirect (blank navbar flash nahi aayega)
+    // Logged-in -> HOME_PATH, logged-out -> Mentorship page (login nahi)
     if (pathname === '/') {
-        const target = isLoggedIn ? HOME_PATH : '/login';
+        const target = isLoggedIn ? HOME_PATH : PUBLIC_LANDING_PATH;
         return NextResponse.redirect(new URL(target, request.url));
     }
 

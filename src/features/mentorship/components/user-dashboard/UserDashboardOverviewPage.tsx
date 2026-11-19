@@ -1,4 +1,4 @@
-//src/features/mentorship/components/user-dashboard/UserDashboardOverviewPage.tsx
+// src/features/mentorship/components/user-dashboard/UserDashboardOverviewPage.tsx
 "use client";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -78,6 +78,31 @@ function initialsFrom(name: string) {
   const parts = name.trim().split(" ").filter(Boolean);
   if (parts.length === 0) return "S";
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
+// Reads the mentor display name from any of the shapes the API may return
+function resolveMentorName(s: any): string {
+  return (
+    s.mentorName ||
+    s.mentor?.fullName ||
+    s.mentor?.displayName ||
+    s.mentorDisplayName ||
+    (s.mentor?.firstName
+      ? `${s.mentor.firstName} ${s.mentor.lastName || ""}`.trim()
+      : "") ||
+    "Mentor"
+  );
+}
+
+// Reads the mentor photo from any of the shapes the API may return
+function resolveMentorPhoto(s: any): string | null {
+  return (
+    s.mentorProfilePhoto ||
+    s.mentor?.profilePic ||
+    s.mentor?.profilePhoto ||
+    s.profilePic ||
+    null
+  );
 }
 
 function OverviewSkeleton() {
@@ -245,13 +270,8 @@ export default function UserDashboardOverviewPage({
 
     dedupedRaw.forEach((s: any) => {
       const sid = s.sessionId || s._id || "";
-      const mentorName =
-        s.mentorName ||
-        s.mentor?.fullName ||
-        (s.mentor?.firstName ? `${s.mentor.firstName} ${s.mentor.lastName || ""}`.trim() : "") ||
-        "Mentor";
-      const mentorProfilePhoto =
-        s.mentorProfilePhoto || s.mentor?.profilePic || s.profilePic || null;
+      const mentorName = resolveMentorName(s);
+      const mentorProfilePhoto = resolveMentorPhoto(s);
       const title = s.title || s.serviceName || s.sessionType || "Mentorship Session";
 
       if (s.isGroupSession) {
@@ -271,7 +291,7 @@ export default function UserDashboardOverviewPage({
           bookingId: `${sid}-${currentUserId}`,
           mentorId: s.mentorId,
           mentorName,
-          mentorProfilePhoto,
+          mentorProfilePhoto: mentorProfilePhoto ?? undefined,
           title: `${title} (Group)`,
           sessionType: s.sessionType || "group",
           scheduledAt: s.scheduledAt,
@@ -301,7 +321,7 @@ export default function UserDashboardOverviewPage({
             bookingId: b._id || b.bookingId,
             mentorId: s.mentorId,
             mentorName,
-            mentorProfilePhoto,
+            mentorProfilePhoto: mentorProfilePhoto ?? undefined,
             title,
             sessionType: s.sessionType,
             scheduledAt: b.scheduledAt || s.scheduledAt,
@@ -321,7 +341,7 @@ export default function UserDashboardOverviewPage({
           bookingId: sid,
           mentorId: s.mentorId,
           mentorName,
-          mentorProfilePhoto,
+          mentorProfilePhoto: mentorProfilePhoto ?? undefined,
           title,
           sessionType: s.sessionType,
           scheduledAt: s.scheduledAt,
@@ -755,7 +775,7 @@ export default function UserDashboardOverviewPage({
             )}
           </h3>
 
-          {/* Reviews fetch error — non-fatal, show inline retry */}
+          {/* Reviews fetch error - non-fatal, show inline retry */}
           {reviewsError && (
             <div className="mb-3 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
