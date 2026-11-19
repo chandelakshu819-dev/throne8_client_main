@@ -1040,24 +1040,16 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                     ? `Save ${pendingDays.map((d: any) => d.day + "s").join(", ")} for all of ${monthNames[currentDate.getMonth()]}`
                     : "Save weekly schedule"
                 }
-                className={`px-6 py-2.5 rounded-xl text-white text-sm font-bold flex items-center gap-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 hover:scale-[1.03] ${isSaving ? '' : 'save-btn-pulse'}`}
-                style={{
-                  backgroundColor: '#4a3728',
-                  border: '2px solid #d4a050',
-                  boxShadow: '0 0 12px rgba(212,160,80,0.55)',
-                }}
+                className="save-btn px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ backgroundColor: '#fbf7f3', color: '#4a3728', border: '2px solid #4a3728' }}
               >
                 <Check className="w-4 h-4" />
                 {getSaveButtonLabel()}
               </button>
-              {/* Save button ko highlight karne ke liye halka pulse glow */}
-              <style>{`
-                @keyframes savePulse {
-                  0%, 100% { box-shadow: 0 0 8px rgba(212,160,80,0.45); }
-                  50%      { box-shadow: 0 0 18px 4px rgba(212,160,80,0.85); }
-                }
-                .save-btn-pulse { animation: savePulse 1.8s ease-in-out infinite; }
-              `}</style>
+              {/* Save button: border style + halka hover */}
+                <style>{`
+                  .save-btn:hover:not(:disabled) { background-color: #f3ece4 !important; }
+                `}</style>
               </div>
             </div>
                         {/* ✅ FIX: max-h + overflow-y-auto hata diya — ab list static
