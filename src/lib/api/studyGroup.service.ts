@@ -751,6 +751,7 @@ export interface GroupChallengeResponse {
 
 export interface PublicGroupStats {
   activeGroups: number;
+  totalGroups: number;
   members: number;
   subjects: number;
   studyingNow: number;

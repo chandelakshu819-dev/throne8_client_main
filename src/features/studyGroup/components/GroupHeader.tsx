@@ -1,6 +1,6 @@
 import Image from 'next/image';
-import React, { useEffect, useState } from 'react';
-import StudyGroupService, { PublicGroupStats } from '@/lib/api/studyGroup.service';
+import React, { useState } from 'react';
+import { usePublicGroupStats, formatStat } from '@/features/studyGroup/hooks/usePublicGroupStats';
 import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
 import { setBrowseSearchQuery as setSearchQuery, selectBrowseSearchQuery as selectSearchQuery } from '@/hooks/studyGroup/features/groups/groupsSlice';
 import SearchDropdown from '@/features/study-group/components/study/dropdown';
@@ -12,23 +12,7 @@ const GroupHeader = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   // Real numbers from the server; null while loading or if the request failed
-  const [stats, setStats] = useState<PublicGroupStats | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    StudyGroupService.getPublicStats()
-      .then((s) => { if (!cancelled) setStats(s); })
-      .catch(() => { /* keep the placeholders */ });
-    return () => { cancelled = true; };
-  }, []);
-
-  // Exact while small ("12"), compact once large ("1.2K+"); "—" until loaded
-  const formatStat = (n?: number) => {
-    if (n === undefined) return '—';
-    if (n < 1000) return String(n);
-    if (n < 1_000_000) return `${Math.floor(n / 100) / 10}K+`;
-    return `${Math.floor(n / 100_000) / 10}M+`;
-  };
+  const stats = usePublicGroupStats();
 
   return (
     <div className="relative overflow-visible py-4 sm:py-6 lg:py-8">
