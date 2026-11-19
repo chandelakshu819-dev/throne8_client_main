@@ -798,6 +798,41 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     }
   };
 
+  // Arrived from the "Live session started" popup (?joinLive=1): join the room straight away,
+  // so the member doesn't have to find the Enter Room button.
+  const autoJoinPending = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (autoJoinPending.current === null) {
+      autoJoinPending.current =
+        new URLSearchParams(window.location.search).get("joinLive") === "1";
+    }
+    if (!autoJoinPending.current) return;
+
+    const clearFlag = () => {
+      autoJoinPending.current = false;
+      const url = new URL(window.location.href);
+      url.searchParams.delete("joinLive");
+      window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    };
+
+    const roomId = activeLiveRoom?.roomId;
+    const isHost =
+      activeLiveRoom?.host?._id === currentUserId || activeLiveRoom?.host === currentUserId;
+    if (roomId && !isHost && !showLiveRoomView) {
+      clearFlag();
+      void handleJoinLiveRoom();
+      return;
+    }
+    if (roomId) {
+      clearFlag(); // host or already inside: nothing to auto-join
+      return;
+    }
+    // The room may have ended before the page loaded: stop waiting after a while
+    const t = setTimeout(clearFlag, 10000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeLiveRoom?.roomId]);
+
   const handleEndOrLeaveLiveRoom = async (): Promise<void> => {
     if (!activeLiveRoom) return;
     const isHost =
