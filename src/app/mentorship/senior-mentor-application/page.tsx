@@ -568,10 +568,17 @@ function TagInput({
     const query = value.trim().toLowerCase();
     const limitReached = tags.length >= maxTags;
 
-    const available = suggestions
+    const available = query
+    ? suggestions
         .filter((s) => !tags.some((t) => t.toLowerCase() === s.toLowerCase()))
-        .filter((s) => !query || s.toLowerCase().includes(query))
-        .slice(0, 8);
+        .filter((s) => s.toLowerCase().includes(query))
+        .slice(0, 8)
+    : [];
+
+
+    const isExactSuggestion = suggestions.some((s) => s.toLowerCase() === query);
+    const isAlreadyAdded = tags.some((t) => t.toLowerCase() === query);
+    const canAddCustom = !!query && !isAlreadyAdded && !isExactSuggestion;
 
     const add = (raw: string) => {
         const v = raw.trim().slice(0, MAX_TAG_LENGTH);
@@ -639,25 +646,43 @@ function TagInput({
                 </button>
             </div>
 
-            {!limitReached && available.length > 0 && (
-                <div className="mt-3">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-[#8a7a6a] mb-1.5">
-                        {query ? 'Matching suggestions' : 'Suggestions (tap to add)'}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                        {available.map((s) => (
-                            <button
-                                key={s}
-                                type="button"
-                                onClick={() => add(s)}
-                                className="px-3 py-1.5 rounded-full border border-[#ece7e2] bg-white text-xs font-semibold text-[#4a3728] hover:bg-[#f8f6f4] hover:border-[#4a3728]/40 transition"
-                            >
-                                + {s}
-                            </button>
-                        ))}
-                    </div>
+            {!limitReached && query && (
+    <div className="mt-3">
+        {available.length > 0 && (
+            <>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-[#8a7a6a] mb-1.5">
+                    Matching suggestions
+                </p>
+                <div className="flex flex-wrap gap-2">
+                    {available.map((s) => (
+                        <button
+                            key={s}
+                            type="button"
+                            onClick={() => add(s)}
+                            className="px-3 py-1.5 rounded-full border border-[#ece7e2] bg-white text-xs font-semibold text-[#4a3728] hover:bg-[#f8f6f4] hover:border-[#4a3728]/40 transition"
+                        >
+                            + {s}
+                        </button>
+                    ))}
                 </div>
-            )}
+            </>
+        )}
+
+        {canAddCustom && (
+            <button
+                type="button"
+                onClick={() => add(value)}
+                className="mt-2 px-3 py-1.5 rounded-full border border-dashed border-[#4a3728] bg-[#f8f6f4] text-xs font-bold text-[#4a3728] hover:bg-[#ece7e2] transition"
+            >
+                + Add "{value.trim()}" as your own
+            </button>
+        )}
+
+        {available.length === 0 && !canAddCustom && !isAlreadyAdded && (
+            <p className="text-xs text-slate-500">No matches.</p>
+        )}
+    </div>
+)}
 
             {error && <p className="text-red-500 text-xs mt-2 font-medium">{error}</p>}
         </div>
@@ -2385,8 +2410,8 @@ export default function SeniorMentorApplicationPage() {
                                 </div>
 
                                 <StepTip>
-                                    Tap a suggestion to add it, or type your own and press Enter / Add. Achievements and certifications are optional.
-                                </StepTip>
+    Start typing to see suggestions. If your skill is not in the list, type it and tap Add. Achievements and certifications are optional.
+</StepTip>
 
                                 <div aria-invalid={errors.technologies ? 'true' : 'false'}>
                                     <TagInput
