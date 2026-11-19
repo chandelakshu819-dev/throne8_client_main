@@ -1,5 +1,6 @@
 import Image from 'next/image';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import StudyGroupService, { PublicGroupStats } from '@/lib/api/studyGroup.service';
 import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
 import { setBrowseSearchQuery as setSearchQuery, selectBrowseSearchQuery as selectSearchQuery } from '@/hooks/studyGroup/features/groups/groupsSlice';
 import SearchDropdown from '@/features/study-group/components/study/dropdown';
@@ -10,6 +11,24 @@ const GroupHeader = () => {
   const searchQuery = useAppSelector(selectSearchQuery);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  // Real numbers from the server; null while loading or if the request failed
+  const [stats, setStats] = useState<PublicGroupStats | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    StudyGroupService.getPublicStats()
+      .then((s) => { if (!cancelled) setStats(s); })
+      .catch(() => { /* keep the placeholders */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Exact while small ("12"), compact once large ("1.2K+"); "—" until loaded
+  const formatStat = (n?: number) => {
+    if (n === undefined) return '—';
+    if (n < 1000) return String(n);
+    if (n < 1_000_000) return `${Math.floor(n / 100) / 10}K+`;
+    return `${Math.floor(n / 100_000) / 10}M+`;
+  };
 
   return (
     <div className="relative overflow-visible py-4 sm:py-6 lg:py-8">
@@ -96,9 +115,9 @@ const GroupHeader = () => {
               {/* Stats */}
               <div className="flex flex-wrap gap-3 mt-2">
                 {[
-                  { value: '500+', label: 'Active Groups' },
-                  { value: '10K+', label: 'Members' },
-                  { value: '50+', label: 'Subjects' },
+                  { value: formatStat(stats?.activeGroups), label: 'Active Groups' },
+                  { value: formatStat(stats?.members), label: 'Members' },
+                  { value: formatStat(stats?.subjects), label: 'Subjects' },
                 ].map((stat, index) => (
                   <div
                     key={index}
@@ -151,7 +170,7 @@ const GroupHeader = () => {
                   <div className="absolute inset-0 w-4 h-4 bg-green-500 rounded-full animate-ping opacity-75" />
                 </div>
                 <div className="text-sm">
-                  <span className="font-extrabold text-[#4a3728] text-lg">250+</span>{' '}
+                  <span className="font-extrabold text-[#4a3728] text-lg">{formatStat(stats?.studyingNow)}</span>{' '}
                   <span className="text-[#6b5847] font-semibold">Studying Now</span>
                 </div>
               </div>
