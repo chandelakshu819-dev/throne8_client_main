@@ -620,16 +620,19 @@ export default function SeniorMentorAvailabilityPage({ mentorData }: SeniorMento
                   onClick={handleSaveConfig}
                   disabled={isSaving}
                   title="Save changes"
-                  className="px-3.5 py-1.5 rounded-lg text-white text-xs font-bold flex items-center gap-1.5 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90"
-                  style={{ backgroundColor: "#4a3728" }}
+                  className="save-btn px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: '#fbf7f3', color: '#4a3728', border: '2px solid #4a3728' }}
                 >
-                  <Check className="w-3.5 h-3.5" />
                   {isSaving
   ? "Saving..."
   : selectedDateStr
   ? `Save ${Number(selectedDateStr.split("-")[2])} ${MONTH_NAMES[Number(selectedDateStr.split("-")[1]) - 1].slice(0, 3)}`
   : "Save Changes"}
                 </button>
+                {/* Save button: border style, hover par brown fill */}
+                <style>{`
+                  .save-btn:hover:not(:disabled) { background-color: #4a3728 !important; color: #ffffff !important; }
+                `}</style>
               </div>
             </div>
 

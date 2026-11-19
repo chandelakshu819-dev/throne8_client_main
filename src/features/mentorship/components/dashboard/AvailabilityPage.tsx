@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
   Clock, Globe, Calendar, ChevronLeft, ChevronRight,
-  Trash2, Plus, X, BarChart2, RefreshCw, Pencil, Check, Lock, Ban
+  Trash2, Plus, X, BarChart2, RefreshCw, Pencil, Lock, Ban
 } from "lucide-react"
 import AvailabilityService from "@/lib/api/availability.service";
 
@@ -1040,12 +1040,15 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
                     ? `Save ${pendingDays.map((d: any) => d.day + "s").join(", ")} for all of ${monthNames[currentDate.getMonth()]}`
                     : "Save weekly schedule"
                 }
-                className="px-3.5 py-1.5 rounded-lg text-white text-xs font-bold flex items-center gap-1.5 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90"
-                style={{ backgroundColor: '#4a3728' }}
+                className="save-btn px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ backgroundColor: '#fbf7f3', color: '#4a3728', border: '2px solid #4a3728' }}
               >
-                                    <Check className="w-3.5 h-3.5" />
                 {getSaveButtonLabel()}
               </button>
+              {/* Save button: border style, hover par brown fill */}
+                <style>{`
+                  .save-btn:hover:not(:disabled) { background-color: #4a3728 !important; color: #ffffff !important; }
+                `}</style>
               </div>
             </div>
                         {/* ✅ FIX: max-h + overflow-y-auto hata diya — ab list static
