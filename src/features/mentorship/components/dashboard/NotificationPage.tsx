@@ -140,19 +140,16 @@ function MenteeAvatar({ photo, name, menteeId }: { photo?: string; name?: string
   )
 }
 
-function RenderTextWithMenteeLink({
+// Name sirf bold dikhta hai (link nahi). Profile sirf avatar (photo) click par khulti hai;
+// name ya notification box par click karne se notification read mark hoti hai.
+function RenderTextWithMenteeName({
   text,
-  menteeId,
   menteeName,
-  isTitle,
 }: {
   text?: string
-  menteeId?: string
   menteeName?: string
-  isTitle?: boolean
 }) {
   if (!text) return null
-  if (!menteeId) return <>{text}</>
 
   const cleanName = menteeName?.trim()
   if (cleanName) {
@@ -161,38 +158,18 @@ function RenderTextWithMenteeLink({
       const parts = text.split(regex)
       return (
         <>
-          {parts.map((part, idx) => {
-            if (part.toLowerCase() === cleanName.toLowerCase()) {
-              return (
-                <Link
-                  key={idx}
-                  href={`/mentorship/menteeProfile/${menteeId}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="font-semibold hover:underline cursor-pointer"
-                  style={{ color: COLORS.ink }}
-                >
-                  {part}
-                </Link>
-              )
-            }
-            return <React.Fragment key={idx}>{part}</React.Fragment>
-          })}
+          {parts.map((part, idx) =>
+            part.toLowerCase() === cleanName.toLowerCase() ? (
+              <span key={idx} className="font-semibold" style={{ color: COLORS.ink }}>
+                {part}
+              </span>
+            ) : (
+              <React.Fragment key={idx}>{part}</React.Fragment>
+            )
+          )}
         </>
       )
     }
-  }
-
-  if (isTitle) {
-    return (
-      <Link
-        href={`/mentorship/menteeProfile/${menteeId}`}
-        onClick={(e) => e.stopPropagation()}
-        className="hover:underline cursor-pointer"
-        style={{ color: COLORS.ink }}
-      >
-        {text}
-      </Link>
-    )
   }
 
   return <>{text}</>
@@ -338,7 +315,7 @@ export default function NotificationPage({
                           fontWeight: item.isRead ? 500 : 700,
                         }}
                       >
-                        <RenderTextWithMenteeLink text={item.title} menteeId={menteeId} menteeName={menteeName} isTitle />
+                        <RenderTextWithMenteeName text={item.title} menteeName={menteeName} />
                       </p>
                       {!item.isRead && (
                         <span
@@ -348,7 +325,7 @@ export default function NotificationPage({
                       )}
                     </div>
                     <p className="text-sm mt-0.5 line-clamp-2" style={{ color: COLORS.muted }}>
-                      <RenderTextWithMenteeLink text={item.message} menteeId={menteeId} menteeName={menteeName} />
+                      <RenderTextWithMenteeName text={item.message} menteeName={menteeName} />
                     </p>
                     {item.data?.actionUrl && (
                       <div className="mt-2">

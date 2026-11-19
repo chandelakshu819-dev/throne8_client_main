@@ -356,9 +356,8 @@ export default function UserDashboardNotificationsPage({
                       if (!isPayment && name) {
                         return (
                           <div 
-                            className={`mt-2 inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-[#fbf7f3] border ${validActorId ? 'cursor-pointer hover:bg-[#f3ece4] transition-colors' : ''}`} 
+                            className="mt-2 inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-[#fbf7f3] border"
                             style={{ color: COLORS.accent, borderColor: COLORS.gold }}
-                            onClick={validActorId ? handleUserClick : undefined}
                           >
                             {label}: {name}
                           </div>
