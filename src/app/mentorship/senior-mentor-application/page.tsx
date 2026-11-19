@@ -25,9 +25,9 @@ import {
     ArrowRight,
 } from "lucide-react";
 import SeniorMentorApplicationService, {
-    SeniorMentorApplication,
     MIN_HELP_AREAS,
     MAX_HELP_AREAS,
+    FREE_SESSIONS_REQUIRED,
 } from "@/lib/api/seniorMentorApplication.service";
 import { syncProfilePhotoToAllRoles } from "@/features/mentorship/utils/syncProfilePhoto";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -44,7 +44,7 @@ import {
 } from "@/features/mentorship/utils/seniorMentorPrefill.util";
 
 // ============================================================================
-// 1. Enums and Select Options (Mirrored from Backend)
+// 1. Enums, options and suggestion lists
 // ============================================================================
 
 enum ExperienceLevel {
@@ -123,16 +123,45 @@ const COMPANY_SUGGESTIONS = [
     'Capgemini', 'LTIMindtree', 'Mphasis', 'Persistent Systems', 'Zensar', 'Hexaware', 'Coforge',
     'Accenture', 'Deloitte', 'PwC', 'EY', 'KPMG', 'McKinsey & Company', 'Boston Consulting Group',
     'Goldman Sachs', 'Morgan Stanley', 'JPMorgan Chase', 'Barclays', 'American Express', 'Visa', 'Mastercard',
-    'Flipkart', 'Swiggy', 'Zomato', 'Paytm', 'Razorpay', 'PhonePe', 'CRED', 'Ola', 'Byju\'s',
+    'Flipkart', 'Swiggy', 'Zomato', 'Paytm', 'Razorpay', 'PhonePe', 'CRED', 'Ola', "Byju's",
     'Meesho', 'Myntra', 'Nykaa', 'Zerodha', 'Groww', 'Freshworks', 'Zoho', 'InMobi', 'Dream11',
     'Physics Wallah', 'Unacademy', 'upGrad', 'Scaler', 'Coding Ninjas',
     'Startup', 'Freelance / Self-employed', 'Own Business',
+];
+
+// Suggestions for the skill fields (Step 3). Users can always type their own value too.
+const TECH_SUGGESTIONS = [
+    'React', 'Next.js', 'Node.js', 'Express.js', 'MongoDB', 'TypeScript', 'JavaScript', 'Python', 'Java', 'C++',
+    'C', 'Go', 'Kotlin', 'Swift', 'Flutter', 'React Native', 'Angular', 'Vue.js', 'Tailwind CSS', 'HTML/CSS',
+    'SQL', 'MySQL', 'PostgreSQL', 'Redis', 'GraphQL', 'REST APIs', 'Django', 'Flask', 'Spring Boot', 'Docker',
+    'Kubernetes', 'AWS', 'Azure', 'Google Cloud', 'Git', 'GitHub Actions', 'Linux', 'Firebase', 'Figma',
+    'TensorFlow', 'PyTorch', 'Pandas', 'NumPy', 'Power BI', 'Tableau', 'Excel',
+];
+
+const SKILL_SUGGESTIONS = [
+    'Data Structures', 'Algorithms', 'Problem Solving', 'System Design', 'Object-Oriented Programming', 'DBMS',
+    'Operating Systems', 'Computer Networks', 'Web Development', 'App Development', 'Machine Learning',
+    'Competitive Programming', 'Open Source', 'Communication', 'Public Speaking', 'Leadership', 'Teamwork',
+    'Time Management', 'Resume Building', 'Interview Preparation', 'Project Management', 'Technical Writing',
+];
+
+const ACHIEVEMENT_SUGGESTIONS = [
+    'Hackathon Winner', 'Smart India Hackathon Finalist', "Dean's List", 'Open Source Contributor',
+    'Research Publication', 'Google Summer of Code', 'Campus Placement Offer', 'Internship at a Product Company',
+    'Coding Contest Rank Holder', 'College Club Lead', 'Scholarship Recipient',
+];
+
+const CERT_SUGGESTIONS = [
+    'AWS Certified Cloud Practitioner', 'Google Cloud Associate', 'Microsoft Azure Fundamentals',
+    'Meta Front-End Developer', 'Oracle Java SE', 'Google Data Analytics', 'NPTEL Certification',
+    'Red Hat Certified', 'Cisco CCNA', 'Coursera Specialization',
 ];
 
 const MAX_YEARS_OPTION = 40;
 const YEARS_OPTIONS: number[] = Array.from({ length: MAX_YEARS_OPTION + 1 }, (_, i) => i);
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_TAG_LENGTH = 60;
 
 const RESUME_ALLOWED_MIME_TYPES = [
     'application/pdf',
@@ -141,35 +170,22 @@ const RESUME_ALLOWED_MIME_TYPES = [
 ];
 const RESUME_ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx'];
 
-const PROOF_ALLOWED_MIME_TYPES = [
-    'application/pdf',
-    'image/jpeg',
-    'image/jpg',
-    'image/png',
-];
+const PROOF_ALLOWED_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
 const PROOF_ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png'];
 
-const PHOTO_ALLOWED_MIME_TYPES = [
-    'image/jpeg',
-    'image/jpg',
-    'image/png',
-];
+const PHOTO_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
 const PHOTO_ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png'];
 
-const isResumeValid = (file: File): boolean => {
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    return RESUME_ALLOWED_MIME_TYPES.includes(file.type) || RESUME_ALLOWED_EXTENSIONS.includes(ext);
-};
+const getExt = (file: File): string => file.name.split('.').pop()?.toLowerCase() || '';
 
-const isProofValid = (file: File): boolean => {
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    return PROOF_ALLOWED_MIME_TYPES.includes(file.type) || PROOF_ALLOWED_EXTENSIONS.includes(ext);
-};
+const isResumeValid = (file: File): boolean =>
+    RESUME_ALLOWED_MIME_TYPES.includes(file.type) || RESUME_ALLOWED_EXTENSIONS.includes(getExt(file));
 
-const isPhotoValid = (file: File): boolean => {
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    return PHOTO_ALLOWED_MIME_TYPES.includes(file.type) || PHOTO_ALLOWED_EXTENSIONS.includes(ext);
-};
+const isProofValid = (file: File): boolean =>
+    PROOF_ALLOWED_MIME_TYPES.includes(file.type) || PROOF_ALLOWED_EXTENSIONS.includes(getExt(file));
+
+const isPhotoValid = (file: File): boolean =>
+    PHOTO_ALLOWED_MIME_TYPES.includes(file.type) || PHOTO_ALLOWED_EXTENSIONS.includes(getExt(file));
 
 const formatFileSize = (bytes: number): string => {
     if (!bytes || bytes === 0) return '0 B';
@@ -222,8 +238,7 @@ const validateFileForUpload = (file: File, rule: FileRule): string | null => {
     if (file.size > rule.maxSizeBytes) {
         return `The file "${file.name}" is ${formatFileSize(file.size)}, which is more than the ${rule.maxSizeBytes / (1024 * 1024)} MB limit. Please choose a smaller file.`;
     }
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    const typeOk = rule.allowedMimeTypes.includes(file.type) || rule.allowedExtensions.includes(ext);
+    const typeOk = rule.allowedMimeTypes.includes(file.type) || rule.allowedExtensions.includes(getExt(file));
     if (!typeOk) {
         return `The file "${file.name}" has an unsupported format. Please upload one of these formats: ${rule.allowedExtensions.map((e) => e.toUpperCase()).join(', ')}.`;
     }
@@ -240,7 +255,36 @@ const normalizeUrl = (url: string | undefined): string => {
     return trimmed;
 };
 
-const DRAFT_STORAGE_KEY = 'throne8_senior_mentor_application_draft';
+/** True when the value (with https:// added if missing) is a usable web address. */
+const isValidWebUrl = (value: string): boolean => {
+    try {
+        const parsed = new URL(normalizeUrl(value));
+        return parsed.hostname.includes('.');
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * Cross-check between the selected role and the graduation year.
+ * Senior Mentor = still studying (graduation year this year or later).
+ * Alumni Mentor = already graduated (graduation year this year or earlier).
+ * The backend applies the same rule.
+ */
+const getGraduationProblem = (role: string | undefined, year: unknown): string | null => {
+    if (!role || typeof year !== 'number' || Number.isNaN(year)) return null;
+    const currentYear = new Date().getFullYear();
+    if (role === 'senior_mentor' && year < currentYear) {
+        return `Senior Mentor is for students who have not graduated yet, but your graduation year (${year}) is in the past. Please choose "Alumni Mentor" instead.`;
+    }
+    if (role === 'alumni' && year > currentYear) {
+        return `Alumni Mentors must have already graduated. If you are still studying, please choose "Senior Mentor" instead.`;
+    }
+    return null;
+};
+
+const DRAFT_STORAGE_KEY_PREFIX = 'throne8_senior_mentor_application_draft';
+const GUIDE_DISMISSED_KEY = 'throne8_senior_mentor_guide_dismissed';
 
 // ============================================================================
 // 2. Validation Schema (Zod)
@@ -249,7 +293,7 @@ const DRAFT_STORAGE_KEY = 'throne8_senior_mentor_application_draft';
 const createSchema = z.object({
     // Step 1: Personal Information
     mentorRole: z.enum(['senior_mentor', 'alumni'], {
-        required_error: "Please select your mentor role.",
+        errorMap: () => ({ message: "Please select your mentor role." }),
     }),
     fullName: z
         .string()
@@ -281,6 +325,7 @@ const createSchema = z.object({
         .int("Graduation year must be a valid whole year.")
         .min(1980, "Graduation year must be 1980 or later.")
         .max(new Date().getFullYear() + 10, "Please enter a valid graduation year."),
+    // Optional: the user can leave these empty or type any custom value
     currentRole: z
         .string()
         .max(100, "Current role cannot exceed 100 characters.")
@@ -313,7 +358,7 @@ const createSchema = z.object({
         .or(z.literal('')),
     portfolioUrl: z
         .string()
-        .url("Please provide a valid URL including https://.")
+        .refine((v) => !v || isValidWebUrl(v), "Please provide a valid website address (e.g. yourportfolio.me).")
         .optional()
         .or(z.literal('')),
     yearsOfExperience: z
@@ -428,7 +473,199 @@ const SERVER_FIELD_MAP: Record<string, keyof FormValues> = {
 };
 
 // ============================================================================
-// 3. Themed Combobox
+// 3. Small UI helpers (defined OUTSIDE the page so inputs keep focus on re-render)
+// ============================================================================
+
+function StepTip({ children }: { children: React.ReactNode }) {
+    return (
+        <p className="text-xs text-[#5c4a3a] bg-[#f8f6f4] border border-[#ece7e2] rounded-xl px-3 py-2.5 leading-relaxed">
+            <span aria-hidden="true">💡 </span>
+            {children}
+        </p>
+    );
+}
+
+function FirstTimeGuide({ onClose }: { onClose: () => void }) {
+    const items: [string, string, string][] = [
+        ['1', 'Choose your role', 'Tap one of the two cards below.'],
+        ['2', 'Fill 5 short steps', 'It takes about 10 minutes. Your text answers are saved on this device automatically.'],
+        ['3', 'Upload your documents', 'Add your resume and a proof document. Our team will then review your application.'],
+    ];
+    return (
+        <div className="rounded-2xl border border-[#ece7e2] bg-[#f8f6f4] p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-bold text-[#4a3728] flex items-center gap-2">
+                    <Info className="w-4 h-4 flex-shrink-0" /> New here? This is how it works
+                </p>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    aria-label="Dismiss guide"
+                    className="w-9 h-9 -mt-1.5 -mr-1.5 flex items-center justify-center text-slate-400 hover:text-slate-700 flex-shrink-0"
+                >
+                    <X className="w-4 h-4" />
+                </button>
+            </div>
+            <ol className="mt-3 space-y-2.5">
+                {items.map(([n, title, text]) => (
+                    <li key={n} className="flex gap-3">
+                        <span className="w-6 h-6 rounded-full bg-[#4a3728] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                            {n}
+                        </span>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                            <b className="text-[#4a3728]">{title}.</b> {text}
+                        </p>
+                    </li>
+                ))}
+            </ol>
+        </div>
+    );
+}
+
+function FreeSessionNotice() {
+    return (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 leading-relaxed space-y-1.5">
+            <p className="font-bold text-sm flex items-center gap-2">
+                <Award className="w-4 h-4 flex-shrink-0" /> Your first {FREE_SESSIONS_REQUIRED} sessions are free
+            </p>
+            <p>
+                As a student Senior Mentor, you will mentor juniors <b>free of charge</b> for your first{' '}
+                {FREE_SESSIONS_REQUIRED} completed sessions. This helps you collect reviews and build trust.
+            </p>
+            <p>
+                After {FREE_SESSIONS_REQUIRED} completed sessions, <b>paid services unlock automatically</b> and you can
+                set your own prices.
+            </p>
+        </div>
+    );
+}
+
+interface TagInputProps {
+    label: string;
+    tags: string[];
+    onChange: (tags: string[]) => void;
+    suggestions: string[];
+    placeholder: string;
+    hint?: string;
+    maxTags?: number;
+    required?: boolean;
+    error?: string;
+}
+
+/** Tag field with tap-to-add suggestion chips. Users can also type any custom value and press Enter / Add. */
+function TagInput({
+    label,
+    tags,
+    onChange,
+    suggestions,
+    placeholder,
+    hint,
+    maxTags = 20,
+    required = false,
+    error,
+}: TagInputProps) {
+    const [value, setValue] = useState('');
+    const query = value.trim().toLowerCase();
+    const limitReached = tags.length >= maxTags;
+
+    const available = suggestions
+        .filter((s) => !tags.some((t) => t.toLowerCase() === s.toLowerCase()))
+        .filter((s) => !query || s.toLowerCase().includes(query))
+        .slice(0, 8);
+
+    const add = (raw: string) => {
+        const v = raw.trim().slice(0, MAX_TAG_LENGTH);
+        if (!v || limitReached || tags.some((t) => t.toLowerCase() === v.toLowerCase())) return;
+        onChange([...tags, v]);
+        setValue('');
+    };
+
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-1 gap-3">
+                <label className="text-sm font-bold text-[#4a3728]">
+                    {label} {required && <span className="text-red-500">*</span>}
+                </label>
+                <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
+                    {tags.length}/{maxTags} added
+                </span>
+            </div>
+            {hint && <p className="text-xs text-slate-500 mb-2.5">{hint}</p>}
+
+            {tags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                    {tags.map((tag) => (
+                        <span
+                            key={tag}
+                            className="pl-3 pr-1.5 py-1 bg-[#4a3728] text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-sm"
+                        >
+                            {tag}
+                            <button
+                                type="button"
+                                onClick={() => onChange(tags.filter((t) => t !== tag))}
+                                aria-label={`Remove ${tag}`}
+                                className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/20 text-sm leading-none"
+                            >
+                                ×
+                            </button>
+                        </span>
+                    ))}
+                </div>
+            )}
+
+            <div className="flex gap-2">
+                <input
+                    type="text"
+                    value={value}
+                    maxLength={MAX_TAG_LENGTH}
+                    disabled={limitReached}
+                    onChange={(e) => setValue(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            add(value);
+                        }
+                    }}
+                    placeholder={limitReached ? 'Maximum reached' : placeholder}
+                    className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900 disabled:opacity-50"
+                />
+                <button
+                    type="button"
+                    onClick={() => add(value)}
+                    disabled={!value.trim() || limitReached}
+                    className="px-5 min-h-[48px] bg-[#4a3728] text-white rounded-2xl font-bold hover:bg-[#7a5c3e] transition text-sm disabled:opacity-40"
+                >
+                    Add
+                </button>
+            </div>
+
+            {!limitReached && available.length > 0 && (
+                <div className="mt-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-[#8a7a6a] mb-1.5">
+                        {query ? 'Matching suggestions' : 'Suggestions (tap to add)'}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        {available.map((s) => (
+                            <button
+                                key={s}
+                                type="button"
+                                onClick={() => add(s)}
+                                className="px-3 py-1.5 rounded-full border border-[#ece7e2] bg-white text-xs font-semibold text-[#4a3728] hover:bg-[#f8f6f4] hover:border-[#4a3728]/40 transition"
+                            >
+                                + {s}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {error && <p className="text-red-500 text-xs mt-2 font-medium">{error}</p>}
+        </div>
+    );
+}
+
+// ============================================================================
+// 4. Themed Combobox (type anything, suggestions are optional)
 // ============================================================================
 
 const MAX_VISIBLE_OPTIONS = 50;
@@ -537,7 +774,7 @@ function ComboboxInput({ control, name, options, placeholder }: ComboboxInputPro
                             aria-label="Toggle suggestions"
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => setOpen((prev) => !prev)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#8a7a6a] hover:text-[#4a3728] transition-colors"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-[#8a7a6a] hover:text-[#4a3728] transition-colors"
                         >
                             <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
                         </button>
@@ -559,7 +796,7 @@ function ComboboxInput({ control, name, options, placeholder }: ComboboxInputPro
                                                         selectOption(opt);
                                                     }}
                                                     onMouseEnter={() => setActiveIndex(idx)}
-                                                    className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${isSelected ? 'font-bold' : 'font-medium'} ${isActive
+                                                    className={`px-4 py-3 text-sm cursor-pointer transition-colors ${isSelected ? 'font-bold' : 'font-medium'} ${isActive
                                                         ? 'bg-[#f8f6f4] text-[#4a3728]'
                                                         : 'text-slate-700 hover:bg-[#f8f6f4] hover:text-[#4a3728]'
                                                         }`}
@@ -571,7 +808,7 @@ function ComboboxInput({ control, name, options, placeholder }: ComboboxInputPro
                                     </ul>
                                 ) : (
                                     <p className="px-4 py-3 text-xs font-medium text-[#8a7a6a]">
-                                        No matching suggestions found. You may continue with your custom input.
+                                        No matching suggestions. You can keep what you typed.
                                     </p>
                                 )}
                             </div>
@@ -587,7 +824,7 @@ function ComboboxInput({ control, name, options, placeholder }: ComboboxInputPro
 }
 
 // ============================================================================
-// 4. Themed Years of Experience dropdown
+// 5. Themed Years of Experience dropdown
 // ============================================================================
 
 interface YearsSelectProps {
@@ -709,7 +946,7 @@ function YearsSelect({ control, name, options, placeholder }: YearsSelectProps) 
                                                 e.preventDefault();
                                                 selectOption(null);
                                             }}
-                                            className="px-4 py-2.5 text-sm font-medium cursor-pointer text-[#8a7a6a] hover:bg-[#f8f6f4] hover:text-[#4a3728] border-b border-[#ece7e2]"
+                                            className="px-4 py-3 text-sm font-medium cursor-pointer text-[#8a7a6a] hover:bg-[#f8f6f4] hover:text-[#4a3728] border-b border-[#ece7e2]"
                                         >
                                             Clear selection
                                         </li>
@@ -727,7 +964,7 @@ function YearsSelect({ control, name, options, placeholder }: YearsSelectProps) 
                                                     selectOption(n);
                                                 }}
                                                 onMouseEnter={() => setActiveIndex(idx)}
-                                                className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${isSelected ? 'font-bold' : 'font-medium'} ${isActive || isSelected
+                                                className={`px-4 py-3 text-sm cursor-pointer transition-colors ${isSelected ? 'font-bold' : 'font-medium'} ${isActive || isSelected
                                                     ? 'bg-[#f8f6f4] text-[#4a3728]'
                                                     : 'text-slate-700 hover:bg-[#f8f6f4] hover:text-[#4a3728]'
                                                     }`}
@@ -750,11 +987,10 @@ function YearsSelect({ control, name, options, placeholder }: YearsSelectProps) 
 }
 
 // ============================================================================
-// 5. Document Upload Field (Resume & Proof of Experience)
+// 6. Document Upload Field (Resume & Proof of Experience)
 // ============================================================================
 
 interface DocumentUploadFieldProps {
-    fieldName: 'resumeFile' | 'proofDocumentFile';
     label: string;
     accept: string;
     allowedExtensions: string[];
@@ -802,9 +1038,7 @@ function DocumentUploadField({
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            validateAndSetFile(file);
-        }
+        if (file) validateAndSetFile(file);
     };
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -823,20 +1057,15 @@ function DocumentUploadField({
         e.preventDefault();
         e.stopPropagation();
         setIsDragging(false);
-
         const file = e.dataTransfer.files?.[0];
-        if (file) {
-            validateAndSetFile(file);
-        }
+        if (file) validateAndSetFile(file);
     };
 
     const handleRemove = (e: React.MouseEvent) => {
         e.stopPropagation();
         setLocalError(null);
         onChange(null);
-        if (inputRef.current) {
-            inputRef.current.value = '';
-        }
+        if (inputRef.current) inputRef.current.value = '';
     };
 
     const handleReplaceClick = (e: React.MouseEvent) => {
@@ -847,7 +1076,7 @@ function DocumentUploadField({
     const displayedError = localError || error;
 
     return (
-        <div>
+        <div aria-invalid={displayedError ? 'true' : 'false'}>
             <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-bold text-[#4a3728]">
                     {label} <span className="text-red-500">*</span>
@@ -855,13 +1084,7 @@ function DocumentUploadField({
                 <span className="text-xs text-slate-500 font-medium">Max 5 MB</span>
             </div>
 
-            <input
-                ref={inputRef}
-                type="file"
-                className="hidden"
-                accept={accept}
-                onChange={handleFileChange}
-            />
+            <input ref={inputRef} type="file" className="hidden" accept={accept} onChange={handleFileChange} />
 
             {value && value instanceof File ? (
                 <div className="bg-[#f8f6f4] border-2 border-[#4a3728]/20 rounded-2xl p-4 transition-all hover:border-[#4a3728]/40">
@@ -874,10 +1097,8 @@ function DocumentUploadField({
                                 <p className="text-sm font-bold text-[#4a3728] truncate" title={value.name}>
                                     {value.name}
                                 </p>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="text-xs text-slate-500 font-medium">
-                                        {formatFileSize(value.size)}
-                                    </span>
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                    <span className="text-xs text-slate-500 font-medium">{formatFileSize(value.size)}</span>
                                     <span className="w-1 h-1 rounded-full bg-slate-300" />
                                     <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                                         <Check className="w-3 h-3" /> Ready to upload
@@ -890,7 +1111,7 @@ function DocumentUploadField({
                             <button
                                 type="button"
                                 onClick={handleReplaceClick}
-                                className="px-3.5 py-2 text-xs font-bold text-[#4a3728] bg-white border border-[#ece7e2] hover:bg-[#ece7e2] rounded-xl transition flex items-center gap-1.5 shadow-sm"
+                                className="px-3.5 py-2.5 text-xs font-bold text-[#4a3728] bg-white border border-[#ece7e2] hover:bg-[#ece7e2] rounded-xl transition flex items-center gap-1.5 shadow-sm"
                             >
                                 <RefreshCw className="w-3.5 h-3.5" />
                                 Replace
@@ -899,7 +1120,7 @@ function DocumentUploadField({
                                 type="button"
                                 onClick={handleRemove}
                                 aria-label="Remove uploaded file"
-                                className="px-3.5 py-2 text-xs font-bold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 rounded-xl transition flex items-center gap-1.5 shadow-sm"
+                                className="px-3.5 py-2.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 rounded-xl transition flex items-center gap-1.5 shadow-sm"
                             >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 Remove
@@ -924,11 +1145,9 @@ function DocumentUploadField({
                         <Upload className="w-5 h-5" />
                     </div>
                     <p className="text-sm font-bold text-[#4a3728] mb-1 text-center">
-                        Click to upload <span className="font-normal text-slate-500">or drag and drop</span>
+                        Tap to upload <span className="font-normal text-slate-500">or drag and drop</span>
                     </p>
-                    <p className="text-xs text-[#8a7a6a] text-center font-medium">
-                        {helperText}
-                    </p>
+                    <p className="text-xs text-[#8a7a6a] text-center font-medium">{helperText}</p>
                 </div>
             )}
 
@@ -943,7 +1162,7 @@ function DocumentUploadField({
 }
 
 // ============================================================================
-// 6. Main Senior Mentor Application Component
+// 7. Main Senior Mentor Application Component
 // ============================================================================
 
 export default function SeniorMentorApplicationPage() {
@@ -956,24 +1175,29 @@ export default function SeniorMentorApplicationPage() {
     const [successMsg, setSuccessMsg] = useState(false);
     const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [photoHint, setPhotoHint] = useState<string | null>(null);
+    const [photoPreview, setPhotoPreview] = useState('');
+    const [showGuide, setShowGuide] = useState(false);
+    const [acceptFreePolicy, setAcceptFreePolicy] = useState(false);
+    const [policyError, setPolicyError] = useState('');
 
     const hasPrefilledRef = useRef(false);
     const isPrefilledPhotoRef = useRef(false);
     const isRedirectingRef = useRef(false);
     const timedOutRef = useRef(false);
+    const draftReadyRef = useRef(false);
+    const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     const {
         register,
         handleSubmit,
         trigger,
-        formState: { errors, dirtyFields },
+        formState: { errors },
         setValue,
         watch,
         setError,
         clearErrors,
         control,
         getValues,
-        reset,
     } = useForm<FormValues>({
         resolver: zodResolver(createSchema),
         defaultValues: {
@@ -1001,43 +1225,29 @@ export default function SeniorMentorApplicationPage() {
         },
     });
 
+    const mentorRoleValue = watch('mentorRole');
+    const isSeniorStudent = mentorRoleValue === 'senior_mentor';
     const selectedHelpAreas = (watch('helpAreas') || []) as MentorshipHelpArea[];
     const isMaxHelpAreas = selectedHelpAreas.length >= MAX_HELP_AREAS;
 
     const shortBioValue = watch('shortBio') || '';
     const motivationValue = watch('motivation') || '';
     const adviceValue = watch('adviceToJuniorSelf') || '';
+    const profilePhotoFile = watch('profilePhotoFile') as File | undefined | null;
 
-    // Auto-dismiss toast after 5s (errors stay longer so users can read long messages)
-    useEffect(() => {
-        if (!toast) return;
-        const timer = setTimeout(() => setToast(null), toast.type === 'error' ? 10000 : 5000);
-        return () => clearTimeout(timer);
-    }, [toast]);
+    const draftKey = `${DRAFT_STORAGE_KEY_PREFIX}_${user?.userId ?? 'guest'}`;
+    const draftKeyRef = useRef(draftKey);
+    draftKeyRef.current = draftKey;
+    const currentStepRef = useRef(currentStep);
+    currentStepRef.current = currentStep;
+    const acceptPolicyRef = useRef(acceptFreePolicy);
+    acceptPolicyRef.current = acceptFreePolicy;
 
-    // Clear helpAreas validation error if count threshold is satisfied
-    useEffect(() => {
-        if (selectedHelpAreas.length >= MIN_HELP_AREAS && errors.helpAreas) {
-            clearErrors('helpAreas');
-        }
-    }, [selectedHelpAreas.length, errors.helpAreas, clearErrors]);
-
-    // Standalone 8-second safety timer on mount
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            timedOutRef.current = true;
-            if (!isRedirectingRef.current) {
-                setIsLoadingInit(false);
-            }
-        }, 8000);
-        return () => clearTimeout(timer);
-    }, []);
-
-    // Save draft to localStorage whenever non-file form values change
-    const saveDraft = useCallback(() => {
+    // ── Draft (text fields only, per user, debounced) ─────────────────────────
+    const writeDraft = useCallback(() => {
         if (typeof window === 'undefined') return;
         const values = getValues();
-        const serializableDraft: Record<string, any> = {
+        const draft = {
             mentorRole: values.mentorRole,
             fullName: values.fullName,
             college: values.college,
@@ -1060,24 +1270,149 @@ export default function SeniorMentorApplicationPage() {
             helpAreas: values.helpAreas,
             motivation: values.motivation,
             adviceToJuniorSelf: values.adviceToJuniorSelf,
-            savedStep: currentStep,
+            acceptFreePolicy: acceptPolicyRef.current,
+            savedStep: currentStepRef.current,
         };
         try {
-            localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(serializableDraft));
+            localStorage.setItem(draftKeyRef.current, JSON.stringify(draft));
         } catch {
             // Ignore quota or private-browsing errors
         }
-    }, [getValues, currentStep]);
+    }, [getValues]);
 
-    // Main data loading coordinator
+    const scheduleSave = useCallback(() => {
+        // Never write before the saved draft has been loaded, or it would be overwritten by empty values
+        if (!draftReadyRef.current) return;
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(writeDraft, 400);
+    }, [writeDraft]);
+
+    // Save whenever any form value changes
+    useEffect(() => {
+        const subscription = watch(() => scheduleSave());
+        return () => {
+            subscription.unsubscribe();
+            if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        };
+    }, [watch, scheduleSave]);
+
+    // Save when the step or the policy checkbox changes
+    useEffect(() => {
+        scheduleSave();
+    }, [currentStep, acceptFreePolicy, scheduleSave]);
+
+    // ── Small effects ─────────────────────────────────────────────────────────
+
+    // First-time guide: show unless the user dismissed it before
+    useEffect(() => {
+        try {
+            setShowGuide(localStorage.getItem(GUIDE_DISMISSED_KEY) !== '1');
+        } catch {
+            setShowGuide(true);
+        }
+    }, []);
+
+    const dismissGuide = () => {
+        setShowGuide(false);
+        try {
+            localStorage.setItem(GUIDE_DISMISSED_KEY, '1');
+        } catch {
+            // Ignore
+        }
+    };
+
+    // Auto-dismiss toast after 5s (errors stay longer so users can read long messages)
+    useEffect(() => {
+        if (!toast) return;
+        const timer = setTimeout(() => setToast(null), toast.type === 'error' ? 10000 : 5000);
+        return () => clearTimeout(timer);
+    }, [toast]);
+
+    // Clear helpAreas validation error once the minimum is reached
+    useEffect(() => {
+        if (selectedHelpAreas.length >= MIN_HELP_AREAS && errors.helpAreas) {
+            clearErrors('helpAreas');
+        }
+    }, [selectedHelpAreas.length, errors.helpAreas, clearErrors]);
+
+    // Standalone 8-second safety timer on mount
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            timedOutRef.current = true;
+            if (!isRedirectingRef.current) {
+                setIsLoadingInit(false);
+            }
+        }, 8000);
+        return () => clearTimeout(timer);
+    }, []);
+
+    // Photo preview URL with proper cleanup (no memory leak)
+    useEffect(() => {
+        if (profilePhotoFile instanceof File) {
+            const url = URL.createObjectURL(profilePhotoFile);
+            setPhotoPreview(url);
+            return () => URL.revokeObjectURL(url);
+        }
+        setPhotoPreview('');
+        return undefined;
+    }, [profilePhotoFile]);
+
+    // ── Main data loading: existing application -> saved draft -> profile prefill ─
     useEffect(() => {
         if (isAuthLoading || hasPrefilledRef.current) return;
 
         let isMounted = true;
 
+        const isEmptyField = (field: keyof FormValues): boolean => {
+            const v = getValues(field) as unknown;
+            return v === undefined || v === null || v === '' || (typeof v === 'number' && Number.isNaN(v));
+        };
+
+        const applyDraft = () => {
+            let savedDraft: Record<string, any> | null = null;
+            try {
+                const localData = localStorage.getItem(draftKeyRef.current);
+                if (localData) savedDraft = JSON.parse(localData);
+            } catch {
+                savedDraft = null;
+            }
+            if (!savedDraft) return;
+
+            if (savedDraft.mentorRole) setValue('mentorRole', savedDraft.mentorRole);
+            if (savedDraft.fullName) setValue('fullName', savedDraft.fullName);
+            if (savedDraft.college) setValue('college', savedDraft.college);
+            if (savedDraft.degree) setValue('degree', savedDraft.degree);
+            if (savedDraft.fieldOfStudy) setValue('fieldOfStudy', savedDraft.fieldOfStudy);
+            if (savedDraft.graduationYear) setValue('graduationYear', Number(savedDraft.graduationYear));
+            if (savedDraft.currentRole) setValue('currentRole', savedDraft.currentRole);
+            if (savedDraft.currentCompany) setValue('currentCompany', savedDraft.currentCompany);
+            if (savedDraft.shortBio) setValue('shortBio', savedDraft.shortBio);
+
+            if (savedDraft.linkedinUrl) setValue('linkedinUrl', savedDraft.linkedinUrl);
+            if (savedDraft.githubUrl) setValue('githubUrl', savedDraft.githubUrl);
+            if (savedDraft.portfolioUrl) setValue('portfolioUrl', savedDraft.portfolioUrl);
+            if (typeof savedDraft.yearsOfExperience === 'number') setValue('yearsOfExperience', savedDraft.yearsOfExperience);
+            if (savedDraft.experienceLevel) setValue('experienceLevel', savedDraft.experienceLevel);
+            if (savedDraft.primaryExpertise) setValue('primaryExpertise', savedDraft.primaryExpertise);
+
+            if (Array.isArray(savedDraft.technologies)) setValue('technologies', savedDraft.technologies);
+            if (Array.isArray(savedDraft.otherSkills)) setValue('otherSkills', savedDraft.otherSkills);
+            if (Array.isArray(savedDraft.achievements)) setValue('achievements', savedDraft.achievements);
+            if (Array.isArray(savedDraft.certifications)) setValue('certifications', savedDraft.certifications);
+            if (Array.isArray(savedDraft.helpAreas)) setValue('helpAreas', savedDraft.helpAreas);
+
+            if (savedDraft.motivation) setValue('motivation', savedDraft.motivation);
+            if (savedDraft.adviceToJuniorSelf) setValue('adviceToJuniorSelf', savedDraft.adviceToJuniorSelf);
+            if (savedDraft.acceptFreePolicy === true) setAcceptFreePolicy(true);
+
+            if (typeof savedDraft.savedStep === 'number' && savedDraft.savedStep >= 1 && savedDraft.savedStep <= 5) {
+                setCurrentStep(savedDraft.savedStep);
+            }
+        };
+
         const loadAndPrefill = async () => {
             try {
-                // Check existing application status first
+                // 1. If the user already applied, go to the profile page
                 const app = await SeniorMentorApplicationService.getMyApplication().catch(() => null);
                 if (!isMounted) return;
 
@@ -1087,23 +1422,16 @@ export default function SeniorMentorApplicationPage() {
                     return;
                 }
 
+                // 2. Restore the saved draft first, so the user's own edits always win
+                applyDraft();
+                draftReadyRef.current = true;
+
                 if (timedOutRef.current) {
                     setIsLoadingInit(false);
                     return;
                 }
 
-                // Check localStorage draft
-                let savedDraft: Record<string, any> | null = null;
-                try {
-                    const localData = localStorage.getItem(DRAFT_STORAGE_KEY);
-                    if (localData) {
-                        savedDraft = JSON.parse(localData);
-                    }
-                } catch {
-                    savedDraft = null;
-                }
-
-                // Fetch profile & education in parallel if user logged in
+                // 3. Prefill only EMPTY fields from the user's profile
                 if (user?.userId) {
                     const [profileRes, eduRes] = await Promise.allSettled([
                         AuthService.getUserProfile(),
@@ -1154,34 +1482,34 @@ export default function SeniorMentorApplicationPage() {
                                 const res = await fetch(photoUrl, { signal: photoController.signal });
                                 if (!res.ok) {
                                     clearTimeout(photoTimer);
-                                    if (!timedOutRef.current) setPhotoHint('Could not load existing profile photo. Please upload one manually.');
+                                    if (!timedOutRef.current) setPhotoHint('Could not load your existing profile photo. Please upload one manually.');
                                 } else {
                                     const blob = await res.blob();
                                     clearTimeout(photoTimer);
                                     if (!isMounted || timedOutRef.current) return;
                                     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
                                     if (blob.size === 0) {
-                                        if (!timedOutRef.current) setPhotoHint('Existing profile photo could not be loaded (empty file). Please upload a new photo.');
-                                    } else if (blob.size <= 5 * 1024 * 1024 && allowedTypes.includes(blob.type)) {
+                                        if (!timedOutRef.current) setPhotoHint('Your existing profile photo could not be loaded (empty file). Please upload a new photo.');
+                                    } else if (blob.size <= MAX_FILE_SIZE && allowedTypes.includes(blob.type)) {
                                         const ext = blob.type === 'image/png' ? 'png' : 'jpg';
                                         photoFile = new File([blob], `profile-photo.${ext}`, { type: blob.type });
-                                    } else if (blob.size > 5 * 1024 * 1024) {
-                                        if (!timedOutRef.current) setPhotoHint('Existing profile photo exceeds 5 MB. Please upload a smaller image.');
+                                    } else if (blob.size > MAX_FILE_SIZE) {
+                                        if (!timedOutRef.current) setPhotoHint('Your existing profile photo is larger than 5 MB. Please upload a smaller image.');
                                     } else {
-                                        if (!timedOutRef.current) setPhotoHint('Existing profile photo is not in JPG/PNG format. Please upload a JPG or PNG image.');
+                                        if (!timedOutRef.current) setPhotoHint('Your existing profile photo is not a JPG/PNG image. Please upload a JPG or PNG photo.');
                                     }
                                 }
                             } catch {
                                 clearTimeout(photoTimer);
-                                if (!timedOutRef.current) setPhotoHint('Could not load existing profile photo. Please upload one manually.');
+                                if (!timedOutRef.current) setPhotoHint('Could not load your existing profile photo. Please upload one manually.');
                             }
                         }
 
                         if (!isMounted || timedOutRef.current) return;
 
-                        // Apply prefill
+                        // Apply prefill (only where the field is still empty)
                         const fullName = `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim();
-                        if (fullName && !dirtyFields.fullName) {
+                        if (fullName && isEmptyField('fullName')) {
                             setValue('fullName', fullName, { shouldValidate: true, shouldDirty: false });
                         }
 
@@ -1190,16 +1518,16 @@ export default function SeniorMentorApplicationPage() {
                             userProfile.onboarding?.studentProfile,
                             userProfile.onboarding?.fresherProfile
                         );
-                        if (eduPrefill.college && !dirtyFields.college) {
+                        if (eduPrefill.college && isEmptyField('college')) {
                             setValue('college', eduPrefill.college, { shouldValidate: true, shouldDirty: false });
                         }
-                        if (eduPrefill.degree && !dirtyFields.degree) {
+                        if (eduPrefill.degree && isEmptyField('degree')) {
                             setValue('degree', eduPrefill.degree, { shouldValidate: true, shouldDirty: false });
                         }
-                        if (eduPrefill.fieldOfStudy && !dirtyFields.fieldOfStudy) {
+                        if (eduPrefill.fieldOfStudy && isEmptyField('fieldOfStudy')) {
                             setValue('fieldOfStudy', eduPrefill.fieldOfStudy, { shouldValidate: true, shouldDirty: false });
                         }
-                        if (eduPrefill.graduationYear && !dirtyFields.graduationYear) {
+                        if (eduPrefill.graduationYear && isEmptyField('graduationYear')) {
                             setValue('graduationYear', eduPrefill.graduationYear, { shouldValidate: true, shouldDirty: false });
                         }
 
@@ -1207,54 +1535,21 @@ export default function SeniorMentorApplicationPage() {
                             experienceList,
                             userProfile.onboarding?.workingProfile
                         );
-                        if (expPrefill.role && !dirtyFields.currentRole) {
+                        if (expPrefill.role && isEmptyField('currentRole')) {
                             setValue('currentRole', expPrefill.role, { shouldValidate: true, shouldDirty: false });
                         }
-                        if (expPrefill.company && !dirtyFields.currentCompany) {
+                        if (expPrefill.company && isEmptyField('currentCompany')) {
                             setValue('currentCompany', expPrefill.company, { shouldValidate: true, shouldDirty: false });
                         }
 
-                        if (aboutText && !dirtyFields.shortBio) {
+                        if (aboutText && isEmptyField('shortBio')) {
                             setValue('shortBio', aboutText.trim(), { shouldValidate: true, shouldDirty: false });
                         }
 
-                        if (photoFile && !dirtyFields.profilePhotoFile && !getValues('profilePhotoFile')) {
+                        if (photoFile && isEmptyField('profilePhotoFile')) {
                             setValue('profilePhotoFile', photoFile as any, { shouldValidate: false, shouldDirty: false });
                             isPrefilledPhotoRef.current = true;
                         }
-                    }
-                }
-
-                // If user had previous draft in localStorage, overwrite matching fields with saved user edits
-                if (savedDraft) {
-                    if (savedDraft.mentorRole) setValue('mentorRole', savedDraft.mentorRole);
-                    if (savedDraft.fullName) setValue('fullName', savedDraft.fullName);
-                    if (savedDraft.college) setValue('college', savedDraft.college);
-                    if (savedDraft.degree) setValue('degree', savedDraft.degree);
-                    if (savedDraft.fieldOfStudy) setValue('fieldOfStudy', savedDraft.fieldOfStudy);
-                    if (savedDraft.graduationYear) setValue('graduationYear', Number(savedDraft.graduationYear));
-                    if (savedDraft.currentRole) setValue('currentRole', savedDraft.currentRole);
-                    if (savedDraft.currentCompany) setValue('currentCompany', savedDraft.currentCompany);
-                    if (savedDraft.shortBio) setValue('shortBio', savedDraft.shortBio);
-
-                    if (savedDraft.linkedinUrl) setValue('linkedinUrl', savedDraft.linkedinUrl);
-                    if (savedDraft.githubUrl) setValue('githubUrl', savedDraft.githubUrl);
-                    if (savedDraft.portfolioUrl) setValue('portfolioUrl', savedDraft.portfolioUrl);
-                    if (typeof savedDraft.yearsOfExperience === 'number') setValue('yearsOfExperience', savedDraft.yearsOfExperience);
-                    if (savedDraft.experienceLevel) setValue('experienceLevel', savedDraft.experienceLevel);
-                    if (savedDraft.primaryExpertise) setValue('primaryExpertise', savedDraft.primaryExpertise);
-
-                    if (Array.isArray(savedDraft.technologies)) setValue('technologies', savedDraft.technologies);
-                    if (Array.isArray(savedDraft.otherSkills)) setValue('otherSkills', savedDraft.otherSkills);
-                    if (Array.isArray(savedDraft.achievements)) setValue('achievements', savedDraft.achievements);
-                    if (Array.isArray(savedDraft.certifications)) setValue('certifications', savedDraft.certifications);
-                    if (Array.isArray(savedDraft.helpAreas)) setValue('helpAreas', savedDraft.helpAreas);
-
-                    if (savedDraft.motivation) setValue('motivation', savedDraft.motivation);
-                    if (savedDraft.adviceToJuniorSelf) setValue('adviceToJuniorSelf', savedDraft.adviceToJuniorSelf);
-
-                    if (typeof savedDraft.savedStep === 'number' && savedDraft.savedStep >= 1 && savedDraft.savedStep <= 5) {
-                        setCurrentStep(savedDraft.savedStep);
                     }
                 }
             } catch (err) {
@@ -1262,6 +1557,7 @@ export default function SeniorMentorApplicationPage() {
             } finally {
                 if (isMounted && !isRedirectingRef.current) {
                     hasPrefilledRef.current = true;
+                    draftReadyRef.current = true;
                     setIsLoadingInit(false);
                 }
             }
@@ -1271,9 +1567,17 @@ export default function SeniorMentorApplicationPage() {
         return () => {
             isMounted = false;
         };
-    }, [isAuthLoading, user?.userId, router, setValue, getValues, dirtyFields]);
+    }, [isAuthLoading, user?.userId, router, setValue, getValues]);
 
-    // Handle next step with validation
+    // ── Navigation ────────────────────────────────────────────────────────────
+
+    const scrollToFirstInvalid = () => {
+        setTimeout(() => {
+            const firstInvalid = document.querySelector<HTMLElement>('[aria-invalid="true"]');
+            firstInvalid?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+    };
+
     const handleNext = async () => {
         if (currentStep === 3) {
             if (selectedHelpAreas.length < MIN_HELP_AREAS) {
@@ -1281,8 +1585,7 @@ export default function SeniorMentorApplicationPage() {
                     type: 'manual',
                     message: `Please select at least ${MIN_HELP_AREAS} help areas (${selectedHelpAreas.length} selected).`,
                 });
-                const el = document.getElementById('help-areas-section');
-                el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                document.getElementById('help-areas-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 return;
             }
         }
@@ -1290,45 +1593,55 @@ export default function SeniorMentorApplicationPage() {
         const stepFields = steps.find((s) => s.id === currentStep)?.fields as (keyof FormValues)[];
         const isValid = await trigger(stepFields);
 
-        if (isValid) {
-            setErrorMsg('');
-            setCurrentStep((prev) => {
-                const nextStep = Math.min(5, prev + 1);
-                return nextStep;
-            });
-            saveDraft();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-            const firstInvalid = document.querySelector<HTMLElement>('[aria-invalid="true"]');
-            firstInvalid?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (!isValid) {
+            scrollToFirstInvalid();
+            return;
         }
+
+        // Role vs graduation year cross-check (same rule as the server)
+        if (currentStep === 1) {
+            const gradProblem = getGraduationProblem(getValues('mentorRole'), getValues('graduationYear'));
+            if (gradProblem) {
+                setError('graduationYear', { type: 'manual', message: gradProblem });
+                scrollToFirstInvalid();
+                return;
+            }
+        }
+
+        setErrorMsg('');
+        setCurrentStep((prev) => Math.min(5, prev + 1));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handlePrev = () => {
         setErrorMsg('');
         setCurrentStep((prev) => Math.max(1, prev - 1));
-        saveDraft();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const onInvalid = (formErrors: any) => {
+    const onInvalid = (formErrors: Record<string, any>) => {
         console.error('[SENIOR_MENTOR_APP] Form validation errors:', formErrors);
         const errorKeys = Object.keys(formErrors);
-        if (errorKeys.length > 0) {
-            const firstKey = errorKeys[0];
-            const stepWithErr = steps.find((s) => (s.fields as string[]).includes(firstKey));
-            if (stepWithErr) {
-                setCurrentStep(stepWithErr.id);
-            }
-            const msg =
-                formErrors[firstKey]?.message ||
-                `Please review and complete the required fields in Step ${stepWithErr?.id || currentStep}.`;
-            const fullErrMsg = `Unable to submit your application. ${msg}`;
-            setErrorMsg(fullErrMsg);
-            setToast({ type: 'error', message: fullErrMsg });
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        if (errorKeys.length === 0) return;
+
+        // Jump to the EARLIEST step that has an error
+        const stepsWithErrors = errorKeys
+            .map((key) => steps.find((s) => (s.fields as string[]).includes(key))?.id)
+            .filter((id): id is number => typeof id === 'number');
+        const firstStep = stepsWithErrors.length > 0 ? Math.min(...stepsWithErrors) : currentStep;
+        setCurrentStep(firstStep);
+
+        const firstKey = errorKeys.find((k) => steps.find((s) => s.id === firstStep)?.fields.includes(k)) ?? errorKeys[0];
+        const msg =
+            formErrors[firstKey]?.message ||
+            `Please review and complete the required fields in Step ${firstStep}.`;
+        const fullErrMsg = `Unable to submit your application. ${msg}`;
+        setErrorMsg(fullErrMsg);
+        setToast({ type: 'error', message: fullErrMsg });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
+
+    // ── Submit ────────────────────────────────────────────────────────────────
 
     const onSubmit = async (values: FormValues) => {
         if (isSubmitting) return;
@@ -1337,6 +1650,27 @@ export default function SeniorMentorApplicationPage() {
             setIsSubmitting(true);
             setErrorMsg('');
             setToast(null);
+
+            // Role vs graduation year (server enforces the same rule)
+            const gradProblem = getGraduationProblem(values.mentorRole, values.graduationYear);
+            if (gradProblem) {
+                setError('graduationYear', { type: 'manual', message: gradProblem });
+                setCurrentStep(1);
+                const msg = `Unable to submit your application. ${gradProblem}`;
+                setErrorMsg(msg);
+                setToast({ type: 'error', message: msg });
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
+
+            // Student Senior Mentors must accept the free sessions policy
+            if (values.mentorRole === 'senior_mentor' && !acceptFreePolicy) {
+                const msg = `Please accept the free sessions policy (your first ${FREE_SESSIONS_REQUIRED} sessions are free) before submitting.`;
+                setPolicyError(msg);
+                setCurrentStep(5);
+                setToast({ type: 'error', message: msg });
+                return;
+            }
 
             // Pre-flight: re-check all three files so the user knows exactly which one is wrong
             const fileChecks: {
@@ -1404,6 +1738,7 @@ export default function SeniorMentorApplicationPage() {
             // Step 4: Additional Information
             formData.append('motivation', values.motivation.trim());
             formData.append('adviceToJuniorSelf', values.adviceToJuniorSelf.trim());
+            formData.append('acceptedFreePolicy', String(values.mentorRole === 'senior_mentor' && acceptFreePolicy));
 
             // Step 5: Verification Documents & Photo
             // Append both field names for maximum compatibility with server multer
@@ -1422,7 +1757,7 @@ export default function SeniorMentorApplicationPage() {
 
             const resp = await SeniorMentorApplicationService.apply(formData);
 
-            if (resp && (resp.applicationId || resp.verificationStatus)) {
+            if (resp && (resp.seniorMentorId || resp.id || resp.applicationId || resp.verificationStatus)) {
                 // Sync profile photo to other roles if newly uploaded
                 if (!isPrefilledPhotoRef.current && values.profilePhotoFile instanceof File) {
                     syncProfilePhotoToAllRoles(values.profilePhotoFile, user?.userId, { skip: ['senior'] }).catch((err) => {
@@ -1431,8 +1766,10 @@ export default function SeniorMentorApplicationPage() {
                 }
 
                 // Clear saved draft on successful submission
+                if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+                draftReadyRef.current = false;
                 try {
-                    localStorage.removeItem(DRAFT_STORAGE_KEY);
+                    localStorage.removeItem(draftKeyRef.current);
                 } catch {
                     // Ignore
                 }
@@ -1467,10 +1804,15 @@ export default function SeniorMentorApplicationPage() {
                     .map((e) => e.message || e.msg || `${e.field || e.param || e.path} is invalid.`)
                     .join(' ');
 
-                const firstRaw = serverErrors[0].field || serverErrors[0].param || serverErrors[0].path || '';
-                const firstField = String(SERVER_FIELD_MAP[firstRaw] || firstRaw);
-                const stepWithErr = steps.find((s) => (s.fields as string[]).includes(firstField));
-                if (stepWithErr) setCurrentStep(stepWithErr.id);
+                // Jump to the earliest step that has a server error
+                const errorSteps = serverErrors
+                    .map((e) => {
+                        const raw = e.field || e.param || e.path || '';
+                        const baseField = String(SERVER_FIELD_MAP[raw] || raw).split(/[.[]/)[0];
+                        return steps.find((s) => (s.fields as string[]).includes(baseField))?.id;
+                    })
+                    .filter((id): id is number => typeof id === 'number');
+                if (errorSteps.length > 0) setCurrentStep(Math.min(...errorSteps));
             } else if (!error?.response) {
                 reason = 'Could not reach the server. Please check your internet connection and try again.';
             } else if (status === 413) {
@@ -1499,6 +1841,25 @@ export default function SeniorMentorApplicationPage() {
         }
     };
 
+    // ── Role + help-area handlers ─────────────────────────────────────────────
+
+    const selectRole = (role: 'senior_mentor' | 'alumni') => {
+        setValue('mentorRole', role, { shouldValidate: true, shouldDirty: true });
+        clearErrors('graduationYear');
+        setPolicyError('');
+    };
+
+    const toggleHelpArea = (area: MentorshipHelpArea) => {
+        const next = selectedHelpAreas.includes(area)
+            ? selectedHelpAreas.filter((a) => a !== area)
+            : selectedHelpAreas.length < MAX_HELP_AREAS
+                ? [...selectedHelpAreas, area]
+                : selectedHelpAreas;
+        setValue('helpAreas', next, { shouldValidate: true, shouldDirty: true });
+    };
+
+    // ── Early returns (all hooks are above this line) ─────────────────────────
+
     if (isLoadingInit) {
         return (
             <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center p-6">
@@ -1512,12 +1873,12 @@ export default function SeniorMentorApplicationPage() {
 
     if (successMsg) {
         return (
-            <div className="min-h-screen bg-[#FAF9F6] p-6 lg:p-12 flex items-center justify-center">
-                <div className="max-w-2xl w-full bg-white p-10 rounded-[40px] shadow-2xl border border-[#ece7e2] text-center animate-fade-in">
+            <div className="min-h-screen bg-[#FAF9F6] p-4 sm:p-6 lg:p-12 flex items-center justify-center">
+                <div className="max-w-2xl w-full bg-white p-6 sm:p-10 rounded-[32px] sm:rounded-[40px] shadow-2xl border border-[#ece7e2] text-center animate-fade-in">
                     <div className="w-20 h-20 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-6 shadow-sm">
                         <CheckCircle2 className="w-12 h-12" />
                     </div>
-                    <h2 className="text-3xl font-black text-[#4a3728] mb-3">Application Submitted!</h2>
+                    <h2 className="text-2xl sm:text-3xl font-black text-[#4a3728] mb-3">Application Submitted!</h2>
                     <p className="text-slate-600 mb-8 max-w-md mx-auto leading-relaxed text-sm">
                         Thank you for applying to become a Senior Mentor. Your application has been received and is currently under review by our team. We will notify you once your verification is complete.
                     </p>
@@ -1529,10 +1890,15 @@ export default function SeniorMentorApplicationPage() {
                         <p>1. Our team reviews your academic and experience verification documents.</p>
                         <p>2. You will receive an email and platform notification with the status update.</p>
                         <p>3. Once approved, you can set your availability and begin mentoring students.</p>
+                        {isSeniorStudent && (
+                            <p>
+                                4. As a student mentor, your first {FREE_SESSIONS_REQUIRED} sessions are free. Paid services unlock automatically after that.
+                            </p>
+                        )}
                     </div>
                     <button
                         onClick={() => router.push('/mentorship')}
-                        className="px-8 py-3.5 bg-[#4a3728] text-white rounded-xl font-bold shadow hover:bg-[#7a5c3e] transition text-sm inline-flex items-center gap-2"
+                        className="px-8 py-3.5 min-h-[48px] bg-[#4a3728] text-white rounded-xl font-bold shadow hover:bg-[#7a5c3e] transition text-sm inline-flex items-center gap-2"
                     >
                         Back to Mentorship
                     </button>
@@ -1541,107 +1907,14 @@ export default function SeniorMentorApplicationPage() {
         );
     }
 
-    const TagInput = ({
-        fieldName,
-        label,
-        placeholder,
-        maxTags = 20,
-        required = false,
-    }: {
-        fieldName: keyof FormValues;
-        label: string;
-        placeholder: string;
-        maxTags?: number;
-        required?: boolean;
-    }) => {
-        const [inputValue, setInputValue] = useState("");
-        const tags = (watch(fieldName) as string[]) || [];
-
-        const addTag = () => {
-            const val = inputValue.trim();
-            if (val && !tags.includes(val) && tags.length < maxTags) {
-                setValue(fieldName, [...tags, val] as any, { shouldValidate: true, shouldDirty: true });
-                setInputValue("");
-                saveDraft();
-            }
-        };
-
-        const removeTag = (tagToRemove: string) => {
-            setValue(fieldName, tags.filter((t: string) => t !== tagToRemove) as any, { shouldValidate: true, shouldDirty: true });
-            saveDraft();
-        };
-
-        return (
-            <div>
-                <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-bold text-[#4a3728]">
-                        {label} {required && <span className="text-red-500">*</span>}
-                    </label>
-                    <span className="text-xs text-slate-500 font-medium">
-                        {tags.length}/{maxTags} added
-                    </span>
-                </div>
-
-                {tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                        {tags.map((tag, i) => (
-                            <span
-                                key={i}
-                                className="px-3 py-1 bg-[#4a3728] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm"
-                            >
-                                {tag}
-                                <button
-                                    type="button"
-                                    onClick={() => removeTag(tag)}
-                                    aria-label={`Remove ${tag}`}
-                                    className="hover:text-red-300 ml-1 text-sm leading-none"
-                                >
-                                    ×
-                                </button>
-                            </span>
-                        ))}
-                    </div>
-                )}
-
-                <div className="flex gap-2">
-                    <input
-                        type="text"
-                        value={inputValue}
-                        disabled={tags.length >= maxTags}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                addTag();
-                            }
-                        }}
-                        placeholder={tags.length >= maxTags ? "Maximum reached" : placeholder}
-                        className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900 disabled:opacity-50"
-                    />
-                    <button
-                        type="button"
-                        onClick={addTag}
-                        disabled={!inputValue.trim() || tags.length >= maxTags}
-                        className="px-5 bg-[#4a3728] text-white rounded-2xl font-bold hover:bg-[#7a5c3e] transition text-sm disabled:opacity-40"
-                    >
-                        Add
-                    </button>
-                </div>
-                {errors[fieldName] && (
-                    <p className="text-red-500 text-xs mt-1.5 font-medium">{errors[fieldName]?.message as string}</p>
-                )}
-            </div>
-        );
-    };
-
-    const profilePhotoFile = watch('profilePhotoFile') as File | undefined;
-    const profilePicPreview = profilePhotoFile instanceof File ? URL.createObjectURL(profilePhotoFile) : '';
+    const currentStepTitle = steps.find((s) => s.id === currentStep)?.title;
 
     return (
-        <div className="min-h-screen bg-[#FAF9F6] flex items-start justify-center p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <div className="min-h-screen bg-[#FAF9F6] flex items-start justify-center p-3 sm:p-6 lg:p-8">
             {toast && (
                 <div
-                    className={`fixed top-5 right-5 left-5 sm:left-auto sm:max-w-md z-50 flex items-start gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-semibold transition-all ${toast.type === 'error'
+                    role="alert"
+                    className={`fixed top-4 right-4 left-4 sm:left-auto sm:max-w-md z-50 flex items-start gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-semibold transition-all ${toast.type === 'error'
                         ? 'bg-red-50 text-red-800 border-red-200'
                         : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                         }`}
@@ -1655,33 +1928,39 @@ export default function SeniorMentorApplicationPage() {
                     <button
                         type="button"
                         onClick={() => setToast(null)}
-                        className="ml-2 hover:opacity-70 text-slate-400 hover:text-slate-700"
+                        aria-label="Dismiss message"
+                        className="ml-auto hover:opacity-70 text-slate-400 hover:text-slate-700"
                     >
                         <X className="w-4 h-4" />
                     </button>
                 </div>
             )}
 
-            <div className="max-w-3xl w-full my-6 relative">
-                <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="bg-white rounded-[40px] shadow-2xl relative border border-[#ece7e2]">
+            <div className="max-w-3xl w-full my-2 sm:my-6 relative">
+                {/* noValidate: we show our own clear messages instead of the browser's pop-ups */}
+                <form
+                    noValidate
+                    onSubmit={handleSubmit(onSubmit, onInvalid)}
+                    className="bg-white rounded-[28px] sm:rounded-[40px] shadow-2xl relative border border-[#ece7e2]"
+                >
                     {/* Close / Return Button */}
                     <button
                         type="button"
                         onClick={() => router.back()}
                         aria-label="Close application form"
-                        className="absolute top-6 right-6 w-10 h-10 bg-[#f8f6f4] hover:bg-[#4a3728] text-[#4a3728] hover:text-white rounded-full flex items-center justify-center transition-all z-20 shadow-sm"
+                        className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 bg-[#f8f6f4] hover:bg-[#4a3728] text-[#4a3728] hover:text-white rounded-full flex items-center justify-center transition-all z-20 shadow-sm"
                     >
                         <X className="w-5 h-5" />
                     </button>
 
                     {/* Form Header */}
-                    <div className="bg-gradient-to-br from-[#4a3728] via-[#5c4535] to-[#7a5c3e] p-8 sm:p-10 rounded-t-[40px] text-white relative overflow-hidden">
+                    <div className="bg-gradient-to-br from-[#4a3728] via-[#5c4535] to-[#7a5c3e] p-6 sm:p-10 rounded-t-[28px] sm:rounded-t-[40px] text-white relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
                         <div className="relative z-10">
                             <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 shadow-inner">
                                 <Users className="w-7 h-7 text-white" />
                             </div>
-                            <h1 className="text-2xl sm:text-3xl font-black mb-2 tracking-tight">
+                            <h1 className="text-2xl sm:text-3xl font-black mb-2 tracking-tight pr-12">
                                 Senior Mentor Application
                             </h1>
                             <p className="text-white/80 font-medium text-sm sm:text-base max-w-xl">
@@ -1689,7 +1968,7 @@ export default function SeniorMentorApplicationPage() {
                             </p>
 
                             {/* Multi-step progress tracker */}
-                            <div className="mt-8">
+                            <div className="mt-6 sm:mt-8">
                                 <div className="flex items-center gap-2 mb-3">
                                     {[1, 2, 3, 4, 5].map((step) => (
                                         <button
@@ -1702,24 +1981,22 @@ export default function SeniorMentorApplicationPage() {
                                                     window.scrollTo({ top: 0, behavior: 'smooth' });
                                                 }
                                             }}
-                                            className={`h-2 rounded-full flex-1 transition-all ${currentStep >= step
-                                                ? 'bg-white'
-                                                : 'bg-white/25'
-                                                } ${step < currentStep ? 'cursor-pointer hover:bg-white/80' : 'cursor-default'}`}
-                                            title={`Go to Step ${step}`}
+                                            aria-label={`Go to step ${step}`}
+                                            className={`h-2 rounded-full flex-1 transition-all ${currentStep >= step ? 'bg-white' : 'bg-white/25'} ${step < currentStep ? 'cursor-pointer hover:bg-white/80' : 'cursor-default'}`}
+                                            title={`Step ${step}`}
                                         />
                                     ))}
                                 </div>
-                                <div className="flex justify-between text-xs font-bold text-white/80">
-                                    <span>Step {currentStep} of 5</span>
-                                    <span>{steps.find((s) => s.id === currentStep)?.title}</span>
+                                <div className="flex justify-between gap-3 text-xs font-bold text-white/80">
+                                    <span className="whitespace-nowrap">Step {currentStep} of 5</span>
+                                    <span className="text-right">{currentStepTitle}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Step Body */}
-                    <div className="p-6 sm:p-10">
+                    <div className="p-5 sm:p-10">
                         {errorMsg && (
                             <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-sm font-semibold flex items-start gap-3">
                                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -1731,7 +2008,7 @@ export default function SeniorMentorApplicationPage() {
                         {currentStep === 1 && (
                             <div className="space-y-6 animate-fade-in">
                                 <div>
-                                    <h2 className="text-2xl font-black text-[#4a3728] tracking-tight">
+                                    <h2 className="text-xl sm:text-2xl font-black text-[#4a3728] tracking-tight">
                                         Personal Information
                                     </h2>
                                     <p className="text-xs sm:text-sm text-slate-500 mt-1">
@@ -1739,27 +2016,27 @@ export default function SeniorMentorApplicationPage() {
                                     </p>
                                 </div>
 
+                                {showGuide && <FirstTimeGuide onClose={dismissGuide} />}
+
                                 {/* Mentor Role Selection */}
-                                <div>
+                                <div aria-invalid={errors.mentorRole ? 'true' : 'false'}>
                                     <label className="block text-sm font-bold text-[#4a3728] mb-2.5">
                                         Which mentor role best describes you? <span className="text-red-500">*</span>
                                     </label>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div role="radiogroup" className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <label
-                                            className={`flex items-start gap-3.5 p-4 border rounded-2xl cursor-pointer transition ${watch('mentorRole') === 'senior_mentor'
+                                            className={`flex items-start gap-3.5 p-4 border rounded-2xl cursor-pointer transition ${mentorRoleValue === 'senior_mentor'
                                                 ? 'border-[#4a3728] bg-[#f8f6f4] shadow-sm ring-1 ring-[#4a3728]'
                                                 : 'border-[#ece7e2] hover:border-[#4a3728]/50 bg-white'
                                                 }`}
                                         >
                                             <input
                                                 type="radio"
+                                                name="mentorRole"
                                                 value="senior_mentor"
-                                                {...register('mentorRole')}
-                                                onChange={(e) => {
-                                                    register('mentorRole').onChange(e);
-                                                    saveDraft();
-                                                }}
-                                                className="mt-1 text-[#4a3728] focus:ring-[#4a3728]"
+                                                checked={mentorRoleValue === 'senior_mentor'}
+                                                onChange={() => selectRole('senior_mentor')}
+                                                className="mt-1 w-5 h-5 flex-shrink-0 text-[#4a3728] focus:ring-[#4a3728]"
                                             />
                                             <div>
                                                 <p className="text-sm font-bold text-[#4a3728] flex items-center gap-1.5">
@@ -1773,20 +2050,18 @@ export default function SeniorMentorApplicationPage() {
                                         </label>
 
                                         <label
-                                            className={`flex items-start gap-3.5 p-4 border rounded-2xl cursor-pointer transition ${watch('mentorRole') === 'alumni'
+                                            className={`flex items-start gap-3.5 p-4 border rounded-2xl cursor-pointer transition ${mentorRoleValue === 'alumni'
                                                 ? 'border-[#4a3728] bg-[#f8f6f4] shadow-sm ring-1 ring-[#4a3728]'
                                                 : 'border-[#ece7e2] hover:border-[#4a3728]/50 bg-white'
                                                 }`}
                                         >
                                             <input
                                                 type="radio"
+                                                name="mentorRole"
                                                 value="alumni"
-                                                {...register('mentorRole')}
-                                                onChange={(e) => {
-                                                    register('mentorRole').onChange(e);
-                                                    saveDraft();
-                                                }}
-                                                className="mt-1 text-[#4a3728] focus:ring-[#4a3728]"
+                                                checked={mentorRoleValue === 'alumni'}
+                                                onChange={() => selectRole('alumni')}
+                                                className="mt-1 w-5 h-5 flex-shrink-0 text-[#4a3728] focus:ring-[#4a3728]"
                                             />
                                             <div>
                                                 <p className="text-sm font-bold text-[#4a3728] flex items-center gap-1.5">
@@ -1799,29 +2074,40 @@ export default function SeniorMentorApplicationPage() {
                                             </div>
                                         </label>
                                     </div>
+
+                                    {!mentorRoleValue && (
+                                        <p className="mt-2.5 text-xs font-semibold text-[#7a5c3e] animate-pulse">
+                                            <span aria-hidden="true">👆 </span>Tap one of the two options above to continue
+                                        </p>
+                                    )}
                                     {errors.mentorRole && (
                                         <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.mentorRole.message}</p>
+                                    )}
+                                    {isSeniorStudent && (
+                                        <div className="mt-3">
+                                            <FreeSessionNotice />
+                                        </div>
                                     )}
                                 </div>
 
                                 {/* Profile Photo Upload */}
-                                <div>
+                                <div aria-invalid={errors.profilePhotoFile ? 'true' : 'false'}>
                                     <label className="block text-sm font-bold text-[#4a3728] mb-2">
                                         Profile Photo <span className="text-red-500">*</span>
                                     </label>
                                     <div className="flex flex-col sm:flex-row sm:items-center gap-5">
                                         <div className="w-24 h-24 rounded-full border-2 border-dashed border-[#ece7e2] overflow-hidden flex items-center justify-center bg-[#f8f6f4] relative flex-shrink-0 shadow-inner">
-                                            {profilePicPreview ? (
-                                                <img src={profilePicPreview} alt="Profile Preview" className="w-full h-full object-cover" />
+                                            {photoPreview ? (
+                                                <img src={photoPreview} alt="Profile Preview" className="w-full h-full object-cover" />
                                             ) : (
                                                 <ImageIcon className="w-8 h-8 text-[#8a7a6a]" />
                                             )}
                                         </div>
                                         <div className="space-y-2">
-                                            <div className="flex items-center gap-3">
-                                                <label className="px-5 py-2.5 bg-[#f8f6f4] hover:bg-[#ece7e2] text-[#4a3728] font-bold rounded-xl text-sm cursor-pointer transition flex items-center gap-2 border border-[#ece7e2] shadow-sm">
+                                            <div className="flex items-center gap-3 flex-wrap">
+                                                <label className="px-5 py-3 min-h-[48px] bg-[#f8f6f4] hover:bg-[#ece7e2] text-[#4a3728] font-bold rounded-xl text-sm cursor-pointer transition flex items-center gap-2 border border-[#ece7e2] shadow-sm">
                                                     <Upload className="w-4 h-4" />
-                                                    {profilePicPreview ? 'Change Photo' : 'Upload Photo'}
+                                                    {photoPreview ? 'Change Photo' : 'Upload Photo'}
                                                     <input
                                                         type="file"
                                                         className="hidden"
@@ -1844,21 +2130,19 @@ export default function SeniorMentorApplicationPage() {
                                                         }}
                                                     />
                                                 </label>
-                                                {profilePicPreview && (
+                                                {photoPreview && (
                                                     <button
                                                         type="button"
                                                         onClick={() => {
                                                             setValue('profilePhotoFile', null as any, { shouldValidate: true, shouldDirty: true });
                                                         }}
-                                                        className="px-3 py-2 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition border border-red-200"
+                                                        className="px-4 py-3 min-h-[48px] text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition border border-red-200"
                                                     >
                                                         Remove
                                                     </button>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-slate-500 font-medium">
-                                                JPG or PNG format • Maximum size 5 MB
-                                            </p>
+                                            <p className="text-xs text-slate-500 font-medium">JPG or PNG format • Maximum size 5 MB</p>
                                         </div>
                                     </div>
                                     {photoHint && (
@@ -1880,12 +2164,9 @@ export default function SeniorMentorApplicationPage() {
                                         <input
                                             type="text"
                                             {...register('fullName')}
-                                            onChange={(e) => {
-                                                register('fullName').onChange(e);
-                                                saveDraft();
-                                            }}
                                             autoComplete="name"
                                             placeholder="Enter your full name"
+                                            aria-invalid={errors.fullName ? 'true' : 'false'}
                                             className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900"
                                         />
                                         {errors.fullName && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.fullName.message}</p>}
@@ -1897,12 +2178,10 @@ export default function SeniorMentorApplicationPage() {
                                         </label>
                                         <input
                                             type="number"
+                                            inputMode="numeric"
                                             {...register('graduationYear', { valueAsNumber: true })}
-                                            onChange={(e) => {
-                                                register('graduationYear', { valueAsNumber: true }).onChange(e);
-                                                saveDraft();
-                                            }}
-                                            placeholder="e.g. 2025"
+                                            placeholder="e.g. 2027"
+                                            aria-invalid={errors.graduationYear ? 'true' : 'false'}
                                             className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900"
                                         />
                                         {errors.graduationYear && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.graduationYear.message}</p>}
@@ -1920,10 +2199,7 @@ export default function SeniorMentorApplicationPage() {
                                                     id="college"
                                                     name={field.name}
                                                     value={field.value || ''}
-                                                    onChange={(val) => {
-                                                        field.onChange(val);
-                                                        saveDraft();
-                                                    }}
+                                                    onChange={(val) => field.onChange(val)}
                                                     onBlur={field.onBlur}
                                                     ariaInvalid={!!errors.college}
                                                     placeholder="Search or enter your college / university name"
@@ -1965,22 +2241,19 @@ export default function SeniorMentorApplicationPage() {
 
                                 {/* Short Bio with Live Character Counter */}
                                 <div>
-                                    <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
                                         <label className="text-sm font-bold text-[#4a3728]">
                                             Short Bio / Introduction <span className="text-red-500">*</span>
                                         </label>
                                         <span className={`text-xs font-semibold ${shortBioValue.length < 50 ? 'text-amber-600' : 'text-slate-500'}`}>
-                                            {shortBioValue.length} / 1000 characters (minimum 50 required)
+                                            {shortBioValue.length} / 1000 (minimum 50)
                                         </span>
                                     </div>
                                     <textarea
                                         {...register('shortBio')}
-                                        onChange={(e) => {
-                                            register('shortBio').onChange(e);
-                                            saveDraft();
-                                        }}
                                         rows={4}
                                         placeholder="Briefly introduce yourself, your academic background, and how you plan to support juniors..."
+                                        aria-invalid={errors.shortBio ? 'true' : 'false'}
                                         className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900 resize-none"
                                     />
                                     {errors.shortBio && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.shortBio.message}</p>}
@@ -1992,13 +2265,15 @@ export default function SeniorMentorApplicationPage() {
                         {currentStep === 2 && (
                             <div className="space-y-6 animate-fade-in">
                                 <div>
-                                    <h2 className="text-2xl font-black text-[#4a3728] tracking-tight">
+                                    <h2 className="text-xl sm:text-2xl font-black text-[#4a3728] tracking-tight">
                                         Professional Information
                                     </h2>
                                     <p className="text-xs sm:text-sm text-slate-500 mt-1">
                                         Provide your professional profiles, industry experience level, and domain expertise.
                                     </p>
                                 </div>
+
+                                <StepTip>LinkedIn URL is required. GitHub, portfolio and years of experience are optional.</StepTip>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
@@ -2007,12 +2282,11 @@ export default function SeniorMentorApplicationPage() {
                                         </label>
                                         <input
                                             type="text"
+                                            inputMode="url"
+                                            autoCapitalize="none"
                                             {...register('linkedinUrl')}
-                                            onChange={(e) => {
-                                                register('linkedinUrl').onChange(e);
-                                                saveDraft();
-                                            }}
                                             placeholder="https://linkedin.com/in/username"
+                                            aria-invalid={errors.linkedinUrl ? 'true' : 'false'}
                                             className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900"
                                         />
                                         {errors.linkedinUrl && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.linkedinUrl.message}</p>}
@@ -2024,12 +2298,11 @@ export default function SeniorMentorApplicationPage() {
                                         </label>
                                         <input
                                             type="text"
+                                            inputMode="url"
+                                            autoCapitalize="none"
                                             {...register('githubUrl')}
-                                            onChange={(e) => {
-                                                register('githubUrl').onChange(e);
-                                                saveDraft();
-                                            }}
                                             placeholder="https://github.com/username"
+                                            aria-invalid={errors.githubUrl ? 'true' : 'false'}
                                             className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900"
                                         />
                                         {errors.githubUrl && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.githubUrl.message}</p>}
@@ -2040,13 +2313,12 @@ export default function SeniorMentorApplicationPage() {
                                             Portfolio / Website URL <span className="text-slate-400 font-normal">(Optional)</span>
                                         </label>
                                         <input
-                                            type="url"
+                                            type="text"
+                                            inputMode="url"
+                                            autoCapitalize="none"
                                             {...register('portfolioUrl')}
-                                            onChange={(e) => {
-                                                register('portfolioUrl').onChange(e);
-                                                saveDraft();
-                                            }}
                                             placeholder="https://yourportfolio.me"
+                                            aria-invalid={errors.portfolioUrl ? 'true' : 'false'}
                                             className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900"
                                         />
                                         {errors.portfolioUrl && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.portfolioUrl.message}</p>}
@@ -2065,10 +2337,7 @@ export default function SeniorMentorApplicationPage() {
                                         </label>
                                         <select
                                             {...register('experienceLevel')}
-                                            onChange={(e) => {
-                                                register('experienceLevel').onChange(e);
-                                                saveDraft();
-                                            }}
+                                            aria-invalid={errors.experienceLevel ? 'true' : 'false'}
                                             className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900"
                                         >
                                             <option value="">Select Level</option>
@@ -2087,10 +2356,7 @@ export default function SeniorMentorApplicationPage() {
                                         </label>
                                         <select
                                             {...register('primaryExpertise')}
-                                            onChange={(e) => {
-                                                register('primaryExpertise').onChange(e);
-                                                saveDraft();
-                                            }}
+                                            aria-invalid={errors.primaryExpertise ? 'true' : 'false'}
                                             className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900"
                                         >
                                             <option value="">Select Domain</option>
@@ -2110,7 +2376,7 @@ export default function SeniorMentorApplicationPage() {
                         {currentStep === 3 && (
                             <div className="space-y-6 animate-fade-in">
                                 <div>
-                                    <h2 className="text-2xl font-black text-[#4a3728] tracking-tight">
+                                    <h2 className="text-xl sm:text-2xl font-black text-[#4a3728] tracking-tight">
                                         Skills & Expertise
                                     </h2>
                                     <p className="text-xs sm:text-sm text-slate-500 mt-1">
@@ -2118,43 +2384,65 @@ export default function SeniorMentorApplicationPage() {
                                     </p>
                                 </div>
 
-                                <TagInput
-                                    fieldName="technologies"
-                                    label="Tools, Frameworks & Tech Stack"
-                                    placeholder="e.g. React, Python, Docker, Node.js"
-                                    maxTags={30}
-                                    required
-                                />
+                                <StepTip>
+                                    Tap a suggestion to add it, or type your own and press Enter / Add. Achievements and certifications are optional.
+                                </StepTip>
+
+                                <div aria-invalid={errors.technologies ? 'true' : 'false'}>
+                                    <TagInput
+                                        label="Tools, Frameworks & Tech Stack"
+                                        required
+                                        maxTags={30}
+                                        tags={watch('technologies') || []}
+                                        onChange={(t) => setValue('technologies', t, { shouldValidate: true, shouldDirty: true })}
+                                        suggestions={TECH_SUGGESTIONS}
+                                        placeholder="e.g. React, Python, Docker"
+                                        hint="Tools, languages and frameworks you use."
+                                        error={errors.technologies?.message as string | undefined}
+                                    />
+                                </div>
+
+                                <div aria-invalid={errors.otherSkills ? 'true' : 'false'}>
+                                    <TagInput
+                                        label="Core Competencies & Skills"
+                                        required
+                                        maxTags={20}
+                                        tags={watch('otherSkills') || []}
+                                        onChange={(t) => setValue('otherSkills', t, { shouldValidate: true, shouldDirty: true })}
+                                        suggestions={SKILL_SUGGESTIONS}
+                                        placeholder="e.g. Data Structures, System Design"
+                                        hint="Concepts and soft skills you can teach."
+                                        error={errors.otherSkills?.message as string | undefined}
+                                    />
+                                </div>
 
                                 <TagInput
-                                    fieldName="otherSkills"
-                                    label="Core Competencies & Skills"
-                                    placeholder="e.g. Data Structures, System Design, Git"
-                                    maxTags={20}
-                                    required
-                                />
-
-                                <TagInput
-                                    fieldName="achievements"
                                     label="Key Highlights & Achievements (Optional)"
-                                    placeholder="e.g. Hackathon Winner, Dean's List, Research Publication"
                                     maxTags={15}
+                                    tags={watch('achievements') || []}
+                                    onChange={(t) => setValue('achievements', t, { shouldValidate: true, shouldDirty: true })}
+                                    suggestions={ACHIEVEMENT_SUGGESTIONS}
+                                    placeholder="e.g. Hackathon Winner, Dean's List"
+                                    error={errors.achievements?.message as string | undefined}
                                 />
 
                                 <TagInput
-                                    fieldName="certifications"
                                     label="Certifications & Credentials (Optional)"
-                                    placeholder="e.g. AWS Certified Developer, Google Cloud Associate"
                                     maxTags={15}
+                                    tags={watch('certifications') || []}
+                                    onChange={(t) => setValue('certifications', t, { shouldValidate: true, shouldDirty: true })}
+                                    suggestions={CERT_SUGGESTIONS}
+                                    placeholder="e.g. AWS Certified Developer"
+                                    error={errors.certifications?.message as string | undefined}
                                 />
 
-                                <div id="help-areas-section" className="pt-4 border-t border-[#ece7e2]">
-                                    <div className="flex items-center justify-between mb-1">
+                                <div id="help-areas-section" aria-invalid={errors.helpAreas ? 'true' : 'false'} className="pt-4 border-t border-[#ece7e2]">
+                                    <div className="flex items-center justify-between mb-1 gap-3 flex-wrap">
                                         <label className="text-sm font-bold text-[#4a3728]">
                                             Areas where you can guide juniors <span className="text-red-500">*</span>
                                         </label>
                                         <span className="text-xs font-bold text-[#4a3728]">
-                                            {selectedHelpAreas.length}/{MAX_HELP_AREAS} selected (minimum {MIN_HELP_AREAS} required)
+                                            {selectedHelpAreas.length}/{MAX_HELP_AREAS} selected (min {MIN_HELP_AREAS})
                                         </span>
                                     </div>
                                     <p className="text-xs text-slate-500 mb-4">
@@ -2169,7 +2457,7 @@ export default function SeniorMentorApplicationPage() {
                                             return (
                                                 <label
                                                     key={area}
-                                                    className={`flex items-center gap-3 p-3.5 border rounded-2xl transition ${disabled
+                                                    className={`flex items-center gap-3 p-3.5 min-h-[52px] border rounded-2xl transition ${disabled
                                                         ? 'opacity-40 cursor-not-allowed border-gray-200 bg-gray-50'
                                                         : checked
                                                             ? 'border-[#4a3728] bg-[#f8f6f4] cursor-pointer shadow-sm ring-1 ring-[#4a3728]'
@@ -2178,14 +2466,10 @@ export default function SeniorMentorApplicationPage() {
                                                 >
                                                     <input
                                                         type="checkbox"
-                                                        value={area}
+                                                        checked={checked}
                                                         disabled={disabled}
-                                                        {...register('helpAreas')}
-                                                        onChange={(e) => {
-                                                            register('helpAreas').onChange(e);
-                                                            saveDraft();
-                                                        }}
-                                                        className="w-4 h-4 text-[#4a3728] rounded focus:ring-[#4a3728] disabled:cursor-not-allowed"
+                                                        onChange={() => toggleHelpArea(area)}
+                                                        className="w-5 h-5 flex-shrink-0 text-[#4a3728] rounded focus:ring-[#4a3728] disabled:cursor-not-allowed"
                                                     />
                                                     <span className={`text-sm font-bold ${checked ? 'text-[#4a3728]' : 'text-slate-700'}`}>
                                                         {label}
@@ -2197,7 +2481,7 @@ export default function SeniorMentorApplicationPage() {
                                     {errors.helpAreas && (
                                         <p className="text-red-500 text-xs font-medium mt-2 flex items-center gap-1.5">
                                             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                                            <span>{errors.helpAreas.message}</span>
+                                            <span>{errors.helpAreas.message as string}</span>
                                         </p>
                                     )}
                                 </div>
@@ -2208,7 +2492,7 @@ export default function SeniorMentorApplicationPage() {
                         {currentStep === 4 && (
                             <div className="space-y-6 animate-fade-in">
                                 <div>
-                                    <h2 className="text-2xl font-black text-[#4a3728] tracking-tight">
+                                    <h2 className="text-xl sm:text-2xl font-black text-[#4a3728] tracking-tight">
                                         Additional Information & Motivation
                                     </h2>
                                     <p className="text-xs sm:text-sm text-slate-500 mt-1">
@@ -2216,45 +2500,41 @@ export default function SeniorMentorApplicationPage() {
                                     </p>
                                 </div>
 
+                                <StepTip>Be genuine. Short, honest answers work better than long generic ones.</StepTip>
+
                                 <div>
-                                    <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
                                         <label className="text-sm font-bold text-[#4a3728]">
                                             Why do you want to become a Senior Mentor? <span className="text-red-500">*</span>
                                         </label>
                                         <span className={`text-xs font-semibold ${motivationValue.length < 30 ? 'text-amber-600' : 'text-slate-500'}`}>
-                                            {motivationValue.length} / 1000 characters (minimum 30 required)
+                                            {motivationValue.length} / 1000 (minimum 30)
                                         </span>
                                     </div>
                                     <textarea
                                         {...register('motivation')}
-                                        onChange={(e) => {
-                                            register('motivation').onChange(e);
-                                            saveDraft();
-                                        }}
                                         rows={5}
                                         placeholder="Describe what motivates you to share knowledge and empower other learners..."
+                                        aria-invalid={errors.motivation ? 'true' : 'false'}
                                         className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900 resize-none"
                                     />
                                     {errors.motivation && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.motivation.message}</p>}
                                 </div>
 
                                 <div>
-                                    <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
                                         <label className="text-sm font-bold text-[#4a3728]">
                                             What is one piece of advice you wish someone had told you? <span className="text-red-500">*</span>
                                         </label>
                                         <span className={`text-xs font-semibold ${adviceValue.length < 10 ? 'text-amber-600' : 'text-slate-500'}`}>
-                                            {adviceValue.length} / 500 characters (minimum 10 required)
+                                            {adviceValue.length} / 500 (minimum 10)
                                         </span>
                                     </div>
                                     <textarea
                                         {...register('adviceToJuniorSelf')}
-                                        onChange={(e) => {
-                                            register('adviceToJuniorSelf').onChange(e);
-                                            saveDraft();
-                                        }}
                                         rows={4}
                                         placeholder="Share one valuable insight you learned that would benefit junior students..."
+                                        aria-invalid={errors.adviceToJuniorSelf ? 'true' : 'false'}
                                         className="w-full px-4 py-3 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium text-slate-900 resize-none"
                                     />
                                     {errors.adviceToJuniorSelf && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.adviceToJuniorSelf.message}</p>}
@@ -2266,7 +2546,7 @@ export default function SeniorMentorApplicationPage() {
                         {currentStep === 5 && (
                             <div className="space-y-6 animate-fade-in">
                                 <div>
-                                    <h2 className="text-2xl font-black text-[#4a3728] tracking-tight">
+                                    <h2 className="text-xl sm:text-2xl font-black text-[#4a3728] tracking-tight">
                                         Verification Documents
                                     </h2>
                                     <p className="text-xs sm:text-sm text-slate-500 mt-1">
@@ -2274,12 +2554,15 @@ export default function SeniorMentorApplicationPage() {
                                     </p>
                                 </div>
 
+                                <StepTip>
+                                    Resume: PDF, DOC or DOCX. Proof: college ID card, offer letter or marksheet (PDF, JPG or PNG). Max 5 MB each. Make sure the file is fully downloaded on your phone. Files are not saved in the draft, so upload them again if you reopen this page.
+                                </StepTip>
+
                                 <Controller
                                     control={control}
                                     name="resumeFile"
                                     render={({ field, fieldState }) => (
                                         <DocumentUploadField
-                                            fieldName="resumeFile"
                                             label="Resume / Curriculum Vitae"
                                             accept=".pdf,.doc,.docx"
                                             allowedExtensions={RESUME_ALLOWED_EXTENSIONS}
@@ -2300,7 +2583,6 @@ export default function SeniorMentorApplicationPage() {
                                     name="proofDocumentFile"
                                     render={({ field, fieldState }) => (
                                         <DocumentUploadField
-                                            fieldName="proofDocumentFile"
                                             label="Proof of Experience / Academic Standing"
                                             accept=".pdf,.jpg,.jpeg,.png"
                                             allowedExtensions={PROOF_ALLOWED_EXTENSIONS}
@@ -2316,6 +2598,34 @@ export default function SeniorMentorApplicationPage() {
                                     )}
                                 />
 
+                                {isSeniorStudent && (
+                                    <div className="space-y-3">
+                                        <FreeSessionNotice />
+                                        <label
+                                            className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer ${policyError ? 'border-red-300 bg-red-50/40' : 'border-[#ece7e2] bg-white'}`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={acceptFreePolicy}
+                                                onChange={(e) => {
+                                                    setAcceptFreePolicy(e.target.checked);
+                                                    setPolicyError('');
+                                                }}
+                                                className="mt-0.5 w-5 h-5 flex-shrink-0 text-[#4a3728] rounded focus:ring-[#4a3728]"
+                                            />
+                                            <span className="text-xs font-semibold text-[#4a3728] leading-relaxed">
+                                                I understand that my first {FREE_SESSIONS_REQUIRED} sessions will be free, and that paid services unlock after that.
+                                            </span>
+                                        </label>
+                                        {policyError && (
+                                            <p className="text-red-500 text-xs font-medium flex items-start gap-1.5">
+                                                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                                                <span>{policyError}</span>
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
                                 <div className="bg-[#f8f6f4] rounded-2xl p-5 border border-[#ece7e2] flex items-start gap-4">
                                     <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center flex-shrink-0 text-[#4a3728] font-bold text-sm shadow-sm border border-[#ece7e2]">
                                         <Info className="w-4 h-4 text-[#4a3728]" />
@@ -2327,14 +2637,14 @@ export default function SeniorMentorApplicationPage() {
                             </div>
                         )}
 
-                        {/* Navigation Actions */}
-                        <div className="mt-10 flex items-center justify-between pt-6 border-t border-[#ece7e2]">
+                        {/* Navigation Actions (sticky on phones so the buttons are always reachable) */}
+                        <div className="mt-10 flex items-center justify-between gap-3 pt-4 border-t border-[#ece7e2] sticky bottom-0 -mx-5 sm:mx-0 px-5 sm:px-0 bg-white/95 backdrop-blur pb-[max(0.75rem,env(safe-area-inset-bottom))] z-10">
                             {currentStep > 1 ? (
                                 <button
                                     type="button"
                                     onClick={handlePrev}
                                     disabled={isSubmitting}
-                                    className="px-6 py-3 text-[#4a3728] font-bold hover:bg-[#f8f6f4] rounded-xl transition-colors flex items-center gap-2 text-sm disabled:opacity-40"
+                                    className="px-5 sm:px-6 min-h-[48px] text-[#4a3728] font-bold hover:bg-[#f8f6f4] rounded-xl transition-colors flex items-center gap-2 text-sm disabled:opacity-40"
                                 >
                                     <ArrowLeft className="w-4 h-4" />
                                     Previous
@@ -2347,7 +2657,7 @@ export default function SeniorMentorApplicationPage() {
                                 <button
                                     type="button"
                                     onClick={handleNext}
-                                    className="px-8 py-3.5 bg-[#4a3728] text-white font-bold rounded-xl hover:bg-[#5c4535] transition-all shadow flex items-center gap-2 text-sm"
+                                    className="px-8 min-h-[48px] bg-[#4a3728] text-white font-bold rounded-xl hover:bg-[#5c4535] transition-all shadow flex items-center gap-2 text-sm"
                                 >
                                     Next Step
                                     <ArrowRight className="w-4 h-4" />
@@ -2356,12 +2666,12 @@ export default function SeniorMentorApplicationPage() {
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="px-10 py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all shadow-lg flex items-center gap-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                                    className="px-8 sm:px-10 min-h-[48px] bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold rounded-xl hover:from-emerald-700 hover:to-emerald-800 transition-all shadow-lg flex items-center gap-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
                                     {isSubmitting ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            Submitting Application...
+                                            Submitting...
                                         </>
                                     ) : (
                                         "Submit Application"
