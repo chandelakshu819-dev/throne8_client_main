@@ -2,14 +2,17 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import {
-    X, Save, User, Code2, Globe,
+    X, Save, Code2, Globe,
     ChevronDown, Plus, Check, Loader2,
     Link2, Github, Linkedin, AlertCircle, Briefcase
 } from "lucide-react";
 import { api } from "@/lib/api/auth.service";
 import config from "@/config/env.config";
 import SkillsInput from "../../shared/SkillsInput";
-import ExperienceEditor, { cleanRolesForSave, type ExperienceRole } from "../../shared/ExperienceEditor";
+import ExperienceEditor, {
+    cleanRolesForSave, type ExperienceRole,
+    EMPLOYMENT_TYPES, LOCATION_TYPES, MONTHS, YEARS, CURRENT_YM, DESC_MAX, splitYM, joinYM,
+} from "../../shared/ExperienceEditor";
 import { splitSkills } from "@/shared/utils/mentorFormat";
 import CompanyAutocomplete from "../../shared/CompanyAutocomplete";
 import type { CompanyRef } from "../../../services/company.service";
@@ -47,7 +50,7 @@ interface UpdateProfileModalProps {
     initialTab?: string;
 }
 
-type TabKey = "basic" | "expertise" | "experience" | "social";
+type TabKey = "experience" | "expertise" | "social";
 
 const inputCls =
     "w-full px-3.5 py-2.5 rounded-xl border text-sm font-medium text-[#4a3728] outline-none transition-colors focus:border-[#4a3728] bg-white border-[#e0d8cf] placeholder:text-[#b0a090]";
@@ -80,6 +83,17 @@ export default function UpdateProfileModal({
     const [companyText, setCompanyText] = useState("");
     const [selectedCompany, setSelectedCompany] = useState<CompanyRef | null>(null);
     const [experienceTotal, setExperienceTotal] = useState<number>(1);
+    // Current role (LinkedIn-style) — saved as an isCurrent entry in experience.previousRoles
+    const [curIsCurrent, setCurIsCurrent] = useState(true);
+    const [curEmploymentType, setCurEmploymentType] = useState("");
+    const [curLocation, setCurLocation] = useState("");
+    const [curLocationType, setCurLocationType] = useState("");
+    const [curStartMonth, setCurStartMonth] = useState("");
+    const [curStartYear, setCurStartYear] = useState("");
+    const [curEndMonth, setCurEndMonth] = useState("");
+    const [curEndYear, setCurEndYear] = useState("");
+    const [curDescription, setCurDescription] = useState("");
+    const [curLogo, setCurLogo] = useState<string | undefined>(undefined);
     const [domains, setDomains] = useState<string[]>([]);
     const [skills, setSkills] = useState<string[]>([]);
     const [previousRoles, setPreviousRoles] = useState<ExperienceRole[]>([]);
@@ -118,8 +132,11 @@ export default function UpdateProfileModal({
     const [portfolioUrl, setPortfolioUrl] = useState("");
 
     // ── UI State ─────────────────────────────────────────────
-    const validTabs: TabKey[] = ["basic", "expertise", "experience", "social"];
-    const resolvedInitialTab: TabKey = (initialTab && validTabs.includes(initialTab as TabKey)) ? (initialTab as TabKey) : "basic";
+    const validTabs: TabKey[] = ["experience", "expertise", "social"];
+    // "basic" (old Basic Info tab) now lives inside the Experience tab
+    const resolveTab = (t?: string): TabKey =>
+        t === "basic" ? "experience" : (t && validTabs.includes(t as TabKey)) ? (t as TabKey) : "experience";
+    const resolvedInitialTab: TabKey = resolveTab(initialTab);
     const [activeTab, setActiveTab] = useState<TabKey>(resolvedInitialTab);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -137,26 +154,42 @@ export default function UpdateProfileModal({
         setDomains(mentorData.domains ?? []);
         // old data may hold "HTML,CSS, JS," as ONE string -> split into separate skills
         setSkills(splitSkills(mentorData.skills ?? []));
-        setPreviousRoles(
-            (mentorData.experience?.previousRoles ?? []).map((r: any) => ({
-                title: r.title || r.position || "",
-                company: r.company || "",
-                employmentType: r.employmentType || undefined,
-                location: r.location || undefined,
-                locationType: r.locationType || undefined,
-                startDate: r.startDate || undefined,
-                endDate: r.endDate || undefined,
-                isCurrent: Boolean(r.isCurrent),
-                description: r.description || undefined,
-                companyLogo: r.companyLogo || undefined,
-                duration: r.duration || undefined,
-            }))
-        );
+        const allRoles: ExperienceRole[] = (mentorData.experience?.previousRoles ?? []).map((r: any) => ({
+            title: r.title || r.position || "",
+            company: r.company || "",
+            employmentType: r.employmentType || undefined,
+            location: r.location || undefined,
+            locationType: r.locationType || undefined,
+            startDate: r.startDate || undefined,
+            endDate: r.endDate || undefined,
+            isCurrent: Boolean(r.isCurrent),
+            description: r.description || undefined,
+            companyLogo: r.companyLogo || undefined,
+            duration: r.duration || undefined,
+        }));
+        // The current role is the isCurrent entry that matches experience.currentRole (else the first isCurrent one)
+        const curTitle = (mentorData.experience?.currentRole ?? "").trim().toLowerCase();
+        let curIdx = allRoles.findIndex((r) => r.isCurrent && r.title.trim().toLowerCase() === curTitle);
+        if (curIdx < 0) curIdx = allRoles.findIndex((r) => r.isCurrent);
+        const cur = curIdx >= 0 ? allRoles[curIdx] : undefined;
+        const st = splitYM(cur?.startDate);
+        const en = splitYM(cur?.endDate);
+        setCurIsCurrent(true);
+        setCurEmploymentType(cur?.employmentType ?? "");
+        setCurLocation(cur?.location ?? "");
+        setCurLocationType(cur?.locationType ?? "");
+        setCurStartMonth(st.m);
+        setCurStartYear(st.y);
+        setCurEndMonth(en.m);
+        setCurEndYear(en.y);
+        setCurDescription(cur?.description ?? "");
+        setCurLogo(cur?.companyLogo);
+        setPreviousRoles(allRoles.filter((_, i) => i !== curIdx));
         setExperienceFormOpen(false);
         setLinkedinUrl(mentorData.socialProof?.linkedinUrl ?? "");
         setGithubUrl(mentorData.socialProof?.githubUrl ?? "");
         setPortfolioUrl(mentorData.socialProof?.portfolioUrl ?? "");
-        setActiveTab((initialTab && validTabs.includes(initialTab as TabKey)) ? (initialTab as TabKey) : "basic");
+        setActiveTab(resolveTab(initialTab));
         setError(null);
         setSuccess(false);
         setDomainOpen(false);
@@ -181,7 +214,7 @@ export default function UpdateProfileModal({
 
 
     const goToTab = (direction: 1 | -1) => {
-        const order: TabKey[] = ["basic", "expertise", "experience", "social"];
+        const order: TabKey[] = ["experience", "expertise", "social"];
         const idx = order.indexOf(activeTab);
         const next = order[idx + direction];
         if (next) setActiveTab(next);
@@ -190,9 +223,24 @@ export default function UpdateProfileModal({
     // ── Submit ───────────────────────────────────────────────
     const handleSubmit = async () => {
         setError(null);
-        if (!title.trim()) { setError("Title is required."); setActiveTab("basic"); return; }
-        if (!bio.trim() || bio.length < 50) { setError("Bio must be at least 50 characters."); setActiveTab("basic"); return; }
-        if (!currentRole.trim()) { setError("Current role is required."); setActiveTab("basic"); return; }
+        const companyName = (selectedCompany?.name || companyText).trim();
+        const curStartDate = joinYM(curStartYear, curStartMonth);
+        const curEndDate = joinYM(curEndYear, curEndMonth);
+        const fail = (msg: string, tab: TabKey) => { setError(msg); setActiveTab(tab); };
+
+        if (!title.trim()) return fail("Title is required.", "experience");
+        if (!bio.trim() || bio.length < 50) return fail("Bio must be at least 50 characters.", "experience");
+        if (!currentRole.trim()) return fail("Current role is required.", "experience");
+        if (!companyName) return fail("Company is required for your current role.", "experience");
+        if (!curStartDate) return fail("Select a start month and year for your current role.", "experience");
+        if (curStartDate > CURRENT_YM) return fail("Start date can't be in the future.", "experience");
+        if (!curIsCurrent) {
+            if (!curEndDate) return fail("Select an end month and year, or tick \"I am currently working in this role\".", "experience");
+            if (curEndDate < curStartDate) return fail("End date can't be before the start date.", "experience");
+            if (curEndDate > CURRENT_YM) return fail("End date can't be in the future.", "experience");
+        }
+        if (curLocation.trim().length > 100) return fail("Location can't exceed 100 characters.", "experience");
+        if (curDescription.length > DESC_MAX) return fail(`Highlights can't exceed ${DESC_MAX} characters.`, "experience");
         if (domains.length === 0) { setError("Select at least 1 domain."); setActiveTab("expertise"); return; }
         if (skills.length === 0) { setError("Add at least 1 skill."); setActiveTab("expertise"); return; }
         if (experienceFormOpen) { setError("Finish or cancel the experience you are editing first."); setActiveTab("experience"); return; }
@@ -216,7 +264,22 @@ export default function UpdateProfileModal({
                 experience: {
                     total: experienceTotal,
                     currentRole,
-                    previousRoles: cleanRolesForSave(previousRoles),
+                    // current role first (isCurrent entry), then past roles
+                    previousRoles: cleanRolesForSave([
+                        {
+                            title: currentRole.trim(),
+                            company: companyName,
+                            employmentType: curEmploymentType || undefined,
+                            location: curLocation.trim() || undefined,
+                            locationType: curLocationType || undefined,
+                            startDate: curStartDate,
+                            endDate: curIsCurrent ? undefined : curEndDate,
+                            isCurrent: curIsCurrent,
+                            description: curDescription.trim() || undefined,
+                            companyLogo: curLogo,
+                        },
+                        ...previousRoles,
+                    ]),
                 },
                 // Only sent when the mentor picked a company from the list (backend keeps legacy text in sync)
                 ...(selectedCompany?.id &&
@@ -249,9 +312,8 @@ export default function UpdateProfileModal({
     };
 
     const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
-        { key: "basic", label: "Basic Info", icon: <User className="w-4 h-4" /> },
-        { key: "expertise", label: "Expertise", icon: <Code2 className="w-4 h-4" /> },
         { key: "experience", label: "Experience", icon: <Briefcase className="w-4 h-4" /> },
+        { key: "expertise", label: "Expertise", icon: <Code2 className="w-4 h-4" /> },
         { key: "social", label: "Social Links", icon: <Globe className="w-4 h-4" /> },
     ];
 
@@ -318,70 +380,186 @@ export default function UpdateProfileModal({
                         </div>
                     )}
 
-                    {/* ── TAB: Basic Info ── */}
-                    {activeTab === "basic" && (
-                        <div className="space-y-4">
-                            <Field label="Mentor Title *">
-                                <input
-                                    type="text"
-                                    value={title}
-                                    onChange={(e) => setTitle(e.target.value)}
-                                    placeholder="e.g. Senior Full Stack Developer & Mentor"
-                                    className={inputCls}
-                                />
-                            </Field>
+                    {/* ── TAB: Experience (headline + current role + past roles) ── */}
+                    {activeTab === "experience" && (
+                        <div className="space-y-6">
+                            {/* Headline & about */}
+                            <section className="space-y-4">
+                                <div>
+                                    <h3 className="text-sm font-bold" style={{ color: "#4a3728" }}>Headline &amp; about</h3>
+                                    <p className="text-xs text-[#75665a] mt-0.5">This is the first thing mentees see on your profile.</p>
+                                </div>
+                                <Field label="Mentor Title *">
+                                    <input
+                                        type="text"
+                                        value={title}
+                                        onChange={(e) => setTitle(e.target.value)}
+                                        placeholder="e.g. Senior Full Stack Developer & Mentor"
+                                        className={inputCls}
+                                    />
+                                </Field>
 
-                            <Field label="Current Role *">
-                                <input
-                                    type="text"
-                                    value={currentRole}
-                                    onChange={(e) => setCurrentRole(e.target.value)}
-                                    placeholder="e.g. Backend and Technical Engineer"
-                                    className={inputCls}
-                                />
-                            </Field>
+                                <Field label="Total Years of Experience *">
+                                    <select
+                                        value={experienceTotal}
+                                        onChange={(e) => setExperienceTotal(Number(e.target.value))}
+                                        className={inputCls}
+                                    >
+                                        {EXPERIENCE_OPTIONS.map((opt) => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </select>
+                                </Field>
 
-                            <Field label="Company">
-                                <CompanyAutocomplete
-                                    value={companyText}
-                                    selected={selectedCompany}
-                                    onTextChange={(v) => {
-                                        setSelectedCompany(null);
-                                        setCompanyText(v);
-                                    }}
-                                    onSelect={(c) => {
-                                        setSelectedCompany(c);
-                                        setCompanyText(c.name);
-                                    }}
-                                    placeholder="Search your company, e.g. Google"
-                                    className={inputCls}
-                                />
-                            </Field>
+                                <Field label={`Bio / About You * — ${bio.length} chars (min 50)`}>
+                                    <textarea
+                                        rows={4}
+                                        value={bio}
+                                        onChange={(e) => setBio(e.target.value)}
+                                        placeholder="Tell us about your journey, expertise, and what you love to mentor..."
+                                        className={`${inputCls} resize-none`}
+                                    />
+                                    {bio.length > 0 && bio.length < 50 && (
+                                        <p className="text-xs text-amber-600 mt-1">{50 - bio.length} more characters needed</p>
+                                    )}
+                                </Field>
+                            </section>
 
-                            <Field label="Years of Experience *">
-                                <select
-                                    value={experienceTotal}
-                                    onChange={(e) => setExperienceTotal(Number(e.target.value))}
-                                    className={inputCls}
-                                >
-                                    {EXPERIENCE_OPTIONS.map((opt) => (
-                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                    ))}
-                                </select>
-                            </Field>
+                            {/* Current role */}
+                            <section className="rounded-2xl p-4 space-y-4" style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-bold" style={{ color: "#4a3728" }}>Current role</h3>
+                                        <p className="text-xs text-[#75665a] mt-0.5">Shown at the top of your Experience on the profile.</p>
+                                    </div>
+                                    {curIsCurrent && (
+                                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-white" style={{ backgroundColor: "#4a3728" }}>Present</span>
+                                    )}
+                                </div>
 
-                            <Field label={`Bio / About You * — ${bio.length} chars (min 50)`}>
-                                <textarea
-                                    rows={4}
-                                    value={bio}
-                                    onChange={(e) => setBio(e.target.value)}
-                                    placeholder="Tell us about your journey, expertise, and what you love to mentor..."
-                                    className={`${inputCls} resize-none`}
-                                />
-                                {bio.length > 0 && bio.length < 50 && (
-                                    <p className="text-xs text-amber-600 mt-1">{50 - bio.length} more characters needed</p>
-                                )}
-                            </Field>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <Field label="Current Role / Job title *">
+                                        <input
+                                            type="text"
+                                            value={currentRole}
+                                            onChange={(e) => setCurrentRole(e.target.value)}
+                                            placeholder="e.g. Backend and Technical Engineer"
+                                            maxLength={100}
+                                            className={inputCls}
+                                        />
+                                    </Field>
+                                    <Field label="Employment type">
+                                        <select value={curEmploymentType} onChange={(e) => setCurEmploymentType(e.target.value)} className={inputCls}>
+                                            <option value="">Select type</option>
+                                            {EMPLOYMENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </Field>
+                                </div>
+
+                                <Field label="Company *">
+                                    <CompanyAutocomplete
+                                        value={companyText}
+                                        selected={selectedCompany}
+                                        onTextChange={(v) => {
+                                            setSelectedCompany(null);
+                                            setCompanyText(v);
+                                        }}
+                                        onSelect={(c) => {
+                                            setSelectedCompany(c);
+                                            setCompanyText(c.name);
+                                        }}
+                                        placeholder="Search your company, e.g. Google"
+                                        className={inputCls}
+                                    />
+                                </Field>
+
+                                <label className="flex items-center gap-2 text-[13px] font-medium cursor-pointer select-none" style={{ color: "#4a3728" }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={curIsCurrent}
+                                        onChange={(e) => setCurIsCurrent(e.target.checked)}
+                                        className="w-4 h-4 accent-[#4a3728]"
+                                    />
+                                    I am currently working in this role
+                                </label>
+
+                                <div className={`grid grid-cols-1 ${curIsCurrent ? "" : "sm:grid-cols-2"} gap-4`}>
+                                    <div>
+                                        <span className="block text-xs font-bold mb-1.5" style={{ color: "#4a3728" }}>Start date *</span>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <select aria-label="Start month" value={curStartMonth} onChange={(e) => setCurStartMonth(e.target.value)} className={inputCls}>
+                                                <option value="">Month</option>
+                                                {MONTHS.map((m, i) => <option key={m} value={String(i + 1).padStart(2, "0")}>{m}</option>)}
+                                            </select>
+                                            <select aria-label="Start year" value={curStartYear} onChange={(e) => setCurStartYear(e.target.value)} className={inputCls}>
+                                                <option value="">Year</option>
+                                                {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    {!curIsCurrent && (
+                                        <div>
+                                            <span className="block text-xs font-bold mb-1.5" style={{ color: "#4a3728" }}>End date *</span>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <select aria-label="End month" value={curEndMonth} onChange={(e) => setCurEndMonth(e.target.value)} className={inputCls}>
+                                                    <option value="">Month</option>
+                                                    {MONTHS.map((m, i) => <option key={m} value={String(i + 1).padStart(2, "0")}>{m}</option>)}
+                                                </select>
+                                                <select aria-label="End year" value={curEndYear} onChange={(e) => setCurEndYear(e.target.value)} className={inputCls}>
+                                                    <option value="">Year</option>
+                                                    {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <Field label="Location">
+                                        <input
+                                            type="text"
+                                            value={curLocation}
+                                            onChange={(e) => setCurLocation(e.target.value)}
+                                            placeholder="Bhopal, Madhya Pradesh"
+                                            maxLength={100}
+                                            className={inputCls}
+                                        />
+                                    </Field>
+                                    <Field label="Location type">
+                                        <select value={curLocationType} onChange={(e) => setCurLocationType(e.target.value)} className={inputCls}>
+                                            <option value="">Select type</option>
+                                            {LOCATION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </Field>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="flex justify-between text-xs font-bold" style={{ color: "#4a3728" }}>
+                                        <span>Highlights</span>
+                                        <span className={curDescription.length > DESC_MAX ? "text-red-500 font-medium" : "text-[#75665a] font-medium"}>
+                                            {curDescription.length}/{DESC_MAX}
+                                        </span>
+                                    </label>
+                                    <textarea
+                                        rows={3}
+                                        value={curDescription}
+                                        onChange={(e) => setCurDescription(e.target.value)}
+                                        placeholder="Projects, problems you solved, or results you achieved"
+                                        className={`${inputCls} resize-none`}
+                                    />
+                                </div>
+                            </section>
+
+                            {/* Past experience */}
+                            <ExperienceEditor
+                                roles={previousRoles}
+                                setRoles={setPreviousRoles}
+                                currentRole={currentRole}
+                                currentCompany={selectedCompany?.name || companyText}
+                                hideCurrentRole
+                                onEditingChange={setExperienceFormOpen}
+                                inputCls={inputCls}
+                            />
                         </div>
                     )}
 
@@ -456,19 +634,6 @@ export default function UpdateProfileModal({
                         </div>
                     )}
 
-                    {/* ── TAB: Experience ── */}
-                    {activeTab === "experience" && (
-                        <ExperienceEditor
-                            roles={previousRoles}
-                            setRoles={setPreviousRoles}
-                            currentRole={currentRole}
-                            currentCompany={selectedCompany?.name || companyText}
-                            onEditCurrentRole={() => setActiveTab("basic")}
-                            onEditingChange={setExperienceFormOpen}
-                            inputCls={inputCls}
-                        />
-                    )}
-
                     {/* ── TAB: Social Links ── */}
                     {activeTab === "social" && (
                         <div className="space-y-4">
@@ -529,7 +694,7 @@ export default function UpdateProfileModal({
                     </button>
 
                     <div className="flex items-center gap-2">
-                        {activeTab !== "basic" && (
+                        {activeTab !== "experience" && (
                             <button
                                 onClick={() => goToTab(-1)}
                                 className="px-3.5 py-2 rounded-xl font-semibold text-sm border transition-colors hover:bg-[#f3ece4]"

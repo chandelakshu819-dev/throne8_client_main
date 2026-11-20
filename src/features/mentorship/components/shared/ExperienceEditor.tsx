@@ -7,18 +7,18 @@ import { formatRoleDuration } from "@/shared/utils/mentorFormat";
 export const EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Contract", "Internship", "Freelance"] as const;
 export const LOCATION_TYPES = ["On-site", "Hybrid", "Remote"] as const;
 export const MAX_EXPERIENCES = 10;
-const DESC_MAX = 300;
+export const DESC_MAX = 300;
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const THIS_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: 51 }, (_, i) => String(THIS_YEAR - i));
-const CURRENT_YM = new Date().toISOString().slice(0, 7);
+export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+export const THIS_YEAR = new Date().getFullYear();
+export const YEARS = Array.from({ length: 51 }, (_, i) => String(THIS_YEAR - i));
+export const CURRENT_YM = new Date().toISOString().slice(0, 7);
 
-const splitYM = (ym?: string): { y: string; m: string } => {
+export const splitYM = (ym?: string): { y: string; m: string } => {
     const [y = "", m = ""] = (ym ?? "").split("-");
     return { y, m };
 };
-const joinYM = (y: string, m: string) => (y && m ? `${y}-${m}` : "");
+export const joinYM = (y: string, m: string) => (y && m ? `${y}-${m}` : "");
 
 export interface ExperienceRole {
     title: string;
@@ -58,7 +58,9 @@ interface Props {
     setRoles: React.Dispatch<React.SetStateAction<ExperienceRole[]>>;
     currentRole: string;
     currentCompany?: string;
-    onEditCurrentRole: () => void;
+    onEditCurrentRole?: () => void;
+    /** When the current role is edited elsewhere (Experience tab form), hide the read-only card here. */
+    hideCurrentRole?: boolean;
     /** Lets the parent block "Save Changes" while a role form is still open. */
     onEditingChange?: (editing: boolean) => void;
     inputCls: string;
@@ -104,7 +106,7 @@ function Select({ value, onChange, inputCls, placeholder, children }: {
 }
 
 export default function ExperienceEditor({
-    roles, setRoles, currentRole, currentCompany, onEditCurrentRole, onEditingChange, inputCls,
+    roles, setRoles, currentRole, currentCompany, onEditCurrentRole, hideCurrentRole, onEditingChange, inputCls,
 }: Props) {
     // null = form closed, -1 = adding new, >=0 = editing that index
     const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -288,6 +290,7 @@ export default function ExperienceEditor({
     return (
         <div className="space-y-5">
             {/* Current role (edited in Basic Info) */}
+            {!hideCurrentRole && (
             <div>
                 <p className="text-xs font-bold mb-1.5" style={{ color: "#4a3728" }}>Current role</p>
                 <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}>
@@ -303,12 +306,13 @@ export default function ExperienceEditor({
                     </button>
                 </div>
             </div>
+            )}
 
             {/* Work experience */}
             <div>
                 <div className="flex items-center justify-between mb-2">
                     <p className="text-xs font-bold" style={{ color: "#4a3728" }}>
-                        Work experience <span className="font-normal text-[#8a7a6a]">· {roles.length} of {MAX_EXPERIENCES}</span>
+                        {hideCurrentRole ? "Past experience" : "Work experience"} <span className="font-normal text-[#8a7a6a]">· {roles.length} of {MAX_EXPERIENCES}</span>
                     </p>
                     {editIndex === null && (
                         <button
