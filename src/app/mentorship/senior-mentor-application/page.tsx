@@ -1899,7 +1899,7 @@ export default function SeniorMentorApplicationPage() {
 
     if (isLoadingInit) {
         return (
-            <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center p-6">
+            <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center p-6 pt-[76px] pb-[96px]">
                 <div className="flex flex-col items-center gap-4 text-center">
                     <Loader2 className="w-10 h-10 text-[#4a3728] animate-spin" />
                     <p className="text-sm font-semibold text-[#4a3728]">Loading your application details...</p>
@@ -1910,7 +1910,7 @@ export default function SeniorMentorApplicationPage() {
 
     if (successMsg) {
         return (
-            <div className="min-h-screen bg-[#FAF9F6] p-4 sm:p-6 lg:p-12 flex items-center justify-center">
+            <div className="min-h-screen bg-[#FAF9F6] px-4 sm:px-6 lg:px-12 pt-[84px] pb-[96px] md:pb-12 flex items-center justify-center">
                 <div className="max-w-2xl w-full bg-white p-6 sm:p-10 rounded-[32px] sm:rounded-[40px] shadow-2xl border border-[#ece7e2] text-center animate-fade-in">
                     <div className="w-20 h-20 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-6 shadow-sm">
                         <CheckCircle2 className="w-12 h-12" />
@@ -1947,11 +1947,11 @@ export default function SeniorMentorApplicationPage() {
     const currentStepTitle = steps.find((s) => s.id === currentStep)?.title;
 
     return (
-        <div className="min-h-screen bg-[#FAF9F6] flex items-start justify-center p-3 sm:p-6 lg:p-8">
+        <div className="min-h-screen bg-[#FAF9F6] flex items-start justify-center px-3 sm:px-6 lg:px-8 pt-[76px] pb-[96px] sm:pt-[84px] md:pb-8">
             {toast && (
                 <div
                     role="alert"
-                    className={`fixed top-4 right-4 left-4 sm:left-auto sm:max-w-md z-50 flex items-start gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-semibold transition-all ${toast.type === 'error'
+                    className={`fixed top-20 right-4 left-4 sm:left-auto sm:max-w-md z-50  flex items-start gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-semibold transition-all ${toast.type === 'error'
                         ? 'bg-red-50 text-red-800 border-red-200'
                         : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                         }`}
@@ -2702,7 +2702,7 @@ export default function SeniorMentorApplicationPage() {
                         )}
 
                         {/* Navigation Actions (sticky on phones so the buttons are always reachable) */}
-                        <div className="mt-10 flex items-center justify-between gap-3 pt-4 border-t border-[#ece7e2] sticky bottom-0 -mx-5 sm:mx-0 px-5 sm:px-0 bg-white/95 backdrop-blur pb-[max(0.75rem,env(safe-area-inset-bottom))] z-10">
+                        <div className="mt-10 flex items-center justify-between gap-3 pt-4 border-t border-[#ece7e2] sticky bottom-[68px] md:bottom-0 -mx-5 sm:mx-0 px-5 sm:px-0 bg-white/95 backdrop-blur pb-3 z-10">
                             {currentStep > 1 ? (
                                 <button
                                     type="button"

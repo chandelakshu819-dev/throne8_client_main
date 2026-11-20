@@ -1258,7 +1258,11 @@ class StudyGroupService {
    * ⚠️ WARN MEMBER (leader or moderator)
    * POST /member/:groupId/warn/:userId   body: { reason }
    */
-  static async warnMember(groupId: string, userId: string, reason: string): Promise<void> {
+  static async warnMember(
+    groupId: string,
+    userId: string,
+    reason: string
+  ): Promise<void> {
     try {
       await api.post(
         `${config.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT}/${groupId}/warn/${userId}`,
@@ -2185,8 +2189,13 @@ class StudyGroupService {
     data?: SendJoinRequestData
   ): Promise<JoinRequestResponse> {
     try {
+      // const { data: res } = await api.post(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT}/${groupId}/send`,
+      //   data || {}
+      // );
+
       const { data: res } = await api.post(
-        `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT}/${groupId}/send`,
+        `/study-group/join-requests/${groupId}/send`,
         data || {}
       );
       return res.data;
@@ -2209,9 +2218,10 @@ class StudyGroupService {
   // Cancel own pending request
   static async cancelJoinRequest(groupId: string): Promise<void> {
     try {
-      await api.delete(
-        `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT}/${groupId}/cancel`
-      );
+      // await api.delete(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT}/${groupId}/cancel`
+      // );
+      await api.delete(`/study-group/join-requests/${groupId}/cancel`);
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 404)
@@ -2228,8 +2238,11 @@ class StudyGroupService {
     groupId: string
   ): Promise<JoinRequestStatusResponse> {
     try {
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT}/${groupId}/status`
+      // );
       const { data: res } = await api.get(
-        `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT}/${groupId}/status`
+        `/study-group/join-requests/${groupId}/status`
       );
       return res.data;
     } catch (error: any) {
@@ -2244,8 +2257,12 @@ class StudyGroupService {
   // Get all my requests
   static async getMyJoinRequests(): Promise<MyRequestsResponse[]> {
     try {
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUESTS_MY_REQUESTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUESTS_MY_REQUESTS_ENDPOINT}/my-requests`
+      // );
+
       const { data: res } = await api.get(
-        `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUESTS_MY_REQUESTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUESTS_MY_REQUESTS_ENDPOINT}/my-requests`
+        `/study-group/join-requests/my-requests`
       );
       return res.data;
     } catch (error: any) {
@@ -2265,8 +2282,13 @@ class StudyGroupService {
     limit: number = 20
   ): Promise<PendingRequestsResponse> {
     try {
+      // const { data: res } = await api.get(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT}/${groupId}/pending`,
+      //   { params: { page, limit } }
+      // );
+
       const { data: res } = await api.get(
-        `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT}/${groupId}/pending`,
+        `/study-group/join-requests/${groupId}/pending`,
         { params: { page, limit } }
       );
       return res.data;
@@ -2287,8 +2309,13 @@ class StudyGroupService {
     data: RespondToRequestData
   ): Promise<any> {
     try {
+      // const { data: res } = await api.patch(
+      //   `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT}/${joinRequestId}/respond`,
+      //   data
+      // );
+
       const { data: res } = await api.patch(
-        `${config.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_JOIN_REQUEST_ENDPOINT}/${joinRequestId}/respond`,
+        `/study-group/join-requests/${joinRequestId}/respond`,
         data
       );
       return res.data;
