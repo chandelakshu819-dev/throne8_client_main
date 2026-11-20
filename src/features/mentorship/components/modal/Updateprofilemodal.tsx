@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api/auth.service";
 import config from "@/config/env.config";
+import SkillsInput from "../shared/SkillsInput";
 
 // Constants
 const DOMAINS_OPTIONS = [
@@ -99,7 +100,6 @@ export default function UpdateProfileModal({
     const [experienceTotal, setExperienceTotal] = useState<number>(1);
     const [domains, setDomains] = useState<string[]>([]);
     const [skills, setSkills] = useState<string[]>([]);
-    const [skillInput, setSkillInput] = useState("");
     const [domainOpen, setDomainOpen] = useState(false);
     const [linkedinUrl, setLinkedinUrl] = useState("");
     const [githubUrl, setGithubUrl] = useState("");
@@ -169,13 +169,6 @@ export default function UpdateProfileModal({
         );
     };
 
-    const addSkill = () => {
-        const trimmed = skillInput.trim();
-        if (trimmed && !skills.includes(trimmed) && skills.length < 20) {
-            setSkills((prev) => [...prev, trimmed]);
-            setSkillInput("");
-        }
-    };
 
     const addPreviousRole = () => {
         if (!newRoleTitle.trim() || !newRoleCompany.trim() || !newRoleDuration.trim()) return;
@@ -442,35 +435,7 @@ export default function UpdateProfileModal({
                             </Field>
 
                             <Field label={`Skills * — ${skills.length}/20 (press Enter or + to add)`}>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={skillInput}
-                                        onChange={(e) => setSkillInput(e.target.value)}
-                                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSkill(); } }}
-                                        placeholder="Type a skill and press Enter..."
-                                        className={`${inputCls} flex-1`}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={addSkill}
-                                        className="px-4 py-3 rounded-xl text-white font-bold transition-all hover:opacity-90 flex-shrink-0"
-                                        style={{ backgroundColor: "#4a3728" }}
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                    </button>
-                                </div>
-
-                                {skills.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 mt-3">
-                                        {skills.map((skill) => (
-                                            <span key={skill} className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: "#4a3728" }}>
-                                                {skill}
-                                                <button type="button" onClick={() => setSkills((p) => p.filter((s) => s !== skill))} className="hover:text-red-300 ml-0.5">×</button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
+                                <SkillsInput skills={skills} setSkills={setSkills} domains={domains} max={20} inputCls={inputCls} />
                             </Field>
                         </div>
                     )}
