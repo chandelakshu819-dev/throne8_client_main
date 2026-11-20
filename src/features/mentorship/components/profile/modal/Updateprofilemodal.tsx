@@ -142,6 +142,8 @@ export default function UpdateProfileModal({
                 title: r.title || r.position || "",
                 company: r.company || "",
                 employmentType: r.employmentType || undefined,
+                location: r.location || undefined,
+                locationType: r.locationType || undefined,
                 startDate: r.startDate || undefined,
                 endDate: r.endDate || undefined,
                 isCurrent: Boolean(r.isCurrent),
@@ -282,12 +284,12 @@ export default function UpdateProfileModal({
                     </div>
 
                     {/* Tabs */}
-                    <div className="relative flex gap-1 bg-white/10 p-1 rounded-t-xl">
+                    <div className="relative flex gap-1 bg-white/10 p-1 rounded-t-xl overflow-x-auto">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
-                                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-semibold transition-colors duration-150 ${activeTab === tab.key
+                                className={`flex-1 flex items-center justify-center gap-1.5 whitespace-nowrap py-2 px-2 rounded-lg text-[13px] font-semibold transition-colors duration-150 ${activeTab === tab.key
                                     ? "bg-white text-[#4a3728]"
                                     : "text-white/60 hover:text-white"
                                     }`}

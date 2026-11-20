@@ -435,7 +435,7 @@ export default function ProfilePage({
                         {role.company}
                       </p>
                       <div className="flex items-center gap-3 text-[11px] mt-0.5" style={{ color: "#8a7a6a" }}>
-                        {role.location && <span>{role.location}</span>}
+                        {(role.location || role.locationType) && <span>{[role.location, role.locationType].filter(Boolean).join(" · ")}</span>}
                         {durationLabel && <span>{durationLabel}</span>}
                       </div>
                       {role.description && (
