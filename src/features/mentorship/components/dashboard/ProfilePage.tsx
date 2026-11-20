@@ -22,7 +22,7 @@ import VerificationService from "@/lib/api/verification.service";
 import UpdateProfileModal from "../profile/modal/Updateprofilemodal";
 import CompanyLogo from "../CompanyLogo";
 import SocialLinkTile from "../SocialLinkTile";
-import { formatRoleDuration, sortRolesNewestFirst } from "@/shared/utils/mentorFormat";
+import { formatRoleDuration, sortRolesNewestFirst, splitSkills } from "@/shared/utils/mentorFormat";
 
 interface ProfilePageProps {
   profilePhoto: string | null
@@ -337,9 +337,9 @@ export default function ProfilePage({
             </InfoTile>
 
             <InfoTile label="Skills" full>
-              {liveMentorData?.skills?.length > 0 ? (
+              {splitSkills(liveMentorData?.skills).length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {liveMentorData.skills.map((s: string) => (
+                  {splitSkills(liveMentorData?.skills).map((s: string) => (
                     <span key={s} className="px-2.5 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: "#ece7e2", color: "#4a3728" }}>
                       {s}
                     </span>

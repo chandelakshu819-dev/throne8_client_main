@@ -4,11 +4,13 @@ import React, { useState, useEffect, useRef } from "react";
 import {
     X, Save, User, Code2, Globe,
     ChevronDown, Plus, Check, Loader2,
-    Link2, Github, Linkedin, AlertCircle
+    Link2, Github, Linkedin, AlertCircle, Briefcase
 } from "lucide-react";
 import { api } from "@/lib/api/auth.service";
 import config from "@/config/env.config";
 import SkillsInput from "../../shared/SkillsInput";
+import ExperienceEditor, { cleanRolesForSave, type ExperienceRole } from "../../shared/ExperienceEditor";
+import { splitSkills } from "@/shared/utils/mentorFormat";
 import CompanyAutocomplete from "../../shared/CompanyAutocomplete";
 import type { CompanyRef } from "../../../services/company.service";
 
@@ -45,7 +47,7 @@ interface UpdateProfileModalProps {
     initialTab?: string;
 }
 
-type TabKey = "basic" | "expertise" | "social";
+type TabKey = "basic" | "expertise" | "experience" | "social";
 
 const inputCls =
     "w-full px-3.5 py-2.5 rounded-xl border text-sm font-medium text-[#4a3728] outline-none transition-colors focus:border-[#4a3728] bg-white border-[#e0d8cf] placeholder:text-[#b0a090]";
@@ -80,6 +82,8 @@ export default function UpdateProfileModal({
     const [experienceTotal, setExperienceTotal] = useState<number>(1);
     const [domains, setDomains] = useState<string[]>([]);
     const [skills, setSkills] = useState<string[]>([]);
+    const [previousRoles, setPreviousRoles] = useState<ExperienceRole[]>([]);
+    const [experienceFormOpen, setExperienceFormOpen] = useState(false);
 
     const [domainOpen, setDomainOpen] = useState(false);
     const domainDropdownRef = useRef<HTMLDivElement>(null);
@@ -114,8 +118,7 @@ export default function UpdateProfileModal({
     const [portfolioUrl, setPortfolioUrl] = useState("");
 
     // ── UI State ─────────────────────────────────────────────
-    const validTabs: TabKey[] = ["basic", "expertise", "social"];
-    // In Stage 2, initialTab="experience" is accepted; since Stage 3 will add the full Experience tab & form, it safely falls back to "basic"
+    const validTabs: TabKey[] = ["basic", "expertise", "experience", "social"];
     const resolvedInitialTab: TabKey = (initialTab && validTabs.includes(initialTab as TabKey)) ? (initialTab as TabKey) : "basic";
     const [activeTab, setActiveTab] = useState<TabKey>(resolvedInitialTab);
     const [saving, setSaving] = useState(false);
@@ -132,7 +135,22 @@ export default function UpdateProfileModal({
         setSelectedCompany(mentorData.companyRef?.id ? mentorData.companyRef : null);
         setExperienceTotal(mentorData.experience?.total ?? 1);
         setDomains(mentorData.domains ?? []);
-        setSkills(mentorData.skills ?? []);
+        // old data may hold "HTML,CSS, JS," as ONE string -> split into separate skills
+        setSkills(splitSkills(mentorData.skills ?? []));
+        setPreviousRoles(
+            (mentorData.experience?.previousRoles ?? []).map((r: any) => ({
+                title: r.title || r.position || "",
+                company: r.company || "",
+                employmentType: r.employmentType || undefined,
+                startDate: r.startDate || undefined,
+                endDate: r.endDate || undefined,
+                isCurrent: Boolean(r.isCurrent),
+                description: r.description || undefined,
+                companyLogo: r.companyLogo || undefined,
+                duration: r.duration || undefined,
+            }))
+        );
+        setExperienceFormOpen(false);
         setLinkedinUrl(mentorData.socialProof?.linkedinUrl ?? "");
         setGithubUrl(mentorData.socialProof?.githubUrl ?? "");
         setPortfolioUrl(mentorData.socialProof?.portfolioUrl ?? "");
@@ -161,7 +179,7 @@ export default function UpdateProfileModal({
 
 
     const goToTab = (direction: 1 | -1) => {
-        const order: TabKey[] = ["basic", "expertise", "social"];
+        const order: TabKey[] = ["basic", "expertise", "experience", "social"];
         const idx = order.indexOf(activeTab);
         const next = order[idx + direction];
         if (next) setActiveTab(next);
@@ -175,6 +193,7 @@ export default function UpdateProfileModal({
         if (!currentRole.trim()) { setError("Current role is required."); setActiveTab("basic"); return; }
         if (domains.length === 0) { setError("Select at least 1 domain."); setActiveTab("expertise"); return; }
         if (skills.length === 0) { setError("Add at least 1 skill."); setActiveTab("expertise"); return; }
+        if (experienceFormOpen) { setError("Finish or cancel the experience you are editing first."); setActiveTab("experience"); return; }
         if (!linkedinUrl.trim()) { setError("LinkedIn URL is required."); setActiveTab("social"); return; }
         if (!linkedinUrl.includes("linkedin.com")) { setError("Please enter a valid LinkedIn URL."); setActiveTab("social"); return; }
         if (!/^https?:\/\/([a-z]{2,3}\.)?linkedin\.com\/(in|pub)\/[^\s/?#]+\/?([?#]\S*)?$/i.test(linkedinUrl.trim())) { setError("Please enter your LinkedIn profile URL (e.g. https://www.linkedin.com/in/username), not the LinkedIn feed or home page."); setActiveTab("social"); return; }
@@ -191,10 +210,11 @@ export default function UpdateProfileModal({
                 title,
                 bio,
                 domains,
-                skills,
+                skills: splitSkills(skills),
                 experience: {
                     total: experienceTotal,
                     currentRole,
+                    previousRoles: cleanRolesForSave(previousRoles),
                 },
                 // Only sent when the mentor picked a company from the list (backend keeps legacy text in sync)
                 ...(selectedCompany?.id &&
@@ -229,6 +249,7 @@ export default function UpdateProfileModal({
     const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
         { key: "basic", label: "Basic Info", icon: <User className="w-4 h-4" /> },
         { key: "expertise", label: "Expertise", icon: <Code2 className="w-4 h-4" /> },
+        { key: "experience", label: "Experience", icon: <Briefcase className="w-4 h-4" /> },
         { key: "social", label: "Social Links", icon: <Globe className="w-4 h-4" /> },
     ];
 
@@ -238,7 +259,7 @@ export default function UpdateProfileModal({
             onClick={onClose}
         >
             <div
-                className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl overflow-hidden shadow-xl"
+                className="relative w-full max-w-xl max-h-[85vh] flex flex-col rounded-2xl overflow-hidden shadow-xl"
                 style={{ backgroundColor: "#fdf9f6" }}
                 onClick={(e) => e.stopPropagation()}
             >
@@ -431,6 +452,19 @@ export default function UpdateProfileModal({
                                 <SkillsInput skills={skills} setSkills={setSkills} domains={domains} max={20} inputCls={inputCls} />
                             </Field>
                         </div>
+                    )}
+
+                    {/* ── TAB: Experience ── */}
+                    {activeTab === "experience" && (
+                        <ExperienceEditor
+                            roles={previousRoles}
+                            setRoles={setPreviousRoles}
+                            currentRole={currentRole}
+                            currentCompany={selectedCompany?.name || companyText}
+                            onEditCurrentRole={() => setActiveTab("basic")}
+                            onEditingChange={setExperienceFormOpen}
+                            inputCls={inputCls}
+                        />
                     )}
 
                     {/* ── TAB: Social Links ── */}

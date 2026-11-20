@@ -11,6 +11,7 @@ import {
 import { api } from "@/lib/api/auth.service";
 import config from "@/config/env.config";
 import SkillsInput from "../shared/SkillsInput";
+import { splitSkills } from "@/shared/utils/mentorFormat";
 
 // Constants
 const DOMAINS_OPTIONS = [
@@ -130,7 +131,7 @@ export default function UpdateProfileModal({
         setCurrentRole(mentorData.experience?.currentRole ?? "");
         setExperienceTotal(mentorData.experience?.total ?? 1);
         setDomains(mentorData.domains ?? []);
-        setSkills(mentorData.skills ?? []);
+        setSkills(splitSkills(mentorData.skills ?? []));
         setLinkedinUrl(mentorData.socialProof?.linkedinUrl ?? "");
         setGithubUrl(mentorData.socialProof?.githubUrl ?? "");
         setPortfolioUrl(mentorData.socialProof?.portfolioUrl ?? "");
@@ -221,7 +222,7 @@ export default function UpdateProfileModal({
                 title,
                 bio,
                 domains,
-                skills,
+                skills: splitSkills(skills),
                 languages,
                 experience: {
                     total: experienceTotal,
