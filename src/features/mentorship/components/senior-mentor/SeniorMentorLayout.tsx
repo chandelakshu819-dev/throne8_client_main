@@ -8,6 +8,7 @@ import NotificationService from "@/lib/api/notification.service";
 import { useSocket } from "@/core/realtime/useSocket";
 import SeniorMentorSidebar from "./SeniorMentorSidebar";
 import { useRouter } from "next/navigation";
+import BrandWordmark from "@/shared/uiComponents/BrandWordmark";
 
 // Sirf active tab ka code download hoga
 const PageLoader = () => (
@@ -46,6 +47,8 @@ export default function SeniorMentorLayout({
   const [mentorProfile, setMentorProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
+  // Mobile par sidebar drawer ki tarah khulti hai
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // ── Notification states (mentorship-scoped) ─────────────────
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -189,14 +192,40 @@ export default function SeniorMentorLayout({
 
   return (
     <div className="flex flex-col h-screen bg-[#f6ede8] font-sans">
-      <div className="h-20 shrink-0" aria-hidden="true" />
+      <div className="h-16 md:h-20 shrink-0" aria-hidden="true" />
 
-      <div className="flex flex-1 min-h-0">
-        <SeniorMentorSidebar
-          application={application}
-          activeTab={activeTab}
-          unreadNotificationCount={unreadNotificationCount}
-        />
+      {/* Mobile header: hamburger + wordmark */}
+      <div className="md:hidden flex items-center justify-between px-4 h-14 shrink-0 bg-[#fbf7f3] border-b border-[#e0d8cf]">
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="p-2 -ml-2 text-[#4a3728] hover:bg-[#f3ece4] rounded-lg transition-colors"
+          aria-label="Open menu"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+        </button>
+        <BrandWordmark size="sm" />
+        <div className="w-8" aria-hidden="true" />
+      </div>
+
+      <div className="flex flex-1 min-h-0 relative">
+        {isMobileMenuOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+        <div
+          className={`absolute md:relative z-50 h-full transform transition-transform duration-300 ease-in-out ${
+            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+          } md:transform-none`}
+        >
+          <SeniorMentorSidebar
+            application={application}
+            activeTab={activeTab}
+            unreadNotificationCount={unreadNotificationCount}
+          />
+        </div>
 
         <main className="flex-1 overflow-y-auto">
           <div className="px-4 md:px-6 py-8 max-w-[1600px] mx-auto">
