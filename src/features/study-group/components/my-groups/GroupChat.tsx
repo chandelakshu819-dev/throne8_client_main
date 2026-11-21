@@ -2141,9 +2141,12 @@ const GroupChat = ({
 
                   {/* File Attachment */}
                   <div className="mb-4">
-                    <label className="text-sm font-semibold text-gray-700 mb-3 block">
-                      Attach Images (optional, up to 5)
+                    <label className="text-sm font-semibold text-gray-700 mb-1 block">
+                      Attach Images (optional)
                     </label>
+                    <p className="text-xs text-gray-500 mb-3">
+                      JPG, PNG, WEBP or GIF · up to 5 images · max 10MB each
+                    </p>
                     <input
                       type="file"
                       multiple
@@ -2151,6 +2154,15 @@ const GroupChat = ({
                       onChange={(e) => {
                         const picked = Array.from(e.target.files || []);
                         e.target.value = ""; // allow picking the same file again
+                        const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+                        const badType = picked.find((f) => !allowed.includes(f.type));
+                        if (badType) {
+                          alert(
+                            `"${badType.name}" can't be attached (${badType.type || "unknown type"}). ` +
+                              "Only JPG, PNG, WEBP or GIF images are supported."
+                          );
+                          return;
+                        }
                         const tooBig = picked.find((f) => f.size > 10 * 1024 * 1024);
                         if (tooBig) {
                           alert(`"${tooBig.name}" is larger than 10MB`);
