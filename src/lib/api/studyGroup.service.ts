@@ -1278,6 +1278,28 @@ class StudyGroupService {
   }
 
   /**
+   * 🔔 REMIND MEMBER (leader or moderator) - soft nudge, no strike
+   * POST /member/:groupId/remind/:userId   (one per member per 24h)
+   */
+  static async remindMember(
+    groupId: string,
+    userId: string
+  ): Promise<{ liveNow: boolean }> {
+    try {
+      const { data: res } = await api.post(
+        `${config.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_MEMBER_ENDPOINT}/${groupId}/remind/${userId}`
+      );
+      return { liveNow: Boolean(res?.data?.liveNow) };
+    } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const msg = error.response?.data?.message;
+        if (msg) throw new Error(msg);
+      }
+      throw new Error("Failed to send reminder.");
+    }
+  }
+
+  /**
    * 🔢 GET MEMBER COUNT
    * GET /:groupId/member-count
    */

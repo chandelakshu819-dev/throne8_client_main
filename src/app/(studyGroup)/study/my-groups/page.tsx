@@ -144,6 +144,40 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
     }
   };
 
+  // Remind: soft nudge (no strike). The server allows one per member per 24h.
+  const [remindedIds, setRemindedIds] = useState<Set<string>>(new Set());
+  const [remindingId, setRemindingId] = useState<string | null>(null);
+
+  const handleRemindMember = async (targetUserId: string, memberName: string): Promise<void> => {
+    setRemindingId(targetUserId);
+    try {
+      const { liveNow } = await StudyGroupService.remindMember((group as any).groupId, targetUserId);
+      setRemindedIds((prev) => new Set(prev).add(targetUserId));
+      alert(liveNow ? `${memberName} was told the live class is on.` : `Reminder sent to ${memberName}.`);
+    } catch (err: any) {
+      // "already reminded" also lands here; keep the button disabled in that case
+      if (/already reminded/i.test(err?.message || '')) {
+        setRemindedIds((prev) => new Set(prev).add(targetUserId));
+      }
+      alert(err?.message || 'Failed to send reminder');
+    } finally {
+      setRemindingId(null);
+    }
+  };
+
+  const remindButton = (targetUserId: string, name: string) => {
+    const done = remindedIds.has(targetUserId);
+    return (
+      <button
+        onClick={() => handleRemindMember(targetUserId, name)}
+        disabled={done || remindingId === targetUserId}
+        className="px-2 py-1 border border-[#8b7355] text-[#4a3728] hover:bg-[#e0d8cf] disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs font-semibold flex-shrink-0"
+      >
+        {done ? 'Reminded' : remindingId === targetUserId ? 'Sending…' : 'Remind'}
+      </button>
+    );
+  };
+
   const handleWarnMember = async (targetUserId: string, memberName: string): Promise<void> => {
     const reason = window.prompt(`Reason for warning ${memberName}?`);
     if (!reason || !reason.trim()) return;
@@ -298,6 +332,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
                                     {member.warningCount > 0 && `${member.warningCount} warning(s)`}
                                   </div>
                                 </div>
+                                {remindButton(member.userId, info.name)}
                                 <button onClick={() => handleWarnMember(member.userId, info.name)} className="px-2 py-1 bg-[#8b7355] hover:bg-[#6b5847] text-white rounded text-xs font-semibold flex-shrink-0">Warn</button>
                               </div>
                             );
@@ -353,13 +388,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
                             </div>
 
                             {isGroupLeader(group, userId) && member.userId !== userId && (
-
+                              <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                                {member.role !== 'leader' && remindButton(member.userId, userInfo.name)}
                               <button
                                 onClick={() => handleRemoveMember(member.userId)}
-                                className="px-2 py-1 bg-[#6b5847] hover:bg-[#4a3728] text-white rounded text-xs font-semibold flex items-center gap-1 flex-shrink-0 ml-2"
+                                className="px-2 py-1 bg-[#6b5847] hover:bg-[#4a3728] text-white rounded text-xs font-semibold flex items-center gap-1 flex-shrink-0"
                               >
                                 <X size={10} /> Remove
                               </button>
+                              </div>
                             )}
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 pt-2 border-t border-[#e0d8cf]">

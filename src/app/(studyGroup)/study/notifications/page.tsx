@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, CheckCheck, Loader2, Trash2, UserPlus, UserCheck, UserX, Video } from "lucide-react";
+import { Bell, CheckCheck, Loader2, Trash2, UserPlus, UserCheck, UserX, Video, BellRing } from "lucide-react";
 
 import StudyGroupNotificationService, {
   StudyNotification,
@@ -19,6 +19,8 @@ const iconFor = (type: string) => {
       return <UserX size={18} className="text-red-500" />;
     case "live_room_started":
       return <Video size={18} className="text-red-500" />;
+    case "member_reminder":
+      return <BellRing size={18} className="text-[#8b7355]" />;
     default:
       return <Bell size={18} className="text-[#8b7355]" />;
   }
@@ -178,7 +180,7 @@ export default function StudyNotificationsPage() {
                 <p className={`text-sm text-[#4a3728] ${n.isRead ? "font-medium" : "font-bold"}`}>{n.title}</p>
                 <p className="text-sm text-[#6b5847] break-words">{n.message}</p>
                 <p className="text-xs text-[#a89080] mt-1">{timeAgo(n.createdAt)}</p>
-                {n.type === "live_room_started" && n.data?.roomId && (
+                {(n.type === "live_room_started" || n.type === "member_reminder") && n.data?.roomId && (
                   liveRooms[String(n.data.roomId)] ? (
                     <button
                       onClick={(e) => handleJoinLive(e, n, liveRooms[String(n.data!.roomId)])}

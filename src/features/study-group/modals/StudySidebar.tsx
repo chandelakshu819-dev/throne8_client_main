@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import StudyGroupNotificationService from "@/lib/api/studyGroupNotification.service";
+import { getSocket } from "@/core/realtime/socket.client";
 
 type SidebarItem = {
   name: string;
@@ -61,6 +62,27 @@ const StudySidebar = () => {
     const timer = setInterval(load, 60_000);
     return () => { cancelled = true; clearInterval(timer); };
   }, [pathname]);
+
+  // ✅ Instant badge update when the server pushes a new notification (e.g. a host reminder).
+  // The socket may not exist yet at first render, so retry attaching until it does.
+  useEffect(() => {
+    let attached: ReturnType<typeof getSocket> = null;
+    const refresh = () =>
+      StudyGroupNotificationService.getUnreadCount().then(setUnreadCount).catch(() => {});
+    const attach = () => {
+      const socket = getSocket();
+      if (!socket || socket === attached) return;
+      attached?.off("notification:new", refresh);
+      attached = socket;
+      socket.on("notification:new", refresh);
+    };
+    attach();
+    const t = setInterval(attach, 3000);
+    return () => {
+      clearInterval(t);
+      attached?.off("notification:new", refresh);
+    };
+  }, []);
 
   // ✅ Close mobile sidebar when route changes
   useEffect(() => {
