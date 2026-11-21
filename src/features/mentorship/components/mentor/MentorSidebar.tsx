@@ -10,6 +10,7 @@ import { C } from "../../types/data";
 import MentorService from "@/lib/api/mentorship.service";
 import SocialLinkTile from "../SocialLinkTile";
 import CompanyLogo from "../CompanyLogo";
+import TrustScoreBadge from "./TrustScoreBadge";
 import { formatRoleDuration, sortRolesNewestFirst } from "@/shared/utils/mentorFormat";
 
 interface MentorSidebarProps {
@@ -157,6 +158,13 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
     const branch: string = mentorData?.branch || "";
     const hasEducation = !!(college || degree || branch);
     const educationLine = [degree, branch].filter(Boolean).join(" · ");
+
+    // mentorData.company backend se kabhi string aata hai, kabhi Company object.
+    // Dono case me sahi naam nikalne ke liye helper.
+    const companyName: string =
+        typeof mentorData?.company === "string"
+            ? mentorData.company
+            : mentorData?.company?.companyName || mentorData?.company?.name || mentorData?.companyRef?.name || "";
 
     const aboutClampStyle: React.CSSProperties = aboutExpanded
         ? {}
@@ -328,6 +336,9 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                         </div>
                     )}
 
+                    {/* Public Trust Score: owner + visitor + logged-out sabko dikhta hai */}
+                    {mentorData?.userId && <TrustScoreBadge userId={mentorData.userId} />}
+
                     {isOwner && (
                         <div style={{ marginBottom: "16px" }}>
                             <button
@@ -428,19 +439,19 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                     <CompanyLogo
                                         src={mentorData?.companyLogo || sortedRoles.find((r: any) => r.isCurrent)?.companyLogo}
-                                        companyName={mentorData?.company || currentRole}
+                                        companyName={companyName || currentRole}
                                         size={28}
                                     />
                                     <div style={{ minWidth: 0, flex: 1 }}>
                                         <div
-                                            title={`${currentRole}${mentorData?.company ? ` at ${mentorData.company}` : ""}`}
+                                            title={`${currentRole}${companyName ? ` at ${companyName}` : ""}`}
                                             style={{ fontWeight: "bold", color: C.dark, fontSize: "13px", marginBottom: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                                         >
                                             {currentRole}
                                         </div>
-                                        {mentorData?.company && (
+                                        {companyName && (
                                             <div style={{ color: C.mid, fontSize: "12px", fontWeight: 600, marginBottom: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                {mentorData.company}
+                                                {companyName}
                                             </div>
                                         )}
                                         <div style={{ fontSize: "11px", color: C.mid }}>Present</div>
