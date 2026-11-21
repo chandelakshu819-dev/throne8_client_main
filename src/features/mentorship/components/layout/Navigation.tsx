@@ -2,7 +2,6 @@
 //src/features/mentorship/components/layout/Navigation.tsx
 
 import React, { useEffect, useState } from "react";
-import { LogOut } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfileData } from "@/features/profile/hooks/useProfileData";
@@ -222,7 +221,7 @@ export default function Navigation({
               })}
             </div>
 
-            {/* Right: Profile Dropdown + Sign Out */}
+            {/* Right: Profile Dropdown (Sign Out isi ke andar hai) */}
             <div className="ml-auto flex min-w-0 flex-shrink-0 items-center gap-2">
               <div className="min-w-0">
                 <ProfileDropdown
@@ -232,24 +231,10 @@ export default function Navigation({
                     navbarProfileData?.profileImage || profileImageUrl
                   }
                   fullName={fullName || undefined}
+                  onSignOut={handleSignOut}
+                  isLoggingOut={isLoggingOut}
                 />
               </div>
-
-              {/* Sign Out: sirf logged-in user ko dikhao */}
-              {user && (
-                <button
-                  onClick={handleSignOut}
-                  disabled={isLoggingOut}
-                  title="Sign Out"
-                  aria-label="Sign Out"
-                  className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#E5D9CE] bg-white px-2.5 py-2 text-xs font-semibold text-[#B4442E] transition-colors hover:bg-[#FBEAE6] disabled:cursor-not-allowed disabled:opacity-50 sm:px-3"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span className="hidden sm:inline">
-                    {isLoggingOut ? "Signing out..." : "Sign Out"}
-                  </span>
-                </button>
-              )}
             </div>
           </div>
         </div>
