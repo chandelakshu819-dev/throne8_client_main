@@ -263,11 +263,11 @@ export const fetchGroupDoubtsThunk = createAsyncThunk(
 export const postDoubtThunk = createAsyncThunk(
   "chat/postDoubt",
   async (
-    { groupId, data }: { groupId: string; data: any },
+    { groupId, data, images }: { groupId: string; data: any; images?: File[] },
     { rejectWithValue }
   ) => {
     try {
-      const doubt = await StudyGroupService.postDoubt(groupId, data);
+      const doubt = await StudyGroupService.postDoubt(groupId, data, images);
       return { groupId, doubt };
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to post doubt");
