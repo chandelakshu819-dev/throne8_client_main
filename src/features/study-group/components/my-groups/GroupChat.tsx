@@ -903,6 +903,7 @@ const GroupChat = ({
             difficulty: doubtInput.difficulty,
             taggedMembers,
           },
+          images: doubtFiles,
         })
       ).unwrap();
       setDoubtInput({
@@ -2141,14 +2142,29 @@ const GroupChat = ({
                   {/* File Attachment */}
                   <div className="mb-4">
                     <label className="text-sm font-semibold text-gray-700 mb-3 block">
-                      Attach Files (optional)
+                      Attach Images (optional, up to 5)
                     </label>
                     <input
                       type="file"
                       multiple
-                      onChange={(e) =>
-                        setDoubtFiles(Array.from(e.target.files || []))
-                      }
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      onChange={(e) => {
+                        const picked = Array.from(e.target.files || []);
+                        e.target.value = ""; // allow picking the same file again
+                        const tooBig = picked.find((f) => f.size > 10 * 1024 * 1024);
+                        if (tooBig) {
+                          alert(`"${tooBig.name}" is larger than 10MB`);
+                          return;
+                        }
+                        setDoubtFiles((prev) => {
+                          const next = [...prev, ...picked];
+                          if (next.length > 5) {
+                            alert("You can attach up to 5 images");
+                            return next.slice(0, 5);
+                          }
+                          return next;
+                        });
+                      }}
                       className="w-full px-4 py-3 border-2 border-dashed border-white/60 rounded-xl backdrop-blur-sm bg-white/40 text-sm text-gray-600 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#8b7355]/10 file:text-[#8b7355] hover:file:bg-[#8b7355]/20 transition-all cursor-pointer"
                     />
                     {doubtFiles.length > 0 && (
@@ -2252,6 +2268,7 @@ const GroupChat = ({
                           difficulty: "Medium",
                         });
                         setTaggedMembers([]);
+                        setDoubtFiles([]);
                         setShowMemberTag(false);
                       }}
                       className="px-6 py-3 border-2 border-white/60 rounded-xl hover:bg-white/50 transition-all font-semibold backdrop-blur-sm"
@@ -2401,6 +2418,24 @@ const GroupChat = ({
                         {doubt.description}
                       </p>
 
+                      {Array.isArray(doubt.images) && doubt.images.length > 0 && (
+                        <div className="flex items-center gap-2 mb-4">
+                          {doubt.images.slice(0, 3).map((img: any, i: number) => (
+                            <img
+                              key={img.publicId || img.url || i}
+                              src={img.url}
+                              alt="Attachment"
+                              loading="lazy"
+                              className="w-16 h-16 rounded-lg object-cover border border-[#8b7355]/20"
+                            />
+                          ))}
+                          <span className="flex items-center gap-1 text-xs font-medium text-[#8b7355]">
+                            <ImageIcon size={14} />
+                            {doubt.images.length} image{doubt.images.length > 1 ? "s" : ""}
+                          </span>
+                        </div>
+                      )}
+
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div className="flex gap-2 flex-wrap">
                           <span className="px-3 py-1.5 bg-[#f6ede8] text-[#8b7355] rounded-full text-xs font-semibold border border-[#8b7355]/20">
@@ -2535,6 +2570,25 @@ const GroupChat = ({
                 <p className="text-gray-800 whitespace-pre-wrap break-words leading-relaxed">
                   {liveSelectedDoubt.description}
                 </p>
+                {Array.isArray(liveSelectedDoubt.images) &&
+                  liveSelectedDoubt.images.length > 0 && (
+                    <div className="flex flex-wrap gap-3 mt-4">
+                      {liveSelectedDoubt.images.map((img: any, i: number) => (
+                        <a
+                          key={img.publicId || img.url || i}
+                          href={img.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <img
+                            src={img.url}
+                            alt="Attachment"
+                            className="max-h-64 max-w-full rounded-xl border border-[#8b7355]/20 object-contain bg-white/60"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 <div className="flex flex-wrap items-center gap-4 mt-5">
                   <button
                     onClick={() => handleUpvoteDoubt(liveSelectedDoubt.id)}

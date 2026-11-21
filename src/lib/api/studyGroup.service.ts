@@ -2793,13 +2793,34 @@ class StudyGroupService {
       isUrgent?: boolean;
       difficulty?: string;
       taggedMembers?: string[];
-    }
+    },
+    images?: File[]
   ): Promise<any> {
     try {
-      const { data: res } = await api.post(
-        `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${groupId}/post`,
-        data
-      );
+      const url = `${config.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT || process.env.NEXT_PUBLIC_STUDY_GROUP_DOUBTS_ENDPOINT}/${groupId}/post`;
+
+      // No images: plain JSON, exactly as before.
+      if (!images || images.length === 0) {
+        const { data: res } = await api.post(url, data);
+        return res.data;
+      }
+
+      // With images: multipart. The server reads them from the "images" field (max 5).
+      // Arrays are sent as JSON strings; the server parses them.
+      const form = new FormData();
+      form.append("title", data.title);
+      if (data.description) form.append("description", data.description);
+      if (data.category) form.append("category", data.category);
+      if (data.subject) form.append("subject", data.subject);
+      if (data.difficulty) form.append("difficulty", data.difficulty);
+      form.append("isUrgent", String(Boolean(data.isUrgent)));
+      form.append("tags", JSON.stringify(data.tags ?? []));
+      form.append("taggedMembers", JSON.stringify(data.taggedMembers ?? []));
+      images.forEach((file) => form.append("images", file));
+
+      const { data: res } = await api.post(url, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
