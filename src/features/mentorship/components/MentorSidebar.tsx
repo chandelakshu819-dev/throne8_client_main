@@ -7,7 +7,7 @@ import ProfileService from "@/lib/api/profile.service";
 import MentorService from "@/lib/api/mentorship.service";
 import SocialLinkTile from "./SocialLinkTile";
 import CompanyLogo from "./CompanyLogo";
-import { formatRoleDuration, sortRolesNewestFirst } from "@/shared/utils/mentorFormat";
+import { formatRoleDuration, sortRolesNewestFirst, splitCurrentAndPastRoles } from "@/shared/utils/mentorFormat";
 
 interface MentorSidebarProps {
     mentorData: any;
@@ -102,7 +102,8 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
     const responseTime = mentorData?.stats?.responseTime != null ? `< ${mentorData.stats.responseTime} hrs` : "N/A";
     const trustScoreVal = mentorData?.trustScore?.overall ?? "N/A";
     const currentRole = mentorData?.experience?.currentRole || "Not specified";
-    const previousRoles = mentorData?.experience?.previousRoles || [];
+    // Current role ek hi baar dikhao (currentRole + previousRoles[isCurrent] duplicate fix)
+    const { current: currentEntry, past: previousRoles } = splitCurrentAndPastRoles<any>(mentorData?.experience);
     const sortedRoles = sortRolesNewestFirst(previousRoles);
     const linkedinUrl = mentorData?.socialProof?.linkedinUrl || "#";
     const twitterUrl = mentorData?.socialProof?.twitterUrl || "";
@@ -491,8 +492,8 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                             <div style={{ borderRadius: "16px", padding: "18px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "12px", boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                                     <CompanyLogo
-                                        src={mentorData?.companyLogo || sortedRoles.find((r: any) => r.isCurrent)?.companyLogo}
-                                        companyName={company || currentRole}
+                                        src={mentorData?.companyLogo || currentEntry?.companyLogo}
+                                        companyName={currentEntry?.company || company || currentRole}
                                         size={32}
                                     />
                                     <div style={{ minWidth: 0, flex: 1 }}>
@@ -507,7 +508,13 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                                                 {company}
                                             </div>
                                         )}
-                                        <div style={{ fontSize: "12px", color: C.mid, fontWeight: "500" }}>Present</div>
+                                        {currentEntry?.employmentType && (
+                                            <span style={{ display: "inline-block", fontSize: "11px", padding: "2px 8px", borderRadius: "4px", background: C.border, color: C.dark, fontWeight: 600, marginBottom: "4px" }}>
+                                                {currentEntry.employmentType}
+                                            </span>
+                                        )}
+                                        {currentEntry?.location && <div style={{ fontSize: "12px", color: C.mid }}>{currentEntry.location}</div>}
+                                        <div style={{ fontSize: "12px", color: C.mid, fontWeight: "500" }}>{formatRoleDuration(currentEntry) || "Present"}</div>
                                     </div>
                                 </div>
                             </div>
