@@ -25,10 +25,28 @@ export interface TrustScoreData {
   totalReviews?: number;
 }
 
+export interface PublicTrustScore {
+  isMentor: boolean;
+  mentorId?: string;
+  isVerified?: boolean;
+  trustScore: {
+    overall: number;
+    tier: { name: string; color: string; bg: string; ring: string } | null;
+  } | null;
+}
+
 export const trustScoreService = {
   getByUserId: async (userId: string): Promise<TrustScoreData | null> => {
     try {
       const response = await api.get(`/mentorship/trust-score/${userId}`);
+      return response.data?.data || response.data || null;
+    } catch {
+      return null;
+    }
+  },
+  getPublicByUserId: async (userId: string): Promise<PublicTrustScore | null> => {
+    try {
+      const response = await api.get(`/mentorship/trust-score/public/${userId}`);
       return response.data?.data || response.data || null;
     } catch {
       return null;

@@ -1203,6 +1203,7 @@ export default function SeniorMentorApplicationPage() {
     const [photoPreview, setPhotoPreview] = useState('');
     const [showGuide, setShowGuide] = useState(false);
     const [acceptFreePolicy, setAcceptFreePolicy] = useState(false);
+    const [acceptAlumniDeclaration, setAcceptAlumniDeclaration] = useState(false);
     const [policyError, setPolicyError] = useState('');
 
     const hasPrefilledRef = useRef(false);
@@ -1252,6 +1253,8 @@ export default function SeniorMentorApplicationPage() {
 
     const mentorRoleValue = watch('mentorRole');
     const isSeniorStudent = mentorRoleValue === 'senior_mentor';
+    // Submit stays disabled until the role-specific checkbox is ticked
+    const isPolicyAccepted = isSeniorStudent ? acceptFreePolicy : acceptAlumniDeclaration;
     const selectedHelpAreas = (watch('helpAreas') || []) as MentorshipHelpArea[];
     const isMaxHelpAreas = selectedHelpAreas.length >= MAX_HELP_AREAS;
 
@@ -1691,6 +1694,15 @@ export default function SeniorMentorApplicationPage() {
             // Student Senior Mentors must accept the free sessions policy
             if (values.mentorRole === 'senior_mentor' && !acceptFreePolicy) {
                 const msg = `Please accept the free sessions policy (your first ${FREE_SESSIONS_REQUIRED} sessions are free) before submitting.`;
+                setPolicyError(msg);
+                setCurrentStep(5);
+                setToast({ type: 'error', message: msg });
+                return;
+            }
+
+            // Alumni Mentors must accept the declaration
+            if (values.mentorRole === 'alumni' && !acceptAlumniDeclaration) {
+                const msg = 'Please accept the declaration before submitting.';
                 setPolicyError(msg);
                 setCurrentStep(5);
                 setToast({ type: 'error', message: msg });
@@ -2651,6 +2663,33 @@ export default function SeniorMentorApplicationPage() {
                                     </div>
                                 )}
 
+                                {mentorRoleValue === 'alumni' && (
+                                    <div className="space-y-3">
+                                        <label
+                                            className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer ${policyError ? 'border-red-300 bg-red-50/40' : 'border-[#ece7e2] bg-white'}`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={acceptAlumniDeclaration}
+                                                onChange={(e) => {
+                                                    setAcceptAlumniDeclaration(e.target.checked);
+                                                    setPolicyError('');
+                                                }}
+                                                className="mt-0.5 w-5 h-5 flex-shrink-0 text-[#4a3728] rounded focus:ring-[#4a3728]"
+                                            />
+                                            <span className="text-xs font-semibold text-[#4a3728] leading-relaxed">
+                                                I confirm that the information and documents I have provided are accurate, and I agree to the mentorship guidelines.
+                                            </span>
+                                        </label>
+                                        {policyError && (
+                                            <p className="text-red-500 text-xs font-medium flex items-start gap-1.5">
+                                                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                                                <span>{policyError}</span>
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
                                 <div className="bg-[#f8f6f4] rounded-2xl p-5 border border-[#ece7e2] flex items-start gap-4">
                                     <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center flex-shrink-0 text-[#4a3728] font-bold text-sm shadow-sm border border-[#ece7e2]">
                                         <Info className="w-4 h-4 text-[#4a3728]" />
@@ -2690,9 +2729,9 @@ export default function SeniorMentorApplicationPage() {
                             ) : (
                                 <button
                                     type="submit"
-                                    disabled={isSubmitting || (isSeniorStudent && !acceptFreePolicy)}
+                                    disabled={isSubmitting || !isPolicyAccepted}
                                     title={
-                                        isSeniorStudent && !acceptFreePolicy
+                                        !isPolicyAccepted
                                             ? 'Please tick the checkbox above to enable submission'
                                             : undefined
                                     }

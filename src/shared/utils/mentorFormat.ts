@@ -275,4 +275,27 @@ export function sortRolesNewestFirst<T extends { isCurrent?: boolean; startDate?
 
         return 0;
     });
-}
+}
+/**
+ * Current role ek hi baar dikhane ke liye.
+ * Backend current role ko do jagah store karta hai:
+ *   1. experience.currentRole (string)
+ *   2. experience.previousRoles[] me isCurrent: true wali entry
+ * Dono ko render karne par same role do baar dikhta tha. Ye helper
+ * current entry alag nikaal deta hai aur `past` me sirf purane roles bachte hain.
+ */
+export function splitCurrentAndPastRoles<T extends { isCurrent?: boolean; title?: string; position?: string }>(
+    experience?: { currentRole?: string | null; previousRoles?: T[] | null } | null
+): { current: T | null; past: T[] } {
+    const roles: T[] = Array.isArray(experience?.previousRoles) ? [...(experience!.previousRoles as T[])] : [];
+    const curTitle = (experience?.currentRole ?? "").trim().toLowerCase();
+    const titleOf = (r: T) => (r.title || r.position || "").trim().toLowerCase();
+
+    let idx = roles.findIndex((r) => r.isCurrent && titleOf(r) === curTitle);
+    if (idx < 0) idx = roles.findIndex((r) => r.isCurrent);
+    if (idx < 0) return { current: null, past: roles };
+
+    const [current] = roles.splice(idx, 1);
+    // Agar aur bhi isCurrent entries ho to wo past list me hi rahengi
+    return { current, past: roles };
+}

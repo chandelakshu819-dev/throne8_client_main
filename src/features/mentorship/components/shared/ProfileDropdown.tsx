@@ -15,6 +15,7 @@ import {
   Briefcase,
   Check,
   LogIn,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
 import { useMyRoles, UNLOCK_WHEN_PENDING, type MyRolesResponse } from "@/features/mentorship/hooks/useMentorRole";
@@ -47,6 +48,9 @@ export interface ProfileDropdownProps {
   profileImageUrl?: string | null;
   fullName?: string;
   onOpenBecomeMentorModal?: () => void;
+  // Sign Out dropdown ke andar dikhana ho to pass karo (nahi diya to row nahi dikhegi)
+  onSignOut?: () => void;
+  isLoggingOut?: boolean;
 }
 
 // WorkspaceKey matches FrontendRoleKey from roleVisibility.ts
@@ -103,6 +107,8 @@ export default function ProfileDropdown({
   profileImageUrl,
   fullName,
   onOpenBecomeMentorModal,
+  onSignOut,
+  isLoggingOut = false,
 }: ProfileDropdownProps) {
   const router   = useRouter();
   const pathname = usePathname();
@@ -422,6 +428,33 @@ export default function ProfileDropdown({
             );
           })}
         </ul>
+
+        {/* Sign Out: sabse neeche, divider ke baad */}
+        {onSignOut && (
+          <div className="py-2" style={{ borderTop: `1px solid ${CREAM_DARK}` }}>
+            <button
+              role="menuitem"
+              onClick={() => {
+                if (isLoggingOut) return;
+                setOpen(false);
+                onSignOut();
+              }}
+              disabled={isLoggingOut}
+              className="flex items-center gap-3 w-full px-5 py-3 text-left transition-colors hover:bg-[#FBEAE6] disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ color: "#B4442E" }}
+            >
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: "#FBEAE6" }}
+              >
+                <LogOut size={17} className="shrink-0" />
+              </div>
+              <span className="text-[13px] font-semibold">
+                {isLoggingOut ? "Signing out..." : "Sign Out"}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       <style>{`

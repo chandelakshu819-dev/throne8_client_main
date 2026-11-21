@@ -10,7 +10,8 @@ import { C } from "../../types/data";
 import MentorService from "@/lib/api/mentorship.service";
 import SocialLinkTile from "../SocialLinkTile";
 import CompanyLogo from "../CompanyLogo";
-import { formatRoleDuration, sortRolesNewestFirst } from "@/shared/utils/mentorFormat";
+import TrustScoreBadge from "./TrustScoreBadge";
+import { formatRoleDuration, sortRolesNewestFirst, splitCurrentAndPastRoles } from "@/shared/utils/mentorFormat";
 
 interface MentorSidebarProps {
     mentorData: any;
@@ -146,7 +147,9 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
         expTotal != null
             ? `${expTotal} ${Number(expTotal) === 1 ? "year" : "years"} of Experience`
             : "Experience not specified";
-    const sortedRoles = sortRolesNewestFirst(mentorData?.experience?.previousRoles || []);
+    // Current role backend me 2 jagah aata hai (currentRole + previousRoles[isCurrent]) -> ek hi baar dikhao
+    const { current: currentEntry, past: pastRoles } = splitCurrentAndPastRoles<any>(mentorData?.experience);
+    const sortedRoles = sortRolesNewestFirst(pastRoles);
     const skills = mentorData?.skills || [];
     const languages: string[] = mentorData?.languages || [];
     const timezone: string = mentorData?.availability?.timezone || "";
@@ -157,6 +160,13 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
     const branch: string = mentorData?.branch || "";
     const hasEducation = !!(college || degree || branch);
     const educationLine = [degree, branch].filter(Boolean).join(" · ");
+
+    // mentorData.company backend se kabhi string aata hai, kabhi Company object.
+    // Dono case me sahi naam nikalne ke liye helper.
+    const companyName: string =
+        typeof mentorData?.company === "string"
+            ? mentorData.company
+            : mentorData?.company?.companyName || mentorData?.company?.name || mentorData?.companyRef?.name || "";
 
     const aboutClampStyle: React.CSSProperties = aboutExpanded
         ? {}
@@ -328,6 +338,9 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                         </div>
                     )}
 
+                    {/* Public Trust Score: owner + visitor + logged-out sabko dikhta hai */}
+                    {mentorData?.userId && <TrustScoreBadge userId={mentorData.userId} />}
+
                     {isOwner && (
                         <div style={{ marginBottom: "16px" }}>
                             <button
@@ -427,23 +440,29 @@ const MentorSidebar: React.FC<MentorSidebarProps> = ({ mentorData, currentUserId
                             <div style={{ borderRadius: "12px", padding: "14px", background: C.surface, border: `1px solid ${C.border}`, marginBottom: "10px" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                     <CompanyLogo
-                                        src={mentorData?.companyLogo || sortedRoles.find((r: any) => r.isCurrent)?.companyLogo}
-                                        companyName={mentorData?.company || currentRole}
+                                        src={mentorData?.companyLogo || currentEntry?.companyLogo}
+                                        companyName={currentEntry?.company || companyName || currentRole}
                                         size={28}
                                     />
                                     <div style={{ minWidth: 0, flex: 1 }}>
                                         <div
-                                            title={`${currentRole}${mentorData?.company ? ` at ${mentorData.company}` : ""}`}
+                                            title={`${currentRole}${(currentEntry?.company || companyName) ? ` at ${currentEntry?.company || companyName}` : ""}`}
                                             style={{ fontWeight: "bold", color: C.dark, fontSize: "13px", marginBottom: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                                         >
                                             {currentRole}
                                         </div>
-                                        {mentorData?.company && (
+                                        {(currentEntry?.company || companyName) && (
                                             <div style={{ color: C.mid, fontSize: "12px", fontWeight: 600, marginBottom: "2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                {mentorData.company}
+                                                {currentEntry?.company || companyName}
                                             </div>
                                         )}
-                                        <div style={{ fontSize: "11px", color: C.mid }}>Present</div>
+                                        {currentEntry?.employmentType && (
+                                            <span style={{ display: "inline-block", fontSize: "10px", padding: "1px 6px", borderRadius: "4px", background: C.border, color: C.dark, fontWeight: 600, marginBottom: "4px" }}>
+                                                {currentEntry.employmentType}
+                                            </span>
+                                        )}
+                                        {currentEntry?.location && <div style={{ fontSize: "11px", color: C.mid, marginBottom: "2px" }}>{currentEntry.location}</div>}
+                                        <div style={{ fontSize: "11px", color: C.mid }}>{formatRoleDuration(currentEntry) || "Present"}</div>
                                     </div>
                                 </div>
                             </div>

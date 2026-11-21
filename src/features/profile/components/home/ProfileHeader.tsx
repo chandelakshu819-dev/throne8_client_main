@@ -285,7 +285,9 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                     <div
                         className="profileImageClick relative w-32 h-32 flex-shrink-0 cursor-pointer"
                         onClick={() => {
-                            if (isOwnProfile) {
+                            // Mobile/tablet par photo tap = photo viewer; laptop par purana behavior
+                            const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+                            if (isOwnProfile && !isMobile) {
                                 setIsProfileImageModalOpen(true);
                             } else {
                                 setIsImageViewerOpen(true);
@@ -668,6 +670,18 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                             className="w-full h-auto rounded-2xl shadow-2xl object-contain"
                             onClick={(e) => e.stopPropagation()}
                         />
+                        {isOwnProfile && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsImageViewerOpen(false);
+                                    setIsProfileImageModalOpen(true);
+                                }}
+                                className="mt-4 mx-auto flex items-center gap-2 rounded-full bg-white px-5 py-2 text-sm font-semibold text-[#4a3728] shadow-lg"
+                            >
+                                Change photo
+                            </button>
+                        )}
                     </div>
                 </div>
             )}

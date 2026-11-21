@@ -22,7 +22,7 @@ import VerificationService from "@/lib/api/verification.service";
 import UpdateProfileModal from "../profile/modal/Updateprofilemodal";
 import CompanyLogo from "../CompanyLogo";
 import SocialLinkTile from "../SocialLinkTile";
-import { formatRoleDuration, sortRolesNewestFirst } from "@/shared/utils/mentorFormat";
+import { formatRoleDuration, sortRolesNewestFirst, splitCurrentAndPastRoles, splitSkills } from "@/shared/utils/mentorFormat";
 
 interface ProfilePageProps {
   profilePhoto: string | null
@@ -84,8 +84,11 @@ export default function ProfilePage({
 
   const user = liveMentorData?.user;
   const exp = liveMentorData?.experience;
-  const previousRoles = exp?.previousRoles || [];
-  const sortedPreviousRoles = sortRolesNewestFirst(previousRoles);
+  // ✅ FIX: current role pehle previousRoles me bhi aata tha aur alag card me bhi -> duplicate.
+  // Ab current entry alag nikaal li jaati hai; list me sirf purane roles dikhte hain.
+  const { current: currentEntry, past: pastRoles } = splitCurrentAndPastRoles(exp);
+  const sortedPreviousRoles = sortRolesNewestFirst(pastRoles);
+  const currentDurationLabel = currentEntry ? formatRoleDuration(currentEntry) : "";
   const socialProof = liveMentorData?.socialProof || {};
   const hasSocialLinks = !!(
     socialProof.linkedinUrl ||
@@ -337,9 +340,9 @@ export default function ProfilePage({
             </InfoTile>
 
             <InfoTile label="Skills" full>
-              {liveMentorData?.skills?.length > 0 ? (
+              {splitSkills(liveMentorData?.skills).length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {liveMentorData.skills.map((s: string) => (
+                  {splitSkills(liveMentorData?.skills).map((s: string) => (
                     <span key={s} className="px-2.5 py-1 rounded-lg text-xs font-medium" style={{ backgroundColor: "#ece7e2", color: "#4a3728" }}>
                       {s}
                     </span>
@@ -377,30 +380,45 @@ export default function ProfilePage({
           </div>
 
           <div className="space-y-3">
-            {/* Current Role */}
+            {/* Current Role — single card (details previousRoles ki isCurrent entry se) */}
             {exp?.currentRole && (
-              <div className="p-4 rounded-xl flex items-center gap-3.5" style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}>
+              <div className="p-4 rounded-xl flex items-start gap-3.5" style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}>
                 <CompanyLogo
-                  src={liveMentorData?.companyLogo || sortedPreviousRoles.find((r: any) => r.isCurrent)?.companyLogo}
-                  companyName={liveMentorData?.company || exp.currentRole}
+                  src={liveMentorData?.companyLogo || currentEntry?.companyLogo}
+                  companyName={currentEntry?.company || liveMentorData?.company || exp.currentRole}
                   size={36}
                 />
                 <div className="flex-1 min-w-0">
-                  <p
-                    className="text-sm font-bold truncate"
-                    style={{ color: "#4a3728" }}
-                    title={`${exp.currentRole}${liveMentorData?.company ? ` at ${liveMentorData.company}` : ""}`}
-                  >
-                    {exp.currentRole}
-                  </p>
-                  {liveMentorData?.company && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p
+                      className="text-sm font-bold truncate"
+                      style={{ color: "#4a3728" }}
+                      title={`${exp.currentRole}${(currentEntry?.company || liveMentorData?.company) ? ` at ${currentEntry?.company || liveMentorData?.company}` : ""}`}
+                    >
+                      {exp.currentRole}
+                    </p>
+                    {currentEntry?.employmentType && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#ece7e2] text-[#4a3728]">
+                        {currentEntry.employmentType}
+                      </span>
+                    )}
+                  </div>
+                  {(currentEntry?.company || liveMentorData?.company) && (
                     <p className="text-xs font-semibold truncate" style={{ color: "#7a5c3e" }}>
-                      {liveMentorData.company}
+                      {currentEntry?.company || liveMentorData?.company}
                     </p>
                   )}
-                  <span className="inline-block text-[11px] font-medium" style={{ color: "#8a7a6a" }}>
-                    Present
-                  </span>
+                  <div className="flex items-center gap-3 text-[11px] mt-0.5" style={{ color: "#8a7a6a" }}>
+                    {(currentEntry?.location || currentEntry?.locationType) && (
+                      <span>{[currentEntry?.location, currentEntry?.locationType].filter(Boolean).join(" · ")}</span>
+                    )}
+                    <span>{currentDurationLabel || "Present"}</span>
+                  </div>
+                  {currentEntry?.description && (
+                    <p className="text-xs mt-2 leading-relaxed" style={{ color: "#5a4535" }}>
+                      {currentEntry.description}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -435,7 +453,7 @@ export default function ProfilePage({
                         {role.company}
                       </p>
                       <div className="flex items-center gap-3 text-[11px] mt-0.5" style={{ color: "#8a7a6a" }}>
-                        {role.location && <span>{role.location}</span>}
+                        {(role.location || role.locationType) && <span>{[role.location, role.locationType].filter(Boolean).join(" · ")}</span>}
                         {durationLabel && <span>{durationLabel}</span>}
                       </div>
                       {role.description && (

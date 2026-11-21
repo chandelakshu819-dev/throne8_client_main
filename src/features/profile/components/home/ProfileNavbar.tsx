@@ -121,7 +121,23 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({
     setIsMobileMenuOpen(false);
     setIsDropdownOpen(false);
     switch (item) {
-      case "View Profile":
+      case "View Profile": {
+        // Mentorship workspace ke andar (mentee / mentor / industry mentor)
+        // user ko usi role ki profile dikhao, general /profile form nahi.
+        const uid = currentUserId && currentUserId !== "undefined" ? currentUserId : "";
+        const path = pathname || "";
+        if (uid && path.startsWith("/mentorship/user-dashboard")) {
+          router.push(`/mentorship/user-dashboard/${uid}?tab=profile`);
+          break;
+        }
+        if (uid && path.startsWith("/mentorship/mentorProfile")) {
+          router.push(`/mentorship/mentorProfile/${uid}?tab=profile`);
+          break;
+        }
+        if (uid && path.startsWith("/mentorship/senior-mentor-profile")) {
+          router.push(`/mentorship/senior-mentor-profile/${uid}`);
+          break;
+        }
         if (onOpenLeftPanel && window.innerWidth < 1024) {
           onOpenLeftPanel();
           setIsProfilePanelOpen(false);
@@ -129,6 +145,7 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({
           router.push(`/profile`);
         }
         break;
+      }
       case "Update Profile":
         router.push(`/profile`);
         break;
