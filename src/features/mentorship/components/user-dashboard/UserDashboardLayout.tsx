@@ -88,6 +88,14 @@ export default function UserDashboardLayout({
 
   const [activePage, setActivePageState] = useState(getResolvedInitialPage);
 
+  // URL ka ?tab= / ?page= badalne par (e.g. navbar ka "View Profile") tab turant badle,
+  // refresh ka wait na kare. initialPage fixed ho to usse override nahi karna.
+  useEffect(() => {
+    if (initialPage) return;
+    const next = getResolvedInitialPage();
+    setActivePageState((prev) => (prev === next ? prev : next));
+  }, [searchParams, initialPage, getResolvedInitialPage]);
+
   // Tab badalne par URL mein ?page=<tab> likho, taaki refresh par wahi tab khule
   const setActivePage = useCallback(
     (page: string) => {

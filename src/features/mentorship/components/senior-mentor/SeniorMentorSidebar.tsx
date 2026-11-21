@@ -51,7 +51,7 @@ export default function SeniorMentorSidebar({
     .join(" ");
 
   return (
-    <aside className="w-80 flex flex-col" style={{ backgroundColor: '#fff', borderRight: '1px solid #ece4db' }}>
+    <aside className="w-80 max-w-[85vw] h-full flex flex-col" style={{ backgroundColor: '#fff', borderRight: '1px solid #ece4db' }}>
       {/* Profile Card */}
       <div className="mx-6 mt-6 mb-3 p-6 rounded-3xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
         <div className="flex flex-col items-center text-center">
