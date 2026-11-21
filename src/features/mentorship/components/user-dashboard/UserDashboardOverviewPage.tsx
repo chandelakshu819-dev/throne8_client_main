@@ -96,11 +96,15 @@ function resolveMentorName(s: any): string {
 
 // Reads the mentor photo from any of the shapes the API may return
 function resolveMentorPhoto(s: any): string | null {
+  const candidates = [
+    s.mentorProfilePhoto,
+    s.mentor?.profilePic,
+    s.mentor?.profilePhoto,
+    s.profilePic,
+  ];
+  // Only real image URLs: a bare photo ID would render as a broken image
   return (
-    s.mentorProfilePhoto ||
-    s.mentor?.profilePic ||
-    s.mentor?.profilePhoto ||
-    s.profilePic ||
+    candidates.find((v) => typeof v === "string" && /^(https?:\/\/|data:image\/)/i.test(v)) ||
     null
   );
 }
@@ -671,6 +675,16 @@ export default function UserDashboardOverviewPage({
                             alt={name}
                             className="w-9 h-9 rounded-full object-cover shrink-0"
                             style={{ border: `1px solid ${COLORS.hairline}` }}
+                            onError={(e) => {
+                              // Broken URL: swap to the initials circle instead of showing alt text
+                              const img = e.currentTarget;
+                              const fallback = document.createElement("div");
+                              fallback.className =
+                                "w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white";
+                              fallback.style.backgroundColor = COLORS.ink;
+                              fallback.textContent = initialsFrom(name);
+                              img.replaceWith(fallback);
+                            }}
                           />
                         ) : (
                           <div

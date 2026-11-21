@@ -140,6 +140,10 @@ export default function UpdateProfileModal({
     const [activeTab, setActiveTab] = useState<TabKey>(resolvedInitialTab);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // which date field group to highlight when validation fails ("start" | "end")
+    const [dateError, setDateError] = useState<"start" | "end" | null>(null);
+    const startDateRef = useRef<HTMLDivElement>(null);
+    const endDateRef = useRef<HTMLDivElement>(null);
     const [success, setSuccess] = useState(false);
 
     // ── Pre-fill on open ─────────────────────────────────────
@@ -226,18 +230,32 @@ export default function UpdateProfileModal({
         const companyName = (selectedCompany?.name || companyText).trim();
         const curStartDate = joinYM(curStartYear, curStartMonth);
         const curEndDate = joinYM(curEndYear, curEndMonth);
+        setDateError(null);
         const fail = (msg: string, tab: TabKey) => { setError(msg); setActiveTab(tab); };
+        // Highlight the date fields, scroll them into view and focus the first empty dropdown,
+        // so the user sees exactly what is missing even when the form is scrolled far away.
+        const failDate = (msg: string, which: "start" | "end") => {
+            fail(msg, "experience");
+            setDateError(which);
+            requestAnimationFrame(() => {
+                const box = (which === "start" ? startDateRef : endDateRef).current;
+                if (!box) return;
+                box.scrollIntoView({ behavior: "smooth", block: "center" });
+                const selects = Array.from(box.querySelectorAll("select"));
+                (selects.find((el) => !el.value) ?? selects[0])?.focus({ preventScroll: true });
+            });
+        };
 
         if (!title.trim()) return fail("Title is required.", "experience");
         if (!bio.trim() || bio.length < 50) return fail("Bio must be at least 50 characters.", "experience");
         if (!currentRole.trim()) return fail("Current role is required.", "experience");
         if (!companyName) return fail("Company is required for your current role.", "experience");
-        if (!curStartDate) return fail("Select a start month and year for your current role.", "experience");
-        if (curStartDate > CURRENT_YM) return fail("Start date can't be in the future.", "experience");
+        if (!curStartDate) return failDate("Start date is required: select both the start month and the start year.", "start");
+        if (curStartDate > CURRENT_YM) return failDate("Start date can't be in the future.", "start");
         if (!curIsCurrent) {
-            if (!curEndDate) return fail("Select an end month and year, or tick \"I am currently working in this role\".", "experience");
-            if (curEndDate < curStartDate) return fail("End date can't be before the start date.", "experience");
-            if (curEndDate > CURRENT_YM) return fail("End date can't be in the future.", "experience");
+            if (!curEndDate) return failDate("Select an end month and year, or tick \"I am currently working in this role\".", "end");
+            if (curEndDate < curStartDate) return failDate("End date can't be before the start date.", "end");
+            if (curEndDate > CURRENT_YM) return failDate("End date can't be in the future.", "end");
         }
         if (curLocation.trim().length > 100) return fail("Location can't exceed 100 characters.", "experience");
         if (curDescription.length > DESC_MAX) return fail(`Highlights can't exceed ${DESC_MAX} characters.`, "experience");
@@ -368,7 +386,10 @@ export default function UpdateProfileModal({
 
                     {/* Error / Success */}
                     {error && (
-                        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-200">
+                        <div
+                            role="alert"
+                            className="sticky top-0 z-20 flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-red-50 border border-red-200 shadow-md"
+                        >
                             <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                             <p className="text-xs text-red-600 font-medium">{error}</p>
                         </div>
@@ -484,32 +505,40 @@ export default function UpdateProfileModal({
                                 </label>
 
                                 <div className={`grid grid-cols-1 ${curIsCurrent ? "" : "sm:grid-cols-2"} gap-4`}>
-                                    <div>
-                                        <span className="block text-xs font-bold mb-1.5" style={{ color: "#4a3728" }}>Start date *</span>
+                                    <div ref={startDateRef} className="scroll-mt-24">
+                                        <span className="block text-xs font-bold mb-1.5" style={{ color: dateError === "start" ? "#dc2626" : "#4a3728" }}>Start date *</span>
                                         <div className="grid grid-cols-2 gap-2">
-                                            <select aria-label="Start month" value={curStartMonth} onChange={(e) => setCurStartMonth(e.target.value)} className={inputCls}>
+                                            <select aria-label="Start month" aria-invalid={dateError === "start" && !curStartMonth} value={curStartMonth} onChange={(e) => { setCurStartMonth(e.target.value); setDateError(null); }} className={`${inputCls} ${dateError === "start" && !curStartMonth ? "!border-red-500 !bg-red-50" : ""}`}>
                                                 <option value="">Month</option>
                                                 {MONTHS.map((m, i) => <option key={m} value={String(i + 1).padStart(2, "0")}>{m}</option>)}
                                             </select>
-                                            <select aria-label="Start year" value={curStartYear} onChange={(e) => setCurStartYear(e.target.value)} className={inputCls}>
+                                            <select aria-label="Start year" aria-invalid={dateError === "start" && !curStartYear} value={curStartYear} onChange={(e) => { setCurStartYear(e.target.value); setDateError(null); }} className={`${inputCls} ${dateError === "start" && !curStartYear ? "!border-red-500 !bg-red-50" : ""}`}>
                                                 <option value="">Year</option>
                                                 {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
                                             </select>
                                         </div>
+                                        {dateError === "start" && (!curStartMonth || !curStartYear) && (
+                                            <p className="mt-1.5 text-xs font-semibold text-red-600">
+                                                {!curStartMonth && !curStartYear ? "Select start month and year" : !curStartMonth ? "Select start month" : "Select start year"}
+                                            </p>
+                                        )}
                                     </div>
                                     {!curIsCurrent && (
-                                        <div>
-                                            <span className="block text-xs font-bold mb-1.5" style={{ color: "#4a3728" }}>End date *</span>
+                                        <div ref={endDateRef} className="scroll-mt-24">
+                                            <span className="block text-xs font-bold mb-1.5" style={{ color: dateError === "end" ? "#dc2626" : "#4a3728" }}>End date *</span>
                                             <div className="grid grid-cols-2 gap-2">
-                                                <select aria-label="End month" value={curEndMonth} onChange={(e) => setCurEndMonth(e.target.value)} className={inputCls}>
+                                                <select aria-label="End month" aria-invalid={dateError === "end" && !curEndMonth} value={curEndMonth} onChange={(e) => { setCurEndMonth(e.target.value); setDateError(null); }} className={`${inputCls} ${dateError === "end" && !curEndMonth ? "!border-red-500 !bg-red-50" : ""}`}>
                                                     <option value="">Month</option>
                                                     {MONTHS.map((m, i) => <option key={m} value={String(i + 1).padStart(2, "0")}>{m}</option>)}
                                                 </select>
-                                                <select aria-label="End year" value={curEndYear} onChange={(e) => setCurEndYear(e.target.value)} className={inputCls}>
+                                                <select aria-label="End year" aria-invalid={dateError === "end" && !curEndYear} value={curEndYear} onChange={(e) => { setCurEndYear(e.target.value); setDateError(null); }} className={`${inputCls} ${dateError === "end" && !curEndYear ? "!border-red-500 !bg-red-50" : ""}`}>
                                                     <option value="">Year</option>
                                                     {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
                                                 </select>
                                             </div>
+                                            {dateError === "end" && (!curEndMonth || !curEndYear) && (
+                                                <p className="mt-1.5 text-xs font-semibold text-red-600">Select end month and year</p>
+                                            )}
                                         </div>
                                     )}
                                 </div>
