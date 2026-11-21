@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, CheckCheck, Loader2, Trash2, UserPlus, UserCheck, UserX } from "lucide-react";
+import { Bell, CheckCheck, Loader2, Trash2, UserPlus, UserCheck, UserX, Video } from "lucide-react";
 
 import StudyGroupNotificationService, {
   StudyNotification,
 } from "@/lib/api/studyGroupNotification.service";
+import StudyGroupService from "@/lib/api/studyGroup.service";
 
 const iconFor = (type: string) => {
   switch (type) {
@@ -16,6 +17,8 @@ const iconFor = (type: string) => {
       return <UserCheck size={18} className="text-green-600" />;
     case "join_request_rejected":
       return <UserX size={18} className="text-red-500" />;
+    case "live_room_started":
+      return <Video size={18} className="text-red-500" />;
     default:
       return <Bell size={18} className="text-[#8b7355]" />;
   }
@@ -38,6 +41,34 @@ export default function StudyNotificationsPage() {
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // roomId -> groupId of live rooms that are running right now
+  const [liveRooms, setLiveRooms] = useState<Record<string, string>>({});
+
+  const refreshLive = useCallback(async () => {
+    const rooms = await StudyGroupService.getMyActiveLiveRooms();
+    const map: Record<string, string> = {};
+    rooms.forEach((r: any) => {
+      if (r?.roomId) map[String(r.roomId)] = String(r.groupId);
+    });
+    setLiveRooms(map);
+  }, []);
+
+  useEffect(() => {
+    void refreshLive();
+    const t = setInterval(refreshLive, 15_000);
+    return () => clearInterval(t);
+  }, [refreshLive]);
+
+  const handleJoinLive = (e: MouseEvent, n: StudyNotification, groupId: string) => {
+    e.stopPropagation();
+    if (!n.isRead) {
+      setItems((prev) => prev.map((x) => (x.notificationId === n.notificationId ? { ...x, isRead: true } : x)));
+      setUnread((c) => Math.max(c - 1, 0));
+      StudyGroupNotificationService.markAsRead(n.notificationId).catch(() => {});
+    }
+    // joinLive=1: the group page joins the live room by itself
+    router.push(`/study/my-groups/${groupId}?joinLive=1`);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -147,6 +178,21 @@ export default function StudyNotificationsPage() {
                 <p className={`text-sm text-[#4a3728] ${n.isRead ? "font-medium" : "font-bold"}`}>{n.title}</p>
                 <p className="text-sm text-[#6b5847] break-words">{n.message}</p>
                 <p className="text-xs text-[#a89080] mt-1">{timeAgo(n.createdAt)}</p>
+                {n.type === "live_room_started" && n.data?.roomId && (
+                  liveRooms[String(n.data.roomId)] ? (
+                    <button
+                      onClick={(e) => handleJoinLive(e, n, liveRooms[String(n.data!.roomId)])}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#4a3728] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#3a2a1e]"
+                    >
+                      <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                      Join live now
+                    </button>
+                  ) : (
+                    <span className="mt-2 inline-block rounded-full bg-[#f0e8df] px-3 py-1 text-xs font-semibold text-[#8b7355]">
+                      Session ended
+                    </span>
+                  )
+                )}
               </div>
               {!n.isRead && <span className="w-2 h-2 rounded-full bg-red-500 mt-2 flex-shrink-0" />}
               <button
