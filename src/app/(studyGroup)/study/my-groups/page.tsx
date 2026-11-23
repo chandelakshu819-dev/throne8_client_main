@@ -883,21 +883,21 @@ export default function MyGroups() {
   const handleLeaveGroup = (groupId: string): void => {
     dispatch(leaveGroupThunk(groupId))
       .unwrap()
-      .then(() => dispatch(fetchMyGroupsThunk())) // list refresh karo
+      .then(() => dispatch(fetchMyGroupsThunk({ force: true }))) // list refresh karo
       .catch((err) => alert(err));
   };
 
   const handleDeleteGroup = (groupId: string): void => {
     dispatch(deleteGroupThunk(groupId))
       .unwrap()
-      .then(() => dispatch(fetchMyGroupsThunk()))
+      .then(() => dispatch(fetchMyGroupsThunk({ force: true })))
       .catch((err) => alert(err));
   };
 
   const handleUpdateGroup = (groupId: string, updatedData: Partial<Group>): void => {
     dispatch(updateGroupThunk({ groupId, updates: updatedData as any }))
       .unwrap()
-      .then(() => dispatch(fetchMyGroupsThunk()))
+      .then(() => dispatch(fetchMyGroupsThunk({ force: true })))
       .catch((err) => alert(err));
   };
 

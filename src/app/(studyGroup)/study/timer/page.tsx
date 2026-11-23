@@ -133,9 +133,9 @@ export default function PomodoroTimer() {
     }
 
     dispatch(getTodaySessionsThunk());
-    dispatch(getTimerStatsThunk());
+    dispatch(getTimerStatsThunk({ force: true }));
     dispatch(getAllSessionsThunk({ limit: 10 }));
-    dispatch(fetchUserStreakThunk());
+    dispatch(fetchUserStreakThunk({ force: true }));
   };
 
   const tabDuration = activeTab === 'timer'

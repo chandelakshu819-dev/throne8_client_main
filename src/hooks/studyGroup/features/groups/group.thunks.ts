@@ -10,18 +10,33 @@ import StudyGroupService, {
 } from "@/lib/api/studyGroup.service";
 import AuthService from "@/lib/api/auth.service";
 import { streakService } from "@/lib/api/streak.service";
+import { createFreshnessGuard, FreshnessArg } from "../../utils/freshness";
+
+// Skip repeat requests when the user just moved between study sections.
+// Pass { force: true } after an action that changes the data.
+const userStreakGuard = createFreshnessGuard("groups/fetchUserStreak");
+const myGroupsGuard = createFreshnessGuard("groups/fetchMyGroups", {
+  hasData: (state) => (state.groups?.myGroups?.length ?? 0) > 0,
+});
+const attendanceStatusGuard = createFreshnessGuard("groups/attendance/fetchStatus", {
+  hasData: (state) => state.groups?.attendanceStatus != null,
+});
+const attendancePercentageGuard = createFreshnessGuard("groups/attendance/fetchPercentage", {
+  hasData: (state) => state.groups?.attendancePercentage != null,
+});
 
 export const fetchUserStreakThunk = createAsyncThunk(
   "groups/fetchUserStreak",
-  async (_, { rejectWithValue }) => {
+  async (_: FreshnessArg, { rejectWithValue, getState }) => {
     try {
-      return await streakService.getCurrentStreak();
+      return await userStreakGuard.track(getState, () => streakService.getCurrentStreak());
     } catch (error: any) {
       return rejectWithValue(
         error.response?.data?.message || error.message || "Failed to fetch streak"
       );
     }
-  }
+  },
+  { condition: userStreakGuard.condition }
 );
 
 export const fetchAllUsersThunk = createAsyncThunk(
@@ -43,6 +58,7 @@ export const createGroupThunk = createAsyncThunk(
   async (groupData: CreateGroupData, { rejectWithValue }) => {
     try {
       const group = await StudyGroupService.createGroup(groupData);
+      myGroupsGuard.invalidate();
       return group;
     } catch (error: any) {
       return rejectWithValue(
@@ -93,14 +109,14 @@ export const fetchGroupByIdThunk = createAsyncThunk(
 
 export const fetchMyGroupsThunk = createAsyncThunk(
   "groups/fetchMyGroups",
-  async (_, { rejectWithValue }) => {
+  async (_: FreshnessArg, { rejectWithValue, getState }) => {
     try {
-      const groups = await StudyGroupService.getMyGroups();
-      return groups;
+      return await myGroupsGuard.track(getState, () => StudyGroupService.getMyGroups());
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to fetch your groups");
     }
-  }
+  },
+  { condition: myGroupsGuard.condition }
 );
 
 export const fetchGroupMembersThunk = createAsyncThunk(
@@ -125,6 +141,7 @@ export const joinGroupThunk = createAsyncThunk(
   ) => {
     try {
       const group = await StudyGroupService.joinGroup(groupId, { inviteCode });
+      myGroupsGuard.invalidate();
       return group;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to join group");
@@ -137,6 +154,7 @@ export const leaveGroupThunk = createAsyncThunk(
   async (groupId: string, { rejectWithValue }) => {
     try {
       await StudyGroupService.leaveGroup(groupId);
+      myGroupsGuard.invalidate();
       return groupId;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to leave group");
@@ -149,6 +167,7 @@ export const deleteGroupThunk = createAsyncThunk(
   async (groupId: string, { rejectWithValue }) => {
     try {
       await StudyGroupService.deleteGroup(groupId);
+      myGroupsGuard.invalidate();
       return groupId;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to delete group");
@@ -164,6 +183,7 @@ export const updateGroupThunk = createAsyncThunk(
   ) => {
     try {
       const group = await StudyGroupService.updateGroup(groupId, updates);
+      myGroupsGuard.invalidate();
       return group;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to update group");
@@ -179,6 +199,7 @@ export const addMemberThunk = createAsyncThunk(
   ) => {
     try {
       await StudyGroupService.addMember(groupId, userId);
+      myGroupsGuard.invalidate();
       return { groupId, userId };
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to add member");
@@ -194,6 +215,7 @@ export const removeMemberThunk = createAsyncThunk(
   ) => {
     try {
       await StudyGroupService.removeMember(groupId, userId);
+      myGroupsGuard.invalidate();
       return { groupId, userId };
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to remove member");
@@ -521,6 +543,7 @@ export const respondToJoinRequestThunk = createAsyncThunk(
           rejectionReason,
         }
       );
+      myGroupsGuard.invalidate();
       return { ...result, groupId, joinRequestId, action };
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to respond to request");
@@ -658,8 +681,10 @@ export const attendanceCheckInThunk = createAsyncThunk(
   async (notes: string | undefined, { rejectWithValue, dispatch }) => {
     try {
       const result = await StudyGroupService.attendanceCheckIn(notes);
+      attendanceStatusGuard.invalidate();
+      attendancePercentageGuard.invalidate();
       // The server updates the streak on check-in; read the real value instead of guessing
-      dispatch(fetchUserStreakThunk());
+      dispatch(fetchUserStreakThunk({ force: true }));
       return result;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to check in");
@@ -678,8 +703,10 @@ export const attendanceAutoMarkThunk = createAsyncThunk(
   ) => {
     try {
       const result = await StudyGroupService.attendanceAutoMark(reason, studyHours);
+      attendanceStatusGuard.invalidate();
+      attendancePercentageGuard.invalidate();
       // The server updates the streak on auto-mark; read the real value instead of guessing
-      dispatch(fetchUserStreakThunk());
+      dispatch(fetchUserStreakThunk({ force: true }));
       return result;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to auto-mark attendance");
@@ -689,28 +716,34 @@ export const attendanceAutoMarkThunk = createAsyncThunk(
 
 export const fetchAttendanceStatusThunk = createAsyncThunk(
   "groups/attendance/fetchStatus",
-  async (_, { rejectWithValue }) => {
+  async (_: FreshnessArg, { rejectWithValue, getState }) => {
     try {
-      return await StudyGroupService.getAttendanceStatus();
+      return await attendanceStatusGuard.track(getState, () =>
+        StudyGroupService.getAttendanceStatus()
+      );
     } catch (error: any) {
       return rejectWithValue(
         error.message || "Failed to fetch attendance status"
       );
     }
-  }
+  },
+  { condition: attendanceStatusGuard.condition }
 );
 
 export const fetchAttendancePercentageThunk = createAsyncThunk(
   "groups/attendance/fetchPercentage",
-  async (_, { rejectWithValue }) => {
+  async (_: FreshnessArg, { rejectWithValue, getState }) => {
     try {
-      return await StudyGroupService.getAttendancePercentage();
+      return await attendancePercentageGuard.track(getState, () =>
+        StudyGroupService.getAttendancePercentage()
+      );
     } catch (error: any) {
       return rejectWithValue(
         error.message || "Failed to fetch attendance percentage"
       );
     }
-  }
+  },
+  { condition: attendancePercentageGuard.condition }
 );
 
 export const fetchAttendanceHistoryThunk = createAsyncThunk(
@@ -857,6 +890,7 @@ export const trackInviteJoinThunk = createAsyncThunk(
   async (inviteCode: string, { rejectWithValue }) => {
     try {
       await StudyGroupService.trackInviteJoin(inviteCode);
+      myGroupsGuard.invalidate();
       return inviteCode;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to track join");

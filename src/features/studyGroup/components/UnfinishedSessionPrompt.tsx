@@ -42,7 +42,7 @@ export default function UnfinishedSessionPrompt() {
   const handleDiscard = async () => {
     await dispatch(cancelTimerThunk());
     dispatch(getTodaySessionsThunk());
-    dispatch(getTimerStatsThunk());
+    dispatch(getTimerStatsThunk({ force: true }));
   };
 
   return (

@@ -107,7 +107,7 @@ export default function TimerControls() {
       } else {
         await dispatch(stopTimerThunk(undefined));
         dispatch(getTodaySessionsThunk());
-        dispatch(getTimerStatsThunk());
+        dispatch(getTimerStatsThunk({ force: true }));
       }
     }
     dispatch(resetTimer());

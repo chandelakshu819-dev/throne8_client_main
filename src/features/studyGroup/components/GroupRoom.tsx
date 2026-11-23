@@ -623,7 +623,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
             )
               .unwrap()
               .catch(() => { });
-            dispatch(fetchAttendanceStatusThunk());
+            dispatch(fetchAttendanceStatusThunk({ force: true }));
             dispatch(fetchUserStreakThunk());
           }
         } catch (err) {
@@ -891,7 +891,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
           await dispatch(
             attendanceAutoMarkThunk({ reason: "study_session", studyHours: 0 })
           ).unwrap();
-          dispatch(fetchAttendanceStatusThunk());
+          dispatch(fetchAttendanceStatusThunk({ force: true }));
           dispatch(fetchUserStreakThunk());
         } catch {
           /* silent */
@@ -1215,7 +1215,7 @@ ADD this block just before your main `return (` statement:
               onClick={async () => {
                 try {
                   await dispatch(attendanceCheckInThunk(undefined)).unwrap();
-                  dispatch(fetchAttendanceStatusThunk());
+                  dispatch(fetchAttendanceStatusThunk({ force: true }));
                   dispatch(fetchUserStreakThunk());
                 } catch (err) {
                   console.error("Check-in error:", err);
@@ -1354,7 +1354,7 @@ ADD this block just before your main `return (` statement:
                 onClick={async () => {
                   try {
                     await dispatch(attendanceCheckInThunk(undefined)).unwrap();
-                    dispatch(fetchAttendanceStatusThunk());
+                    dispatch(fetchAttendanceStatusThunk({ force: true }));
                     dispatch(fetchUserStreakThunk());
                   } catch (err) {
                     console.error("Check-in error:", err);

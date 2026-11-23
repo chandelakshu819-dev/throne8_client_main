@@ -4,6 +4,12 @@ import { createAsyncThunk } from '@reduxjs/toolkit';
 import StudyGroupService, {
   StartTimerData,
 } from '@/lib/api/studyGroup.service';
+import { createFreshnessGuard, FreshnessArg } from '../../utils/freshness';
+
+// Timer stats are an expensive aggregation on the server, and three screens ask for them.
+const timerStatsGuard = createFreshnessGuard('timer/getStats', {
+  hasData: (state) => state.timer?.timerStats != null,
+});
 
 export const startTimerThunk = createAsyncThunk(
   'timer/start',
@@ -42,7 +48,9 @@ export const stopTimerThunk = createAsyncThunk(
   'timer/stop',
   async (notes: string | undefined, { rejectWithValue }) => {
     try {
-      return await StudyGroupService.stopTimer(notes);
+      const result = await StudyGroupService.stopTimer(notes);
+      timerStatsGuard.invalidate();
+      return result;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to stop timer');
     }
@@ -54,6 +62,7 @@ export const cancelTimerThunk = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       await StudyGroupService.cancelTimer();
+      timerStatsGuard.invalidate();
       return true;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to cancel timer');
@@ -99,13 +108,14 @@ export const getTodaySessionsThunk = createAsyncThunk(
 
 export const getTimerStatsThunk = createAsyncThunk(
   'timer/getStats',
-  async (_, { rejectWithValue }) => {
+  async (_: FreshnessArg, { rejectWithValue, getState }) => {
     try {
-      return await StudyGroupService.getTimerStats();
+      return await timerStatsGuard.track(getState, () => StudyGroupService.getTimerStats());
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch timer stats');
     }
-  }
+  },
+  { condition: timerStatsGuard.condition }
 );
 
 export const deleteSessionThunk = createAsyncThunk(
@@ -113,6 +123,7 @@ export const deleteSessionThunk = createAsyncThunk(
   async (sessionId: string, { rejectWithValue }) => {
     try {
       await StudyGroupService.deleteTimerSession(sessionId);
+      timerStatsGuard.invalidate();
       return sessionId;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to delete session');
