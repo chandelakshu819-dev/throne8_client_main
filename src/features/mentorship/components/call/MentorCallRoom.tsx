@@ -142,7 +142,23 @@ function VideoSurface({
 
   useEffect(() => {
     const el = ref.current;
-    if (el && el.srcObject !== stream) el.srcObject = stream;
+    if (!el) return;
+    if (el.srcObject !== stream) el.srcObject = stream ?? null;
+    if (!stream) return;
+
+    // Make sure playback really starts (and carries sound). Browsers can block autoplay with
+    // audio; if so, retry on the user's next click / key press.
+    const tryPlay = () => {
+      el.play().catch(() => {});
+    };
+    tryPlay();
+    const onGesture = () => tryPlay();
+    document.addEventListener('pointerdown', onGesture, { once: true });
+    document.addEventListener('keydown', onGesture, { once: true });
+    return () => {
+      document.removeEventListener('pointerdown', onGesture);
+      document.removeEventListener('keydown', onGesture);
+    };
   }, [stream]);
 
   return (
