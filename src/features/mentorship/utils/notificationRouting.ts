@@ -66,6 +66,8 @@ export function isNotificationForRole(n: NotificationLike, role: NotificationRol
   const t = haystack(n);
   if (/\byour mentor\b/.test(t)) return role === "mentee";
   if (/\byour mentee\b|\bmentee has joined\b/.test(t)) return role !== "mentee";
+  // "Start it when you are ready" -> sirf mentor session start kar sakta hai, mentee ko ye nahi dikhna chahiye
+  if (/(start it when you are ready|you can start the session|start the session when)/.test(t)) return role !== "mentee";
 
   const kind = classifyNotification(n);
   if (role === "mentee") return kind !== "booking_request";
@@ -121,7 +123,22 @@ export async function checkRoomJoinable(sessionId: string, bookingId?: string): 
       ? (s?.bookings || []).find((b: any) => b._id === bookingId || b.id === bookingId)
       : null;
     const status = String(matched?.status ?? s?.status ?? "").toLowerCase();
-    return OVER.includes(status) ? "ended" : "ok";
+    if (OVER.includes(status)) return "ended";
+
+    // Backend 'join' check time-window par hamesha error nahi deta (expiry sirf socket join par aati hai).
+    // Isliye yaha khud time check: agar session ka scheduled end guzar chuka hai aur wo
+    // abhi live (in_progress) nahi hai, to room mat kholo.
+    const LIVE = ["in_progress", "in progress", "active", "ongoing", "live", "started"];
+    if (!LIVE.includes(status)) {
+      const startRaw = matched?.scheduledAt ?? s?.scheduledAt ?? s?.startTime;
+      const durationMin = Number(matched?.duration ?? s?.duration);
+      const startMs = startRaw ? new Date(startRaw).getTime() : NaN;
+      if (!isNaN(startMs) && durationMin > 0) {
+        const endMs = startMs + durationMin * 60_000;
+        if (Date.now() > endMs) return "ended";
+      }
+    }
+    return "ok";
   } catch (e: any) {
     const msg = String(e?.message || "").toLowerCase();
     if (/(has ended|no longer active|expired|cancelled|completed)/.test(msg)) return "ended";
