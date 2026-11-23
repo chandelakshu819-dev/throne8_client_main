@@ -43,7 +43,6 @@ import {
   toggleCameraThunk,
   toggleMicThunk,
   toggleScreenShareThunk,
-  fetchAllUsersThunk,
   attendanceAutoMarkThunk,
   fetchAttendanceStatusThunk,
   attendanceCheckInThunk,
@@ -995,9 +994,9 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     if (groupId) {
       dispatch(fetchGroupByIdThunk(groupId));
       dispatch(fetchGroupMembersThunk(groupId));
-      dispatch(fetchAllUsersThunk()).then(() => {
-        fetchGroupMembersRef.current?.(groupId);
-      });
+      // Member names are resolved from the members response itself (useGroupData),
+      // so there is no need to load every user first.
+      fetchGroupMembersRef.current?.(groupId);
       dispatch(fetchAttendanceStatusThunk());
       dispatch(fetchUserStreakThunk());
 

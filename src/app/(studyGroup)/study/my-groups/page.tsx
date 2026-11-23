@@ -12,8 +12,8 @@ import {
   Check
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/core/store/store.hooks";
-import { updateGroup, deleteGroup, leaveGroup, selectMyGroups, selectMyGroupsLoading, selectGroupMembers, selectGroupMembersLoading, selectAllUsers, selectAllUsersLoading, selectPendingRequests, selectPendingRequestsLoading, selectRespondToRequestLoading, selectAttendanceStatus, selectAttendancePercentage, selectUserStreak } from "@/hooks/studyGroup/features/groups/groupsSlice";
-import { deleteGroupThunk, fetchAllUsersThunk, fetchUserStreakThunk, fetchAttendancePercentageThunk, fetchAttendanceStatusThunk, fetchMyGroupsThunk, generateInviteLinkThunk, getGroupPendingRequestsThunk, leaveGroupThunk, removeMemberThunk, respondToJoinRequestThunk, updateGroupThunk } from "@/hooks/studyGroup/features/groups/group.thunks";
+import { updateGroup, deleteGroup, leaveGroup, selectMyGroups, selectMyGroupsLoading, selectGroupMembers, selectGroupMembersLoading, selectPendingRequests, selectPendingRequestsLoading, selectRespondToRequestLoading, selectAttendanceStatus, selectAttendancePercentage, selectUserStreak } from "@/hooks/studyGroup/features/groups/groupsSlice";
+import { deleteGroupThunk, fetchUserStreakThunk, fetchAttendancePercentageThunk, fetchAttendanceStatusThunk, fetchMyGroupsThunk, generateInviteLinkThunk, getGroupPendingRequestsThunk, leaveGroupThunk, removeMemberThunk, respondToJoinRequestThunk, updateGroupThunk } from "@/hooks/studyGroup/features/groups/group.thunks";
 import {useAuth} from "@/features/auth/hooks/useAuth";
 import { selectTimerStats } from "@/hooks/studyGroup/features/timer/timerSlice";
 import { getTimerStatsThunk } from "@/hooks/studyGroup/features/timer/timer.thunks";
@@ -34,7 +34,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
   const { fetchGroupMembers: fetchEnrichedMembers, groupMembers: enrichedMembers, isLoadingGroupMembers: enrichedLoading, getUserInfoSync } = useGroupData();
   const groupMembers = enrichedMembers; // hook se
   const membersLoading = enrichedLoading; // hook se
-  const allUsers = useAppSelector(selectAllUsers);
   const [showRequestsDropdown, setShowRequestsDropdown] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [isEditing, setIsEditing] = useState(false);
@@ -201,7 +200,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ userId, isOpen, onClose, 
   useEffect(() => {
     if (isOpen && group) {
       fetchEnrichedMembers((group as any).groupId);
-      dispatch(fetchAllUsersThunk());
       dispatch(fetchUserStreakThunk());
       if (isGroupLeader(group, userId)) {
         loadMemberStats((group as any).groupId);
@@ -926,7 +924,6 @@ export default function MyGroups() {
 
   useEffect(() => {
     dispatch(fetchMyGroupsThunk());
-    dispatch(fetchAllUsersThunk());
     dispatch(getTimerStatsThunk());
     dispatch(fetchAttendanceStatusThunk());        
     dispatch(fetchAttendancePercentageThunk());    
