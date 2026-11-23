@@ -1,8 +1,9 @@
-import React, { useMemo, useEffect, useState } from "react"
+import React, { useMemo, useEffect, useState, useCallback } from "react"
 import { CalendarClock, Star, CreditCard, Bell, MessageSquare, CheckCheck, BellRing, Trash2 } from "lucide-react"
 import AuthService from "@/lib/api/auth.service"
 import ProfileService from "@/lib/api/profile.service"
 import { useRouter } from "next/navigation"
+import { useNotificationNavigator, hasNotificationTarget } from "@/features/mentorship/utils/notificationRouting"
 
 const COLORS = {
   ink: "#4a3728",
@@ -21,6 +22,7 @@ type NotificationType = string
 type NotificationItem = {
   _id?: string
   type?: NotificationType
+  rawType?: string
   title?: string
   message?: string
   createdAt?: string
@@ -37,6 +39,7 @@ interface UserDashboardNotificationsPageProps {
   onMarkAllRead?: () => void
   onMarkRead?: (id: string) => void
   onDeleteNotification?: (id: string) => Promise<boolean>
+  notificationUserId?: string
 }
 
 const TYPE_ICON: Record<NotificationType, React.FC<any>> = {
@@ -93,6 +96,7 @@ export default function UserDashboardNotificationsPage({
   onMarkAllRead,
   onMarkRead,
   onDeleteNotification,
+  notificationUserId = "",
 }: UserDashboardNotificationsPageProps) {
   const router = useRouter();
   const groups = useMemo(() => groupByRecency(notifications), [notifications])
@@ -102,6 +106,16 @@ export default function UserDashboardNotificationsPage({
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showNotice = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  }, []);
+  const openNotification = useNotificationNavigator({
+    role: "mentee",
+    userId: notificationUserId,
+    onNotice: showNotice,
+  });
 
   const handleDelete = async () => {
     if (!deleteConfirmId || !onDeleteNotification) return;
@@ -269,12 +283,10 @@ export default function UserDashboardNotificationsPage({
                     if (isInteractive) {
                       onMarkRead?.(item._id!);
                     }
-                    if (item.data?.actionUrl) {
-                      router.push(item.data.actionUrl);
-                    }
+                    void openNotification(item);
                   }}
                   className={`group w-full flex items-start gap-4 p-4 rounded-2xl text-left transition-all duration-200 motion-reduce:transition-none hover:-translate-y-1 hover:shadow-md ${
-                    isInteractive || item.data?.actionUrl
+                    isInteractive || hasNotificationTarget(item)
                       ? 'hover:border-[#c9baa9] cursor-pointer'
                       : 'cursor-default'
                   }`}
@@ -366,7 +378,7 @@ export default function UserDashboardNotificationsPage({
                       return null;
                     })()}
 
-                    {item.data?.actionUrl && (
+                    {hasNotificationTarget(item) && (
                       <div className="mt-2">
                         <span
                           className="inline-flex items-center text-xs font-semibold hover:underline"

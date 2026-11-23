@@ -7,6 +7,8 @@ import UserDashboardOverviewPage from "./UserDashboardOverviewPage";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
+import { isNotificationForRole } from "@/features/mentorship/utils/notificationRouting";
+import { joinMentorshipSession } from "@/features/mentorship/services/sessionJoin.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfile } from "@/features/profile/hooks/useProfile";
 import { useNavbarData } from "@/features/profile/components/home/NavbarProvider";
@@ -145,7 +147,7 @@ export default function UserDashboardLayout({
 
   // Realtime socket hook: pushes 'notification:new' and 'session:started'
   // the instant the backend emits them
-  const { latestNotification, sessionStarted } = useSocket('industry-mentor');
+  const { latestNotification, sessionStarted, sessionEnded } = useSocket('industry-mentor');
 
     // Jo ids user ne read kar di hain, unhe yaad rakho taaki refetch unhe wapas unread na kare
     const readIdsRef = useRef<Set<string>>(new Set());
@@ -195,6 +197,7 @@ export default function UserDashboardLayout({
           _id: latestNotification.notificationId,
           notificationId: latestNotification.notificationId,
           type: mappedType,
+          rawType,
           title: latestNotification.title,
           message: latestNotification.message,
           createdAt: latestNotification.createdAt,
@@ -289,14 +292,29 @@ export default function UserDashboardLayout({
   // Mentor ka "Start" button BookingsPage.tsx mein
   // `/mentorship/session-room/${sessionId}` par jata hai, mentee ko bhi
   // wahi route chahiye warna dono alag WebRTC room mein pahunchenge.
-  const handleJoinLiveSession = () => {
+  // Session khatam ho gaya to "Join live session" banner hata do (pehle ye hamesha atka rehta tha)
+  useEffect(() => {
+    if (!sessionEnded) return;
+    setLiveSession((prev) => (prev && prev.sessionId === sessionEnded.sessionId ? null : prev));
+  }, [sessionEnded]);
+
+  const handleJoinLiveSession = async () => {
     if (!liveSession) return;
-    router.push(`/mentorship/session-room/${liveSession.sessionId}?bookingId=${liveSession.bookingId || ""}`);
+    const { sessionId, bookingId } = liveSession;
     setLiveSession(null);
+    try {
+      // joinMentorshipSession backend se verify karta hai; ended/expired par room nahi khulta
+      await joinMentorshipSession({ sessionId, bookingId: bookingId || undefined, router });
+    } catch {
+      router.push(`/mentorship/user-dashboard/${encodeURIComponent(userId)}?page=session-history`);
+    }
   };
 
   const CurrentPage = pageComponents[activePage] || UserDashboardOverviewPage;
-  const safeNotifications = Array.isArray(notifications) ? notifications : [];
+  // Mentor-side notifications (e.g. "New booking request") mentee view me nahi dikhne chahiye
+  const safeNotifications = (Array.isArray(notifications) ? notifications : []).filter((n) =>
+    isNotificationForRole(n, "mentee")
+  );
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -393,6 +411,7 @@ export default function UserDashboardLayout({
               onMarkAllRead={handleMarkAllRead}
               onMarkRead={handleMarkRead}
               onDeleteNotification={handleDeleteNotification}
+              notificationUserId={userId}
             />
           </div>
         </main>

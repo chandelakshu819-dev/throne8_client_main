@@ -281,7 +281,9 @@ class SessionService {
     // Session ko backend data se validate karke real room URL return karta hai
     static async joinSession(sessionId: string, _bookingId?: string): Promise<{ session: any; roomUrl: string }> {
         try {
-            const res = await SessionService.getSessionById(sessionId);
+            // 'join' intent: backend time-window / ended check karta hai (room page bhi yahi use karta hai).
+            // Bina intent ke ended ya expired session par bhi roomUrl mil jata tha.
+            const res = await SessionService.getSessionById(sessionId, 'join');
             const session = res?.data ?? res;
             const roomUrl = `/mentorship/session-room/${encodeURIComponent(sessionId)}` + (_bookingId ? `?bookingId=${encodeURIComponent(_bookingId)}` : "");
             return { session, roomUrl };

@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import {
+  useNotificationNavigator,
+  hasNotificationTarget,
+  type NotificationRole,
+} from "@/features/mentorship/utils/notificationRouting"
 import { CalendarClock, Star, CreditCard, Bell, MessageSquare, CheckCheck, BellRing, User as UserIcon } from "lucide-react"
 
 const COLORS = {
@@ -20,6 +24,7 @@ type NotificationType = "booking" | "review" | "payment" | "message" | "system"
 type NotificationItem = {
   _id?: string
   type?: NotificationType
+  rawType?: string
   title?: string
   message?: string
   createdAt?: string
@@ -37,6 +42,9 @@ interface NotificationPageProps {
   notificationsLoading?: boolean
   onMarkAllRead?: () => void
   onMarkRead?: (id: string) => void
+  /** Kis role ke liye ye page dikh raha hai (click routing isi se decide hota hai) */
+  notificationRole?: NotificationRole
+  notificationUserId?: string
 }
 
 const TYPE_ICON: Record<NotificationType, React.FC<any>> = {
@@ -180,8 +188,19 @@ export default function NotificationPage({
   notificationsLoading = false,
   onMarkAllRead,
   onMarkRead,
+  notificationRole = "mentor",
+  notificationUserId = "",
 }: NotificationPageProps) {
-  const router = useRouter()
+  const [notice, setNotice] = useState<string | null>(null)
+  const showNotice = React.useCallback((msg: string) => {
+    setNotice(msg)
+    setTimeout(() => setNotice(null), 3500)
+  }, [])
+  const openNotification = useNotificationNavigator({
+    role: notificationRole,
+    userId: notificationUserId,
+    onNotice: showNotice,
+  })
   const groups = useMemo(() => groupByRecency(notifications), [notifications])
   const unreadCount = notifications.filter((n) => !n.isRead).length
 
@@ -276,17 +295,13 @@ export default function NotificationPage({
                   tabIndex={0}
                   onClick={() => {
                     if (item._id) onMarkRead?.(item._id)
-                    if (item.data?.actionUrl) {
-                      router.push(item.data.actionUrl)
-                    }
+                    void openNotification(item)
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault()
                       if (item._id) onMarkRead?.(item._id)
-                      if (item.data?.actionUrl) {
-                        router.push(item.data.actionUrl)
-                      }
+                      void openNotification(item)
                     }
                   }}
                   className="w-full flex items-start gap-3.5 p-3.5 rounded-xl text-left transition-colors hover:border-[#c9baa9] cursor-pointer"
@@ -327,7 +342,7 @@ export default function NotificationPage({
                     <p className="text-sm mt-0.5 line-clamp-2" style={{ color: COLORS.muted }}>
                       <RenderTextWithMenteeName text={item.message} menteeName={menteeName} />
                     </p>
-                    {item.data?.actionUrl && (
+                    {hasNotificationTarget(item) && (
                       <div className="mt-2">
                         <span
                           className="inline-flex items-center text-xs font-semibold hover:underline"
@@ -348,6 +363,15 @@ export default function NotificationPage({
           </div>
         </div>
       ))}
+
+      {notice && (
+        <div
+          className="fixed bottom-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-medium"
+          style={{ backgroundColor: COLORS.ink, color: "white" }}
+        >
+          {notice}
+        </div>
+      )}
     </div>
   )
 }

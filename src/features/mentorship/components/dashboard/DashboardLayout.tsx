@@ -16,6 +16,7 @@ import {
 import { useProfile } from "@/features/profile/hooks/useProfile";
 import SessionService from "@/lib/api/session.service";
 import NotificationService from "@/lib/api/notification.service";
+import { isNotificationForRole } from "@/features/mentorship/utils/notificationRouting";
 import { useNavbarProfileImage } from "@/features/profile/components/home/NavbarProvider";
 // Realtime notification push (booking requests, session started, etc.)
 import { useSocket } from "@/core/realtime/useSocket";
@@ -361,6 +362,7 @@ export default function MentorDashboard(
           _id: latestNotification.notificationId,
           notificationId: latestNotification.notificationId,
           type: mappedType,
+          rawType,
           title: latestNotification.title,
           message: latestNotification.message,
           createdAt: latestNotification.createdAt,
@@ -557,7 +559,11 @@ export default function MentorDashboard(
 
   const CurrentPage = pageComponents[activePage] || DashboardOverviewPage;
 
-  const safeNotifications = Array.isArray(notifications) ? notifications : [];
+  // Mentee-side notifications (e.g. "Booking Confirmed") mentor dashboard me nahi dikhne chahiye:
+  // dono dashboards same API/module use karte hain, isliye role ke hisaab se filter.
+  const safeNotifications = (Array.isArray(notifications) ? notifications : []).filter((n) =>
+    isNotificationForRole(n, "mentor")
+  );
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -655,6 +661,8 @@ export default function MentorDashboard(
               notificationsLoading={notificationsLoading}
               onMarkRead={handleMarkNotificationRead}
               onMarkAllRead={handleMarkAllNotificationsRead}
+              notificationRole="mentor"
+              notificationUserId={userId}
             />
           </div>
         </main>

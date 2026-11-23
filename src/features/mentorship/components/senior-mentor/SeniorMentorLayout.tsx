@@ -5,6 +5,7 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import SeniorMentorApplicationService, { SeniorMentorApplication } from "@/lib/api/seniorMentorApplication.service";
 import MentorService from "@/lib/api/mentorship.service";
 import NotificationService from "@/lib/api/notification.service";
+import { isNotificationForRole } from "@/features/mentorship/utils/notificationRouting";
 import { useSocket } from "@/core/realtime/useSocket";
 import SeniorMentorSidebar from "./SeniorMentorSidebar";
 import { useRouter } from "next/navigation";
@@ -103,6 +104,7 @@ export default function SeniorMentorLayout({
           _id: latestNotification.notificationId,
           notificationId: latestNotification.notificationId,
           type: mappedType,
+          rawType,
           title: latestNotification.title,
           message: latestNotification.message,
           createdAt: latestNotification.createdAt,
@@ -240,10 +242,12 @@ export default function SeniorMentorLayout({
             {activeTab === 'analytics' && <SeniorAnalyticsPage seniorData={application} />}
             {activeTab === 'notifications' && (
               <NotificationPage
-                notifications={notifications}
+                notifications={notifications.filter((n) => isNotificationForRole(n, "senior-mentor"))}
                 notificationsLoading={notificationsLoading}
                 onMarkRead={handleMarkNotificationRead}
                 onMarkAllRead={handleMarkAllNotificationsRead}
+                notificationRole="senior-mentor"
+                notificationUserId={userId}
               />
             )}
             {activeTab === 'availability' && <SeniorMentorAvailabilityPage mentorData={application} />}

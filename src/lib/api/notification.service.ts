@@ -55,6 +55,9 @@ class NotificationService {
             _id: raw.id || raw.notificationId || raw._id,
             notificationId: raw.notificationId || raw.id || raw._id,
             type: NotificationService.mapNotificationType(raw.type),
+            // Backend ka asli type (e.g. "new_booking_request") bhi rakho, warna routing ko
+            // pata hi nahi chalta ki notification kis cheez ka hai (sab "booking" ban jate the).
+            rawType: raw.type,
             title: raw.title,
             message: raw.message,
             createdAt: raw.createdAt,
