@@ -35,7 +35,7 @@ export function groupMentorsByCompany(items: MentorCompanyInput[], invalid: Set<
             groups.set(key, {
                 name: ref.name,
                 count: 0,
-                logoUrl: ref.logoUrl && /^https:\/\//i.test(ref.logoUrl) ? ref.logoUrl : undefined,
+                logoUrl: ref.logoUrl && /^(?:https:\/\/|\/)/i.test(ref.logoUrl) ? ref.logoUrl : undefined,
             });
             const n = normCompanyName(ref.name);
             if (n && !nameToKey.has(n)) nameToKey.set(n, key);

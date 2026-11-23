@@ -10,8 +10,11 @@ interface TrustedCompaniesProps {
 // ---------- Extra partner companies (logo ke saath) ----------
 const logoUrl = (domain: string) =>
   `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`;
-const PARTNERS: { name: string; domain: string; color: string; letters: string; src?: string }[] = [
 
+const PARTNERS: { name: string; domain: string; color: string; letters: string; src?: string }[] = [
+  { name: "AKSSAI ProjExel", domain: "akssai.com", color: "#DD4433", letters: "AP", src: "/logos/akssai.png" },
+  { name: "Redient Security", domain: "redientsecurity.in", color: "#2563EB", letters: "RS", src: "/logos/redient.png" },
+  { name: "Vikaro", domain: "vikaro.in", color: "#4F46E5", letters: "VK", src: "/logos/vikaro.svg" },
   { name: "Netlink Software", domain: "netlink.com", color: "#1E88E5", letters: "NS" },
   { name: "We Win Limited", domain: "wewinlimited.com", color: "#D32F2F", letters: "WW" },
   { name: "TechStalwarts", domain: "techstalwarts.com", color: "#00796B", letters: "TS" },
@@ -29,64 +32,76 @@ const PARTNERS: { name: string; domain: string; color: string; letters: string; 
   { name: "Walkover", domain: "walkover.in", color: "#00A651", letters: "WS" },
 ];
 
-// Logo image; load na ho to letter wala badge dikhega
-const buildSvg = (src: string, letters: string) =>
-  `<img src="${src}" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:contain;border-radius:8px" onerror="this.style.display='none';this.nextElementSibling.style.display='block'" /><svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" style="display:none"><circle cx="24" cy="24" r="22" fill="currentColor"/><text x="24" y="24" text-anchor="middle" dominant-baseline="central" font-family="Arial, sans-serif" font-size="${letters.length > 2 ? 15 : 19}" font-weight="700" fill="#ffffff">${letters}</text></svg>`;
-
-// Alag-alag field naam daale hain taaki tumhara CompanyBigCard jo bhi field padhe, logo mil jaye
-const EXTRA_COMPANIES = PARTNERS.map((p) => ({
-  name: p.name,
-  color: p.color,
-  svg: buildSvg(p.src || logoUrl(p.domain), p.letters),
-  logo: p.src || logoUrl(p.domain),
-  logoUrl: p.src || logoUrl(p.domain),
-  image: p.src || logoUrl(p.domain),
-  imageUrl: p.src || logoUrl(p.domain),
-}));
-
+const EXTRA_COMPANIES = PARTNERS.map((p) => {
+  const src = p.src || logoUrl(p.domain);
+  return {
+    name: p.name,
+    color: p.color,
+    storedLogoUrl: src,
+    logo: src,
+    logoUrl: src,
+    image: src,
+    imageUrl: src,
+  };
+});
 
 // ---------- Real companies ke asli logo ----------
 const brandKey = (s: any) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
-const imgHtml = (src: string) =>
-  `<img src="${src}" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:contain;border-radius:8px" />`;
-
 // key = company naam (small letters, bina space), value = asli logo
-const BRAND_LOGOS: Record<string, { label: string; src: string }> = {
-  google: { label: "Google", src: "https://www.google.com/s2/favicons?domain=google.com&sz=128" },
-  meta: { label: "Meta", src: "https://www.google.com/s2/favicons?domain=meta.com&sz=128" },
-  throne8: { label: "Throne 8", src: "/throne8logo.png" },
-  wipro: { label: "Wipro", src: "https://www.google.com/s2/favicons?domain=wipro.com&sz=128" },
+const BRAND_LOGOS: Record<string, { label: string; src: string; color?: string }> = {
+  google: { label: "Google", src: "https://www.google.com/s2/favicons?domain=google.com&sz=128", color: "#4285F4" },
+  meta: { label: "Meta", src: "https://www.google.com/s2/favicons?domain=meta.com&sz=128", color: "#0668E1" },
+  throne8: { label: "Throne 8", src: "/throne8logo.png", color: "#D4AF37" },
+  wipro: { label: "Wipro", src: "https://www.google.com/s2/favicons?domain=wipro.com&sz=128", color: "#5B2D90" },
+  akssai: { label: "AKSSAI ProjExel", src: "/logos/akssai.png", color: "#DD4433" },
+  akssaiprojexel: { label: "AKSSAI ProjExel", src: "/logos/akssai.png", color: "#DD4433" },
+  projexel: { label: "AKSSAI ProjExel", src: "/logos/akssai.png", color: "#DD4433" },
+  redient: { label: "Redient Security", src: "/logos/redient.png", color: "#2563EB" },
+  redientsecurity: { label: "Redient Security", src: "/logos/redient.png", color: "#2563EB" },
+  vikaro: { label: "Vikaro", src: "/logos/vikaro.svg", color: "#4F46E5" },
 };
+
 const withRealLogo = (c: any) => {
-  if (c?.storedLogoUrl) return c; // stored (autocomplete) logo wins over hardcoded brands
-  const brand = BRAND_LOGOS[brandKey(c?.name)];
-  if (!brand) return c;
+  const key = brandKey(c?.name);
+  let brand = BRAND_LOGOS[key];
+  if (!brand && key) {
+    for (const [k, v] of Object.entries(BRAND_LOGOS)) {
+      if (key.includes(k) || k.includes(key)) {
+        brand = v;
+        break;
+      }
+    }
+  }
+
+  const logoSrc = c?.storedLogoUrl || c?.logoUrl || brand?.src;
+
   return {
-    ...c, // mentorCount wagairah waise hi rahenge
-    name: brand.label,
-    svg: imgHtml(brand.src),
-    logo: brand.src,
-    logoUrl: brand.src,
-    image: brand.src,
-    imageUrl: brand.src,
+    ...c,
+    name: brand?.label && brandKey(brand.label) === key ? brand.label : c?.name || brand?.label,
+    color: c?.color || brand?.color,
+    storedLogoUrl: logoSrc,
+    logoUrl: logoSrc,
+    logo: logoSrc,
+    image: logoSrc,
+    imageUrl: logoSrc,
   };
 };
 
 export default function TrustedCompanies({ companies: realCompanies = [] }: TrustedCompaniesProps) {
+  // Naam ko simple karo (small letters, bina space/symbol) taaki "Wipro Ltd" aur "Wipro" same maane jaye
+  const norm = (s: any) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const realNames = realCompanies.map((c: any) => norm(c?.name));
 
-   // Naam ko simple karo (small letters, bina space/symbol) taaki "Wipro Ltd" aur "Wipro" same maane jaye
-   const norm = (s: any) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-   const realNames = realCompanies.map((c: any) => norm(c?.name));
- 
-   // Real companies pehle, uske baad extra companies (jo real mein pehle se hain wo skip)
-   const companies = [
+  // Real companies pehle, uske baad extra companies (jo real mein pehle se hain wo skip)
+  const companies = [
     ...realCompanies.map(withRealLogo),
-     ...EXTRA_COMPANIES.filter((c) => {
-       const n = norm(c.name);
-       return !realNames.some((r: string) => r && (r === n || r.includes(n) || n.includes(r)));
-     }),
-   ];
+    ...EXTRA_COMPANIES.filter((c) => {
+      const n = norm(c.name);
+      return !realNames.some((r: string) => r && (r === n || r.includes(n) || n.includes(r)));
+    }),
+  ];
+
   // Itne items rakho ki ek set poori screen width se lamba ho (smooth loop ke liye)
   let baseList = [...companies];
   while (companies.length > 0 && baseList.length < 8) {

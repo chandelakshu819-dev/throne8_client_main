@@ -3,6 +3,7 @@ export interface PartnerCompany {
     name: string;        // full naam (companies page ke liye)
     shortName: string;   // chhota naam (mentorship circle card ke liye)
     domain: string;      // website domain, isse logo aata hai
+    logoUrl?: string;    // local ya static logo URL
     color: string;
     letters: string;     // logo fail ho to ye letters dikhenge
     industry: string;
@@ -14,6 +15,9 @@ export const logoUrl = (domain: string) =>
     `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
 
 export const PARTNER_COMPANIES: PartnerCompany[] = [
+    { id: 'akssai', name: 'AKSSAI ProjExel', shortName: 'AKSSAI', domain: 'akssai.com', logoUrl: '/logos/akssai.png', color: '#DD4433', letters: 'AP', industry: 'Engineering & Project Management', employees: '50-200 employees', location: 'India' },
+    { id: 'redient', name: 'Redient Security', shortName: 'Redient', domain: 'redientsecurity.in', logoUrl: '/logos/redient.png', color: '#2563EB', letters: 'RS', industry: 'Cybersecurity & Safety', employees: '50-200 employees', location: 'India' },
+    { id: 'vikaro', name: 'Vikaro', shortName: 'Vikaro', domain: 'vikaro.in', logoUrl: '/logos/vikaro.svg', color: '#4F46E5', letters: 'VK', industry: 'Software & Technology', employees: '50-200 employees', location: 'India' },
     { id: 'netlink', name: 'Netlink Software', shortName: 'Netlink', domain: 'netlink.com', color: '#1E88E5', letters: 'NS', industry: 'Software Development', employees: '', location: 'India' },
     { id: 'wewin', name: 'We Win Limited', shortName: 'We Win', domain: 'wewinlimited.com', color: '#D32F2F', letters: 'WW', industry: 'Software Development', employees: '', location: 'India' },
     { id: 'techstalwarts', name: 'TechStalwarts Software Development LLP', shortName: 'TechStalwarts', domain: 'techstalwarts.com', color: '#00796B', letters: 'TS', industry: 'Software Development', employees: '', location: 'India' },

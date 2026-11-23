@@ -8,15 +8,30 @@ interface CompanyBigCardProps {
     logoUrl?: string;
     /** Logo we store for this company (mentor-company autocomplete). Highest priority. */
     storedLogoUrl?: string;
+    logo?: string;
+    image?: string;
+    imageUrl?: string;
     count?: number;
   };
 }
 
 export default function CompanyBigCard({ company }: CompanyBigCardProps) {
-  // Logo priority: stored logo -> old SVG -> manual logoUrl -> letter circle
-  const [storedFailed, setStoredFailed] = useState(false);
-  useEffect(() => setStoredFailed(false), [company.storedLogoUrl]);
-  const useStored = Boolean(company.storedLogoUrl) && !storedFailed;
+  const [imgFailed, setImgFailed] = useState(false);
+
+  // Logo source priority: storedLogoUrl -> logoUrl -> logo -> imageUrl -> image
+  const resolvedLogoUrl =
+    company.storedLogoUrl ||
+    company.logoUrl ||
+    (company as any).logo ||
+    (company as any).imageUrl ||
+    (company as any).image;
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [resolvedLogoUrl, company.svg]);
+
+  const isPureSvg = Boolean(company.svg && company.svg.trim().startsWith("<svg"));
+  const canShowImg = Boolean(resolvedLogoUrl && !imgFailed);
 
   return (
     <div className="flex-shrink-0 w-[172px] h-[172px] sm:w-[178px] sm:h-[178px] group/card relative select-none">
@@ -39,7 +54,6 @@ export default function CompanyBigCard({ company }: CompanyBigCardProps) {
       {/* Circular Badge Card */}
       <div
         className="
-        
           relative
           w-full
           h-full
@@ -79,51 +93,45 @@ export default function CompanyBigCard({ company }: CompanyBigCardProps) {
           "
         />
 
-        {/* Company SVG Logo (Centered & Scaled) */}
+        {/* Company Logo Container (Centered & Scaled) */}
         <div
           className="
             relative
             z-10
-            w-12
+            w-20
             h-12
-            sm:w-14
+            sm:w-24
             sm:h-14
             mb-1.5
+            px-1.5
             flex
             items-center
             justify-center
-            [&>svg]:w-full
-            [&>svg]:h-full
-            [&>svg]:max-w-full
-            [&>svg]:max-h-full
-            [&>svg]:block
             transition-transform
             duration-500
             ease-out
             group-hover/card:scale-110
           "
           style={{ color: company.color }}
-          {...(!useStored && company.svg ? { dangerouslySetInnerHTML: { __html: company.svg } } : {})}
         >
-          {useStored ? (
+          {canShowImg ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={company.storedLogoUrl}
+              src={resolvedLogoUrl}
               alt={company.name}
               loading="lazy"
               referrerPolicy="no-referrer"
-              onError={() => setStoredFailed(true)}
-              className="w-full h-full object-contain"
+              onError={() => setImgFailed(true)}
+              className="w-full h-full max-w-full max-h-full object-contain block select-none pointer-events-none"
             />
-          ) : company.svg ? null : company.logoUrl ? (
-            <img
-              src={company.logoUrl}
-              alt={company.name}
-              className="w-full h-full object-contain"
+          ) : isPureSvg ? (
+            <div
+              className="w-full h-full max-w-full max-h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:object-contain [&>svg]:block select-none pointer-events-none"
+              dangerouslySetInnerHTML={{ __html: company.svg! }}
             />
           ) : (
             <span
-              className="w-full h-full rounded-full flex items-center justify-center text-xl font-black text-white"
+              className="w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-xl font-black text-white select-none shrink-0"
               style={{ backgroundColor: company.color }}
             >
               {company.name.charAt(0).toUpperCase()}
@@ -150,7 +158,7 @@ export default function CompanyBigCard({ company }: CompanyBigCardProps) {
           "
           title={company.name}
         >
-                {company.name}
+          {company.name}
         </p>
 
         {typeof company.count === "number" && company.count > 0 && (

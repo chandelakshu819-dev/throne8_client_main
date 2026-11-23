@@ -10,6 +10,7 @@ export interface ManualCompany {
   }
   
   export const MANUAL_COMPANIES: ManualCompany[] = [
-    // { name: "Infosys" },
-    // { name: "Razorpay", logoUrl: "/logos/razorpay.png" },
+    { name: "AKSSAI ProjExel", logoUrl: "/logos/akssai.png" },
+    { name: "Redient Security", logoUrl: "/logos/redient.png" },
+    { name: "Vikaro", logoUrl: "/logos/vikaro.svg" },
   ];

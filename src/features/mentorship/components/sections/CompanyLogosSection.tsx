@@ -13,15 +13,22 @@ interface CompanyLogosSectionProps {
 }
 
 // "Throne 8" / "throne8" / "THRONE8" -> same key
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+const norm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
 const INVALID = new Set(["", "na", "none", "null", "undefined", "notapplicable"]);
 
-// Mock list ab dikhayi nahi jaati, sirf known brands ke logo/colour ke liye use hoti hai
-const KNOWN_BRANDS: Record<string, { color: string; svg: string }> = {};
+// Known brands ke logo/colour
+const KNOWN_BRANDS: Record<string, { color: string; svg?: string; logoUrl?: string }> = {};
 [...TOP_COMPANIES, ...TOP_COMPANIES_ROW2].forEach((c) => {
     KNOWN_BRANDS[norm(c.name)] = { color: c.color, svg: c.svg };
 });
+KNOWN_BRANDS["throne8"] = { color: "#D4AF37", logoUrl: "/throne8logo.png" };
+KNOWN_BRANDS["akssaiprojexel"] = { color: "#DD4433", logoUrl: "/logos/akssai.png" };
+KNOWN_BRANDS["akssai"] = { color: "#DD4433", logoUrl: "/logos/akssai.png" };
+KNOWN_BRANDS["projexel"] = { color: "#DD4433", logoUrl: "/logos/akssai.png" };
+KNOWN_BRANDS["redientsecurity"] = { color: "#2563EB", logoUrl: "/logos/redient.png" };
+KNOWN_BRANDS["redient"] = { color: "#2563EB", logoUrl: "/logos/redient.png" };
+KNOWN_BRANDS["vikaro"] = { color: "#4F46E5", logoUrl: "/logos/vikaro.svg" };
 
 const PALETTE = ["#8B7355", "#4A3728", "#9C7A59", "#B47A3E", "#6B5B4F", "#7D5B3D"];
 
@@ -48,12 +55,14 @@ export default function CompanyLogosSection({ mentors = [] }: CompanyLogosSectio
 
         const real = groups.map((g) => {
             const brand = KNOWN_BRANDS[norm(g.name)];
+            const logo = g.logoUrl || brand?.logoUrl;
             return {
                 name: g.name,
                 count: g.count,
                 color: brand?.color ?? pickColor(g.name),
                 svg: brand?.svg,
-                storedLogoUrl: g.logoUrl,
+                storedLogoUrl: logo,
+                logoUrl: logo,
             };
         });
 
@@ -66,11 +75,13 @@ export default function CompanyLogosSection({ mentors = [] }: CompanyLogosSectio
             return true;
         }).map((c) => {
             const brand = KNOWN_BRANDS[norm(c.name)];
+            const logo = c.logoUrl || brand?.logoUrl;
             return {
                 name: c.name,
                 color: brand?.color ?? pickColor(c.name),
                 svg: brand?.svg,
-                logoUrl: c.logoUrl,
+                storedLogoUrl: logo,
+                logoUrl: logo,
             };
         });
 

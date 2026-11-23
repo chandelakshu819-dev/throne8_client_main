@@ -25,6 +25,7 @@ export const COMPANIES: string[] = [
   'Schneider Electric', 'Havells', 'Adani Group', 'Airtel', 'Vodafone Idea', 'BSNL', 'ISRO', 'DRDO', 'BHEL',
   'ONGC', 'NTPC', 'Indian Oil', 'Power Grid', 'Coal India', 'Indian Railways',
   // Bhopal / MP
+  'AKSSAI ProjExel', 'Redient Security', 'Vikaro',
   'BHEL Bhopal', 'Bharat Heavy Electricals Limited', 'MP Online', 'MPSEDC', 'AISECT', 'Sagar Group',
   'Nayan Technologies', 'Infobeans Technologies', 'Calsoft', 'Pitampura Tech',
   // Generic
@@ -105,4 +106,5 @@ export const COMPANY_DOMAINS: Record<string, string> = {
   'Indian Oil': 'iocl.com', 'Power Grid': 'powergrid.in', 'Coal India': 'coalindia.in',
   'Indian Railways': 'indianrailways.gov.in', 'AISECT': 'aisect.org',
   'Infobeans Technologies': 'infobeans.com', 'Calsoft': 'calsoftinc.com',
+  'AKSSAI ProjExel': 'akssai.com', 'Redient Security': 'redientsecurity.in', 'Vikaro': 'vikaro.in',
 };

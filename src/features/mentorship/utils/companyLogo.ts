@@ -26,7 +26,7 @@ export function apiOrigin(apiBaseUrl?: string | null): string {
  */
 export function resolveLogoSrc(item: CompanyLike | null | undefined, apiBaseUrl?: string | null): string | undefined {
     if (!item) return undefined;
-    if (item.logoUrl && /^https:\/\//i.test(item.logoUrl)) return item.logoUrl;
+    if (item.logoUrl && /^(?:https:\/\/|\/)/i.test(item.logoUrl)) return item.logoUrl;
     if (item.logoPreviewPath && item.logoPreviewPath.startsWith("/api/")) {
         const origin = apiOrigin(apiBaseUrl);
         if (origin) return `${origin}${item.logoPreviewPath}`;
