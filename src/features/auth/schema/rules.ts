@@ -20,15 +20,44 @@ export const MIN_JOB_DURATION_MONTHS = 1;
 
 export const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
+export const PHONE_ERROR_MESSAGE =
+  'Enter a valid mobile number, e.g. 7992087000, 07992087000, 917992087000 or +917992087000';
+
+const INDIAN_MOBILE = /^[6-9]\d{9}$/;
+
+/**
+ * Accepts and converts to canonical "+<countrycode><number>":
+ *   7992087000, 07992087000, 917992087000, +917992087000, 00917992087000
+ *   (spaces, dashes, dots and brackets are ignored)
+ *   Other countries: +<country code><number> (8 to 15 digits in total)
+ * Throws an Error if the number is not valid.
+ */
 export function normalizePhone(phone: string): string {
+  const fail = (): never => {
+    throw new Error(PHONE_ERROR_MESSAGE);
+  };
+
   const cleaned = phone.trim().replace(/[\s().-]/g, '');
+
   if (cleaned.startsWith('+')) {
     const digits = cleaned.slice(1);
-    if (/^[1-9]\d{7,14}$/.test(digits)) return `+${digits}`;
-  } else if (/^[6-9]\d{9}$/.test(cleaned)) {
-    return `+91${cleaned}`;
+    if (!/^[1-9]\d{7,14}$/.test(digits)) return fail();
+    if (digits.startsWith('91') && !INDIAN_MOBILE.test(digits.slice(2))) return fail();
+    return `+${digits}`;
   }
-  throw new Error('Enter a valid phone number with a country code, or a 10-digit Indian mobile number.');
+
+  if (!/^\d+$/.test(cleaned)) return fail();
+
+  // 7992087000
+  if (INDIAN_MOBILE.test(cleaned)) return `+91${cleaned}`;
+  // 07992087000
+  if (/^0[6-9]\d{9}$/.test(cleaned)) return `+91${cleaned.slice(1)}`;
+  // 917992087000
+  if (/^91[6-9]\d{9}$/.test(cleaned)) return `+${cleaned}`;
+  // 00917992087000
+  if (/^0091[6-9]\d{9}$/.test(cleaned)) return `+${cleaned.slice(2)}`;
+
+  return fail();
 }
 
 export const emailRule = z.string().trim().toLowerCase().email('Enter a valid email like name@example.com');
@@ -54,7 +83,7 @@ export const phoneRule = z.string().trim()
     } catch {
       return false;
     }
-  }, 'Enter a valid phone number with a country code, or a 10-digit Indian mobile number')
+  }, PHONE_ERROR_MESSAGE)
   .transform(normalizePhone);
 export const locationRule = z.string().trim().min(2, 'Location must be at least 2 characters')
   .max(100, 'Location cannot exceed 100 characters').regex(LOCATION_PATTERN, 'Use letters, spaces, commas, periods or hyphens');
