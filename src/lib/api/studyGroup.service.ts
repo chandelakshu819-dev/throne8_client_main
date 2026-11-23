@@ -2824,8 +2824,18 @@ class StudyGroupService {
       return res.data;
     } catch (error: any) {
       if (axios.isAxiosError(error)) {
-        const msg = error.response?.data?.message;
-        if (msg) throw new Error(msg);
+        const body = error.response?.data;
+        // Validation errors carry the exact reasons in `errors` ([{ field, message }])
+        const details: string[] = Array.isArray(body?.errors)
+          ? body.errors
+              .map((e: any) => (typeof e === "string" ? e : e?.message))
+              .filter(Boolean)
+          : [];
+        if (body?.message) {
+          throw new Error(
+            details.length ? `${body.message}: ${details.join("; ")}` : body.message
+          );
+        }
       }
       throw new Error("Failed to post doubt.");
     }

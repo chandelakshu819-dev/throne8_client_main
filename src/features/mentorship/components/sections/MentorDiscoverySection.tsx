@@ -53,7 +53,7 @@ interface MentorData {
     domains: string[];
     acceptsBooking: boolean;
     sessionId?: string | null;
-    // Performance ranking ke liye extra fields
+    // Extra fields used for performance ranking
     completedSessions?: number;
     cancelledSessions?: number;
     completionRate?: number;
@@ -108,10 +108,11 @@ const formatDisplayRole = (role: string | undefined | null): string => {
 };
 
 const GRID_CLASS = "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch";
-// Ek hi sidebar (left) + dono mentor sections (right)
-const ROW_CLASS = "grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-10";
+// One sidebar (left) + both mentor sections (right).
+// No gap on mobile so the empty sidebar slot does not add extra space above the content.
+const ROW_CLASS = "grid grid-cols-1 gap-0 lg:grid-cols-[280px_1fr] lg:gap-10";
 
-// College mentor ki photo alag-alag field names me aa sakti hai
+// A college mentor's photo can arrive under different field names
 const getCollegeMentorImage = (mentor: PublicSeniorMentor): string =>
     (mentor as any).profilePic ||
     (mentor as any).profilePhoto ||
@@ -119,7 +120,7 @@ const getCollegeMentorImage = (mentor: PublicSeniorMentor): string =>
     (mentor as any).user?.profilePic ||
     "";
 
-// PublicSeniorMentor -> card ke liye MentorData
+// PublicSeniorMentor -> MentorData for the card
 const toCollegeCardData = (mentor: PublicSeniorMentor): MentorData => ({
     id: mentor.id,
     name: mentor.displayName,
@@ -140,7 +141,7 @@ const toCollegeCardData = (mentor: PublicSeniorMentor): MentorData => ({
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Recent activity: 0 se 1 (aaj = 1, 30 din baad = 0)
+// Recent activity: 0 to 1 (today = 1, 30 days ago = 0)
 const recencyFactor = (dateStr?: string): number => {
     if (!dateStr) return 0;
     const t = new Date(dateStr).getTime();
@@ -151,39 +152,39 @@ const recencyFactor = (dateStr?: string): number => {
     return 1 - days / 30;
 };
 
-// Industry mentor score (0 se ~100)
+// Industry mentor score (0 to ~100)
 const industryPerformanceScore = (m: MentorData): number => {
     const completed = m.completedSessions ?? m.sessions ?? 0;
     const rating = m.rating ?? 0;
     const reviews = m.reviewCount ?? 0;
 
-    // 1. Completed sessions (sabse zyada weight, log scale taaki ek mentor sab par haavi na ho)
+    // 1. Completed sessions (highest weight, log scale so one mentor cannot dominate)
     const sessionsScore = Math.min(Math.log1p(completed) / Math.log1p(50), 1) * 40;
 
-    // 2. Rating, reviews ke confidence ke saath (5 reviews pe full weight)
+    // 2. Rating, weighted by review confidence (full weight at 5 reviews)
     const ratingScore = (rating / 5) * Math.min(reviews / 5, 1) * 20;
 
     // 3. Trust score (0-100)
     const trustScore = Math.min(Math.max(m.trustScore ?? 0, 0), 100) * 0.15;
 
-    // 4. Reliability: completion rate, cancellations kam hon
+    // 4. Reliability: completion rate (fewer cancellations is better)
     const totalForRate = completed + (m.cancelledSessions ?? 0);
     const reliabilityScore =
         totalForRate > 0 ? Math.min(Math.max(m.completionRate ?? 100, 0), 100) * 0.1 : 0;
 
-    // 5. Recent activity (last 30 din)
+    // 5. Recent activity (last 30 days)
     const activityScore = recencyFactor(m.lastActiveAt) * 10;
 
-    // 6. Booking open hai to chhota boost
+    // 6. Small boost if booking is open
     const bookingBoost = m.acceptsBooking ? 3 : 0;
 
-    // 7. Naye mentor (abhi koi session/rating nahi) ko thoda boost taaki hamesha neeche na dabe
+    // 7. Small boost for new mentors (no sessions/rating yet) so they do not sink to the bottom
     const newBoost = completed === 0 && rating === 0 ? 5 : 0;
 
     return sessionsScore + ratingScore + trustScore + reliabilityScore + activityScore + bookingBoost + newBoost;
 };
 
-// College mentor score: sessions + rating (agar API de) + booking open + recent activity
+// College mentor score: sessions + rating (if the API provides it) + open booking + recent activity
 const collegePerformanceScore = (m: PublicSeniorMentor): number => {
     const sessions = Number(m.sessionsCount) || 0;
     const rating = Number((m as any).averageRating ?? (m as any).rating) || 0;
@@ -193,13 +194,13 @@ const collegePerformanceScore = (m: PublicSeniorMentor): number => {
     const sessionsScore = Math.min(Math.log1p(sessions) / Math.log1p(50), 1) * 55;
     const ratingScore = (rating / 5) * Math.min(reviews / 5, 1) * 20;
     const activityScore = recencyFactor(lastActive) * 10;
-    const bookingBoost = m.sessionId ? 10 : 0; // session open hai to upar
+    const bookingBoost = m.sessionId ? 10 : 0; // open session ranks higher
     const newBoost = sessions === 0 ? 5 : 0;
 
     return sessionsScore + ratingScore + activityScore + bookingBoost + newBoost;
 };
 
-// Dono sections ke liye ek hi sort logic
+// Single sort logic shared by both sections
 function sortByMode<T>(
     list: T[],
     sort: CollegeSort,
@@ -244,13 +245,13 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     const [collegeVisible, setCollegeVisible] = useState(COLLEGE_LIMIT);
     const [showAllIndustryMentors, setShowAllIndustryMentors] = useState(false);
     const [collegeView, setCollegeView] = useState<CollegeView>("grid");
-    const [filtersOpen, setFiltersOpen] = useState(false); // sirf mobile panel
+    const [filtersOpen, setFiltersOpen] = useState(false); // mobile panel only
 
-    // EK hi unified filter: Industry aur College dono par lagta hai
+    // One unified filter: applies to both Industry and College
     const filters = useMentorFilters(industryMentors, collegeMentors);
 
-    // Industry aur College dono sections ek hi sort follow karte hain.
-    // Default "Recommended" = performance ke hisaab se.
+    // Industry and College sections follow the same sort.
+    // Default "Recommended" = performance ranking.
     const filteredIndustryMentors = useMemo(
         () =>
             sortByMode(
@@ -277,7 +278,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
 
     const hasActiveFilters = filters.activeCount > 0;
 
-    // Filter / sort badalte hi lists dobara pehle page se
+    // Reset both lists to the first page whenever filters or sort change
     const filterSignature = JSON.stringify({ values: filters.values, sort: filters.sort });
     useEffect(() => {
         setCollegeVisible(COLLEGE_LIMIT);
@@ -327,7 +328,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                         (mentor as any).profilePhotoUrl ||
                         (mentor as any).user?.profilePic ||
                         "",
-                    // Sab skills rakho (comma split ke saath); card mein max 3 + "+N more" dikhega
+                    // Keep all skills (comma-split); the card shows max 3 + "+N more"
                     tags: splitSkills(mentor.skills),
                     expTotal: totalExp,
                     domains: Array.isArray(mentor.domains) ? mentor.domains : [],
@@ -370,7 +371,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         void loadCollegeMentors();
     }, [loadIndustryMentors, loadCollegeMentors]);
 
-    // Sliced lists for initial view
+    // Sliced lists for the initial view
     const visibleCollegeMentors = filteredCollegeMentors.slice(0, collegeVisible);
     const collegeRemaining = filteredCollegeMentors.length - collegeVisible;
 
@@ -379,7 +380,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         : filteredIndustryMentors.slice(0, INDUSTRY_LIMIT);
 
     const handleNavigate = (mentor: MentorData) => {
-        // Agar mentor khud apni hi profile pe click kar raha hai
+        // If the mentor clicks their own profile, send them to their dashboard
         if (user?.userId && mentor.userId && user.userId === mentor.userId) {
             router.push(`/mentorship/user-dashboard/${user.userId}`);
             return;
@@ -389,7 +390,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         router.push(`/mentorship/mentor-card/${slugName}/${mentor.id}`);
     };
 
-    // Card ya button, kahin bhi click ho, same page khulna chahiye
+    // Clicking the card or the button must open the same page
     const handleCardNavigate = (mentor: MentorData, isIndustryCard: boolean) => {
         if (!isIndustryCard) {
             router.push(`/mentorship/senior-mentor/${mentor.id}`);
@@ -406,8 +407,8 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         const hasDegree = Boolean(degree);
         const hasEducation = hasCollege || hasDegree;
 
-        // Skills: "Programming Languages: C++" -> "C++", emoji hata kar, duplicates merge,
-        // phir sirf utne pick karo jo ONE row me fit hon
+        // Skills: "Programming Languages: C++" -> "C++", strip emoji, merge duplicates,
+        // then pick only as many as fit in ONE row
         const cleanTags = Array.from(
             new Set(
                 mentor.tags
@@ -578,9 +579,9 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                         }}
                         className="w-full py-2 px-3 bg-[#3a2a1e] hover:bg-[#251910] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                     >
-                        {/* Industry mentor: availability set ho ya na ho, "Book Session" hi dikhao;
-                            uski saari services mentor page par dikhti hain. College mentor: sirf tab
-                            "View Profile" jab uski koi bookable service nahi hai. */}
+                        {/* Industry mentor: always show "Book Session" whether or not availability
+                            is set; all their services are listed on the mentor page.
+                            College mentor: show "View Profile" only when they have no bookable service. */}
                         {!isIndustryCard && !mentor.sessionId ? (
                             <>
                                 <Eye className="w-3.5 h-3.5" />
@@ -600,7 +601,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         );
     };
 
-    // List view: College Mentor ke liye compact row
+    // List view: compact row for College Mentor
     const renderCollegeListRow = (mentor: PublicSeniorMentor) => {
         const data = toCollegeCardData(mentor);
         const tags = Array.from(new Set(data.tags.map(getSkillLabel).filter(Boolean)));
@@ -732,27 +733,28 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     const showIndustryRow = industryStatus !== "success" || industryMentors.length > 0;
     const showCollegeRow = collegeStatus !== "success" || collegeMentors.length > 0;
 
-    // Mentor Type filter: sirf ek type dikhana ho to dusra section chhupa do
+    // Mentor Type filter: when only one type is selected, hide the other section
     const showIndustrySection = showIndustryRow && filters.values.type !== "college";
     const showCollegeSection = showCollegeRow && filters.values.type !== "industry";
 
     return (
-        <section className="py-12 px-6 max-w-7xl mx-auto flex flex-col gap-6">
+        // pb-24 keeps the last card clear of the fixed mobile bottom nav
+        <section className="pt-6 pb-24 px-4 sm:px-6 sm:pt-12 lg:pb-12 max-w-7xl mx-auto flex flex-col gap-4 sm:gap-6">
             {/* Search + Mentor Type (All / Industry / College) */}
             <MentorTopBar f={filters} onOpenFilters={() => setFiltersOpen(true)} />
 
-            {/* Lage hue filters ke chips */}
+            {/* Chips for the applied filters */}
             <ActiveFilterChips f={filters} />
 
             <div className={ROW_CLASS}>
-                {/* EK hi sidebar: desktop par left, mobile par full-screen panel */}
+                {/* Single sidebar: left on desktop, full-screen panel on mobile */}
                 <MentorFilterSidebar
                     f={filters}
                     mobileOpen={filtersOpen}
                     onMobileClose={() => setFiltersOpen(false)}
                 />
 
-                <div className="min-w-0 flex flex-col gap-12">
+                <div className="min-w-0 flex flex-col gap-10 sm:gap-12">
 
                     {/* ───────────── INDUSTRY MENTORS ───────────── */}
                     {showIndustrySection && (

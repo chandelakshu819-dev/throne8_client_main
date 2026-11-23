@@ -1,8 +1,8 @@
 // src/features/mentorship/components/sections/CollegeMentorFilters.tsx
-// Ek hi UNIFIED filter: Industry + College dono mentors par lagta hai.
-// - Search + Mentor Type page ke top par
+// One UNIFIED filter: applies to both Industry and College mentors.
+// - Search + Mentor Type at the top of the page
 // - Sidebar: collapsible groups, "Show all" toggle, typeahead search
-// - Counts live update hote hain (0 result wale options chhup jaate hain)
+// - Counts update live (options with 0 results are hidden)
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -32,27 +32,27 @@ type GroupKey = ListField | "search" | "available";
 
 const GROUPS: GroupKey[] = ["search", "skills", "domains", "exps", "colleges", "degrees", "years", "locations", "available"];
 
-// Kaun sa filter kis type ke mentors par lagta hai
+// Which filters apply to which mentor type
 const INDUSTRY_ONLY_FIELDS: ListField[] = ["domains", "exps"];
 const COLLEGE_ONLY_FIELDS: ListField[] = ["colleges", "degrees", "years", "locations"];
 
 export interface FilterValues {
     search: string;
     type: MentorType;
-    skills: string[]; // dono ke liye
-    domains: string[]; // sirf industry
-    exps: string[]; // sirf industry
-    colleges: string[]; // sirf college
-    degrees: string[]; // sirf college
-    years: string[]; // sirf college (graduation year)
-    locations: string[]; // sirf college
-    availableOnly: boolean; // dono ke liye: abhi book ho sakta hai
+    skills: string[]; // both types
+    domains: string[]; // industry only
+    exps: string[]; // industry only
+    colleges: string[]; // college only
+    degrees: string[]; // college only
+    years: string[]; // college only (graduation year)
+    locations: string[]; // college only
+    availableOnly: boolean; // both types: can be booked right now
 }
 
 export interface FilterOption {
     key: string;
     label: string;
-    count: number; // live count (baaki filters lagne ke baad)
+    count: number; // live count (after all other filters are applied)
 }
 
 export interface FilterChip {
@@ -61,7 +61,7 @@ export interface FilterChip {
     onRemove: () => void;
 }
 
-/** Industry mentor card ke jitne fields filter ke liye chahiye */
+/** Fields of an industry mentor card that the filter needs */
 export interface IndustryFilterable {
     name: string;
     role: string;
@@ -100,7 +100,7 @@ const DOMAIN_FILTERS: { key: string; api: string[] }[] = [
     { key: "Data Science/AI", api: ["data_science", "machine_learning"] },
 ];
 
-// Experience: chhote buckets (min <= years < max), ek mentor sirf ek bucket me aata hai
+// Experience: small buckets (min <= years < max); a mentor falls into exactly one bucket
 const EXP_FILTERS: { key: string; min: number; max: number }[] = [
     { key: "0-1 Yr", min: 0, max: 1 },
     { key: "1-2 Yrs", min: 1, max: 2 },
@@ -126,8 +126,8 @@ const ACRONYMS = new Set([
     "php", "oop", "oops", "iot", "nlp", "dbms", "os", "mern", "mean", "gcp",
 ]);
 
-// Alag-alag likhe hue same skills ko ek me merge karne ke liye
-// key = compact form (lowercase, sirf a-z 0-9 + #)
+// Merges differently written versions of the same skill into one
+// key = compact form (lowercase, only a-z 0-9 + #)
 const SKILL_ALIASES: Record<string, string> = {
     react: "React.js",
     reactjs: "React.js",
@@ -179,7 +179,7 @@ const SKILL_ALIASES: Record<string, string> = {
     problemsolving: "Problem Solving",
 };
 
-// Ye skills sirf noise hain, filter options me nahi dikhate (search me phir bhi match hote hain)
+// These skills are just noise, so they are not shown as filter options (still matched by search)
 const IGNORED_SKILL_KEYS = new Set(["mentor"]);
 
 const stripPrefix = (s: string): string => s.replace(/^[^:]{2,40}:\s*/, "").trim();
@@ -195,7 +195,7 @@ const compactSkill = (s: string): string => s.toLowerCase().replace(/[^a-z0-9+#]
 const titleCase = (s: string): string => s.replace(/\b\w/g, (c) => c.toUpperCase());
 
 const formatSkillWords = (base: string): string => {
-    if (base !== base.toLowerCase()) return base; // pehle se properly formatted hai
+    if (base !== base.toLowerCase()) return base; // already formatted properly
     return base
         .split(" ")
         .map((w) =>
@@ -217,7 +217,7 @@ const parseSkill = (raw: string): ParsedSkill | null => {
     return { key: base.toLowerCase(), label: formatSkillWords(base) };
 };
 
-/** Card / list me dikhane ke liye clean skill label (emoji hata kar, canonical naam). */
+/** Clean skill label for cards / lists (emoji removed, canonical name). */
 export const getSkillLabel = (raw: string): string => parseSkill(raw)?.label ?? "";
 
 // ── College ───────────────────────────────────────────────────
@@ -264,12 +264,12 @@ const degreeLabel = (raw: string): string => {
     return base === base.toLowerCase() ? titleCase(base) : base;
 };
 
-// ── Graduation year / Location: backend ke alag-alag field names ──
+// ── Graduation year / Location: the backend uses different field names ──
 
 const firstNonEmpty = (...values: unknown[]): unknown =>
     values.find((v) => v !== undefined && v !== null && String(v).trim() !== "");
 
-// "2025", 2025, "Batch of 2025", "2021-2025" (last year lega) -> "2025"
+// "2025", 2025, "Batch of 2025", "2021-2025" (takes the last year) -> "2025"
 const readGraduationYear = (m: any): string => {
     const raw = firstNonEmpty(
         m.graduationYear,
@@ -290,7 +290,7 @@ const readGraduationYear = (m: any): string => {
     return year >= 1980 && year <= 2100 ? String(year) : "";
 };
 
-// city + state mile to "City, State", warna jo bhi location field mile
+// If city + state exist -> "City, State", otherwise whichever location field is available
 const readLocation = (m: any): string => {
     const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
     const city = str(firstNonEmpty(m.city, m.collegeCity, m.user?.city));
@@ -303,7 +303,7 @@ const readLocation = (m: any): string => {
 };
 
 /* ─────────────────────────────────────────────────────────────
- * Hook: ek hi filter state + live (faceted) counts
+ * Hook: one filter state + live (faceted) counts
  * ───────────────────────────────────────────────────────────── */
 
 interface IndexedIndustry<T> {
@@ -335,7 +335,7 @@ const bumpCount = (map: Map<string, number>, key: string) =>
     map.set(key, (map.get(key) ?? 0) + 1);
 
 const allPass = (flags: Flags): boolean => GROUPS.every((g) => flags[g]);
-// Ek group ko chhod kar baaki sab pass hain? (us group ke live count ke liye)
+// Do all groups except one pass? (used for that group's live count)
 const othersPass = (flags: Flags, skip: GroupKey): boolean =>
     GROUPS.every((g) => g === skip || flags[g]);
 
@@ -346,9 +346,9 @@ export function useMentorFilters<T extends IndustryFilterable>(
     const [values, setValues] = useState<FilterValues>(EMPTY_FILTERS);
     const [sort, setSort] = useState<CollegeSort>("recommended");
 
-    /* 1) Index: ek baar banta hai jab mentors change hon */
+    /* 1) Index: built once whenever the mentors change */
     const index = useMemo(() => {
-        // College names: "OIST" ko "Oriental Institute of Science & Technology" me merge karo
+        // College names: merge "OIST" into "Oriental Institute of Science & Technology"
         const collegeLabels = new Map<string, string>();
         college.forEach((m) => {
             if (!m.college?.trim()) return;
@@ -425,7 +425,7 @@ export function useMentorFilters<T extends IndustryFilterable>(
             const dKey = mentor.degree?.trim() ? degreeKey(mentor.degree) : "";
             if (dKey && !degreeLabels.has(dKey)) degreeLabels.set(dKey, degreeLabel(mentor.degree));
 
-            // Graduation year aur location: backend jo field bheje wahi padhte hain
+            // Graduation year and location: read whichever field the backend sends
             const anyM = mentor as any;
             const yKey = readGraduationYear(anyM);
             if (yKey && !yearLabels.has(yKey)) yearLabels.set(yKey, yKey);
@@ -461,11 +461,11 @@ export function useMentorFilters<T extends IndustryFilterable>(
         return { indexedIndustry, indexedCollege, skillLabels, collegeLabels, degreeLabels, yearLabels, locationLabels };
     }, [industry, college]);
 
-    /* 2) Har mentor ke liye: kaun sa filter group pass ho raha hai */
+    /* 2) For each mentor: which filter groups pass */
     const q = values.search.trim().toLowerCase();
 
-    // Industry mentors par college-only filter lage ho to wo match nahi karte
-    // (pehle ye hamesha pass hote the, jo user ko galat lagta tha)
+    // If a college-only filter is applied, industry mentors do not match
+    // (previously they always passed, which looked wrong to the user)
     const industryFlags = useCallback(
         (it: IndexedIndustry<T>): Flags => ({
             search: !q || it.haystack.includes(q),
@@ -481,7 +481,7 @@ export function useMentorFilters<T extends IndustryFilterable>(
         [q, values]
     );
 
-    // College mentors par domain / experience filter lage ho to wo match nahi karte
+    // If a domain / experience filter is applied, college mentors do not match
     const collegeFlags = useCallback(
         (it: IndexedCollege): Flags => ({
             search: !q || it.haystack.includes(q),
@@ -523,7 +523,7 @@ export function useMentorFilters<T extends IndustryFilterable>(
         return result.map((it) => it.mentor);
     }, [index.indexedCollege, collegeFlags, sort]);
 
-    /* 4) LIVE counts: har group ka count baaki sab filters lagne ke baad */
+    /* 4) LIVE counts: each group's count after all the other filters are applied */
     const facets = useMemo(() => {
         const skills = new Map<string, number>();
         const domains = new Map<string, number>();
@@ -534,7 +534,7 @@ export function useMentorFilters<T extends IndustryFilterable>(
         const locations = new Map<string, number>();
         let available = 0;
 
-        // Jo type hidden hai uske mentors counts me na ginein
+        // Do not count mentors of the type that is hidden
         if (values.type !== "college") {
             index.indexedIndustry.forEach((it) => {
                 const flags = industryFlags(it);
@@ -561,7 +561,7 @@ export function useMentorFilters<T extends IndustryFilterable>(
                 .map(([key, label]) => ({ key, label, count: counts.get(key) ?? 0 }))
                 .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 
-        // Year: naya batch pehle (2026, 2025, ...)
+        // Year: newest batch first (2026, 2025, ...)
         const yearOptions = toOptions(index.yearLabels, years).sort((a, b) => Number(b.key) - Number(a.key));
 
         return {
@@ -587,7 +587,8 @@ export function useMentorFilters<T extends IndustryFilterable>(
     /* setters */
     const setSearch = useCallback((search: string) => setValues((v) => ({ ...v, search })), []);
 
-    // Type badalne par jo filters ab dikhte hi nahi, unhe hata do (warna chupke se results kam kar dete)
+    // When the type changes, remove filters that are no longer visible
+    // (otherwise they would silently reduce the results)
     const setType = useCallback((type: MentorType) => {
         setValues((v) => {
             const next: FilterValues = { ...v, type };
@@ -606,7 +607,7 @@ export function useMentorFilters<T extends IndustryFilterable>(
             setValues((v) => ({ ...v, [field]: toggleIn(v[field], key) })),
         []
     );
-    // Clear all: search + filters saaf, par Mentor Type tab wahi rahe
+    // Clear all: resets search + filters, but keeps the Mentor Type tab as is
     const clearAll = useCallback(() => setValues((v) => ({ ...EMPTY_FILTERS, type: v.type })), []);
 
     const activeCount =
@@ -620,7 +621,7 @@ export function useMentorFilters<T extends IndustryFilterable>(
         values.locations.length +
         (values.availableOnly ? 1 : 0);
 
-    // Mobile button ke liye: abhi screen par kitne mentors dikhenge
+    // For the mobile button: how many mentors will be visible on screen right now
     const visibleTotal =
         (values.type !== "college" ? filteredIndustry.length : 0) +
         (values.type !== "industry" ? filteredCollege.length : 0);
@@ -707,7 +708,7 @@ export function useMentorFilters<T extends IndustryFilterable>(
 export type MentorFiltersApi = ReturnType<typeof useMentorFilters>;
 
 /* ─────────────────────────────────────────────────────────────
- * UI: page ke top par Search + Mentor Type
+ * UI: Search + Mentor Type at the top of the page
  * ───────────────────────────────────────────────────────────── */
 
 const FOCUS_RING =
@@ -722,8 +723,9 @@ export function MentorTopBar({
 }) {
     const { values } = f;
 
+    // Short labels on purpose: all 3 tabs must always fit in one row on any phone.
     const tabs: { value: MentorType; label: string; count: number }[] = [
-        { value: "all", label: "All mentors", count: f.filteredIndustry.length + f.filteredCollege.length },
+        { value: "all", label: "All", count: f.filteredIndustry.length + f.filteredCollege.length },
         { value: "industry", label: "Industry", count: f.filteredIndustry.length },
         { value: "college", label: "College", count: f.filteredCollege.length },
     ];
@@ -731,7 +733,7 @@ export function MentorTopBar({
     return (
         <div className="space-y-4">
             <div className="flex items-center gap-3">
-                <div className="relative flex-1">
+                <div className="relative flex-1 min-w-0">
                     <Search className="w-5 h-5 text-[#a89580] absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                         type="text"
@@ -753,11 +755,11 @@ export function MentorTopBar({
                     )}
                 </div>
 
-                {/* Mobile par filter panel kholne ka button */}
+                {/* Button that opens the filter panel on mobile */}
                 <button
                     type="button"
                     onClick={onOpenFilters}
-                    className={`lg:hidden relative flex items-center gap-2 px-4 py-3.5 rounded-2xl border text-sm font-bold transition-colors ${FOCUS_RING} ${
+                    className={`lg:hidden relative shrink-0 flex items-center gap-2 px-4 py-3.5 rounded-2xl border text-sm font-bold transition-colors ${FOCUS_RING} ${
                         f.activeCount > 0
                             ? "bg-[#3a2a1e] text-white border-[#3a2a1e]"
                             : "bg-white text-[#3a2a1e] border-[#e8ded5]"
@@ -773,11 +775,12 @@ export function MentorTopBar({
                 </button>
             </div>
 
-            {/* Segmented control */}
+            {/* Segmented control: a 3-column grid, so every tab always gets exactly 1/3 of the
+                width. It can never overflow or scroll, regardless of screen size. */}
             <div
                 role="tablist"
                 aria-label="Mentor type"
-                className="inline-flex max-w-full overflow-x-auto p-1 rounded-full bg-white border border-[#e8ded5] shadow-sm [scrollbar-width:none]"
+                className="grid grid-cols-3 gap-1 w-full max-w-md p-1 rounded-full bg-white border border-[#e8ded5] shadow-sm overflow-hidden"
             >
                 {tabs.map((t) => {
                     const active = values.type === t.value;
@@ -787,16 +790,17 @@ export function MentorTopBar({
                             type="button"
                             role="tab"
                             aria-selected={active}
+                            aria-label={`${t.label}, ${t.count} mentors`}
                             onClick={() => f.setType(t.value)}
-                            className={`shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${FOCUS_RING} ${
+                            className={`min-w-0 flex items-center justify-center gap-1.5 px-1.5 py-2 rounded-full text-[13px] font-bold whitespace-nowrap transition-all ${FOCUS_RING} ${
                                 active
                                     ? "bg-[#4a3728] text-white shadow"
                                     : "text-[#6b5643] hover:bg-[#f8f4ef]"
                             }`}
                         >
-                            {t.label}
+                            <span className="truncate">{t.label}</span>
                             <span
-                                className={`text-[11px] font-black min-w-[22px] text-center px-1.5 py-0.5 rounded-full ${
+                                className={`shrink-0 text-[11px] font-black min-w-[20px] text-center px-1.5 py-0.5 rounded-full ${
                                     active ? "bg-white/20 text-white" : "bg-[#f5ede5] text-[#8b7355]"
                                 }`}
                             >
@@ -811,7 +815,7 @@ export function MentorTopBar({
 }
 
 /* ─────────────────────────────────────────────────────────────
- * UI: typeahead (click karo -> suggestions, type karo -> filter)
+ * UI: typeahead (click -> suggestions, type -> filter)
  * ───────────────────────────────────────────────────────────── */
 
 function SearchPicker({
@@ -838,7 +842,7 @@ function SearchPicker({
         return () => document.removeEventListener("mousedown", onDown);
     }, []);
 
-    // Multi-word search: "oriental tech" -> har word label me hona chahiye
+    // Multi-word search: "oriental tech" -> every word must appear in the label
     const needle = text.trim().toLowerCase();
     const tokens = needle.split(/\s+/).filter(Boolean);
     const matches = options
@@ -924,9 +928,9 @@ function SearchPicker({
 }
 
 /* ─────────────────────────────────────────────────────────────
- * UI: ek filter group (collapsible)
+ * UI: one filter group (collapsible)
  *  - list: checkbox rows (skills, college, degree ...)
- *  - chips: chhote toggle pills (experience, graduation year)
+ *  - chips: small toggle pills (experience, graduation year)
  * ───────────────────────────────────────────────────────────── */
 
 function CountBadge({ children }: { children: React.ReactNode }) {
@@ -962,7 +966,7 @@ function FacetGroup({
     const selectedOptions = selected
         .map((k) => options.find((o) => o.key === k))
         .filter((o): o is FilterOption => Boolean(o));
-    // Sirf wahi options jinse kuch result milta hai
+    // Only options that return at least one result
     const available = options.filter((o) => o.count > 0 && !selected.includes(o.key));
     const visibleAvailable = expanded ? available : available.slice(0, topN);
     const shown = [...selectedOptions, ...visibleAvailable];
@@ -1143,7 +1147,7 @@ export function MentorFilterSidebar({
 }) {
     const { values } = f;
 
-    // Mobile panel khula ho to page scroll lock + Esc se band
+    // While the mobile panel is open: lock page scroll and close on Esc
     useEffect(() => {
         if (!mobileOpen) return;
         const prev = document.body.style.overflow;
@@ -1320,7 +1324,7 @@ export function MentorFilterSidebar({
 }
 
 /* ─────────────────────────────────────────────────────────────
- * UI: selected filters ke chips
+ * UI: chips for the selected filters
  * ───────────────────────────────────────────────────────────── */
 
 export function ActiveFilterChips({ f }: { f: MentorFiltersApi }) {
@@ -1355,7 +1359,7 @@ export function ActiveFilterChips({ f }: { f: MentorFiltersApi }) {
 }
 
 /* ─────────────────────────────────────────────────────────────
- * UI: College section ka result count + sort + grid/list toggle
+ * UI: College section result count + sort + grid/list toggle
  * ───────────────────────────────────────────────────────────── */
 
 interface CollegeResultsBarProps {
