@@ -36,6 +36,39 @@ import {
 const inputClass =
     "w-full px-4 py-2.5 bg-[#f8f6f4] border border-[#ece7e2] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#4a3728] text-sm font-medium";
 
+// Form fields in the order they appear on screen, with the step each one lives on
+const FIELD_STEP: Record<string, number> = {
+    profilePic: 1,
+    linkedinUrl: 1,
+    title: 1,
+    currentRole: 2,
+    company: 2,
+    college: 2,
+    degree: 2,
+    branch: 2,
+    experienceTotal: 2,
+    domains: 2,
+    skills: 2,
+    bio: 2,
+};
+const FIELD_ORDER = Object.keys(FIELD_STEP);
+
+// Scroll to the field (after the step has rendered) and focus its first control
+const focusField = (field: string) => {
+    let tries = 0;
+    const attempt = () => {
+        const wrapper = document.querySelector<HTMLElement>(`[data-field="${field}"]`);
+        if (!wrapper) {
+            if (tries++ < 10) setTimeout(attempt, 50);
+            return;
+        }
+        wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const control = wrapper.querySelector<HTMLElement>('input:not([type="hidden"]), textarea, select, label[for]');
+        setTimeout(() => control?.focus({ preventScroll: true }), 250);
+    };
+    setTimeout(attempt, 0);
+};
+
 interface BecomeMentorModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -231,6 +264,8 @@ export default function BecomeMentorModal({
         if (branch && !getValues('branch')) setValue('branch', branch, { shouldValidate: false });
     }, [educationList, userProfileData, setValue, getValues]);
 
+    const allAgreed = agreements.every(Boolean);
+
     const fullName = userProfileData
         ? [userProfileData.firstName, userProfileData.lastName].filter(Boolean).join(' ').trim()
         : '';
@@ -265,7 +300,27 @@ export default function BecomeMentorModal({
             ]);
         }
 
-        if (isValid) setFormStep(formStep + 1);
+        if (isValid) {
+            setFormStep(formStep + 1);
+            return;
+        }
+
+        // Scroll to + focus the first field that failed validation on this step
+        const result = createMentorSchema.safeParse(getValues());
+        if (!result.success) {
+            const failed = new Set(result.error.issues.map((i) => String(i.path[0])));
+            const first = FIELD_ORDER.find((f) => FIELD_STEP[f] === formStep && failed.has(f));
+            if (first) focusField(first);
+        }
+    };
+
+    // Submit par koi required field missing/invalid ho to us field wale step par le jao aur focus karo
+    const onInvalid = (errs: Record<string, any>) => {
+        const first = FIELD_ORDER.find((f) => f in errs);
+        if (!first) return;
+        const targetStep = FIELD_STEP[first];
+        if (targetStep !== formStep) setFormStep(targetStep);
+        focusField(first);
     };
 
     const onSubmit = async (formData: CreateMentorFormData) => {
@@ -334,9 +389,7 @@ export default function BecomeMentorModal({
                             handleNext();
                             return;
                         }
-                        handleSubmit(onSubmit, (errs) => {
-                            console.log("Validation errors:", errs);
-                        })();
+                        handleSubmit(onSubmit, onInvalid)();
                     }}
                     className="bg-white rounded-[28px] max-w-2xl w-full relative shadow-2xl animate-slide-up-modal my-2"
                     onClick={(e) => e.stopPropagation()}
@@ -382,7 +435,7 @@ export default function BecomeMentorModal({
                                     Personal Information
                                 </h3>
 
-                                <div>
+                                <div data-field="profilePic">
                                     <label className="block text-sm font-bold text-[#4a3728] mb-2">
                                         Profile Photo *
                                     </label>
@@ -455,7 +508,7 @@ export default function BecomeMentorModal({
                                         />
                                     </div>
 
-                                    <div>
+                                    <div data-field="linkedinUrl">
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">LinkedIn URL *</label>
                                         <input
                                             {...register('linkedinUrl')}
@@ -469,7 +522,7 @@ export default function BecomeMentorModal({
                                     </div>
                                 </div>
 
-                                <div>
+                                <div data-field="title">
                                     <label className="block text-sm font-bold text-[#4a3728] mb-2">Mentor Title *</label>
                                     <input
                                         {...register('title')}
@@ -493,7 +546,7 @@ export default function BecomeMentorModal({
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Current Role */}
-                                    <div>
+                                    <div data-field="currentRole">
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Current Role *</label>
                                         <AutocompleteInput
     value={watch('currentRole') || ''}
@@ -509,7 +562,7 @@ export default function BecomeMentorModal({
                                     </div>
 
                                     {/* Company */}
-                                    <div>
+                                    <div data-field="company">
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Company *</label>
                                         <CompanyAutocomplete
     value={watch('company') || ''}
@@ -531,7 +584,7 @@ export default function BecomeMentorModal({
                                     </div>
 
                                     {/* College */}
-                                    <div>
+                                    <div data-field="college">
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">College / University *</label>
                                         <AutocompleteInput
     value={watch('college') || ''}
@@ -547,7 +600,7 @@ export default function BecomeMentorModal({
                                     </div>
 
                                     {/* Degree */}
-                                    <div>
+                                    <div data-field="degree">
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Degree *</label>
                                         <AutocompleteInput
     value={watch('degree') || ''}
@@ -563,7 +616,7 @@ export default function BecomeMentorModal({
                                     </div>
 
                                     {/* Branch */}
-                                    <div>
+                                    <div data-field="branch">
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Branch *</label>
                                         <AutocompleteInput
     value={watch('branch') || ''}
@@ -579,7 +632,7 @@ export default function BecomeMentorModal({
                                     </div>
 
                                     {/* Years of Experience */}
-                                    <div>
+                                    <div data-field="experienceTotal">
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">Years of Experience *</label>
                                         <select
                                             {...register('experienceTotal', { valueAsNumber: true })}
@@ -598,7 +651,7 @@ export default function BecomeMentorModal({
                                     </div>
 
                                                                        {/* Domains */}
-                                                                       <div className="md:col-span-2">
+                                                                       <div className="md:col-span-2" data-field="domains">
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">
                                             Domains * <span className="text-slate-400 font-normal">(max 5, type to search e.g. react, dsa, aws)</span>
                                         </label>
@@ -663,7 +716,7 @@ export default function BecomeMentorModal({
 
                                 {/* Skills */}
 
-                                                                <div>
+                                <div data-field="skills">
                                     <label className="block text-sm font-bold text-[#4a3728] mb-2">
                                         Skills * <span className="text-slate-400 font-normal">(press Enter to add)</span>
                                     </label>
@@ -717,7 +770,7 @@ export default function BecomeMentorModal({
                                     )}
                                 </div>
                                 {/* Bio */}
-                                <div>
+                                <div data-field="bio">
                                     <label className="block text-sm font-bold text-[#4a3728] mb-2">
                                         Bio / About You *
                                         <span className="text-slate-400 font-normal ml-1">(min 50 chars)</span>
@@ -818,7 +871,7 @@ export default function BecomeMentorModal({
                             ) : (
                                 <button
                                     type="submit"
-                                    disabled={isSubmitting}
+                                    disabled={isSubmitting || !allAgreed}
                                     className="px-8 py-3 bg-gradient-to-r from-[#4a3728] to-[#7a5c3e] text-white rounded-2xl font-bold text-sm hover:shadow-xl transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
                                     {isSubmitting ? 'Submitting...' : 'Submit Application'}
