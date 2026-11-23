@@ -1,6 +1,6 @@
 "use client";
 // src/features/mentorship/components/dashboard/ServiceModal.tsx
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import {
     X, DollarSign, Image as ImageIcon, Upload, FileText,
     Briefcase, Clock, Users, AlertCircle, Trash2
@@ -136,6 +136,30 @@ export default function ServiceModal({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [formData?.serviceType]);
 
+    // Validation fail hone par pehle error wali field par scroll + focus karo
+    const bodyRef = useRef<HTMLDivElement>(null);
+    const errorBannerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const errorKeys = Object.keys(fieldErrors || {});
+        if (errorKeys.length === 0) return;
+
+        const root = bodyRef.current;
+        if (!root) return;
+
+        // DOM order me sabse pehli error wali field (top se bottom)
+        const target = Array.from(root.querySelectorAll<HTMLElement>('[data-field]'))
+            .find((el) => errorKeys.includes(el.dataset.field || ''));
+
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.focus({ preventScroll: true });
+        } else {
+            // Koi input nahi (e.g. serviceType error) -> error banner dikhao
+            errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [fieldErrors]);
+
     const currentServiceType = serviceTypes.find(t => t.name === formData?.serviceType);
     const needsDescription = currentServiceType?.needsDescription ?? true;
     const needsParticipants = currentServiceType?.needsParticipants ?? true;
@@ -214,7 +238,7 @@ export default function ServiceModal({
                 </div>
 
                 {/* Body - only this part scrolls */}
-                <div className="space-y-5 overflow-y-auto p-6 pt-5">
+                <div ref={bodyRef} className="space-y-5 overflow-y-auto p-6 pt-5">
 
                     {/* Image Upload */}
                     <div
@@ -299,6 +323,7 @@ export default function ServiceModal({
                                 type="text"
                                 placeholder="e.g., Advanced React Mentoring"
                                 className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                data-field="serviceName"
                                 style={inputStyle(fieldErrors?.serviceName)}
                                 value={formData?.serviceName || ''}
                                 onChange={(e) => setFormData({ ...formData, serviceName: e.target.value })}
@@ -330,6 +355,7 @@ export default function ServiceModal({
                                     type="number"
                                     placeholder="500"
                                     className="w-full pl-7 pr-3.5 py-2.5 rounded-lg border outline-none text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                                    data-field="price"
                                     style={inputStyle(fieldErrors?.price)}
                                     value={formData?.isFree ? 0 : (formData?.price || '')}
                                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
@@ -351,6 +377,7 @@ export default function ServiceModal({
                                 maxLength={MAX_DESCRIPTION_LENGTH}
                                 placeholder="Describe your service in detail..."
                                 className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm resize-none"
+                                data-field="description"
                                 style={inputStyle(fieldErrors?.description)}
                                 value={formData?.description || ''}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value.slice(0, MAX_DESCRIPTION_LENGTH) })}
@@ -378,6 +405,7 @@ export default function ServiceModal({
                                 type="url"
                                 placeholder="https://your-portfolio.com"
                                 className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                data-field="portfolioUrl"
                                 style={inputStyle(fieldErrors?.portfolioUrl)}
                                 value={formData?.portfolioUrl || ''}
                                 onChange={(e) => setFormData({ ...formData, portfolioUrl: e.target.value })}
@@ -425,6 +453,7 @@ export default function ServiceModal({
                                 type="text"
                                 placeholder="e.g., React System Design"
                                 className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                data-field="topic"
                                 style={inputStyle(fieldErrors?.topic)}
                                 value={formData?.topic || ''}
                                 onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
@@ -444,6 +473,7 @@ export default function ServiceModal({
                                 type="url"
                                 placeholder="https://meet.google.com/abc-defg-hij"
                                 className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                data-field="meetingUrl"
                                 style={inputStyle(fieldErrors?.meetingUrl)}
                                 value={formData?.meetingUrl || ''}
                                 onChange={(e) => setFormData({ ...formData, meetingUrl: e.target.value })}
@@ -493,6 +523,7 @@ export default function ServiceModal({
                                             type="number"
                                             placeholder="1"
                                             className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                            data-field="minParticipants"
                                             style={inputStyle(fieldErrors?.minParticipants)}
                                             value={formData?.minParticipants || ''}
                                             onChange={(e) => setFormData({ ...formData, minParticipants: e.target.value })}
@@ -508,6 +539,7 @@ export default function ServiceModal({
                                             type="number"
                                             placeholder="10"
                                             className="w-full px-3.5 py-2.5 rounded-lg border outline-none text-sm"
+                                            data-field="maxParticipants"
                                             style={inputStyle(fieldErrors?.maxParticipants)}
                                             value={formData?.maxParticipants || ''}
                                             onChange={(e) => setFormData({ ...formData, maxParticipants: e.target.value })}
@@ -568,6 +600,7 @@ export default function ServiceModal({
                     {/* Error Message */}
                     {saveError && (
                         <div
+                            ref={errorBannerRef}
                             className="flex items-center gap-2 p-3 rounded-lg text-sm font-medium"
                             style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5' }}
                         >
