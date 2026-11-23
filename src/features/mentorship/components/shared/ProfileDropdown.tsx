@@ -2,7 +2,7 @@
 // src/features/mentorship/components/shared/ProfileDropdown.tsx
 //
 // "Switch Workspace" dropdown in the mentorship navbar.
-// Roles: Mentee / Industry Mentor (seniorMentor key) / Senior Mentor (industryMentor key)
+// Roles (display order): Mentee / College Mentor (industryMentor key) / Industry Mentor (seniorMentor key)
 // Visibility is driven by getVisibleRoles() in constants/roleVisibility.ts.
 // Each visible role has: approved (open) | pending (under review) | none/rejected (locked).
 

@@ -7,10 +7,10 @@
 // ---------------------------------------------------------------------------
 // | Approved roles (from API)           | Options shown                       |
 // |-------------------------------------|-------------------------------------|
-// | Only mentee (no approved mentoring) | Mentee + Senior Mentor(L) + Ind(L)  |
-// | Approved Senior Mentor only         | Mentee + Senior Mentor               |
+// | Only mentee (no approved mentoring) | Mentee + College(L) + Industry(L)   |
+// | Approved College Mentor only        | Mentee + College Mentor              |
 // | Approved Industry Mentor only       | Mentee + Industry Mentor             |
-// | Both approved                       | Mentee + Senior Mentor + Industry    |
+// | Both approved                       | Mentee + College Mentor + Industry   |
 // ---------------------------------------------------------------------------
 // "pending" does NOT count as approved for visibility purposes.
 // The user's currently-active role (from usePathname) is always included so
@@ -18,7 +18,7 @@
 //
 // NOTE: The frontend uses the alias `seniorMentor` as the FrontendRoleKey
 // for the API field `seniorMentor` (Mentor collection).
-// Display label is "Senior Mentor". No backend changes are needed.
+// Display labels: seniorMentor -> "Industry Mentor", industryMentor -> "College Mentor". No backend changes are needed.
 
 import { MyRolesResponse, RoleStatus } from "@/lib/api/mentorship.service";
 
@@ -51,9 +51,9 @@ export const ROLE_CONFIG: Record<
     label: "Industry Mentor",
     subLabel: "Share professional experience",
   },
-  // key `industryMentor` = SeniorMentorApplication ("Become Senior Mentor" form) -> shown as "Senior Mentor"
+  // key `industryMentor` = SeniorMentorApplication ("Become Senior Mentor" form) -> shown as "College Mentor"
   industryMentor: {
-    label: "Senior Mentor",
+    label: "College Mentor",
     subLabel: "Guide your juniors",
   },
 };
@@ -118,21 +118,22 @@ export function getVisibleRoles(
     status: "approved",
   });
 
-  if (showSeniorMentor) {
-    visible.push({
-      key: "seniorMentor",
-      label: ROLE_CONFIG.seniorMentor.label,
-      subLabel: ROLE_CONFIG.seniorMentor.subLabel,
-      status: mapped.seniorMentor,
-    });
-  }
-
+  // Order: Mentee -> College Mentor (key `industryMentor`) -> Industry Mentor (key `seniorMentor`)
   if (showIndustryMentor) {
     visible.push({
       key: "industryMentor",
       label: ROLE_CONFIG.industryMentor.label,
       subLabel: ROLE_CONFIG.industryMentor.subLabel,
       status: mapped.industryMentor,
+    });
+  }
+
+  if (showSeniorMentor) {
+    visible.push({
+      key: "seniorMentor",
+      label: ROLE_CONFIG.seniorMentor.label,
+      subLabel: ROLE_CONFIG.seniorMentor.subLabel,
+      status: mapped.seniorMentor,
     });
   }
 
