@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 import FilterModal from "./FilterModal";
@@ -50,7 +50,8 @@ const StudySidebar = () => {
     setMounted(true);
   }, []);
 
-  // ✅ Load unread count on mount, on every route change, and every 60s.
+  // ✅ Load unread count on mount and every 60s (socket pushes cover the rest).
+  // Route changes no longer trigger a request; see the effect below for the one case that does.
   // Failures are silent so the sidebar never breaks because of notifications.
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +62,18 @@ const StudySidebar = () => {
     load();
     const timer = setInterval(load, 60_000);
     return () => { cancelled = true; clearInterval(timer); };
+  }, []);
+
+  // ✅ Items are marked read on the notifications page, so refresh the badge only when
+  // the user leaves it. Every other route change cannot change the count.
+  const previousPathRef = useRef(pathname);
+  useEffect(() => {
+    const previous = previousPathRef.current;
+    previousPathRef.current = pathname;
+    const NOTIFICATIONS = "/study/notifications";
+    if (previous?.startsWith(NOTIFICATIONS) && !pathname?.startsWith(NOTIFICATIONS)) {
+      StudyGroupNotificationService.getUnreadCount().then(setUnreadCount).catch(() => {});
+    }
   }, [pathname]);
 
   // ✅ Instant badge update when the server pushes a new notification (e.g. a host reminder).

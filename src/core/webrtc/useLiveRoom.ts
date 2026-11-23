@@ -283,6 +283,10 @@ export function useLiveRoom({
   // Presence heartbeat: server drops a participant after ~120s without 'liveroom:heartbeat'
   const heartbeatTimerRef = useRef<NodeJS.Timeout | null>(null);
   const joinedRef = useRef(false);
+  // Room id the server accepted our join for (what the server keys camera/mic state on).
+  const joinedRoomIdRef = useRef<string>('');
+  // Re-announces our camera/mic state to the room (called once a peer connection is up).
+  const announceLocalStateRef = useRef<() => void>(() => {});
   const joinInFlightRef = useRef<Promise<JoinOutcome> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioAnalysers = useRef<Map<string, AnalyserNode>>(new Map());
@@ -521,7 +525,10 @@ export function useLiveRoom({
         if (!meta.remoteStream.getTracks().includes(track)) {
           meta.remoteStream.addTrack(track);
         }
-        updatePeer(peerId, { stream: meta.remoteStream });
+        // Hand the UI a NEW MediaStream object each time a track arrives (audio and video come in
+        // separate ontrack events). Adding a track to the same object doesn't fire 'addtrack', so
+        // elements already bound to it could keep playing only the first track.
+        updatePeer(peerId, { stream: new MediaStream(meta.remoteStream.getTracks()) });
 
         // Voice activity detection on the remote audio
         if (track.kind === 'audio') setupVAD(peerId, new MediaStream([track]));
@@ -580,6 +587,10 @@ export function useLiveRoom({
         if (state === 'connected') {
           // Reset retry counter on success
           retryCount.current.set(peerId, 0);
+          // The peer's UI starts with camera/mic "unknown/off" and the one-off toggle events sent
+          // at join can arrive before it has created our tile (they are then dropped). Now that the
+          // connection is up both sides have a tile, so say what our state really is.
+          announceLocalStateRef.current();
         }
       };
 
@@ -1037,6 +1048,7 @@ const toggleMic = useCallback(async () => {
         .then((outcome) => {
           if (outcome.status === 'ok') {
             joinedRef.current = true;
+            joinedRoomIdRef.current = targetRoomId;
             socket.emit('toggle-camera', { roomId: targetRoomId, cameraOn: !!opts.cameraOn });
             socket.emit('toggle-mic', { roomId: targetRoomId, micOn: !!opts.micOn });
           }
@@ -1122,11 +1134,32 @@ const toggleMic = useCallback(async () => {
   }, [roomId, userId, userName, startLocalStream, requestJoin]);
   
 
+  // Tell the room our real camera/mic state (read from the actual local tracks).
+  useEffect(() => {
+    announceLocalStateRef.current = () => {
+      const socket = getSocket();
+      const joinedRoomId = joinedRoomIdRef.current;
+      if (!socket?.connected || !joinedRoomId) return;
+      const stream = localStreamRef.current;
+      const video = stream?.getVideoTracks()[0];
+      const audio = stream?.getAudioTracks()[0];
+      socket.emit('toggle-camera', {
+        roomId: joinedRoomId,
+        cameraOn: !!video && video.enabled && video.readyState === 'live',
+      });
+      socket.emit('toggle-mic', {
+        roomId: joinedRoomId,
+        micOn: !!audio && audio.enabled && audio.readyState === 'live',
+      });
+    };
+  }, []);
+
   // ── Leave live room ───────────────────────────────────────
   const leaveRoom = useCallback(() => {
     const socket = getSocket();
     socket?.emit('leave-live-room', { roomId });
     joinedRef.current = false;
+    joinedRoomIdRef.current = '';
     joinInFlightRef.current = null;
 
     if (heartbeatTimerRef.current) {

@@ -62,7 +62,23 @@ function VideoTile({
   // Attach stream via ref — no re-mount when layouts change
   useEffect(() => {
     const el = videoRef.current;
-    if (el && el.srcObject !== stream) el.srcObject = stream ?? null;
+    if (!el) return;
+    if (el.srcObject !== stream) el.srcObject = stream ?? null;
+    if (!stream) return;
+
+    // Make sure playback really starts (and carries sound). Browsers can block autoplay with
+    // audio; if so, retry on the user's next click / key press.
+    const tryPlay = () => {
+      el.play().catch(() => {});
+    };
+    tryPlay();
+    const onGesture = () => tryPlay();
+    document.addEventListener('pointerdown', onGesture, { once: true });
+    document.addEventListener('keydown', onGesture, { once: true });
+    return () => {
+      document.removeEventListener('pointerdown', onGesture);
+      document.removeEventListener('keydown', onGesture);
+    };
   }, [stream]);
 
   return (
@@ -233,9 +249,14 @@ export default function SessionRoomPage() {
   const roomId = bookingId || sessionId;
 
   const { user } = useAuth();
-  const currentUserId = (user as any)?.id || (user as any)?.userId || '';
+  // Same id the study group uses (and the one the socket server authenticates the user as).
+  const currentUserId = (user as any)?.userId || (user as any)?.id || '';
   const currentUserName =
-    `${(user as any)?.firstName || ''} ${(user as any)?.lastName || ''}`.trim() || 'User';
+    `${(user as any)?.firstName || ''} ${(user as any)?.lastName || ''}`.trim() ||
+    (user as any)?.fullName ||
+    (user as any)?.name ||
+    (user as any)?.email ||
+    'User';
 
   const [sessionData, setSessionData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
