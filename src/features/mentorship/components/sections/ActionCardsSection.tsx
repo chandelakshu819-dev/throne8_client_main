@@ -363,19 +363,7 @@ export default function ActionCardsSection({
                         cta="Get Matched"
                     />
 
-                    {/* 2. BECOME INDUSTRY MENTOR - Visible to Normal Users & College Mentors */}
-                    {showIndustryMentor && (
-                        <ActionCard
-                            onClick={handleIndustryMentorClick}
-                            icon={<Users className={ICON_CLASS} />}
-                            audience={MENTOR_AUDIENCE}
-                            title="Become Industry Mentor"
-                            description={MENTOR_DESC}
-                            cta="Apply Now"
-                        />
-                    )}
-
-                    {/* 3. BECOME COLLEGE MENTOR - Visible to Normal Users & Industry Mentors */}
+                    {/* 2. BECOME COLLEGE MENTOR - Visible to Normal Users & Industry Mentors */}
                     {showCollegeMentor && (
                         <ActionCard
                             onClick={handleSeniorMentorClick}
@@ -401,6 +389,18 @@ export default function ActionCardsSection({
                                 )
                             }
                             cta={seniorLoading ? "Loading..." : cta}
+                        />
+                    )}
+
+                    {/* 3. BECOME INDUSTRY MENTOR - Visible to Normal Users & College Mentors */}
+                    {showIndustryMentor && (
+                        <ActionCard
+                            onClick={handleIndustryMentorClick}
+                            icon={<Users className={ICON_CLASS} />}
+                            audience={MENTOR_AUDIENCE}
+                            title="Become Industry Mentor"
+                            description={MENTOR_DESC}
+                            cta="Apply Now"
                         />
                     )}
                 </div>
