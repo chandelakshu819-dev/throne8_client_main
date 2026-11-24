@@ -25,6 +25,49 @@ const attendancePercentageGuard = createFreshnessGuard("groups/attendance/fetchP
   hasData: (state) => state.groups?.attendancePercentage != null,
 });
 
+// ── Groups page lists (top ranked, university, placement, public, trending, popular) ──
+// Reopening /study/groups within the TTL reuses the lists already in the store.
+// Guards are keyed per list AND per limit, because the search dropdown asks for
+// 5 trending/popular groups while the page asks for 6.
+// Call with { force: true } to always refetch; join/leave/create/delete clear them
+// through invalidateGroupCaches().
+type ListArg = number | { limit?: number; force?: boolean } | void;
+const listLimit = (arg: ListArg, fallback = 10): number =>
+  typeof arg === "number" ? arg : (arg && arg.limit) || fallback;
+const listForce = (arg: ListArg): boolean =>
+  typeof arg === "object" && !!arg && !!arg.force;
+
+const listGuards = new Map<string, ReturnType<typeof createFreshnessGuard>>();
+const listGuard = (name: string, limit: number, hasData: (state: any) => boolean) => {
+  const key = `groups/list/${name}:${limit}`;
+  let guard = listGuards.get(key);
+  if (!guard) {
+    guard = createFreshnessGuard(key, { hasData });
+    listGuards.set(key, guard);
+  }
+  return guard;
+};
+const listCondition =
+  (name: string, hasData: (state: any) => boolean) =>
+  (arg: ListArg, api: { getState: () => unknown }) =>
+    listGuard(name, listLimit(arg), hasData).condition(
+      listForce(arg) ? { force: true } : undefined,
+      api
+    );
+
+const hasTopRanked = (state: any) => (state.groups?.topRankedGroups?.length ?? 0) > 0;
+const hasUniversity = (state: any) => (state.groups?.universityGroups?.length ?? 0) > 0;
+const hasPlacement = (state: any) => (state.groups?.placementGroups?.length ?? 0) > 0;
+const hasPublic = (state: any) => (state.groups?.publicGroupsFromApi?.length ?? 0) > 0;
+const hasTrending = (state: any) => (state.groups?.trendingGroups?.length ?? 0) > 0;
+const hasPopular = (state: any) => (state.groups?.popularGroups?.length ?? 0) > 0;
+
+/** Clear the cached "my groups" and every Groups page list (use after any join/leave/create/delete). */
+export const invalidateGroupCaches = () => {
+  myGroupsGuard.invalidate();
+  listGuards.forEach((g) => g.invalidate());
+};
+
 export const fetchUserStreakThunk = createAsyncThunk(
   "groups/fetchUserStreak",
   async (_: FreshnessArg, { rejectWithValue, getState }) => {
@@ -58,7 +101,7 @@ export const createGroupThunk = createAsyncThunk(
   async (groupData: CreateGroupData, { rejectWithValue }) => {
     try {
       const group = await StudyGroupService.createGroup(groupData);
-      myGroupsGuard.invalidate();
+      invalidateGroupCaches();
       return group;
     } catch (error: any) {
       return rejectWithValue(
@@ -83,16 +126,18 @@ export const fetchGroupsThunk = createAsyncThunk(
 // ADD this thunk
 export const fetchTopRankedGroupsThunk = createAsyncThunk(
   "groups/fetchTopRanked",
-  async (limit: number = 10, { rejectWithValue }) => {
+  async (arg: ListArg, { rejectWithValue, getState }) => {
+    const limit = listLimit(arg);
     try {
-      const groups = await StudyGroupService.getTopRankedGroups(limit);
-      return groups;
+      return await listGuard("topRanked", limit, hasTopRanked).track(getState, async () => {
+        const response = await StudyGroupService.getTopRankedGroups(limit);
+        return response;
+      });
     } catch (error: any) {
-      return rejectWithValue(
-        error.message || "Failed to fetch top ranked groups"
-      );
+      return rejectWithValue(error.message || "Failed to fetch top ranked groups");
     }
-  }
+  },
+  { condition: listCondition("topRanked", hasTopRanked) }
 );
 
 export const fetchGroupByIdThunk = createAsyncThunk(
@@ -141,7 +186,7 @@ export const joinGroupThunk = createAsyncThunk(
   ) => {
     try {
       const group = await StudyGroupService.joinGroup(groupId, { inviteCode });
-      myGroupsGuard.invalidate();
+      invalidateGroupCaches();
       return group;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to join group");
@@ -154,7 +199,7 @@ export const leaveGroupThunk = createAsyncThunk(
   async (groupId: string, { rejectWithValue }) => {
     try {
       await StudyGroupService.leaveGroup(groupId);
-      myGroupsGuard.invalidate();
+      invalidateGroupCaches();
       return groupId;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to leave group");
@@ -167,7 +212,7 @@ export const deleteGroupThunk = createAsyncThunk(
   async (groupId: string, { rejectWithValue }) => {
     try {
       await StudyGroupService.deleteGroup(groupId);
-      myGroupsGuard.invalidate();
+      invalidateGroupCaches();
       return groupId;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to delete group");
@@ -183,7 +228,7 @@ export const updateGroupThunk = createAsyncThunk(
   ) => {
     try {
       const group = await StudyGroupService.updateGroup(groupId, updates);
-      myGroupsGuard.invalidate();
+      invalidateGroupCaches();
       return group;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to update group");
@@ -199,7 +244,7 @@ export const addMemberThunk = createAsyncThunk(
   ) => {
     try {
       await StudyGroupService.addMember(groupId, userId);
-      myGroupsGuard.invalidate();
+      invalidateGroupCaches();
       return { groupId, userId };
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to add member");
@@ -215,7 +260,7 @@ export const removeMemberThunk = createAsyncThunk(
   ) => {
     try {
       await StudyGroupService.removeMember(groupId, userId);
-      myGroupsGuard.invalidate();
+      invalidateGroupCaches();
       return { groupId, userId };
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to remove member");
@@ -249,28 +294,34 @@ export const searchGroupsThunk = createAsyncThunk(
 
 export const fetchPopularGroupsThunk = createAsyncThunk(
   "groups/fetchPopular",
-  async (limit: number = 10, { rejectWithValue }) => {
+  async (arg: ListArg, { rejectWithValue, getState }) => {
+    const limit = listLimit(arg);
     try {
-      const response = await StudyGroupService.getPopularGroups(limit);
-      return response;
+      return await listGuard("popular", limit, hasPopular).track(getState, async () => {
+        const response = await StudyGroupService.getPopularGroups(limit);
+        return response;
+      });
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to fetch popular groups");
     }
-  }
+  },
+  { condition: listCondition("popular", hasPopular) }
 );
 
 export const fetchTrendingGroupsThunk = createAsyncThunk(
   "groups/fetchTrending",
-  async (limit: number = 10, { rejectWithValue }) => {
+  async (arg: ListArg, { rejectWithValue, getState }) => {
+    const limit = listLimit(arg);
     try {
-      const response = await StudyGroupService.getTrendingGroups(limit);
-      return response;
+      return await listGuard("trending", limit, hasTrending).track(getState, async () => {
+        const response = await StudyGroupService.getTrendingGroups(limit);
+        return response;
+      });
     } catch (error: any) {
-      return rejectWithValue(
-        error.message || "Failed to fetch trending groups"
-      );
+      return rejectWithValue(error.message || "Failed to fetch trending groups");
     }
-  }
+  },
+  { condition: listCondition("trending", hasTrending) }
 );
 
 export const fetchRecommendedGroupsThunk = createAsyncThunk(
@@ -353,72 +404,63 @@ export const searchGroupsByTagsThunk = createAsyncThunk(
 // ADD these 3 specific thunks
 export const fetchUniversityGroupsThunk = createAsyncThunk(
   "groups/fetchUniversity",
-  async (limit: number = 10, { rejectWithValue }) => {
+  async (arg: ListArg, { rejectWithValue, getState }) => {
+    const limit = listLimit(arg);
     try {
-      const response = await StudyGroupService.getGroupsByCategory(
-        GroupCategory.COLLEGE,
-        { limit }
-      );
-      return response.groups;
+      return await listGuard("university", limit, hasUniversity).track(getState, async () => {
+        const response = await StudyGroupService.getGroupsByCategory(GroupCategory.COLLEGE, { limit });
+        return response.groups;
+      });
     } catch (error: any) {
-      return rejectWithValue(
-        error.message || "Failed to fetch university groups"
-      );
+      return rejectWithValue(error.message || "Failed to fetch university groups");
     }
-  }
+  },
+  { condition: listCondition("university", hasUniversity) }
 );
 
 export const fetchPlacementGroupsThunk = createAsyncThunk(
   "groups/fetchPlacement",
-  async (limit: number = 10, { rejectWithValue }) => {
+  async (arg: ListArg, { rejectWithValue, getState }) => {
+    const limit = listLimit(arg);
     try {
-      //   const response = await StudyGroupService.getGroupsByCategory(
-      //     GroupCategory.PLACEMENT,
-      //     { limit }
-      //   );
-      //   return response.groups;
-      const [placementRes, competitiveRes] = await Promise.all([
-        // StudyGroupService.getGroupsByCategory(GroupCategory.PLACEMENT, { limit }).catch(() => ({ groups: [] })),
-        StudyGroupService.getGroupsByCategory(GroupCategory.PLACEMENT, {
-          limit,
-        }).catch((err: any) => {
-          console.warn("[placement groups] failed:", err?.message);
-          return { groups: [] as any[] };
-        }),
-        // StudyGroupService.getGroupsByCategory(GroupCategory.COMPETITIVE, {
-        //   limit,
-        // }).catch(() => ({ groups: [] })),
-        StudyGroupService.getGroupsByCategory(GroupCategory.COMPETITIVE, {
-          limit,
-        }).catch((err: any) => {
-          console.warn("[competitive groups] failed:", err?.message);
-          return { groups: [] as any[] };
-        }),
-      ]);
-      return [...(placementRes.groups ?? []), ...(competitiveRes.groups ?? [])];
+      return await listGuard("placement", limit, hasPlacement).track(getState, async () => {
+        const [placementRes, competitiveRes] = await Promise.all([
+          StudyGroupService.getGroupsByCategory(GroupCategory.PLACEMENT, { limit }).catch(
+            (err: any) => {
+              console.warn("[placement groups] failed:", err?.message);
+              return { groups: [] as any[] };
+            }
+          ),
+          StudyGroupService.getGroupsByCategory(GroupCategory.COMPETITIVE, { limit }).catch(
+            (err: any) => {
+              console.warn("[competitive groups] failed:", err?.message);
+              return { groups: [] as any[] };
+            }
+          ),
+        ]);
+        return [...(placementRes.groups ?? []), ...(competitiveRes.groups ?? [])];
+      });
     } catch (error: any) {
-      return rejectWithValue(
-        error.message || "Failed to fetch placement groups"
-      );
+      return rejectWithValue(error.message || "Failed to fetch placement groups");
     }
-  }
+  },
+  { condition: listCondition("placement", hasPlacement) }
 );
 
 export const fetchPublicGroupsThunk = createAsyncThunk(
   "groups/fetchPublic",
-  async (limit: number = 10, { rejectWithValue }) => {
+  async (arg: ListArg, { rejectWithValue, getState }) => {
+    const limit = listLimit(arg);
     try {
-      const response = await StudyGroupService.getGroups({
-        visibility: GroupVisibility.PUBLIC,
-        // sortBy: 'memberCount',
-        // sortOrder: 'desc',
-        limit,
+      return await listGuard("public", limit, hasPublic).track(getState, async () => {
+        const response = await StudyGroupService.getGroups({ visibility: GroupVisibility.PUBLIC, limit });
+        return response.groups;
       });
-      return response.groups;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to fetch public groups");
     }
-  }
+  },
+  { condition: listCondition("public", hasPublic) }
 );
 
 // ADD in group.thunks.ts
@@ -543,7 +585,7 @@ export const respondToJoinRequestThunk = createAsyncThunk(
           rejectionReason,
         }
       );
-      myGroupsGuard.invalidate();
+      invalidateGroupCaches();
       return { ...result, groupId, joinRequestId, action };
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to respond to request");
@@ -890,7 +932,7 @@ export const trackInviteJoinThunk = createAsyncThunk(
   async (inviteCode: string, { rejectWithValue }) => {
     try {
       await StudyGroupService.trackInviteJoin(inviteCode);
-      myGroupsGuard.invalidate();
+      invalidateGroupCaches();
       return inviteCode;
     } catch (error: any) {
       return rejectWithValue(error.message || "Failed to track join");

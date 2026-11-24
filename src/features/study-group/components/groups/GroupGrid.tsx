@@ -57,12 +57,14 @@ const GroupGrid: React.FC<GroupGridProps> = ({ title, subtitle, sectionKey }) =>
     university: universityGroups,
     dsa: placementGroups,
     jee: jeeGroups,
+    public: [],
   };
 
   const loadingMap: Record<SectionKey, boolean> = {
     university: universityLoading,
     dsa: placementLoading,
     jee: false,
+    public: false,
   };
 
   // REPLACE groups variable

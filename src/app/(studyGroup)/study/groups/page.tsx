@@ -35,8 +35,8 @@ const Groups: React.FC = () => {
   const SECTION = "px-2 sm:px-4 md:px-6 lg:px-8 xl:px-12 2xl:px-16 py-6 sm:py-8 lg:py-10";
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-[#f6ede8] via-[#ede4db] to-[#e0d8cf] overflow-x-hidden">
-      <div className="w-full max-w-[1920px] mx-auto">
+    <div className="min-h-full w-full bg-gradient-to-br from-[#f6ede8] via-[#ede4db] to-[#e0d8cf] overflow-x-hidden">
+      <div className="w-full max-w-[1920px] mx-auto pb-12 sm:pb-16 lg:pb-12">
 
         <div className="px-2 sm:px-4 md:px-6 lg:px-8 xl:px-12 2xl:px-16">
           <GroupHeader />

@@ -59,6 +59,30 @@ font-family: var(--font-sans, Arial, Helvetica, sans-serif);
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
+  /* Subtle & minimal Throne8 custom scrollbar matching cream & brown palette */
+  .throne8-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #c4b5a5 transparent;
+  }
+
+  .throne8-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .throne8-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .throne8-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #c4b5a5;
+    border-radius: 9999px;
+  }
+
+  .throne8-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #8a7a6a;
+  }
 }
 
 @keyframes shake {

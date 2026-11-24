@@ -198,7 +198,7 @@ const StudySidebar = () => {
   const SidebarContent = () => (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 lg:mb-10">
+      <div className="flex items-center justify-between mb-4 lg:mb-8 flex-shrink-0">
         <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#4a3728]">
           Throne8
         </h2>
@@ -212,15 +212,15 @@ const StudySidebar = () => {
         </button>
       </div>
 
-      {/* Sections - REMOVED overflow-y-auto */}
-      <div className="flex-1">
+      {/* Sections - independently scrollable with accessible Profile section */}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden throne8-scrollbar pr-1 -mr-1">
         {sidebarSections.map((section, index) => (
-          <div key={index} className="mb-6 lg:mb-8">
-            <h3 className="text-xs lg:text-sm font-bold text-gray-700 uppercase mb-3 lg:mb-4 px-1">
+          <div key={index} className="mb-5 lg:mb-7">
+            <h3 className="text-xs lg:text-sm font-bold text-gray-700 uppercase mb-2.5 lg:mb-3.5 px-1">
               {section.title}
             </h3>
 
-            <ul className="space-y-2 lg:space-y-3">
+            <ul className="space-y-1.5 lg:space-y-2.5">
               {section.items.map((item, idx) => (
                 <li
                   key={idx}
