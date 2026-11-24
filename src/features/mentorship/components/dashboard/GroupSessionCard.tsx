@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Clock, Users, MoreVertical, Pencil, Trash2 } from 'lucide-react';
-import { getPriceLabel } from './ServicesPage';
-
+import { getPriceLabel, getServiceIcon, getServiceAccent } from './ServicesPage';
+import ServiceThumbnail, { getServiceImage } from '@/features/mentorship/components/shared/ServiceThumbnail';
 interface GroupSessionCardProps {
   group: any;
   idx?: number;
@@ -15,6 +15,10 @@ export function GroupSessionCard({ group, idx = 0, onEdit, onDelete, onMenteeSta
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuAnchorRect, setMenuAnchorRect] = useState<{ top: number; left: number } | null>(null);
 
+
+  const Icon = getServiceIcon('group_session');
+  const accent = getServiceAccent('group_session');
+
   const bookings = group.bookings ?? [];
   const pending = bookings.filter((b: any) => b.status === 'pending').length;
   const confirmed = bookings.filter((b: any) => b.status === 'confirmed').length;
@@ -25,28 +29,26 @@ export function GroupSessionCard({ group, idx = 0, onEdit, onDelete, onMenteeSta
       className="bg-white rounded-[20px] border flex flex-col h-full overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
       style={{ borderColor: '#e0d8cf', boxShadow: '0 4px 20px -4px rgba(74, 55, 40, 0.08)' }}
     >
-      {/* Thumbnail */}
-      <div
-        className="w-full h-32 flex items-center justify-center relative"
+           {/* Thumbnail */}
+           <div
+        className="w-full aspect-video relative overflow-hidden"
         style={{ backgroundColor: '#f3ece4' }}
       >
-        {group.thumbnailImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={group.thumbnailImage}
-            alt={group.title || "Group Session"}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <Users className="w-8 h-8" style={{ color: '#8a7a6a' }} />
-        )}
+        <ServiceThumbnail
+          src={getServiceImage({ ...group, name: group.title })}
+          alt={group.title || 'Group Session'}
+          label="Group Session"
+          type="group_session"
+        />
         <span
-          className="absolute top-3 left-3 w-8 h-8 rounded-lg flex items-center justify-center shadow-sm"
+          className="absolute top-3 left-3 w-8 h-8 rounded-lg flex items-center justify-center shadow-sm z-10"
           style={{ backgroundColor: '#fff' }}
         >
-          <Users className="w-4 h-4" style={{ color: '#15803d' }} />
+          <Icon className="w-4 h-4" style={{ color: accent }} />
         </span>
       </div>
+
+
 
       <div className="p-6 flex flex-col flex-1">
         <div className="flex-1">
@@ -125,7 +127,7 @@ export function GroupSessionCard({ group, idx = 0, onEdit, onDelete, onMenteeSta
         </h3>
 
         <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold mb-3"
-          style={{ backgroundColor: '#15803d1A', color: '#15803d' }}>
+          style={{ backgroundColor: `${accent}1A`, color: accent }}>
           Group Session
         </span>
 

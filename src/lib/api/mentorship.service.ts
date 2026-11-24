@@ -605,7 +605,8 @@ class MentorService {
     try {
       const { data } = await api.patch(
         `/mentorship/group-sessions/${id}`,
-        payload
+        payload,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
       );
 
       return data;

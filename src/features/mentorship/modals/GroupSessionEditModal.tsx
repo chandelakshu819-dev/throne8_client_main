@@ -1,7 +1,7 @@
 'use client';
 // src/features/mentorship/modals/GroupSessionEditModal.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, DollarSign, Image as ImageIcon, Upload, FileText, Briefcase, Clock, Users, Video } from 'lucide-react';
+import { X, DollarSign, Image as ImageIcon, Upload, FileText, Briefcase, Clock, Users, Video, Trash2 } from 'lucide-react';
 import MentorService from '@/lib/api/mentorship.service';
 
 const followUpAllowedOptions = [
@@ -174,8 +174,10 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
           }
       });
       if (formData.thumbnailImage instanceof File) {
-           fd.append('thumbnailImage', formData.thumbnailImage);
-      }
+        fd.append('thumbnailImage', formData.thumbnailImage);
+   } else if (formData.removeThumbnailImage) {
+        fd.append('removeThumbnailImage', 'true');
+   }
 
       await MentorService.updateGroupSession(targetSessionId, fd);
 
@@ -222,25 +224,38 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
           <div className="space-y-6">
 
             <div className="p-8 rounded-2xl border-2 border-dashed relative overflow-hidden flex items-center justify-center" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', minHeight: '240px' }}>
-                {thumbnailPreview ? (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/5 group">
+            {thumbnailPreview ? (
+                    <div className="absolute inset-0">
                         <img src={thumbnailPreview} alt="Preview" className="w-full h-full object-cover" />
-                        <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                            <input
-                                type="file"
-                                accept="image/jpeg,image/png,image/webp"
-                                className="hidden"
-                                onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) setFormData({ ...formData, thumbnailImage: file });
-                                }}
+                        <div className="absolute bottom-3 right-3 flex gap-2">
+                            <label
+                                className="cursor-pointer text-white px-4 py-2.5 rounded-xl font-semibold flex items-center gap-2 text-sm shadow-lg"
+                                style={{ backgroundColor: '#4a3728' }}
+                            >
+                                <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) setFormData({ ...formData, thumbnailImage: file, removeThumbnailImage: false });
+                                    }}
+                                    disabled={isSaving}
+                                />
+                                <Upload className="w-4 h-4" />
+                                Change
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, thumbnailImage: null, removeThumbnailImage: true })}
                                 disabled={isSaving}
-                            />
-                            <div className="text-white px-6 py-3 rounded-xl font-semibold flex items-center gap-2" style={{ backgroundColor: '#4a3728' }}>
-                                <Upload className="w-5 h-5" />
-                                Change Image
-                            </div>
-                        </label>
+                                className="bg-white px-4 py-2.5 rounded-xl font-semibold flex items-center gap-2 text-sm shadow-lg disabled:opacity-50"
+                                style={{ color: '#dc2626' }}
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Remove
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <div className="text-center w-full">
@@ -256,7 +271,7 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
                                 className="hidden"
                                 onChange={(e) => {
                                     const file = e.target.files?.[0];
-                                    if (file) setFormData({ ...formData, thumbnailImage: file });
+                                    if (file) setFormData({ ...formData, thumbnailImage: file, removeThumbnailImage: false });
                                 }}
                                 disabled={isSaving}
                             />
