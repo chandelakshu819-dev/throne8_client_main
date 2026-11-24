@@ -236,4 +236,4 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
   );
 };
 
-export default GroupCard;
+export default React.memo(GroupCard);
