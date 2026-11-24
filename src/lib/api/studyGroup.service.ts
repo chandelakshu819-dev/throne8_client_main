@@ -127,6 +127,7 @@ export interface GroupResponse {
   updatedAt: string;
   memberRole?: MemberRole;
   isMember?: boolean;
+  memberPreview?: { userId: string; initials: string }[];
 }
 
 export interface GroupMember {
@@ -166,6 +167,7 @@ export interface TopRankedGroupResponse {
   minAttendancePercent?: number | null;
   isMember: boolean;
   memberRole?: string;
+  memberPreview?: { userId: string; initials: string }[];
 }
 
 // ==================== ADD THESE INTERFACES ====================

@@ -13,7 +13,7 @@ import {
 import { joinGroupThunk, sendJoinRequestThunk } from '@/hooks/studyGroup/features/groups/group.thunks';
 import { useGroupData } from '@/features/study-group/hooks/useGroupData';
 import JoinGroupModal from '@/features/study-group/modals/joinGroupModal';
-import { generateMemberAvatars } from '@/features/studyGroup/helper';
+import { getMemberAvatarInitials } from '@/features/studyGroup/helper';
 
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -149,8 +149,13 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
         {/* Avatars */}
         <div className="flex items-center gap-2 mb-3">
           <div className="flex -space-x-2">
-            {generateMemberAvatars(isApiGroup ? memberCount : group.members).map((avatar, idx) => (
-              <img key={idx} src={avatar} alt={`Member ${idx + 1}`} className="w-8 h-8 rounded-full border-2 border-white shadow-sm" />
+            {getMemberAvatarInitials(group.memberPreview, isApiGroup ? memberCount : group.members).map((initials, idx) => (
+              <div
+                key={idx}
+                className="w-8 h-8 rounded-full border-2 border-white shadow-sm bg-[#d4a574] text-white text-[11px] font-medium flex items-center justify-center"
+              >
+                {initials}
+              </div>
             ))}
           </div>
           <div className="text-xs">

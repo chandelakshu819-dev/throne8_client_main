@@ -12,15 +12,27 @@ export function getStatus(goal: GoalWithUI) {
   return 'active';
 }
 
-export const generateMemberAvatars = (count: number): string[] => {
-  const names = [
-    'Priya Kumar', 'Rahul Patel', 'Ananya Das', 'Arjun Singh',
-    'Sneha Reddy', 'Vikram Joshi', 'Ishita Kapoor', 'Rohan Gupta',
-  ];
-  return Array.from({ length: Math.min(count, 3) }, () => {
-    const name = names[Math.floor(Math.random() * names.length)];
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=d4a574&color=fff&size=128`;
-  });
+export const getInitials = (name?: string): string => {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+/**
+ * Initials to show in a group card's avatar stack.
+ * Uses the real members from the API (memberPreview); no random values,
+ * so the letters stay the same across re-renders.
+ */
+export const getMemberAvatarInitials = (
+  memberPreview: { initials: string }[] | undefined,
+  memberCount: number
+): string[] => {
+  if (memberPreview && memberPreview.length > 0) {
+    return memberPreview.slice(0, 3).map((m) => m.initials);
+  }
+  // Preview not loaded yet: neutral placeholders instead of wrong letters
+  return Array.from({ length: Math.min(memberCount, 3) }, () => '•');
 };
 
 export function getGridClass(total: number, hasPinned: boolean): string {
