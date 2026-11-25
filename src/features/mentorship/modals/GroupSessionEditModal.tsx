@@ -23,13 +23,7 @@ const bufferTimeOptions = [
     { value: '10', label: '10 Min' }, { value: '15', label: '15 Min' },
 ];
 
-const formatLocalDatetimeForInput = (isoString?: string | Date | null) => {
-  if (!isoString) return '';
-  const d = new Date(isoString);
-  if (isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
+
 
 interface EditSessionModalProps {
   isOpen: boolean;
@@ -90,11 +84,8 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
             duration: dbSession.duration || '',
             minParticipants: dbSession.minParticipants || '',
             maxParticipants: dbSession.maxParticipants || '',
-            scheduledAt: formatLocalDatetimeForInput(dbSession.scheduledAt),
-            status: dbSession.status || 'open',
             pricePerPerson: dbSession.pricing?.pricePerPerson ?? 0,
-            paymentMethod: dbSession.payment?.method || dbSession.paymentMethod || 'razorpay',
-            followUpAllowed: dbSession.settings?.followUp?.allowed !== undefined ? String(dbSession.settings.followUp.allowed) : '0',
+            followUpAllowed: dbSession.settings?.followUp?.allowed ? '1' : '0',
             followUpPeriod: dbSession.settings?.followUp?.periodDays !== undefined ? String(dbSession.settings.followUp.periodDays) : '0',
             bufferTime: String(dbSession.settings?.bufferTimeMinutes ?? 0),
             thumbnailImage: dbSession.thumbnailImage || null,
@@ -142,15 +133,12 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
         minParticipants: Number(formData.minParticipants),
         maxParticipants: Number(formData.maxParticipants),
         pricePerPerson: Number(formData.pricePerPerson) || 0,
-        paymentMethod: formData.paymentMethod,
-        status: formData.status,
+       
         bufferTimeMinutes: Number(formData.bufferTime) || 0,
         meetingUrl: formData.meetingUrl.trim(),
       };
 
-      if (formData.scheduledAt) {
-        changes.scheduledAt = new Date(formData.scheduledAt).toISOString();
-      }
+     
 
             // ✅ FIX: followUpAllowed dropdown "0"–"7" (kitni baar follow-up
       // allowed hai) store karta hai — ek COUNT, boolean nahi. Lekin
@@ -195,26 +183,29 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div
-        className="bg-white rounded-3xl p-8 max-w-4xl w-full shadow-2xl transform animate-fadeIn max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl transform animate-fadeIn max-h-[90vh] flex flex-col overflow-hidden"
         style={{ border: '2px solid #e0d8cf' }}
       >
-        <div className="flex justify-between items-start mb-8">
-          <div className="flex items-center gap-4">
-            <div className="text-6xl">👥</div>
+        <div className="shrink-0 flex justify-between items-start px-8 pt-8 pb-6 border-b" style={{ borderColor: '#e0d8cf' }}>
+        <div className="flex items-center gap-3">
+            <div className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#f3ece5' }}>
+              <Video className="w-5 h-5" style={{ color: '#4a3728' }} />
+            </div>
             <div>
-              <h3 className="text-4xl font-bold mb-2" style={{ color: '#4a3728' }}>
+              <h3 className="text-xl font-bold" style={{ color: '#4a3728' }}>
                 Edit Group Session
               </h3>
-              <p className="text-lg" style={{ color: '#8a7a6a' }}>
+              <p className="text-sm" style={{ color: '#8a7a6a' }}>
                 Modify your published group session details
               </p>
             </div>
           </div>
-          <button onClick={onClose} disabled={isLoading || isSaving} className="p-3 hover:bg-gray-100 rounded-xl transition-all duration-300 hover:rotate-90 disabled:opacity-50">
-            <X className="w-7 h-7" style={{ color: '#4a3728' }} />
+          <button onClick={onClose} disabled={isLoading || isSaving} className="p-2 hover:bg-gray-100 rounded-xl transition-all duration-300 hover:rotate-90 disabled:opacity-50">
+            <X className="w-5 h-5" style={{ color: '#4a3728' }} />
           </button>
         </div>
 
+        <div className="flex-1 min-h-0 overflow-y-auto px-8 py-6">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2" style={{ borderColor: '#4a3728' }}></div>
@@ -342,41 +333,24 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                  <DollarSign className="w-5 h-5 inline mr-2" />
-                  Price per Person
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold" style={{ color: '#7a5c3e' }}>₹</span>
-                  <input
-                    type="number"
-                    className="w-full p-4 pl-10 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                    style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
-                    value={formData.pricePerPerson || 0}
-                    onChange={(e) => setFormData({ ...formData, pricePerPerson: e.target.value })}
-                    disabled={isSaving || formData.paymentMethod === 'free'}
-                  />
-                </div>
-              </div>
-              <div>
-                 <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                     <Clock className="w-5 h-5 inline mr-2" />
-                     Schedule Date & Time
-                 </label>
-                 <input
-                     type="datetime-local"
-                     className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                     style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
-                     value={formData.scheduledAt || ''}
-                     onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
-                     disabled={isSaving}
-                 />
+            <div>
+              <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
+                <DollarSign className="w-5 h-5 inline mr-2" />
+                Price per Person
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold" style={{ color: '#7a5c3e' }}>₹</span>
+                <input
+                  type="number"
+                  className="w-full p-4 pl-10 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
+                  style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+                  value={formData.pricePerPerson || 0}
+                  onChange={(e) => setFormData({ ...formData, pricePerPerson: e.target.value })}
+                  disabled={isSaving}
+                />
               </div>
             </div>
-
-            <div className="grid grid-cols-3 gap-6 p-6 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '2px solid #e0d8cf' }}>
+            <div className="grid grid-cols-3 gap-3 p-4 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '2px solid #e0d8cf' }}>
               <div>
                   <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
                       <Clock className="w-5 h-5 inline mr-2" />
@@ -436,45 +410,7 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                    Payment Method
-                  </label>
-                  <select
-                      className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                      style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
-                      value={formData.paymentMethod || 'razorpay'}
-                      onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                      disabled={isSaving}
-                  >
-                      <option value="free">🆓 Free (No Charge)</option>
-                      <option value="razorpay">Razorpay</option>
-                      <option value="stripe">Stripe</option>
-                      <option value="cash">Cash</option>
-                      <option value="bank_transfer">Bank Transfer</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
-                      📊 Status
-                  </label>
-                  <select
-                      className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                      style={{
-                          borderColor: '#e0d8cf',
-                          backgroundColor: '#fbf7f3',
-                          color: '#4a3728',
-                      }}
-                      value={formData.status || 'open'}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                      disabled={isSaving}
-                  >
-                        <option value="open">Open</option>
-                        <option value="rescheduled">Rescheduled</option>
-                  </select>
-                </div>
-            </div>
+           
 
             <div className="p-6 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '2px solid #e0d8cf' }}>
                 <h4 className="text-lg font-bold mb-4" style={{ color: '#4a3728' }}>Follow-up Settings</h4>
@@ -545,8 +481,9 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
               </button>
             </div>
 
-          </div>
+            </div>
         )}
+        </div>
       </div>
     </div>
   );
