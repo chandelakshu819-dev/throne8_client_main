@@ -188,8 +188,11 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
       >
         <div className="shrink-0 flex justify-between items-start px-8 pt-8 pb-6 border-b" style={{ borderColor: '#e0d8cf' }}>
         <div className="flex items-center gap-3">
-            <div className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#f3ece5' }}>
-              <Video className="w-5 h-5" style={{ color: '#4a3728' }} />
+            <div
+              className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center bg-white"
+              style={{ border: '1px solid #e0d8cf', boxShadow: '0 1px 3px rgba(74,55,40,0.12)' }}
+            >
+              <Users className="w-5 h-5" style={{ color: '#15803d' }} />
             </div>
             <div>
               <h3 className="text-xl font-bold" style={{ color: '#4a3728' }}>

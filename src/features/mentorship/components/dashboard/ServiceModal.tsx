@@ -218,9 +218,18 @@ export default function ServiceModal({
                 {/* Header - static, does not scroll */}
                 <div className="flex justify-between items-start p-6 pb-4 shrink-0" style={{ borderBottom: '1px solid #f0ebe4' }}>
                     <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#f3ece4' }}>
-                            <ServiceIcon className="w-5 h-5" style={{ color: '#4a3728' }} />
-                        </div>
+                        {service.name === 'group_session' || currentServiceType?.name === 'group_session' ? (
+                            <div
+                                className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-white"
+                                style={{ border: '1px solid #e0d8cf', boxShadow: '0 1px 3px rgba(74,55,40,0.12)' }}
+                            >
+                                <ServiceIcon className="w-5 h-5" style={{ color: '#15803d' }} />
+                            </div>
+                        ) : (
+                            <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#f3ece4' }}>
+                                <ServiceIcon className="w-5 h-5" style={{ color: '#4a3728' }} />
+                            </div>
+                        )}
                         <div>
                             <h3 className="text-xl font-bold" style={{ color: '#4a3728' }}>
                                 {service.name === 'New Service' ? 'Create New Service' : service.name}
