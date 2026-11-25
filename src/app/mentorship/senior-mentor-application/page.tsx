@@ -290,6 +290,12 @@ const GUIDE_DISMISSED_KEY = 'throne8_senior_mentor_guide_dismissed';
 // 2. Validation Schema (Zod)
 // ============================================================================
 
+/**
+ * Step 4 ("Additional Information": motivation + adviceToJuniorSelf) is hidden for now.
+ * Set this to true to bring the step (and its validation) back.
+ */
+const SHOW_MOTIVATION_STEP = false;
+
 const createSchema = z.object({
     // Step 1: Personal Information
     mentorRole: z.enum(['senior_mentor', 'alumni'], {
@@ -397,14 +403,18 @@ const createSchema = z.object({
         .max(MAX_HELP_AREAS, `You can select up to ${MAX_HELP_AREAS} help areas.`),
 
     // Step 4: Additional Information
-    motivation: z
-        .string()
-        .min(30, "Please share why you want to become a Senior Mentor (at least 30 characters).")
-        .max(1000, "Motivation cannot exceed 1000 characters."),
-    adviceToJuniorSelf: z
-        .string()
-        .min(10, "Please write at least 10 characters of advice.")
-        .max(500, "Advice cannot exceed 500 characters."),
+    motivation: SHOW_MOTIVATION_STEP
+        ? z
+              .string()
+              .min(30, "Please share why you want to become a Senior Mentor (at least 30 characters).")
+              .max(1000, "Motivation cannot exceed 1000 characters.")
+        : z.string().optional(),
+    adviceToJuniorSelf: SHOW_MOTIVATION_STEP
+        ? z
+              .string()
+              .min(10, "Please write at least 10 characters of advice.")
+              .max(500, "Advice cannot exceed 500 characters.")
+        : z.string().optional(),
 
     // Step 5: Verification Documents
     resumeFile: z
@@ -465,6 +475,11 @@ const steps = [
     },
 ];
 
+/** Step ids the user actually sees, e.g. [1, 2, 3, 5] while the motivation step is hidden */
+const visibleStepIds: number[] = steps
+    .filter((s) => SHOW_MOTIVATION_STEP || s.id !== 4)
+    .map((s) => s.id);
+
 /** Server field names -> form field names */
 const SERVER_FIELD_MAP: Record<string, keyof FormValues> = {
     resume: 'resumeFile',
@@ -488,7 +503,7 @@ function StepTip({ children }: { children: React.ReactNode }) {
 function FirstTimeGuide({ onClose }: { onClose: () => void }) {
     const items: [string, string, string][] = [
         ['1', 'Choose your role', 'Tap one of the two cards below.'],
-        ['2', 'Fill 5 short steps', 'It takes about 10 minutes. Your text answers are saved on this device automatically.'],
+        ['2', `Fill ${visibleStepIds.length} short steps`,'It takes about 10 minutes. Your text answers are saved on this device automatically.'],
         ['3', 'Upload your documents', 'Add your resume and a proof document. Our team will then review your application.'],
     ];
     return (
@@ -1434,7 +1449,10 @@ export default function SeniorMentorApplicationPage() {
             if (savedDraft.acceptFreePolicy === true) setAcceptFreePolicy(true);
 
             if (typeof savedDraft.savedStep === 'number' && savedDraft.savedStep >= 1 && savedDraft.savedStep <= 5) {
-                setCurrentStep(savedDraft.savedStep);
+                // An old draft saved on the hidden step continues from the next visible step
+                const restoredStep =
+                    !SHOW_MOTIVATION_STEP && savedDraft.savedStep === 4 ? 5 : savedDraft.savedStep;
+                setCurrentStep(restoredStep);
             }
         };
 
@@ -1637,13 +1655,19 @@ export default function SeniorMentorApplicationPage() {
         }
 
         setErrorMsg('');
-        setCurrentStep((prev) => Math.min(5, prev + 1));
+        setCurrentStep((prev) => {
+            const idx = visibleStepIds.indexOf(prev);
+            return visibleStepIds[Math.min(visibleStepIds.length - 1, idx + 1)];
+        });
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handlePrev = () => {
         setErrorMsg('');
-        setCurrentStep((prev) => Math.max(1, prev - 1));
+        setCurrentStep((prev) => {
+            const idx = visibleStepIds.indexOf(prev);
+            return visibleStepIds[Math.max(0, idx - 1)];
+        });
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -1773,8 +1797,10 @@ export default function SeniorMentorApplicationPage() {
             formData.append('helpAreas', JSON.stringify(values.helpAreas));
 
             // Step 4: Additional Information
-            formData.append('motivation', values.motivation.trim());
-            formData.append('adviceToJuniorSelf', values.adviceToJuniorSelf.trim());
+            if (SHOW_MOTIVATION_STEP) {
+                formData.append('motivation', (values.motivation ?? '').trim());
+                formData.append('adviceToJuniorSelf', (values.adviceToJuniorSelf ?? '').trim());
+            }
             formData.append('acceptedFreePolicy', String(values.mentorRole === 'senior_mentor' && acceptFreePolicy));
 
             // Step 5: Verification Documents & Photo
@@ -2007,7 +2033,7 @@ export default function SeniorMentorApplicationPage() {
                             {/* Multi-step progress tracker */}
                             <div className="mt-6 sm:mt-8">
                                 <div className="flex items-center gap-2 mb-3">
-                                    {[1, 2, 3, 4, 5].map((step) => (
+                                    {visibleStepIds.map((step, stepIdx) => (
                                         <button
                                             key={step}
                                             type="button"
@@ -2018,14 +2044,14 @@ export default function SeniorMentorApplicationPage() {
                                                     window.scrollTo({ top: 0, behavior: 'smooth' });
                                                 }
                                             }}
-                                            aria-label={`Go to step ${step}`}
+                                            aria-label={`Go to step ${stepIdx + 1}`}
                                             className={`h-2 rounded-full flex-1 transition-all ${currentStep >= step ? 'bg-white' : 'bg-white/25'} ${step < currentStep ? 'cursor-pointer hover:bg-white/80' : 'cursor-default'}`}
-                                            title={`Step ${step}`}
+                                            title={`Step ${stepIdx + 1}`}
                                         />
                                     ))}
                                 </div>
                                 <div className="flex justify-between gap-3 text-xs font-bold text-white/80">
-                                    <span className="whitespace-nowrap">Step {currentStep} of 5</span>
+                                    <span className="whitespace-nowrap">Step {visibleStepIds.indexOf(currentStep) + 1} of {visibleStepIds.length}</span>
                                     <span className="text-right">{currentStepTitle}</span>
                                 </div>
                             </div>
