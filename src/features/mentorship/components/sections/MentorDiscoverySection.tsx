@@ -2,6 +2,7 @@
 "use client";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { routes } from "@/config/routes";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -123,6 +124,7 @@ const getCollegeMentorImage = (mentor: PublicSeniorMentor): string =>
 // PublicSeniorMentor -> MentorData for the card
 const toCollegeCardData = (mentor: PublicSeniorMentor): MentorData => ({
     id: mentor.id,
+    userId: mentor.userId,
     name: mentor.displayName,
     role: "",
     company: "",
@@ -379,10 +381,15 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         ? filteredIndustryMentors
         : filteredIndustryMentors.slice(0, INDUSTRY_LIMIT);
 
+    // Logged-in user ka apna card hai ya nahi (userId match)
+    const isOwnCard = (mentor: MentorData): boolean =>
+        Boolean(user?.userId && mentor.userId && String(user.userId) === String(mentor.userId));
+
     const handleNavigate = (mentor: MentorData) => {
-        // If the mentor clicks their own profile, send them to their dashboard
-        if (user?.userId && mentor.userId && user.userId === mentor.userId) {
-            router.push(`/mentorship/user-dashboard/${user.userId}`);
+        // Industry mentor apne hi card par click kare -> apni Industry Mentor profile
+        // (booking page nahi, kyunki khud se session book nahi kar sakte)
+        if (isOwnCard(mentor) && user?.userId) {
+            router.push(`${routes.seniorMentorDashboard(user.userId)}?tab=profile`);
             return;
         }
 
@@ -393,6 +400,11 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     // Clicking the card or the button must open the same page
     const handleCardNavigate = (mentor: MentorData, isIndustryCard: boolean) => {
         if (!isIndustryCard) {
+            // College mentor apne hi card par click kare -> apni College Mentor profile
+            if (isOwnCard(mentor) && user?.userId) {
+                router.push(routes.industryMentorDashboard(user.userId));
+                return;
+            }
             router.push(`/mentorship/senior-mentor/${mentor.id}`);
             return;
         }

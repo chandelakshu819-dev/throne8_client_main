@@ -23,6 +23,8 @@ let _rolesInflight: Promise<MyRolesResponse> | null = null;
 
 export interface PublicSeniorMentor {
   id: string;
+  /** Owner's user id (needed to detect "this is my own card"). Backend must return it. */
+  userId?: string;
   displayName: string;
   profilePic?: string;
   college: string;

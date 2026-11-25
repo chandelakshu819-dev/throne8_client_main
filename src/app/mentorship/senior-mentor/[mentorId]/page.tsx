@@ -62,6 +62,13 @@ export default function SeniorMentorPublicProfilePage() {
     const [sessionsError, setSessionsError] = useState("");
     const [activeCategory, setActiveCategory] = useState("All");
 
+    // Owner khud ki public page khole to usse apni College Mentor profile par bhejo
+    useEffect(() => {
+        if (profile?.userId && user?.userId && String(profile.userId) === String(user.userId)) {
+            router.replace(`/mentorship/senior-mentor-profile/${user.userId}`);
+        }
+    }, [profile?.userId, user?.userId, router]);
+
     const loadProfile = useCallback(async () => {
         setProfileStatus("loading");
         setProfileError("");
