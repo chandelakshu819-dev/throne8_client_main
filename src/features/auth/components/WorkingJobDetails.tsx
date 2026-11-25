@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { currentJobSchema, CurrentJobFormData } from '../schema';
+import { currentJobSchema, CurrentJobFormData, getCanonicalJobTitle } from '../schema';
 import SearchableCombobox from './SearchableCombobox';
 import CompanyLogo from './CompanyLogo';
 import { COMPANIES, JOB_TITLES } from '../data/jobData';
@@ -61,7 +61,7 @@ export default function CurrentJob({
 
   const onSubmit = (data: CurrentJobFormData) => {
     onNext({
-      jobTitle: data.jobTitle,
+      jobTitle: getCanonicalJobTitle(data.jobTitle),
       companyName: data.companyName,
       startDate: data.startDate,
       endDate: isCurrentlyWorking ? '' : data.endDate || '',

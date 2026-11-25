@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { JOB_TITLES } from '../data/jobData';
 import {
   cgpaRule,
   companyNameRule,
@@ -16,6 +17,14 @@ import {
   phoneRule,
   startDateRule,
 } from './rules';
+
+const JOB_TITLE_SET = new Set(JOB_TITLES.map((t) => t.trim().toLowerCase()));
+export const getCanonicalJobTitle = (value: string): string =>
+  JOB_TITLES.find((t) => t.trim().toLowerCase() === value.trim().toLowerCase()) ?? value.trim();
+const jobTitleRule = freeTextRule('Job title').refine(
+  (value) => JOB_TITLE_SET.has(value.trim().toLowerCase()),
+  'Please select a valid job title from the list'
+);
 
 const accountFields = {
   email: emailRule,
@@ -42,7 +51,7 @@ export const currentStatusSchema = z.object({
 });
 
 export const currentJobSchema = z.object({
-  jobTitle: freeTextRule('Job title'),
+  jobTitle: jobTitleRule,
   companyName: companyNameRule,
   startDate: startDateRule,
   endDate: endDateRule,
@@ -79,7 +88,7 @@ const commonRegistrationFields = {
 
 export const fullRegistrationSchema = z.object({
   ...commonRegistrationFields,
-  jobTitle: freeTextRule('Job title').optional(),
+  jobTitle: jobTitleRule.optional(),
   companyName: companyNameRule.optional(),
   startDate: startDateRule.optional(),
   endDate: endDateRule,

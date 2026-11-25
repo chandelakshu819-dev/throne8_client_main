@@ -20,7 +20,7 @@ import { useRegister } from '@/features/auth/hooks/useRegister';
 import { HOME_PATH } from '@/config/launch';
 import { RegistrationData } from '@/features/auth/interface';
 import ProgressSteps from '@/shared/uiComponents/ProgressSteps';
-import { fullRegistrationSchema } from '@/features/auth/schema';
+import { fullRegistrationSchema, getCanonicalJobTitle } from '@/features/auth/schema';
 import AuthService, { RegistrationFailure } from '@/lib/api/auth.service';
 import {
   mapRegistrationFieldErrors,
@@ -282,7 +282,7 @@ export default function SignupPage() {
       verificationToken: token,
       referralCode: getStoredReferralCode(),
       ...(parsed.data.userType === 'working' && {
-        jobTitle: parsed.data.jobTitle,
+        jobTitle: getCanonicalJobTitle(parsed.data.jobTitle ?? ''),
         companyName: parsed.data.companyName,
         startDate: parsed.data.startDate,
         endDate: parsed.data.endDate || undefined,
