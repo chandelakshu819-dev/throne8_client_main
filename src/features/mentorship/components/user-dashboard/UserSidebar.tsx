@@ -40,6 +40,7 @@ const USER_MENU_ITEMS = [
   { id: "dashboard", label: "Overview", icon: LayoutDashboard },
   { id: "profile-preferences", label: "Profile & Preferences", icon: UserCog },
   { id: "progress", label: "Mentorship Progress", icon: TrendingUp },
+  { id: "notifications", label: "Notifications", icon: Bell },
   { id: "queries", label: "My Queries", icon: HelpCircle },
   { id: "recommended-mentors", label: "Recommended Mentors", icon: Sparkles },
   { id: "upcoming-sessions", label: "Sessions", icon: CalendarClock },
@@ -50,7 +51,6 @@ const USER_MENU_ITEMS = [
   { id: "group-sessions", label: "Group Sessions", icon: Users },
   { id: "waitlist", label: "Waitlist", icon: Clock },
   { id: "reviews", label: "Reviews & Feedback", icon: Star },
-  { id: "notifications", label: "Notifications", icon: Bell },
 ];
 
 export default function UserSidebar({
