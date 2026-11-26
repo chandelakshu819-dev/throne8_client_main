@@ -3,6 +3,7 @@
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { routes } from "@/config/routes";
+import { useMyCollegeMentorIds } from "@/features/mentorship/hooks/useMyCollegeMentorIds";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -232,9 +233,8 @@ function sortByMode<T>(
 export default function MentorDiscoverySection({ toggleCompare, compareList }: MentorDiscoverySectionProps) {
     const router = useRouter();
     const { user } = useAuth();
-    // Logged-in user ka apna College Mentor id (SeniorMentorApplication.seniorMentorId).
-    // Backend list response mein userId na aaye tab bhi "own card" pehchanne ke liye.
-    const [myCollegeMentorId, setMyCollegeMentorId] = useState<string | null>(null);
+    // Logged-in user ke College Mentor ids (application + roles), own card pehchanne ke liye
+    const myCollegeMentorIds = useMyCollegeMentorIds(Boolean(user?.userId));
     const [industryMentors, setIndustryMentors] = useState<MentorData[]>([]);
     const [collegeMentors, setCollegeMentors] = useState<PublicSeniorMentor[]>([]);
     const [industryStatus, setIndustryStatus] = useState<"loading" | "success" | "error">("loading");
@@ -376,24 +376,6 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         void loadCollegeMentors();
     }, [loadIndustryMentors, loadCollegeMentors]);
 
-    useEffect(() => {
-        if (!user?.userId) {
-            setMyCollegeMentorId(null);
-            return;
-        }
-        let cancelled = false;
-        MentorService.getMyRoles()
-            .then((roles) => {
-                if (!cancelled) setMyCollegeMentorId(roles.industryMentorId ?? null);
-            })
-            .catch(() => {
-                if (!cancelled) setMyCollegeMentorId(null);
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [user?.userId]);
-
     // Sliced lists for the initial view
     const visibleCollegeMentors = filteredCollegeMentors.slice(0, collegeVisible);
     const collegeRemaining = filteredCollegeMentors.length - collegeVisible;
@@ -406,12 +388,11 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     const isOwnIndustryCard = (mentor: MentorData): boolean =>
         Boolean(user?.userId && mentor.userId && String(user.userId) === String(mentor.userId));
 
-    // College card: userId match YA card ka id == mera College Mentor id (roles API)
+    // College card: userId match YA card id mere College Mentor ids mein ho
     const isOwnCollegeCard = (mentor: MentorData): boolean =>
-        Boolean(
-            (user?.userId && mentor.userId && String(user.userId) === String(mentor.userId)) ||
-            (myCollegeMentorId && String(mentor.id) === String(myCollegeMentorId))
-        );
+        myCollegeMentorIds.has(String(mentor.id)) ||
+        (!!mentor.userId && myCollegeMentorIds.has(String(mentor.userId))) ||
+        Boolean(user?.userId && mentor.userId && String(user.userId) === String(mentor.userId));
 
     const handleNavigate = (mentor: MentorData) => {
         // Industry mentor apne hi card par click kare -> apni Industry Mentor profile

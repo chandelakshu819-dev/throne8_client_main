@@ -9,6 +9,7 @@ import AuthService from "@/lib/api/auth.service";
 import { GlobalStyles, Navigation } from "@/features/index";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import ServiceThumbnail from "@/features/mentorship/components/shared/ServiceThumbnail";
+import { useMyCollegeMentorIds } from "@/features/mentorship/hooks/useMyCollegeMentorIds";
 import { buildLoginRedirectUrl } from "@/shared/utils/safeRedirect";
 
 type LoadStatus = "loading" | "success" | "error";
@@ -63,28 +64,17 @@ export default function SeniorMentorPublicProfilePage() {
     const [activeCategory, setActiveCategory] = useState("All");
 
     // Owner khud ki public page khole to usse apni College Mentor profile par bhejo.
-    // 1) profile.userId match, ya 2) URL ka mentorId == mera College Mentor id (roles API)
+    // URL ka mentorId mere College Mentor ids mein ho, ya profile.userId == meri userId.
+    const myCollegeMentorIds = useMyCollegeMentorIds(Boolean(user?.userId));
     useEffect(() => {
         if (!user?.userId || !mentorId) return;
-        const ownDashboard = `/mentorship/senior-mentor-profile/${user.userId}`;
-
-        if (profile?.userId && String(profile.userId) === String(user.userId)) {
-            router.replace(ownDashboard);
-            return;
+        const isOwnProfile =
+            myCollegeMentorIds.has(String(mentorId)) ||
+            (!!profile?.userId && String(profile.userId) === String(user.userId));
+        if (isOwnProfile) {
+            router.replace(`/mentorship/senior-mentor-profile/${user.userId}`);
         }
-
-        let cancelled = false;
-        MentorService.getMyRoles()
-            .then((roles) => {
-                if (!cancelled && roles.industryMentorId && String(roles.industryMentorId) === String(mentorId)) {
-                    router.replace(ownDashboard);
-                }
-            })
-            .catch(() => { /* ignore: normal public view dikhega */ });
-        return () => {
-            cancelled = true;
-        };
-    }, [profile?.userId, user?.userId, mentorId, router]);
+    }, [myCollegeMentorIds, profile?.userId, user?.userId, mentorId, router]);
 
     const loadProfile = useCallback(async () => {
         setProfileStatus("loading");
