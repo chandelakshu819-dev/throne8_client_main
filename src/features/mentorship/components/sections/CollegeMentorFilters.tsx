@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import type { PublicSeniorMentor } from "@/lib/api/mentorship.service";
 import { splitSkills } from "@/shared/utils/mentorFormat";
+import { canonicalCollege, looseCollegeKey } from "@/shared/utils/collegeName";
+import { ALL_INSTITUTIONS } from "@/features/auth/components/CollegeAutocomplete";
 
 /* ─────────────────────────────────────────────────────────────
  * Types
@@ -224,12 +226,11 @@ export const getSkillLabel = (raw: string): string => parseSkill(raw)?.label ?? 
 
 const COLLEGE_STOP = new Set(["of", "and", "the", "for", "in", "a"]);
 
+// Spelling variants of the same college ("Oriental College Of Technology",
+// "Oriental college of technology Bhopal", "... (OCT) Bhopal") get ONE key,
+// by matching them to the standard name in the institutions list first.
 const collegeKey = (raw: string): string => {
-    const k = raw
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+    const k = looseCollegeKey(canonicalCollege(raw, ALL_INSTITUTIONS) ?? raw);
     // "o.i.s.t" -> "o i s t" -> "oist"
     return /^([a-z0-9] )+[a-z0-9]$/.test(k) ? k.replace(/ /g, "") : k;
 };
@@ -238,6 +239,10 @@ const collegeLabel = (raw: string): string => {
     const base = raw.trim().replace(/[,.\s]+$/, "");
     return base === base.toLowerCase() ? titleCase(base) : base;
 };
+
+// Name shown in the sidebar: the standard list name when known, else a tidied version of what was typed
+const collegeDisplayName = (raw: string): string =>
+    canonicalCollege(raw, ALL_INSTITUTIONS) ?? collegeLabel(raw);
 
 // ── Degree ────────────────────────────────────────────────────
 
@@ -354,7 +359,7 @@ export function useMentorFilters<T extends IndustryFilterable>(
             if (!m.college?.trim()) return;
             const k = collegeKey(m.college);
             if (!k) return;
-            const label = collegeLabel(m.college);
+            const label = collegeDisplayName(m.college);
             const prev = collegeLabels.get(k);
             if (!prev || label.length > prev.length) collegeLabels.set(k, label);
         });

@@ -1,6 +1,7 @@
 'use client';
 // src/features/auth/components/CollegeAutocomplete.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { canonicalCollege, looseCollegeKey, tidyCustomCollege } from '@/shared/utils/collegeName';
 
 const BHOPAL_INSTITUTIONS: string[] = [
   // Government / National institutes
@@ -136,10 +137,10 @@ const POPULAR_INSTITUTIONS: string[] = [
   'AIIMS Delhi', 'Maulana Azad Medical College',
 ];
 
-const ALL_INSTITUTIONS: string[] = [...BHOPAL_INSTITUTIONS, ...POPULAR_INSTITUTIONS];
+export const ALL_INSTITUTIONS: string[] = [...BHOPAL_INSTITUTIONS, ...POPULAR_INSTITUTIONS];
 
 // Short names jo log type karte hain
-const ALIASES: Record<string, string[]> = {
+export const ALIASES: Record<string, string[]> = {
   manit: ['MANIT Bhopal (Maulana Azad National Institute of Technology)'],
   rgpv: ['University Institute of Technology RGPV Bhopal (UIT-RGPV)', 'Rajiv Gandhi Proudyogiki Vishwavidyalaya (RGPV) Bhopal'],
   uit: ['University Institute of Technology RGPV Bhopal (UIT-RGPV)'],
@@ -164,6 +165,25 @@ interface Props {
   name?: string;
 }
 
+const OTHER_LABEL = 'Other – my college is not listed';
+
+/** Maps anything the user typed to the standard list name (or null if it is not a known college). */
+const resolveKnown = (text: string): string | null => {
+  const t = text.trim();
+  if (!t) return null;
+  const alias = ALIASES[t.toLowerCase()];
+  if (alias && alias.length === 1) return alias[0];
+  return canonicalCollege(t, ALL_INSTITUTIONS);
+};
+
+/**
+ * College input with two ways to fill it:
+ *  1) Search and PICK a college from the suggestions  -> the standard name is saved.
+ *  2) Choose "Other" and type your own name            -> the name is saved (and matched to the
+ *     standard spelling if it is just a variant of a listed college).
+ * Plain typing never changes the form value on its own, so spelling variants of the same
+ * college cannot end up in the database.
+ */
 export default function CollegeAutocomplete({
   id = 'college',
   value,
@@ -175,13 +195,22 @@ export default function CollegeAutocomplete({
   ariaDescribedBy,
   name,
 }: Props) {
+  const [text, setText] = useState(value ?? '');
+  const [customMode, setCustomMode] = useState(false);
+  const [needsPick, setNeedsPick] = useState(false);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [remote, setRemote] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const query = value.trim();
+  // Keep the box in sync when the form changes the value (select, reset, prefill, draft restore)
+  useEffect(() => {
+    setText(value ?? '');
+  }, [value]);
+
+  const query = text.trim();
 
   // Local matches (instant)
   const localMatches = useMemo(() => {
@@ -197,7 +226,7 @@ export default function CollegeAutocomplete({
 
   // Remote matches (debounced, free API; fails silently)
   useEffect(() => {
-    if (query.length < 3) {
+    if (customMode || query.length < 3) {
       setRemote([]);
       return;
     }
@@ -223,13 +252,13 @@ export default function CollegeAutocomplete({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query]);
+  }, [query, customMode]);
 
   const suggestions = useMemo(() => {
     const seen = new Set<string>();
     const out: string[] = [];
     for (const n of [...localMatches, ...remote]) {
-      const key = n.toLowerCase();
+      const key = looseCollegeKey(n); // same college spelled differently shows only once
       if (!seen.has(key)) {
         seen.add(key);
         out.push(n);
@@ -237,6 +266,10 @@ export default function CollegeAutocomplete({
     }
     return out.slice(0, 12);
   }, [localMatches, remote]);
+
+  // Last row is always "Other"
+  const optionCount = suggestions.length + 1;
+  const showDropdown = open && !customMode && query.length >= 2;
 
   // Close on outside click
   useEffect(() => {
@@ -251,37 +284,92 @@ export default function CollegeAutocomplete({
 
   const select = (n: string) => {
     onChange(n);
+    setText(n);
+    setNeedsPick(false);
     setOpen(false);
     setActiveIndex(-1);
   };
 
+  const chooseOther = () => {
+    setCustomMode(true);
+    setNeedsPick(false);
+    setOpen(false);
+    setActiveIndex(-1);
+    onChange(tidyCustomCollege(text)); // keep what the user already typed
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const leaveOther = () => {
+    setCustomMode(false);
+    setText(value ?? '');
+  };
+
+  // Custom name: match it to the standard spelling if it is only a variant, else keep it tidy
+  const commitCustom = () => {
+    const t = text.trim();
+    if (!t) {
+      onChange('');
+      return;
+    }
+    const final = resolveKnown(t) ?? tidyCustomCollege(t);
+    setText(final);
+    onChange(final);
+    if (resolveKnown(t)) setCustomMode(false); // it was actually a listed college
+  };
+
+  const handleBlur = () => {
+    setOpen(false);
+    if (customMode) {
+      commitCustom();
+    } else {
+      const t = text.trim();
+      if (!t) {
+        if (value) onChange('');
+      } else if (t !== value) {
+        const known = resolveKnown(t);
+        if (known) {
+          select(known);
+        } else {
+          // Typed but never picked -> do not save it; ask the user to pick or use "Other"
+          setText(value ?? '');
+          setNeedsPick(true);
+        }
+      }
+    }
+    onBlur?.();
+  };
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!open || suggestions.length === 0) return;
+    if (customMode) {
+      if (e.key === 'Enter') commitCustom();
+      return;
+    }
+    if (!showDropdown) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActiveIndex((i) => (i + 1) % suggestions.length);
+      setActiveIndex((i) => (i + 1) % optionCount);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setActiveIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+      setActiveIndex((i) => (i <= 0 ? optionCount - 1 : i - 1));
     } else if (e.key === 'Enter' && activeIndex >= 0) {
       e.preventDefault();
-      select(suggestions[activeIndex]);
+      if (activeIndex < suggestions.length) select(suggestions[activeIndex]);
+      else chooseOther();
     } else if (e.key === 'Escape') {
       setOpen(false);
     }
   };
 
-  const showDropdown = open && query.length >= 2 && (suggestions.length > 0 || loading);
-
   return (
     <div ref={wrapperRef} className="relative">
       <input
+        ref={inputRef}
         id={id}
         name={name}
         type="text"
-        value={value}
+        value={text}
         autoComplete="off"
-        placeholder={placeholder}
+        placeholder={customMode ? 'Type your college / university name' : placeholder}
         role="combobox"
         aria-expanded={showDropdown}
         aria-controls={`${id}-options`}
@@ -289,18 +377,41 @@ export default function CollegeAutocomplete({
         aria-invalid={ariaInvalid}
         aria-describedby={ariaDescribedBy}
         onChange={(e) => {
-          onChange(e.target.value);
+          const v = e.target.value;
+          setText(v);
+          setNeedsPick(false);
           setOpen(true);
           setActiveIndex(-1);
+          if (customMode) onChange(v); // "Other": keep the form value live; cleaned up on blur
         }}
         onFocus={() => setOpen(true)}
-        onBlur={onBlur}
+        onBlur={handleBlur}
         onKeyDown={onKeyDown}
         className={
           className ||
           'w-full px-5 py-4 rounded-xl border border-[#4a3728] bg-white text-black placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#4a3728] focus:border-transparent transition'
         }
       />
+
+      {customMode && (
+        <p className="mt-1.5 text-xs text-gray-500">
+          Entering a custom name.{' '}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={leaveOther}
+            className="underline text-[#4a3728] font-medium"
+          >
+            Back to list
+          </button>
+        </p>
+      )}
+
+      {needsPick && !customMode && (
+        <p role="alert" className="mt-1.5 text-xs text-red-500">
+          Please pick your college from the list, or choose &quot;Other&quot; if it is not listed.
+        </p>
+      )}
 
       {showDropdown && (
         <ul
@@ -328,6 +439,23 @@ export default function CollegeAutocomplete({
           {loading && suggestions.length === 0 && (
             <li className="px-4 py-2.5 text-sm text-gray-400">Searching...</li>
           )}
+          {!loading && suggestions.length === 0 && (
+            <li className="px-4 py-2.5 text-sm text-gray-400">No matching college found</li>
+          )}
+          <li
+            role="option"
+            aria-selected={activeIndex === suggestions.length}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              chooseOther();
+            }}
+            onMouseEnter={() => setActiveIndex(suggestions.length)}
+            className={`cursor-pointer border-t border-[#e5d9cc] px-4 py-2.5 text-sm font-semibold text-[#4a3728] ${
+              activeIndex === suggestions.length ? 'bg-[#f5ede4]' : 'hover:bg-[#f5ede4]'
+            }`}
+          >
+            {OTHER_LABEL}
+          </li>
         </ul>
       )}
     </div>

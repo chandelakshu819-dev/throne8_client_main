@@ -17,6 +17,7 @@ import { useProfileData } from "@/features/profile/hooks/useProfileData";
 import { useExperienceData } from "@/features/profile/hooks/useExperienceData";
 import { useEducationData } from "@/features/profile/hooks/useEducationData";
 import AutocompleteInput from "@/features/mentorship/components/shared/AutocompleteInput";
+import CollegeAutocomplete from "@/features/auth/components/CollegeAutocomplete";
 import { useFieldSuggestions } from "@/features/mentorship/hooks/useFieldSuggestions";
 import CompanyAutocomplete from "@/features/mentorship/components/shared/CompanyAutocomplete";
 import type { CompanyRef } from "@/features/mentorship/services/company.service";
@@ -586,14 +587,14 @@ export default function BecomeMentorModal({
                                     {/* College */}
                                     <div data-field="college">
                                         <label className="block text-sm font-bold text-[#4a3728] mb-2">College / University *</label>
-                                        <AutocompleteInput
-    value={watch('college') || ''}
-    onChange={(v) => setValue('college', v, { shouldValidate: false })}
-    onSelect={(v) => setValue('college', v, { shouldValidate: true })}
-    suggestions={collegeOptions}
-    placeholder="IIT Bombay"
-    className={inputClass}
-/>
+                                        <CollegeAutocomplete
+                                            id="college"
+                                            value={watch('college') || ''}
+                                            onChange={(v) => setValue('college', v, { shouldValidate: true })}
+                                            ariaInvalid={!!errors.college}
+                                            placeholder="Search your college (e.g. IIT Bombay, LNCT Bhopal)"
+                                            className={inputClass}
+                                        />
                                         {errors.college && (
                                             <p className="text-red-500 text-xs mt-1">{errors.college.message as string}</p>
                                         )}
