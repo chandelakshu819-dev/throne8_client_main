@@ -1,22 +1,28 @@
 //studygroup/study/groups/components/groupcard.tsx
 
 import React, { useState } from 'react';
-import { Users, Clock, Eye, EyeOff, Camera, CameraOff, TrendingUp, Award } from 'lucide-react';
-import type { Group } from '../types';
-import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
-
-import { selectJoiningGroupId, selectJoinLoading, selectSendRequestLoading } from '@/hooks/studyGroup/features/groups/groupsSlice';
-import { joinGroupThunk, sendJoinRequestThunk } from '@/hooks/studyGroup/features/groups/group.thunks';
-import JoinGroupModal from '@/features/study-group/modals/joinGroupModal';
-import { useGroupData } from '@/features/study-group/hooks/useGroupData';
+import { Clock, Eye, EyeOff, Camera, CameraOff, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { getMemberAvatarInitials } from '../helper';
-import { CardShell, GROUP_BTN_PRIMARY, GROUP_BTN_DISABLED } from './GroupSectionUI';
-// ─── Component ───────────────────────────────
+
+import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
+import {
+  selectJoiningGroupId,
+  selectJoinLoading,
+  selectSendRequestLoading,
+} from '@/hooks/studyGroup/features/groups/groupsSlice';
+import { joinGroupThunk, sendJoinRequestThunk } from '@/hooks/studyGroup/features/groups/group.thunks';
+import { useGroupData } from '@/features/study-group/hooks/useGroupData';
+import JoinGroupModal from '@/features/study-group/modals/joinGroupModal';
+import { getMemberAvatarInitials } from '@/features/studyGroup/helper';
+
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 interface GroupCardProps {
   // group: Group;
   group: any;
 }
+
 const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
   const dispatch = useAppDispatch();
   const router = useRouter();
@@ -99,114 +105,122 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
     }
   };
 
+  const spotsColor = isFull ? 'text-red-700' : spotsLeft <= 5 ? 'text-orange-700' : 'text-emerald-800';
+  const avatarColors = ['bg-[#c9a27a]', 'bg-[#a9795a]', 'bg-[#6b4a36]'];
+  const cameraOn = group.cameraRequired ?? group.cameraOn;
+
   return (
-    <>
-      <CardShell>
-        {/* Header */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="text-lg font-bold text-[#4a3728] line-clamp-1">{group.title}</h3>
-              {group.rank <= 3 && (
-                <Award className="w-4 h-4 text-[#d4a574] fill-[#d4a574] flex-shrink-0" />
-              )}
-            </div>
-            <span className="inline-block bg-[#4a3728] text-white px-2 py-0.5 rounded-full text-xs font-medium">
-              {group.category}
-            </span>
-          </div>
-
-          <div className="flex gap-1.5 ml-2">
-            <div className={`p-1.5 rounded ${group.visibility === 'public' ? 'bg-[#8b6f47]/10' : 'bg-gray-100'}`}>
+    <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-md transition-shadow duration-300 hover:shadow-xl">
+      {/* Gradient header */}
+      <div className="bg-gradient-to-br from-[#4a3728] to-[#8b6f47] px-5 pb-4 pt-5">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="line-clamp-1 text-xl font-bold text-white">{group.title}</h3>
+          <div className="flex shrink-0 gap-1.5">
+            <div
+              title={group.visibility === 'public' ? 'Public group' : 'Private group'}
+              className="rounded-lg bg-white/15 p-1.5"
+            >
               {group.visibility === 'public' ? (
-                <Eye className="w-3.5 h-3.5 text-[#4a3728]" />
+                <Eye className="h-3.5 w-3.5 text-white" />
               ) : (
-                <EyeOff className="w-3.5 h-3.5 text-gray-600" />
+                <EyeOff className="h-3.5 w-3.5 text-white" />
               )}
             </div>
-
-            <div className={`p-1.5 rounded ${(group.cameraRequired ?? group.cameraOn) ? 'bg-[#8b6f47]/10' : 'bg-gray-100'}`}>
-              {(group.cameraRequired ?? group.cameraOn) ? (
-                <Camera className="w-3.5 h-3.5 text-[#4a3728]" />
+            <div
+              title={cameraOn ? 'Camera required' : 'Camera optional'}
+              className="rounded-lg bg-white/15 p-1.5"
+            >
+              {cameraOn ? (
+                <Camera className="h-3.5 w-3.5 text-white" />
               ) : (
-                <CameraOff className="w-3.5 h-3.5 text-gray-600" />
+                <CameraOff className="h-3.5 w-3.5 text-white" />
               )}
             </div>
           </div>
         </div>
+        <span className="mt-2 inline-block rounded-full bg-[#f3e6d8] px-3 py-1 text-xs font-semibold text-[#4a3728]">
+          {group.category}
+        </span>
+      </div>
 
-        {/* Description */}
-        <p className="text-gray-600 text-xs leading-relaxed mb-3 line-clamp-2">{group.description}</p>
+      {/* Body */}
+      <div className="flex flex-1 flex-col gap-4 px-5 pb-5 pt-4">
+        <p className="line-clamp-2 min-h-[2.5rem] text-sm leading-relaxed text-[#6b5648]">{group.description}</p>
 
         {/* Avatars */}
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex -space-x-2">
+        <div className="flex items-center gap-3">
+          <div className="flex -space-x-2.5">
             {getMemberAvatarInitials(group.memberPreview, isApiGroup ? memberCount : group.members).map((initials, idx) => (
               <div
                 key={idx}
-                className="w-8 h-8 rounded-full border-2 border-white shadow-sm bg-[#d4a574] text-white text-[11px] font-medium flex items-center justify-center"
+                className={`flex h-9 w-9 items-center justify-center rounded-full border-2 border-white text-[11px] font-bold text-white shadow-sm ${avatarColors[idx % 3]}`}
               >
                 {initials}
               </div>
             ))}
           </div>
-          <div className="text-xs">
-            <p className="text-[#4a3728] font-semibold">{memberCount} members</p>
-            {!isApiGroup && (
-              <p className="text-gray-500">by {group.leader}</p>
-            )}
+          <div className="text-sm">
+            <p className="font-semibold text-[#3a281c]">
+              {memberCount} {memberCount === 1 ? 'member' : 'members'}
+            </p>
+            {!isApiGroup && <p className="text-xs text-gray-500">by {group.leader}</p>}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="bg-[#faf6f1] rounded-lg p-2">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Clock className="w-3.5 h-3.5 text-[#8b6f47]" />
-              <span className="text-xs text-gray-600">Goal</span>
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="rounded-xl bg-[#faf5ef] p-3">
+            <div className="mb-1 flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5 text-[#8b6f47]" />
+              <span className="text-xs text-[#6b5648]">Goal</span>
             </div>
-            <p className="text-lg font-bold text-[#4a3728]">{group.goalHours}h</p>
+            <p className="text-2xl font-bold text-[#3a281c]">{group.goalHours}h</p>
           </div>
-          <div className="bg-[#faf6f1] rounded-lg p-2">
-            <div className="flex items-center gap-1.5 mb-1">
-              <TrendingUp className="w-3.5 h-3.5 text-[#8b6f47]" />
-              <span className="text-xs text-gray-600">Attendance</span>
+          <div className="rounded-xl bg-[#faf5ef] p-3">
+            <div className="mb-1 flex items-center gap-1.5">
+              <TrendingUp className="h-3.5 w-3.5 text-[#8b6f47]" />
+              <span className="text-xs text-[#6b5648]">Attendance</span>
             </div>
             {group.attendanceRequired ? (
-              <p className="text-lg font-bold text-[#4a3728]">
+              <p className="text-2xl font-bold text-[#3a281c]">
                 {group.minAttendancePercent ?? group.attendanceAvg ?? 0}%
               </p>
             ) : (
-              <p className="text-xs text-gray-400 mt-1">Not required</p>
+              <p className="pt-1.5 text-sm text-[#8a7667]">Not required</p>
             )}
           </div>
         </div>
 
         {/* Capacity Bar */}
-        <div className="mb-3">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-xs text-gray-600 font-medium">{memberCount}/{group.capacity} joined</span>
-            <span className="text-xs text-gray-500">{spotsLeft} left</span>
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-xs">
+            <span className="font-medium text-[#6b5648]">{memberCount}/{group.capacity} joined</span>
+            <span className={`font-bold ${spotsColor}`}>{isFull ? 'Full' : `${spotsLeft} spots left`}</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-[#eadfd3]">
             <div
               className={`h-full rounded-full transition-all duration-500 ${isFilling
                 ? 'bg-gradient-to-r from-[#d4a574] to-[#8b6f47]'
-                : 'bg-gradient-to-r from-[#8b6f47] to-[#4a3728]'
+                : 'bg-gradient-to-r from-[#4a3728] to-[#c9a27a]'
                 }`}
-              style={{ width: `${(memberCount / group.capacity) * 100}%` }}
+              style={{ width: `${Math.min((memberCount / group.capacity) * 100, 100)}%` }}
             />
           </div>
         </div>
-        <div className="mt-auto pt-1">
-          <button
-            onClick={handleJoinClick}
-            disabled={(isFull && !isMember) || isThisGroupJoining}
-            className={isFull && !isMember ? GROUP_BTN_DISABLED : `${GROUP_BTN_PRIMARY} disabled:opacity-60`}
-          >
-            {isMember ? 'Open Group' : isFull ? 'Full' : isThisGroupJoining ? 'Joining...' : 'Join Group'}
-          </button>
-        </div>
-      </CardShell>
+
+        <button
+          onClick={handleJoinClick}
+          disabled={(isFull && !isMember) || isThisGroupJoining}
+          className={`mt-auto w-full rounded-xl py-3 text-sm font-bold transition-all duration-300 disabled:cursor-not-allowed ${isFull && !isMember
+            ? 'bg-gray-200 text-gray-400'
+            : isMember
+              ? 'border-2 border-[#4a3728] bg-white text-[#4a3728] hover:bg-[#4a3728] hover:text-white'
+              : 'bg-[#4a3728] text-white hover:bg-[#3a281c] active:scale-[0.98] disabled:opacity-60'
+            }`}
+        >
+          {isMember ? 'Open Group' : isFull ? 'Full' : isThisGroupJoining ? 'Joining...' : 'Join Group'}
+        </button>
+      </div>
       {
         joinSuccess && (
           <div className="fixed bottom-6 right-6 z-50 bg-green-500 text-white px-5 py-3 rounded-xl shadow-xl text-sm font-semibold">
@@ -232,7 +246,7 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
             existingRequest={existingRequest}  // ADD
           />
         )}
-    </>
+    </div >
   );
 };
 

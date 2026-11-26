@@ -17,6 +17,7 @@ import {
   Menu,
   X,
   Bell,
+  PanelLeft
 } from "lucide-react";
 
 import StudyGroupNotificationService from "@/lib/api/studyGroupNotification.service";
@@ -250,41 +251,33 @@ const StudySidebar = () => {
 
   return (
     <>
-      {/* MOBILE TOGGLE BUTTON - Fixed at top */}
+      {/* MOBILE TOGGLE BUTTON - sits below the fixed top nav */}
       <button
         onClick={() => setIsMobileSidebarOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-40 p-3 bg-[#4a3728] text-white rounded-xl shadow-lg hover:bg-[#5a4738] transition-colors"
-        aria-label="Open sidebar"
+        className="lg:hidden fixed top-3 right-4 z-[51] flex h-10 w-10 items-center justify-center bg-[#4a3728] text-white rounded-xl shadow-md hover:bg-[#5a4738] active:scale-95 transition"
+         aria-label="Open sidebar"
       >
-        <Menu size={24} />
+        <Menu size={22} />
       </button>
 
       {/* OVERLAY - Mobile & Tablet only */}
       {isMobileSidebarOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black/50 z-40 transition-opacity"
-          onClick={() => setIsMobileSidebarOpen(false)}
+          className="lg:hidden fixed inset-0 bg-black/50 z-[55] transition-opacity"
+           onClick={() => setIsMobileSidebarOpen(false)}
         />
       )}
 
       {/* SIDEBAR - Desktop (fixed), Mobile/Tablet (sliding) */}
       <aside
         className={`
-          fixed top-0 left-0 h-screen bg-[#f7f3ee] shadow-lg z-50 flex flex-col
-          transition-transform duration-300 ease-in-out
-          
-          /* Mobile: Full screen sliding sidebar */
-          w-full sm:w-80
-          ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          
-          /* Tablet: Medium width */
-          md:w-64
-          
-          /* Desktop: Always visible, fixed */
-          lg:translate-x-0 lg:w-72
-          
-          p-4 sm:p-5 lg:p-6
-        `}
++          fixed top-0 left-0 h-screen bg-[#f7f3ee] shadow-lg z-[60] flex flex-col
++          transition-transform duration-300 ease-in-out
++          w-72 max-w-[85vw] md:w-64 lg:w-72
++          ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}
++          lg:translate-x-0
++          p-4 sm:p-5 lg:p-6
++        `}
       >
         <SidebarContent />
       </aside>

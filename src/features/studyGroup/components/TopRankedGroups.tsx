@@ -9,8 +9,6 @@ import SkeletonLoader from "@/app/loading";
 import { joinGroupThunk, sendJoinRequestThunk } from "@/hooks/studyGroup/features/groups/group.thunks";
 import JoinGroupModal from "@/features/study-group/modals/joinGroupModal";
 import {
-  CardShell,
-  GROUP_BTN_PRIMARY,
   GROUP_GRID,
   SectionHeader,
   ShowMoreButton,
@@ -28,6 +26,12 @@ const TopRankedCard = ({
   const [imgFailed, setImgFailed] = useState(false);
   const memberCount = group.currentMemberCount ?? group.members ?? 0;
   const spotsLeft = group.capacity - memberCount;
+  const isFull = spotsLeft <= 0;
+  const spotsColor = isFull
+    ? "text-red-700"
+    : spotsLeft <= 5
+      ? "text-orange-700"
+      : "text-emerald-800";
   const pct = group.capacity
     ? Math.min(100, Math.round((memberCount / group.capacity) * 100))
     : 0;
@@ -38,87 +42,69 @@ const TopRankedCard = ({
     : group.category || "Study group";
 
   return (
-    <CardShell>
-      {/* Header: avatar, title, rank */}
-      <div className="flex items-start gap-3">
+    <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-md transition-shadow duration-300 hover:shadow-xl">{/* Gradient header */}
+      <div className="flex items-center gap-3 bg-gradient-to-br from-[#4a3728] to-[#8b6f47] px-5 pb-4 pt-5">
         {group.imgUrl && !imgFailed ? (
           <img
             src={group.imgUrl}
             alt={group.leader}
             onError={() => setImgFailed(true)}
-            className="h-12 w-12 flex-shrink-0 rounded-full border-2 border-[#e0d8cf] object-cover"
+            className="h-12 w-12 flex-shrink-0 rounded-full border-2 border-white/80 object-cover"
           />
         ) : (
-          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#f6ede8] text-lg font-bold text-[#4a3728]">
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-lg font-bold text-white">
             {(group.title || "G").charAt(0).toUpperCase()}
           </div>
         )}
-
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-lg font-bold text-[#4a3728]">
-            {group.title}
-          </h3>
-          <p className="flex items-center gap-1 text-xs text-[#6b5847]">
-            <Award className="h-3 w-3 flex-shrink-0 text-[#8b7355]" />
+          <h3 className="truncate text-xl font-bold text-white">{group.title}</h3>
+          <p className="flex items-center gap-1 text-sm text-[#f3e6d8]">
+            <Award className="h-3.5 w-3.5 flex-shrink-0" />
             <span className="truncate">{subtitle}</span>
           </p>
         </div>
-
-        <span
-          className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-bold text-white shadow-sm ${
-            group.rank <= 3
-              ? "bg-gradient-to-br from-amber-400 to-orange-500"
-              : "bg-[#8b7355]"
-          }`}
-        >
-          #{group.rank}
-        </span>
       </div>
 
-      {/* Stats */}
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <div className="rounded-lg bg-[#faf6f1] p-2">
-          <div className="mb-1 flex items-center gap-1.5">
-            <TrendingUp className="h-3.5 w-3.5 text-[#8b6f47]" />
-            <span className="text-xs text-gray-600">Attendance</span>
+      {/* Body */}
+      <div className="flex flex-1 flex-col gap-4 px-5 pb-5 pt-4">
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="rounded-xl bg-[#faf5ef] p-3">
+            <div className="mb-1 flex items-center gap-1.5">
+              <TrendingUp className="h-3.5 w-3.5 text-[#8b6f47]" />
+              <span className="text-xs text-[#6b5648]">Attendance</span>
+            </div>
+            <p className="text-2xl font-bold text-[#3a281c]">{attendance}%</p>
           </div>
-          <p className="text-lg font-bold text-[#4a3728]">{attendance}%</p>
-        </div>
-        <div className="rounded-lg bg-[#faf6f1] p-2">
-          <div className="mb-1 flex items-center gap-1.5">
-            <Users className="h-3.5 w-3.5 text-[#8b6f47]" />
-            <span className="text-xs text-gray-600">Members</span>
+          <div className="rounded-xl bg-[#faf5ef] p-3">
+            <div className="mb-1 flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 text-[#8b6f47]" />
+              <span className="text-xs text-[#6b5648]">Members</span>
+            </div>
+            <p className="text-2xl font-bold text-[#3a281c]">
+              {memberCount}/{group.capacity}
+            </p>
           </div>
-          <p className="text-lg font-bold text-[#4a3728]">
-            {memberCount}/{group.capacity}
-          </p>
         </div>
-      </div>
 
-      {/* Capacity bar */}
-      <div className="mt-3 mb-4">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-xs font-medium text-gray-600">
-            {memberCount}/{group.capacity} joined
-          </span>
-          <span
-            className={`text-xs font-medium ${
-              spotsLeft > 0 ? "text-green-700" : "text-red-600"
-            }`}
-          >
-            {spotsLeft > 0 ? `${spotsLeft} left` : "Full"}
-          </span>
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-xs">
+            <span className="font-medium text-[#6b5648]">
+              {memberCount}/{group.capacity} joined
+            </span>
+            <span className={`font-bold ${spotsColor}`}>
+              {isFull ? "Full" : `${spotsLeft} spots left`}
+            </span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-[#eadfd3]">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#4a3728] to-[#c9a27a] transition-all duration-500"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
         </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-[#8b6f47] to-[#4a3728] transition-all duration-500"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      </div>
 
-      <div className="mt-auto pt-1">
         <button
+          disabled={isFull && !group.isMember}
           onClick={() => {
             if (group.isMember) {
               window.location.href = `/study/my-groups/${group.groupId || group.id}`;
@@ -126,12 +112,18 @@ const TopRankedCard = ({
             }
             onJoinClick(group);
           }}
-          className={GROUP_BTN_PRIMARY}
+          className={`mt-auto w-full rounded-xl py-3 text-sm font-bold transition-all duration-300 disabled:cursor-not-allowed ${
+            group.isMember
+              ? "border-2 border-[#4a3728] bg-white text-[#4a3728] hover:bg-[#4a3728] hover:text-white"
+              : isFull
+                ? "bg-gray-200 text-gray-400"
+                : "bg-[#4a3728] text-white hover:bg-[#3a281c] active:scale-[0.98]"
+          }`}
         >
-          {group.isMember ? "Open Group" : "Join Group"}
+          {group.isMember ? "Open Group" : isFull ? "Full" : "Join Group"}
         </button>
       </div>
-    </CardShell>
+    </div>
   );
 };
 
