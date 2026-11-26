@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, GraduationCap, Building2, BookOpen, Award, Calendar, MapPin, FileText } from 'lucide-react';
 import z from 'zod';
+import CollegeAutocomplete from '@/features/auth/components/CollegeAutocomplete';
 import AuthService from '@/lib/api/auth.service';
 import { useEducation } from '@/features/profile/hooks/useEducation';import { packFutureDate } from '@/shared/utils/educationDateHelper';
 
@@ -384,12 +385,15 @@ const AddEducationModal: React.FC<AddEducationModalProps> = ({
                                 <label className="block text-sm font-medium text-[#4a3728] mb-2 flex items-center gap-1.5">
                                     <Building2 className="w-4 h-4 text-[#8b6f47]" /> College / University <span className="text-red-500">*</span>
                                 </label>
-                                <input
-                                    type="text"
+                                <CollegeAutocomplete
+                                    id="schoolCollegeName"
                                     name="schoolCollegeName"
                                     value={formData.schoolCollegeName}
-                                    onChange={handleChange}
-                                    placeholder="e.g., MIT, Stanford University"
+                                    onChange={(v) =>
+                                        handleChange({ target: { name: 'schoolCollegeName', value: v } } as React.ChangeEvent<HTMLInputElement>)
+                                    }
+                                    ariaInvalid={!!errors.schoolCollegeName}
+                                    placeholder="e.g., IIT Bombay, LNCT Bhopal, MANIT"
                                     className={`w-full px-4 py-2 rounded-xl border-2 focus:outline-none transition-colors duration-200 text-[#4a3728] ${errors.schoolCollegeName
                                         ? 'border-red-500 bg-red-50 focus:border-red-600'
                                         : 'border-[#e0d8cf] bg-white/50 focus:border-[#4a3728]'

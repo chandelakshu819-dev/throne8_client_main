@@ -23,7 +23,6 @@ import ProfileService from "@/lib/api/profile.service";
 import AuthService from "@/lib/api/auth.service";
 import { useSocket } from "@/core/realtime/useSocket";
 import MenteeLink from "@/features/mentorship/components/shared/MenteeLink";
-import { getSessionTiming } from "@/features/mentorship/utils/sessionJoin";
 
 interface BookingProps {
   mentorData: any;
@@ -51,15 +50,15 @@ type MentorBookingRow = {
   // still-PENDING join request and an already-ACCEPTED, grouped session)
   isGroupSession?: boolean;
   status:
-  | "pending"
-  | "confirmed"
-  | "rescheduled"
-  | "in_progress"
-  | "completed"
-  | "cancelled"
-  | "open"
-  | "full"
-  | "missed";
+    | "pending"
+    | "confirmed"
+    | "rescheduled"
+    | "in_progress"
+    | "completed"
+    | "cancelled"
+    | "open"
+    | "full"
+    | "missed";
   // Present only on grouped (accepted) group-session rows: one row per
   // session, carrying the full accepted-participant list instead of the
   // table spawning a duplicate row per student.
@@ -122,8 +121,6 @@ const statusBadge: Record<
   missed: { bg: "#f3f4f6", fg: "#6b7280", label: "Missed" },
 };
 
-
-const ENDED_GRACE_MINUTES = 15;
 const START_LATE_LIMIT_MINUTES = 15; // server: START_LATE_LIMIT_MS
 const DEFAULT_SESSION_MINUTES = 60;
 const DEFAULT_GROUP_SESSION_MINUTES = 120;
@@ -172,13 +169,11 @@ const getEffectiveStatus = (b: MentorBookingRow, nowMs: number): EffectiveStatus
     ? endMs !== null && nowMs > endMs
     : !b.isTemplate && !Number.isNaN(startMs) && nowMs > startMs + START_LATE_LIMIT_MINUTES * 60000;
 
-
-
-    if (b.status === "in_progress") {
-      // Slot chal raha hai -> In Progress. Slot khatam par mentor ne End nahi dabaya -> Ended.
-      // completed / no_show ka faisla sirf backend karta hai, frontend nahi.
-      return endMs !== null && nowMs >= endMs ? "ended" : "in_progress";
-    }
+  if (b.status === "in_progress") {
+    // Slot chal raha hai -> In Progress. Slot khatam par mentor ne End nahi dabaya -> Ended.
+    // completed / no_show ka faisla sirf backend karta hai, frontend nahi.
+    return endMs !== null && nowMs >= endMs ? "ended" : "in_progress";
+  }
 
   // Pending request slot start par hi expire (accept sirf start time tak)
   if (b.status === "pending") {
@@ -197,6 +192,18 @@ const timeOf = (b: MentorBookingRow): number => {
 };
 const byNearestFirst = (a: MentorBookingRow, b: MentorBookingRow) => timeOf(a) - timeOf(b);
 const byLatestFirst = (a: MentorBookingRow, b: MentorBookingRow) => timeOf(b) - timeOf(a);
+
+// Mobile card / desktop table cell ke common classes
+const TD = "flex items-center justify-between gap-3 py-1.5 md:table-cell md:px-5 md:py-3.5";
+const TH = "px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider";
+const MobileLabel = ({ children }: { children: React.ReactNode }) => (
+  <span
+    className="md:hidden text-[11px] font-bold uppercase tracking-wider shrink-0"
+    style={{ color: "#8a7a6a" }}
+  >
+    {children}
+  </span>
+);
 
 // ── Mentee photo helpers ────────────────────────────────────
 // Server kabhi full URL bhejta hai, kabhi photoId, kabhi kuch nahi.
@@ -584,7 +591,6 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     setVisibleCount(PAGE_SIZE);
   }, [bookingTab, searchQuery]);
 
-
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return "N/A";
     const date = new Date(dateStr);
@@ -680,7 +686,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         await fetchSessions();
 
         if (meetUrl) {
-          window.open(meetUrl, '_blank', 'noopener,noreferrer');
+          window.open(meetUrl, "_blank", "noopener,noreferrer");
         } else {
           showToast("Session started, but no Google Meet link found", "error");
         }
@@ -728,6 +734,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
 <html>
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Session Receipt - ${r.menteeName || "Student"}</title>
 <style>
   body { font-family: Arial, sans-serif; padding: 40px; color: #4a3728; }
@@ -737,6 +744,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
   .value { font-weight: 600; text-align: right; }
   .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; background: #f3e8ff; color: #7c3aed; font-size: 12px; font-weight: 600; }
   .total { margin-top: 16px; padding-top: 16px; border-top: 2px solid #4a3728; font-size: 18px; font-weight: 700; display: flex; justify-content: space-between; }
+  @media (max-width: 600px) { body { padding: 20px; } }
 </style>
 </head>
 <body>
@@ -862,7 +870,6 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         await SessionService.rejectGroupJoinRequest(cancelSessionId, bookingRow.menteeId);
         showToast("Join request declined", "success");
         setAllBookings((prev) => prev.filter((b) => b.bookingId !== rowKey));
-
       } else if (bookingRow?.isGroupSession) {
         if (cancelReason.trim().length < 10) {
           showToast("Reason must be at least 10 characters.", "error");
@@ -870,7 +877,6 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         }
         await SessionService.cancelGroupSession(cancelSessionId, cancelReason.trim());
 
-        
         showToast("Session cancelled successfully", "success");
         setAllBookings((prev) =>
           prev.map((b) =>
@@ -939,14 +945,20 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     }
   };
 
+  // Modal ke common classes (mobile pe scroll + chhota padding)
+  const modalOverlay =
+    "fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4";
+  const modalBox =
+    "bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto";
+
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-4 md:space-y-6 animate-fadeIn">
       {/* TOAST */}
       {toast &&
         typeof document !== "undefined" &&
         createPortal(
           <div
-            className="fixed top-5 right-5 z-[9999] flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg"
+            className="fixed top-20 left-4 right-4 sm:left-auto sm:right-5 z-[9999] flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg"
             style={{
               backgroundColor: toast.type === "success" ? "#dcfce7" : "#fee2e2",
               color: toast.type === "success" ? "#15803d" : "#dc2626",
@@ -958,7 +970,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
             ) : (
               <XCircle className="w-4.5 h-4.5 shrink-0" />
             )}
-            <span className="text-sm font-semibold">{toast.message}</span>
+            <span className="text-sm font-semibold flex-1">{toast.message}</span>
             <button onClick={() => setToast(null)} className="ml-2 shrink-0">
               <X className="w-3.5 h-3.5" />
             </button>
@@ -968,26 +980,29 @@ export default function BookingsPage({ mentorData }: BookingProps) {
 
       {/* HEADER */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#4a3728" }}>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "#4a3728" }}>
             <Calendar className="w-5 h-5 text-white" />
           </div>
-          <div>
-            <h2 className="text-2xl font-bold" style={{ color: "#4a3728" }}>Bookings</h2>
+          <div className="min-w-0">
+            <h2 className="text-xl md:text-2xl font-bold" style={{ color: "#4a3728" }}>Bookings</h2>
             <p style={{ color: "#8a7a6a" }} className="text-sm">Manage your sessions</p>
           </div>
         </div>
 
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap justify-end">
           {showSearch && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}>
-              <Search className="w-4 h-4" style={{ color: "#8a7a6a" }} />
+            <div
+              className="flex items-center gap-2 px-3 py-2 rounded-lg order-2 sm:order-1 w-full sm:w-auto"
+              style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}
+            >
+              <Search className="w-4 h-4 shrink-0" style={{ color: "#8a7a6a" }} />
               <input
                 autoFocus
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search student or service..."
-                className="bg-transparent outline-none text-sm w-48"
+                className="bg-transparent outline-none text-sm w-full sm:w-48"
                 style={{ color: "#4a3728" }}
               />
               {searchQuery && (
@@ -1003,7 +1018,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
               setShowSearch((v) => !v);
               if (showSearch) setSearchQuery("");
             }}
-            className="px-3.5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors hover:bg-[#f3ece4]"
+            className="order-1 sm:order-2 px-3.5 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors hover:bg-[#f3ece4]"
             style={{ backgroundColor: showSearch ? "#f3ece4" : "#fbf7f3", color: "#7a5c3e", border: "1px solid #e0d8cf" }}
           >
             <Search className="w-4 h-4" />
@@ -1013,7 +1028,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       </div>
 
       {/* STATS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {[
           { label: "Pending", value: pendingBookings.length, icon: Clock, palette: "amber" },
           { label: "Upcoming", value: upcomingBookings.length, icon: Calendar, palette: "green" },
@@ -1022,8 +1037,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         ].map((stat, idx) => {
           const c = statPalette[stat.palette];
           return (
-            <div key={idx} className="bg-white p-5 rounded-2xl" style={{ border: "1px solid #e0d8cf" }}>
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-3" style={{ backgroundColor: c.bg }}>
+            <div key={idx} className="bg-white p-3.5 md:p-5 rounded-2xl" style={{ border: "1px solid #e0d8cf" }}>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-2 md:mb-3" style={{ backgroundColor: c.bg }}>
                 <stat.icon className="w-4.5 h-4.5" style={{ color: c.fg }} />
               </div>
               <p className="text-2xl font-bold" style={{ color: "#4a3728" }}>{stat.value}</p>
@@ -1033,9 +1048,12 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         })}
       </div>
 
-      {/* TABS */}
-      <div className="bg-white p-1.5 rounded-2xl overflow-x-auto" style={{ border: "1px solid #e0d8cf" }}>
-        <div className="flex gap-1.5 min-w-max">
+      {/* TABS: mobile pe horizontal scroll chips */}
+      <div
+        className="bg-white p-1.5 rounded-2xl overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ border: "1px solid #e0d8cf" }}
+      >
+        <div className="flex gap-1.5 min-w-max md:min-w-0">
           {(["all", "pending", "upcoming", "in_progress", "completed", "missed", "history"] as const).map((tab) => {
             const count = {
               all: activeBookings.length,
@@ -1054,7 +1072,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
               <button
                 key={tab}
                 onClick={() => setBookingTab(tab)}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors duration-150"
+                className="shrink-0 md:flex-1 px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-sm font-semibold transition-colors duration-150"
                 style={{ backgroundColor: isActive ? "#4a3728" : "transparent", color: isActive ? "#fff" : "#7a5c3e" }}
               >
                 <div className="flex items-center justify-center gap-2 whitespace-nowrap">
@@ -1073,16 +1091,16 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         </div>
       </div>
 
-      {/* TABLE */}
+      {/* LIST: desktop pe table, mobile pe cards */}
       <div className="bg-white rounded-2xl overflow-hidden" style={{ border: "1px solid #e0d8cf" }}>
-        <div className="overflow-x-auto">
+        <div className="p-3 md:p-0 md:overflow-x-auto">
           {loadingData ? (
             <div className="flex items-center justify-center py-16" style={{ color: "#8a7a6a" }}>
               <Clock className="w-5 h-5 animate-spin mr-3" />
               <span className="text-sm font-semibold">Loading bookings...</span>
             </div>
           ) : currentBookings.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16" style={{ color: "#8a7a6a" }}>
+            <div className="flex flex-col items-center justify-center py-16 text-center px-4" style={{ color: "#8a7a6a" }}>
               <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: "#f3ece4" }}>
                 <Calendar className="w-6 h-6" style={{ color: "#a08070" }} />
               </div>
@@ -1092,19 +1110,19 @@ export default function BookingsPage({ mentorData }: BookingProps) {
               <p className="text-xs mt-1">{searchQuery ? "Try a different search" : "Bookings will appear here when available"}</p>
             </div>
           ) : (
-            <table className="w-full">
-              <thead style={{ backgroundColor: "#fbf7f3" }}>
+            <table className="w-full block md:table">
+              <thead className="hidden md:table-header-group" style={{ backgroundColor: "#fbf7f3" }}>
                 <tr>
-                  <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Student</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Service</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Date</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Time</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Status</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: "#8a7a6a" }}>Actions</th>
+                  <th className={TH} style={{ color: "#8a7a6a" }}>Student</th>
+                  <th className={TH} style={{ color: "#8a7a6a" }}>Service</th>
+                  <th className={TH} style={{ color: "#8a7a6a" }}>Date</th>
+                  <th className={TH} style={{ color: "#8a7a6a" }}>Time</th>
+                  <th className={TH} style={{ color: "#8a7a6a" }}>Status</th>
+                  <th className={TH} style={{ color: "#8a7a6a" }}>Actions</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y" style={{ borderColor: "#f0ebe4" }}>
+              <tbody className="block md:table-row-group md:divide-y" style={{ borderColor: "#f0ebe4" }}>
                 {currentBookings.slice(0, visibleCount).map((booking, idx) => {
                   const resolvedPhoto = booking.menteeId ? photoUrls[booking.menteeId] : null;
 
@@ -1113,27 +1131,29 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                   const badgeKey = eff === "upcoming" ? booking.status : eff;
                   const sb = statusBadge[badgeKey] ?? statusBadge.pending;
 
-                      
-
                   const isGroupedRow = !!booking.participants; // accepted, session-level row
                   const rowKey = booking.bookingId || booking.sessionId;
                   const currentAction = rowActionsLoading[rowKey];
                   const isRowLoading = Boolean(currentAction);
 
                   return (
-                    <tr key={`${booking.sessionId}-${booking.bookingId}-${idx}`} className="transition-colors hover:bg-[#fbf7f3]">
+                    <tr
+                      key={`${booking.sessionId}-${booking.bookingId}-${idx}`}
+                      className="block md:table-row rounded-xl md:rounded-none mb-3 md:mb-0 p-3 md:p-0 border md:border-0 border-[#e0d8cf] transition-colors hover:bg-[#fbf7f3]"
+                    >
                       {/* Student */}
-                      <td className="px-5 py-3.5">
+                      <td className={TD}>
+                        <MobileLabel>Student</MobileLabel>
                         {isGroupedRow ? (
                           <div className="flex items-center gap-2.5">
                             <div
-                              className="w-9 h-9 rounded-full flex items-center justify-center text-white"
+                              className="w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0"
                               style={{ backgroundColor: "#7c3aed" }}
                             >
                               <Users className="w-4 h-4" />
                             </div>
                             <span
-                              className="px-2 py-1 rounded-full text-xs font-bold"
+                              className="px-2 py-1 rounded-full text-xs font-bold whitespace-nowrap"
                               style={{ backgroundColor: "#f3e8ff", color: "#7c3aed" }}
                             >
                               {booking.enrolledCount}/{booking.maxParticipants} Enrolled
@@ -1148,7 +1168,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
                             <MenteeLink
                               menteeId={booking.menteeId}
                               name={booking.menteeName}
@@ -1169,16 +1189,26 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                       </td>
 
                       {/* Service */}
-                      <td className="px-5 py-3.5 text-sm" style={{ color: "#8a7a6a" }}>{booking.serviceName}</td>
+                      <td className={`${TD} text-sm`} style={{ color: "#8a7a6a" }}>
+                        <MobileLabel>Service</MobileLabel>
+                        <span className="text-right md:text-left">{booking.serviceName}</span>
+                      </td>
 
                       {/* Date */}
-                      <td className="px-5 py-3.5 text-sm" style={{ color: "#8a7a6a" }}>{formatDate(booking.scheduledAt)}</td>
+                      <td className={`${TD} text-sm`} style={{ color: "#8a7a6a" }}>
+                        <MobileLabel>Date</MobileLabel>
+                        <span>{formatDate(booking.scheduledAt)}</span>
+                      </td>
 
                       {/* Time */}
-                      <td className="px-5 py-3.5 text-sm" style={{ color: "#8a7a6a" }}>{formatTime(booking)}</td>
+                      <td className={`${TD} text-sm`} style={{ color: "#8a7a6a" }}>
+                        <MobileLabel>Time</MobileLabel>
+                        <span>{formatTime(booking)}</span>
+                      </td>
 
                       {/* Status */}
-                      <td className="px-5 py-3.5">
+                      <td className={TD}>
+                        <MobileLabel>Status</MobileLabel>
                         <span
                           className="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-semibold"
                           style={{ backgroundColor: sb.bg, color: sb.fg }}
@@ -1188,8 +1218,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                       </td>
 
                       {/* Actions */}
-                      <td className="px-5 py-3.5">
-                        <div className="flex gap-1.5">
+                      <td className="block md:table-cell pt-3 mt-1 border-t md:border-t-0 md:pt-3.5 md:mt-0 md:px-5 md:py-3.5 border-[#f0ebe4]">
+                        <div className="flex flex-wrap gap-1.5">
                           {/* Pending: only real pending join-request rows land here */}
                           {eff === "pending" && (
                             <>
@@ -1227,59 +1257,59 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                             </>
                           )}
 
-                            {/* Upcoming */}
-                            {eff === "upcoming" && (
-                              <>
-                                {booking.isGroupSession ? (
-                                  (booking.status === "open" ||
-                                    booking.status === "full" ||
-                                    booking.status === "confirmed") &&
-                                  !(booking.isTemplate || !booking.scheduledAt) && (() => {
-                                    const scheduledTime = booking.scheduledAt ? new Date(booking.scheduledAt).getTime() : 0;
-                                    const now = Date.now();
-                                    const isTooEarly = now < scheduledTime - 5 * 60 * 1000;
-                                    const isTooLate = now > scheduledTime + 10 * 60 * 1000;
-                                    const isWithinWindow = !isTooEarly && !isTooLate;
+                          {/* Upcoming */}
+                          {eff === "upcoming" && (
+                            <>
+                              {booking.isGroupSession ? (
+                                (booking.status === "open" ||
+                                  booking.status === "full" ||
+                                  booking.status === "confirmed") &&
+                                !(booking.isTemplate || !booking.scheduledAt) && (() => {
+                                  const scheduledTime = booking.scheduledAt ? new Date(booking.scheduledAt).getTime() : 0;
+                                  const now = Date.now();
+                                  const isTooEarly = now < scheduledTime - 5 * 60 * 1000;
+                                  const isTooLate = now > scheduledTime + 10 * 60 * 1000;
+                                  const isWithinWindow = !isTooEarly && !isTooLate;
 
-                                    return (
-                                      <div className="flex flex-col items-start gap-0.5">
-                                        <button
-                                          onClick={() => openStartModal(booking)}
-                                          disabled={isRowLoading || !isWithinWindow}
-                                          className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                          style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
-                                          title={isTooEarly ? "Available 5 minutes before scheduled start" : isTooLate ? "Window passed (10 min after scheduled start)" : undefined}
-                                        >
-                                          {currentAction === "start" ? (
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                          ) : (
-                                            <Play className="w-3.5 h-3.5" />
-                                          )}
-                                          <span>Start</span>
-                                        </button>
-                                        {!isWithinWindow && (
-                                          <span className="text-[10px] text-amber-700 whitespace-nowrap">
-                                            {isTooEarly ? "Starts 5m before scheduled time" : "Start window closed (+10m)"}
-                                          </span>
+                                  return (
+                                    <div className="flex flex-col items-start gap-0.5">
+                                      <button
+                                        onClick={() => openStartModal(booking)}
+                                        disabled={isRowLoading || !isWithinWindow}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                        style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
+                                        title={isTooEarly ? "Available 5 minutes before scheduled start" : isTooLate ? "Window passed (10 min after scheduled start)" : undefined}
+                                      >
+                                        {currentAction === "start" ? (
+                                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                          <Play className="w-3.5 h-3.5" />
                                         )}
-                                      </div>
-                                    );
-                                  })()
-                                ) : (
-                                  <button
-                                    onClick={() => openStartModal(booking)}
-                                    disabled={isRowLoading}
-                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                    style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
-                                  >
-                                    {currentAction === "start" ? (
-                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    ) : (
-                                      <Play className="w-3.5 h-3.5" />
-                                    )}
-                                    <span>Start</span>
-                                  </button>
-                                )}
+                                        <span>Start</span>
+                                      </button>
+                                      {!isWithinWindow && (
+                                        <span className="text-[10px] text-amber-700">
+                                          {isTooEarly ? "Starts 5m before scheduled time" : "Start window closed (+10m)"}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })()
+                              ) : (
+                                <button
+                                  onClick={() => openStartModal(booking)}
+                                  disabled={isRowLoading}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                  style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
+                                >
+                                  {currentAction === "start" ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Play className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>Start</span>
+                                </button>
+                              )}
 
                               {/* Reschedule not supported for group sessions yet */}
                               {!booking.isGroupSession && (
@@ -1314,76 +1344,74 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                             </>
                           )}
 
-                            {/* In Progress */}
-                            {(eff === "in_progress" || eff === "ended") && (
-                              <div className="flex items-center gap-1.5">
-                                {booking.isGroupSession && booking.meetingUrl && (
-                                  <button
-                                    onClick={() => window.open(booking.meetingUrl, '_blank', 'noopener,noreferrer')}
-                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
-                                    style={{ backgroundColor: "#22c55e", color: "#ffffff" }}
-                                  >
-                                    <Play className="w-3.5 h-3.5" />
-                                    Open Meet
-                                  </button>
-                                )}
-                                                               {eff === "in_progress" && !booking.isGroupSession && (
-                                  <button
-                                    onClick={() =>
-                                      router.push(
-                                        `/mentorship/mentor-session?sessionId=${encodeURIComponent(booking.sessionId)}&roomId=${encodeURIComponent(
-                                          booking.bookingId
-                                        )}&bookingId=${encodeURIComponent(booking.bookingId)}&role=mentor`
-                                      )
-                                    }
-                                    disabled={isRowLoading}
-                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
-                                    style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
-                                  >
-                                    <Play className="w-3.5 h-3.5" />
-                                    <span>Rejoin</span>
-                                  </button>
-                                )}
+                          {/* In Progress */}
+                          {(eff === "in_progress" || eff === "ended") && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {booking.isGroupSession && booking.meetingUrl && (
                                 <button
-                                  onClick={() => handleEndSessionClick(booking)}
-                                  disabled={isRowLoading}
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50 min-w-[104px]"
-                                  style={{ backgroundColor: "#f3e8ff", color: "#7c3aed" }}
+                                  onClick={() => window.open(booking.meetingUrl, "_blank", "noopener,noreferrer")}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80"
+                                  style={{ backgroundColor: "#22c55e", color: "#ffffff" }}
                                 >
-                                  {currentAction === "end" ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  ) : (
-                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                  )}
-                                  <span>End Session</span>
+                                  <Play className="w-3.5 h-3.5" />
+                                  Open Meet
                                 </button>
-                              </div>
-                            )}
+                              )}
+                              {eff === "in_progress" && !booking.isGroupSession && (
+                                <button
+                                  onClick={() =>
+                                    router.push(
+                                      `/mentorship/mentor-session?sessionId=${encodeURIComponent(booking.sessionId)}&roomId=${encodeURIComponent(
+                                        booking.bookingId
+                                      )}&bookingId=${encodeURIComponent(booking.bookingId)}&role=mentor`
+                                    )
+                                  }
+                                  disabled={isRowLoading}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50"
+                                  style={{ backgroundColor: "#dbeafe", color: "#1d4ed8" }}
+                                >
+                                  <Play className="w-3.5 h-3.5" />
+                                  <span>Rejoin</span>
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleEndSessionClick(booking)}
+                                disabled={isRowLoading}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-opacity hover:opacity-80 disabled:opacity-50 min-w-[104px]"
+                                style={{ backgroundColor: "#f3e8ff", color: "#7c3aed" }}
+                              >
+                                {currentAction === "end" ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                )}
+                                <span>End Session</span>
+                              </button>
+                            </div>
+                          )}
 
-                               
-                            {/* Completed */}
-
-                            {eff === "completed" && (
-                              <>
-                                {isGroupedRow ? (
+                          {/* Completed */}
+                          {eff === "completed" && (
+                            <>
+                              {isGroupedRow ? (
+                                <button
+                                  onClick={() => openParticipantsModal(booking)}
+                                  className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4]"
+                                  style={{ border: "1px solid #e0d8cf" }}
+                                  title="View Participants"
+                                >
+                                  <Eye className="w-3.5 h-3.5" style={{ color: "#7a5c3e" }} />
+                                </button>
+                              ) : (
+                                <>
                                   <button
-                                    onClick={() => openParticipantsModal(booking)}
+                                    onClick={() => openDetailsModal(booking)}
                                     className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4]"
                                     style={{ border: "1px solid #e0d8cf" }}
-                                    title="View Participants"
+                                    title="View Details"
                                   >
                                     <Eye className="w-3.5 h-3.5" style={{ color: "#7a5c3e" }} />
                                   </button>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() => openDetailsModal(booking)}
-                                      className="p-1.5 rounded-lg transition-colors hover:bg-[#f3ece4]"
-                                      style={{ border: "1px solid #e0d8cf" }}
-                                      title="View Details"
-                                    >
-                                      <Eye className="w-3.5 h-3.5" style={{ color: "#7a5c3e" }} />
-                                    </button>
 
                                   <button
                                     onClick={() => handleDownloadReceipt(booking)}
@@ -1433,8 +1461,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       {showCancelModal &&
         typeof document !== "undefined" &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4" style={{ border: "1px solid #e0d8cf" }}>
+          <div className={modalOverlay}>
+            <div className={modalBox} style={{ border: "1px solid #e0d8cf" }}>
               <h3 className="text-lg font-bold mb-4" style={{ color: "#4a3728" }}>
                 {allBookings.find((b) => b.sessionId === cancelSessionId && b.bookingId === cancelBookingId)?.status === "pending"
                   ? "Decline Join Request"
@@ -1455,7 +1483,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                 />
               </div>
 
-              <div className="flex justify-end gap-3 mt-6">
+              <div className="flex flex-wrap justify-end gap-3 mt-6">
                 <button
                   className="px-4 py-2 rounded-lg text-sm font-semibold"
                   style={{ backgroundColor: "#fbf7f3", color: "#7a5c3e", border: "1px solid #e0d8cf" }}
@@ -1487,8 +1515,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       {showRescheduleModal &&
         typeof document !== "undefined" &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4" style={{ border: "1px solid #e0d8cf" }}>
+          <div className={modalOverlay}>
+            <div className={modalBox} style={{ border: "1px solid #e0d8cf" }}>
               <h3 className="text-lg font-bold mb-4" style={{ color: "#4a3728" }}>Reschedule Session</h3>
 
               <div className="space-y-4">
@@ -1516,7 +1544,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 mt-6">
+              <div className="flex flex-wrap justify-end gap-3 mt-6">
                 <button
                   className="px-4 py-2 rounded-lg text-sm font-semibold"
                   style={{ backgroundColor: "#fbf7f3", color: "#7a5c3e", border: "1px solid #e0d8cf" }}
@@ -1550,8 +1578,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         startModalBooking &&
         typeof document !== "undefined" &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4" style={{ border: "1px solid #e0d8cf" }}>
+          <div className={modalOverlay}>
+            <div className={modalBox} style={{ border: "1px solid #e0d8cf" }}>
               <h3 className="text-lg font-bold mb-1" style={{ color: "#4a3728" }}>Session Details</h3>
               <p className="text-xs mb-4" style={{ color: "#8a7a6a" }}>
                 {startModalBooking.isGroupSession
@@ -1560,9 +1588,9 @@ export default function BookingsPage({ mentorData }: BookingProps) {
               </p>
 
               <div className="space-y-2.5 rounded-xl p-4 mb-4" style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between gap-3 text-sm">
                   <span style={{ color: "#8a7a6a" }}>Session Title</span>
-                  <span style={{ color: "#4a3728" }} className="font-semibold">{startModalBooking.serviceName}</span>
+                  <span style={{ color: "#4a3728" }} className="font-semibold text-right">{startModalBooking.serviceName}</span>
                 </div>
 
                 {startModalBooking.isGroupSession ? (
@@ -1622,6 +1650,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                 }
 
                 const canStartSession = !isGroup || (!isTemplate && isWithinWindow);
+                const isStarting = rowActionsLoading[startModalBooking.bookingId || startModalBooking.sessionId] === "start";
 
                 return (
                   <>
@@ -1630,7 +1659,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                         {windowHint}
                       </div>
                     )}
-                    <div className="flex justify-end gap-3">
+                    <div className="flex flex-wrap justify-end gap-3">
                       <button
                         className="px-4 py-2 rounded-lg text-sm font-semibold"
                         style={{ backgroundColor: "#fbf7f3", color: "#7a5c3e", border: "1px solid #e0d8cf" }}
@@ -1639,23 +1668,23 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                           setStartModalBooking(null);
                           setStartError(null);
                         }}
-                        disabled={rowActionsLoading[startModalBooking.bookingId || startModalBooking.sessionId] === "start"}
+                        disabled={isStarting}
                       >
                         Cancel
                       </button>
 
                       <button
                         className="px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
-                        style={{ backgroundColor: "#1d4ed8", opacity: (rowActionsLoading[startModalBooking.bookingId || startModalBooking.sessionId] === "start" || !canStartSession) ? 0.6 : 1 }}
+                        style={{ backgroundColor: "#1d4ed8", opacity: (isStarting || !canStartSession) ? 0.6 : 1 }}
                         onClick={confirmStartSession}
-                        disabled={rowActionsLoading[startModalBooking.bookingId || startModalBooking.sessionId] === "start" || !canStartSession}
+                        disabled={isStarting || !canStartSession}
                       >
-                        {rowActionsLoading[startModalBooking.bookingId || startModalBooking.sessionId] === "start" ? (
+                        {isStarting ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
                           <Play className="w-3.5 h-3.5" />
                         )}
-                        <span>{rowActionsLoading[startModalBooking.bookingId || startModalBooking.sessionId] === "start" ? "Starting..." : "Start Session"}</span>
+                        <span>{isStarting ? "Starting..." : "Start Session"}</span>
                       </button>
                     </div>
                   </>
@@ -1671,8 +1700,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         detailsBooking &&
         typeof document !== "undefined" &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4" style={{ border: "1px solid #e0d8cf" }}>
+          <div className={modalOverlay}>
+            <div className={modalBox} style={{ border: "1px solid #e0d8cf" }}>
               <h3 className="text-lg font-bold mb-1" style={{ color: "#4a3728" }}>Session Details</h3>
               <p className="text-xs mb-4" style={{ color: "#8a7a6a" }}>Completed session summary.</p>
 
@@ -1686,9 +1715,9 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                     underlineOnHover
                   />
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between gap-3 text-sm">
                   <span style={{ color: "#8a7a6a" }}>Service</span>
-                  <span style={{ color: "#4a3728" }} className="font-semibold">{detailsBooking.serviceName}</span>
+                  <span style={{ color: "#4a3728" }} className="font-semibold text-right">{detailsBooking.serviceName}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span style={{ color: "#8a7a6a" }}>Date</span>
@@ -1706,7 +1735,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3">
+              <div className="flex flex-wrap justify-end gap-3">
                 <button
                   className="px-4 py-2 rounded-lg text-sm font-semibold"
                   style={{ backgroundColor: "#fbf7f3", color: "#7a5c3e", border: "1px solid #e0d8cf" }}
@@ -1737,8 +1766,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
       {showParticipantsModal &&
         typeof document !== "undefined" &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4 max-h-[80vh] flex flex-col" style={{ border: "1px solid #e0d8cf" }}>
+          <div className={modalOverlay}>
+            <div className="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md max-h-[85vh] flex flex-col" style={{ border: "1px solid #e0d8cf" }}>
               <h3 className="text-lg font-bold mb-1" style={{ color: "#4a3728" }}>{participantsModalTitle}</h3>
               <p className="text-xs mb-4" style={{ color: "#8a7a6a" }}>
                 {participantsModalList.length} accepted participant{participantsModalList.length === 1 ? "" : "s"}
@@ -1799,8 +1828,8 @@ export default function BookingsPage({ mentorData }: BookingProps) {
         attendanceBooking &&
         typeof document !== "undefined" &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4 max-h-[80vh] flex flex-col" style={{ border: "1px solid #e0d8cf" }}>
+          <div className={modalOverlay}>
+            <div className="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-md max-h-[85vh] flex flex-col" style={{ border: "1px solid #e0d8cf" }}>
               <h3 className="text-lg font-bold mb-1" style={{ color: "#4a3728" }}>Mark Attendance</h3>
               <p className="text-xs mb-4" style={{ color: "#8a7a6a" }}>
                 {attendanceBooking.serviceName} - uncheck anyone who didn't attend before completing.
@@ -1824,20 +1853,20 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                       />
 
                       {photo ? (
-                        <img src={photo} alt={p.menteeName} className="w-8 h-8 rounded-full object-cover" />
+                        <img src={photo} alt={p.menteeName} className="w-8 h-8 rounded-full object-cover shrink-0" />
                       ) : (
                         <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
                           style={{ backgroundColor: "#4a3728" }}
                         >
                           {p.menteeName?.[0]?.toUpperCase() ?? "?"}
                         </div>
                       )}
 
-                      <span className="text-sm font-semibold flex-1" style={{ color: "#4a3728" }}>{p.menteeName}</span>
+                      <span className="text-sm font-semibold flex-1 min-w-0 truncate" style={{ color: "#4a3728" }}>{p.menteeName}</span>
 
                       <span
-                        className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                        className="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0"
                         style={{
                           backgroundColor: checked ? "#dcfce7" : "#fee2e2",
                           color: checked ? "#15803d" : "#dc2626",
@@ -1850,7 +1879,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
                 })}
               </div>
 
-              <div className="flex justify-end gap-3 mt-5">
+              <div className="flex flex-wrap justify-end gap-3 mt-5">
                 <button
                   className="px-4 py-2 rounded-lg text-sm font-semibold"
                   style={{ backgroundColor: "#fbf7f3", color: "#7a5c3e", border: "1px solid #e0d8cf" }}

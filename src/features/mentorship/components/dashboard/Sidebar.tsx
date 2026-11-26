@@ -9,7 +9,6 @@ import { useNavbarData } from "@/features/profile/components/home/NavbarProvider
 import { useEffect, useState } from "react";
 import PhotoLightbox from "../shared/PhotoLightbox";
 
-
 interface SidebarProps {
   activePage: string;
   setActivePage: (page: string) => void;
@@ -37,7 +36,7 @@ export default function Sidebar({
   isCollapsed = false,
   onToggleCollapse,
 }: SidebarProps) {
-    // Account profile (mentee view jaisa) -- mentor API load hone se pehle ya fail hone par bhi
+  // Account profile (mentee view jaisa) -- mentor API load hone se pehle ya fail hone par bhi
   // sahi naam/photo dikhane ke liye fallback
   const { userProfileData, profileImageUrl: accountPhoto, loadProfile } = useProfile();
   const { user: authUser } = useAuth();
@@ -93,19 +92,19 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`flex flex-col h-full overflow-visible transition-all duration-300 ease-in-out relative ${
-        isCollapsed ? "w-20" : "w-72"
+      className={`flex flex-col h-full overflow-visible transition-all duration-300 ease-in-out relative w-72 max-w-[85vw] ${
+        isCollapsed ? "md:w-20" : "md:w-72"
       }`}
       style={{ backgroundColor: "#fff", borderRight: "1px solid #ece4db" }}
     >
-      {/* Collapse Toggle Button */}
+      {/* Collapse Toggle Button: sirf desktop pe (mobile pe drawer hai) */}
       {onToggleCollapse && (
         <button
           onClick={(e) => {
             e.stopPropagation();
             onToggleCollapse();
           }}
-          className="absolute -right-3.5 top-8 z-50 w-7 h-7 rounded-full flex items-center justify-center border shadow-sm transition-transform hover:scale-105"
+          className="hidden md:flex absolute -right-3.5 top-8 z-50 w-7 h-7 rounded-full items-center justify-center border shadow-sm transition-transform hover:scale-105"
           style={{ backgroundColor: "#fff", borderColor: "#ece4db", color: "#7a5c3e" }}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -116,8 +115,8 @@ export default function Sidebar({
 
       {/* Profile Card: photo, naam, category, rating, switch button */}
       <div
-        className={`mt-5 mb-1 rounded-2xl transition-all duration-200 shrink-0 ${
-          isCollapsed ? "mx-3 p-2" : "mx-4 p-4"
+        className={`mt-4 md:mt-5 mb-1 rounded-2xl transition-all duration-200 shrink-0 ${
+          isCollapsed ? "mx-3 p-2" : "mx-4 p-3 md:p-4"
         }`}
         style={{ backgroundColor: "#fbf7f3", border: "1px solid #e0d8cf" }}
       >
@@ -130,17 +129,17 @@ export default function Sidebar({
           >
             {profilePic ? (
               <>
-              <img
-                src={profilePic}
-                alt={fullName}
-                title="Click to view photo"
-                className="w-full h-full object-cover cursor-zoom-in"
-                onClick={() => setShowPhoto(true)}
-              />
-              {showPhoto && (
-                <PhotoLightbox src={profilePic} alt={fullName} onClose={() => setShowPhoto(false)} />
-              )}
-            </>
+                <img
+                  src={profilePic}
+                  alt={fullName}
+                  title="Click to view photo"
+                  className="w-full h-full object-cover cursor-zoom-in"
+                  onClick={() => setShowPhoto(true)}
+                />
+                {showPhoto && (
+                  <PhotoLightbox src={profilePic} alt={fullName} onClose={() => setShowPhoto(false)} />
+                )}
+              </>
             ) : (
               <div
                 className="w-full h-full flex items-center justify-center font-bold text-white transition-all duration-300"
@@ -211,8 +210,8 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Menu */}
-      <nav className="flex-1 overflow-y-auto px-4 py-3">
+      {/* Menu: pb-24 mobile pe taaki last items bottom nav ke peeche na chhupein */}
+      <nav className="flex-1 overflow-y-auto px-4 py-3 pb-24 md:pb-3">
         <div className="space-y-0.5">
           {MENU_ITEMS.map((item: MenuItem) => {
             const Icon = item.icon;
@@ -226,7 +225,7 @@ export default function Sidebar({
                 key={item.id}
                 onClick={() => setActivePage(item.id)}
                 title={isCollapsed ? label : undefined}
-                className={`w-full flex items-center gap-3 py-2 rounded-xl text-sm font-semibold transition-colors duration-150 ${
+                className={`w-full flex items-center gap-3 py-2.5 md:py-2 rounded-xl text-sm font-semibold transition-colors duration-150 ${
                   isCollapsed ? "justify-center px-0" : "px-3"
                 }`}
                 style={{

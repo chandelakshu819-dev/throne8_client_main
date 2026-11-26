@@ -9,6 +9,7 @@ import AuthService from "@/lib/api/auth.service";
 import { GlobalStyles, Navigation } from "@/features/index";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import ServiceThumbnail from "@/features/mentorship/components/shared/ServiceThumbnail";
+import { useMyCollegeMentorIds } from "@/features/mentorship/hooks/useMyCollegeMentorIds";
 import { buildLoginRedirectUrl } from "@/shared/utils/safeRedirect";
 
 type LoadStatus = "loading" | "success" | "error";
@@ -62,12 +63,18 @@ export default function SeniorMentorPublicProfilePage() {
     const [sessionsError, setSessionsError] = useState("");
     const [activeCategory, setActiveCategory] = useState("All");
 
-    // Owner khud ki public page khole to usse apni College Mentor profile par bhejo
+    // Owner khud ki public page khole to usse apni College Mentor profile par bhejo.
+    // URL ka mentorId mere College Mentor ids mein ho, ya profile.userId == meri userId.
+    const myCollegeMentorIds = useMyCollegeMentorIds(Boolean(user?.userId));
     useEffect(() => {
-        if (profile?.userId && user?.userId && String(profile.userId) === String(user.userId)) {
+        if (!user?.userId || !mentorId) return;
+        const isOwnProfile =
+            myCollegeMentorIds.has(String(mentorId)) ||
+            (!!profile?.userId && String(profile.userId) === String(user.userId));
+        if (isOwnProfile) {
             router.replace(`/mentorship/senior-mentor-profile/${user.userId}`);
         }
-    }, [profile?.userId, user?.userId, router]);
+    }, [myCollegeMentorIds, profile?.userId, user?.userId, mentorId, router]);
 
     const loadProfile = useCallback(async () => {
         setProfileStatus("loading");

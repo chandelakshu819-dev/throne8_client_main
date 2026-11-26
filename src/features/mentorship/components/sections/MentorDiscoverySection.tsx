@@ -3,6 +3,7 @@
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { routes } from "@/config/routes";
+import { useMyCollegeMentorIds } from "@/features/mentorship/hooks/useMyCollegeMentorIds";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -232,6 +233,8 @@ function sortByMode<T>(
 export default function MentorDiscoverySection({ toggleCompare, compareList }: MentorDiscoverySectionProps) {
     const router = useRouter();
     const { user } = useAuth();
+    // Logged-in user ke College Mentor ids (application + roles), own card pehchanne ke liye
+    const myCollegeMentorIds = useMyCollegeMentorIds(Boolean(user?.userId));
     const [industryMentors, setIndustryMentors] = useState<MentorData[]>([]);
     const [collegeMentors, setCollegeMentors] = useState<PublicSeniorMentor[]>([]);
     const [industryStatus, setIndustryStatus] = useState<"loading" | "success" | "error">("loading");
@@ -381,14 +384,20 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
         ? filteredIndustryMentors
         : filteredIndustryMentors.slice(0, INDUSTRY_LIMIT);
 
-    // Logged-in user ka apna card hai ya nahi (userId match)
-    const isOwnCard = (mentor: MentorData): boolean =>
+    // Industry card: userId match
+    const isOwnIndustryCard = (mentor: MentorData): boolean =>
+        Boolean(user?.userId && mentor.userId && String(user.userId) === String(mentor.userId));
+
+    // College card: userId match YA card id mere College Mentor ids mein ho
+    const isOwnCollegeCard = (mentor: MentorData): boolean =>
+        myCollegeMentorIds.has(String(mentor.id)) ||
+        (!!mentor.userId && myCollegeMentorIds.has(String(mentor.userId))) ||
         Boolean(user?.userId && mentor.userId && String(user.userId) === String(mentor.userId));
 
     const handleNavigate = (mentor: MentorData) => {
         // Industry mentor apne hi card par click kare -> apni Industry Mentor profile
         // (booking page nahi, kyunki khud se session book nahi kar sakte)
-        if (isOwnCard(mentor) && user?.userId) {
+        if (isOwnIndustryCard(mentor) && user?.userId) {
             router.push(`${routes.seniorMentorDashboard(user.userId)}?tab=profile`);
             return;
         }
@@ -401,7 +410,7 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
     const handleCardNavigate = (mentor: MentorData, isIndustryCard: boolean) => {
         if (!isIndustryCard) {
             // College mentor apne hi card par click kare -> apni College Mentor profile
-            if (isOwnCard(mentor) && user?.userId) {
+            if (isOwnCollegeCard(mentor) && user?.userId) {
                 router.push(routes.industryMentorDashboard(user.userId));
                 return;
             }
