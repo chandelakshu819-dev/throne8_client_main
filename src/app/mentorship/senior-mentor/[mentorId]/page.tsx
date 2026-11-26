@@ -62,12 +62,29 @@ export default function SeniorMentorPublicProfilePage() {
     const [sessionsError, setSessionsError] = useState("");
     const [activeCategory, setActiveCategory] = useState("All");
 
-    // Owner khud ki public page khole to usse apni College Mentor profile par bhejo
+    // Owner khud ki public page khole to usse apni College Mentor profile par bhejo.
+    // 1) profile.userId match, ya 2) URL ka mentorId == mera College Mentor id (roles API)
     useEffect(() => {
-        if (profile?.userId && user?.userId && String(profile.userId) === String(user.userId)) {
-            router.replace(`/mentorship/senior-mentor-profile/${user.userId}`);
+        if (!user?.userId || !mentorId) return;
+        const ownDashboard = `/mentorship/senior-mentor-profile/${user.userId}`;
+
+        if (profile?.userId && String(profile.userId) === String(user.userId)) {
+            router.replace(ownDashboard);
+            return;
         }
-    }, [profile?.userId, user?.userId, router]);
+
+        let cancelled = false;
+        MentorService.getMyRoles()
+            .then((roles) => {
+                if (!cancelled && roles.industryMentorId && String(roles.industryMentorId) === String(mentorId)) {
+                    router.replace(ownDashboard);
+                }
+            })
+            .catch(() => { /* ignore: normal public view dikhega */ });
+        return () => {
+            cancelled = true;
+        };
+    }, [profile?.userId, user?.userId, mentorId, router]);
 
     const loadProfile = useCallback(async () => {
         setProfileStatus("loading");
