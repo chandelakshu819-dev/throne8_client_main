@@ -292,11 +292,7 @@ export default function ServicesPage({
     if (!service.sessionId) return;
 
     if (service.type === 'group_session') {
-      const participantCount = (service as any).currentParticipants ?? 0;
-      if (participantCount > 0) {
-        setBlockedDeleteMessage('This group session has registered participants. Cancel it first before deleting.');
-        return;
-      }
+      // Delete ho sakta hai, archive hoga ya block hoga - ye backend session status dekh kar tay karta hai
       setDeleteTarget(service);
       return;
     }
@@ -327,6 +323,7 @@ export default function ServicesPage({
       }
       setDeleteTarget(null);
     } catch (err: any) {
+      setDeleteTarget(null);
       setBlockedDeleteMessage(err.message || 'Failed to delete service.');
     } finally {
       setIsDeleting(false);
@@ -1265,7 +1262,10 @@ export default function ServicesPage({
             </div>
 
             <p className="text-sm mb-6" style={{ color: '#8a7a6a' }}>
-              Are you sure you want to delete <span className="font-semibold" style={{ color: '#4a3728' }}>"{deleteTarget.name}"</span> permanently? This cannot be undone.
+              Are you sure you want to delete <span className="font-semibold" style={{ color: '#4a3728' }}>"{deleteTarget.name}"</span>?{' '}
+              {deleteTarget.type === 'group_session'
+                ? 'It will be removed from your services. Past bookings with participants stay in your history.'
+                : 'This is permanent and cannot be undone.'}
             </p>
 
             <div className="flex justify-end gap-3 pt-4" style={{ borderTop: '1px solid #f0ebe4' }}>
