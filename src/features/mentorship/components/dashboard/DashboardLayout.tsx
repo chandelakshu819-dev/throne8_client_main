@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams, usePathname, useParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { MessageCircle, Wrench, GraduationCap, Dumbbell, CheckSquare } from "lucide-react";
+import { MessageCircle, Wrench, GraduationCap, Dumbbell, CheckSquare, Menu } from "lucide-react";
 
 import Sidebar from "./Sidebar";
 import DashboardOverviewPage from "./DashboardOverviewPage";
@@ -20,7 +20,6 @@ import { isNotificationForRole } from "@/features/mentorship/utils/notificationR
 import { useNavbarProfileImage } from "@/features/profile/components/home/NavbarProvider";
 // Realtime notification push (booking requests, session started, etc.)
 import { useSocket } from "@/core/realtime/useSocket";
-import BrandWordmark from "@/shared/uiComponents/BrandWordmark";
 
 type ServiceType = {
   name: string;
@@ -105,6 +104,27 @@ const pageComponents: Record<string, React.FC<any>> = {
   marketing: MarketingKitPage,
   services_search: ServicesPage,
   mentee_profile: MenteeProfileTabWrapper,
+};
+
+// Mobile sub-header me current page ka naam dikhane ke liye
+const PAGE_TITLES: Record<string, string> = {
+  dashboard: "Overview",
+  profile: "Profile",
+  notification: "Notification",
+  services: "Services",
+  services_search: "Services",
+  booking: "Bookings",
+  waitlist: "Waitlist",
+  queries: "Queries",
+  availability: "Availability",
+  payment: "Payments",
+  review: "Reviews",
+  analytics: "Analytics",
+  plans: "Plans",
+  trust: "Trust Score",
+  community: "Community",
+  marketing: "Marketing Kit",
+  mentee_profile: "Mentee Profile",
 };
 
 function normalizeNotifications(res: any): any[] {
@@ -309,27 +329,26 @@ export default function MentorDashboard(
   // (booking request, session started/confirmed, etc.)
   const { latestNotification } = useSocket('industry-mentor');
 
-   // Jo ids user ne read kar di hain, unhe yaad rakho taaki refetch unhe wapas unread na kare
-   const readIdsRef = useRef<Set<string>>(new Set());
+  // Jo ids user ne read kar di hain, unhe yaad rakho taaki refetch unhe wapas unread na kare
+  const readIdsRef = useRef<Set<string>>(new Set());
 
-   const fetchNotifications = useCallback(() => {
-     setNotificationsLoading(true);
-     NotificationService.getMentorshipNotifications({ limit: 50, module: 'industry-mentor' })
-       .then((res) =>
-         setNotifications(
-           normalizeNotifications(res).map((n: any) => ({
-             ...n,
-             isRead: n.isRead || readIdsRef.current.has(n._id),
-           }))
-         )
-       )
-       .catch((err) => {
-         console.error("Failed to fetch notifications:", err);
-         setNotifications((prev) => (Array.isArray(prev) ? prev : []));
-       })
-       .finally(() => setNotificationsLoading(false));
-   }, []);
-
+  const fetchNotifications = useCallback(() => {
+    setNotificationsLoading(true);
+    NotificationService.getMentorshipNotifications({ limit: 50, module: 'industry-mentor' })
+      .then((res) =>
+        setNotifications(
+          normalizeNotifications(res).map((n: any) => ({
+            ...n,
+            isRead: n.isRead || readIdsRef.current.has(n._id),
+          }))
+        )
+      )
+      .catch((err) => {
+        console.error("Failed to fetch notifications:", err);
+        setNotifications((prev) => (Array.isArray(prev) ? prev : []));
+      })
+      .finally(() => setNotificationsLoading(false));
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -395,7 +414,6 @@ export default function MentorDashboard(
       console.error("Failed to mark all notifications as read:", err?.response?.status, err);
     });
   };
-  
 
   useEffect(() => {
     if (!userId) return;
@@ -524,9 +542,8 @@ export default function MentorDashboard(
       await MentorService.removeProfilePhoto(mentorData.mentorId);
       // Mentee (account) + Senior Mentor se bhi hatao
       await removeProfilePhotoFromAllRoles(userId, { skip: ['mentor'] });
-      if (typeof loadProfile === "function") loadProfile();      
+      if (typeof loadProfile === "function") loadProfile();
       setMentorData((prev: any) => ({ ...prev, profilePic: null }));
-
 
       setDashboardData((prev: any) => (prev ? { ...prev, profilePic: null } : prev));
       setProfilePhoto(null);
@@ -568,46 +585,56 @@ export default function MentorDashboard(
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  // Drawer khula ho to body scroll lock (mobile)
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const prev = document.body.style.overflow;
+    if (isMobileMenuOpen) document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isMobileMenuOpen]);
+
+  const unreadCount = safeNotifications.filter((n) => !n.isRead).length;
+  const pageTitle = PAGE_TITLES[activePage] || "Dashboard";
+
   return (
-    <div className="flex flex-col h-screen bg-[#f6ede8]">
+    <div className="flex flex-col h-[100dvh] bg-[#f6ede8]">
+      {/* Global navbar ke liye spacer */}
       <div className="h-16 shrink-0" aria-hidden="true" />
 
-      {/* Mobile Header */}
-      <div className="md:hidden flex items-center justify-between px-4 h-16 shrink-0 bg-[#fbf7f3] border-b border-[#e0d8cf]">
+      {/* Mobile sub-bar: sirf menu button + current page naam (branding global navbar me hai, dobara nahi) */}
+      <div className="md:hidden flex items-center gap-2 px-3 h-12 shrink-0 bg-[#fbf7f3] border-b border-[#e0d8cf]">
         <button
           onClick={() => setIsMobileMenuOpen(true)}
-          className="p-2 -ml-2 text-[#4a3728] hover:bg-[#f3ece4] rounded-lg transition-colors"
-          aria-label="Open menu"
+          className="relative p-2 text-[#4a3728] hover:bg-[#f3ece4] rounded-lg transition-colors"
+          aria-label="Open dashboard menu"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
-        </button>
-
-        <BrandWordmark size="sm" />
-
-        <div className="w-8 h-8 rounded-full overflow-hidden border border-[#e0d8cf] flex-shrink-0">
-          {dashboardData?.profilePic || mentorData?.profilePic ? (
-            <img src={dashboardData?.profilePic || mentorData?.profilePic} alt="Profile" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-[#4a3728] text-white flex items-center justify-center text-xs font-bold">
-              {(dashboardData?.user?.firstName?.[0] || mentorData?.user?.firstName?.[0] || 'M').toUpperCase()}
-            </div>
+          <Menu className="w-5 h-5" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#b91c1c]" />
           )}
-        </div>
+        </button>
+        <span className="text-sm font-bold text-[#4a3728] truncate">{pageTitle}</span>
       </div>
 
       <div className="flex flex-1 min-h-0 relative">
         {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
           <div
-            className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
+            className="absolute inset-0 bg-black/50 z-40 md:hidden transition-opacity"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-hidden="true"
           />
         )}
-        <div className={`
-          absolute md:relative z-50 h-full transform transition-transform duration-300 ease-in-out
-          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        `}>
+
+        <div
+          className={`
+            absolute md:relative inset-y-0 left-0 z-50 h-full max-w-[85vw] shrink-0
+            transform transition-transform duration-300 ease-in-out
+            ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+          `}
+        >
           <Sidebar
             activePage={activePage}
             setActivePage={(page) => {
@@ -616,15 +643,17 @@ export default function MentorDashboard(
             }}
             mentorData={mentorData}
             dashboardData={dashboardData}
-            unreadNotificationCount={safeNotifications.filter((n) => !n.isRead).length}
+            unreadNotificationCount={unreadCount}
             onSwitchRole={onSwitchRole}
-            isCollapsed={isSidebarCollapsed}
+            // Mobile drawer me hamesha expanded; collapse sirf desktop pe
+            isCollapsed={isSidebarCollapsed && !isMobileMenuOpen}
             onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           />
         </div>
 
-        <main className="flex-1 overflow-y-auto">
-          <div className="px-4 md:px-8 py-6 max-w-[1600px] mx-auto">
+        {/* pb-24: mobile bottom nav ke neeche content na chhupe */}
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden pb-24 md:pb-0">
+          <div className="px-3 sm:px-4 md:px-8 py-4 md:py-6 max-w-[1600px] mx-auto">
             <CurrentPage
               setActivePage={setActivePage}
 
