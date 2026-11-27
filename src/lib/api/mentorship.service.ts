@@ -617,7 +617,11 @@ class MentorService {
         const apiError = error.response?.data;
 
         if (apiError?.message) {
-          throw new Error(apiError.message);
+          // Backend ka field-wise errors array bhi aage bhejo, taaki form
+          // har error ko uske field ke neeche dikha sake.
+          throw Object.assign(new Error(apiError.message), {
+            errors: Array.isArray(apiError.errors) ? apiError.errors : [],
+          });
         }
       }
 

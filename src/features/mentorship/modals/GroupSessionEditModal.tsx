@@ -1,6 +1,6 @@
 'use client';
 // src/features/mentorship/modals/GroupSessionEditModal.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, DollarSign, Image as ImageIcon, Upload, FileText, Briefcase, Clock, Users, Video, Trash2 } from 'lucide-react';
 import MentorService from '@/lib/api/mentorship.service';
 
@@ -25,6 +25,29 @@ const bufferTimeOptions = [
 
 
 
+// Form ke fields, usi order me jis order me screen par dikhte hain.
+// Pehle galat field par scroll/focus karne ke liye yahi order use hota hai.
+const FIELD_ORDER = [
+    'thumbnailImage', 'title', 'topic', 'meetingUrl', 'pricePerPerson',
+    'duration', 'minParticipants', 'maxParticipants', 'description',
+    'followUpAllowed', 'followUpPeriod', 'bufferTime',
+];
+
+// Backend ke field names jo form ke names se alag hain.
+const BACKEND_FIELD_MAP: Record<string, string> = {
+    bufferTimeMinutes: 'bufferTime',
+    followUp: 'followUpAllowed',
+    'followUp.allowed': 'followUpAllowed',
+    'followUp.periodDays': 'followUpPeriod',
+};
+
+function FieldError({ message }: { message?: string }) {
+    if (!message) return null;
+    return (
+        <p role="alert" className="text-sm mt-1.5 font-bold" style={{ color: '#dc2626' }}>{message}</p>
+    );
+}
+
 interface EditSessionModalProps {
   isOpen: boolean;
   initialMode?: 'view' | 'edit';
@@ -37,7 +60,8 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [meetUrlError, setMeetUrlError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const formRef = useRef<HTMLDivElement>(null);
   const [canonicalSession, setCanonicalSession] = useState<any>(null);
 
   const [formData, setFormData] = useState<Record<string, any>>({});
@@ -100,8 +124,38 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
     };
 
     fetchCanonicalData();
-    return () => { isMounted = false; setFormData({}); setCanonicalSession(null); setSaveError(null); };
+    return () => { isMounted = false; setFormData({}); setCanonicalSession(null); setSaveError(null); setFieldErrors({}); };
   }, [isOpen, initialPropSession]);
+
+  // Save fail hone par pehle galat field par le jao. isSaving false hone ka wait
+  // zaroori hai, kyunki saving ke time inputs disabled hote hain (focus nahi lagta).
+  const shouldJumpRef = useRef(false);
+  useEffect(() => {
+    if (isSaving || !shouldJumpRef.current) return;
+    const firstInvalid = FIELD_ORDER.find((name) => fieldErrors[name]);
+    if (!firstInvalid) return;
+    shouldJumpRef.current = false;
+    const wrapper = formRef.current?.querySelector<HTMLElement>(`[data-field="${firstInvalid}"]`);
+    wrapper?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    wrapper?.querySelector<HTMLElement>('input:not([type="file"]), textarea, select')?.focus({ preventScroll: true });
+  }, [fieldErrors, isSaving]);
+
+  const showFieldErrors = (errors: Record<string, string>) => {
+    shouldJumpRef.current = true;
+    setFieldErrors(errors);
+  };
+
+  // Value badalte hi us field ka error hata do.
+  const updateField = (name: string, value: any) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const { [name]: _removed, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const borderFor = (name: string) => (fieldErrors[name] ? '#dc2626' : '#e0d8cf');
 
   const handleUpdate = async () => {
     if (!canonicalSession) return;
@@ -110,17 +164,25 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
     try {
       setIsSaving(true);
       setSaveError(null);
-      setMeetUrlError(null);
+      setFieldErrors({});
+
+      // Saare known rules ek saath check karo, taaki har galat field ke
+      // neeche ek hi baar me error dikh jaye.
+      const errors: Record<string, string> = {};
+      const textLength = (value: any) => String(value || '').trim().length;
+      if (textLength(formData.title) < 3) errors.title = 'Title must be at least 3 characters';
+      if (textLength(formData.topic) < 3) errors.topic = 'Topic must be at least 3 characters';
+      if (textLength(formData.description) < 10) errors.description = 'Description must be at least 10 characters';
 
       const MEET_REGEX = /^https:\/\/meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3}|lookup\/[A-Za-z0-9]+)(\?.*)?$/;
       if (!formData.meetingUrl || !formData.meetingUrl.trim()) {
-        setMeetUrlError('Google Meet link is required');
-        setIsSaving(false);
-        return;
+        errors.meetingUrl = 'Google Meet link is required';
+      } else if (!MEET_REGEX.test(formData.meetingUrl.trim())) {
+        errors.meetingUrl = 'Must be a valid Google Meet link (e.g. https://meet.google.com/abc-defg-hij)';
       }
-      if (!MEET_REGEX.test(formData.meetingUrl.trim())) {
-        setMeetUrlError('Must be a valid Google Meet link (e.g. https://meet.google.com/abc-defg-hij)');
-        setIsSaving(false);
+
+      if (Object.keys(errors).length > 0) {
+        showFieldErrors(errors);
         return;
       }
 
@@ -172,7 +234,27 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
       onRefresh();
       onClose();
     } catch (err: any) {
-      setSaveError(err.message || 'Failed to update service details.');
+      // Backend errors ko unke field ke neeche dikhao. Jo kisi field se
+      // match na ho, wo neeche wale box me poore message ke saath aayega.
+      const serverErrors: Record<string, string> = {};
+      const otherMessages: string[] = [];
+      (err.errors || []).forEach((item: { field?: string; message?: string }) => {
+        const field = BACKEND_FIELD_MAP[item.field || ''] || item.field || '';
+        if (!item.message) return;
+        if (FIELD_ORDER.includes(field)) {
+          serverErrors[field] = serverErrors[field] || item.message;
+        } else {
+          otherMessages.push(item.message);
+        }
+      });
+
+      if (Object.keys(serverErrors).length > 0) showFieldErrors(serverErrors);
+
+      if (otherMessages.length > 0) {
+        setSaveError(otherMessages.join(', '));
+      } else if (Object.keys(serverErrors).length === 0) {
+        setSaveError(err.message || 'Failed to update service details.');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -215,8 +297,9 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
             <span className="mt-4 font-bold text-lg" style={{ color: '#4a3728' }}>Loading Service Details...</span>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div ref={formRef} className="space-y-6">
 
+            <div data-field="thumbnailImage">
             <div className="p-8 rounded-2xl border-2 border-dashed relative overflow-hidden flex items-center justify-center" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', minHeight: '240px' }}>
             {thumbnailPreview ? (
                     <div className="absolute inset-0">
@@ -232,7 +315,10 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
                                     className="hidden"
                                     onChange={(e) => {
                                         const file = e.target.files?.[0];
-                                        if (file) setFormData({ ...formData, thumbnailImage: file, removeThumbnailImage: false });
+                                        if (file) {
+                                        setFormData({ ...formData, thumbnailImage: file, removeThumbnailImage: false });
+                                        setFieldErrors(({ thumbnailImage: _removed, ...rest }) => rest);
+                                    }
                                     }}
                                     disabled={isSaving}
                                 />
@@ -265,7 +351,10 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
                                 className="hidden"
                                 onChange={(e) => {
                                     const file = e.target.files?.[0];
-                                    if (file) setFormData({ ...formData, thumbnailImage: file, removeThumbnailImage: false });
+                                    if (file) {
+                                        setFormData({ ...formData, thumbnailImage: file, removeThumbnailImage: false });
+                                        setFieldErrors(({ thumbnailImage: _removed, ...rest }) => rest);
+                                    }
                                 }}
                                 disabled={isSaving}
                             />
@@ -275,9 +364,11 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
                     </div>
                 )}
             </div>
+              <FieldError message={fieldErrors.thumbnailImage} />
+            </div>
 
             <div className="grid grid-cols-2 gap-6">
-              <div>
+              <div data-field="title">
                 <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
                   <Briefcase className="w-5 h-5 inline mr-2" />
                   Service Name / Title
@@ -285,13 +376,14 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
                 <input
                   type="text"
                   className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                  style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+                  style={{ borderColor: borderFor('title'), backgroundColor: '#fbf7f3', color: '#4a3728' }}
                   value={formData.title || ''}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  onChange={(e) => updateField('title', e.target.value)}
                   disabled={isSaving}
                 />
+                <FieldError message={fieldErrors.title} />
               </div>
-              <div>
+              <div data-field="topic">
                 <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
                   <FileText className="w-5 h-5 inline mr-2" />
                   Topic
@@ -299,15 +391,16 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
                 <input
                   type="text"
                   className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                  style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+                  style={{ borderColor: borderFor('topic'), backgroundColor: '#fbf7f3', color: '#4a3728' }}
                   value={formData.topic || ''}
-                  onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
+                  onChange={(e) => updateField('topic', e.target.value)}
                   disabled={isSaving}
                 />
+                <FieldError message={fieldErrors.topic} />
               </div>
             </div>
 
-            <div>
+            <div data-field="meetingUrl">
               <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
                 <Video className="w-5 h-5 inline mr-2" />
                 Google Meet link
@@ -317,26 +410,21 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
                 placeholder="https://meet.google.com/abc-defg-hij"
                 className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
                 style={{
-                  borderColor: meetUrlError ? '#dc2626' : '#e0d8cf',
+                  borderColor: borderFor('meetingUrl'),
                   backgroundColor: '#fbf7f3',
                   color: '#4a3728'
                 }}
                 value={formData.meetingUrl || ''}
-                onChange={(e) => {
-                  setFormData({ ...formData, meetingUrl: e.target.value });
-                  if (meetUrlError) setMeetUrlError(null);
-                }}
+                onChange={(e) => updateField('meetingUrl', e.target.value)}
                 disabled={isSaving}
               />
               <p className="text-sm mt-1.5" style={{ color: '#8a7a6a' }}>
                 Create one at <a href="https://meet.new" target="_blank" rel="noopener noreferrer" className="underline font-bold" style={{ color: '#7a5c3e' }}>meet.new</a> and paste the link here
               </p>
-              {meetUrlError && (
-                <p className="text-sm mt-1.5 font-bold" style={{ color: '#dc2626' }}>{meetUrlError}</p>
-              )}
+              <FieldError message={fieldErrors.meetingUrl} />
             </div>
 
-            <div>
+            <div data-field="pricePerPerson">
               <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
                 <DollarSign className="w-5 h-5 inline mr-2" />
                 Price per Person
@@ -346,15 +434,16 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
                 <input
                   type="number"
                   className="w-full p-4 pl-10 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                  style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+                  style={{ borderColor: borderFor('pricePerPerson'), backgroundColor: '#fbf7f3', color: '#4a3728' }}
                   value={formData.pricePerPerson || 0}
-                  onChange={(e) => setFormData({ ...formData, pricePerPerson: e.target.value })}
+                  onChange={(e) => updateField('pricePerPerson', e.target.value)}
                   disabled={isSaving}
                 />
               </div>
+              <FieldError message={fieldErrors.pricePerPerson} />
             </div>
             <div className="grid grid-cols-3 gap-3 p-4 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '2px solid #e0d8cf' }}>
-              <div>
+              <div data-field="duration">
                   <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
                       <Clock className="w-5 h-5 inline mr-2" />
                       Duration (min)
@@ -362,13 +451,14 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
                   <input
                       type="number"
                       className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                      style={{ borderColor: '#e0d8cf', backgroundColor: '#fff', color: '#4a3728' }}
+                      style={{ borderColor: borderFor('duration'), backgroundColor: '#fff', color: '#4a3728' }}
                       value={formData.duration || ''}
-                      onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                      onChange={(e) => updateField('duration', e.target.value)}
                       disabled={isSaving}
                   />
+                  <FieldError message={fieldErrors.duration} />
               </div>
-              <div>
+              <div data-field="minParticipants">
                   <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
                       <Users className="w-5 h-5 inline mr-2" />
                       Min Participants
@@ -376,13 +466,14 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
                   <input
                       type="number"
                       className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                      style={{ borderColor: '#e0d8cf', backgroundColor: '#fff', color: '#4a3728' }}
+                      style={{ borderColor: borderFor('minParticipants'), backgroundColor: '#fff', color: '#4a3728' }}
                       value={formData.minParticipants || ''}
-                      onChange={(e) => setFormData({ ...formData, minParticipants: e.target.value })}
+                      onChange={(e) => updateField('minParticipants', e.target.value)}
                       disabled={isSaving}
                   />
+                  <FieldError message={fieldErrors.minParticipants} />
               </div>
-              <div>
+              <div data-field="maxParticipants">
                   <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
                       <Users className="w-5 h-5 inline mr-2" />
                       Max Participants
@@ -390,15 +481,16 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
                   <input
                       type="number"
                       className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg"
-                      style={{ borderColor: '#e0d8cf', backgroundColor: '#fff', color: '#4a3728' }}
+                      style={{ borderColor: borderFor('maxParticipants'), backgroundColor: '#fff', color: '#4a3728' }}
                       value={formData.maxParticipants || ''}
-                      onChange={(e) => setFormData({ ...formData, maxParticipants: e.target.value })}
+                      onChange={(e) => updateField('maxParticipants', e.target.value)}
                       disabled={isSaving}
                   />
+                  <FieldError message={fieldErrors.maxParticipants} />
               </div>
             </div>
 
-            <div>
+            <div data-field="description">
               <label className="block text-lg font-bold mb-3" style={{ color: '#4a3728' }}>
                 <FileText className="w-5 h-5 inline mr-2" />
                 Description
@@ -406,11 +498,12 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
               <textarea
                 rows={5}
                 className="w-full p-4 rounded-xl border-2 outline-none transition-all duration-300 text-lg resize-none"
-                style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3', color: '#4a3728' }}
+                style={{ borderColor: borderFor('description'), backgroundColor: '#fbf7f3', color: '#4a3728' }}
                 value={formData.description || ''}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) => updateField('description', e.target.value)}
                 disabled={isSaving}
               />
+              <FieldError message={fieldErrors.description} />
             </div>
 
            
@@ -418,43 +511,46 @@ export default function GroupSessionEditModal({ isOpen, onClose, session: initia
             <div className="p-6 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '2px solid #e0d8cf' }}>
                 <h4 className="text-lg font-bold mb-4" style={{ color: '#4a3728' }}>Follow-up Settings</h4>
                 <div className="grid grid-cols-3 gap-6">
-                    <div>
+                    <div data-field="followUpAllowed">
                         <label className="block text-sm font-bold mb-3" style={{ color: '#4a3728' }}>Follow-up Allowed</label>
                         <select
                             className="w-full px-4 py-3 rounded-xl border-2 outline-none transition-all"
-                            style={{ borderColor: '#e0d8cf', backgroundColor: '#fff', color: '#4a3728' }}
+                            style={{ borderColor: borderFor('followUpAllowed'), backgroundColor: '#fff', color: '#4a3728' }}
                             value={formData.followUpAllowed || '0'}
-                            onChange={(e) => setFormData({ ...formData, followUpAllowed: e.target.value })}
+                            onChange={(e) => updateField('followUpAllowed', e.target.value)}
                             disabled={isSaving}
                         >
                             {followUpAllowedOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                         </select>
+                        <FieldError message={fieldErrors.followUpAllowed} />
                     </div>
-                    <div>
+                    <div data-field="followUpPeriod">
                         <label className="block text-sm font-bold mb-3" style={{ color: '#4a3728' }}>Follow-up Period</label>
                         <select
                             className="w-full px-4 py-3 rounded-xl border-2 outline-none transition-all"
-                            style={{ borderColor: '#e0d8cf', backgroundColor: formData.followUpAllowed === '0' ? '#e5e7eb' : '#fff', color: formData.followUpAllowed === '0' ? '#9ca3af' : '#4a3728' }}
+                            style={{ borderColor: borderFor('followUpPeriod'), backgroundColor: formData.followUpAllowed === '0' ? '#e5e7eb' : '#fff', color: formData.followUpAllowed === '0' ? '#9ca3af' : '#4a3728' }}
                             value={formData.followUpPeriod || '0'}
-                            onChange={(e) => setFormData({ ...formData, followUpPeriod: e.target.value })}
+                            onChange={(e) => updateField('followUpPeriod', e.target.value)}
                             disabled={isSaving || formData.followUpAllowed === '0'}
                         >
                             <option value="0">N/A</option>
                             {followUpPeriodOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                         </select>
+                        <FieldError message={fieldErrors.followUpPeriod} />
                     </div>
-                    <div>
+                    <div data-field="bufferTime">
                         <label className="block text-sm font-bold mb-3" style={{ color: '#4a3728' }}>Buffer Time</label>
                         <select
                             className="w-full px-4 py-3 rounded-xl border-2 outline-none transition-all"
-                            style={{ borderColor: '#e0d8cf', backgroundColor: '#fff', color: '#4a3728' }}
+                            style={{ borderColor: borderFor('bufferTime'), backgroundColor: '#fff', color: '#4a3728' }}
                             value={formData.bufferTime || '0'}
-                            onChange={(e) => setFormData({ ...formData, bufferTime: e.target.value })}
+                            onChange={(e) => updateField('bufferTime', e.target.value)}
                             disabled={isSaving}
                         >
                             <option value="0">None</option>
                             {bufferTimeOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                         </select>
+                        <FieldError message={fieldErrors.bufferTime} />
                     </div>
                 </div>
             </div>
