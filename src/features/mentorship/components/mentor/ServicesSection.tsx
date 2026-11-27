@@ -18,7 +18,7 @@ import {
   Sparkles,
   User as UserIcon,
 } from "lucide-react";
-import { SERVICES, FILTERS, C, btnPrimary } from "../../types/data";
+import { C, btnPrimary } from "../../types/data";
 import type { Service } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
 import AuthService from "@/lib/api/auth.service";
@@ -33,14 +33,10 @@ interface ServicesSectionProps {
   bookedSessionIds: string[];
   currentUserId: string;
   mentorName?: string;
-  // NEW: when the mentee arrives here via a "Join Session" deep-link
-  // from the group-session detail page (?serviceId=<sessionId>), this
-  // carries that sessionId so the matching group session's detail modal
-  // opens automatically instead of forcing the mentee to re-find and
-  // re-click the same card they just came from.
+  // When the mentee arrives via a "Join Session" deep-link (?serviceId=<sessionId>),
+  // the matching group session's detail modal opens automatically.
   deepLinkSessionId?: string;
-  // Logged-out user ne login-required action (waitlist / group join) dabaya to parent
-  // use login par bhejta hai; login ke baad user isi page par wapas aata hai.
+  // Logged-out user ne login-required action dabaya to parent use login par bhejta hai.
   onRequireLogin?: (opts?: { serviceId?: string; autoBook?: boolean }) => void;
 }
 
@@ -94,74 +90,211 @@ const getServiceImage = (item: any): string | null => {
   return item.thumbnailImage || item.thumbnail || item.image || item.imageUrl || item.coverImage || null;
 };
 
-interface ServiceImageBannerProps {
+// ───────────────────────── Card styles (light, flat, calm) ─────────────────────────
+const CARD_CSS = `
+.svc-card{background:${C.bg};border:1px solid ${C.border};border-radius:18px;overflow:hidden;display:flex;flex-direction:column;min-width:0;transition:border-color .15s ease,box-shadow .15s ease}
+.svc-card:hover{border-color:${C.muted};box-shadow:0 6px 18px rgba(74,55,40,.08)}
+.svc-card--click{cursor:pointer}
+.svc-btn{font-size:13px;font-weight:600;border-radius:10px;padding:8px 16px;cursor:pointer;line-height:1.2;transition:background-color .15s ease,opacity .15s ease}
+.svc-btn:focus-visible,.svc-link:focus-visible,.svc-chip:focus-visible{outline:2px solid ${C.dark};outline-offset:2px}
+.svc-btn:disabled{opacity:.6;cursor:not-allowed}
+.svc-btn--primary{background:${C.dark};color:#fff;border:1px solid ${C.dark}}
+.svc-btn--primary:hover:not(:disabled){opacity:.9}
+.svc-btn--ghost{background:transparent;color:${C.dark};border:1px solid ${C.border}}
+.svc-btn--ghost:hover:not(:disabled){background:${C.border}}
+.svc-btn--danger{background:transparent;color:#dc2626;border:1px solid #fca5a5}
+.svc-btn--danger:hover:not(:disabled){background:#fef2f2}
+.svc-link{background:none;border:none;padding:0;font-size:12px;font-weight:600;color:${C.dark};cursor:pointer;border-radius:4px}
+.svc-link:hover{text-decoration:underline}
+.svc-chip{font-size:13px;font-weight:500;padding:7px 16px;border-radius:999px;cursor:pointer;transition:background-color .15s ease,color .15s ease,border-color .15s ease}
+.svc-chip[aria-pressed="false"]{background:transparent;color:${C.dark};border:1px solid ${C.border}}
+.svc-chip[aria-pressed="false"]:hover{background:${C.border}}
+.svc-chip[aria-pressed="true"]{background:${C.dark};color:#fff;border:1px solid ${C.dark}}
+@keyframes svc-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.svc-skel{background:${C.border};border-radius:8px;animation:svc-pulse 1.4s ease-in-out infinite}
+@keyframes svc-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.svc-card,.svc-btn,.svc-chip{transition:none}.svc-skel{animation:none}}
+`;
+
+const clamp = (lines: number): React.CSSProperties => ({
+  display: "-webkit-box",
+  WebkitLineClamp: lines,
+  WebkitBoxOrient: "vertical",
+  overflow: "hidden",
+});
+
+interface CardImageProps {
   imageSrc: string | null;
   alt: string;
-  icon?: React.ReactNode;
+  icon: React.ReactNode;
+  badge: React.ReactNode;
 }
 
-const ServiceImageBanner: React.FC<ServiceImageBannerProps> = ({ imageSrc, alt, icon }) => {
-  const [imgFailed, setImgFailed] = useState(false);
-
+const CardImage: React.FC<CardImageProps> = ({ imageSrc, alt, icon, badge }) => {
+  const [failed, setFailed] = useState(false);
   return (
-    <div
-      style={{
-        width: "100%",
-        aspectRatio: "16 / 9",
-        borderRadius: "12px",
-        overflow: "hidden",
-        marginBottom: "12px",
-        position: "relative",
-        background: "#f4ece1",
-      }}
-    >
-      {!imgFailed && imageSrc ? (
-        <>
-          <img
-            src={imageSrc}
-            alt=""
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              transform: "scale(1.1)",
-              filter: "blur(16px)",
-              opacity: 0.6,
-            }}
-          />
-          <img
-            src={imageSrc}
-            alt={alt}
-            onError={() => setImgFailed(true)}
-            style={{
-              position: "relative",
-              width: "100%",
-              height: "100%",
-              objectFit: "contain",
-              display: "block",
-            }}
-          />
-        </>
+    <div style={{ position: "relative", height: "136px", background: "#efe4d6", flexShrink: 0 }}>
+      {!failed && imageSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imageSrc}
+          alt={alt}
+          loading="lazy"
+          onError={() => setFailed(true)}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
       ) : (
         <div
           style={{
             width: "100%",
             height: "100%",
-            background: C.grad,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            background: "linear-gradient(135deg, #f1e7da 0%, #e4d4bf 100%)",
+            color: C.dark,
+            opacity: 0.9,
           }}
         >
-          {icon || <Sparkles size={24} color="#ffffff" style={{ opacity: 0.6 }} />}
+          <span style={{ opacity: 0.45 }}>{icon}</span>
         </div>
       )}
+      <span
+        style={{
+          position: "absolute",
+          top: "10px",
+          left: "10px",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "5px",
+          padding: "4px 10px",
+          borderRadius: "999px",
+          fontSize: "11px",
+          fontWeight: 600,
+          color: C.dark,
+          background: "rgba(255,255,255,0.92)",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
+        }}
+      >
+        {badge}
+      </span>
     </div>
   );
 };
+
+interface CardShellProps {
+  imageSrc: string | null;
+  fallbackIcon: React.ReactNode;
+  badge: React.ReactNode;
+  title: string;
+  description?: string;
+  expanded: boolean;
+  onToggleDesc: () => void;
+  meta: React.ReactNode;
+  footer: React.ReactNode;
+  onClick?: () => void;
+}
+
+const CardShell: React.FC<CardShellProps> = ({
+  imageSrc,
+  fallbackIcon,
+  badge,
+  title,
+  description,
+  expanded,
+  onToggleDesc,
+  meta,
+  footer,
+  onClick,
+}) => {
+  const isLong = !!description && description.length > 90;
+  return (
+    <div
+      className={`svc-card${onClick ? " svc-card--click" : ""}`}
+      onClick={onClick}
+    >
+      <CardImage imageSrc={imageSrc} alt={title} icon={fallbackIcon} badge={badge} />
+      <div style={{ padding: "14px 16px 16px", display: "flex", flexDirection: "column", flex: 1, gap: "8px" }}>
+        <h3
+          title={title}
+          style={{ fontSize: "15px", fontWeight: 700, color: C.dark, lineHeight: 1.35, margin: 0, overflowWrap: "anywhere", ...clamp(2) }}
+        >
+          {title}
+        </h3>
+
+        {description && (
+          <div>
+            <p
+              style={{
+                fontSize: "12.5px",
+                color: C.mid,
+                lineHeight: 1.5,
+                margin: 0,
+                overflowWrap: "break-word",
+                ...(expanded ? {} : clamp(2)),
+              }}
+            >
+              {description}
+            </p>
+            {isLong && (
+              <button
+                type="button"
+                className="svc-link"
+                style={{ marginTop: "4px" }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleDesc();
+                }}
+              >
+                {expanded ? "Show less" : "Read more"}
+              </button>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "12px", color: C.mid }}>{meta}</div>
+
+        <div style={{ marginTop: "auto", paddingTop: "12px", borderTop: `1px solid ${C.border}` }}>{footer}</div>
+      </div>
+    </div>
+  );
+};
+
+const PriceTag: React.FC<{ value: unknown; suffix?: string }> = ({ value, suffix }) => {
+  if (value === 0) {
+    return <span style={{ fontSize: "16px", fontWeight: 700, color: "#10b981" }}>Free</span>;
+  }
+  if (typeof value !== "number") return <span />;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "baseline", gap: "3px" }}>
+      <span style={{ fontSize: "17px", fontWeight: 700, color: C.dark }}>₹{value}</span>
+      {suffix && <span style={{ fontSize: "11px", color: C.mid }}>{suffix}</span>}
+    </span>
+  );
+};
+
+const StatusPill: React.FC<{ children: React.ReactNode; bg?: string; fg?: string }> = ({
+  children,
+  bg = "#ecfdf5",
+  fg = "#047857",
+}) => (
+  <span
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "5px",
+      padding: "4px 10px",
+      borderRadius: "999px",
+      fontSize: "11px",
+      fontWeight: 600,
+      background: bg,
+      color: fg,
+    }}
+  >
+    {children}
+  </span>
+);
 
 const formatGroupDate = (dateString?: string) => {
   if (!dateString) return "Date not available";
@@ -170,6 +303,20 @@ const formatGroupDate = (dateString?: string) => {
     if (isNaN(d.getTime())) return "Date not available";
     return new Intl.DateTimeFormat('en-IN', {
       day: 'numeric', month: 'short', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true,
+    }).format(d);
+  } catch {
+    return "Date not available";
+  }
+};
+
+const formatGroupDateShort = (dateString?: string) => {
+  if (!dateString) return "Date not available";
+  try {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return "Date not available";
+    return new Intl.DateTimeFormat('en-IN', {
+      day: 'numeric', month: 'short',
       hour: 'numeric', minute: '2-digit', hour12: true,
     }).format(d);
   } catch {
@@ -202,13 +349,10 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
   const [sessions, setSessions] = useState<any[]>([]);
   const [groupSessions, setGroupSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  // joinedIds means "I have an active (pending or accepted) request with
-  // this session" - an optimistic flag used only until fetchGroupSessions()
-  // returns the real participant row with its actual requestStatus.
+  // joinedIds: optimistic flag until fetchGroupSessions() returns the real participant row.
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
 
-  // NEW: "Read more/less" toggle state for long service descriptions.
-  // Tracks which session cards currently have their description expanded.
+  // "Read more/less" toggle state for long descriptions.
   const [expandedDescIds, setExpandedDescIds] = useState<string[]>([]);
   const toggleDescExpanded = (sessionId: string) => {
     setExpandedDescIds((prev) =>
@@ -216,20 +360,16 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     );
   };
 
-
-  // NEW: detail modal state for a clicked group session card
+  // detail modal state for a clicked group session card
   const [detailGroup, setDetailGroup] = useState<any | null>(null);
   const [groupActionBusy, setGroupActionBusy] = useState(false);
   const [groupActionError, setGroupActionError] = useState<string | null>(null);
   const [, forceTick] = useState(0);
 
-  // NEW: tracks whether we've already auto-opened the modal for the
-  // current deepLinkSessionId, so it doesn't keep re-opening every time
-  // groupSessions refreshes (e.g. right after the mentee sends a request).
+  // Auto-open the modal only once per deepLinkSessionId.
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
 
-  // NEW: mentee's own queries (Query model) - used so ask_query status
-  // reflects Query.status ("pending"/"answered"), not the stale Booking status.
+  // mentee's own queries - ask_query status reflects Query.status, not the stale Booking status.
   const [myQueries, setMyQueries] = useState<QueryItem[]>([]);
 
   // Waitlist
@@ -258,8 +398,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       .catch(() => setWaitlistEntries({}));
   }, [mentorId, currentUserId]);
 
-  // NEW: fetch mentee's own queries so ask_query cards show the real
-  // Query.status instead of the stale Booking status.
   useEffect(() => {
     if (!mentorId || !currentUserId) return;
     QueryService.getAllQueries({ role: "mentee", limit: 50 })
@@ -324,9 +462,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     if (!mentorId) return;
     setLoading(true);
 
-    // Logged-out visitor ko bhi mentor ki services dikhni chahiye (login sirf Book par chahiye).
-    // Private endpoint 401 deta hai, isliye logged-out par sanitized public endpoint use karo.
-    // AuthService se sync check: hook state load hone ka wait nahi karna padta.
+    // Logged-out visitor ko bhi services dikhni chahiye (login sirf Book par chahiye).
     const fetchSessions = AuthService.isAuthenticated()
       ? SessionService.getMentorSessions(mentorId)
       : SessionService.getPublicMentorSessions(mentorId);
@@ -356,11 +492,6 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     return () => clearInterval(interval);
   }, [detailGroup]);
 
-  // NEW: auto-open the detail modal for the group session named in
-  // ?serviceId= once groupSessions has loaded. Runs once per
-  // deepLinkSessionId - if the match isn't in this mentor's session list
-  // (wrong id, or the session was removed), it just does nothing instead
-  // of erroring.
   useEffect(() => {
     if (!deepLinkSessionId || deepLinkHandled || groupSessions.length === 0) return;
     const match = groupSessions.find((g) => g.sessionId === deepLinkSessionId);
@@ -383,13 +514,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       : sessions.filter((s) => (SESSION_TYPE_FILTER[s.sessionType] || s.sessionType) === activeFilter);
 
   const showGroupSessions = activeFilter === "All" || activeFilter === "Group Session";
-  // FIX: previously this dropped any group session whose status wasn't
-  // 'open' (or undefined) from the "All" tab, including sessions the
-  // mentee already has a stake in (pending request, accepted seat). That
-  // meant an accepted mentee lost visibility of their own session the
-  // moment it filled up ('full') or started ('in_progress') unless they
-  // manually switched to the "Group Session" filter. Now a session the
-  // mentee has any participant row in always stays visible.
+  // A session the mentee has any participant row in always stays visible, even once full / started.
   const visibleGroupSessions = activeFilter === "Group Session"
     ? groupSessions
     : groupSessions.filter((g) => {
@@ -408,11 +533,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     popular: false,
   });
 
-  // NEW: availability-based group session ("template") ko Service shape
-  // mein convert karta hai taaki onServiceClick() ko wahi 1:1 flow ki tarah
-  // "calendar" bookingStep pe bheja ja sake - CalendarStep already generic
-  // hai (sirf mentorId + duration use karta hai), isliye koi extra change
-  // uss file mein nahi chahiye.
+  // availability-based group session ("template") ko Service shape mein convert karta hai.
   const getServiceFromGroupTemplate = (group: any): Service => {
     const pricePerPerson = group.pricing?.pricePerPerson ?? group.pricePerPerson ?? 0;
     return {
@@ -431,17 +552,10 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
     setGroupActionError(null);
   };
 
-  // FIX: this is now the single place a join request is actually sent
-  // from - only reachable after the user has opened the detail modal (seen
-  // date/time/duration/seats) and pressed "Join Group" there.
-  // FIX: was calling MentorService.joinGroupSession() - the OLD
-  // direct-join method that adds the mentee as a participant immediately,
-  // with no mentor approval step. Switched to
-  // MentorService.requestToJoinGroupSession(), which creates a pending
-  // request that only becomes a real seat once the mentor accepts it.
+  // The single place a join request is sent from (after the user saw the details modal).
   const handleJoinFromModal = async () => {
     if (!detailGroup) return;
-    // Logged-out user: login par bhejo, wapas aane par yahi group session modal khulega (?serviceId=).
+    // Logged-out user: login par bhejo, wapas aane par yahi modal khulega (?serviceId=).
     if (!currentUserId && onRequireLogin) {
       onRequireLogin({ serviceId: detailGroup.sessionId });
       return;
@@ -482,52 +596,57 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
 
   return (
     <div
-      className="w-full min-w-0 p-4 sm:p-8"
-      style={{ borderRadius: "24px", marginBottom: "24px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 8px 32px rgba(74,55,40,0.08)" }}
+      className="w-full min-w-0 p-4 sm:p-6"
+      style={{ borderRadius: "20px", background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(74,55,40,0.06)" }}
     >
-      <h2 style={{ fontSize: "22px", fontWeight: "bold", color: C.dark, marginBottom: "4px" }}>
-        Available Services
-      </h2>
-      <p style={{ color: C.mid, fontSize: "13px", marginBottom: "20px" }}>Discover our mentorship offerings designed for your success</p>
+      <style>{CARD_CSS}</style>
 
-      {/* Filter chips: mobile par chhote padding, wrap ho jaate hain */}
-      <div className="mb-6 flex flex-wrap gap-2 sm:gap-2.5">
+      <h2 style={{ fontSize: "20px", fontWeight: 700, color: C.dark, margin: 0, letterSpacing: "-0.01em" }}>
+        Available services
+      </h2>
+      <p style={{ color: C.mid, fontSize: "13px", margin: "4px 0 16px" }}>
+        Pick a session that fits what you want to work on.
+      </p>
+
+      {/* Filter chips */}
+      <div className="mb-5 flex flex-wrap gap-2" role="group" aria-label="Filter services">
         {dynamicFilters.map((f) => (
           <button
             key={f}
+            type="button"
+            className="svc-chip"
+            aria-pressed={activeFilter === f}
             onClick={() => setActiveFilter(f)}
-            className="px-3.5 py-2 text-[13px] sm:px-5 sm:py-2.5 sm:text-sm"
-            style={{
-              borderRadius: "20px", fontWeight: 500, cursor: "pointer",
-              background: activeFilter === f ? C.grad : C.border,
-              color: activeFilter === f ? "#fff" : C.dark,
-              border: activeFilter === f ? "none" : `1px solid ${C.muted}`,
-              boxShadow: activeFilter === f ? "0 8px 20px rgba(74,55,40,0.3)" : "none",
-              transform: activeFilter === f ? "scale(1.05)" : "scale(1)",
-              transition: "all 0.3s",
-            }}
           >
             {f}
           </button>
         ))}
       </div>
 
-      {/* Cards: mobile par 1 column, tablet/desktop par 2 columns */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-
-        {loading && (
-          <>
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px", gap: "12px" }}>
-              <div style={{ width: "36px", height: "36px", border: `3px solid ${C.border}`, borderTop: `3px solid ${C.dark}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-              <span style={{ fontSize: "13px", color: C.mid }}>Fetching sessions...</span>
+      {/* Cards: as many columns as fit, never narrower than 260px */}
+      <div
+        style={{
+          display: "grid",
+          gap: "16px",
+          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+        }}
+      >
+        {loading &&
+          [0, 1, 2].map((i) => (
+            <div key={i} className="svc-card" aria-hidden="true">
+              <div className="svc-skel" style={{ height: "136px", borderRadius: 0 }} />
+              <div style={{ padding: "14px 16px 16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div className="svc-skel" style={{ height: "16px", width: "75%" }} />
+                <div className="svc-skel" style={{ height: "12px", width: "100%" }} />
+                <div className="svc-skel" style={{ height: "12px", width: "60%" }} />
+                <div className="svc-skel" style={{ height: "34px", width: "100%", marginTop: "10px" }} />
+              </div>
             </div>
-          </>
-        )}
+          ))}
 
         {!loading && !hasAnyResults && (
-          <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: C.mid }}>
-            No sessions available for this filter.
+          <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px 16px", color: C.mid, fontSize: "13px" }}>
+            No sessions available for this filter yet.
           </div>
         )}
 
@@ -537,261 +656,199 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
             (b: any) => b.menteeId === currentUserId
           ) ?? [];
           const latestBooking = myBookings[myBookings.length - 1];
-          // NEW: ask_query ke liye asli status Query model se lo, Booking se nahi
+          // ask_query ke liye asli status Query model se lo, Booking se nahi
           const latestQuery = session.sessionType === "ask_query"
             ? [...myQueries]
                 .filter((q) => (q as any).sessionId === session.sessionId) // TODO: confirm correct field on QueryItem
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
             : undefined;
           const wl = waitlistEntries[session.sessionId];
+          const isQuery = session.sessionType === "ask_query";
+          const hasActiveBooking =
+            !isQuery && latestBooking && (latestBooking.status === "confirmed" || latestBooking.status === "pending");
+          const queryPending = isQuery && latestQuery && latestQuery.status === "pending";
+
           return (
-            <div key={session.sessionId}
-              className="min-w-0 p-4 sm:p-5"
-              style={{
-                borderRadius: "16px", background: C.bg,
-                border: `1px solid ${C.border}`, position: "relative",
-                boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
-              }}>
-              <ServiceImageBanner
-                imageSrc={getServiceImage(session)}
-                alt={session.title}
-                icon={<Sparkles size={24} color="#ffffff" style={{ opacity: 0.6 }} />}
-              />
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "12px", background: C.border, color: C.dark }}>
-                  {SESSION_TYPE_FILTER[session.sessionType] || session.sessionType}
-                </span>
-              </div>
-              <h3 style={{ fontWeight: "bold", color: C.dark, fontSize: "14px", marginBottom: "8px", lineHeight: "1.4", overflowWrap: "anywhere" }}>{session.title}</h3>
-              {session.description && (() => {
-                const isExpanded = expandedDescIds.includes(session.sessionId);
-                const isLong = session.description.length > 100;
-                return (
-                  <p style={{ fontSize: "12px", color: C.mid, marginBottom: "8px", lineHeight: "1.4", overflowWrap: "break-word", wordBreak: "break-word" }}>
-                    {isExpanded || !isLong ? session.description : `${session.description.slice(0, 100)}...`}
-                    {isLong && (
-                      <span
-                        onClick={(e) => { e.stopPropagation(); toggleDescExpanded(session.sessionId); }}
-                        style={{ color: C.dark, fontWeight: 700, cursor: "pointer", marginLeft: "4px" }}
-                      >
-                        {isExpanded ? "Read less" : "Read more"}
-                      </span>
-                    )}
-                  </p>
-                );
-              })()}
-              <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
-                <Clock /> {session.duration} Min
-              </div>
-              {/* flexWrap: chhoti screen par price aur buttons ek ke neeche ek aa jaayein */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
-                <span style={{ fontWeight: "bold", color: session.pricing?.basePrice === 0 ? "#10b981" : C.dark, fontSize: "15px" }}>
-                  {session.pricing?.basePrice === 0 ? "Free" : `₹${session.pricing?.basePrice}`}
-                </span>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px", maxWidth: "100%" }}>
-                  {session.sessionType === "ask_query" ? (
-                    latestQuery && latestQuery.status === "pending" && (
-                      <div style={{ fontSize: "10px", fontWeight: 700, color: "#10b981", textAlign: "right" }}>
-                        Your query is pending a reply
-                      </div>
-                    )
-                  ) : (
-                    latestBooking && (latestBooking.status === "confirmed" || latestBooking.status === "pending") && (
-                      <div style={{ fontSize: "10px", fontWeight: 700, color: "#10b981", textAlign: "right" }}>
-                        {latestBooking.status === "confirmed" ? "You have a confirmed session" : "You have a session pending confirmation"}
-                      </div>
-                    )
+            <CardShell
+              key={session.sessionId}
+              imageSrc={getServiceImage(session)}
+              fallbackIcon={<Sparkles size={28} />}
+              badge={SESSION_TYPE_FILTER[session.sessionType] || session.sessionType}
+              title={session.title}
+              description={session.description}
+              expanded={expandedDescIds.includes(session.sessionId)}
+              onToggleDesc={() => toggleDescExpanded(session.sessionId)}
+              meta={
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Clock /> {session.duration} min
+                </div>
+              }
+              footer={
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {hasActiveBooking && (
+                    <div>
+                      <StatusPill>
+                        <CheckCircle2 size={12} />
+                        {latestBooking.status === "confirmed" ? "Session confirmed" : "Awaiting confirmation"}
+                      </StatusPill>
+                    </div>
                   )}
-                  {session.sessionType === "ask_query" ? (
-                    <button onClick={() => onServiceClick(svc)} style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}>
-                      {latestQuery ? "Ask Another Query" : "Ask a Query"}
-                    </button>
-                  ) : wl ? (
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: "12px", fontWeight: 700, color: wl.status === "notified" ? "#10b981" : C.dark }}>
+                  {queryPending && (
+                    <div>
+                      <StatusPill bg="#fef3c7" fg="#b45309">Query pending a reply</StatusPill>
+                    </div>
+                  )}
+
+                  {wl ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      <span style={{ fontSize: "12px", fontWeight: 600, color: wl.status === "notified" ? "#10b981" : C.dark }}>
                         {wl.status === "notified"
-                          ? "Slot available, book now"
-                          : `On waitlist · #${wl.queuePosition ?? "-"}`}
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "flex-end", marginTop: "8px" }}>
-                        {wl.status === "notified" && (
+                          ? "A slot opened up. Book now."
+                          : `On the waitlist, position #${wl.queuePosition ?? "-"}`}
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+                        <PriceTag value={session.pricing?.basePrice} />
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          {wl.status === "notified" && (
+                            <button className="svc-btn svc-btn--primary" onClick={() => onServiceClick(svc)}>
+                              Book now
+                            </button>
+                          )}
                           <button
-                            onClick={() => onServiceClick(svc)}
-                            style={{ ...btnPrimary, padding: "6px 14px", borderRadius: "10px", fontSize: "12px" }}
+                            className="svc-btn svc-btn--danger"
+                            onClick={() => handleLeaveWaitlist(session.sessionId, wl)}
+                            disabled={leavingId === wl.waitlistId}
                           >
-                            Book now
+                            {leavingId === wl.waitlistId ? "Leaving..." : "Leave waitlist"}
                           </button>
-                        )}
-                        <button
-                          onClick={() => handleLeaveWaitlist(session.sessionId, wl)}
-                          disabled={leavingId === wl.waitlistId}
-                          style={{
-                            padding: "6px 14px", borderRadius: "10px", fontSize: "12px", fontWeight: 600,
-                            background: "transparent", color: "#dc2626", border: "1.5px solid #fca5a5",
-                            cursor: "pointer", opacity: leavingId === wl.waitlistId ? 0.6 : 1,
-                          }}
-                        >
-                          {leavingId === wl.waitlistId ? "Leaving..." : "Leave waitlist"}
-                        </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
-                    <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "8px" }}>
-                      <button onClick={() => onServiceClick(svc)} style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}>
-                        {latestBooking ? "Book Another Slot" : "Book"}
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (!currentUserId && onRequireLogin) {
-                            onRequireLogin();
-                            return;
-                          }
-                          setWaitlistTarget(session);
-                        }}
-                        style={{
-                          padding: "8px 18px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
-                          background: "transparent", color: C.dark, border: `1.5px solid ${C.dark}`,
-                          cursor: "pointer",
-                        }}
-                      >
-                        Waitlist
-                      </button>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+                      <PriceTag value={session.pricing?.basePrice} />
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        {isQuery ? (
+                          <button className="svc-btn svc-btn--primary" onClick={() => onServiceClick(svc)}>
+                            {latestQuery ? "Ask another" : "Ask a query"}
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              className="svc-btn svc-btn--ghost"
+                              onClick={() => {
+                                if (!currentUserId && onRequireLogin) {
+                                  onRequireLogin();
+                                  return;
+                                }
+                                setWaitlistTarget(session);
+                              }}
+                            >
+                              Waitlist
+                            </button>
+                            <button className="svc-btn svc-btn--primary" onClick={() => onServiceClick(svc)}>
+                              {latestBooking ? "Book again" : "Book"}
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
+              }
+            />
           );
         })}
 
-        {/* Group session cards - clicking anywhere on the card (including
-            the action button) only OPENS the detail modal. No API call
-            happens from here. The modal is where the user sees the
-            date/time/duration/seat-count and then explicitly confirms;
-            only that confirm click sends the join request. */}
+        {/* Group session cards: the card only OPENS the detail modal. The modal is where the
+            user sees date/time/seats and confirms; only that click sends the join request. */}
         {!loading && showGroupSessions && visibleGroupSessions.map((group) => {
-          const seatsLeft = (group.maxParticipants ?? 0) - (group.currentParticipants ?? 0);
+          const maxP = group.maxParticipants ?? 0;
+          const curP = group.currentParticipants ?? 0;
+          const seatsLeft = maxP - curP;
+          const fillPct = maxP > 0 ? Math.min(100, Math.round((curP / maxP) * 100)) : 0;
           const myParticipant = group.participants?.find((p: any) => p.menteeId === currentUserId);
           const myRequestStatus: string | undefined =
             myParticipant?.requestStatus || (joinedIds.includes(group.sessionId) ? "pending" : undefined);
           const pricePerPerson = group.pricing?.pricePerPerson ?? group.pricePerPerson ?? 0;
           const statusMeta = myRequestStatus ? REQUEST_STATUS_META[myRequestStatus] : undefined;
-
-          // CHANGED: card click always opens the detail modal
-          // first (same as fixed-date sessions) - the slot picker
-          // (CalendarStep) now only opens from the "Select a Slot" button
-          // inside that modal, not directly from the card.
           const isTemplate = !!group.isTemplate;
-          const openGroupSession = () => {
-            setDetailGroup(group);
-          };
+          const open = () => setDetailGroup(group);
 
           return (
-            <div key={group.sessionId}
-              onClick={openGroupSession}
-              className="min-w-0 p-4 sm:p-5"
-              style={{
-                borderRadius: "16px", background: C.bg,
-                border: `1px solid ${C.border}`, position: "relative",
-                boxShadow: "0 2px 8px rgba(74,55,40,0.06)",
-                cursor: "pointer",
-                transition: "transform 0.15s ease, box-shadow 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 8px 20px rgba(74,55,40,0.12)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 2px 8px rgba(74,55,40,0.06)";
-              }}
-            >
-              <ServiceImageBanner
-                imageSrc={getServiceImage(group)}
-                alt={group.title}
-                icon={<Users size={24} color="#ffffff" style={{ opacity: 0.6 }} />}
-              />
-              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "8px" }}>
-                <Users size={14} color={C.dark} />
-                <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "12px", background: C.border, color: C.dark }}>
-                  Group Session
-                </span>
-                {group.status && group.status !== 'open' && (
-                  <span style={{ fontSize: "10px", fontWeight: 700, padding: "3px 10px", borderRadius: "12px", background: "#f3e8ff", color: "#7c3aed" }}>
-                    {GROUP_STATUS_LABEL[group.status] || group.status}
-                  </span>
-                )}
-              </div>
-              <h3 style={{ fontWeight: "bold", color: C.dark, fontSize: "14px", marginBottom: "8px", lineHeight: "1.4", overflowWrap: "anywhere" }}>
-                {group.title}
-              </h3>
-              {group.description && (() => {
-                const isExpanded = expandedDescIds.includes(group.sessionId);
-                const isLong = group.description.length > 100;
-                return (
-                  <p style={{ fontSize: "12px", color: C.mid, marginBottom: "8px", lineHeight: "1.4", overflowWrap: "break-word", wordBreak: "break-word" }}>
-                    {isExpanded || !isLong ? group.description : `${group.description.slice(0, 100)}...`}
-                    {isLong && (
-                      <span
-                        onClick={(e) => { e.stopPropagation(); toggleDescExpanded(group.sessionId); }}
-                        style={{ color: C.dark, fontWeight: 700, cursor: "pointer", marginLeft: "4px" }}
-                      >
-                        {isExpanded ? "Read less" : "Read more"}
-                      </span>
-                    )}
-                  </p>
-                );
-              })()}
-              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px", fontSize: "12px", color: C.mid, marginBottom: "4px" }}>
-                <Clock /> {formatGroupDate(group.scheduledAt)} · {group.duration} Min
-              </div>
-              <div style={{ fontSize: "12px", color: C.mid, marginBottom: "14px" }}>
-                {seatsLeft > 0 ? `${seatsLeft} seats available` : "Session full"} · {group.currentParticipants ?? 0}/{group.maxParticipants ?? 0} enrolled
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
-                <span style={{ fontWeight: "bold", color: pricePerPerson === 0 ? "#10b981" : C.dark, fontSize: "15px" }}>
-                  {pricePerPerson === 0 ? "Free" : `₹${pricePerPerson}/person`}
-                </span>
-                {isTemplate ? (
-                  // CHANGED: opens the detail modal instead of jumping
-                  // straight to the slot picker - the slot picker now opens
-                  // from inside the modal's "Select a Slot" button. Label
-                  // switches to "Book Another Slot" once the mentee has
-                  // already booked at least one slot for this template.
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDetailGroup(group);
-                    }}
-                    style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}
-                  >
-                    {bookedSessionIds.includes(group.sessionId) ? "Book Another Slot" : "View Details"}
-                  </button>
-                ) : statusMeta ? (
-                  <div style={{ fontSize: "12px", fontWeight: 700, color: statusMeta.fg }}>
-                    {statusMeta.label}
+            <CardShell
+              key={group.sessionId}
+              onClick={open}
+              imageSrc={getServiceImage(group)}
+              fallbackIcon={<Users size={28} />}
+              badge={
+                <>
+                  <Users size={12} />
+                  Group session
+                </>
+              }
+              title={group.title}
+              description={group.description}
+              expanded={expandedDescIds.includes(group.sessionId)}
+              onToggleDesc={() => toggleDescExpanded(group.sessionId)}
+              meta={
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <Calendar size={13} />
+                    {formatGroupDateShort(group.scheduledAt)} · {group.duration} min
                   </div>
-                ) : seatsLeft <= 0 ? (
-                  <span style={{ fontSize: "12px", fontWeight: 700, color: C.mid }}>Full</span>
-                ) : (
-                  // FIX: used to call handleJoinGroupSession() directly,
-                  // which fired MentorService.joinGroupSession() (old
-                  // direct-join) the instant it was clicked - no details
-                  // screen, no confirmation. It now only opens the same
-                  // detail modal the card click opens; the request is sent
-                  // from inside that modal instead.
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDetailGroup(group);
-                    }}
-                    style={{ ...btnPrimary, padding: "8px 18px", borderRadius: "10px", fontSize: "13px" }}
-                  >
-                    View Details
-                  </button>
-                )}
-              </div>
-            </div>
+                  {!isTemplate && maxP > 0 && (
+                    <div style={{ marginTop: "4px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                        <span>{seatsLeft > 0 ? `${seatsLeft} seat${seatsLeft === 1 ? "" : "s"} left` : "Session full"}</span>
+                        <span style={{ fontVariantNumeric: "tabular-nums" }}>{curP}/{maxP}</span>
+                      </div>
+                      <div style={{ height: "4px", borderRadius: "999px", background: C.border, overflow: "hidden" }}>
+                        <div
+                          style={{
+                            height: "100%",
+                            width: `${fillPct}%`,
+                            borderRadius: "999px",
+                            background: seatsLeft <= 0 ? "#dc2626" : C.dark,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
+              }
+              footer={
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {group.status && group.status !== "open" && (
+                    <div>
+                      <StatusPill bg="#f3e8ff" fg="#7c3aed">{GROUP_STATUS_LABEL[group.status] || group.status}</StatusPill>
+                    </div>
+                  )}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+                    <PriceTag value={pricePerPerson} suffix={pricePerPerson === 0 ? undefined : "/person"} />
+                    {isTemplate ? (
+                      <button
+                        className="svc-btn svc-btn--primary"
+                        onClick={(e) => { e.stopPropagation(); open(); }}
+                      >
+                        {bookedSessionIds.includes(group.sessionId) ? "Book again" : "View details"}
+                      </button>
+                    ) : statusMeta ? (
+                      <StatusPill bg={statusMeta.bg} fg={statusMeta.fg}>{statusMeta.label}</StatusPill>
+                    ) : seatsLeft <= 0 ? (
+                      <StatusPill bg={C.border} fg={C.mid}>Full</StatusPill>
+                    ) : (
+                      <button
+                        className="svc-btn svc-btn--primary"
+                        onClick={(e) => { e.stopPropagation(); open(); }}
+                      >
+                        View details
+                      </button>
+                    )}
+                  </div>
+                </div>
+              }
+            />
           );
         })}
       </div>
@@ -830,6 +887,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
 
       {toast && (
         <div
+          role="status"
           className="left-3 right-3 sm:left-auto sm:right-5"
           style={{
             position: "fixed", top: 20, zIndex: 9999, padding: "12px 16px", borderRadius: 12,
@@ -861,6 +919,7 @@ interface GroupSessionDetailModalProps {
   getServiceFromGroupTemplate: (group: any) => Service;
 }
 
+// Modal is unchanged from the previous version.
 const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
   detailGroup,
   currentUserId,
@@ -969,6 +1028,7 @@ const GroupSessionDetailModal: React.FC<GroupSessionDetailModalProps> = ({
         >
           {getServiceImage(detailGroup) ? (
             <div style={{ width: "100%", height: "140px", borderRadius: "14px", overflow: "hidden", marginBottom: "16px" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={getServiceImage(detailGroup)!} alt={detailGroup.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
           ) : (
