@@ -24,13 +24,13 @@ import { useAuth } from "@/features/auth/hooks/useAuth";
 import TokenStorage from "@/lib/store/token.storage";
 import { buildLoginRedirectUrl } from "@/shared/utils/safeRedirect";
 
-// ─── Module-level cache (revisit / back navigation par instant render) ─────
+// Module-level cache (revisit / back navigation par instant render)
 const serviceCache = new Map<string, any>();
 const mentorCache = new Map<string, any>();
 let similarCache: any[] | null = null;
 let mentorsListCache: any[] | null = null;
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
+// Helpers
 const toSlug = (first?: string, last?: string) =>
     [first, last]
         .filter(Boolean)
@@ -106,11 +106,10 @@ export default function ServiceDetailsPage() {
 
     const carouselRef = useRef<HTMLDivElement>(null);
 
-    // ─── 1. Fetch Session Details ──────────────────────────────────────────
+    // 1. Fetch Session Details
     useEffect(() => {
         if (!serviceId) return;
 
-        // Logged-out user -> login par bhejo, login ke baad isi page par wapas aayega.
         if (!TokenStorage.isAuthenticated()) {
             router.replace(buildLoginRedirectUrl(`/mentorship/service/${serviceId}`));
             return;
@@ -120,7 +119,6 @@ export default function ServiceDetailsPage() {
         setIsNavigating(false);
         setError(null);
 
-        // Cache hit: turant dikhao, background me refresh karo
         const cached = serviceCache.get(serviceId);
         if (cached) {
             setService(cached);
@@ -157,7 +155,6 @@ export default function ServiceDetailsPage() {
                     })
                     .catch(() => {
                         if (cancelled) return;
-                        // Session expire ho gaya ho to error ke bajay login par bhejo
                         if (!TokenStorage.isAuthenticated()) {
                             router.replace(
                                 buildLoginRedirectUrl(`/mentorship/service/${serviceId}`)
@@ -177,7 +174,7 @@ export default function ServiceDetailsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [serviceId]);
 
-    // ─── 2. Fetch Mentor Profile ───────────────────────────────────────────
+    // 2. Fetch Mentor Profile
     const mentorIdFromService: string | undefined = service?.mentorId;
 
     useEffect(() => {
@@ -214,7 +211,7 @@ export default function ServiceDetailsPage() {
         };
     }, [mentorIdFromService]);
 
-    // ─── 3. Similar Sessions + mentors list (service load hone ke baad) ────
+    // 3. Similar Sessions + mentors list (service load hone ke baad)
     const hasService = !!service;
 
     useEffect(() => {
@@ -256,7 +253,6 @@ export default function ServiceDetailsPage() {
         };
     }, [hasService, serviceId]);
 
-    // mentorId -> display name
     const mentorNameMap = useMemo(() => {
         const map: Record<string, string> = {};
         allMentors.forEach((m: any) => {
@@ -267,7 +263,6 @@ export default function ServiceDetailsPage() {
         return map;
     }, [allMentors]);
 
-    // Same category first, then the rest; max 10
     const displaySimilar = useMemo(() => {
         if (!service) return [];
         const pool = similarSessions.filter(
@@ -279,7 +274,7 @@ export default function ServiceDetailsPage() {
         return [...same, ...rest].slice(0, 10);
     }, [similarSessions, service, serviceId]);
 
-    // ─── Booking target (mentor load hone ka wait nahi) ────────────────────
+    // Booking target (mentor load hone ka wait nahi)
     const bookingMentorId: string = mentor?.mentorId || service?.mentorId || "";
     const bookingUrl = bookingMentorId
         ? `/mentorship/mentor-card/${toSlug(
@@ -288,12 +283,10 @@ export default function ServiceDetailsPage() {
           )}/${bookingMentorId}?serviceId=${serviceId}&book=true`
         : "";
 
-    // Next route ko pehle se warm kar do
     useEffect(() => {
         if (bookingUrl) router.prefetch(bookingUrl);
     }, [bookingUrl, router]);
 
-    // ─── Navigation Handlers ───────────────────────────────────────────────
     const handleBookSession = () => {
         if (!bookingUrl || isNavigating) return;
         setIsNavigating(true);
@@ -314,7 +307,7 @@ export default function ServiceDetailsPage() {
         });
     };
 
-    // ─── Loading Skeleton ──────────────────────────────────────────────────
+    // Loading Skeleton
     if (loading) {
         return (
             <div className="min-h-screen bg-[#fbf8f4] text-[#4a3426] font-sans pb-20">
@@ -322,12 +315,13 @@ export default function ServiceDetailsPage() {
                 <Navigation currentUserId={user?.userId} activeTimezone="IST (UTC+5:30)" />
                 <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-24 animate-pulse">
                     <div className="w-36 h-4 bg-[#e8dfd5] rounded mb-4" />
-                    <div className="w-full h-[220px] bg-[#e8dfd5] rounded-3xl mb-8" />
+                    <div className="w-full aspect-video max-h-[340px] bg-[#e8dfd5] rounded-3xl mb-6" />
+                    <div className="w-2/3 h-8 bg-[#e8dfd5] rounded mb-3" />
+                    <div className="w-1/2 h-4 bg-[#efe8df] rounded mb-8" />
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div className="lg:col-span-2 space-y-6">
                             <div className="w-full h-24 bg-[#e8dfd5] rounded-2xl" />
                             <div className="w-full h-32 bg-[#e8dfd5] rounded-2xl" />
-                            <div className="w-full h-44 bg-[#e8dfd5] rounded-2xl" />
                         </div>
                         <div className="w-full h-80 bg-[#e8dfd5] rounded-2xl" />
                     </div>
@@ -336,7 +330,7 @@ export default function ServiceDetailsPage() {
         );
     }
 
-    // ─── Error State ───────────────────────────────────────────────────────
+    // Error State
     if (error || !service) {
         return (
             <div className="min-h-screen bg-[#fbf8f4] flex flex-col items-center justify-center gap-4 text-[#4a3426]">
@@ -351,8 +345,8 @@ export default function ServiceDetailsPage() {
         );
     }
 
-    // ─── Derived Data (real data only, no dummy fallbacks) ─────────────────
-    const title = (service.title || "Mentorship Session").toUpperCase();
+    // Derived Data
+    const title: string = service.title || "Mentorship Session";
     const category = (service.category || service.sessionType || "")
         .replace(/_/g, " ")
         .toUpperCase();
@@ -381,7 +375,6 @@ export default function ServiceDetailsPage() {
     const price = getPrice(service);
     const priceDisplay = price === null ? "-" : price === 0 ? "Free" : `₹${price}`;
 
-    // Mentor details
     const mentorName =
         `${mentor?.user?.firstName || ""} ${mentor?.user?.lastName || ""}`.trim() ||
         mentor?.name ||
@@ -417,60 +410,75 @@ export default function ServiceDetailsPage() {
                     <span>Back to Mentors</span>
                 </button>
 
-                {/* Hero Section */}
-                <div className="relative w-full h-[220px] sm:h-[240px] md:h-[260px] rounded-[24px] sm:rounded-3xl overflow-hidden shadow-sm border border-[#e6dccf] mb-6 bg-gradient-to-br from-[#4a3426] to-[#8b7355]">
+                {/* Hero: image clean (no text over it), title neeche */}
+                <div className="relative w-full aspect-video max-h-[340px] rounded-[24px] sm:rounded-3xl overflow-hidden shadow-sm border border-[#e6dccf] bg-gradient-to-br from-[#4a3426] to-[#8b7355]">
                     {coverImage && (
-                        <img
-                            src={coverImage}
-                            alt={title}
-                            loading="eager"
-                            decoding="async"
-                            className="absolute inset-0 w-full h-full object-cover"
-                        />
+                        <>
+                            {/* Blurred backdrop: image poori dikhe, side khaali na lage */}
+                            <img
+                                src={coverImage}
+                                alt=""
+                                aria-hidden="true"
+                                className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-60"
+                            />
+                            <img
+                                src={coverImage}
+                                alt={title}
+                                loading="eager"
+                                decoding="async"
+                                className="relative w-full h-full object-contain"
+                            />
+                        </>
                     )}
 
-                    <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/60 to-black/20" />
+                    {category && (
+                        <span className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-3 py-1 bg-black/55 backdrop-blur-md text-white text-[11px] font-bold rounded-full uppercase tracking-wider border border-white/20">
+                            <Video className="w-3.5 h-3.5" />
+                            {category}
+                        </span>
+                    )}
 
-                    <div className="relative z-10 h-full p-6 sm:p-8 md:p-9 flex flex-col justify-between">
-                        <div>
-                            {category && (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 backdrop-blur-md text-white text-[11px] font-bold rounded-full uppercase tracking-wider border border-white/20">
-                                    <Video className="w-3.5 h-3.5 text-white" />
-                                    {category}
-                                </span>
-                            )}
-                        </div>
-
-                        <div className="max-w-3xl">
-                            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-[40px] font-black uppercase text-white tracking-tight leading-tight mb-2 line-clamp-2">
+                    {!coverImage && (
+                        <div className="absolute inset-0 flex items-center justify-center p-6">
+                            <h1 className="text-2xl sm:text-4xl font-black text-white text-center leading-tight">
                                 {title}
                             </h1>
-                            {shortDescription && (
-                                <p className="text-white/90 text-xs sm:text-sm md:text-[15px] font-normal leading-snug max-w-2xl mb-3 line-clamp-2">
-                                    {shortDescription}
-                                </p>
-                            )}
-                            {tags.length > 0 && (
-                                <div className="flex flex-wrap items-center gap-2">
-                                    {tags.slice(0, 6).map((tag, idx) => (
-                                        <span
-                                            key={idx}
-                                            className="px-3 py-0.5 sm:py-1 bg-white/15 backdrop-blur-sm text-white/95 text-[11px] sm:text-xs font-medium rounded-full border border-white/10"
-                                        >
-                                            {tag}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
                         </div>
-                    </div>
+                    )}
                 </div>
+
+                {/* Title block (image ke neeche) */}
+                {coverImage && (
+                    <div className="mt-5 mb-8 max-w-3xl">
+                        <h1 className="text-2xl sm:text-3xl md:text-[34px] font-black text-[#2d2116] tracking-tight leading-tight mb-2 break-words">
+                            {title}
+                        </h1>
+                        {shortDescription && (
+                            <p className="text-[#6e5849] text-sm sm:text-base leading-relaxed mb-3">
+                                {shortDescription}
+                            </p>
+                        )}
+                        {tags.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-2">
+                                {tags.slice(0, 8).map((tag, idx) => (
+                                    <span
+                                        key={idx}
+                                        className="px-3 py-1 bg-[#f4ece1] text-[#4a3426] text-[11px] sm:text-xs font-semibold rounded-full border border-[#e8dfd5]"
+                                    >
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+                {!coverImage && <div className="mb-8" />}
 
                 {/* 2-Column Main Layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                     {/* LEFT COLUMN */}
                     <div className="lg:col-span-2 space-y-8 min-w-0">
-                        {/* Mentor Card (skeleton jab tak mentor load ho raha hai) */}
+                        {/* Mentor Card */}
                         {!mentor ? (
                             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece7e2] flex items-center gap-3.5 animate-pulse">
                                 <div className="w-14 h-14 rounded-full bg-[#e8dfd5]" />
@@ -708,7 +716,7 @@ export default function ServiceDetailsPage() {
                         )}
                     </div>
 
-                    {/* RIGHT COLUMN: Sticky Booking Sidebar (desktop) */}
+                    {/* RIGHT COLUMN: Booking Sidebar */}
                     <div className="lg:col-span-1">
                         <div className="bg-white rounded-2xl p-6 border border-[#ece7e2] shadow-sm lg:sticky lg:top-24 space-y-5">
                             {duration !== null && (
