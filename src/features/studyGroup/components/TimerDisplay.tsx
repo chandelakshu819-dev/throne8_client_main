@@ -4,7 +4,7 @@ import { useAppSelector } from "@/store/hooks";
 import { useState, useEffect } from 'react';
 
 interface TimerDisplayProps {
-  progress: number;
+  progress?: number;
 }
 
 const RADIUS = 88;
@@ -16,6 +16,7 @@ export default function TimerDisplay({ progress }: TimerDisplayProps) {
   const secondsStore = useAppSelector(state => state.timer.seconds);
   const isBreakModeStore = useAppSelector(state => state.timer.isBreakMode);
   const activeTabStore = useAppSelector(state => state.timer.activeTab);
+  const customMinutesStore = useAppSelector(state => state.timer.customMinutes);
   const completedSessions = useAppSelector(state => state.timer.completedSessions);
   const isActiveStore = useAppSelector(state => state.timer.isActive);
   const activeSession = useAppSelector(state => state.timer.activeSession);
@@ -31,7 +32,13 @@ export default function TimerDisplay({ progress }: TimerDisplayProps) {
   const activeTab = mounted ? activeTabStore || 'pomodoro' : 'pomodoro';
   const isActive = mounted ? isActiveStore : false;
   const isPaused = mounted && !isActive && activeSession?.status === 'paused';
-  const pct = mounted ? Math.min(100, Math.max(0, progress || 0)) : 0;
+  const tabDuration = activeTab === 'timer'
+    ? (customMinutesStore || 15)
+    : (activeTab === 'pomodoro' ? 25 : 45);
+  const computedProgress = progress !== undefined
+    ? progress
+    : ((tabDuration * 60 - (minutes * 60 + seconds)) / (tabDuration * 60)) * 100;
+  const pct = mounted ? Math.min(100, Math.max(0, computedProgress || 0)) : 0;
 
   const label = isBreakMode
     ? completedSessions % 4 === 0

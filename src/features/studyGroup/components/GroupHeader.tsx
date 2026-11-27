@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { usePublicGroupStats, formatStat } from '@/features/studyGroup/hooks/usePublicGroupStats';
 import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
 import { setBrowseSearchQuery as setSearchQuery, selectBrowseSearchQuery as selectSearchQuery } from '@/hooks/studyGroup/features/groups/groupsSlice';
-import SearchDropdown from '@/features/study-group/components/study/dropdown';
-import FilterModal from '@/features/study-group/modals/FilterModal';
+
+const SearchDropdown = dynamic(() => import('@/features/study-group/components/study/dropdown'), { ssr: false });
+const FilterModal = dynamic(() => import('@/features/study-group/modals/FilterModal'), { ssr: false });
 
 const GroupHeader = () => {
   const dispatch = useAppDispatch();
@@ -86,13 +88,15 @@ const GroupHeader = () => {
                   Explore Groups
                 </button> */}
 
-                {/* Dropdown — sits directly below search row */}
-                <SearchDropdown
-                  isOpen={isDropdownOpen}
-                  onClose={() => setIsDropdownOpen(false)}
-                  query={searchQuery}
-                  onQueryChange={(val) => dispatch(setSearchQuery(val))}
-                />
+                {/* Dropdown — sits directly below search row; lazy-loaded on first open */}
+                {isDropdownOpen && (
+                  <SearchDropdown
+                    isOpen={isDropdownOpen}
+                    onClose={() => setIsDropdownOpen(false)}
+                    query={searchQuery}
+                    onQueryChange={(val) => dispatch(setSearchQuery(val))}
+                  />
+                )}
               </div>
 
               {/* Stats */}
@@ -121,15 +125,15 @@ const GroupHeader = () => {
           </div>
         </div>
       </section>
-  <FilterModal
-    isOpen={isFilterOpen}
-    onClose={() => setIsFilterOpen(false)}
-    onApply={(filters) => {
-      console.log('Applied filters:', filters);
-      // TODO: wire to search/filter thunk in next step
-      setIsFilterOpen(false);
-    }}
-  />
+  {isFilterOpen && (
+    <FilterModal
+      isOpen={isFilterOpen}
+      onClose={() => setIsFilterOpen(false)}
+      onApply={(filters) => {
+        setIsFilterOpen(false);
+      }}
+    />
+  )}
     </div >
   );
 };

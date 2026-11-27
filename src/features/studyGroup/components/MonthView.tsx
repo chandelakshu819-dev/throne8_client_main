@@ -3,7 +3,7 @@
 'use client';
 
 import { useAppSelector } from '@/core/store/store.hooks';
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { Award } from 'lucide-react';
 
 interface MonthViewProps {
@@ -14,43 +14,50 @@ interface MonthViewProps {
 
 type CompletionFilter = 'all' | 'incomplete' | 'complete';
 
-export default function MonthView({ currentDate, onDateClick, selectedDate }: MonthViewProps) {
+export default memo(function MonthView({ currentDate, onDateClick, selectedDate }: MonthViewProps) {
   // ✅ apiTasks se data lo — deadline field se date match karenge
   const apiTasks = useAppSelector(state => state.todos.apiTasks);
-  // ✅ local items bhi rakhte hain (newly created tasks jo abhi apiTasks mein nahi)
-  const localItems = useAppSelector(state => state.todos.items);
   const [completionFilter, setCompletionFilter] = useState<CompletionFilter>('all');
 
   const formatDate = useCallback((date: Date): string => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }, []);
 
-  const today = formatDate(new Date());
+  const today = useMemo(() => formatDate(new Date()), [formatDate]);
 
-  const getApiTasksForDate = useCallback((dateStr: string) => {
-    const tasksForDate = apiTasks.filter(task => {
-      // deadline se match karo pehle
-      if (task.deadline) {
-        return task.deadline.slice(0, 10) === dateStr;
-      }
-      // deadline nahi hai toh createdAt se match karo
-      return task.createdAt.slice(0, 10) === dateStr;
-    });
-
-    // Apply completion filter
-    if (completionFilter === 'incomplete') return tasksForDate.filter(t => !t.completed);
-    if (completionFilter === 'complete') return tasksForDate.filter(t => t.completed);
-    return tasksForDate;
+  // Pre-index tasks by date string once per apiTasks/filter change instead of scanning 30+ times per render
+  const tasksByDate = useMemo(() => {
+    const map = new Map<string, typeof apiTasks>();
+    for (const task of apiTasks) {
+      if (completionFilter === 'incomplete' && task.completed) continue;
+      if (completionFilter === 'complete' && !task.completed) continue;
+      const dateKey = task.deadline ? task.deadline.slice(0, 10) : task.createdAt.slice(0, 10);
+      const list = map.get(dateKey);
+      if (list) list.push(task);
+      else map.set(dateKey, [task]);
+    }
+    return map;
   }, [apiTasks, completionFilter]);
 
+  const getApiTasksForDate = useCallback(
+    (dateStr: string) => tasksByDate.get(dateStr) ?? [],
+    [tasksByDate]
+  );
+
   const getStats = useCallback((dateStr: string) => {
-    const apiForDate = getApiTasksForDate(dateStr);
+    const apiForDate = tasksByDate.get(dateStr) ?? [];
+    let completed = 0;
+    let overdue = 0;
+    for (const t of apiForDate) {
+      if (t.completed) completed++;
+      if (t.isOverdue) overdue++;
+    }
     return {
       total: apiForDate.length,
-      completed: apiForDate.filter(t => t.completed).length,
-      overdue: apiForDate.filter(t => t.isOverdue).length,
+      completed,
+      overdue,
     };
-  }, [getApiTasksForDate]);
+  }, [tasksByDate]);
 
   const getDaysInMonth = () => {
     const year = currentDate.getFullYear();
@@ -195,4 +202,4 @@ export default function MonthView({ currentDate, onDateClick, selectedDate }: Mo
       </div>
     </div>
   );
-}
+});

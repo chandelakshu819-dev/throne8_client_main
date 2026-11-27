@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { memo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Pencil, Trash2, GripVertical, CheckCircle2 } from 'lucide-react';
 import { GoalWithUI } from '@/hooks/studyGroup/features/goals/goalsSlice';
-import { useAppSelector } from '@/core/store/store.hooks';
-import GoalProgressModal from './GoalProgressModal';
 import { statusConfig } from '../data';
 import { getStatus } from '../helper';
+
+const GoalProgressModal = dynamic(() => import('./GoalProgressModal'), { ssr: false });
 
 interface GoalCardProps {
   goal: GoalWithUI;
@@ -18,11 +19,10 @@ interface GoalCardProps {
 
 
 
-export default function GoalCard({ goal, onEdit, onDelete }: GoalCardProps) {
-  const allGoals = useAppSelector(state => state.goals.items);
+export default memo(function GoalCard({ goal, onEdit, onDelete }: GoalCardProps) {
   const [showModal, setShowModal] = useState(false);
 
-  const freshGoal = allGoals.find(g => g.goalId === goal.goalId) ?? goal;
+  const freshGoal = goal;
   const pct =
     freshGoal.targetHours > 0
       ? Math.min(100, Math.round(((freshGoal.currentHours ?? 0) / freshGoal.targetHours) * 100))
@@ -190,4 +190,4 @@ export default function GoalCard({ goal, onEdit, onDelete }: GoalCardProps) {
       )}
     </>
   );
-}
+});

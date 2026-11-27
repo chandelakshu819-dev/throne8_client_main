@@ -28,6 +28,10 @@ export interface EnrichedGroupMember {
 // Module-level cache — shared across all hook instances
 const globalUserCache: Record<string, UserInfo> = {};
 const globalJoinRequestsMap: Record<string, MyRequestsResponse> = {};
+let globalJoinRequestsList: MyRequestsResponse[] = [];
+let joinRequestsFetchedAt = 0;
+let joinRequestsInflight: Promise<MyRequestsResponse[]> | null = null;
+const JOIN_REQUESTS_TTL_MS = 45_000;
 
 // ─── Hook ─────────────────────────────────────────────────
 
@@ -292,19 +296,38 @@ export const useGroupData = () => {
     }
   }, []);
 
-  const fetchMyJoinRequests = useCallback(async () => {
+  const fetchMyJoinRequests = useCallback(async (force = false) => {
+    const isFresh =
+      !force &&
+      joinRequestsFetchedAt > 0 &&
+      Date.now() - joinRequestsFetchedAt < JOIN_REQUESTS_TTL_MS;
+
+    if (isFresh) {
+      setMyJoinRequests(globalJoinRequestsList);
+      myJoinRequestsMap.current = { ...globalJoinRequestsMap };
+      return;
+    }
+
     try {
       setIsLoadingMyJoinRequests(true);
-      const requests = await StudyGroupService.getMyJoinRequests();
+      if (!joinRequestsInflight) {
+        joinRequestsInflight = StudyGroupService.getMyJoinRequests()
+          .then((requests) => {
+            globalJoinRequestsList = requests;
+            joinRequestsFetchedAt = Date.now();
+            Object.keys(globalJoinRequestsMap).forEach((k) => delete globalJoinRequestsMap[k]);
+            requests.forEach((req) => {
+              globalJoinRequestsMap[req.groupId] = req;
+            });
+            return requests;
+          })
+          .finally(() => {
+            joinRequestsInflight = null;
+          });
+      }
+      const requests = await joinRequestsInflight;
       setMyJoinRequests(requests);
-
-      myJoinRequestsMap.current = requests.reduce(
-        (acc, req) => {
-          acc[req.groupId] = req;
-          return acc;
-        },
-        {} as Record<string, MyRequestsResponse>
-      );
+      myJoinRequestsMap.current = { ...globalJoinRequestsMap };
     } catch (err: any) {
       console.error('Failed to fetch join requests:', err.message);
     } finally {
@@ -314,7 +337,7 @@ export const useGroupData = () => {
 
   const getJoinRequestForGroup = useCallback(
     (groupId: string): MyRequestsResponse | null => {
-      return myJoinRequestsMap.current[groupId] ?? null;
+      return myJoinRequestsMap.current[groupId] ?? globalJoinRequestsMap[groupId] ?? null;
     },
     []
   );
@@ -322,12 +345,14 @@ export const useGroupData = () => {
   const addJoinRequestToCache = useCallback(
     (request: MyRequestsResponse) => {
       myJoinRequestsMap.current[request.groupId] = request;
+      globalJoinRequestsMap[request.groupId] = request;
       setMyJoinRequests(prev => {
         const exists = prev.find(r => r.groupId === request.groupId);
-        if (exists) {
-          return prev.map(r => r.groupId === request.groupId ? request : r);
-        }
-        return [...prev, request];
+        const next = exists
+          ? prev.map(r => r.groupId === request.groupId ? request : r)
+          : [...prev, request];
+        globalJoinRequestsList = next;
+        return next;
       });
     },
     []
@@ -336,7 +361,12 @@ export const useGroupData = () => {
   const removeJoinRequestFromCache = useCallback(
     (groupId: string) => {
       delete myJoinRequestsMap.current[groupId];
-      setMyJoinRequests(prev => prev.filter(r => r.groupId !== groupId));
+      delete globalJoinRequestsMap[groupId];
+      setMyJoinRequests(prev => {
+        const next = prev.filter(r => r.groupId !== groupId);
+        globalJoinRequestsList = next;
+        return next;
+      });
     },
     []
   );

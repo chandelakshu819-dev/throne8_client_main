@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { TrendingUp, Users, Award, Trophy } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { selectJoinLoading, selectTopRankedGroups, selectTopRankedGroupsLoading } from "@/hooks/studyGroup/features/groups/groupsSlice";
@@ -24,6 +25,7 @@ const TopRankedCard = ({
   group: any;
   onJoinClick: (group: any) => void;
 }) => {
+  const router = useRouter();
   const [imgFailed, setImgFailed] = useState(false);
   const [showOpenConfirm, setShowOpenConfirm] = useState(false);
 
@@ -39,7 +41,7 @@ const TopRankedCard = ({
 
   const handleConfirmOpen = () => {
     setShowOpenConfirm(false);
-    window.location.href = `/study/my-groups/${group.groupId || group.id}`;
+    router.push(`/study/my-groups/${group.groupId || group.id}`);
   };
 
   const memberCount = group.currentMemberCount ?? group.members ?? 0;

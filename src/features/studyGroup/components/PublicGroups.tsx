@@ -14,6 +14,7 @@ import {
 import SkeletonLoader from "@/app/loading";
 import { GroupVisibility } from "@/lib/api/studyGroup.service";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { joinGroupThunk, sendJoinRequestThunk } from "@/hooks/studyGroup/features/groups/group.thunks";
 import { useGroupData } from "@/features/study-group/hooks/useGroupData";
 
@@ -29,7 +30,9 @@ interface PublicGroupCardProps {
   isJoinLoading: boolean;
 }
 
-const PublicGroupCard: React.FC<PublicGroupCardProps> = ({ title, isMember, members, groupId, visibility, onJoin, isJoinLoading }) => (
+const PublicGroupCard: React.FC<PublicGroupCardProps> = ({ title, isMember, members, groupId, visibility, onJoin, isJoinLoading }) => {
+  const router = useRouter();
+  return (
   <div className="backdrop-blur-xl bg-white/70 rounded-2xl border-2 border-white/60 p-5 hover:border-[#8b7355]/50 hover:shadow-2xl transition-all duration-300 w-full">
     <div className="flex items-start gap-3 mb-3">
       <div className="p-2.5 rounded-xl bg-[#8b7355]/10 backdrop-blur-sm border border-[#8b7355]/20">
@@ -56,8 +59,7 @@ const PublicGroupCard: React.FC<PublicGroupCardProps> = ({ title, isMember, memb
     <button
       onClick={() => {
         if(isMember) {
-          console.log("Navigating to group room from public group for groupId:", groupId);
-          window.location.href = `/study/my-groups/${groupId}`; // Navigate to group room if already a member
+          router.push(`/study/my-groups/${groupId}`); // Navigate to group room if already a member
           return;
         }
         !isMember && onJoin(groupId, visibility)
@@ -69,7 +71,8 @@ const PublicGroupCard: React.FC<PublicGroupCardProps> = ({ title, isMember, memb
       {isMember ? 'Open Group' : isJoinLoading ? 'Joining...' : 'Join Now'}
     </button>
   </div>
-);
+  );
+};
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 

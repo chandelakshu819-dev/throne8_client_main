@@ -62,40 +62,36 @@ const Groups: React.FC = () => {
           <TopRankedGroups fetched={topFetched} onReady={handleTopReady} />
         </div>
 
-        {topReady && (
-          <>
-            <div className={SECTION}>
-              <GroupGrid
-                icon={<GraduationCap size={22} />}
-                title="University Groups"
-                subtitle="Find friends from your college"
-                sectionKey="university"
-              />
-            </div>
+        <div className={SECTION}>
+          <GroupGrid
+            icon={<GraduationCap size={22} />}
+            title="University Groups"
+            subtitle="Find friends from your college"
+            sectionKey="university"
+          />
+        </div>
 
-            <div className={SECTION}>
-              <GroupGrid
-                icon={<Globe size={22} />}
-                title="Public Groups"
-                subtitle="Open groups with instant access, no approval required"
-                sectionKey="public"
-              />
-            </div>
+        <div className={SECTION}>
+          <GroupGrid
+            icon={<Globe size={22} />}
+            title="Public Groups"
+            subtitle="Open groups with instant access, no approval required"
+            sectionKey="public"
+          />
+        </div>
 
-            <div className={SECTION}>
-              <GroupGrid
-                icon={<Briefcase size={22} />}
-                title="Placement Groups"
-                subtitle="Gear up for placements with like-minded people"
-                sectionKey="dsa"
-              />
-            </div>
+        <div className={SECTION}>
+          <GroupGrid
+            icon={<Briefcase size={22} />}
+            title="Placement Groups"
+            subtitle="Gear up for placements with like-minded people"
+            sectionKey="dsa"
+          />
+        </div>
 
-            <div className={SECTION}>
-              <CTA />
-            </div>
-          </>
-        )}
+        <div className={SECTION}>
+          <CTA />
+        </div>
 
       </div>
     </div>

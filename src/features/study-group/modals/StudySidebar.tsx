@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 
-import FilterModal from "./FilterModal";
-import CreateGroupModal from "./CreateGroupModal";
+const FilterModal = dynamic(() => import("./FilterModal"), { ssr: false });
+const CreateGroupModal = dynamic(() => import("./CreateGroupModal"), { ssr: false });
 
 import {
   Home,
@@ -31,8 +33,162 @@ type SidebarItem = {
   badge?: number;
 };
 
+const SIDEBAR_SECTIONS: { title: string; items: SidebarItem[] }[] = [
+  {
+    title: "Community",
+    items: [
+      {
+        name: "Groups",
+        path: "/study/groups",
+        icon: <GraduationCap size={18} />,
+      },
+      {
+        name: "My Groups",
+        path: "/study/my-groups",
+        icon: <GraduationCap size={18} />,
+      },
+      {
+        name: "Filter Groups",
+        action: "filter",
+        icon: <Search size={18} />,
+      },
+      {
+        name: "Create Group",
+        action: "create",
+        icon: <UserPlus size={18} />,
+      },
+      {
+        name: "Notifications",
+        path: "/study/notifications",
+        icon: <Bell size={18} />,
+      },
+    ],
+  },
+  {
+    title: "Planning",
+    items: [
+      {
+        name: "Timer",
+        path: "/study/timer",
+        icon: <Home size={18} />,
+      },
+      {
+        name: "Goals",
+        path: "/study/goals",
+        icon: <Star size={18} />,
+      },
+      {
+        name: "Todo",
+        path: "/study/todo",
+        icon: <Star size={18} />,
+      },
+    ],
+  },
+  {
+    title: "Profile",
+    items: [
+      {
+        name: "Dashboard",
+        path: "/student-dashboard",
+        icon: <Users size={18} />,
+      },
+    ],
+  },
+];
+
+interface SidebarContentProps {
+  pathname: string | null;
+  unreadCount: number;
+  onCloseMobile: () => void;
+  onAction: (action: "filter" | "create") => void;
+}
+
+const SidebarContent = memo(function SidebarContent({
+  pathname,
+  unreadCount,
+  onCloseMobile,
+  onAction,
+}: SidebarContentProps) {
+  return (
+    <>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 lg:mb-8 flex-shrink-0">
+        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#4a3728]">
+          Throne8
+        </h2>
+        {/* Close button - only visible on mobile */}
+        <button
+          onClick={onCloseMobile}
+          className="lg:hidden p-2 hover:bg-black/5 rounded-lg transition-colors"
+          aria-label="Close sidebar"
+        >
+          <X size={24} className="text-[#4a3728]" />
+        </button>
+      </div>
+
+      {/* Sections - independently scrollable with accessible Profile section */}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden throne8-scrollbar pr-1 -mr-1">
+        {SIDEBAR_SECTIONS.map((section) => (
+          <div key={section.title} className="mb-5 lg:mb-7">
+            <h3 className="text-xs lg:text-sm font-bold text-gray-700 uppercase mb-2.5 lg:mb-3.5 px-1">
+              {section.title}
+            </h3>
+
+            <ul className="space-y-1.5 lg:space-y-2.5">
+              {section.items.map((item) => {
+                const badge = item.path === "/study/notifications" ? unreadCount : undefined;
+                const isActive = item.path ? pathname === item.path : false;
+                const itemClass = `flex items-center gap-3 p-2.5 lg:p-3 rounded-xl cursor-pointer transition-all ${
+                  isActive
+                    ? "bg-[#4a3728] text-white shadow-md"
+                    : "text-gray-700 hover:bg-black/5"
+                }`;
+
+                if (item.path) {
+                  return (
+                    <li key={item.name}>
+                      <Link
+                        href={item.path}
+                        prefetch={true}
+                        onClick={onCloseMobile}
+                        className={itemClass}
+                      >
+                        <span className="flex-shrink-0">{item.icon}</span>
+                        <span className="text-sm lg:text-base font-medium">{item.name}</span>
+                        {!!badge && (
+                          <span className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center">
+                            {badge > 99 ? "99+" : badge}
+                          </span>
+                        )}
+                      </Link>
+                    </li>
+                  );
+                }
+
+                return (
+                  <li key={item.name}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (item.action) onAction(item.action);
+                      }}
+                      className={`w-full text-left ${itemClass}`}
+                    >
+                      <span className="flex-shrink-0">{item.icon}</span>
+                      <span className="text-sm lg:text-base font-medium">{item.name}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+});
+
 const StudySidebar = () => {
-  const router = useRouter();
   const pathname = usePathname();
 
   // ✅ modal states
@@ -51,15 +207,17 @@ const StudySidebar = () => {
     setMounted(true);
   }, []);
 
-  // ✅ Load unread count on mount and every 60s (socket pushes cover the rest).
+  // ✅ Load unread count on mount and every 60s when tab is visible (socket pushes cover the rest).
   // Route changes no longer trigger a request; see the effect below for the one case that does.
   // Failures are silent so the sidebar never breaks because of notifications.
   useEffect(() => {
     let cancelled = false;
-    const load = () =>
+    const load = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
       StudyGroupNotificationService.getUnreadCount()
         .then((n) => { if (!cancelled) setUnreadCount(n); })
         .catch(() => {});
+    };
     load();
     const timer = setInterval(load, 60_000);
     return () => { cancelled = true; clearInterval(timer); };
@@ -98,9 +256,11 @@ const StudySidebar = () => {
     };
   }, []);
 
-  // ✅ Close mobile sidebar when route changes
+  // ✅ Close mobile sidebar and temporary modals when route changes
   useEffect(() => {
     setIsMobileSidebarOpen(false);
+    setIsFilterOpen(false);
+    setIsCreateGroupOpen(false);
   }, [pathname]);
 
   // ✅ Prevent body scroll when mobile sidebar is open
@@ -115,139 +275,14 @@ const StudySidebar = () => {
     };
   }, [isMobileSidebarOpen]);
 
-  const handleItemClick = (item: SidebarItem) => {
-    if (item.action === "filter") {
-      setIsFilterOpen(true);
-      return;
-    }
+  const handleCloseMobile = useCallback(() => {
+    setIsMobileSidebarOpen(false);
+  }, []);
 
-    if (item.action === "create") {
-      setIsCreateGroupOpen(true);
-      return;
-    }
-
-    if (item.path) {
-      router.push(item.path);
-    }
-  };
-
-  const sidebarSections = [
-    {
-      title: "Community",
-      items: [
-        {
-          name: "Groups",
-          path: "/study/groups",
-          icon: <GraduationCap size={18} />,
-        },
-        {
-          name: "My Groups",
-          path: "/study/my-groups",
-          icon: <GraduationCap size={18} />,
-        },
-        {
-          name: "Filter Groups",
-          action: "filter" as const,
-          icon: <Search size={18} />,
-        },
-        {
-          name: "Create Group",
-          action: "create" as const,
-          icon: <UserPlus size={18} />,
-        },
-        {
-          name: "Notifications",
-          path: "/study/notifications",
-          icon: <Bell size={18} />,
-          badge: unreadCount,
-        },
-      ],
-    },
-    {
-      title: "Planning",
-      items: [
-        {
-          name: "Timer",
-          path: "/study/timer",
-          icon: <Home size={18} />,
-        },
-        {
-          name: "Goals",
-          path: "/study/goals",
-          icon: <Star size={18} />,
-        },
-        {
-          name: "Todo",
-          path: "/study/todo",
-          icon: <Star size={18} />,
-        },
-      ],
-    },
-    {
-      title: "Profile",
-      items: [
-   
-        {
-          name: "Dashboard",
-          path: "/student-dashboard",
-          icon: <Users size={18} />,
-        },
-      ],
-    },
-  ];
-
-  const SidebarContent = () => (
-    <>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 lg:mb-8 flex-shrink-0">
-        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#4a3728]">
-          Throne8
-        </h2>
-        {/* Close button - only visible on mobile */}
-        <button
-          onClick={() => setIsMobileSidebarOpen(false)}
-          className="lg:hidden p-2 hover:bg-black/5 rounded-lg transition-colors"
-          aria-label="Close sidebar"
-        >
-          <X size={24} className="text-[#4a3728]" />
-        </button>
-      </div>
-
-      {/* Sections - independently scrollable with accessible Profile section */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden throne8-scrollbar pr-1 -mr-1">
-        {sidebarSections.map((section, index) => (
-          <div key={index} className="mb-5 lg:mb-7">
-            <h3 className="text-xs lg:text-sm font-bold text-gray-700 uppercase mb-2.5 lg:mb-3.5 px-1">
-              {section.title}
-            </h3>
-
-            <ul className="space-y-1.5 lg:space-y-2.5">
-              {section.items.map((item, idx) => (
-                <li
-                  key={idx}
-                  onClick={() => handleItemClick(item)}
-                  className={`flex items-center gap-3 p-2.5 lg:p-3 rounded-xl cursor-pointer transition-all
-                    ${
-                      pathname === item.path
-                        ? "bg-[#4a3728] text-white shadow-md"
-                        : "text-gray-700 hover:bg-black/5"
-                    }`}
-                >
-                  <span className="flex-shrink-0">{item.icon}</span>
-                  <span className="text-sm lg:text-base font-medium">{item.name}</span>
-                  {!!(item as SidebarItem).badge && (
-                    <span className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center">
-                      {(item as SidebarItem).badge! > 99 ? "99+" : (item as SidebarItem).badge}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-    </>
-  );
+  const handleAction = useCallback((action: "filter" | "create") => {
+    if (action === "filter") setIsFilterOpen(true);
+    else if (action === "create") setIsCreateGroupOpen(true);
+  }, []);
 
   return (
     <>
@@ -264,37 +299,42 @@ const StudySidebar = () => {
       {isMobileSidebarOpen && (
         <div
           className="lg:hidden fixed inset-0 bg-black/50 z-[55] transition-opacity"
-           onClick={() => setIsMobileSidebarOpen(false)}
+           onClick={handleCloseMobile}
         />
       )}
 
       {/* SIDEBAR - Desktop (fixed), Mobile/Tablet (sliding) */}
       <aside
         className={`
-+          fixed top-0 left-0 h-screen bg-[#f7f3ee] shadow-lg z-[60] flex flex-col
-+          transition-transform duration-300 ease-in-out
-+          w-72 max-w-[85vw] md:w-64 lg:w-72
-+          ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}
-+          lg:translate-x-0
-+          p-4 sm:p-5 lg:p-6
-+        `}
+          fixed top-0 left-0 h-screen bg-[#f7f3ee] shadow-lg z-[60] flex flex-col
+          transition-transform duration-300 ease-in-out
+          w-72 max-w-[85vw] md:w-64 lg:w-72
+          ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}
+          lg:translate-x-0
+          p-4 sm:p-5 lg:p-6
+        `}
       >
-        <SidebarContent />
+        <SidebarContent
+          pathname={pathname}
+          unreadCount={unreadCount}
+          onCloseMobile={handleCloseMobile}
+          onAction={handleAction}
+        />
       </aside>
 
-      {/* MODALS (render ONLY after mount) */}
-      {mounted && (
-        <>
-          <FilterModal
-            isOpen={isFilterOpen}
-            onClose={() => setIsFilterOpen(false)}
-          />
+      {/* MODALS (lazy-loaded & mounted only when opened) */}
+      {mounted && isFilterOpen && (
+        <FilterModal
+          isOpen={isFilterOpen}
+          onClose={() => setIsFilterOpen(false)}
+        />
+      )}
 
-          <CreateGroupModal
-            isOpen={isCreateGroupOpen}
-            onClose={() => setIsCreateGroupOpen(false)}
-          />
-        </>
+      {mounted && isCreateGroupOpen && (
+        <CreateGroupModal
+          isOpen={isCreateGroupOpen}
+          onClose={() => setIsCreateGroupOpen(false)}
+        />
       )}
     </>
   );

@@ -9,7 +9,7 @@ import {
   endBreak,
   resetTimer
 } from '@/hooks/studyGroup/features/timer/timerSlice';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import TimerTabs from '@/features/studyGroup/components/TimerTabs';
 import TimerDisplay from '@/features/studyGroup/components/TimerDisplay';
@@ -23,29 +23,20 @@ import { startTimerThunk, getActiveTimerThunk, getAllSessionsThunk, getTimerStat
 import { fetchUserStreakThunk } from '@/hooks/studyGroup/features/groups/group.thunks';
 import { STUDY_PAGE_WRAP } from "@/features/study-group/constants/pageLayout";
 
-export default function PomodoroTimer() {
+// Isolated countdown + completion engine so per-second Redux ticks only re-render TimerDisplay,
+// not the entire PomodoroTimer page and all sibling panels.
+function TimerEngine({ onSessionCompleted }: { onSessionCompleted: () => void }) {
   const dispatch = useAppDispatch();
-
   const isActive = useAppSelector(state => state.timer.isActive);
   const minutes = useAppSelector(state => state.timer.minutes);
   const seconds = useAppSelector(state => state.timer.seconds);
   const isBreakMode = useAppSelector(state => state.timer.isBreakMode);
   const activeTab = useAppSelector(state => state.timer.activeTab);
-  const customMinutes = useAppSelector(state => state.timer.customMinutes);
   const completedSessions = useAppSelector(state => state.timer.completedSessions);
   const subject = useAppSelector(state => state.timer.subject);
   const selectedGoalId = useAppSelector(state => state.timer.selectedGoalId);
   const autoStartPomodoros = useAppSelector(state => state.timer.settings?.autoStartPomodoros);
-  const [sessionCompleted, setSessionCompleted] = useState(false);
-  const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const finishing = useRef(false);
-
-  useEffect(() => {
-    dispatch(getActiveTimerThunk());
-    dispatch(getTodaySessionsThunk());
-    dispatch(getTimerStatsThunk());
-    dispatch(fetchUserStreakThunk());
-  }, [dispatch]);
 
   // Clock-based countdown. Counting 1-second ticks drifts (every tick re-creates the
   // interval, and browsers slow timers in background tabs), so a 5 min session ran
@@ -64,8 +55,6 @@ export default function PomodoroTimer() {
     }
     const interval = setInterval(() => {
       const now = Date.now();
-      // First tick, or the store was changed from outside (break started, re-sync
-      // with the server, reset): restart the end time from what the store shows.
       if (endAtRef.current === null || remainingRef.current !== lastShownRef.current) {
         endAtRef.current = now + remainingRef.current * 1000;
         lastShownRef.current = remainingRef.current;
@@ -81,9 +70,45 @@ export default function PomodoroTimer() {
     return () => clearInterval(interval);
   }, [isActive, dispatch]);
 
-  // Finish step. It runs once per countdown: the flag stays set while the clock
-  // is at 0:00 (including while the stop request is in flight) and is only
-  // cleared when the clock shows time again (break started, clock reset).
+  const handleTimerComplete = async () => {
+    if (activeTab === 'pomodoro' && isBreakMode) {
+      dispatch(endBreak());
+      if (autoStartPomodoros) {
+        const started: any = await dispatch(
+          startTimerThunk({
+            subject: subject || undefined,
+            goalId: selectedGoalId || undefined,
+          })
+        );
+        if (started.meta.requestStatus === 'rejected') dispatch(getActiveTimerThunk());
+      }
+      return;
+    }
+
+    const result: any = await dispatch(stopTimerThunk(undefined));
+
+    if (result.meta.requestStatus !== 'fulfilled') {
+      dispatch(resetTimer());
+      dispatch(getActiveTimerThunk());
+      return;
+    }
+
+    onSessionCompleted();
+    dispatch(completeSession());
+
+    if (activeTab === 'pomodoro') {
+      const isLongBreak = (completedSessions + 1) % 4 === 0;
+      dispatch(startBreak(isLongBreak ? 'long' : 'short'));
+    } else {
+      dispatch(resetTimer());
+    }
+
+    dispatch(getTodaySessionsThunk());
+    dispatch(getTimerStatsThunk({ force: true }));
+    dispatch(getAllSessionsThunk({ limit: 10 }));
+    dispatch(fetchUserStreakThunk({ force: true }));
+  };
+
   useEffect(() => {
     if (minutes !== 0 || seconds !== 0) {
       finishing.current = false;
@@ -94,60 +119,31 @@ export default function PomodoroTimer() {
     handleTimerComplete();
   }, [isActive, minutes, seconds]);
 
-  const handleTimerComplete = async () => {
-    // A break has no server session to stop. The next pomodoro is started on the server when the break ends.
-    if (activeTab === 'pomodoro' && isBreakMode) {
-      dispatch(endBreak());
-      if (autoStartPomodoros) {
-        const started: any = await dispatch(
-          startTimerThunk({
-            subject: subject || undefined,
-            goalId: selectedGoalId || undefined,
-          })
-        );
-        // Server refused (for example an old session exists): show the prompt
-        if (started.meta.requestStatus === 'rejected') dispatch(getActiveTimerThunk());
-      }
-      return;
-    }
+  return null;
+}
 
-    const result: any = await dispatch(stopTimerThunk(undefined));
+export default function PomodoroTimer() {
+  const dispatch = useAppDispatch();
 
-    if (result.meta.requestStatus !== 'fulfilled') {
-      // Could not save: put the clock back and re-sync with the server
-      dispatch(resetTimer());
-      dispatch(getActiveTimerThunk());
-      return;
-    }
+  const activeTab = useAppSelector(state => state.timer.activeTab);
+  const [sessionCompleted, setSessionCompleted] = useState(false);
+  const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
 
+  useEffect(() => {
+    dispatch(getActiveTimerThunk());
+    dispatch(getTodaySessionsThunk());
+    dispatch(getTimerStatsThunk());
+    dispatch(fetchUserStreakThunk());
+  }, [dispatch]);
+
+  const handleSessionCompleted = useCallback(() => {
     setSessionCompleted(true);
     setTimeout(() => setSessionCompleted(false), 4000);
-    dispatch(completeSession());
-
-    if (activeTab === 'pomodoro') {
-      const isLongBreak = (completedSessions + 1) % 4 === 0;
-      dispatch(startBreak(isLongBreak ? 'long' : 'short'));
-    } else {
-      // Back to the chosen length so Start does not run a 0:00 session
-      dispatch(resetTimer());
-    }
-
-    dispatch(getTodaySessionsThunk());
-    dispatch(getTimerStatsThunk({ force: true }));
-    dispatch(getAllSessionsThunk({ limit: 10 }));
-    dispatch(fetchUserStreakThunk({ force: true }));
-  };
-
-  const tabDuration = activeTab === 'timer'
-    ? (customMinutes || 15)
-    : (activeTab === 'pomodoro' ? 25 : 45);
-
-  const totalSeconds = tabDuration * 60;
-  const remainingSeconds = (minutes || 0) * 60 + (seconds || 0);
-  const progress = Math.min(100, Math.max(0, ((totalSeconds - remainingSeconds) / totalSeconds) * 100));
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#f7f3ee] py-5 sm:py-6 lg:py-8">
+      <TimerEngine onSessionCompleted={handleSessionCompleted} />
 
       {/* Session complete toast */}
       {sessionCompleted && (
@@ -175,7 +171,7 @@ export default function PomodoroTimer() {
             <div className="space-y-6 p-5 sm:p-6">
               <UnfinishedSessionPrompt />
               <TimerTabs />
-              <TimerDisplay progress={progress} />
+              <TimerDisplay />
               {activeTab === 'timer' && <CustomTimerControls />}
               <SubjectInput />
               <TimerControls />

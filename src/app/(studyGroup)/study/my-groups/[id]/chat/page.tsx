@@ -18,8 +18,10 @@ export default function GroupChatPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Fetch group details from Redux store first
-  const myGroups = useAppSelector(state => (state as any).groups?.myGroups?.groups || []);
-  const reduxGroupDetails = myGroups.find((g: any) => g.groupId === resolvedParams.id);
+  const myGroups = useAppSelector(state => (state as any).groups?.myGroups ?? []);
+  const reduxGroupDetails = Array.isArray(myGroups)
+    ? myGroups.find((g: any) => g.groupId === resolvedParams.id)
+    : undefined;
 
   useEffect(() => {
     const fetchGroupDetails = async () => {
@@ -48,7 +50,7 @@ export default function GroupChatPage({ params }: PageProps) {
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-[#f6ede8] via-[#ede4db] to-[#e0d8cf]">
+      <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-[#f6ede8] via-[#ede4db] to-[#e0d8cf]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-[#8b7355]" />
           <p className="text-[#6b5847] font-medium">Loading chat...</p>
@@ -59,7 +61,7 @@ export default function GroupChatPage({ params }: PageProps) {
 
   if (error) {
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-[#f6ede8] via-[#ede4db] to-[#e0d8cf]">
+      <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-[#f6ede8] via-[#ede4db] to-[#e0d8cf]">
         <div className="text-center">
           <p className="text-red-600 font-medium">{error}</p>
           <p className="text-[#6b5847] text-sm mt-2">Please try again</p>
@@ -68,7 +70,7 @@ export default function GroupChatPage({ params }: PageProps) {
     );
   }
 
-  return <GroupChat groupId={resolvedParams.id} groupDetails={groupDetails} />;
+  return <GroupChat key={resolvedParams.id} groupId={resolvedParams.id} groupDetails={groupDetails} />;
 }
 
 

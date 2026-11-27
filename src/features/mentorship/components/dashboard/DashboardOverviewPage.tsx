@@ -14,12 +14,9 @@ import {
   RotateCcw,
   Calendar,
   Clock,
-
   Video,
   Loader2,
   ChevronRight,
-
-
   Wallet,
   Briefcase,
   Share2,
@@ -27,7 +24,6 @@ import {
 } from "lucide-react"
 import {
   getJoinState,
-  getJoinWindow,
   getSessionTiming,
   useNow,
 } from "@/features/mentorship/utils/sessionJoin"
@@ -36,9 +32,6 @@ import ProfileService from "@/lib/api/profile.service"
 import SessionService from "@/lib/api/session.service"
 import { useSocket } from "@/core/realtime/useSocket"
 
-
-
-
 const COLORS = {
   ink: "#4a3728",
   accent: "#7a5c3e",
@@ -46,11 +39,13 @@ const COLORS = {
   wash: "#f6ede8",
   softWash: "#fbf7f3",
   chip: "#f3ece4",
-  paper: "#fffdfb",
-  gold: "#c9a87c",
   muted: "#8a7a6a",
   faint: "#a08070",
 }
+
+// Shared focus style so every interactive element has a visible keyboard focus
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7a5c3e]/50 focus-visible:ring-offset-1"
 
 type Session = {
   _id?: string
@@ -143,7 +138,7 @@ function formatINR(n: number) {
   }).format(n)
 }
 
-// Photo value URL hai ya photo ID? (ID ko baad me ProfileService se URL me convert karte hain)
+// Is the photo value a URL or a photo ID? (IDs are resolved to URLs later via ProfileService)
 function isUrlLike(value: unknown): value is string {
   return (
     typeof value === "string" &&
@@ -155,7 +150,7 @@ function isUrlLike(value: unknown): value is string {
 function MenteeAvatar({
   photo,
   name,
-  className = "w-9 h-9",
+  className = "w-10 h-10",
 }: {
   photo?: string | null
   name: string
@@ -165,7 +160,7 @@ function MenteeAvatar({
   const initials = initialsFrom(name)
   const isValidUrl = isUrlLike(photo)
 
-  // photo badalne par error reset ho (ID resolve hone ke baad URL aata hai)
+  // Reset the error when the photo changes (an ID resolves to a URL later)
   useEffect(() => {
     setImgError(false)
   }, [photo])
@@ -186,9 +181,127 @@ function MenteeAvatar({
   return (
     <div
       className={`${className} rounded-full flex items-center justify-center shrink-0 text-xs font-bold text-white`}
-      style={{ backgroundColor: COLORS.ink, border: `1px solid ${COLORS.hairline}` }}
+      style={{ backgroundColor: COLORS.ink }}
+      aria-hidden="true"
     >
       {initials}
+    </div>
+  )
+}
+
+// -- Small presentational pieces --
+
+function StatCard({
+  label,
+  value,
+  unit,
+  caption,
+  icon: Icon,
+  selected,
+  onClick,
+}: {
+  label: string
+  value: string
+  unit?: string
+  caption?: string
+  icon: React.ElementType
+  selected?: boolean
+  onClick?: () => void
+}) {
+  const content = (
+    <>
+      <div className="flex items-center gap-2 min-w-0" style={{ color: COLORS.muted }}>
+        <Icon className="w-4 h-4 shrink-0" style={{ color: COLORS.accent }} />
+        <span className="text-xs font-medium truncate">{label}</span>
+      </div>
+      <div className="mt-3 text-2xl font-bold leading-none flex items-baseline gap-1" style={{ color: COLORS.ink }}>
+        <span className="truncate">{value}</span>
+        {unit && (
+          <span className="text-sm font-semibold" style={{ color: COLORS.muted }}>
+            {unit}
+          </span>
+        )}
+      </div>
+      <div className="mt-1.5 text-xs h-4 truncate" style={{ color: COLORS.muted }}>
+        {caption || "\u00A0"}
+      </div>
+    </>
+  )
+
+  const baseClass = "bg-white rounded-xl p-4 text-left w-full min-w-0 border"
+  const style = { borderColor: selected ? COLORS.ink : COLORS.hairline }
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={selected}
+        className={`${baseClass} transition-colors hover:border-[#c9baa9] ${FOCUS_RING}`}
+        style={style}
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <div className={baseClass} style={style}>
+      {content}
+    </div>
+  )
+}
+
+// Time badge for a session row. Color carries meaning: green = today, amber = tomorrow, neutral = later
+function TimeBadge({ info }: { info: ReturnType<typeof formatSessionDate> }) {
+  if (info.category === "today") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 whitespace-nowrap">
+        <Clock className="w-3.5 h-3.5" />
+        Today · {info.time}
+      </span>
+    )
+  }
+  if (info.category === "tomorrow") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200 whitespace-nowrap">
+        <Clock className="w-3.5 h-3.5" />
+        Tomorrow · {info.time}
+      </span>
+    )
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"
+      style={{ backgroundColor: COLORS.chip, color: COLORS.accent, border: `1px solid ${COLORS.hairline}` }}
+    >
+      <Calendar className="w-3.5 h-3.5" />
+      {info.label}
+    </span>
+  )
+}
+
+function EmptyPanel({
+  icon: Icon,
+  title,
+  text,
+  action,
+}: {
+  icon: React.ElementType
+  title: string
+  text?: string
+  action?: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center text-center gap-3 py-10 px-4">
+      <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.chip }}>
+        <Icon className="w-5 h-5" style={{ color: COLORS.accent }} />
+      </div>
+      <div>
+        <p className="text-sm font-semibold" style={{ color: COLORS.ink }}>{title}</p>
+        {text && <p className="text-xs mt-1" style={{ color: COLORS.muted }}>{text}</p>}
+      </div>
+      {action}
     </div>
   )
 }
@@ -204,23 +317,22 @@ export default function DashboardOverviewPage({
 }: DashboardOverviewPageProps) {
   const router = useRouter()
 
-  // Saare hooks early return se pehle (Rules of Hooks)
+  // All hooks stay above the early returns (Rules of Hooks)
   // Panel-level tab: "upcoming" shows future sessions, "missedNotHeld" shows stale past ones
   const [sessionsPanelTab, setSessionsPanelTab] = useState<"upcoming" | "missedNotHeld">("upcoming")
-  // Day-filter within Upcoming tab
+  // Day filter within the Upcoming tab
   const [filterTab, setFilterTab] = useState<"all" | "today" | "tomorrow" | "later">("today")
 
-  // Start / Rejoin click ke dauran loading + error
+  // Loading + error state while Start / Rejoin is clicked
   const [joiningKey, setJoiningKey] = useState<string | null>(null)
   const [joinError, setJoinError] = useState<string | null>(null)
 
-
-    // photoId -> resolved cloudinary URL
-    const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
-  // Jin photo IDs ki request ja chuki hai (dobara fetch na ho)
+  // photoId -> resolved cloudinary URL
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
+  // Photo IDs that were already requested (so we never fetch them twice)
   const requestedPhotoIds = useRef<Set<string>>(new Set())
 
-  // Clock skew correction + auto-ticking timer (har 15s)
+  // Clock skew correction + auto-ticking timer (every 15s)
   const serverNowIso = dashboardData?.serverNow
   const serverOffsetMs = useMemo(() => {
     if (!serverNowIso) return 0
@@ -234,7 +346,7 @@ export default function DashboardOverviewPage({
 
   // ── Flatten sessions first, then deduplicate by bookingId (fallback to _id) ──
   // Container sessions (SessionMentor) embed bookings. Flatten every item from
-  // upcomingSessions, missedNotHeldSessions, and sessions prop so each booking is
+  // upcomingSessions, missedNotHeldSessions, and the sessions prop so each booking is
   // evaluated individually via getSessionTiming(session, booking, now).
   const sourceSessionList: any[] = [
     ...(Array.isArray(dashboardData?.upcomingSessions) ? dashboardData.upcomingSessions : []),
@@ -281,7 +393,7 @@ export default function DashboardOverviewPage({
           s.menteeName ||
           "Student"
 
-        // Photo URL ya photo ID (ID ho to neeche effect se URL me resolve hoga)
+        // Photo URL or photo ID (an ID is resolved to a URL by the effect below)
         const menteePhoto: string | null =
           b.menteeProfilePhoto ||
           b.mentee?.profilePic ||
@@ -357,8 +469,8 @@ export default function DashboardOverviewPage({
     }
   })
 
-  // ── Photo IDs jinhe URL me resolve karna hai (URL wale skip) ──
-  // String key use kar rahe hain taaki har 15s ke re-render par effect dobara na chale.
+  // ── Photo IDs that need to be resolved to URLs (URL values are skipped) ──
+  // A string key is used so the effect does not re-run on every 15s re-render.
   const pendingPhotoIdsKey = Array.from(
     new Set(
       flattenedBookings
@@ -386,7 +498,7 @@ export default function DashboardOverviewPage({
         ProfileService.getProfilePhotoById(id)
           .then((res: any) => ({ id, url: res?.data?.photo?.cloudinarySecureUrl as string | undefined }))
           .catch(() => {
-            // fail hua to dobara try ho sake
+            // If it fails, allow a retry later
             requestedPhotoIds.current.delete(id)
             return { id, url: undefined }
           })
@@ -407,7 +519,7 @@ export default function DashboardOverviewPage({
     }
   }, [pendingPhotoIdsKey])
 
-  // URL ho to wahi, ID ho to resolved URL (jab tak nahi aata, initials dikhte hain)
+  // A URL is used as-is, an ID uses the resolved URL (initials show until it arrives)
   const resolvePhoto = (photo?: string | null): string | null => {
     if (!photo) return null
     if (isUrlLike(photo)) return photo
@@ -416,17 +528,14 @@ export default function DashboardOverviewPage({
 
   // Upcoming: not terminal, not completed, not stale, end time in the future (or live)
   const upcoming: Session[] = flattenedBookings
-
-  .filter(
-    ({ timing, session }) =>
-      timing.isUpcoming &&
-      !timing.isStale &&
-      session.status !== "available" &&
-      // session ka end time nikalte hi Overview se hata do
-      (isNaN(timing.endMs) || now <= timing.endMs)
-  )
-  
-  
+    .filter(
+      ({ timing, session }) =>
+        timing.isUpcoming &&
+        !timing.isStale &&
+        session.status !== "available" &&
+        // Remove the session from Overview as soon as its end time passes
+        (isNaN(timing.endMs) || now <= timing.endMs)
+    )
     .map(({ session }) => session)
     .sort(
       (a, b) =>
@@ -442,14 +551,12 @@ export default function DashboardOverviewPage({
     .filter(
       ({ timing, session }) =>
         !timing.isTerminal &&
-      !timing.isCompleted &&
-      session.status !== "available" &&
-      timing.staleLabel !== "Expired" &&
-      (timing.isStale ||
-        // in_progress tha, end time nikal gaya par End nahi hua
-        (timing.isInProgress && !isNaN(timing.endMs) && now > timing.endMs))
-
-
+        !timing.isCompleted &&
+        session.status !== "available" &&
+        timing.staleLabel !== "Expired" &&
+        (timing.isStale ||
+          // Was in_progress, the end time passed but End was never pressed
+          (timing.isInProgress && !isNaN(timing.endMs) && now > timing.endMs))
     )
     .map(({ session }) => session)
     .sort(
@@ -458,11 +565,7 @@ export default function DashboardOverviewPage({
         new Date(a.startTime || a.scheduledAt || 0).getTime()
     )
 
-  const completed: Session[] = flattenedBookings
-    .filter(({ timing }) => timing.isCompleted)
-    .map(({ session }) => session)
-
-  // Auto-switch panel tab: if no upcoming but missed/not held exist, show those
+  // Auto-switch panel tab: if there is no upcoming but missed/not held exist, show those
   // Placed at top level before ANY conditional return (Rules of Hooks)
   const prevUpcomingLen = useRef(upcoming.length)
   const prevMissedLen = useRef(missedNotHeld.length)
@@ -475,46 +578,92 @@ export default function DashboardOverviewPage({
     }
   }, [upcoming.length, missedNotHeld.length])
 
-   // Mentor End kare ya room se wapas aaye: dashboard dobara fetch (in_progress -> completed)
-   const { sessionEnded } = useSocket()
-   useEffect(() => {
-     if (sessionEnded) onRetryDashboard?.()
-     // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [sessionEnded])
- 
-   useEffect(() => {
-     if (!onRetryDashboard) return
-     const refresh = () => {
-       if (document.visibilityState === "visible") onRetryDashboard()
-     }
-     window.addEventListener("focus", refresh)
-     document.addEventListener("visibilitychange", refresh)
-     return () => {
-       window.removeEventListener("focus", refresh)
-       document.removeEventListener("visibilitychange", refresh)
-     }
-   }, [onRetryDashboard])
- 
-   // Loading skeleton
-   if (dashboardLoading && !dashboardData) {
+  // When the mentor ends a session or comes back from the room: refetch the dashboard (in_progress -> completed)
+  const { sessionEnded } = useSocket()
+  useEffect(() => {
+    if (sessionEnded) onRetryDashboard?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionEnded])
 
+  useEffect(() => {
+    if (!onRetryDashboard) return
+    const refresh = () => {
+      if (document.visibilityState === "visible") onRetryDashboard()
+    }
+    window.addEventListener("focus", refresh)
+    document.addEventListener("visibilitychange", refresh)
+    return () => {
+      window.removeEventListener("focus", refresh)
+      document.removeEventListener("visibilitychange", refresh)
+    }
+  }, [onRetryDashboard])
 
+  // Start / Rejoin a session
+  const startOrRejoin = async (
+    s: Session,
+    isLive: boolean,
+    rowKey: string,
+    sessionId?: string
+  ) => {
+    if (!sessionId || joiningKey === rowKey) return
+    setJoinError(null)
+    setJoiningKey(rowKey)
+    try {
+      if (s.isGroupSession) {
+        let meetUrl = s.meetingUrl
+        if (!isLive) {
+          const res: any = await SessionService.startGroupSession(String(sessionId))
+          meetUrl = res?.data?.meeting?.meetingUrl || res?.data?.meetingUrl || meetUrl
+          onRetryDashboard?.()
+        }
+        if (meetUrl) window.open(meetUrl, "_blank", "noopener,noreferrer")
+        else setJoinError("Session started, but no meeting link found.")
+        return
+      }
+
+      // 1:1: first time -> start on the backend, then open the mentor-session room
+      // (End Session and Rejoin both live there)
+      let roomId = s.bookingId
+      if (!isLive) {
+        const res: any = await SessionService.startSession(String(sessionId), s.bookingId)
+        roomId = res?.data?.roomId || s.bookingId
+        onRetryDashboard?.()
+      }
+      const qs = new URLSearchParams({
+        sessionId: String(sessionId),
+        roomId: String(roomId || ""),
+        bookingId: String(s.bookingId || ""),
+        role: "mentor",
+      })
+      router.push(`/mentorship/mentor-session?${qs.toString()}`)
+    } catch (err: any) {
+      setJoinError(err?.message || "Could not start the session. Please try again.")
+    } finally {
+      setJoiningKey(null)
+    }
+  }
+
+  const openMentee = (menteeId?: string) => {
+    if (menteeId) router.push(`/mentorship/menteeProfile/${menteeId}`)
+  }
+
+  // Loading skeleton
+  if (dashboardLoading && !dashboardData) {
     return (
-      <div className="space-y-6 w-full max-w-7xl mx-auto animate-pulse">
+      <div className="space-y-6 w-full max-w-7xl mx-auto motion-safe:animate-pulse">
         <div className="space-y-2">
           <div className="h-7 w-48 bg-[#e0d8cf] rounded-md" />
           <div className="h-4 w-64 bg-[#e0d8cf]/60 rounded-md" />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="bg-white p-4 rounded-2xl border border-[#e0d8cf] space-y-3">
-              <div className="w-8 h-8 rounded-lg bg-[#f3ece4]" />
-              <div className="h-6 w-16 bg-[#e0d8cf] rounded" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="bg-white p-4 rounded-xl border border-[#e0d8cf] space-y-3">
               <div className="h-3 w-20 bg-[#e0d8cf]/60 rounded" />
+              <div className="h-6 w-16 bg-[#e0d8cf] rounded" />
             </div>
           ))}
         </div>
-        <div className="bg-white p-6 rounded-2xl border border-[#e0d8cf] space-y-4">
+        <div className="bg-white p-5 rounded-xl border border-[#e0d8cf] space-y-4">
           <div className="h-5 w-36 bg-[#e0d8cf] rounded" />
           {[1, 2].map((i) => (
             <div key={i} className="h-16 w-full bg-[#fbf7f3] rounded-xl border border-[#e0d8cf]" />
@@ -527,21 +676,21 @@ export default function DashboardOverviewPage({
   // Error state
   if (dashboardError && !dashboardData) {
     return (
-      <div className="max-w-4xl p-6 rounded-2xl bg-red-50 border border-red-200 text-red-800 space-y-4">
-        <div className="flex items-center gap-3">
-          <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
-          <div>
-            <h3 className="font-bold text-base">Unable to load mentor dashboard data</h3>
-            <p className="text-sm text-red-600 mt-0.5">{dashboardError}</p>
+      <div className="w-full max-w-2xl p-5 rounded-xl bg-red-50 border border-red-200 text-red-800 space-y-4">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <h3 className="font-bold text-base">Unable to load your mentor dashboard</h3>
+            <p className="text-sm text-red-600 mt-0.5 break-words">{dashboardError}</p>
           </div>
         </div>
         {onRetryDashboard && (
           <button
             onClick={onRetryDashboard}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors flex items-center gap-2"
+            className={`px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors flex items-center gap-2 ${FOCUS_RING}`}
           >
             <RotateCcw className="w-4 h-4" />
-            Try Again
+            Try again
           </button>
         )}
       </div>
@@ -556,7 +705,7 @@ export default function DashboardOverviewPage({
   )
   const reviewCount: number | undefined =
     dashboardData?.totalReviews ?? mentorData?.stats?.totalReviews ?? undefined
-  // Reviews zero hain to rating dikhana fake lagta hai
+  // With zero reviews a rating would look fake
   const hasReviews = reviewCount != null ? reviewCount > 0 : rating > 0
 
   // trustScore: backend now returns .overall correctly; also guard against old .score
@@ -568,8 +717,11 @@ export default function DashboardOverviewPage({
   const isVerified =
     dashboardData?.isVerified ?? Boolean(mentorData?.verification?.isVerified || mentorData?.isVerified)
 
-  // Earnings this month: comes from backend (real sum of paid/completed bookings in IST month)
-  // Shows Rs 0 when real sum is 0, never "--" when mentor profile or dashboard is loaded.
+  const isPendingApproval =
+    mentorData?.status === "pending_approval" || dashboardData?.status === "pending_approval"
+
+  // Earnings this month come from the backend (real sum of paid/completed bookings in the IST month)
+  // Shows Rs 0 when the real sum is 0, never "--" once the mentor profile or dashboard is loaded.
   const earningsRaw =
     dashboardData?.stats?.thisMonthEarnings ??
     dashboardData?.stats?.monthlyEarnings ??
@@ -578,7 +730,7 @@ export default function DashboardOverviewPage({
     0
   const earningsValue = formatINR(Number(earningsRaw) || 0)
 
-  // Day-filter tabs (only relevant for Upcoming panel)
+  // Day-filter tabs (only relevant for the Upcoming panel)
   const todaySessions = upcoming.filter((s) => getDayCategory(s.startTime || s.scheduledAt) === "today")
   const tomorrowSessions = upcoming.filter((s) => getDayCategory(s.startTime || s.scheduledAt) === "tomorrow")
   const laterSessions = upcoming.filter((s) => getDayCategory(s.startTime || s.scheduledAt) === "later")
@@ -589,50 +741,64 @@ export default function DashboardOverviewPage({
         filterTab === "later" ? laterSessions :
           upcoming
 
-  // Read stats directly from backend dashboardData.stats (computed across all containers)
+  // Stats come straight from backend dashboardData.stats (computed across all containers)
   const totalSessions = dashboardData?.stats?.totalSessions ?? 0
   const upcomingCount = upcoming.length
   const missedNotHeldCount = missedNotHeld.length
 
   const stats: {
+    key: string
     label: string
     value: string
     unit?: string
+    caption?: string
     icon: React.ElementType
-    page?: string
-    highlight?: boolean
+    selected?: boolean
     onClick?: () => void
   }[] = [
-      { label: "Total sessions", value: String(totalSessions), icon: ClipboardList },
-      {
-        label: "Upcoming",
-        value: String(upcomingCount),
-        icon: CalendarClock,
-        highlight: upcomingCount > 0,
-        onClick: () => setSessionsPanelTab("upcoming"),
-      },
-      {
-        label: "Missed / Not held",
-        value: String(missedNotHeldCount),
-        icon: AlertCircle,
-        onClick: () => setSessionsPanelTab("missedNotHeld"),
-      },
-      { label: "Earnings this month", value: earningsValue, icon: Wallet, page: "payment" },
-      {
-        label: hasReviews && reviewCount ? `Rating · ${reviewCount} review${reviewCount > 1 ? "s" : ""}` : "No reviews yet",
-        value: hasReviews ? rating.toFixed(1) : "--",
-        unit: hasReviews ? "/5" : undefined,
-        icon: Star,
-        page: "review",
-      },
-      {
-        label: trustScore != null ? "Trust score" : "Trust score (building)",
-        value: trustScore != null ? String(trustScore) : "-",
-        unit: trustScore != null ? "/100" : undefined,
-        icon: Award,
-        page: "trust",
-      },
-    ]
+    { key: "total", label: "Total sessions", value: String(totalSessions), icon: ClipboardList },
+    {
+      key: "upcoming",
+      label: "Upcoming",
+      value: String(upcomingCount),
+      icon: CalendarClock,
+      selected: sessionsPanelTab === "upcoming",
+      onClick: () => setSessionsPanelTab("upcoming"),
+    },
+    {
+      key: "missed",
+      label: "Missed / not held",
+      value: String(missedNotHeldCount),
+      icon: AlertCircle,
+      selected: sessionsPanelTab === "missedNotHeld",
+      onClick: () => setSessionsPanelTab("missedNotHeld"),
+    },
+    {
+      key: "earnings",
+      label: "Earnings this month",
+      value: earningsValue,
+      icon: Wallet,
+      onClick: () => setActivePage?.("payment"),
+    },
+    {
+      key: "rating",
+      label: "Rating",
+      value: hasReviews ? rating.toFixed(1) : "--",
+      unit: hasReviews ? "/5" : undefined,
+      caption: hasReviews && reviewCount ? `${reviewCount} review${reviewCount > 1 ? "s" : ""}` : "No reviews yet",
+      icon: Star,
+      onClick: () => setActivePage?.("review"),
+    },
+    {
+      key: "trust",
+      label: "Trust score",
+      value: trustScore != null ? String(trustScore) : "-",
+      unit: trustScore != null ? "/100" : undefined,
+      caption: trustScore != null ? undefined : "Building",
+      icon: Award,
+      onClick: () => setActivePage?.("trust"),
+    },
+  ]
 
   const setupSteps = [
     { label: "Set your availability", desc: "Students can only book open slots", page: "availability", icon: Clock3, done: false },
@@ -649,184 +815,118 @@ export default function DashboardOverviewPage({
 
   const showSetup = Number(totalSessions) === 0
 
+  const dayTabs = [
+    { key: "all", label: "All", count: upcoming.length },
+    { key: "today", label: "Today", count: todaySessions.length },
+    { key: "tomorrow", label: "Tomorrow", count: tomorrowSessions.length },
+    { key: "later", label: "Later", count: laterSessions.length },
+  ] as const
+
+  const panelTabs = [
+    { key: "upcoming", label: "Upcoming", count: upcomingCount, icon: CalendarClock },
+    { key: "missedNotHeld", label: "Missed / not held", count: missedNotHeldCount, icon: AlertCircle },
+  ] as const
+
   return (
-    <div className="space-y-6 animate-fadeIn w-full max-w-7xl mx-auto">
+    <div className="w-full max-w-7xl mx-auto space-y-6">
       {/* Greeting */}
       <div>
-        <h2 className="text-2xl font-bold" style={{ color: COLORS.ink }}>
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: COLORS.ink }}>
           Welcome back, {firstName}
         </h2>
-        <p style={{ color: COLORS.muted }} className="text-sm mt-1">
-          Here's where things stand today
+        <p className="text-sm mt-1" style={{ color: COLORS.muted }}>
+          Here’s where things stand today
         </p>
       </div>
 
-      {/* Stat cards: sab ek jaisi size aur baseline */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {stats.map((stat, idx) => {
-          const clickable = Boolean(stat.page || stat.onClick)
-          const handleClick = () => {
-            if (stat.onClick) stat.onClick()
-            else if (stat.page) setActivePage?.(stat.page)
-          }
-          return (
-            <div
-              key={idx}
-              role={clickable ? "button" : undefined}
-              tabIndex={clickable ? 0 : undefined}
-              onClick={clickable ? handleClick : undefined}
-              onKeyDown={
-                clickable
-                  ? (e) => (e.key === "Enter" || e.key === " ") && handleClick()
-                  : undefined
-              }
-              className={`bg-white p-4 rounded-2xl transition-colors hover:border-[#c9baa9] ${clickable ? "cursor-pointer" : ""
-                }`}
-              style={{
-                border: `1px solid ${stat.highlight ? COLORS.gold : COLORS.hairline}`,
-                boxShadow: stat.highlight ? "0 2px 10px rgba(201,168,124,0.22)" : undefined,
-              }}
-            >
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center mb-3"
-                style={{ backgroundColor: stat.highlight ? "#f4e6d0" : COLORS.chip }}
-              >
-                <stat.icon className="w-4 h-4" style={{ color: COLORS.accent }} />
-              </div>
-              <div className="text-2xl font-bold flex items-baseline gap-1" style={{ color: COLORS.ink }}>
-                {stat.value}
-                {stat.unit && (
-                  <span className="text-sm font-semibold" style={{ color: COLORS.muted }}>
-                    {stat.unit}
-                  </span>
-                )}
-              </div>
-              <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
-                {stat.label}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Verification nudge: sirf jab verified nahi */}
+      {/* Verification nudge: only shown when not verified */}
       {!isVerified && (
         <div
-          className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl"
-          style={{ backgroundColor: COLORS.wash, border: `1px solid ${COLORS.hairline}` }}
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border"
+          style={{ backgroundColor: COLORS.wash, borderColor: COLORS.hairline }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
             <div
               className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
               style={{ backgroundColor: COLORS.ink }}
             >
-              {mentorData?.status === "pending_approval" || dashboardData?.status === "pending_approval" ? (
+              {isPendingApproval ? (
                 <Clock className="w-4 h-4 text-white" />
               ) : (
                 <ShieldCheck className="w-4 h-4 text-white" />
               )}
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-semibold" style={{ color: COLORS.ink }}>
-                {mentorData?.status === "pending_approval" || dashboardData?.status === "pending_approval"
-                  ? "Verification under review"
-                  : "Complete verification to unlock your badge"}
+                {isPendingApproval ? "Verification under review" : "Complete verification to unlock your badge"}
               </p>
               <p className="text-xs mt-0.5" style={{ color: COLORS.muted }}>
-                {mentorData?.status === "pending_approval" || dashboardData?.status === "pending_approval"
-                  ? "Your application is currently under review by the Throne8 team (5 to 7 business days)"
+                {isPendingApproval
+                  ? "The Throne8 team is reviewing your application (5 to 7 business days)"
                   : "Verified mentors get more booking requests"}
               </p>
             </div>
           </div>
           <button
             onClick={() => setActivePage?.("profile", "verification")}
-            className="shrink-0 px-5 py-2.5 rounded-full text-xs font-bold transition-all hover:bg-[#8b7355] shadow-sm"
-            style={{ backgroundColor: COLORS.ink, color: "#fff" }}
+            className={`shrink-0 w-full sm:w-auto px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90 ${FOCUS_RING}`}
+            style={{ backgroundColor: COLORS.ink }}
           >
-            {mentorData?.status === "pending_approval" || dashboardData?.status === "pending_approval"
-              ? "Check status"
-              : "Verify now"}
+            {isPendingApproval ? "Check status" : "Verify now"}
           </button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-        {/* Sessions panel — Upcoming + Missed/Not held dual tabs */}
-        <div
-          className="lg:col-span-3 bg-white p-6 rounded-2xl"
-          style={{ border: `1px solid ${COLORS.hairline}` }}
-        >
-          {/* Panel header: tab switcher + "View all" */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setSessionsPanelTab("upcoming")}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
-                style={{
-                  backgroundColor: sessionsPanelTab === "upcoming" ? COLORS.ink : COLORS.chip,
-                  color: sessionsPanelTab === "upcoming" ? "#fff" : COLORS.accent,
-                }}
-              >
-                <CalendarClock className="w-3.5 h-3.5" />
-                Upcoming ({upcomingCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setSessionsPanelTab("missedNotHeld")}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
-                style={{
-                  backgroundColor: sessionsPanelTab === "missedNotHeld" ? COLORS.ink : COLORS.chip,
-                  color: sessionsPanelTab === "missedNotHeld" ? "#fff" : COLORS.accent,
-                }}
-              >
-                <AlertCircle className="w-3.5 h-3.5" />
-                Missed / Not held ({missedNotHeldCount})
-              </button>
-            </div>
-            <button
-              onClick={() => setActivePage?.("booking")}
-              className="text-xs font-semibold hover:underline flex items-center gap-1 self-start sm:self-auto"
-              style={{ color: COLORS.accent }}
-            >
-              <span>View all bookings</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
+      {/* Stat cards: 2 columns on mobile, 3 on tablet, 6 on large screens */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+        {stats.map((stat) => (
+          <StatCard
+            key={stat.key}
+            label={stat.label}
+            value={stat.value}
+            unit={stat.unit}
+            caption={stat.caption}
+            icon={stat.icon}
+            selected={stat.selected}
+            onClick={stat.onClick}
+          />
+        ))}
+      </div>
 
-          {/* Day-filter sub-tabs — only visible when Upcoming tab is active and has sessions */}
-          {sessionsPanelTab === "upcoming" && upcoming.length > 0 && (
-            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#f6ede8] border border-[#e0d8cf] mb-4 w-fit overflow-x-auto max-w-full">
-              {(
-                [
-                  { key: "all", label: "All", count: upcoming.length },
-                  { key: "today", label: "Today", count: todaySessions.length, hasDot: todaySessions.length > 0 },
-                  { key: "tomorrow", label: "Tomorrow", count: tomorrowSessions.length },
-                  { key: "later", label: "Later", count: laterSessions.length },
-                ] as const
-              ).map((tab) => {
-                const isActive = filterTab === tab.key
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Sessions panel: Upcoming + Missed / not held tabs */}
+        <section
+          className="lg:col-span-2 bg-white rounded-xl border min-w-0"
+          style={{ borderColor: COLORS.hairline }}
+        >
+          {/* Panel header: tabs + "View all" */}
+          <div
+            className="flex items-center justify-between gap-3 px-4 sm:px-5 border-b"
+            style={{ borderColor: COLORS.hairline }}
+          >
+            <div role="tablist" aria-label="Sessions" className="flex gap-4 sm:gap-6 overflow-x-auto">
+              {panelTabs.map((tab) => {
+                const active = sessionsPanelTab === tab.key
                 return (
                   <button
                     key={tab.key}
+                    role="tab"
                     type="button"
-                    onClick={() => setFilterTab(tab.key)}
-                    className={`px-3 py-1.5 text-xs rounded-lg transition-all shrink-0 flex items-center gap-1.5 ${isActive
-                      ? "bg-[#7a5c3e] text-white shadow-sm font-bold"
-                      : "text-[#8a7a6a] hover:text-[#4a3728]"
-                      }`}
+                    aria-selected={active}
+                    onClick={() => setSessionsPanelTab(tab.key)}
+                    className={`flex items-center gap-2 py-3.5 -mb-px border-b-2 text-sm font-semibold whitespace-nowrap transition-colors ${FOCUS_RING}`}
+                    style={{
+                      borderColor: active ? COLORS.ink : "transparent",
+                      color: active ? COLORS.ink : COLORS.muted,
+                    }}
                   >
-                    {"hasDot" in tab && tab.hasDot && (
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-300" : "bg-emerald-500"
-                          } animate-pulse`}
-                      />
-                    )}
-                    <span>{tab.label}</span>
+                    {tab.label}
                     <span
-                      className={`px-1.5 rounded-full text-[10px] font-bold ${isActive ? "bg-white/20 text-white" : "bg-[#e0d8cf] text-[#4a3728]"
-                        }`}
+                      className="px-1.5 min-w-[20px] text-center rounded-full text-[11px] font-bold"
+                      style={{
+                        backgroundColor: active ? COLORS.ink : COLORS.chip,
+                        color: active ? "#fff" : COLORS.accent,
+                      }}
                     >
                       {tab.count}
                     </span>
@@ -834,317 +934,246 @@ export default function DashboardOverviewPage({
                 )
               })}
             </div>
-          )}
+            <button
+              onClick={() => setActivePage?.("booking")}
+              className={`text-xs font-semibold hover:underline flex items-center gap-0.5 shrink-0 rounded ${FOCUS_RING}`}
+              style={{ color: COLORS.accent }}
+            >
+              <span className="hidden sm:inline">View all bookings</span>
+              <span className="sm:hidden">View all</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-
-{joinError && (
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              <span>{joinError}</span>
-              <button type="button" onClick={() => setJoinError(null)} className="font-semibold hover:underline">
-                Dismiss
-              </button>
-            </div>
-          )}
-
-          {/* ─── UPCOMING panel content ─────────────────────────────── */}
-
-          
-
-          {sessionsPanelTab === "upcoming" && (
-            upcoming.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: COLORS.chip }}
-                >
-                  <CalendarClock className="w-6 h-6" style={{ color: COLORS.accent }} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: COLORS.ink }}>
-                    No upcoming sessions booked yet.
-                  </p>
-                  <p className="text-xs mt-1" style={{ color: COLORS.muted }}>
-                    Open your slots so students can book you.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setActivePage?.("availability")}
-                  className="px-5 py-2.5 rounded-full text-xs font-bold transition-all hover:bg-[#8b7355] shadow-sm"
-                  style={{ backgroundColor: COLORS.ink, color: "#fff" }}
-                >
-                  Set availability
-                </button>
-              </div>
-            ) : displayedSessions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-                <p className="text-sm font-medium" style={{ color: COLORS.muted }}>
-                  No sessions scheduled for{" "}
-                  {filterTab === "today" ? "today" : filterTab === "tomorrow" ? "tomorrow" : "later dates"}.
-                </p>
-                <button
-                  onClick={() => setFilterTab("all")}
-                  className="text-xs font-semibold hover:underline"
-                  style={{ color: COLORS.accent }}
-                >
-                  Show all upcoming sessions ({upcoming.length})
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {displayedSessions.map((s, idx) => {
-                  const name = s.menteeName || s.bookedMenteeName || "Student"
-                  const menteeId = s.menteeId
-                  const isClickable = Boolean(menteeId)
-                  const sessionDateInfo = formatSessionDate(s.startTime || s.scheduledAt)
-                  const isToday = sessionDateInfo.category === "today"
-                  const isTomorrow = sessionDateInfo.category === "tomorrow"
-                  const sessionId = s.sessionId || s._id
-                  const joinInfo = getJoinState(s, now, 0)
-
-                  const handleMenteeClick = (e: React.MouseEvent | React.KeyboardEvent) => {
-                    if (!menteeId) return
-                    e.stopPropagation()
-                    if ("key" in e && e.key !== "Enter" && e.key !== " ") return
-                    if ("key" in e) e.preventDefault()
-                    router.push(`/mentorship/menteeProfile/${menteeId}`)
-                  }
-
-                                    // Session pehle se in_progress hai to "Rejoin", startSession dobara nahi
-                                    const sessionTiming = (s as any).timing as ReturnType<typeof getSessionTiming> | undefined
-                                    const isLive = Boolean(sessionTiming?.isInProgress)
-                                    const rowKey = String(s.bookingId ?? s._id ?? sessionId ?? idx)
-                                    const isJoining = joiningKey === rowKey
-                  
-                                    const handleJoinSession = async (e: React.MouseEvent) => {
-                                      e.stopPropagation()
-                                      if (!sessionId || isJoining) return
-                                      setJoinError(null)
-                                      setJoiningKey(rowKey)
-                                      try {
-                                        if (s.isGroupSession) {
-                                          let meetUrl = s.meetingUrl
-                                          if (!isLive) {
-                                            const res: any = await SessionService.startGroupSession(String(sessionId))
-                                            meetUrl = res?.data?.meeting?.meetingUrl || res?.data?.meetingUrl || meetUrl
-                                            onRetryDashboard?.()
-                                          }
-                                          if (meetUrl) window.open(meetUrl, "_blank", "noopener,noreferrer")
-                                          else setJoinError("Session started, but no meeting link found.")
-                                          return
-                                        }
-                  
-                                        // 1:1: pehli baar -> backend par start, phir mentor-session room
-                                        // (wahin End Session aur Rejoin dono hain)
-                                        let roomId = s.bookingId
-                                        if (!isLive) {
-                                          const res: any = await SessionService.startSession(String(sessionId), s.bookingId)
-                                          roomId = res?.data?.roomId || s.bookingId
-                                          onRetryDashboard?.()
-                                        }
-                                        const qs = new URLSearchParams({
-                                          sessionId: String(sessionId),
-                                          roomId: String(roomId || ""),
-                                          bookingId: String(s.bookingId || ""),
-                                          role: "mentor",
-                                        })
-                                        router.push(`/mentorship/mentor-session?${qs.toString()}`)
-                                      } catch (err: any) {
-                                        setJoinError(err?.message || "Could not start the session. Please try again.")
-                                      } finally {
-                                        setJoiningKey(null)
-                                      }
-                                    }
-
-
+          <div className="p-4 sm:p-5">
+            {/* Day filter: only when the Upcoming tab is active and has sessions */}
+            {sessionsPanelTab === "upcoming" && upcoming.length > 0 && (
+              <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
+                {dayTabs.map((tab) => {
+                  const isActive = filterTab === tab.key
                   return (
-                    <div
-                      key={s.bookingId ?? s._id ?? idx}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl transition-all hover:border-[#c9baa9] hover:shadow-xs"
-                      style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
+                    <button
+                      key={tab.key}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => setFilterTab(tab.key)}
+                      className={`px-3.5 py-1.5 text-xs font-semibold rounded-full border shrink-0 flex items-center gap-1.5 transition-colors ${FOCUS_RING}`}
+                      style={{
+                        backgroundColor: isActive ? COLORS.ink : "#fff",
+                        color: isActive ? "#fff" : COLORS.accent,
+                        borderColor: isActive ? COLORS.ink : COLORS.hairline,
+                      }}
                     >
-                      <div
-                        {...(isClickable
-                          ? {
-                            role: "link",
-                            tabIndex: 0,
-                            onClick: handleMenteeClick,
-                            onKeyDown: handleMenteeClick,
-                          }
-                          : {})}
-                        className={`flex items-center gap-3 min-w-0 ${isClickable ? "cursor-pointer group" : ""}`}
-                      >
-                        <MenteeAvatar photo={resolvePhoto(s.menteeProfilePhoto)} name={name} />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p
-                              className={`text-sm font-semibold truncate ${isClickable ? "group-hover:underline" : ""}`}
-                              style={{ color: COLORS.ink }}
-                            >
-                              {name}
-                            </p>
-                            {s.isGroupSession && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
-                                Group Session
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs mt-0.5 truncate" style={{ color: COLORS.muted }}>
-                            {s.title || s.sessionType || "1-on-1 Mentorship"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                        {isToday ? (
-                          <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                            <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                            Today · {sessionDateInfo.time}
-                          </span>
-                        ) : isTomorrow ? (
-                          <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
-                            <Clock className="w-3.5 h-3.5 text-amber-700" />
-                            Tomorrow · {sessionDateInfo.time}
-                          </span>
-                        ) : (
-                          <span
-                            className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
-                            style={{
-                              backgroundColor: COLORS.chip,
-                              color: COLORS.accent,
-                              border: `1px solid ${COLORS.hairline}`,
-                            }}
-                          >
-                            <Calendar className="w-3.5 h-3.5" />
-                            {sessionDateInfo.label}
-                          </span>
-                        )}
-
-{sessionId && (isLive || joinInfo.state !== "hidden") && (
-                          <div className="flex flex-col items-end">
-                            {isLive ? (
-                              <button
-                                type="button"
-                                onClick={handleJoinSession}
-                                disabled={isJoining}
-                                title="Session is live, click to rejoin"
-                                className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white transition-colors shadow-xs cursor-pointer disabled:opacity-60"
-                              >
-                                {isJoining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Video className="w-3.5 h-3.5" />}
-                                <span>Rejoin</span>
-                              </button>
-                            ) : joinInfo.state === "active" ? (
-                              <button
-                                type="button"
-                                onClick={handleJoinSession}
-                                disabled={isJoining}
-                                title="Session is active, click to start"
-                                className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition-colors shadow-xs cursor-pointer disabled:opacity-60"
-                              >
-                                {isJoining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Video className="w-3.5 h-3.5" />}
-                                <span>Start</span>
-                              </button>
-                            ) : joinInfo.state === "ended" ? (
-
-
-
-                              <button
-                                type="button"
-                                disabled
-                                title="Session has ended"
-                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#ece4dc] text-[#a08070] cursor-not-allowed border border-[#e0d8cf]"
-                              >
-                                <span>Ended</span>
-                              </button>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  disabled
-                                  title="Available 5 minutes before scheduled start"
-                                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-[#e8e0d5] text-[#8a7a6a] cursor-not-allowed border border-[#e0d8cf]"
-                                >
-                                  <Video className="w-3.5 h-3.5 opacity-60" />
-                                  <span>Start</span>
-                                </button>
-                                <span className="text-[10px] text-[#8a7a6a] mt-0.5 whitespace-nowrap font-medium">
-                                  {joinInfo.subtext}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                      {tab.label}
+                      <span className="opacity-70">{tab.count}</span>
+                    </button>
                   )
                 })}
               </div>
-            )
-          )}
+            )}
 
-          {/* ─── MISSED / NOT HELD panel content ───────────────────── */}
-          {sessionsPanelTab === "missedNotHeld" && (
-            missedNotHeld.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: COLORS.chip }}
-                >
-                  <AlertCircle className="w-6 h-6" style={{ color: COLORS.accent }} />
-                </div>
-                <p className="text-sm font-medium" style={{ color: COLORS.muted }}>
-                  No missed or not-held sessions.
-                </p>
+            {joinError && (
+              <div
+                role="alert"
+                className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+              >
+                <span className="min-w-0 break-words">{joinError}</span>
+                <button type="button" onClick={() => setJoinError(null)} className="font-semibold hover:underline shrink-0">
+                  Dismiss
+                </button>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {missedNotHeld.map((s, idx) => {
-                  const name = s.menteeName || s.bookedMenteeName || "Student"
-                  const menteeId = s.menteeId
-                  const isClickable = Boolean(menteeId)
-                  const sessionDateInfo = formatSessionDate(s.startTime || s.scheduledAt)
-                  // Derive stale label from booking timing
-                  const timing = (s as any).timing || getSessionTiming(s, undefined, now)
+            )}
 
-                  const staleLabel = timing.isInProgress
-                    ? "Ended"
-                    : (s as any).staleLabel || timing.staleLabel || "Not held"
-
-                  const staleBadgeClass =
-                    staleLabel === "Expired"
-                      ? "bg-amber-50 text-amber-800 border border-amber-200"
-                      : staleLabel === "Ended"
-                        ? "bg-zinc-100 text-zinc-600 border border-zinc-200"
-                        : "bg-rose-50 text-rose-700 border border-rose-200" // "Missed" / "Not held"
-
-                  const handleMenteeClick = (e: React.MouseEvent | React.KeyboardEvent) => {
-                    if (!menteeId) return
-                    e.stopPropagation()
-                    if ("key" in e && e.key !== "Enter" && e.key !== " ") return
-                    if ("key" in e) e.preventDefault()
-                    router.push(`/mentorship/menteeProfile/${menteeId}`)
-                  }
-
-                  return (
-                    <div
-                      key={s.bookingId ?? s._id ?? idx}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl"
-                      style={{
-                        backgroundColor: "#fdf8f6",
-                        border: `1px solid ${COLORS.hairline}`,
-                        opacity: 0.9,
-                      }}
+            {/* ─── UPCOMING ─────────────────────────────── */}
+            {sessionsPanelTab === "upcoming" && (
+              upcoming.length === 0 ? (
+                <EmptyPanel
+                  icon={CalendarClock}
+                  title="No upcoming sessions booked yet"
+                  text="Open your slots so students can book you."
+                  action={
+                    <button
+                      onClick={() => setActivePage?.("availability")}
+                      className={`px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90 ${FOCUS_RING}`}
+                      style={{ backgroundColor: COLORS.ink }}
                     >
-                      <div
-                        {...(isClickable
-                          ? {
-                            role: "link",
-                            tabIndex: 0,
-                            onClick: handleMenteeClick,
-                            onKeyDown: handleMenteeClick,
-                          }
-                          : {})}
-                        className={`flex items-center gap-3 min-w-0 ${isClickable ? "cursor-pointer group" : ""}`}
+                      Set availability
+                    </button>
+                  }
+                />
+              ) : displayedSessions.length === 0 ? (
+                <EmptyPanel
+                  icon={Calendar}
+                  title={`No sessions scheduled for ${filterTab === "today" ? "today" : filterTab === "tomorrow" ? "tomorrow" : "later dates"}`}
+                  action={
+                    <button
+                      onClick={() => setFilterTab("all")}
+                      className={`text-xs font-semibold hover:underline rounded ${FOCUS_RING}`}
+                      style={{ color: COLORS.accent }}
+                    >
+                      Show all upcoming sessions ({upcoming.length})
+                    </button>
+                  }
+                />
+              ) : (
+                <ul className="space-y-3">
+                  {displayedSessions.map((s, idx) => {
+                    const name = s.menteeName || s.bookedMenteeName || "Student"
+                    const menteeId = s.menteeId
+                    const isClickable = Boolean(menteeId)
+                    const sessionDateInfo = formatSessionDate(s.startTime || s.scheduledAt)
+                    const sessionId = s.sessionId || s._id
+                    const joinInfo = getJoinState(s, now, 0)
+
+                    // If the session is already in_progress show "Rejoin", never call startSession again
+                    const sessionTiming = (s as any).timing as ReturnType<typeof getSessionTiming> | undefined
+                    const isLive = Boolean(sessionTiming?.isInProgress)
+                    const rowKey = String(s.bookingId ?? s._id ?? sessionId ?? idx)
+                    const isJoining = joiningKey === rowKey
+
+                    return (
+                      <li
+                        key={s.bookingId ?? s._id ?? idx}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border"
+                        style={{ backgroundColor: COLORS.softWash, borderColor: COLORS.hairline }}
                       >
+                        {/* Mentee info */}
+                        {isClickable ? (
+                          <button
+                            type="button"
+                            onClick={() => openMentee(menteeId)}
+                            className={`group flex items-center gap-3 min-w-0 text-left rounded-lg ${FOCUS_RING}`}
+                          >
+                            <MenteeAvatar photo={resolvePhoto(s.menteeProfilePhoto)} name={name} />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-semibold truncate group-hover:underline" style={{ color: COLORS.ink }}>
+                                  {name}
+                                </p>
+                                {s.isGroupSession && (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                                    Group
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs mt-0.5 truncate" style={{ color: COLORS.muted }}>
+                                {s.title || s.sessionType || "1-on-1 Mentorship"}
+                              </p>
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-3 min-w-0">
+                            <MenteeAvatar photo={resolvePhoto(s.menteeProfilePhoto)} name={name} />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-semibold truncate" style={{ color: COLORS.ink }}>
+                                  {name}
+                                </p>
+                                {s.isGroupSession && (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                                    Group
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs mt-0.5 truncate" style={{ color: COLORS.muted }}>
+                                {s.title || s.sessionType || "1-on-1 Mentorship"}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Time + action */}
+                        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                          <TimeBadge info={sessionDateInfo} />
+
+                          {sessionId && (isLive || joinInfo.state !== "hidden") && (
+                            <div className="flex flex-col items-end">
+                              {isLive ? (
+                                <button
+                                  type="button"
+                                  onClick={() => startOrRejoin(s, isLive, rowKey, String(sessionId))}
+                                  disabled={isJoining}
+                                  title="Session is live, click to rejoin"
+                                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white transition-colors disabled:opacity-60 ${FOCUS_RING}`}
+                                >
+                                  {isJoining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Video className="w-3.5 h-3.5" />}
+                                  Rejoin
+                                </button>
+                              ) : joinInfo.state === "active" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => startOrRejoin(s, isLive, rowKey, String(sessionId))}
+                                  disabled={isJoining}
+                                  title="Session is active, click to start"
+                                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition-colors disabled:opacity-60 ${FOCUS_RING}`}
+                                >
+                                  {isJoining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Video className="w-3.5 h-3.5" />}
+                                  Start
+                                </button>
+                              ) : joinInfo.state === "ended" ? (
+                                <button
+                                  type="button"
+                                  disabled
+                                  title="Session has ended"
+                                  className="px-3.5 py-2 rounded-lg text-xs font-bold cursor-not-allowed border"
+                                  style={{ backgroundColor: "#ece4dc", color: COLORS.faint, borderColor: COLORS.hairline }}
+                                >
+                                  Ended
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled
+                                    title="Available 5 minutes before the scheduled start"
+                                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold cursor-not-allowed border"
+                                    style={{ backgroundColor: "#e8e0d5", color: COLORS.muted, borderColor: COLORS.hairline }}
+                                  >
+                                    <Video className="w-3.5 h-3.5 opacity-60" />
+                                    Start
+                                  </button>
+                                  <span className="text-[10px] mt-1 whitespace-nowrap font-medium" style={{ color: COLORS.muted }}>
+                                    {joinInfo.subtext}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )
+            )}
+
+            {/* ─── MISSED / NOT HELD ───────────────────── */}
+            {sessionsPanelTab === "missedNotHeld" && (
+              missedNotHeld.length === 0 ? (
+                <EmptyPanel icon={AlertCircle} title="No missed or not-held sessions" />
+              ) : (
+                <ul className="space-y-3">
+                  {missedNotHeld.map((s, idx) => {
+                    const name = s.menteeName || s.bookedMenteeName || "Student"
+                    const menteeId = s.menteeId
+                    const isClickable = Boolean(menteeId)
+                    const sessionDateInfo = formatSessionDate(s.startTime || s.scheduledAt)
+                    // Derive the stale label from booking timing
+                    const timing = (s as any).timing || getSessionTiming(s, undefined, now)
+
+                    const staleLabel = timing.isInProgress
+                      ? "Ended"
+                      : (s as any).staleLabel || timing.staleLabel || "Not held"
+
+                    const staleBadgeClass =
+                      staleLabel === "Expired"
+                        ? "bg-amber-50 text-amber-800 border border-amber-200"
+                        : staleLabel === "Ended"
+                          ? "bg-zinc-100 text-zinc-600 border border-zinc-200"
+                          : "bg-rose-50 text-rose-700 border border-rose-200" // "Missed" / "Not held"
+
+                    const info = (
+                      <>
                         <MenteeAvatar photo={resolvePhoto(s.menteeProfilePhoto)} name={name} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -1167,90 +1196,112 @@ export default function DashboardOverviewPage({
                             {s.title || s.sessionType || "1-on-1 Mentorship"}
                           </p>
                         </div>
-                      </div>
+                      </>
+                    )
 
-                      <span
-                        className="text-xs font-semibold px-2.5 py-1 rounded-full self-end sm:self-center shrink-0"
-                        style={{
-                          backgroundColor: COLORS.chip,
-                          color: COLORS.faint,
-                          border: `1px solid ${COLORS.hairline}`,
-                        }}
+                    return (
+                      <li
+                        key={s.bookingId ?? s._id ?? idx}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border"
+                        style={{ backgroundColor: COLORS.softWash, borderColor: COLORS.hairline }}
                       >
-                        {sessionDateInfo.label}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          )}
-        </div>
+                        {isClickable ? (
+                          <button
+                            type="button"
+                            onClick={() => openMentee(menteeId)}
+                            className={`group flex items-center gap-3 min-w-0 text-left rounded-lg ${FOCUS_RING}`}
+                          >
+                            {info}
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-3 min-w-0">{info}</div>
+                        )}
 
+                        <span
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full self-start sm:self-center shrink-0 whitespace-nowrap"
+                          style={{ backgroundColor: COLORS.chip, color: COLORS.faint, border: `1px solid ${COLORS.hairline}` }}
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                          {sessionDateInfo.label}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )
+            )}
+          </div>
+        </section>
 
-        {/* Right column */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Setup checklist: naye mentor (0 sessions) ke liye */}
+        {/* Right column: on mobile it stacks below the sessions panel */}
+        <aside className="space-y-6 min-w-0">
+          {/* Setup checklist: for new mentors (0 sessions) */}
           {showSetup && (
-            <div className="bg-white p-6 rounded-2xl" style={{ border: `1px solid ${COLORS.hairline}` }}>
-              <h3 className="text-sm font-bold mb-1" style={{ color: COLORS.ink }}>
+            <section className="bg-white p-4 sm:p-5 rounded-xl border" style={{ borderColor: COLORS.hairline }}>
+              <h3 className="text-sm font-bold" style={{ color: COLORS.ink }}>
                 Get started
               </h3>
-              <p className="text-xs mb-4" style={{ color: COLORS.muted }}>
-                Ye steps complete karo taaki students tumhe book kar sakein
+              <p className="text-xs mt-1 mb-3" style={{ color: COLORS.muted }}>
+                Complete these steps so students can book you
               </p>
-              <div className="flex flex-col gap-2.5">
+              <ul className="divide-y" style={{ borderColor: COLORS.hairline }}>
                 {setupSteps.map((step) => (
-                  <button
-                    key={step.page}
-                    onClick={() => setActivePage?.(step.page, (step as any).subtab)}
-                    className="flex items-center justify-between gap-3 p-3 rounded-xl text-left transition-all hover:border-[#c9baa9] hover:shadow-sm"
-                    style={{ backgroundColor: COLORS.softWash, border: `1px solid ${COLORS.hairline}` }}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center bg-white border border-[#e0d8cf]">
-                        {step.done ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        ) : (
-                          <step.icon className="w-4 h-4" style={{ color: COLORS.accent }} />
-                        )}
+                  <li key={step.page} style={{ borderColor: COLORS.hairline }}>
+                    <button
+                      onClick={() => setActivePage?.(step.page, (step as any).subtab)}
+                      className={`w-full flex items-center justify-between gap-3 py-3 text-left rounded-lg hover:bg-[#fbf7f3] transition-colors ${FOCUS_RING}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center"
+                          style={{ backgroundColor: step.done ? "#dcfce7" : COLORS.chip }}
+                        >
+                          {step.done ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                          ) : (
+                            <step.icon className="w-4 h-4" style={{ color: COLORS.accent }} />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold" style={{ color: COLORS.ink }}>
+                            {step.label}
+                          </p>
+                          <p className="text-xs" style={{ color: COLORS.muted }}>
+                            {step.desc}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold" style={{ color: COLORS.ink }}>
-                          {step.label}
-                        </p>
-                        <p className="text-xs" style={{ color: COLORS.muted }}>
-                          {step.desc}
-                        </p>
-                      </div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 shrink-0" style={{ color: COLORS.accent }} />
-                  </button>
+                      <ChevronRight className="w-4 h-4 shrink-0" style={{ color: COLORS.muted }} />
+                    </button>
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ul>
+            </section>
           )}
 
           {/* Quick actions */}
-          <div className="bg-white p-6 rounded-2xl" style={{ border: `1px solid ${COLORS.hairline}` }}>
-            <h3 className="text-sm font-bold mb-4" style={{ color: COLORS.ink }}>
+          <section className="bg-white p-4 sm:p-5 rounded-xl border" style={{ borderColor: COLORS.hairline }}>
+            <h3 className="text-sm font-bold mb-3" style={{ color: COLORS.ink }}>
               Quick actions
             </h3>
-            <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-2">
               {quickActions.map((action) => (
                 <button
                   key={action.page}
                   onClick={() => setActivePage?.(action.page)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:border-[#c9baa9]"
-                  style={{ backgroundColor: COLORS.wash, color: COLORS.accent, border: `1px solid ${COLORS.hairline}` }}
+                  className={`flex items-center justify-between gap-2 px-3.5 py-3 rounded-lg text-sm font-semibold border transition-colors hover:border-[#c9baa9] hover:bg-[#fbf7f3] ${FOCUS_RING}`}
+                  style={{ color: COLORS.ink, borderColor: COLORS.hairline }}
                 >
-                  <action.icon className="w-4 h-4" />
-                  {action.label}
+                  <span className="flex items-center gap-2.5">
+                    <action.icon className="w-4 h-4" style={{ color: COLORS.accent }} />
+                    {action.label}
+                  </span>
+                  <ChevronRight className="w-4 h-4" style={{ color: COLORS.muted }} />
                 </button>
               ))}
             </div>
-          </div>
-        </div>
+          </section>
+        </aside>
       </div>
     </div>
   )
