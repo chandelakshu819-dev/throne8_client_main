@@ -64,6 +64,26 @@ const getDefaultFormData = (serviceType: string = '') => ({
   isTemplate: true,
 });
 
+// Browser ka actual timezone (hardcoded Asia/Kolkata ki jagah)
+const getUserTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+};
+
+// Jin services (Quick Call etc.) me form se date nahi aati, unke liye safe future time.
+// 60 min lead: chhota clock skew bhi fail na kare. Backend bhi apna fallback lagata hai.
+const SCHEDULE_LEAD_MINUTES = 60;
+const buildScheduledAtISO = (raw?: string): string => {
+  if (raw) {
+    const d = new Date(raw);
+    if (!isNaN(d.getTime()) && d.getTime() > Date.now() + 60_000) return d.toISOString();
+  }
+  return new Date(Date.now() + SCHEDULE_LEAD_MINUTES * 60_000).toISOString();
+};
+
 // Local datetime-local string banata hai (browser's local timezone me),
 // toISOString() (UTC) use karne se IST users ke liye time 5:30 hrs shift ho jaata tha.
 const toLocalDatetimeString = (date: Date) => {
@@ -292,7 +312,11 @@ export default function ServicesPage({
     if (!service.sessionId) return;
 
     if (service.type === 'group_session') {
-      // Delete ho sakta hai, archive hoga ya block hoga - ye backend session status dekh kar tay karta hai
+      const participantCount = (service as any).currentParticipants ?? 0;
+      if (participantCount > 0) {
+        setBlockedDeleteMessage('This group session has registered participants. Cancel it first before deleting.');
+        return;
+      }
       setDeleteTarget(service);
       return;
     }
@@ -323,7 +347,6 @@ export default function ServicesPage({
       }
       setDeleteTarget(null);
     } catch (err: any) {
-      setDeleteTarget(null);
       setBlockedDeleteMessage(err.message || 'Failed to delete service.');
     } finally {
       setIsDeleting(false);
@@ -349,8 +372,11 @@ export default function ServicesPage({
     setSaveError(null);
 
     try {
-      // 1:1 sessions ke liye abhi "abhi se +10 min" fallback lagta hai.
-      const scheduledAtISO = new Date(formData.scheduledAt || Date.now() + 10 * 60 * 1000).toISOString();
+      // Form se date na aaye (Quick Call etc.) to safe future time banta hai.
+      // Backend bhi apna server-time fallback lagata hai.
+      const scheduledAtISO = buildScheduledAtISO(formData.scheduledAt);
+      // Mentor ka real browser timezone (Asia/Kolkata hardcode nahi)
+      const userTimezone = getUserTimezone();
       const isGroupTemplateMode = formData.serviceType === "group_session" && !!formData.isTemplate;
 
       if (isEditMode && editingSession) {
@@ -363,10 +389,16 @@ export default function ServicesPage({
           };
           await MentorService.updateGroupSession(editingSession.sessionId, groupUpdatePayload);
         } else {
+          const editScheduledAt = formData.scheduledAt
+            ? new Date(formData.scheduledAt).toISOString()
+            : editingSession.scheduledAt
+              ? new Date(editingSession.scheduledAt).toISOString()
+              : undefined;
+
           const updatePayload: Record<string, any> = {
             title: formData.serviceName,
             description: formData.description || "",
-            scheduledAt: new Date(formData.scheduledAt).toISOString(),
+            ...(editScheduledAt ? { scheduledAt: editScheduledAt } : {}),
             duration: Number(formData.duration) || 60,
             pricing: {
               basePrice: Number(formData.price),
@@ -416,7 +448,7 @@ export default function ServicesPage({
           description: formData.description || "",
           topic: formData.topic,
           duration: Number(formData.duration) || 60,
-          timezone: "Asia/Kolkata",
+          timezone: userTimezone,
           maxParticipants: Number(formData.maxParticipants),
           minParticipants: Number(formData.minParticipants),
           pricePerPerson: Number(formData.price) || 0,
@@ -444,7 +476,7 @@ export default function ServicesPage({
         const sessionInput: CreateSessionInput = {
           sessionType: formData.serviceType,
           scheduledAt: scheduledAtISO,
-          timezone: "Asia/Kolkata",
+          timezone: userTimezone,
           title: formData.serviceName,
           description: [formData.description, responseTimeSuffix].filter(Boolean).join(" • ") || "",
           paymentMethod: "stripe",
@@ -540,7 +572,7 @@ export default function ServicesPage({
         sessionId: null,
         status: "local",
         bookings: [],
-        thumbnailImage: s.thumbnailImage || s.image || null,
+        thumbnailImage: (s as any).thumbnailImage || (s as any).image || null,
         duration: (s as any).duration ?? 0,
         isApi: false,
       })),
@@ -1046,7 +1078,7 @@ export default function ServicesPage({
             <>
               <div
                 className="grid gap-6"
-                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
+                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))' }}
               >
                 {visibleServices.map((service, idx) => {
                   return (
@@ -1157,7 +1189,7 @@ export default function ServicesPage({
             <>
               <div
                 className="grid gap-6"
-                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
+                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))' }}
               >
                 {visibleGroupSessions.map((group, idx) => {
                   return (
@@ -1262,10 +1294,7 @@ export default function ServicesPage({
             </div>
 
             <p className="text-sm mb-6" style={{ color: '#8a7a6a' }}>
-              Are you sure you want to delete <span className="font-semibold" style={{ color: '#4a3728' }}>"{deleteTarget.name}"</span>?{' '}
-              {deleteTarget.type === 'group_session'
-                ? 'It will be removed from your services. Past bookings with participants stay in your history.'
-                : 'This is permanent and cannot be undone.'}
+              Are you sure you want to delete <span className="font-semibold" style={{ color: '#4a3728' }}>"{deleteTarget.name}"</span> permanently? This cannot be undone.
             </p>
 
             <div className="flex justify-end gap-3 pt-4" style={{ borderTop: '1px solid #f0ebe4' }}>

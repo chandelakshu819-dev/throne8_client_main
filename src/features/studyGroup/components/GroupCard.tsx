@@ -1,6 +1,7 @@
 //studygroup/study/groups/components/groupcard.tsx
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Clock, Eye, EyeOff, Camera, CameraOff, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -13,7 +14,14 @@ import {
 import { joinGroupThunk, sendJoinRequestThunk } from '@/hooks/studyGroup/features/groups/group.thunks';
 import { useGroupData } from '@/features/study-group/hooks/useGroupData';
 import JoinGroupModal from '@/features/study-group/modals/joinGroupModal';
-import { getMemberAvatarInitials } from '@/features/studyGroup/helper';
+
+// ── NEW ──────────────────────────────────────────────────────────────────────
+// 1) copy GroupMembers.tsx and useMemberProfiles.ts into this same folder
+// 2) fix the StudyGroupService import path (use the same one other files use)
+import { MembersButton } from './GroupMembers';
+import { useMemberProfiles, resolveProfile } from './useMemberProfiles';
+import StudyGroupService from '@/lib/api/studyGroup.service'; // <-- adjust path
+// (getMemberAvatarInitials import removed: no longer used)
 
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -34,7 +42,24 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
   const [joinModalGroup, setJoinModalGroup] = useState<any | null>(null);
   const [joinSuccess, setJoinSuccess] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
-  const { getJoinRequestForGroup, addJoinRequestToCache } = useGroupData();
+  const [showOpenConfirm, setShowOpenConfirm] = useState(false);
+
+  // Close the "Open Group" confirmation with the Escape key
+  useEffect(() => {
+    if (!showOpenConfirm) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowOpenConfirm(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showOpenConfirm]);
+
+  // CHANGED: also take getUserInfo (same lookup the Top Ranked section uses)
+  const { getJoinRequestForGroup, addJoinRequestToCache, getUserInfo } = useGroupData();
+
+  // NEW: add name + profile photo to the preview members (cached, no backend change)
+  const previewMembers = useMemberProfiles(group.memberPreview ?? [], getUserInfo);
+
   const existingRequest = getJoinRequestForGroup(group.groupId);
   const isApiGroup = !!group.groupId;
   const isMember = isApiGroup ? (group.isMember ?? false) : false;
@@ -45,16 +70,22 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
 
   const handleJoinClick = async () => {
     if (isMember) {
-      console.log("Navigating to group room for groupId:", group.groupId || group.id);
-      router.push(`/study/my-groups/${group.groupId || group.id}`); // Navigate to group room if already a member
+      // already member — button says "Open Group": ask for confirmation first
+      setShowOpenConfirm(true);
       return;
-    }; // already member — button says "Open Group"
+    }
     if (!isApiGroup) return;
     if (group.visibility === 'private') {
       setJoinModalGroup(group);
     } else {
       await handlePublicJoin(group.groupId);
     }
+  };
+
+  const handleConfirmOpen = () => {
+    setShowOpenConfirm(false);
+    console.log("Navigating to group room for groupId:", group.groupId || group.id);
+    router.push(`/study/my-groups/${group.groupId || group.id}`); // Navigate to group room
   };
 
   const handlePublicJoin = async (groupId: string) => {
@@ -106,7 +137,6 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
   };
 
   const spotsColor = isFull ? 'text-red-700' : spotsLeft <= 5 ? 'text-orange-700' : 'text-emerald-800';
-  const avatarColors = ['bg-[#c9a27a]', 'bg-[#a9795a]', 'bg-[#6b4a36]'];
   const cameraOn = group.cameraRequired ?? group.cameraOn;
 
   return (
@@ -147,24 +177,18 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
       <div className="flex flex-1 flex-col gap-4 px-5 pb-5 pt-4">
         <p className="line-clamp-2 min-h-[2.5rem] text-sm leading-relaxed text-[#6b5648]">{group.description}</p>
 
-        {/* Avatars */}
-        <div className="flex items-center gap-3">
-          <div className="flex -space-x-2.5">
-            {getMemberAvatarInitials(group.memberPreview, isApiGroup ? memberCount : group.members).map((initials, idx) => (
-              <div
-                key={idx}
-                className={`flex h-9 w-9 items-center justify-center rounded-full border-2 border-white text-[11px] font-bold text-white shadow-sm ${avatarColors[idx % 3]}`}
-              >
-                {initials}
-              </div>
-            ))}
-          </div>
-          <div className="text-sm">
-            <p className="font-semibold text-[#3a281c]">
-              {memberCount} {memberCount === 1 ? 'member' : 'members'}
-            </p>
-            {!isApiGroup && <p className="text-xs text-gray-500">by {group.leader}</p>}
-          </div>
+        {/* Avatars + members popup (CHANGED) */}
+        <div className="flex flex-wrap items-center gap-x-3">
+          <MembersButton
+            groupName={group.title}
+            members={previewMembers}
+            memberCount={memberCount ?? 0}
+            canViewAll={isMember}
+            cacheKey={group.groupId}
+            fetchMembers={() => StudyGroupService.getGroupMembers(group.groupId)}
+            resolveProfile={(id) => resolveProfile(id, getUserInfo)}
+          />
+          {!isApiGroup && <p className="text-xs text-gray-500">by {group.leader}</p>}
         </div>
 
         {/* Stats */}
@@ -246,6 +270,53 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
             existingRequest={existingRequest}  // ADD
           />
         )}
+      {
+        showOpenConfirm &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+            onClick={() => setShowOpenConfirm(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="open-group-confirm-title"
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
+            >
+              <div className="bg-gradient-to-br from-[#4a3728] to-[#8b6f47] px-6 py-5">
+                <h3 id="open-group-confirm-title" className="text-lg font-bold text-white">
+                  Open study room?
+                </h3>
+                <p className="mt-1 line-clamp-1 text-sm text-white/80">{group.title}</p>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-sm leading-relaxed text-[#6b5648]">
+                  You are about to enter the study room for this group. Do you want to continue?
+                </p>
+                <div className="mt-5 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowOpenConfirm(false)}
+                    className="flex-1 rounded-xl border-2 border-[#e0d8cf] bg-white py-2.5 text-sm font-bold text-[#4a3728] transition-colors hover:bg-[#faf5ef]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    autoFocus
+                    onClick={handleConfirmOpen}
+                    className="flex-1 rounded-xl bg-[#4a3728] py-2.5 text-sm font-bold text-white transition-all hover:bg-[#3a281c] active:scale-[0.98]"
+                  >
+                    Open Group
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      }
     </div >
   );
 };

@@ -1,7 +1,7 @@
 "use client";
 //src/features/mentorship/components/sections/MentorshipServicesSection.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Clock, Calendar, Star } from "lucide-react";
+import { ArrowRight, Clock, Calendar, Star, Loader2 } from "lucide-react";
 import PublicServicesService from "@/lib/api/publicServices.service";
 import MentorService from "@/lib/api/mentorship.service";
 import { useRouter } from "next/navigation";
@@ -21,15 +21,32 @@ interface MentorshipServicesSectionProps {
     mentorRole?: string;
 }
 
+const MENTOR_PAGE_LIMIT = 50;
+const MENTOR_MAX_PAGES = 5;
+
+const extractMentorList = (mRes: any): any[] =>
+    Array.isArray(mRes?.data)
+        ? mRes.data
+        : Array.isArray(mRes?.data?.mentors)
+        ? mRes.data.mentors
+        : [];
+
+// Module-level cache: dobara home page aane par instant render
+let servicesCache: any[] | null = null;
+let mentorMapCache: Map<string, any> | null = null;
+
 export default function MentorshipServicesSection({
     mentorName,
     mentorImage,
     mentorRole,
 }: MentorshipServicesSectionProps) {
     const router = useRouter();
-    const [rawServices, setRawServices] = useState<any[]>([]);
-    const [mentorMap, setMentorMap] = useState<Map<string, any>>(new Map());
-    const [loading, setLoading] = useState(true);
+    const [rawServices, setRawServices] = useState<any[]>(() => servicesCache ?? []);
+    const [mentorMap, setMentorMap] = useState<Map<string, any>>(
+        () => mentorMapCache ?? new Map()
+    );
+    const [loading, setLoading] = useState<boolean>(() => servicesCache === null);
+    const [navigatingId, setNavigatingId] = useState<string | null>(null);
 
     // Garbled title wali (test/junk) sessions public listing mein nahi dikhengi
     const services = useMemo(
@@ -48,9 +65,18 @@ export default function MentorshipServicesSection({
     } = useInfiniteCarousel(services.length);
 
     useEffect(() => {
+        let cancelled = false;
+
         const fetchData = async () => {
             try {
-                const sessionRes = await PublicServicesService.getPublicServices({ limit: 100 });
+                // Sessions aur mentors ka pehla page PARALLEL fetch
+                const [sessionRes, firstMentorRes] = await Promise.all([
+                    PublicServicesService.getPublicServices({ limit: 100 }),
+                    MentorService.getAllMentors({ page: 1, limit: MENTOR_PAGE_LIMIT }).catch(
+                        () => null
+                    ),
+                ]);
+
                 const allSessions = Array.isArray(sessionRes?.data)
                     ? sessionRes.data
                     : Array.isArray(sessionRes?.data?.sessions)
@@ -63,59 +89,62 @@ export default function MentorshipServicesSection({
                     (s: any) => s.sessionType !== "group_session"
                 );
 
-                // Debug help: agar list empty aaye to console me count dikhega
-                console.info(
-                    "[MentorshipServices] fetched:",
-                    allSessions.length,
-                    "after group filter:",
-                    globalServices.length
-                );
+                const map = new Map<string, any>();
+                const firstList = extractMentorList(firstMentorRes);
+                firstList.forEach((m: any) => {
+                    if (m.mentorId) map.set(m.mentorId, m);
+                });
 
-                setRawServices(globalServices);
-
+                // Agar kuch mentors pehle page me nahi mile, to baaki pages parallel lo
                 const uniqueMentorIds = Array.from(
                     new Set(globalServices.map((s: any) => s.mentorId))
                 ).filter(Boolean) as string[];
-                const map = new Map<string, any>();
 
-                if (uniqueMentorIds.length > 0) {
-                    let page = 1;
-                    const limit = 50;
-                    let hasMore = true;
-
-                    // Safety limit of 5 pages
-                    while (hasMore && page <= 5) {
-                        const mRes = await MentorService.getAllMentors({ page, limit });
-                        const list = Array.isArray(mRes?.data)
-                            ? mRes.data
-                            : Array.isArray(mRes?.data?.mentors)
-                            ? mRes.data.mentors
-                            : [];
-
-                        if (!list || list.length === 0) {
-                            hasMore = false;
-                        } else {
-                            list.forEach((m: any) => {
-                                if (m.mentorId) map.set(m.mentorId, m);
-                            });
-                            const allFound = uniqueMentorIds.every((id) => map.has(id));
-                            if (list.length < limit || allFound) hasMore = false;
-                        }
-                        page++;
-                    }
+                const missing = uniqueMentorIds.some((id) => !map.has(id));
+                if (missing && firstList.length >= MENTOR_PAGE_LIMIT) {
+                    const pageNumbers = Array.from(
+                        { length: MENTOR_MAX_PAGES - 1 },
+                        (_, i) => i + 2
+                    );
+                    const rest = await Promise.all(
+                        pageNumbers.map((page) =>
+                            MentorService.getAllMentors({ page, limit: MENTOR_PAGE_LIMIT }).catch(
+                                () => null
+                            )
+                        )
+                    );
+                    rest.forEach((mRes) => {
+                        extractMentorList(mRes).forEach((m: any) => {
+                            if (m.mentorId) map.set(m.mentorId, m);
+                        });
+                    });
                 }
+
+                if (cancelled) return;
+                servicesCache = globalServices;
+                mentorMapCache = map;
+                setRawServices(globalServices);
                 setMentorMap(map);
             } catch (error) {
                 console.error("Failed to load mentorship marketplace", error);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         };
 
         fetchData();
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
+    const prefetchService = (serviceId: string) => {
+        if (serviceId) router.prefetch(`/mentorship/service/${serviceId}`);
+    };
+
     const handleServiceClick = (serviceId: string) => {
+        if (navigatingId) return;
+        setNavigatingId(serviceId);
         goToServiceDetails(router, serviceId);
     };
 
@@ -137,6 +166,7 @@ export default function MentorshipServicesSection({
 
             <button
                 type="button"
+                onMouseEnter={() => router.prefetch("/mentorship/services")}
                 onClick={() => router.push("/mentorship/services")}
                 className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-[#e2d5c8] bg-white text-[#4a3728] font-bold text-xs hover:bg-[#8b7355] hover:text-white hover:border-[#8b7355] transition-all duration-200 shadow-xs"
             >
@@ -152,8 +182,17 @@ export default function MentorshipServicesSection({
                 {header}
 
                 {loading && (
-                    <div className="flex items-center justify-center py-16 text-[#8e847c] text-sm font-medium">
-                        Loading services...
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 animate-pulse">
+                        {[0, 1, 2].map((i) => (
+                            <div key={i} className="bg-white rounded-[22px] border border-[#ece7e2] overflow-hidden">
+                                <div className="w-full aspect-video bg-[#e8dfd5]" />
+                                <div className="p-4 space-y-3">
+                                    <div className="h-4 w-1/2 bg-[#e8dfd5] rounded" />
+                                    <div className="h-4 w-3/4 bg-[#efe8df] rounded" />
+                                    <div className="h-9 w-full bg-[#efe8df] rounded-full" />
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 )}
 
@@ -174,8 +213,7 @@ export default function MentorshipServicesSection({
 
                                 const hostData = mentorMap.get(service.mentorId) || service.host;
 
-                                // Skip card if no mentor profile found (prevents "Industry Mentor" ghost cards).
-                                // Exception: if parent passed explicit mentorName (single mentor profile page).
+                                // Mentor profile na mile to card skip (ghost cards se bachne ke liye)
                                 if (!hostData && !mentorName) return null;
 
                                 const host = resolveHostInfo(
@@ -184,7 +222,6 @@ export default function MentorshipServicesSection({
                                     { name: "", role: "" }
                                 );
                                 if (!host.name) return null;
-
 
                                 const cardMentorId = hostData?.mentorId || service.mentorId || "";
                                 const mentorProfileUrl = cardMentorId
@@ -200,13 +237,12 @@ export default function MentorshipServicesSection({
                                 const durationMinutes = service.duration || 60;
                                 const priceDisplay = formatPrice(service.pricing?.basePrice);
 
-                                // Tags: sirf service ke apne tags. Category (upar badge mein hai) aur
-                                // mentor ke skills (galat "JAVA" tag) ab nahi aayenge.
+                                // Tags: sirf service ke apne tags
                                 const tags: string[] = [];
                                 const addTag = (t?: string) => {
                                     const v = typeof t === "string" ? t.trim() : "";
                                     if (!v) return;
-                                    if (v.toUpperCase() === topCategory) return; // badge ka duplicate
+                                    if (v.toUpperCase() === topCategory) return;
                                     if (tags.some((x) => x.toLowerCase() === v.toLowerCase())) return;
                                     tags.push(v);
                                 };
@@ -216,7 +252,6 @@ export default function MentorshipServicesSection({
                                 if (service.topic) addTag(service.topic);
                                 const displayTags = tags.slice(0, 2);
 
-                                // Rating sirf real data se
                                 const rawRating =
                                     hostData?.stats?.averageRating ?? hostData?.rating ?? service.rating;
                                 const rawSessions =
@@ -225,18 +260,20 @@ export default function MentorshipServicesSection({
                                     service.sessionCount;
                                 const rating = getRatingDisplay(rawRating, rawSessions);
 
-                                // Default description repeat hoti thi, ab khali ho to hide
                                 const description = isMeaningfulText(service.description)
                                     ? cleanText(service.description, "")
                                     : "";
 
                                 const thumbnail = getServiceImage(service);
+                                const isOpening = navigatingId === serviceId;
 
                                 return (
                                     <div
                                         key={uniqueKey}
                                         style={{ width: `${cardWidthPercent}%` }}
                                         className="flex flex-shrink-0 px-2 sm:px-2.5"
+                                        onMouseEnter={() => prefetchService(serviceId)}
+                                        onTouchStart={() => prefetchService(serviceId)}
                                         onClick={(e) => {
                                             if (wasDragged()) {
                                                 e.stopPropagation();
@@ -248,12 +285,12 @@ export default function MentorshipServicesSection({
                                         <div className="group flex flex-col w-full bg-white hover:bg-[#FDFBF7] rounded-[20px] sm:rounded-[22px] overflow-hidden border border-[#ece7e2] hover:border-[#8b7355]/40 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-xl transition-all duration-300 hover:-translate-y-1 h-full pointer-events-auto cursor-pointer">
                                             <div className="relative w-full aspect-video bg-[#f4ece1] overflow-hidden flex-shrink-0">
                                                 <ServiceThumbnail
-                                                src={thumbnail}
-                                                alt={service.title}
-                                                label={topCategory}
-                                                tone="brown"
-                                                type={service.sessionType}
-                                            />
+                                                    src={thumbnail}
+                                                    alt={service.title}
+                                                    label={topCategory}
+                                                    tone="brown"
+                                                    type={service.sessionType}
+                                                />
 
                                                 <div className="absolute top-2.5 left-2.5 bg-[#4a3728]/75 backdrop-blur-md px-2.5 py-0.5 rounded-full shadow-xs z-10">
                                                     <span className="text-[9px] sm:text-[10px] font-bold text-white uppercase tracking-wider">
@@ -277,6 +314,8 @@ export default function MentorshipServicesSection({
                                                                 src={host.pic}
                                                                 alt={host.name}
                                                                 draggable={false}
+                                                                loading="lazy"
+                                                                decoding="async"
                                                                 className="w-8 h-8 rounded-full object-cover border border-[#ece7e2]"
                                                             />
                                                         ) : (
@@ -376,15 +415,26 @@ export default function MentorshipServicesSection({
 
                                                     <button
                                                         type="button"
+                                                        disabled={!!navigatingId}
+                                                        aria-busy={isOpening}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             if (wasDragged()) return;
                                                             handleServiceClick(serviceId);
                                                         }}
-                                                        className="flex-1 py-1.5 sm:py-2 px-2.5 rounded-full bg-[#4a3728] hover:bg-[#38291e] text-white font-bold text-xs text-center transition-all duration-200 flex items-center justify-center gap-1 shadow-xs hover:shadow"
+                                                        className="flex-1 py-1.5 sm:py-2 px-2.5 rounded-full bg-[#4a3728] hover:bg-[#38291e] active:scale-[0.97] text-white font-bold text-xs text-center transition-all duration-150 flex items-center justify-center gap-1 shadow-xs hover:shadow disabled:opacity-70 disabled:cursor-not-allowed"
                                                     >
-                                                        <span>Book Session</span>
-                                                        <ArrowRight className="w-3 h-3" />
+                                                        {isOpening ? (
+                                                            <>
+                                                                <Loader2 className="w-3 h-3 animate-spin" />
+                                                                <span>Opening...</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span>Book Session</span>
+                                                                <ArrowRight className="w-3 h-3" />
+                                                            </>
+                                                        )}
                                                     </button>
                                                 </div>
                                             </div>
