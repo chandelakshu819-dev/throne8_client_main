@@ -7,6 +7,7 @@ import SessionService from "@/lib/api/session.service";
 import MentorService from "@/lib/api/mentorship.service";
 import {
     ArrowLeft,
+    ArrowRight,
     Clock,
     User,
     Tag,
@@ -85,6 +86,52 @@ const extractSessionList = (res: any): any[] => {
 const extractMentorList = (res: any): any[] => {
     const list = res?.data || res?.mentors || [];
     return Array.isArray(list) ? list : [];
+};
+
+const getMentorDisplayName = (m: any): string =>
+    `${m?.user?.firstName || ""} ${m?.user?.lastName || ""}`.trim() || m?.name || "";
+
+const getMentorPhoto = (m: any): string | null =>
+    m?.profilePic || m?.user?.profilePic || m?.profilePicture || m?.user?.profilePicture || null;
+
+// Avatar: photo dikhao, fail ho ya na ho to initial
+const MentorAvatar: React.FC<{
+    src?: string | null;
+    name: string;
+    fallbackLetter?: string;
+    size?: number;
+}> = ({ src, name, fallbackLetter, size = 48 }) => {
+    const [failed, setFailed] = useState(false);
+
+    useEffect(() => {
+        setFailed(false);
+    }, [src]);
+
+    const letter = (fallbackLetter || name || "M").charAt(0).toUpperCase();
+
+    if (src && !failed) {
+        return (
+            <img
+                src={src}
+                alt={name}
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+                onError={() => setFailed(true)}
+                style={{ width: size, height: size }}
+                className="rounded-full object-cover border-2 border-[#f4ece1] flex-shrink-0 transition-shadow duration-200 group-hover:ring-2 group-hover:ring-[#8b7355]/40"
+            />
+        );
+    }
+
+    return (
+        <div
+            style={{ width: size, height: size }}
+            className="rounded-full bg-[#f4ece1] text-[#4a3426] font-black flex items-center justify-center text-base flex-shrink-0"
+        >
+            {letter}
+        </div>
+    );
 };
 
 export default function ServiceDetailsPage() {
@@ -253,15 +300,29 @@ export default function ServiceDetailsPage() {
         };
     }, [hasService, serviceId]);
 
-    const mentorNameMap = useMemo(() => {
-        const map: Record<string, string> = {};
+    // mentorId -> { name, pic } (current mentor bhi include, taaki same-mentor cards par photo turant aaye)
+    const mentorInfoMap = useMemo(() => {
+        const map: Record<string, { name: string; pic: string | null }> = {};
+
         allMentors.forEach((m: any) => {
-            const name =
-                `${m.user?.firstName || ""} ${m.user?.lastName || ""}`.trim() || m.name || "";
-            if (m.mentorId && name) map[m.mentorId] = name;
+            if (!m?.mentorId) return;
+            map[m.mentorId] = {
+                name: getMentorDisplayName(m),
+                pic: getMentorPhoto(m),
+            };
         });
+
+        if (mentor && (mentor.mentorId || mentorIdFromService)) {
+            const key = mentor.mentorId || (mentorIdFromService as string);
+            const existing = map[key];
+            map[key] = {
+                name: getMentorDisplayName(mentor) || existing?.name || "",
+                pic: getMentorPhoto(mentor) || existing?.pic || null,
+            };
+        }
+
         return map;
-    }, [allMentors]);
+    }, [allMentors, mentor, mentorIdFromService]);
 
     const displaySimilar = useMemo(() => {
         if (!service) return [];
@@ -375,12 +436,8 @@ export default function ServiceDetailsPage() {
     const price = getPrice(service);
     const priceDisplay = price === null ? "-" : price === 0 ? "Free" : `₹${price}`;
 
-    const mentorName =
-        `${mentor?.user?.firstName || ""} ${mentor?.user?.lastName || ""}`.trim() ||
-        mentor?.name ||
-        "";
-
-    const mentorPic: string | null = mentor?.profilePic || mentor?.user?.profilePic || null;
+    const mentorName = getMentorDisplayName(mentor);
+    const mentorPic: string | null = getMentorPhoto(mentor);
 
     const parsed = splitRoleCompany(mentor?.experience?.currentRole);
     const mentorRole = formatRoleDisplay(mentor?.headline || parsed.role || mentor?.role);
@@ -414,7 +471,6 @@ export default function ServiceDetailsPage() {
                 <div className="relative w-full aspect-video max-h-[340px] rounded-[24px] sm:rounded-3xl overflow-hidden shadow-sm border border-[#e6dccf] bg-gradient-to-br from-[#4a3426] to-[#8b7355]">
                     {coverImage && (
                         <>
-                            {/* Blurred backdrop: image poori dikhe, side khaali na lage */}
                             <img
                                 src={coverImage}
                                 alt=""
@@ -643,7 +699,20 @@ export default function ServiceDetailsPage() {
                                         {displaySimilar.map((item: any, idx: number) => {
                                             const sId = getSessionId(item);
                                             const sTitle = item.title || "Mentorship Session";
-                                            const sMentor = mentorNameMap[item.mentorId] || "";
+
+                                            const info = mentorInfoMap[item.mentorId];
+                                            const sMentorName =
+                                                info?.name ||
+                                                item.mentor?.name ||
+                                                item.host?.name ||
+                                                "";
+                                            const sMentorPic: string | null =
+                                                info?.pic ||
+                                                getMentorPhoto(item.mentor) ||
+                                                item.host?.pic ||
+                                                item.host?.profilePic ||
+                                                null;
+
                                             const sRatingRaw =
                                                 item.rating ?? item.stats?.averageRating;
                                             const sRating =
@@ -660,13 +729,13 @@ export default function ServiceDetailsPage() {
                                                     : sPriceNum === 0
                                                     ? "Free"
                                                     : `₹${sPriceNum}`;
-                                            const initial = sTitle.charAt(0).toUpperCase();
-
-                                            const meta = [
-                                                sRating !== null ? `${sRating.toFixed(1)} rating` : "",
-                                                sDur,
-                                                sPrice,
-                                            ].filter(Boolean);
+                                            const sCategory = (
+                                                item.category ||
+                                                item.sessionType ||
+                                                ""
+                                            )
+                                                .replace(/_/g, " ")
+                                                .toLowerCase();
 
                                             return (
                                                 <div
@@ -685,27 +754,60 @@ export default function ServiceDetailsPage() {
                                                             router.push(`/mentorship/service/${sId}`);
                                                         }
                                                     }}
-                                                    className="w-[270px] sm:w-[290px] flex-shrink-0 snap-start bg-white rounded-2xl p-4 border border-[#ece7e2] hover:border-[#8b7355]/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center gap-3.5"
+                                                    className="group w-[290px] sm:w-[310px] flex-shrink-0 snap-start bg-white rounded-2xl p-4 border border-[#ece7e2] hover:border-[#8b7355]/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-start gap-3.5"
                                                 >
-                                                    <div className="w-12 h-12 rounded-xl bg-[#f4ece1] text-[#4a3426] font-black flex items-center justify-center text-base flex-shrink-0">
-                                                        {initial}
-                                                    </div>
+                                                    <MentorAvatar
+                                                        src={sMentorPic}
+                                                        name={sMentorName || sTitle}
+                                                        fallbackLetter={sMentorName || sTitle}
+                                                        size={48}
+                                                    />
 
                                                     <div className="min-w-0 flex-1">
-                                                        <h5 className="text-sm font-bold text-[#2d2116] leading-tight truncate">
+                                                        {sCategory && (
+                                                            <span className="inline-block mb-1 px-2 py-0.5 bg-[#f4ece1] text-[#6e5849] text-[10px] font-bold rounded-full capitalize">
+                                                                {sCategory}
+                                                            </span>
+                                                        )}
+
+                                                        <h5 className="text-sm font-bold text-[#2d2116] leading-snug line-clamp-2 break-words">
                                                             {sTitle}
                                                         </h5>
-                                                        {sMentor && (
+
+                                                        {sMentorName && (
                                                             <p className="text-xs text-[#8e847c] font-medium mt-0.5 truncate">
-                                                                {sMentor}
+                                                                {sMentorName}
                                                             </p>
                                                         )}
-                                                        {meta.length > 0 && (
-                                                            <p className="text-xs text-[#8e847c] font-medium mt-2 truncate">
-                                                                {meta.join("  |  ")}
-                                                            </p>
-                                                        )}
+
+                                                        <div className="flex items-center gap-2 mt-2 text-xs text-[#8e847c] font-medium">
+                                                            {sDur && (
+                                                                <span className="flex items-center gap-1">
+                                                                    <Clock className="w-3 h-3" />
+                                                                    {sDur}
+                                                                </span>
+                                                            )}
+                                                            {sPrice && (
+                                                                <span
+                                                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                                        sPriceNum === 0
+                                                                            ? "bg-emerald-50 text-emerald-700"
+                                                                            : "bg-[#f4ece1] text-[#4a3426]"
+                                                                    }`}
+                                                                >
+                                                                    {sPrice}
+                                                                </span>
+                                                            )}
+                                                            {sRating !== null && (
+                                                                <span className="flex items-center gap-0.5 text-[#c4963a]">
+                                                                    <Star className="w-3 h-3 fill-[#c4963a] text-[#c4963a]" />
+                                                                    {sRating.toFixed(1)}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
+
+                                                    <ArrowRight className="w-4 h-4 text-[#b8a99a] self-center flex-shrink-0 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-[#4a3426]" />
                                                 </div>
                                             );
                                         })}
