@@ -3,8 +3,8 @@
 
 'use client';
 
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { months } from '../data';
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { months } from "../data";
 
 interface CalendarHeaderProps {
   currentDate: Date;
