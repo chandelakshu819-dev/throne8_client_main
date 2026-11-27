@@ -920,7 +920,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     setRowAction(rowKey, "reschedule");
 
     try {
-      const scheduledAtISO = new Date(`${rescheduleDate}:00+05:30`).toISOString();
+      const scheduledAtISO = new Date(rescheduleDate).toISOString();
 
       await SessionService.rescheduleSession(
         rescheduleSessionId,

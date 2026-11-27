@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
     ArrowLeft, Clock, User, Tag, Video, Star, CheckCircle2,
-    BookOpen, ShieldCheck, ChevronLeft, ChevronRight,
+    BookOpen, ShieldCheck, ChevronLeft, ChevronRight, Loader2,
 } from "lucide-react";
 import { GlobalStyles, Navigation } from "@/features/index";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -13,6 +13,11 @@ import SeniorSessionService from "@/lib/api/seniorSession.service";
 import MentorService from "@/lib/api/mentorship.service";
 import AuthService from "@/lib/api/auth.service";
 import { buildLoginRedirectUrl } from "@/shared/utils/safeRedirect";
+
+// Module-level cache: back / revisit par instant render
+const seniorServiceCache = new Map<string, any>();
+const seniorMentorCache = new Map<string, any>();
+let seniorSimilarCache: any[] | null = null;
 
 // Helpers
 const toArray = (value: any): string[] => {
@@ -44,23 +49,25 @@ const getInitials = (name: string) =>
 const getSessionId = (s: any): string => String(s?.sessionId || s?._id || s?.id || "");
 
 export default function SeniorServiceDetailsPage() {
-
     const params = useParams();
     const router = useRouter();
     const { user } = useAuth();
     const sessionId = params.sessionId as string;
 
-    const [service, setService] = useState<any>(null);
-    const [mentor, setMentor] = useState<any>(null);
-    const [similarSessions, setSimilarSessions] = useState<any[]>([]);
+    const [service, setService] = useState<any>(() => seniorServiceCache.get(sessionId) ?? null);
+    const [mentor, setMentor] = useState<any>(() => {
+        const cs = seniorServiceCache.get(sessionId);
+        return cs?.mentorId ? seniorMentorCache.get(cs.mentorId) ?? null : null;
+    });
+    const [similarSessions, setSimilarSessions] = useState<any[]>(() => seniorSimilarCache ?? []);
+    const [loading, setLoading] = useState<boolean>(() => !seniorServiceCache.has(sessionId));
+    const [error, setError] = useState<string | null>(null);
+    const [isNavigating, setIsNavigating] = useState(false);
     const carouselRef = useRef<HTMLDivElement>(null);
 
-    // Status states
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const bookPath = `/mentorship/senior-service/${sessionId}/book`;
 
-    // Service detail (backend par auth-protected) ke liye login zaroori hai.
-    // Logged-out user ko login par bhejo; login ke baad isi page par wapas aayega.
+    // Login guard
     useEffect(() => {
         if (!sessionId) return;
         if (!AuthService.isAuthenticated()) {
@@ -68,53 +75,124 @@ export default function SeniorServiceDetailsPage() {
         }
     }, [sessionId, router]);
 
+    // 1. Service detail
     useEffect(() => {
         if (!sessionId) return;
         if (!AuthService.isAuthenticated()) return;
 
+        let cancelled = false;
+        setIsNavigating(false);
+        setError(null);
+
+        const cached = seniorServiceCache.get(sessionId);
+        if (cached) {
+            setService(cached);
+            setMentor(cached.mentorId ? seniorMentorCache.get(cached.mentorId) ?? null : null);
+            setLoading(false);
+        } else {
+            setService(null);
+            setMentor(null);
+            setLoading(true);
+        }
+
         SeniorSessionService.getSessionById(sessionId)
-            .then(res => {
+            .then((res: any) => {
+                if (cancelled) return;
                 const data = res?.data || res?.session || res;
+                seniorServiceCache.set(sessionId, data);
                 setService(data);
-                if (data?.mentorId) {
-                    MentorService.getMentorByUserId(data.mentorId)
-                        .then((mRes: any) => setMentor(mRes?.data ?? mRes?.mentor ?? mRes))
-                        .catch(() => {
-                            MentorService.getMyMentorProfile(data.mentorId)
-                                .then((m2: any) => setMentor(m2?.data ?? m2?.mentor ?? m2))
-                                .catch(() => {});
-                        });
+            })
+            .catch(() => {
+                if (cancelled) return;
+                if (!seniorServiceCache.has(sessionId)) {
+                    setError("Senior service not found or you don't have access.");
                 }
             })
-            .catch(err => {
-                setError("Senior service not found or you don't have access.");
-            })
             .finally(() => {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             });
+
+        return () => {
+            cancelled = true;
+        };
     }, [sessionId]);
 
-    // Similar senior sessions
+    // 2. Mentor profile
+    const mentorIdFromService: string | undefined = service?.mentorId;
+
     useEffect(() => {
+        if (!mentorIdFromService) return;
+
+        const cached = seniorMentorCache.get(mentorIdFromService);
+        if (cached) {
+            setMentor(cached);
+            return;
+        }
+
+        let cancelled = false;
+        const commit = (data: any) => {
+            if (cancelled || !data) return;
+            seniorMentorCache.set(mentorIdFromService, data);
+            setMentor(data);
+        };
+
+        MentorService.getMentorByUserId(mentorIdFromService)
+            .then((mRes: any) => commit(mRes?.data ?? mRes?.mentor ?? mRes))
+            .catch(() => {
+                MentorService.getMyMentorProfile(mentorIdFromService)
+                    .then((m2: any) => commit(m2?.data ?? m2?.mentor ?? m2))
+                    .catch(() => {});
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [mentorIdFromService]);
+
+    // 3. Similar sessions (service load hone ke baad)
+    const hasService = !!service;
+
+    useEffect(() => {
+        if (!hasService) return;
+        if (seniorSimilarCache) {
+            setSimilarSessions(seniorSimilarCache);
+            return;
+        }
+
+        let cancelled = false;
         SeniorSessionService.getAllDiscoverySessions()
             .then((res: any) => {
+                if (cancelled) return;
                 const all = Array.isArray(res?.data)
                     ? res.data
                     : Array.isArray(res?.data?.sessions)
                     ? res.data.sessions
                     : [];
-                setSimilarSessions(all.filter((s: any) => getSessionId(s) !== sessionId));
+                seniorSimilarCache = all;
+                setSimilarSessions(all);
             })
-            .catch(() => setSimilarSessions([]));
-    }, [sessionId]);
+            .catch(() => {
+                if (!cancelled) setSimilarSessions([]);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [hasService]);
 
     const displaySimilar = useMemo(() => {
         if (!service) return [];
+        const pool = similarSessions.filter((s) => getSessionId(s) !== sessionId);
         const cat = service.category || service.sessionType;
-        const same = similarSessions.filter((s) => (s.category || s.sessionType) === cat);
-        const rest = similarSessions.filter((s) => (s.category || s.sessionType) !== cat);
+        const same = pool.filter((s) => (s.category || s.sessionType) === cat);
+        const rest = pool.filter((s) => (s.category || s.sessionType) !== cat);
         return [...same, ...rest].slice(0, 10);
-    }, [similarSessions, service]);
+    }, [similarSessions, service, sessionId]);
+
+    // Book route ko pehle se warm karo
+    useEffect(() => {
+        if (sessionId) router.prefetch(bookPath);
+    }, [sessionId, bookPath, router]);
 
     const scrollCarousel = (direction: "left" | "right") => {
         carouselRef.current?.scrollBy({
@@ -123,13 +201,34 @@ export default function SeniorServiceDetailsPage() {
         });
     };
 
+    const handleBookSession = () => {
+        if (isNavigating) return;
+        if (!AuthService.isAuthenticated()) {
+            router.push(buildLoginRedirectUrl(bookPath));
+            return;
+        }
+        setIsNavigating(true);
+        router.push(bookPath);
+    };
+
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center px-4">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="w-10 h-10 rounded-full border-4 border-[#e2d5c8] border-t-[#8b7355] animate-spin" />
-                    <p className="text-[#8e847c] font-medium text-sm text-center">Loading senior service details...</p>
-                </div>
+            <div className="min-h-screen bg-[#fbf8f4] text-[#4a3426] font-sans pb-20">
+                <GlobalStyles />
+                <Navigation currentUserId={user?.userId} activeTimezone="IST (UTC+5:30)" />
+                <main className="w-full max-w-4xl mx-auto px-4 sm:px-6 pt-20 sm:pt-24 animate-pulse">
+                    <div className="w-24 h-4 bg-[#e8dfd5] rounded mb-4" />
+                    <div className="w-full aspect-video max-h-[320px] bg-[#e8dfd5] rounded-3xl mb-6" />
+                    <div className="w-2/3 h-8 bg-[#e8dfd5] rounded mb-3" />
+                    <div className="w-1/2 h-4 bg-[#efe8df] rounded mb-8" />
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2 space-y-6">
+                            <div className="w-full h-24 bg-[#e8dfd5] rounded-2xl" />
+                            <div className="w-full h-32 bg-[#e8dfd5] rounded-2xl" />
+                        </div>
+                        <div className="w-full h-72 bg-[#e8dfd5] rounded-2xl" />
+                    </div>
+                </main>
             </div>
         );
     }
@@ -149,7 +248,7 @@ export default function SeniorServiceDetailsPage() {
     }
 
     // Derived data
-    const title = (service.title || "Mentorship Session").toUpperCase();
+    const title: string = service.title || "Mentorship Session";
     const category = (service.category || service.sessionType || "").replace(/_/g, " ").toUpperCase();
     const duration: number | null = service.duration ?? null;
     const description: string = service.description || "";
@@ -177,15 +276,6 @@ export default function SeniorServiceDetailsPage() {
     const mentorExp = mentor?.experience?.total ? `${mentor.experience.total}+ Years` : "";
     const mentorSubtitle = [mentorRole, mentorCompany].filter(Boolean).join(" @ ");
 
-    const handleBookSession = () => {
-        const bookPath = `/mentorship/senior-service/${sessionId}/book`;
-        if (!AuthService.isAuthenticated()) {
-            router.push(buildLoginRedirectUrl(bookPath));
-            return;
-        }
-        router.push(bookPath);
-    };
-
     return (
         <div className="min-h-screen w-full overflow-x-hidden bg-[#fbf8f4] text-[#2d2116] font-sans selection:bg-[#4a3426] selection:text-white pb-28 lg:pb-20">
             <GlobalStyles />
@@ -200,56 +290,78 @@ export default function SeniorServiceDetailsPage() {
                     <span>Back</span>
                 </button>
 
-                {/* Hero: min-h use kiya taaki lamba title overflow na kare */}
-                <div className="relative w-full min-h-[220px] sm:min-h-[240px] md:min-h-[250px] rounded-[24px] sm:rounded-3xl overflow-hidden shadow-sm border border-[#e6dccf] mb-6 bg-gradient-to-br from-[#4a3426] to-[#8b7355]">
+                {/* Hero: image clean (text overlap nahi), title neeche */}
+                <div className="relative w-full aspect-video max-h-[320px] rounded-[24px] sm:rounded-3xl overflow-hidden shadow-sm border border-[#e6dccf] bg-gradient-to-br from-[#4a3426] to-[#8b7355]">
                     {coverImage && (
-                        <img src={coverImage} alt={title} className="absolute inset-0 w-full h-full object-cover" />
+                        <>
+                            <img
+                                src={coverImage}
+                                alt=""
+                                aria-hidden="true"
+                                className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-60"
+                            />
+                            <img
+                                src={coverImage}
+                                alt={title}
+                                loading="eager"
+                                decoding="async"
+                                className="relative w-full h-full object-contain"
+                            />
+                        </>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/60 to-black/20" />
 
-                    <div className="relative z-10 h-full min-h-[220px] sm:min-h-[240px] md:min-h-[250px] p-5 sm:p-8 md:p-9 flex flex-col justify-between gap-6">
-                        <div>
-                            {category && (
-                                <span className="inline-flex max-w-full items-center gap-1.5 px-3 py-1 bg-white/20 backdrop-blur-md text-white text-[10px] sm:text-[11px] font-bold rounded-full uppercase tracking-wider border border-white/20">
-                                    <Video className="w-3.5 h-3.5 text-white shrink-0" />
-                                    <span className="truncate">{category}</span>
-                                </span>
-                            )}
-                        </div>
+                    {category && (
+                        <span className="absolute top-4 left-4 inline-flex max-w-[80%] items-center gap-1.5 px-3 py-1 bg-black/55 backdrop-blur-md text-white text-[10px] sm:text-[11px] font-bold rounded-full uppercase tracking-wider border border-white/20">
+                            <Video className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{category}</span>
+                        </span>
+                    )}
 
-                        <div className="max-w-3xl min-w-0">
-                            <h1 className="text-xl sm:text-3xl md:text-4xl lg:text-[40px] font-black uppercase text-white tracking-tight leading-tight mb-2 break-words">
+                    {!coverImage && (
+                        <div className="absolute inset-0 flex items-center justify-center p-6">
+                            <h1 className="text-xl sm:text-3xl font-black text-white text-center leading-tight break-words">
                                 {title}
                             </h1>
-                            {shortDescription && (
-                                <p className="text-white/90 text-xs sm:text-sm md:text-[15px] leading-snug max-w-2xl mb-3 line-clamp-2 break-words">
-                                    {shortDescription}
-                                </p>
-                            )}
-                            {tags.length > 0 && (
-                                <div className="flex flex-wrap items-center gap-2">
-                                    {tags.map((tag, idx) => (
-                                        <span
-                                            key={idx}
-                                            className="max-w-full break-words px-3 py-0.5 sm:py-1 bg-white/15 backdrop-blur-sm text-white/95 text-[11px] sm:text-xs font-medium rounded-full border border-white/10"
-                                        >
-                                            {tag}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
                         </div>
-                    </div>
+                    )}
                 </div>
+
+                {/* Title block */}
+                {coverImage ? (
+                    <div className="mt-5 mb-8 max-w-3xl min-w-0">
+                        <h1 className="text-xl sm:text-3xl md:text-[34px] font-black text-[#2d2116] tracking-tight leading-tight mb-2 break-words">
+                            {title}
+                        </h1>
+                        {shortDescription && (
+                            <p className="text-[#6e5849] text-sm sm:text-base leading-relaxed mb-3 break-words">
+                                {shortDescription}
+                            </p>
+                        )}
+                        {tags.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-2">
+                                {tags.slice(0, 8).map((tag, idx) => (
+                                    <span
+                                        key={idx}
+                                        className="max-w-full break-words px-3 py-1 bg-[#f4ece1] text-[#4a3426] text-[11px] sm:text-xs font-semibold rounded-full border border-[#e8dfd5]"
+                                    >
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="mb-8" />
+                )}
 
                 {/* 2-column layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
-                    {/* Booking card: mobile par pehle dikhega, desktop par right side sticky */}
+                    {/* Booking card */}
                     <div className="order-first lg:order-none lg:col-start-3 lg:row-start-1 min-w-0">
-                        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-[#ece7e2] shadow-xs lg:sticky lg:top-24 space-y-4 sm:space-y-5">
+                        <div className="bg-white rounded-2xl p-5 sm:p-6 border border-[#ece7e2] shadow-sm lg:sticky lg:top-24 space-y-4 sm:space-y-5">
                             {duration !== null && (
                                 <div className="flex items-start gap-3.5">
-                                    <div className="w-8 h-8 rounded-lg bg-[#f8f5ef] flex items-center justify-center text-[#4a3426] flex-shrink-0 mt-0.5">
+                                    <div className="w-9 h-9 rounded-lg bg-[#f8f5ef] flex items-center justify-center text-[#4a3426] flex-shrink-0">
                                         <Clock className="w-4 h-4" />
                                     </div>
                                     <div>
@@ -260,7 +372,7 @@ export default function SeniorServiceDetailsPage() {
                             )}
 
                             <div className="flex items-start gap-3.5">
-                                <div className="w-8 h-8 rounded-lg bg-[#f8f5ef] flex items-center justify-center text-[#4a3426] flex-shrink-0 mt-0.5">
+                                <div className="w-9 h-9 rounded-lg bg-[#f8f5ef] flex items-center justify-center text-[#4a3426] flex-shrink-0">
                                     <Video className="w-4 h-4" />
                                 </div>
                                 <div>
@@ -271,7 +383,7 @@ export default function SeniorServiceDetailsPage() {
 
                             {category && (
                                 <div className="flex items-start gap-3.5 min-w-0">
-                                    <div className="w-8 h-8 rounded-lg bg-[#f8f5ef] flex items-center justify-center text-[#4a3426] flex-shrink-0 mt-0.5">
+                                    <div className="w-9 h-9 rounded-lg bg-[#f8f5ef] flex items-center justify-center text-[#4a3426] flex-shrink-0">
                                         <Tag className="w-4 h-4" />
                                     </div>
                                     <div className="min-w-0">
@@ -287,9 +399,7 @@ export default function SeniorServiceDetailsPage() {
                                 <div className="flex items-baseline justify-between">
                                     <span className="text-sm text-[#8e847c] font-medium">Price</span>
                                     <div className="text-right">
-                                        <span className="text-3xl sm:text-[34px] font-black text-[#2d2116] leading-none">
-                                            Free
-                                        </span>
+                                        <span className="text-3xl sm:text-[34px] font-black text-[#2d2116] leading-none">Free</span>
                                         {duration !== null && (
                                             <p className="text-xs text-[#8e847c] mt-1">{duration} mins · 1-to-1</p>
                                         )}
@@ -299,9 +409,20 @@ export default function SeniorServiceDetailsPage() {
 
                             <button
                                 onClick={handleBookSession}
-                                className="w-full py-3.5 bg-[#4a3426] hover:bg-[#38291e] active:scale-[0.99] text-white font-bold rounded-xl text-xs uppercase tracking-[2px] transition-all duration-200 shadow-md shadow-[#4a3426]/15 hover:-translate-y-0.5 flex items-center justify-center gap-2 cursor-pointer"
+                                onMouseEnter={() => router.prefetch(bookPath)}
+                                onTouchStart={() => router.prefetch(bookPath)}
+                                disabled={isNavigating}
+                                aria-busy={isNavigating}
+                                className="w-full py-3.5 bg-[#4a3426] hover:bg-[#38291e] active:scale-[0.98] text-white font-bold rounded-xl text-xs uppercase tracking-[2px] transition-all duration-150 shadow-md shadow-[#4a3426]/15 hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2 cursor-pointer"
                             >
-                                BOOK SESSION →
+                                {isNavigating ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <span>Opening...</span>
+                                    </>
+                                ) : (
+                                    <span>Book Session →</span>
+                                )}
                             </button>
 
                             <div className="flex items-center justify-center gap-1.5 text-[11px] text-[#8e847c] pt-1">
@@ -312,9 +433,17 @@ export default function SeniorServiceDetailsPage() {
                     </div>
 
                     {/* LEFT content */}
-                    <div className="lg:col-span-2 lg:col-start-1 lg:row-start-1 space-y-6 sm:space-y-7 min-w-0">
+                    <div className="lg:col-span-2 lg:col-start-1 lg:row-start-1 space-y-6 sm:space-y-8 min-w-0">
                         {/* Mentor card */}
-                        {mentor && (
+                        {!mentor ? (
+                            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece7e2] flex items-center gap-3.5 animate-pulse">
+                                <div className="w-14 h-14 rounded-full bg-[#e8dfd5]" />
+                                <div className="flex-1 space-y-2">
+                                    <div className="h-4 w-40 bg-[#e8dfd5] rounded" />
+                                    <div className="h-3 w-56 max-w-full bg-[#efe8df] rounded" />
+                                </div>
+                            </div>
+                        ) : (
                             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#ece7e2] shadow-xs flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
                                 <div className="flex items-center gap-3.5 min-w-0">
                                     {mentorPic ? (
@@ -372,17 +501,17 @@ export default function SeniorServiceDetailsPage() {
 
                         {/* About */}
                         {description && (
-                            <div>
-                                <h3 className="text-lg sm:text-xl font-bold text-[#2d2116] mb-2.5">About this session</h3>
+                            <section>
+                                <h3 className="text-lg sm:text-xl font-bold text-[#2d2116] mb-3">About this session</h3>
                                 <p className="text-[#5c6874] text-sm sm:text-[15px] leading-relaxed whitespace-pre-line break-words">
                                     {description}
                                 </p>
-                            </div>
+                            </section>
                         )}
 
                         {/* What you'll learn */}
                         {learningOutcomes.length > 0 && (
-                            <div>
+                            <section>
                                 <h3 className="text-lg sm:text-xl font-bold text-[#2d2116] mb-3">What you&apos;ll learn</h3>
                                 <div className="bg-[#f8f5ef] border border-[#e8dfd5] rounded-2xl p-4 sm:p-6">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -396,12 +525,12 @@ export default function SeniorServiceDetailsPage() {
                                         ))}
                                     </div>
                                 </div>
-                            </div>
+                            </section>
                         )}
 
                         {/* Prerequisites */}
                         {prerequisites.length > 0 && (
-                            <div>
+                            <section>
                                 <h3 className="text-lg sm:text-xl font-bold text-[#2d2116] mb-3">Prerequisites</h3>
                                 <div className="space-y-2">
                                     {prerequisites.map((item, idx) => (
@@ -416,12 +545,12 @@ export default function SeniorServiceDetailsPage() {
                                         </div>
                                     ))}
                                 </div>
-                            </div>
+                            </section>
                         )}
 
                         {/* Similar sessions */}
                         {displaySimilar.length > 0 && (
-                            <div className="pt-2 min-w-0">
+                            <section className="pt-2 min-w-0">
                                 <div className="flex items-center justify-between gap-3 mb-4">
                                     <h3 className="text-lg sm:text-xl font-bold text-[#2d2116]">Similar Sessions You Might Like</h3>
                                     <div className="flex items-center gap-2 shrink-0">
@@ -442,42 +571,56 @@ export default function SeniorServiceDetailsPage() {
                                     </div>
                                 </div>
 
-                                <div
-                                    ref={carouselRef}
-                                    className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-3"
-                                    style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-                                >
-                                    {displaySimilar.map((item: any, idx: number) => {
-                                        const sId = getSessionId(item);
-                                        const sTitle = item.title || "Mentorship Session";
-                                        const sMentor = item.mentorId === service.mentorId ? mentorName : "";
-                                        const sDur = item.duration ? `${item.duration} mins` : "";
-                                        // Senior sessions are free: no price is looked up or shown
-                                        const meta = [sDur, "Free"].filter(Boolean);
+                                <div className="relative">
+                                    <div
+                                        ref={carouselRef}
+                                        className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-3 pr-10"
+                                        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                                    >
+                                        {displaySimilar.map((item: any, idx: number) => {
+                                            const sId = getSessionId(item);
+                                            const sTitle = item.title || "Mentorship Session";
+                                            const sMentor = item.mentorId === service.mentorId ? mentorName : "";
+                                            const sDur = item.duration ? `${item.duration} mins` : "";
+                                            const meta = [sDur, "Free"].filter(Boolean);
 
-                                        return (
-                                            <div
-                                                key={sId || idx}
-                                                onClick={() => router.push(`/mentorship/senior-service/${sId}`)}
-                                                className="w-[78vw] max-w-[300px] sm:w-[290px] flex-shrink-0 snap-start bg-white rounded-2xl p-4 border border-[#ece7e2] hover:border-[#8b7355]/40 hover:shadow-md transition-all duration-200 cursor-pointer flex items-center gap-3.5"
-                                            >
-                                                <div className="w-12 h-12 rounded-xl bg-[#f4ece1] text-[#4a3426] font-black flex items-center justify-center text-base flex-shrink-0">
-                                                    {sTitle.charAt(0).toUpperCase()}
+                                            return (
+                                                <div
+                                                    key={sId || idx}
+                                                    role="link"
+                                                    tabIndex={0}
+                                                    onMouseEnter={() =>
+                                                        sId && router.prefetch(`/mentorship/senior-service/${sId}`)
+                                                    }
+                                                    onClick={() =>
+                                                        sId && router.push(`/mentorship/senior-service/${sId}`)
+                                                    }
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter" && sId) {
+                                                            router.push(`/mentorship/senior-service/${sId}`);
+                                                        }
+                                                    }}
+                                                    className="w-[78vw] max-w-[300px] sm:w-[290px] flex-shrink-0 snap-start bg-white rounded-2xl p-4 border border-[#ece7e2] hover:border-[#8b7355]/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex items-center gap-3.5"
+                                                >
+                                                    <div className="w-12 h-12 rounded-xl bg-[#f4ece1] text-[#4a3426] font-black flex items-center justify-center text-base flex-shrink-0">
+                                                        {sTitle.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <h5 className="text-sm font-bold text-[#2d2116] leading-tight truncate">{sTitle}</h5>
+                                                        {sMentor && (
+                                                            <p className="text-xs text-[#8e847c] font-medium mt-0.5 truncate">{sMentor}</p>
+                                                        )}
+                                                        <p className="text-xs text-[#8e847c] font-medium mt-2 truncate">
+                                                            {meta.join("  |  ")}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <h5 className="text-sm font-bold text-[#2d2116] leading-tight truncate">{sTitle}</h5>
-                                                    {sMentor && (
-                                                        <p className="text-xs text-[#8e847c] font-medium mt-0.5 truncate">{sMentor}</p>
-                                                    )}
-                                                    <p className="text-xs text-[#8e847c] font-medium mt-2 truncate">
-                                                        {meta.join("  |  ")}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="pointer-events-none absolute top-0 right-0 bottom-3 w-10 bg-gradient-to-l from-[#fbf8f4] to-transparent" />
                                 </div>
-                            </div>
+                            </section>
                         )}
                     </div>
                 </div>

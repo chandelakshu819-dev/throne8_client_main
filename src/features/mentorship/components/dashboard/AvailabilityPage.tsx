@@ -82,7 +82,9 @@ export default function AvailabilityPage({ mentorData }: AvailabilityPageProps) 
     return () => window.removeEventListener("mentorSlotDurationUpdated", handler);
   }, []);
   const [bufferTime, setBufferTime] = useState(0);
-  const [timezone, setTimezone] = useState("Asia/Kolkata");
+ const [timezone, setTimezone] = useState<string>(
+  () => mentorData?.availability?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata"
+); 
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
   const [freeTrialEnabled, setFreeTrialEnabled] = useState(false);
 
