@@ -10,7 +10,7 @@ interface PageProps {
 
 export default function GroupRoomPage({ params }: PageProps) {
   const resolvedParams = use(params);
-  
-  return <GroupRoom groupId={resolvedParams.id} />;
+
+  return <GroupRoom key={resolvedParams.id} groupId={resolvedParams.id} />;
 }
 

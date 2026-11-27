@@ -2,12 +2,24 @@
 
 import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, CheckCheck, Loader2, Trash2, UserPlus, UserCheck, UserX, Video, BellRing } from "lucide-react";
+import { Bell, CheckCheck, Trash2, UserPlus, UserCheck, UserX, Video, BellRing } from "lucide-react";
 
 import StudyGroupNotificationService, {
   StudyNotification,
 } from "@/lib/api/studyGroupNotification.service";
 import StudyGroupService from "@/lib/api/studyGroup.service";
+
+// Short-lived cache so switching away and back to Notifications is instant
+const NOTIF_CACHE_TTL_MS = 20_000;
+const notifCache = new Map<
+  "all" | "unread",
+  { items: StudyNotification[]; unread: number; at: number }
+>();
+let liveRoomsCache: { map: Record<string, string>; at: number } | null = null;
+
+const invalidateNotifCache = () => {
+  notifCache.clear();
+};
 
 const iconFor = (type: string) => {
   switch (type) {
@@ -38,26 +50,37 @@ const timeAgo = (iso: string): string => {
 
 export default function StudyNotificationsPage() {
   const router = useRouter();
-  const [items, setItems] = useState<StudyNotification[]>([]);
-  const [unread, setUnread] = useState(0);
   const [filter, setFilter] = useState<"all" | "unread">("all");
-  const [loading, setLoading] = useState(true);
+  const initialCached = notifCache.get("all");
+  const [items, setItems] = useState<StudyNotification[]>(initialCached?.items ?? []);
+  const [unread, setUnread] = useState(initialCached?.unread ?? 0);
+  const [loading, setLoading] = useState(!initialCached);
   const [error, setError] = useState("");
   // roomId -> groupId of live rooms that are running right now
-  const [liveRooms, setLiveRooms] = useState<Record<string, string>>({});
+  const [liveRooms, setLiveRooms] = useState<Record<string, string>>(liveRoomsCache?.map ?? {});
 
-  const refreshLive = useCallback(async () => {
-    const rooms = await StudyGroupService.getMyActiveLiveRooms();
-    const map: Record<string, string> = {};
-    rooms.forEach((r: any) => {
-      if (r?.roomId) map[String(r.roomId)] = String(r.groupId);
-    });
-    setLiveRooms(map);
+  const refreshLive = useCallback(async (force = false) => {
+    if (typeof document !== "undefined" && document.hidden && !force) return;
+    if (!force && liveRoomsCache && Date.now() - liveRoomsCache.at < 15_000) {
+      setLiveRooms(liveRoomsCache.map);
+      return;
+    }
+    try {
+      const rooms = await StudyGroupService.getMyActiveLiveRooms();
+      const map: Record<string, string> = {};
+      rooms.forEach((r: any) => {
+        if (r?.roomId) map[String(r.roomId)] = String(r.groupId);
+      });
+      liveRoomsCache = { map, at: Date.now() };
+      setLiveRooms(map);
+    } catch {
+      // keep existing live rooms map
+    }
   }, []);
 
   useEffect(() => {
     void refreshLive();
-    const t = setInterval(refreshLive, 15_000);
+    const t = setInterval(() => void refreshLive(true), 15_000);
     return () => clearInterval(t);
   }, [refreshLive]);
 
@@ -66,37 +89,67 @@ export default function StudyNotificationsPage() {
     if (!n.isRead) {
       setItems((prev) => prev.map((x) => (x.notificationId === n.notificationId ? { ...x, isRead: true } : x)));
       setUnread((c) => Math.max(c - 1, 0));
+      invalidateNotifCache();
       StudyGroupNotificationService.markAsRead(n.notificationId).catch(() => {});
     }
     // joinLive=1: the group page joins the live room by itself
     router.push(`/study/my-groups/${groupId}?joinLive=1`);
   };
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  useEffect(() => {
+    const cached = notifCache.get(filter);
+    if (cached && Date.now() - cached.at < NOTIF_CACHE_TTL_MS) {
+      setItems(cached.items);
+      setUnread(cached.unread);
+      setLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    // Show cached items while refreshing in background if available, otherwise show skeleton
+    if (!cached) {
+      setLoading(true);
+    } else {
+      setItems(cached.items);
+      setUnread(cached.unread);
+    }
     setError("");
-    try {
-      const res = await StudyGroupNotificationService.getAll({
+
+    StudyGroupNotificationService.getAll(
+      {
         limit: 50,
         ...(filter === "unread" ? { isRead: false } : {}),
+      },
+      { signal: controller.signal }
+    )
+      .then((res) => {
+        if (controller.signal.aborted) return;
+        setItems(res.notifications);
+        setUnread(res.unreadCount);
+        notifCache.set(filter, {
+          items: res.notifications,
+          unread: res.unreadCount,
+          at: Date.now(),
+        });
+      })
+      .catch((e: any) => {
+        if (controller.signal.aborted) return;
+        setError(e?.message || "Failed to load notifications");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
       });
-      setItems(res.notifications);
-      setUnread(res.unreadCount);
-    } catch (e: any) {
-      setError(e?.message || "Failed to load notifications");
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+    return () => {
+      controller.abort();
+    };
+  }, [filter]);
 
   const handleOpen = async (n: StudyNotification) => {
     if (!n.isRead) {
       setItems((prev) => prev.map((x) => (x.notificationId === n.notificationId ? { ...x, isRead: true } : x)));
       setUnread((c) => Math.max(c - 1, 0));
+      invalidateNotifCache();
       StudyGroupNotificationService.markAsRead(n.notificationId).catch(() => {});
     }
     if (n.link) router.push(n.link);
@@ -107,6 +160,7 @@ export default function StudyNotificationsPage() {
       await StudyGroupNotificationService.markAllAsRead();
       setItems((prev) => prev.map((x) => ({ ...x, isRead: true })));
       setUnread(0);
+      invalidateNotifCache();
     } catch (e: any) {
       setError(e?.message || "Failed to mark all as read");
     }
@@ -117,6 +171,7 @@ export default function StudyNotificationsPage() {
       await StudyGroupNotificationService.remove(n.notificationId);
       setItems((prev) => prev.filter((x) => x.notificationId !== n.notificationId));
       if (!n.isRead) setUnread((c) => Math.max(c - 1, 0));
+      invalidateNotifCache();
     } catch (e: any) {
       setError(e?.message || "Failed to delete notification");
     }
@@ -156,10 +211,22 @@ export default function StudyNotificationsPage() {
 
       {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
 
-      {loading ? (
-        <div className="flex items-center justify-center gap-2 text-[#8b7355] py-16">
-          <Loader2 className="w-5 h-5 animate-spin" /> Loading…
-        </div>
+      {loading && items.length === 0 ? (
+        <ul className="space-y-2 animate-pulse" aria-label="Loading notifications">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <li
+              key={i}
+              className="flex items-start gap-3 p-3 sm:p-4 rounded-xl border border-[#e0d8cf] bg-white"
+            >
+              <div className="w-5 h-5 rounded-full bg-[#e0d8cf] mt-0.5 flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-2/5 rounded bg-[#e0d8cf]" />
+                <div className="h-3 w-4/5 rounded bg-[#e8e0d7]" />
+                <div className="h-3 w-16 rounded bg-[#e8e0d7]" />
+              </div>
+            </li>
+          ))}
+        </ul>
       ) : items.length === 0 ? (
         <div className="text-center text-[#8b7355] py-16">
           <Bell className="w-10 h-10 mx-auto mb-2 opacity-40" />

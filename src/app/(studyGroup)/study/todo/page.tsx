@@ -1,11 +1,18 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useAppDispatch } from "@/store/hooks";
 import CalendarHeader from "@/features/studyGroup/components/CalendarHeader";
 import MonthView from "@/features/studyGroup/components/MonthView";
-import YearView from "@/features/studyGroup/components/YearView";
-import TaskDrawer from "@/features/studyGroup/components/TaskDrawer";
+
+const YearView = dynamic(() => import("@/features/studyGroup/components/YearView"), {
+  ssr: false,
+  loading: () => <div className="h-64 rounded-xl bg-white/70 animate-pulse" />,
+});
+const TaskDrawer = dynamic(() => import("@/features/studyGroup/components/TaskDrawer"), {
+  ssr: false,
+});
 import {
   fetchAllTasksThunk,
   fetchUpcomingTasksThunk,

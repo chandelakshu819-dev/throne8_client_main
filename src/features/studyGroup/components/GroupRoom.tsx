@@ -1070,7 +1070,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
 
   if (isLoading || activeSessionLoading)
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] flex items-center justify-center">
+      <div className="h-full w-full bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-[#8b7355] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-[#4a3728] font-semibold">
@@ -1082,7 +1082,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
 
   if (!groupData)
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] flex items-center justify-center">
+      <div className="h-full w-full bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] flex items-center justify-center">
         <div className="text-center">
           <p className="text-[#4a3728] font-bold text-lg mb-2">
             Group not found
@@ -1114,7 +1114,7 @@ ADD this block just before your main `return (` statement:
     .toUpperCase();
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] flex flex-col z-50">
+    <div className="h-full w-full bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] flex flex-col relative">
       {/* Header - Responsive */}
       <div className="px-2 sm:px-4 py-3 sm:py-3 shrink-0 lg:backdrop-blur-md lg:bg-white/40 lg:border-b lg:border-[#d4c4b5] lg:shadow-md">
         {/* Mobile Header - Clean with Glassmorphism */}

@@ -60,15 +60,22 @@ const fail = (error: unknown, fallback: string): never => {
 };
 
 export class StudyGroupNotificationService {
-  static async getAll(params?: {
-    page?: number;
-    limit?: number;
-    isRead?: boolean;
-  }): Promise<StudyNotificationList> {
+  static async getAll(
+    params?: {
+      page?: number;
+      limit?: number;
+      isRead?: boolean;
+    },
+    options?: { signal?: AbortSignal }
+  ): Promise<StudyNotificationList> {
     try {
-      const { data } = await api.get(`${baseUrl()}/all`, { params });
+      const { data } = await api.get(`${baseUrl()}/all`, {
+        params,
+        signal: options?.signal,
+      });
       return data.data;
     } catch (e) {
+      if (axios.isCancel(e)) throw e;
       return fail(e, "Failed to load notifications");
     }
   }

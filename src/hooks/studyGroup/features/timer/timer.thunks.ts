@@ -10,12 +10,30 @@ import { createFreshnessGuard, FreshnessArg } from '../../utils/freshness';
 const timerStatsGuard = createFreshnessGuard('timer/getStats', {
   hasData: (state) => state.timer?.timerStats != null,
 });
+const activeTimerGuard = createFreshnessGuard('timer/getActive', {
+  ttlMs: 15_000,
+});
+const todaySessionsGuard = createFreshnessGuard('timer/getTodaySessions', {
+  hasData: (state) => (state.timer?.todaySessions?.length ?? 0) > 0,
+});
+const allSessionsGuard = createFreshnessGuard('timer/getAllSessions:10', {
+  hasData: (state) => (state.timer?.allSessions?.length ?? 0) > 0,
+});
+
+const invalidateTimerCaches = () => {
+  timerStatsGuard.invalidate();
+  activeTimerGuard.invalidate();
+  todaySessionsGuard.invalidate();
+  allSessionsGuard.invalidate();
+};
 
 export const startTimerThunk = createAsyncThunk(
   'timer/start',
   async (data: StartTimerData, { rejectWithValue }) => {
     try {
-      return await StudyGroupService.startTimer(data);
+      const res = await StudyGroupService.startTimer(data);
+      activeTimerGuard.invalidate();
+      return res;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to start timer');
     }
@@ -26,7 +44,9 @@ export const pauseTimerThunk = createAsyncThunk(
   'timer/pause',
   async (_, { rejectWithValue }) => {
     try {
-      return await StudyGroupService.pauseTimer();
+      const res = await StudyGroupService.pauseTimer();
+      activeTimerGuard.invalidate();
+      return res;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to pause timer');
     }
@@ -37,7 +57,9 @@ export const resumeTimerThunk = createAsyncThunk(
   'timer/resume',
   async (_, { rejectWithValue }) => {
     try {
-      return await StudyGroupService.resumeTimer();
+      const res = await StudyGroupService.resumeTimer();
+      activeTimerGuard.invalidate();
+      return res;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to resume timer');
     }
@@ -49,7 +71,7 @@ export const stopTimerThunk = createAsyncThunk(
   async (notes: string | undefined, { rejectWithValue }) => {
     try {
       const result = await StudyGroupService.stopTimer(notes);
-      timerStatsGuard.invalidate();
+      invalidateTimerCaches();
       return result;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to stop timer');
@@ -62,7 +84,7 @@ export const cancelTimerThunk = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       await StudyGroupService.cancelTimer();
-      timerStatsGuard.invalidate();
+      invalidateTimerCaches();
       return true;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to cancel timer');
@@ -72,38 +94,51 @@ export const cancelTimerThunk = createAsyncThunk(
 
 export const getActiveTimerThunk = createAsyncThunk(
   'timer/getActive',
-  async (_, { rejectWithValue }) => {
+  async (_: FreshnessArg, { rejectWithValue, getState }) => {
     try {
-      return await StudyGroupService.getActiveTimer();
+      return await activeTimerGuard.track(getState, () => StudyGroupService.getActiveTimer());
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch active timer');
     }
-  }
+  },
+  { condition: activeTimerGuard.condition }
 );
 
 export const getAllSessionsThunk = createAsyncThunk(
   'timer/getAllSessions',
   async (
     params: { page?: number; limit?: number; subject?: string } = {},
-    { rejectWithValue }
+    { rejectWithValue, getState }
   ) => {
     try {
+      const isDefault = !params.subject && (!params.page || params.page === 1) && (params.limit ?? 10) === 10;
+      if (isDefault) {
+        return await allSessionsGuard.track(getState, () => StudyGroupService.getAllTimerSessions(params));
+      }
       return await StudyGroupService.getAllTimerSessions(params);
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch sessions');
     }
+  },
+  {
+    condition: (params = {}, api) => {
+      const isDefault = !params.subject && (!params.page || params.page === 1) && (params.limit ?? 10) === 10;
+      if (!isDefault) return true;
+      return allSessionsGuard.condition(undefined, api);
+    },
   }
 );
 
 export const getTodaySessionsThunk = createAsyncThunk(
   'timer/getTodaySessions',
-  async (_, { rejectWithValue }) => {
+  async (_: FreshnessArg, { rejectWithValue, getState }) => {
     try {
-      return await StudyGroupService.getTodayTimerSessions();
+      return await todaySessionsGuard.track(getState, () => StudyGroupService.getTodayTimerSessions());
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch today sessions');
     }
-  }
+  },
+  { condition: todaySessionsGuard.condition }
 );
 
 export const getTimerStatsThunk = createAsyncThunk(
@@ -123,7 +158,7 @@ export const deleteSessionThunk = createAsyncThunk(
   async (sessionId: string, { rejectWithValue }) => {
     try {
       await StudyGroupService.deleteTimerSession(sessionId);
-      timerStatsGuard.invalidate();
+      invalidateTimerCaches();
       return sessionId;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to delete session');

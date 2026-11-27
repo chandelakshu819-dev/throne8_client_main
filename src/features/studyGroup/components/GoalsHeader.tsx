@@ -1,6 +1,7 @@
 "use client";
 // src/features/studyGroup/components/goalsHeader.tsx
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useAppDispatch, useAppSelector } from "@/core/store/store.hooks";
 import {
   addGoalToDay,
@@ -17,11 +18,12 @@ import {
   markGoalIncompleteThunk,
   updateGoalThunk,
 } from "@/hooks/studyGroup/features/goals/goals.thunks";
-import CreateGoalModal from "./CreateGoalModal";
-import EditGoalModal from "./EditGoalModal";
 import GoalBoard from "./GoalBoard";
 import { getTodayDayName, getStatus } from "@/features/studyGroup/helper";
 import { Plus, CheckCircle2, Target, AlertCircle, Clock } from "lucide-react";
+
+const CreateGoalModal = dynamic(() => import("./CreateGoalModal"), { ssr: false });
+const EditGoalModal = dynamic(() => import("./EditGoalModal"), { ssr: false });
 export default function GoalsHeader() {
   const dispatch = useAppDispatch();
   const goals = useAppSelector(selectAllGoals);
@@ -52,32 +54,51 @@ export default function GoalsHeader() {
   }, [dispatch]);
 
   // Summary numbers, worked out from the goals themselves so they always match the cards.
-  const overdueCount = goals.filter((g: any) => getStatus(g) === "overdue").length;
-  const activeCount = goals.filter((g: any) => getStatus(g) === "active").length;
-  const doneCount = stats?.completedGoals ?? goals.filter((g: any) => g.completed).length;
-  const totalCount = stats?.totalGoals ?? goals.length;
-  const hoursDone = goals.reduce((sum: number, g: any) => sum + (g.currentHours ?? 0), 0);
-  const hoursTarget = goals.reduce((sum: number, g: any) => sum + (g.targetHours ?? 0), 0);
+  const { overdueCount, activeCount, doneCount, totalCount, hoursDone, hoursTarget } = useMemo(() => {
+    let overdue = 0;
+    let active = 0;
+    let completed = 0;
+    let doneHrs = 0;
+    let targetHrs = 0;
+    for (const g of goals as any[]) {
+      const s = getStatus(g);
+      if (s === "overdue") overdue++;
+      else if (s === "active") active++;
+      if (g.completed) completed++;
+      doneHrs += g.currentHours ?? 0;
+      targetHrs += g.targetHours ?? 0;
+    }
+    return {
+      overdueCount: overdue,
+      activeCount: active,
+      doneCount: stats?.completedGoals ?? completed,
+      totalCount: stats?.totalGoals ?? goals.length,
+      hoursDone: doneHrs,
+      hoursTarget: targetHrs,
+    };
+  }, [goals, stats]);
   const fmtHours = (n: number) => `${Math.round(n * 10) / 10}h`;
+
+  const handleEditGoal = useCallback((goal: GoalWithUI) => setEditingGoal(goal), []);
 
   const handleCreate = async (data: any) => {
     await dispatch(createGoalThunk(data));
-    dispatch(fetchGoalStatsThunk());
+    dispatch(fetchGoalStatsThunk({ force: true }));
     setIsCreateOpen(false);
   };
 
   const handleUpdate = async (data: any) => {
     if (!editingGoal) return;
     await dispatch(updateGoalThunk({ goalId: editingGoal.goalId, data }));
-    dispatch(fetchGoalStatsThunk());
+    dispatch(fetchGoalStatsThunk({ force: true }));
     setEditingGoal(null);
   };
 
-  const handleDelete = async (goalId: string) => {
+  const handleDelete = useCallback(async (goalId: string) => {
     if (!confirm("Delete this goal?")) return;
     await dispatch(deleteGoalThunk(goalId));
-    dispatch(fetchGoalStatsThunk());
-  };
+    dispatch(fetchGoalStatsThunk({ force: true }));
+  }, [dispatch]);
 
   // handleDelete ke baad ye function add karo
   const handleMarkComplete = async (goal: GoalWithUI) => {
@@ -163,7 +184,7 @@ export default function GoalsHeader() {
       </h2>
       <GoalBoard
         goals={goals}
-        onEdit={(goal) => setEditingGoal(goal)}
+        onEdit={handleEditGoal}
         onDelete={handleDelete}
         onCreate={() => setIsCreateOpen(true)}
       />

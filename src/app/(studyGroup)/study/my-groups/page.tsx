@@ -2,7 +2,7 @@
 //src/app/studyGroup/study/my-groups/page.tsx
 'use client';
 
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Users, Crown, Calendar, Clock, Camera, CameraOff, Globe, Lock,
@@ -783,7 +783,7 @@ interface GroupCardProps {
   onOpenClick: (groupId: string) => void;
 }
 
-const GroupCard: React.FC<GroupCardProps> = ({ userId, group, timerStats, groupStudyTime, attendancePercent, onSettingsClick, onOpenClick }) => (
+const GroupCard: React.FC<GroupCardProps> = memo(({ userId, group, timerStats, groupStudyTime, attendancePercent, onSettingsClick, onOpenClick }) => (
   <div
     onClick={
       () => onOpenClick((group as any).groupId)
@@ -859,7 +859,7 @@ const GroupCard: React.FC<GroupCardProps> = ({ userId, group, timerStats, groupS
       </button>
     </div>
   </div>
-);
+));
 
 // ─── Main Page ─────────────────────────────────────────────────
 export default function MyGroups() {
@@ -899,28 +899,38 @@ export default function MyGroups() {
       .catch((err) => alert(err));
   };
 
-  const handleOpenGroup = (groupId: string,): void => {
+  const handleOpenGroup = useCallback((groupId: string): void => {
     router.push(`/study/my-groups/${groupId}`);
-  };
+  }, [router]);
 
-  const filteredGroups = groups.filter(group => {
-    const matchesSearch =
-      group.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (group.description ?? '').toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTab = activeTab === "all" ||
-      (activeTab === "created" && isGroupLeader(group, user?.userId)) ||
-      (activeTab === "joined" && !isGroupLeader(group, user?.userId));
-    return matchesSearch && matchesTab;
-  });
+  const handleSettingsClick = useCallback((group: Group): void => {
+    setSettingsGroup(group);
+  }, []);
 
+  const filteredGroups = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return groups.filter(group => {
+      const matchesSearch =
+        !q ||
+        group.title?.toLowerCase().includes(q) ||
+        (group.description ?? '').toLowerCase().includes(q);
+      const matchesTab = activeTab === "all" ||
+        (activeTab === "created" && isGroupLeader(group, user?.userId)) ||
+        (activeTab === "joined" && !isGroupLeader(group, user?.userId));
+      return matchesSearch && matchesTab;
+    });
+  }, [groups, searchQuery, activeTab, user?.userId]);
 
-  const stats = {
-    totalGroups: groups.length,
-    createdGroups: groups.filter(g => isGroupLeader(g, user?.userId)).length,
-    joinedGroups: groups.filter(g => !isGroupLeader(g, user?.userId)).length,
-    totalStudyHours: timerStats?.totalDurationInHours ?? 0,
-    avgAttendance: attendancePercentage?.overallPercentage ?? 0,
-  };
+  const stats = useMemo(() => {
+    const createdGroups = groups.filter(g => isGroupLeader(g, user?.userId)).length;
+    return {
+      totalGroups: groups.length,
+      createdGroups,
+      joinedGroups: groups.length - createdGroups,
+      totalStudyHours: timerStats?.totalDurationInHours ?? 0,
+      avgAttendance: attendancePercentage?.overallPercentage ?? 0,
+    };
+  }, [groups, user?.userId, timerStats?.totalDurationInHours, attendancePercentage?.overallPercentage]);
 
   useEffect(() => {
     dispatch(fetchMyGroupsThunk());
@@ -982,8 +992,23 @@ export default function MyGroups() {
         </div>
 
         {/* Groups Grid */}
-        {myGroupsLoading ? (
-          <div className="text-center py-12 text-[#6b5847]">Loading your groups...</div>
+        {myGroupsLoading && groups.length === 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 animate-pulse" aria-label="Loading your groups">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-xl border-2 border-[#e0d8cf] p-4 space-y-4">
+                <div className="space-y-2">
+                  <div className="h-5 w-1/2 rounded bg-[#e0d8cf]" />
+                  <div className="h-3 w-3/4 rounded bg-[#e8e0d7]" />
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {[0, 1, 2, 3].map((j) => (
+                    <div key={j} className="h-10 rounded-lg bg-[#f6ede8]" />
+                  ))}
+                </div>
+                <div className="h-8 rounded-lg bg-[#f6ede8]" />
+              </div>
+            ))}
+          </div>
         ) : filteredGroups.length > 0 ? (
           < div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
            
@@ -993,7 +1018,7 @@ export default function MyGroups() {
                 group={group}
                 timerStats={timerStats}
                 attendancePercent={attendancePercentage?.overallPercentage}
-                onSettingsClick={setSettingsGroup}
+                onSettingsClick={handleSettingsClick}
                 onOpenClick={handleOpenGroup}
                 userId={user?.userId ?? ''}
               />
@@ -1010,10 +1035,10 @@ export default function MyGroups() {
           </div>
         )}
 
-        {user?.userId && (
+        {user?.userId && settingsGroup && (
           <SettingsModal
             userId={user.userId}
-            isOpen={!!settingsGroup}
+            isOpen={true}
             onClose={() => setSettingsGroup(null)}
             group={settingsGroup}
             onUpdate={handleUpdateGroup}

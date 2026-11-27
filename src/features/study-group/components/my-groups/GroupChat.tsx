@@ -1135,7 +1135,7 @@ const GroupChat = ({
   // ==========================
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-gradient-to-br from-[#f6ede8] via-[#ede4db] to-[#e0d8cf]">
+    <div className="h-full w-full relative flex flex-col bg-gradient-to-br from-[#f6ede8] via-[#ede4db] to-[#e0d8cf]">
       <input
         type="file"
         ref={fileInputRef}
