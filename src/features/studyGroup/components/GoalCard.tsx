@@ -29,6 +29,20 @@ export default function GoalCard({ goal, onEdit, onDelete }: GoalCardProps) {
       : 0;
   const status = getStatus(freshGoal);
   const { label, className } = statusConfig[status];
+  const hoursLeft = Math.max(
+    0,
+    Math.round((freshGoal.targetHours - (freshGoal.currentHours ?? 0)) * 10) / 10
+  );
+
+  const openModal = () => setShowModal(true);
+  const handleCardKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Only react when the card itself is focused, not the edit/delete buttons inside it
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openModal();
+    }
+  };
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     e.dataTransfer.setData('goal', JSON.stringify(freshGoal));
@@ -47,8 +61,12 @@ export default function GoalCard({ goal, onEdit, onDelete }: GoalCardProps) {
       <div
         draggable
         onDragStart={handleDragStart}
-        onClick={() => setShowModal(true)}
-        className="group relative flex cursor-pointer flex-col rounded-xl border border-[#e0d8cf] bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+        onClick={openModal}
+        onKeyDown={handleCardKeyDown}
+        role="button"
+        tabIndex={0}
+        aria-label={`${goal.title}: ${pct}% complete. Open to log hours`}
+        className="group relative flex cursor-pointer flex-col rounded-xl border border-[#e0d8cf] bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8b7355] focus-visible:ring-offset-2 active:scale-[0.99] sm:p-4"
         style={{ borderLeft: `4px solid ${goal.color}` }}
       >
         {/* Header: icon, title, status, actions */}
@@ -78,7 +96,7 @@ export default function GoalCard({ goal, onEdit, onDelete }: GoalCardProps) {
           <div className="flex flex-shrink-0 items-center gap-1">
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(freshGoal); }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#6b5847] transition-colors hover:bg-[#f6ede8] hover:text-[#4a3728]"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-[#6b5847] transition-colors hover:bg-[#f6ede8] hover:text-[#4a3728] sm:h-8 sm:w-8"
               title="Edit goal"
               aria-label="Edit goal"
             >
@@ -86,7 +104,7 @@ export default function GoalCard({ goal, onEdit, onDelete }: GoalCardProps) {
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(goal.goalId); }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#6b5847] transition-colors hover:bg-red-50 hover:text-red-600"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-[#6b5847] transition-colors hover:bg-red-50 hover:text-red-600 sm:h-8 sm:w-8"
               title="Delete goal"
               aria-label="Delete goal"
             >
@@ -100,10 +118,20 @@ export default function GoalCard({ goal, onEdit, onDelete }: GoalCardProps) {
           <div className="mb-1.5 flex items-baseline justify-between">
             <span className="text-sm text-[#6b5847]">
               <span className="font-semibold text-[#4a3728]">{freshGoal.currentHours ?? 0}h</span> of {freshGoal.targetHours}h
+              {status !== 'completed' && hoursLeft > 0 && (
+                <span className="ml-1.5 text-xs text-[#6b5847]/80">· {hoursLeft}h left</span>
+              )}
             </span>
             <span className="text-sm font-bold tabular-nums text-[#4a3728]">{pct}%</span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-[#efe6dc]">
+          <div
+            className="h-2 w-full overflow-hidden rounded-full bg-[#efe6dc]"
+            role="progressbar"
+            aria-valuenow={pct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${goal.title} progress`}
+          >
             <div
               className="h-full rounded-full transition-all duration-500"
               style={{ width: `${pct}%`, backgroundColor: goal.color }}
@@ -136,8 +164,14 @@ export default function GoalCard({ goal, onEdit, onDelete }: GoalCardProps) {
 
         {/* Footer hints */}
         <div className="mt-3 flex items-center justify-between border-t border-[#f0e9e0] pt-2 text-xs text-[#6b5847]">
-          <span>Click to log hours</span>
-          <span className="flex items-center gap-1" title="Drag this card onto a day in the weekly plan">
+          <span>
+            <span className="[@media(hover:none)]:hidden">Click to log hours</span>
+            <span className="hidden [@media(hover:none)]:inline">Tap to log hours</span>
+          </span>
+          <span
+            className="flex items-center gap-1 [@media(hover:none)]:hidden"
+            title="Drag this card onto a day in the weekly plan"
+          >
             <GripVertical size={14} className="text-[#6b5847]/60" />
             Drag to plan
           </span>

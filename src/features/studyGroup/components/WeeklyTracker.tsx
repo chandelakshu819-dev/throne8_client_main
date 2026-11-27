@@ -14,6 +14,13 @@ import GoalProgressModal from './GoalProgressModal';
 import { DAY_SHORT, DayName, DAYS } from '@/features/studyGroup/data';
 import { getTodayDayName, getWeekDates } from '@/features/studyGroup/helper';
 
+// "2026-11-27" or "2026-11-27T00:00:00Z" -> local midnight.
+// new Date('YYYY-MM-DD') is parsed as UTC and shifts the day in non-UTC zones (e.g. IST).
+const parseLocalDate = (value: string) => {
+  const [y, m, d] = value.split('T')[0].split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+
 export default function WeeklyTracker() {
   const dispatch = useAppDispatch();
   const weeklyGoals = useAppSelector(selectWeeklyGoals);
@@ -29,21 +36,26 @@ export default function WeeklyTracker() {
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    e.currentTarget.style.background = 'rgba(74,55,40,0.05)';
+    e.currentTarget.style.background = 'rgba(139,115,85,0.14)';
+    e.currentTarget.style.outline = '2px dashed #8b7355';
   };
 
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.currentTarget.style.background = '';
+    e.currentTarget.style.outline = '';
   };
 
   // Put a goal on a day. If the day is outside the goal's dates, stretch the goal to include it.
   const assignGoalToDay = async (goal: GoalWithUI, day: DayName, date: Date) => {
+    // Show the goal on the day straight away; stretch its dates in the background
+    dispatch(addGoalToDay({ goal, day }));
+
     const pad = (n: number) => String(n).padStart(2, '0');
     const dateStr = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
     const dropDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const goalStart = new Date(goal.startDate.split('T')[0]);
-    const goalEnd = new Date(goal.endDate.split('T')[0]);
+    const goalStart = parseLocalDate(goal.startDate);
+    const goalEnd = parseLocalDate(goal.endDate);
 
     if (dropDate < goalStart) {
       await dispatch(updateGoalThunk({ goalId: goal.goalId, data: { startDate: dateStr } }));
@@ -52,13 +64,12 @@ export default function WeeklyTracker() {
       await dispatch(updateGoalThunk({ goalId: goal.goalId, data: { endDate: dateStr } }));
       dispatch(fetchAllGoalsThunk());
     }
-
-    dispatch(addGoalToDay({ goal, day }));
   };
 
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>, day: DayName, date: Date) => {
     e.preventDefault();
     e.currentTarget.style.background = '';
+    e.currentTarget.style.outline = '';
     try {
       const goal: GoalWithUI = JSON.parse(e.dataTransfer.getData('goal'));
       await assignGoalToDay(goal, day, date);
@@ -120,7 +131,17 @@ export default function WeeklyTracker() {
               <div
                 key={goal.goalId}
                 onClick={() => handleChipClick(day, goal.goalId, goal.title, color)}
-                className={`group relative flex cursor-pointer items-center gap-2 rounded-lg border border-[#e0d8cf] bg-white px-2 py-2 transition-shadow hover:shadow-sm ${
+                onKeyDown={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleChipClick(day, goal.goalId, goal.title, color);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={`${goal.title}. Open to log hours`}
+                className={`group relative flex cursor-pointer items-center gap-2 rounded-lg border border-[#e0d8cf] bg-white px-2 py-2 transition-shadow hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8b7355] ${
                   goal.completed ? 'opacity-75' : ''
                 }`}
                 style={{ borderLeft: `4px solid ${color}` }}
@@ -142,8 +163,8 @@ export default function WeeklyTracker() {
                     e.stopPropagation();
                     dispatch(removeGoalFromDay({ day, goalId: goal.goalId }));
                   }}
-                  className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-[#6b5847] transition-opacity hover:bg-red-50 hover:text-red-600 focus:opacity-100 ${
-                    single ? '' : 'opacity-0 group-hover:opacity-100'
+                  className={`flex flex-shrink-0 items-center justify-center rounded text-[#6b5847] transition-opacity hover:bg-red-50 hover:text-red-600 focus:opacity-100 [@media(hover:none)]:opacity-100 ${
+                    single ? 'h-8 w-8' : 'h-5 w-5 opacity-0 group-hover:opacity-100'
                   }`}
                   title="Remove from this day"
                   aria-label={`Remove ${goal.title} from this day`}
@@ -213,6 +234,7 @@ export default function WeeklyTracker() {
         <div className="mb-4 flex items-center justify-between gap-2">
           <button
             onClick={() => setWeekOffset(w => w - 1)}
+            aria-label="Previous week"
             className="flex h-9 items-center gap-1.5 rounded-lg border border-[#d4c4b5] bg-white px-3 text-sm font-semibold text-[#4a3728] transition-colors hover:bg-[#f6ede8]"
           >
             <ChevronLeft size={16} /> <span className="hidden sm:inline">Prev week</span>
@@ -232,23 +254,25 @@ export default function WeeklyTracker() {
 
           <button
             onClick={() => setWeekOffset(w => w + 1)}
+            aria-label="Next week"
             className="flex h-9 items-center gap-1.5 rounded-lg border border-[#d4c4b5] bg-white px-3 text-sm font-semibold text-[#4a3728] transition-colors hover:bg-[#f6ede8]"
           >
             <span className="hidden sm:inline">Next week</span> <ChevronRight size={16} />
           </button>
         </div>
 
-        {/* Desktop: 7 columns */}
-        <div className="hidden grid-cols-7 gap-2 md:grid">
+        {/* Wide screens: 7 columns */}
+        <div className="hidden grid-cols-7 gap-2 xl:grid">
           {DAYS.map((day, i) => renderDay(day, i, false))}
         </div>
 
-        {/* Mobile: day picker + the chosen day */}
-        <div className="md:hidden">
+        {/* Phones and tablets: day picker + the chosen day */}
+        <div className="xl:hidden">
           <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1">
             {DAYS.map((day, i) => {
               const isToday = weekOffset === 0 && day === todayName;
               const selected = mobileDay === day;
+              const count = (weeklyGoals[day] || []).length;
               return (
                 <button
                   key={day}
@@ -261,11 +285,22 @@ export default function WeeklyTracker() {
                 >
                   {DAY_SHORT[i]} {weekDates[i].getDate()}
                   {isToday && !selected && <span className="ml-1 text-[#8b7355]">•</span>}
+                  {count > 0 && (
+                    <span
+                      className={`ml-1.5 rounded-full px-1.5 text-xs ${
+                        selected ? 'bg-white/20' : 'bg-[#f6ede8]'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
-          {renderDay(mobileDay, DAYS.indexOf(mobileDay), true)}
+          <div className="mx-auto max-w-xl">
+            {renderDay(mobileDay, DAYS.indexOf(mobileDay), true)}
+          </div>
         </div>
       </div>
 

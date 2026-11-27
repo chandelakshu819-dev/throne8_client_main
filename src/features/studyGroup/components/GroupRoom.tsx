@@ -2,31 +2,25 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   Users,
-  Camera,
   Mic,
   MicOff,
   Video,
   VideoOff,
-  Settings,
   LogOut,
   MessageCircle,
-  UserPlus,
   Crown,
   Clock,
-  Target,
-  Award,
-  TrendingUp,
-  MoreVertical,
   X,
   Send,
   ChevronLeft,
   Info,
   Play,
   Pause,
-  Menu,
   Bell,
   Zap,
   Megaphone,
@@ -40,9 +34,6 @@ import {
   joinLiveRoomThunk,
   leaveLiveRoomThunk,
   endLiveRoomThunk,
-  toggleCameraThunk,
-  toggleMicThunk,
-  toggleScreenShareThunk,
   attendanceAutoMarkThunk,
   fetchAttendanceStatusThunk,
   attendanceCheckInThunk,
@@ -52,7 +43,6 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   clearSelectedGroup,
   selectGroupMembers,
-  selectGroupMembersLoading,
   selectSelectedGroup,
   selectSelectedGroupLoading,
   selectActiveLiveRoom,
@@ -60,7 +50,6 @@ import {
   selectLiveRoomActionLoading,
   selectLocalCameraOn,
   selectLocalMicOn,
-  selectLocalScreenShareOn,
   setLocalCamera,
   setLocalMic,
   setLocalScreenShare,
@@ -70,7 +59,6 @@ import {
   selectUserStreak,
 } from "@/hooks/studyGroup/features/groups/groupsSlice";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-// import { useGroupData } from "@/hooks/studyGroup/useGroupData";
 import { useGroupData } from "@/features/study-group/hooks/useGroupData";
 import StudyGroupService from "@/lib/api/studyGroup.service";
 import { useChatSocket } from "@/core/realtime/useChatSocket";
@@ -79,16 +67,13 @@ import {
   pauseTimerThunk,
   resumeTimerThunk,
   stopTimerThunk,
+  getTimerStatsThunk,
+  getActiveTimerThunk,
 } from "@/hooks/studyGroup/features/timer/timer.thunks";
 import {
   selectActiveSession,
   selectTimerApiLoading,
-  selectTimerStats,
 } from "@/hooks/studyGroup/features/timer/timerSlice";
-import {
-  getTimerStatsThunk,
-  getActiveTimerThunk,
-} from "@/hooks/studyGroup/features/timer/timer.thunks";
 import {
   fetchMessagesThunk,
   sendMessageThunk,
@@ -100,21 +85,62 @@ import {
   selectActiveSessionMemberIds,
   selectSendLoading,
 } from "@/hooks/studyGroup/features/chats/chatSlice";
-import {
-  createLiveRoomSchema,
-  type CreateLiveRoomInput,
-} from "@/features/study-group/validators/liveroom.validation";
+import { createLiveRoomSchema } from "@/features/study-group/validators/liveroom.validation";
 import { LIVE_ROOM_MAX_PARTICIPANTS } from "@/features/study-group/constants/liveRoom";
 import { getSocket, initializeSocket } from "@/core/realtime/socket.client";
 import { useLiveRoom } from "@/core/webrtc/useLiveRoom";
-import LiveRoomView from "./LiveRoomView";
-import GroupChallengeModal from "./GroupChallengeModal";
+
+// Heavy, only needed after the user joins a call / opens the challenge dialog
+const LiveRoomView = dynamic(() => import("./LiveRoomView"), { ssr: false });
+const GroupChallengeModal = dynamic(() => import("./GroupChallengeModal"), {
+  ssr: false,
+});
 
 interface GroupRoomProps {
   groupId: string;
 }
 
-const SelfVideo: React.FC<{ stream: MediaStream | null; className?: string }> = ({ stream, className }) => {
+/* ------------------------------------------------------------------ */
+/* Constants & helpers                                                 */
+/* ------------------------------------------------------------------ */
+
+const HDR_BTN =
+  "inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
+const HDR_PRIMARY = `${HDR_BTN} bg-[#4a3728] text-white shadow-sm hover:bg-[#3a2a1e]`;
+const HDR_AMBER = `${HDR_BTN} bg-[#b9803f] text-white shadow-sm hover:bg-[#a06e33]`;
+const HDR_WARM = `${HDR_BTN} bg-[#8b7355] text-white shadow-sm hover:bg-[#6b5847]`;
+const HDR_OUTLINE = `${HDR_BTN} border border-[#d4c4b5] bg-white/70 text-[#4a3728] hover:bg-white`;
+const HDR_DANGER_OUTLINE = `${HDR_BTN} border border-red-200 bg-white/70 text-red-600 hover:bg-red-50`;
+const HDR_DANGER = `${HDR_BTN} bg-red-600 text-white shadow-sm hover:bg-red-700`;
+
+const DEFAULT_REMINDER_MESSAGE =
+  "Hey study buddy! 📚 Your group is in session right now. Join us and let's crush our goals together! 💪";
+const REMINDER_MAX_LENGTH = 200;
+
+const CTRL_BASE =
+  "relative flex h-11 w-11 sm:h-14 sm:w-14 items-center justify-center rounded-full text-white shadow-md transition-all active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8b7355] focus-visible:ring-offset-2";
+const CTRL_DARK = `${CTRL_BASE} bg-[#4a3728] hover:bg-[#3a2a1e]`;
+const CTRL_TAN = `${CTRL_BASE} bg-[#8b7355] hover:bg-[#6b5847]`;
+const CTRL_RED = `${CTRL_BASE} bg-red-600 hover:bg-red-700`;
+const CTRL_LABEL = "text-[10px] font-medium text-[#4a3728] sm:text-xs";
+
+const formatTime = (seconds: number): string => {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${hrs.toString().padStart(2, "0")}:${mins
+    .toString()
+    .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+};
+
+/* ------------------------------------------------------------------ */
+/* Small presentational components                                     */
+/* ------------------------------------------------------------------ */
+
+const SelfVideo: React.FC<{ stream: MediaStream | null; className?: string }> = ({
+  stream,
+  className,
+}) => {
   const ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -142,47 +168,321 @@ const SelfVideo: React.FC<{ stream: MediaStream | null; className?: string }> = 
   );
 };
 
+const RoomSkeleton = () => (
+  <div className="fixed inset-0 z-[60] flex h-[100dvh] animate-pulse flex-col bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] p-4">
+    <div className="h-14 rounded-2xl bg-white/60" />
+    <div className="mt-6 grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="aspect-video rounded-2xl bg-white/60" />
+      <div className="hidden aspect-video rounded-2xl bg-white/40 sm:block" />
+    </div>
+    <div className="mx-auto mt-4 h-16 w-72 max-w-full rounded-full bg-white/60" />
+  </div>
+);
 
+interface TileProps {
+  name: string;
+  initials: string;
+  avatar?: string | null;
+  time: number;
+  isSelf?: boolean;
+  stream?: MediaStream | null;
+  camOn?: boolean;
+  micOn?: boolean;
+  badge?: React.ReactNode;
+  speaking?: boolean;
+}
 
+const ParticipantTile: React.FC<TileProps> = ({
+  name,
+  initials,
+  avatar,
+  time,
+  isSelf,
+  stream,
+  camOn,
+  micOn,
+  badge,
+  speaking,
+}) => (
+  <div
+    className={`relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-[#7a6350] to-[#3a2a1e] shadow-lg sm:aspect-video ${
+      speaking
+        ? "ring-4 ring-green-400"
+        : isSelf
+        ? "ring-2 ring-[#c9a97a]"
+        : "ring-1 ring-white/20"
+    }`}
+  >
+    <div className="absolute inset-0 flex items-center justify-center">
+      {camOn && stream ? (
+        <SelfVideo stream={stream} className="h-full w-full object-cover" />
+      ) : avatar ? (
+        <img
+          src={avatar}
+          alt={name}
+          className="h-16 w-16 rounded-full border-4 border-white/30 object-cover sm:h-24 sm:w-24"
+        />
+      ) : (
+        <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-white/30 bg-white/15 text-xl font-bold text-white sm:h-24 sm:w-24 sm:text-3xl">
+          {initials}
+        </div>
+      )}
+    </div>
 
-// Desktop header button styles: one size, one theme.
-const HDR_BTN =
-  "inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
-const HDR_PRIMARY = `${HDR_BTN} bg-[#4a3728] text-white shadow-sm hover:bg-[#3a2a1e]`;
-const HDR_WARM = `${HDR_BTN} bg-[#8b7355] text-white shadow-sm hover:bg-[#6b5847]`;
-const HDR_OUTLINE = `${HDR_BTN} border border-[#d4c4b5] bg-white/70 text-[#4a3728] hover:bg-white`;
-const HDR_DANGER_OUTLINE = `${HDR_BTN} border border-red-200 bg-white/70 text-red-600 hover:bg-red-50`;
-const HDR_DANGER = `${HDR_BTN} bg-red-600 text-white shadow-sm hover:bg-red-700`;
+    {isSelf && !camOn && (
+      <div className="absolute inset-x-0 top-[62%] flex items-center justify-center gap-1.5 text-xs font-semibold text-white/90 sm:top-[68%] sm:text-sm">
+        <VideoOff size={14} /> Camera off
+      </div>
+    )}
 
-// Study reminder popup: default text the host can edit before sending.
-const DEFAULT_REMINDER_MESSAGE =
-  "Hey study buddy! 📚 Your group is in session right now. Join us and let's crush our goals together! 💪";
-const REMINDER_MAX_LENGTH = 200;
+    <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/80 to-transparent p-2.5 pt-8 sm:p-4">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-white sm:text-base">
+          {name}
+        </p>
+        <p className="flex items-center gap-1 text-xs tabular-nums text-white/85 sm:text-sm">
+          <Clock size={12} /> {formatTime(time)}
+        </p>
+      </div>
+      <span
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full sm:h-8 sm:w-8 ${
+          micOn ? "bg-green-500" : "bg-red-500"
+        }`}
+      >
+        {micOn ? (
+          <Mic size={14} className="text-white" />
+        ) : (
+          <MicOff size={14} className="text-white" />
+        )}
+      </span>
+    </div>
 
-// Bottom control bar styles.
-const CTRL_BASE =
-  "relative flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full text-white shadow-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8b7355] focus-visible:ring-offset-2";
-const CTRL_DARK = `${CTRL_BASE} bg-[#4a3728] hover:bg-[#3a2a1e]`;
-const CTRL_TAN = `${CTRL_BASE} bg-[#8b7355] hover:bg-[#6b5847]`;
-const CTRL_RED = `${CTRL_BASE} bg-red-600 hover:bg-red-700`;
-const CTRL_LABEL =
-  "hidden whitespace-nowrap text-xs font-medium text-[#4a3728] sm:block";
+    {badge && (
+      <div className="absolute right-2 top-2 sm:right-3 sm:top-3">{badge}</div>
+    )}
+  </div>
+);
+
+const Avatar: React.FC<{
+  src?: string | null;
+  name: string;
+  className?: string;
+}> = ({ src, name, className = "h-8 w-8" }) => (
+  <div
+    className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#8b7355] text-xs font-bold text-white ${className}`}
+  >
+    {src ? (
+      <img src={src} alt={name} className="h-full w-full object-cover" />
+    ) : (
+      name.slice(0, 2).toUpperCase()
+    )}
+  </div>
+);
+
+interface ChatPanelProps {
+  messages: any[];
+  currentUserId: string;
+  getUserInfoSync: (id: string) => { name: string; avatar?: string | null };
+  message: string;
+  setMessage: (v: string) => void;
+  onSend: () => void;
+  sendLoading: boolean;
+}
+
+const ChatPanel: React.FC<ChatPanelProps> = ({
+  messages,
+  currentUserId,
+  getUserInfoSync,
+  message,
+  setMessage,
+  onSend,
+  sendLoading,
+}) => {
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (messages.length > 0) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages.length]);
+
+  return (
+    <>
+      <div className="flex-1 space-y-3 overflow-y-auto p-3 lg:p-4">
+        {messages.length === 0 && (
+          <div className="mt-8 text-center text-xs text-[#6b5847]">
+            No messages yet. Say hi! 👋
+          </div>
+        )}
+        {messages.map((msg: any) => {
+          const isOwn = msg.sender === currentUserId;
+          const info = getUserInfoSync(msg.sender);
+          return (
+            <div
+              key={msg.messageId}
+              className={`flex gap-2 ${isOwn ? "flex-row-reverse" : ""}`}
+            >
+              <Avatar src={info.avatar} name={info.name} className="h-8 w-8" />
+              <div className={`min-w-0 flex-1 ${isOwn ? "text-right" : ""}`}>
+                <div
+                  className={`mb-1 flex items-center gap-1.5 ${
+                    isOwn ? "justify-end" : ""
+                  }`}
+                >
+                  <span className="text-xs font-semibold text-[#4a3728]">
+                    {isOwn ? "You" : info.name}
+                  </span>
+                  <span className="text-xs text-[#6b5847]">
+                    {new Date(msg.createdAt).toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+                <div
+                  className={`inline-block max-w-[85%] break-words rounded-2xl px-3 py-2 text-left text-sm ${
+                    isOwn
+                      ? "rounded-tr-sm bg-[#8b7355] text-white"
+                      : "rounded-tl-sm bg-[#f6ede8] text-[#4a3728]"
+                  }`}
+                >
+                  {msg.content}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={bottomRef} />
+      </div>
+      <div className="shrink-0 border-t border-[#e0d8cf] bg-white/80 p-3 lg:p-4">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && onSend()}
+            placeholder="Type a message..."
+            className="min-w-0 flex-1 rounded-lg border-2 border-[#e0d8cf] px-3 py-2 text-sm text-[#4a3728] outline-none placeholder:text-[#6b5847]/50 focus:border-[#8b7355]"
+          />
+          <button
+            onClick={onSend}
+            disabled={sendLoading}
+            aria-label="Send message"
+            className="rounded-lg bg-[#8b7355] px-3 py-2 text-white transition-all hover:bg-[#6b5847] disabled:opacity-50"
+          >
+            <Send size={16} />
+          </button>
+        </div>
+      </div>
+    </>
+  );
+};
+
+interface MembersPanelProps {
+  members: any[];
+  currentUserId: string;
+  memberSessionTimes: Record<string, number>;
+}
+
+const MembersPanel: React.FC<MembersPanelProps> = ({
+  members,
+  currentUserId,
+  memberSessionTimes,
+}) => (
+  <div className="flex-1 space-y-2 overflow-y-auto p-3 lg:p-4">
+    {members.length === 0 && (
+      <div className="mt-8 text-center text-xs text-[#6b5847]">
+        No members yet.
+      </div>
+    )}
+    {members.map((m) => (
+      <div
+        key={m.userId || m.id}
+        className={`rounded-lg p-3 transition-all ${
+          m.isOnline ? "bg-[#f6ede8]" : "bg-gray-100 opacity-60"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <div className="relative shrink-0">
+            <Avatar src={m.avatar} name={m.name} className="h-9 w-9" />
+            {m.isOnline && (
+              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-[#4a3728]">
+              {m.userId === currentUserId ? "You" : m.name}
+            </div>
+            <div className="text-xs tabular-nums text-[#6b5847]">
+              {formatTime(memberSessionTimes[m.userId] ?? 0)} •{" "}
+              {m.role === "leader" ? "Leader" : `Rank #${m.rank}`}
+            </div>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+interface ControlProps {
+  label: string;
+  title?: string;
+  className: string;
+  onClick: () => void;
+  pressed?: boolean;
+  children: React.ReactNode;
+  badge?: number;
+}
+
+const ControlButton: React.FC<ControlProps> = ({
+  label,
+  title,
+  className,
+  onClick,
+  pressed,
+  children,
+  badge,
+}) => (
+  <div className="flex shrink-0 flex-col items-center gap-1">
+    <button
+      onClick={onClick}
+      className={className}
+      title={title ?? label}
+      aria-label={title ?? label}
+      aria-pressed={pressed}
+    >
+      {children}
+      {!!badge && badge > 0 && (
+        <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+          {badge}
+        </span>
+      )}
+    </button>
+    <span className={CTRL_LABEL}>{label}</span>
+  </div>
+);
+
+/* ------------------------------------------------------------------ */
+/* Main component                                                      */
+/* ------------------------------------------------------------------ */
 
 const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const router = useRouter();
-  const pendingJoinRef = useRef(false);
+  const dispatch = useAppDispatch();
+
+  // Render into document.body so the room escapes the app layout's stacking context
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const [showAttendancePrompt, setShowAttendancePrompt] = useState(false);
   const attendanceTimerRef = useRef<NodeJS.Timeout | null>(null);
-
   const attendanceStatus = useAppSelector(selectAttendanceStatus);
   const attendanceCheckInLoading = useAppSelector(
     selectAttendanceCheckInLoading
   );
+
   const {
     fetchGroupMembers,
     groupMembers: enrichedMembers,
-    isLoadingGroupMembers,
     getUserInfoSync,
   } = useGroupData();
   const fetchGroupMembersRef = useRef(fetchGroupMembers);
@@ -192,21 +492,25 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
 
   const leaveWebRTCRoomRef = useRef<() => void>(() => {});
 
-  const [showChat, setShowChat] = useState<boolean>(false);
-  const [showMembers, setShowMembers] = useState<boolean>(false);
+  // Side panel: one state instead of two booleans
+  const [panel, setPanel] = useState<"chat" | "members" | null>(null);
+  const togglePanel = (p: "chat" | "members") =>
+    setPanel((prev) => (prev === p ? null : p));
+
   const [message, setMessage] = useState<string>("");
   const [studyTime, setStudyTime] = useState<number>(0);
   const [isSessionActive, setIsSessionActive] = useState<boolean>(false);
-  const timerAnchorRef = useRef<{ baseSeconds: number; anchorTimestamp: number } | null>(null);
-  const [showNotificationPopup, setShowNotificationPopup] =
-    useState<boolean>(false);
+  const timerAnchorRef = useRef<{
+    baseSeconds: number;
+    anchorTimestamp: number;
+  } | null>(null);
+  const [showNotificationPopup, setShowNotificationPopup] = useState(false);
   const [reminderMessage, setReminderMessage] = useState<string>(
     DEFAULT_REMINDER_MESSAGE
   );
-  const [showChallengeModal, setShowChallengeModal] = useState<boolean>(false);
-  const [showAnnouncementModal, setShowAnnouncementModal] =
-    useState<boolean>(false);
-  const dispatch = useAppDispatch();
+  const [showChallengeModal, setShowChallengeModal] = useState(false);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+
   const groupData = useAppSelector(selectSelectedGroup);
   const isLoading = useAppSelector(selectSelectedGroupLoading);
   const rawMembers = useAppSelector(selectGroupMembers);
@@ -217,24 +521,16 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const activeSessionLoading = useAppSelector(
     (state: any) => state.timer.activeSessionLoading
   );
-  const timerStats = useAppSelector(selectTimerStats);
   const roomMessages = useAppSelector(selectMessagesByGroup(groupId));
   const sendLoading = useAppSelector(selectSendLoading);
-  const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (roomMessages.length > 0) {
-      chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [roomMessages.length]);
   const activeLiveRoom = useAppSelector(selectActiveLiveRoom);
   const activeLiveRoomLoading = useAppSelector(selectActiveLiveRoomLoading);
   const liveRoomActionLoading = useAppSelector(selectLiveRoomActionLoading);
   const isCameraOn = useAppSelector(selectLocalCameraOn);
   const isMicOn = useAppSelector(selectLocalMicOn);
-  const isScreenSharing = useAppSelector(selectLocalScreenShareOn);
 
-  // ⬇️ YAHAN DAALEIN (Change 2, Hissa A)
+  /* ---------- camera preview (outside the live room) ---------- */
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const previewStreamRef = useRef<MediaStream | null>(null);
 
@@ -262,7 +558,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     }
   };
 
-  // unmount par camera band + Redux reset + WebRTC cleanup
+  // unmount: camera off + Redux reset + WebRTC cleanup
   useEffect(() => {
     dispatch(setLocalCamera(false));
     dispatch(setLocalMic(false));
@@ -276,31 +572,30 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     };
   }, [dispatch]);
 
-
+  /* ---------- live room state ---------- */
   const [showLiveRoomModal, setShowLiveRoomModal] = useState(false);
   const [liveRoomTitle, setLiveRoomTitle] = useState("");
   const [liveRoomError, setLiveRoomError] = useState("");
   const [showLiveRoomView, setShowLiveRoomView] = useState(false);
-  // True while Start/Join Live Room is running, so a double click can't start two joins
   const liveRoomJoinInFlight = useRef(false);
   const isUserInLiveRoom = showLiveRoomView;
 
-  // Latest active room, readable from the listeners below without re-subscribing
   const activeLiveRoomRef = useRef(activeLiveRoom);
   useEffect(() => {
     activeLiveRoomRef.current = activeLiveRoom;
   }, [activeLiveRoom]);
 
-  // Live room started / ended by the host: update this page at once.
-  // Socket events are the fast path. Because a socket can be missing at first render,
-  // offline, or reconnecting, we also re-check the server on reconnect, when the tab becomes
-  // visible again, and every 15s, so "host ended" always reaches everyone.
+  const isLiveHost =
+    !!activeLiveRoom &&
+    (activeLiveRoom.host?._id === currentUserId ||
+      activeLiveRoom.host === currentUserId);
+
+  // Live room started / ended: socket events + resync on reconnect / visibility / every 15s
   useEffect(() => {
     if (!groupId) return;
     let cancelled = false;
     let attached: ReturnType<typeof getSocket> = null;
 
-    // Leave the call (stop camera/mic, close peers) and drop the room from the page
     const closeCall = () => {
       leaveWebRTCRoomRef.current?.();
       setShowLiveRoomView(false);
@@ -317,23 +612,26 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     };
 
     const resync = async () => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      )
+        return;
       try {
         const room = await StudyGroupService.getGroupActiveLiveRoom(groupId);
         if (cancelled) return;
         const current = activeLiveRoomRef.current;
 
         if (!room) {
-          // Server confirms no live room: we missed the "ended" event
           if (current) closeCall();
           return;
         }
-        if (current && current.roomId !== room.roomId) closeCall(); // old room ended, a new one started
+        if (current && current.roomId !== room.roomId) closeCall();
         if (!current || current.roomId !== room.roomId) {
           dispatch(fetchGroupActiveLiveRoomThunk(groupId));
         }
       } catch {
-        // Network blip: keep the current state rather than kicking anyone out of the call
+        // Network blip: keep current state
       }
     };
 
@@ -367,6 +665,8 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       }
     };
   }, [groupId, dispatch]);
+
+  /* ---------- members / online ---------- */
   const rawOnlineMembers = useAppSelector(selectOnlineMembers(groupId));
   const onlineMembers = useMemo(() => {
     if (currentUserId && !rawOnlineMembers.includes(currentUserId)) {
@@ -375,9 +675,13 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     return rawOnlineMembers;
   }, [rawOnlineMembers, currentUserId]);
 
-  const activeSessionMemberIds = useAppSelector(selectActiveSessionMemberIds(groupId));
+  const activeSessionMemberIds = useAppSelector(
+    selectActiveSessionMemberIds(groupId)
+  );
   const activeCount = useMemo(() => {
-    const others = activeSessionMemberIds.filter((id) => String(id) !== String(currentUserId));
+    const others = activeSessionMemberIds.filter(
+      (id) => String(id) !== String(currentUserId)
+    );
     return others.length + (isSessionActive ? 1 : 0);
   }, [activeSessionMemberIds, currentUserId, isSessionActive]);
 
@@ -389,37 +693,43 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   }, [studyTime]);
 
   const memberSessionTimes = useAppSelector(selectMemberSessionTimes(groupId));
-  const membersSource = enrichedMembers.length > 0 ? enrichedMembers : (rawMembers as any[]);
+  const membersSource =
+    enrichedMembers.length > 0 ? enrichedMembers : (rawMembers as any[]);
   const members =
     membersSource.length > 0
       ? membersSource.map((m: any, idx: number) => {
           const mUserId =
             typeof m.userId === "string"
               ? m.userId
-              : (m.userId?._id || m.userId?.id || m.userId?.userId || m._id || m.id || "");
+              : m.userId?._id ||
+                m.userId?.id ||
+                m.userId?.userId ||
+                m._id ||
+                m.id ||
+                "";
           const isOnline = onlineMembers.some(
             (onlineId) => String(onlineId) === String(mUserId)
           );
           const cachedUser = getUserInfoSync(mUserId);
           return {
             id: idx + 1,
-            name: m.name ?? cachedUser?.name ?? (mUserId ? mUserId.slice(0, 8) : "Member"),
+            name:
+              m.name ??
+              cachedUser?.name ??
+              (mUserId ? mUserId.slice(0, 8) : "Member"),
             avatar: m.avatar ?? cachedUser?.avatar ?? null,
             isOnline,
             isSpeaking: false,
-            studyTime: 0,
             rank: idx + 1,
-            videoEnabled: false,
-            audioEnabled: false,
             userId: mUserId,
             role: m.role,
           };
         })
       : [];
 
+  /* ---------- WebRTC ---------- */
   const liveRoomId = activeLiveRoom?.roomId ?? "";
 
-  // REPLACE WITH:
   const {
     localStream,
     peers: webrtcPeers,
@@ -436,13 +746,13 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     toggleCamera: toggleWebRTCCamera,
     toggleMic: toggleWebRTCMic,
     toggleScreenShare: toggleWebRTCScreenShare,
-    startLocalStream, // ← ADD
+    startLocalStream,
   } = useLiveRoom({
     roomId: liveRoomId,
     userId: currentUserId,
     userName: user?.name ?? user?.email ?? "User",
-    onPeerJoined: (peer) => { },
-    onPeerLeft: (socketId) => { },
+    onPeerJoined: () => {},
+    onPeerLeft: () => {},
     onQualityChange: (socketId, quality) => {
       if (quality === "poor") {
         console.warn("[LiveRoom] Poor connection for socket:", socketId);
@@ -459,12 +769,10 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     joinWebRTCRoomRef.current = joinWebRTCRoom;
   }, [joinWebRTCRoom]);
 
-  // Camera/mic state as of the latest render (read when the connection drops)
   const callPrefsRef = useRef({ cam: true, mic: true });
   callPrefsRef.current = { cam: webrtcCameraOn, mic: webrtcMicOn };
 
-  // Network drop while in the call: show "Reconnecting...", then re-join automatically
-  // (same behaviour as the mentorship call). Gives up after a grace period.
+  // Network drop while in call: show "Reconnecting...", re-join automatically
   const [liveReconnecting, setLiveReconnecting] = useState(false);
   useEffect(() => {
     if (!showLiveRoomView || !groupId) return;
@@ -486,17 +794,16 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       reconnecting = false;
       setLiveReconnecting(false);
     };
-    // Leave the call view; the Join button comes back if the room is still live
-    const dropToJoinButton = (message?: string) => {
+    const dropToJoinButton = (msg?: string) => {
       stopReconnecting();
       leaveWebRTCRoomRef.current?.();
       setShowLiveRoomView(false);
       dispatch(fetchGroupActiveLiveRoomThunk(groupId));
-      if (message) alert(message);
+      if (msg) alert(msg);
     };
 
     const onDisconnect = (reason: string) => {
-      if (reason === "io client disconnect") return; // we did it ourselves
+      if (reason === "io client disconnect") return;
       prefs = { ...callPrefsRef.current };
       reconnecting = true;
       setLiveReconnecting(true);
@@ -504,7 +811,9 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       clearDropTimer();
       dropTimer = setTimeout(() => {
         if (reconnecting) {
-          dropToJoinButton("Connection lost. Press Join to re-enter the live room.");
+          dropToJoinButton(
+            "Connection lost. Press Join to re-enter the live room."
+          );
         }
       }, RECONNECT_GRACE_MS);
     };
@@ -514,12 +823,13 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       busy = true;
       clearDropTimer();
       try {
-        // The server forgot our old socket, so the others removed us: first check the room is still live
         let room: any;
         try {
           room = await StudyGroupService.getGroupActiveLiveRoom(groupId);
         } catch {
-          dropToJoinButton("Connection lost. Press Join to re-enter the live room.");
+          dropToJoinButton(
+            "Connection lost. Press Join to re-enter the live room."
+          );
           return;
         }
         const current = activeLiveRoomRef.current;
@@ -532,7 +842,6 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
           return;
         }
 
-        // Re-register (the room may have freed our seat) and rebuild every link from scratch
         await dispatch(
           joinLiveRoomThunk({
             roomId: room.roomId,
@@ -544,10 +853,14 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
         if (ok) {
           stopReconnecting();
         } else {
-          dropToJoinButton("Could not reconnect to the live room. Press Join to try again.");
+          dropToJoinButton(
+            "Could not reconnect to the live room. Press Join to try again."
+          );
         }
       } catch {
-        dropToJoinButton("Could not reconnect to the live room. Press Join to try again.");
+        dropToJoinButton(
+          "Could not reconnect to the live room. Press Join to try again."
+        );
       } finally {
         busy = false;
       }
@@ -563,8 +876,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     };
   }, [showLiveRoomView, groupId, dispatch]);
 
-  // Host ended the live room: close the room view for everyone else and
-  // refresh the group's active room so the Join button disappears.
+  // Host ended the live room
   useEffect(() => {
     if (!roomEnded) return;
     setShowLiveRoomView(false);
@@ -575,14 +887,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   const micOn = showLiveRoomView ? webrtcMicOn : isMicOn;
   const selfStream = showLiveRoomView ? localStream : previewStream;
 
-
-  const formatTime = (seconds: number): string => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
+  /* ---------- handlers ---------- */
   const handleSendMessage = async (): Promise<void> => {
     if (!message.trim()) return;
     const textToSend = message;
@@ -594,11 +899,20 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
           data: { content: textToSend, messageType: "text" },
         })
       ).unwrap();
-      // WORKAROUND: Refetch messages because backend POST /chat/:groupId/send returns { "data": { "data": null } }.
-      // This workaround can be removed once the backend returns the saved message in the send response.
+      // WORKAROUND: backend POST /chat/:groupId/send returns no saved message, so refetch.
       dispatch(fetchMessagesThunk({ groupId, params: { page: 1, limit: 30 } }));
     } catch (err) {
       setMessage(textToSend);
+    }
+  };
+
+  const handleCheckIn = async () => {
+    try {
+      await dispatch(attendanceCheckInThunk(undefined)).unwrap();
+      dispatch(fetchAttendanceStatusThunk({ force: true }));
+      dispatch(fetchUserStreakThunk());
+    } catch (err) {
+      console.error("Check-in error:", err);
     }
   };
 
@@ -613,7 +927,6 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
           }
           const hoursStudied = studyTime / 3600;
           if (hoursStudied > 0.1) {
-            // only mark if studied > 6 mins
             await dispatch(
               attendanceAutoMarkThunk({
                 reason: "study_session",
@@ -621,7 +934,7 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
               })
             )
               .unwrap()
-              .catch(() => { });
+              .catch(() => {});
             dispatch(fetchAttendanceStatusThunk({ force: true }));
             dispatch(fetchUserStreakThunk());
           }
@@ -645,12 +958,9 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     if (liveRoomJoinInFlight.current || showLiveRoomView) return;
     liveRoomJoinInFlight.current = true;
     try {
-      // 1. Room create karo
+      // 1. Create room
       const createdRoom = await dispatch(
-        createLiveRoomThunk({
-          groupId,
-          ...parsed.data,
-        })
+        createLiveRoomThunk({ groupId, ...parsed.data })
       ).unwrap();
 
       const roomId = createdRoom?.roomId;
@@ -678,29 +988,28 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       stopPreview();
       const stream = await startLocalStream(userCam, userMic);
       if (!stream) {
-        // Never leave a started room behind with nobody connected to it
         await dispatch(endLiveRoomThunk(roomId)).unwrap().catch(() => {});
-        alert("Could not access your camera/microphone. Allow access in the browser and try again.");
+        alert(
+          "Could not access your camera/microphone. Allow access in the browser and try again."
+        );
         return;
       }
 
-      // 4. Socket join — wait for the server's answer (accepted / room full / not allowed)
+      // 4. Socket join
       const socket = getSocket();
       if (!socket?.connected) {
-        leaveWebRTCRoom(); // stop the camera/mic we just opened
+        leaveWebRTCRoom();
         await dispatch(endLiveRoomThunk(roomId)).unwrap().catch(() => {});
         alert("Socket not connected");
         return;
       }
-      // Pass the new room id: the hook's own roomId is still '' until the page re-renders
       const joined = await requestWebRTCJoin({
         roomId,
         cameraOn: userCam && stream.getVideoTracks().length > 0,
         micOn: userMic && stream.getAudioTracks().length > 0,
       });
       if (joined.status !== "ok") {
-        leaveWebRTCRoom(); // stop the camera/mic we just opened
-        // The host is the only one in a room they just started: end it (a host "leave" ends it anyway)
+        leaveWebRTCRoom();
         await dispatch(endLiveRoomThunk(roomId)).unwrap().catch(() => {});
         alert(joined.message);
         return;
@@ -724,16 +1033,14 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
 
     const userCam = isCameraOn;
     const userMic = isMicOn;
-    // A host "leaving" ends the room for everyone, so never use the leave call to undo a host's join
-    const joiningAsHost =
-      activeLiveRoom.host?._id === currentUserId || activeLiveRoom.host === currentUserId;
+    // A host "leaving" ends the room, so never use leave to undo a host's join
+    const joiningAsHost = isLiveHost;
     const undoHttpJoin = async () => {
       if (joiningAsHost) return;
       await dispatch(leaveLiveRoomThunk(roomId)).unwrap().catch(() => {});
     };
 
     try {
-      // 1. HTTP join
       await dispatch(
         joinLiveRoomThunk({
           roomId,
@@ -741,20 +1048,17 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
         })
       ).unwrap();
 
-      // 2. Media get karo
       stopPreview();
       const stream = await startLocalStream(userCam, userMic);
       if (!stream) {
-        await undoHttpJoin(); // no camera/mic access: don't stay registered as a participant
+        await undoHttpJoin();
         return;
       }
 
-      // 3. Socket join. Like the mentorship call, give a reconnecting socket a few seconds
-      //    instead of failing at once.
       let socket = getSocket();
       if (socket && !socket.connected) {
         try {
-          socket = initializeSocket(); // wakes a socket that gave up reconnecting
+          socket = initializeSocket();
         } catch {
           /* keep the current socket */
         }
@@ -770,19 +1074,20 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
         }
       }
       if (!socket?.connected) {
-        leaveWebRTCRoom(); // stop the camera/mic we just opened
+        leaveWebRTCRoom();
         await undoHttpJoin();
-        alert("Could not reach the live server. Check your connection and try again.");
+        alert(
+          "Could not reach the live server. Check your connection and try again."
+        );
         return;
       }
-      // Tell the others what we really have (camera may be missing/busy -> mic only)
       const joined = await requestWebRTCJoin({
         cameraOn: userCam && stream.getVideoTracks().length > 0,
         micOn: userMic && stream.getAudioTracks().length > 0,
       });
       if (joined.status !== "ok") {
-        leaveWebRTCRoom(); // stop the camera/mic we just opened
-        await undoHttpJoin(); // undo the HTTP join
+        leaveWebRTCRoom();
+        await undoHttpJoin();
         alert(joined.message);
         return;
       }
@@ -790,15 +1095,13 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       setShowLiveRoomView(true);
     } catch (err: any) {
       alert(err || "Failed to join live room");
-      // The room may have just ended (stale Join button): refresh so the button goes away
       if (groupId) dispatch(fetchGroupActiveLiveRoomThunk(groupId));
     } finally {
       liveRoomJoinInFlight.current = false;
     }
   };
 
-  // Arrived from the "Live session started" popup (?joinLive=1): join the room straight away,
-  // so the member doesn't have to find the Enter Room button.
+  // Arrived from the "Live session started" popup (?joinLive=1)
   const autoJoinPending = useRef<boolean | null>(null);
   useEffect(() => {
     if (autoJoinPending.current === null) {
@@ -811,22 +1114,23 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       autoJoinPending.current = false;
       const url = new URL(window.location.href);
       url.searchParams.delete("joinLive");
-      window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+      window.history.replaceState(
+        null,
+        "",
+        url.pathname + url.search + url.hash
+      );
     };
 
     const roomId = activeLiveRoom?.roomId;
-    const isHost =
-      activeLiveRoom?.host?._id === currentUserId || activeLiveRoom?.host === currentUserId;
-    if (roomId && !isHost && !showLiveRoomView) {
+    if (roomId && !isLiveHost && !showLiveRoomView) {
       clearFlag();
       void handleJoinLiveRoom();
       return;
     }
     if (roomId) {
-      clearFlag(); // host or already inside: nothing to auto-join
+      clearFlag();
       return;
     }
-    // The room may have ended before the page loaded: stop waiting after a while
     const t = setTimeout(clearFlag, 10000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -834,20 +1138,13 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
 
   const handleEndOrLeaveLiveRoom = async (): Promise<void> => {
     if (!activeLiveRoom) return;
-    const isHost =
-      activeLiveRoom.host?._id === currentUserId ||
-      activeLiveRoom.host === currentUserId;
-
-    // Ask first: cancelling must leave the host in the call
-    if (isHost && !window.confirm("End the live room for everyone?")) return;
+    if (isLiveHost && !window.confirm("End the live room for everyone?")) return;
 
     try {
-      // 1. WebRTC cleanup
       leaveWebRTCRoom();
       setShowLiveRoomView(false);
 
-      // 2. HTTP leave/end
-      if (isHost) {
+      if (isLiveHost) {
         await dispatch(endLiveRoomThunk(activeLiveRoom.roomId)).unwrap();
       } else {
         await dispatch(leaveLiveRoomThunk(activeLiveRoom.roomId)).unwrap();
@@ -885,7 +1182,6 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
           };
           setIsSessionActive(true);
         }
-        // Auto-mark attendance when session starts
         try {
           await dispatch(
             attendanceAutoMarkThunk({ reason: "study_session", studyHours: 0 })
@@ -906,22 +1202,20 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       }
     } catch (err: any) {
       console.error("Timer error:", err);
-      setIsSessionActive((prev) => !prev); // fallback
+      setIsSessionActive((prev) => !prev);
     }
   };
 
   const handleSendNotification = (): void => {
     const text = reminderMessage.trim();
     if (!text) return;
+    // TODO: wire to a real "remind inactive members" API
     alert(`Study reminder sent to all inactive members!\n\n"${text}"`);
     setShowNotificationPopup(false);
     setReminderMessage(DEFAULT_REMINDER_MESSAGE);
   };
 
-  const handleCreateChallenge = (): void => {
-    setShowChallengeModal(true);
-  };
-
+  /* ---------- session timer ---------- */
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
 
@@ -930,7 +1224,8 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
       const elapsedSinceAnchor = Math.floor(
         (Date.now() - timerAnchorRef.current.anchorTimestamp) / 1000
       );
-      const currentStudyTime = forcedTime ?? (timerAnchorRef.current.baseSeconds + elapsedSinceAnchor);
+      const currentStudyTime =
+        forcedTime ?? timerAnchorRef.current.baseSeconds + elapsedSinceAnchor;
       lastBroadcastRef.current = Date.now();
       const socket = getSocket();
       if (socket?.connected) {
@@ -946,7 +1241,8 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
         const elapsedSinceAnchor = Math.floor(
           (Date.now() - timerAnchorRef.current.anchorTimestamp) / 1000
         );
-        const currentStudyTime = timerAnchorRef.current.baseSeconds + elapsedSinceAnchor;
+        const currentStudyTime =
+          timerAnchorRef.current.baseSeconds + elapsedSinceAnchor;
         setStudyTime(currentStudyTime);
         broadcastCurrentTime(currentStudyTime);
         const socket = getSocket();
@@ -971,10 +1267,10 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
         const elapsedSinceAnchor = Math.floor(
           (Date.now() - timerAnchorRef.current.anchorTimestamp) / 1000
         );
-        const currentStudyTime = timerAnchorRef.current.baseSeconds + elapsedSinceAnchor;
+        const currentStudyTime =
+          timerAnchorRef.current.baseSeconds + elapsedSinceAnchor;
         setStudyTime(currentStudyTime);
 
-        // Safe broadcast check using wall-clock delta
         const now = Date.now();
         if (now - lastBroadcastRef.current >= 5000) {
           broadcastCurrentTime(currentStudyTime);
@@ -990,26 +1286,43 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     };
   }, [isSessionActive, groupId]);
 
+  /* ---------- data loading (critical first, the rest after first paint) ---------- */
   useEffect(() => {
-    if (groupId) {
-      dispatch(fetchGroupByIdThunk(groupId));
-      dispatch(fetchGroupMembersThunk(groupId));
-      // Member names are resolved from the members response itself (useGroupData),
-      // so there is no need to load every user first.
-      fetchGroupMembersRef.current?.(groupId);
+    if (!groupId) return;
+
+    // Critical for first paint
+    dispatch(fetchGroupByIdThunk(groupId));
+    dispatch(fetchGroupMembersThunk(groupId));
+    fetchGroupMembersRef.current?.(groupId); // enriched names/avatars (useGroupData)
+    dispatch(getActiveTimerThunk());
+    dispatch(fetchGroupActiveLiveRoomThunk(groupId));
+
+    // Non-critical: after first paint
+    const w = window as any;
+    const idle: (cb: () => void) => any =
+      w.requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 300));
+    const cancelIdle: (h: any) => void = w.cancelIdleCallback ?? clearTimeout;
+    const handle = idle(() => {
       dispatch(fetchAttendanceStatusThunk());
       dispatch(fetchUserStreakThunk());
-
-      dispatch(getActiveTimerThunk());
       dispatch(getTimerStatsThunk());
-      dispatch(fetchMessagesThunk({ groupId, params: { page: 1, limit: 30 } }));
-      dispatch(fetchGroupActiveLiveRoomThunk(groupId));
-    }
+    });
+
     return () => {
+      cancelIdle(handle);
       dispatch(clearSelectedGroup());
       dispatch(clearActiveLiveRoom());
     };
   }, [groupId, dispatch]);
+
+  // Chat history loads only when the chat panel is first opened
+  const chatLoadedRef = useRef(false);
+  useEffect(() => {
+    if (panel === "chat" && !chatLoadedRef.current) {
+      chatLoadedRef.current = true;
+      dispatch(fetchMessagesThunk({ groupId, params: { page: 1, limit: 30 } }));
+    }
+  }, [panel, groupId, dispatch]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -1028,7 +1341,10 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   useEffect(() => {
     if (activeSession?.status === "active") {
       setIsSessionActive(true);
-      if (activeSession.elapsedTime !== undefined && activeSession.elapsedTime !== null) {
+      if (
+        activeSession.elapsedTime !== undefined &&
+        activeSession.elapsedTime !== null
+      ) {
         const serverSeconds = Math.floor(activeSession.elapsedTime);
         setStudyTime(serverSeconds);
         timerAnchorRef.current = {
@@ -1039,7 +1355,10 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
     } else if (activeSession?.status === "paused") {
       setIsSessionActive(false);
       timerAnchorRef.current = null;
-      if (activeSession.elapsedTime !== undefined && activeSession.elapsedTime !== null) {
+      if (
+        activeSession.elapsedTime !== undefined &&
+        activeSession.elapsedTime !== null
+      ) {
         setStudyTime(Math.floor(activeSession.elapsedTime));
       }
     } else if (!activeSession) {
@@ -1050,14 +1369,10 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
   }, [activeSession]);
 
   useEffect(() => {
-    // Start 5-min timer when session becomes active
     if (isSessionActive && !attendanceStatus?.hasCheckedInToday) {
-      attendanceTimerRef.current = setTimeout(
-        () => {
-          setShowAttendancePrompt(true);
-        },
-        5 * 60 * 1000
-      ); // 5 minutes
+      attendanceTimerRef.current = setTimeout(() => {
+        setShowAttendancePrompt(true);
+      }, 5 * 60 * 1000);
     }
     return () => {
       if (attendanceTimerRef.current) {
@@ -1068,666 +1383,317 @@ const GroupRoom: React.FC<GroupRoomProps> = ({ groupId }) => {
 
   useChatSocket(groupId);
 
-  if (isLoading || activeSessionLoading)
-    return (
-      <div className="fixed inset-0 bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#8b7355] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[#4a3728] font-semibold">
-            {activeSessionLoading ? "Checking session..." : "Loading group..."}
-          </p>
-        </div>
-      </div>
-    );
+  /* ------------------------------------------------------------------ */
+  /* Render                                                              */
+  /* ------------------------------------------------------------------ */
 
-  if (!groupData)
-    return (
-      <div className="fixed inset-0 bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] flex items-center justify-center">
+  if (!mounted) return null;
+
+  // Block only while there is no data at all; otherwise show the page and let parts fill in
+  if (isLoading && !groupData) {
+    return createPortal(<RoomSkeleton />, document.body);
+  }
+
+  if (!groupData) {
+    return createPortal(
+      <div className="fixed inset-0 z-[60] flex h-[100dvh] items-center justify-center bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] p-4">
         <div className="text-center">
-          <p className="text-[#4a3728] font-bold text-lg mb-2">
-            Group not found
-          </p>
+          <p className="mb-2 text-lg font-bold text-[#4a3728]">Group not found</p>
           <button
             onClick={() => router.push("/study/my-groups")}
-            className="px-4 py-2 bg-[#8b7355] text-white rounded-lg font-semibold"
+            className="rounded-lg bg-[#8b7355] px-4 py-2 font-semibold text-white"
           >
             Back to My Groups
           </button>
         </div>
-      </div>
+      </div>,
+      document.body
     );
+  }
 
-  /*
-ADD this block just before your main `return (` statement:
-*/
   if (webrtcError) {
-    // Non-blocking — just log, don't crash the component
     console.error("[WebRTC Error]", webrtcError);
   }
 
   const onlineOthers = members.filter(
     (m) => m.isOnline && m.userId !== currentUserId
   );
+  const onlineCount = members.filter((m) => m.isOnline).length;
+  const inactiveCount = Math.max(
+    0,
+    (groupData.currentMemberCount ?? 0) - onlineCount
+  );
   const tileCount = onlineOthers.length + 1;
+  const selfName = user?.name ?? user?.email ?? "You";
   const selfInitials = (user?.name ?? user?.email ?? "Y")
     .slice(0, 2)
     .toUpperCase();
 
-  return (
-    <div className="fixed inset-0 bg-gradient-to-br from-[#f6ede8] to-[#e0d8cf] flex flex-col z-50">
-      {/* Header - Responsive */}
-      <div className="px-2 sm:px-4 py-3 sm:py-3 shrink-0 lg:backdrop-blur-md lg:bg-white/40 lg:border-b lg:border-[#d4c4b5] lg:shadow-md">
-        {/* Mobile Header - Clean with Glassmorphism */}
-        <div className="lg:hidden">
-          {/* Top Row - Group name with announcement icon */}
-          <div className="flex items-center gap-2 mb-3">
-            <div className="min-w-0 flex-1 bg-white/70 backdrop-blur-md rounded-full px-4 py-2.5 shadow-lg border border-white/40 flex items-center justify-between">
-              <h1 className="text-sm font-bold text-[#4a3728] truncate leading-tight flex-1">
-                {groupData.title}
-              </h1>
-              <button
-                onClick={() => setShowAnnouncementModal(true)}
-                className="ml-2 p-1.5 bg-amber-100/80 backdrop-blur-sm hover:bg-amber-200/80 rounded-full transition-all shrink-0"
-                title="Group announcements"
-              >
-                <Megaphone size={16} className="text-amber-600" />
-              </button>
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-2.5 bg-white/70 backdrop-blur-md rounded-full shadow-lg border border-white/40 shrink-0">
-              <Users size={16} className="text-[#4a3728]" />
-              <span className="text-sm font-bold text-[#4a3728]">
-                {onlineMembers.length > 0
-                  ? onlineMembers.length
-                  : members.filter((m) => m.isOnline).length}
-              </span>
-            </div>
-          </div>
+  const gridCols =
+    tileCount === 1
+      ? "grid-cols-1 max-w-3xl"
+      : tileCount <= 4
+      ? "grid-cols-2 max-w-5xl"
+      : "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 max-w-7xl";
 
-          {/* Timer & Actions Row */}
-          <div className="flex items-center justify-between gap-2 mb-3">
-            {/* Big Timer Display */}
-            <div className="flex-1 bg-white/70 backdrop-blur-md rounded-2xl px-4 py-3 shadow-lg border border-white/40">
-              <div className="flex items-center justify-center gap-2">
-                <div
-                  className={`text-2xl font-bold tabular-nums ${isSessionActive ? "text-green-600" : "text-[#4a3728]"}`}
-                >
-                  {formatTime(studyTime)}
-                </div>
-                {isSessionActive && (
-                  <div className="flex flex-col items-center gap-0.5">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-[8px] font-semibold text-green-600 uppercase tracking-wide">
-                      Live
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
+  const sessionBusy = timerApiLoading || activeSessionLoading;
 
-            {/* Session Control */}
-            <button
-              onClick={handleToggleSession}
-              disabled={timerApiLoading}
-              className={`px-4 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 text-sm shadow-lg disabled:opacity-60 disabled:cursor-not-allowed ${isSessionActive
-                ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
-                : "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white"
-                }`}
-            >
-              {isSessionActive ? (
-                <>
-                  <Pause size={16} />
-                  Pause
-                </>
-              ) : (
-                <>
-                  <Play size={16} />
-                  Start
-                </>
-              )}
-            </button>
+  const renderTabs = (showClose: boolean) => (
+    <div className="flex shrink-0 border-b border-[#e0d8cf]">
+      {(
+        [
+          ["chat", "Chat", <MessageCircle key="c" size={15} />],
+          [
+            "members",
+            `Members (${groupData.currentMemberCount ?? rawMembers.length})`,
+            <Users key="m" size={15} />,
+          ],
+        ] as const
+      ).map(([key, label, icon]) => (
+        <button
+          key={key}
+          onClick={() => setPanel(key)}
+          className={`flex flex-1 items-center justify-center gap-1.5 px-3 py-3 text-sm font-semibold transition-all ${
+            panel === key
+              ? "border-b-4 border-[#8b7355] bg-[#f6ede8] text-[#4a3728]"
+              : "text-[#6b5847] hover:bg-[#f6ede8]"
+          }`}
+        >
+          {icon}
+          {label}
+        </button>
+      ))}
+      {showClose && (
+        <button
+          onClick={() => setPanel(null)}
+          aria-label="Close panel"
+          className="p-3 text-[#6b5847]"
+        >
+          <X size={20} />
+        </button>
+      )}
+    </div>
+  );
 
-            {/* Leave Button */}
-            <button
-              onClick={handleLeaveRoom}
-              className="p-3 bg-white/70 backdrop-blur-md hover:bg-red-50/70 rounded-2xl transition-all shadow-lg border border-white/40"
-            >
-              <LogOut size={18} className="text-red-500" />
-            </button>
-          </div>
+  const panelBody =
+    panel === "chat" ? (
+      <ChatPanel
+        messages={roomMessages}
+        currentUserId={currentUserId}
+        getUserInfoSync={getUserInfoSync as any}
+        message={message}
+        setMessage={setMessage}
+        onSend={handleSendMessage}
+        sendLoading={sendLoading}
+      />
+    ) : panel === "members" ? (
+      <MembersPanel
+        members={members}
+        currentUserId={currentUserId}
+        memberSessionTimes={memberSessionTimes as any}
+      />
+    ) : null;
 
-          {/* Go to Chat Room Button - Mobile/Tablet */}
+  const modalOverlay =
+    "fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4";
+
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex h-[100dvh] flex-col bg-gradient-to-br from-[#f6ede8] via-[#efe4da] to-[#e0d8cf]">
+      {/* ================= Header ================= */}
+      <header className="shrink-0 border-b border-white/50 bg-white/50 px-3 py-2 shadow-sm backdrop-blur-xl sm:px-6 sm:py-3">
+        <div className="flex items-center gap-2 sm:gap-4">
           <button
-            onClick={() => router.push(`/study/my-groups/${groupId}/chat`)}
-            className="w-full px-4 py-3 bg-white/70 backdrop-blur-md hover:bg-[#8b7355]/10 text-[#8b7355] rounded-2xl font-semibold transition-all flex items-center justify-center gap-2 text-sm shadow-lg border border-white/40"
+            onClick={() => router.push("/study/my-groups")}
+            aria-label="Back"
+            className="rounded-full p-2 text-[#6b5847] hover:bg-white/70"
           >
-            <MessageCircle size={16} />
-            Go to Chat Room
+            <ChevronLeft size={20} />
           </button>
 
-          {/* Attendance Check-in */}
-          {attendanceStatus?.hasCheckedInToday ? (
-            <div className="w-full px-4 py-3 bg-green-100 text-green-700 rounded-2xl text-sm text-center font-semibold">
-              ✅ Attendance marked for today
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h1 className="truncate text-base font-bold text-[#4a3728] sm:text-xl">
+                {groupData.title}
+              </h1>
+              {groupData.leaderId === currentUserId && (
+                <span className="hidden shrink-0 rounded-full bg-[#8b7355] px-2 py-0.5 text-[10px] font-bold text-white sm:inline">
+                  Host
+                </span>
+              )}
             </div>
+            <p className="truncate text-xs text-[#6b5847]">{groupData.category}</p>
+          </div>
+
+          {/* Stats */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div
+              className={`flex items-center gap-2 rounded-xl bg-white/70 px-2.5 py-1 text-base font-bold tabular-nums sm:px-4 sm:text-2xl ${
+                isSessionActive ? "text-green-600" : "text-[#4a3728]"
+              }`}
+            >
+              {isSessionActive && (
+                <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+              )}
+              {formatTime(studyTime)}
+            </div>
+            <div
+              className="hidden items-center gap-1 rounded-xl bg-white/70 px-3 py-1.5 text-sm font-bold text-[#4a3728] sm:flex"
+              title="Active now"
+            >
+              <Users size={14} /> {activeCount}/{groupData.currentMemberCount}
+            </div>
+            <div
+              className="hidden items-center gap-1 rounded-xl bg-white/70 px-3 py-1.5 text-sm font-bold text-[#8b7355] md:flex"
+              title="Day streak"
+            >
+              🔥 {userStreak ?? 0}
+            </div>
+          </div>
+
+          <button
+            onClick={handleToggleSession}
+            disabled={sessionBusy}
+            className={isSessionActive ? HDR_AMBER : HDR_PRIMARY}
+          >
+            {isSessionActive ? <Pause size={15} /> : <Play size={15} />}
+            <span className="hidden sm:inline">
+              {isSessionActive
+                ? "Pause"
+                : activeSession?.status === "paused"
+                ? "Resume"
+                : "Start"}
+            </span>
+          </button>
+          <button
+            onClick={handleLeaveRoom}
+            aria-label="Leave"
+            className={HDR_DANGER_OUTLINE}
+          >
+            <LogOut size={15} />
+          </button>
+        </div>
+
+        {/* Secondary actions: horizontal scroll chips, work at every width */}
+        <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-sm:[mask-image:linear-gradient(to_right,black_calc(100%-28px),transparent)]">
+          <button
+            onClick={() => setShowAnnouncementModal(true)}
+            className={HDR_OUTLINE}
+          >
+            <Megaphone size={15} /> Announcements
+          </button>
+
+          {attendanceStatus?.hasCheckedInToday ? (
+            <button
+              disabled
+              className={`${HDR_BTN} cursor-default border border-[#c9d4bd] bg-[#e6ece0] text-[#4f6b3a] disabled:opacity-100`}
+            >
+              <CheckCircle2 size={15} /> Checked in
+            </button>
           ) : (
             <button
-              onClick={async () => {
-                try {
-                  await dispatch(attendanceCheckInThunk(undefined)).unwrap();
-                  dispatch(fetchAttendanceStatusThunk({ force: true }));
-                  dispatch(fetchUserStreakThunk());
-                } catch (err) {
-                  console.error("Check-in error:", err);
-                }
-              }}
+              onClick={handleCheckIn}
               disabled={attendanceCheckInLoading}
-              className="w-full px-4 py-3 bg-green-500/10 text-green-700 rounded-2xl font-semibold text-sm border border-green-500/20 flex items-center justify-center gap-2"
+              className={HDR_WARM}
             >
-              {attendanceCheckInLoading ? "Checking in..." : "✅ Mark Today's Attendance"}
+              <CheckCircle2 size={15} />
+              {attendanceCheckInLoading ? "Checking in..." : "Check in"}
             </button>
           )}
 
           {activeLiveRoom ? (
-            <div className="flex gap-2">
+            <>
+              <span className="flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-red-500/20 bg-red-500/10 px-3 text-xs font-semibold text-red-600">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                Live
+              </span>
               {!isUserInLiveRoom && (
                 <button
                   onClick={handleJoinLiveRoom}
-                  className="flex-1 px-4 py-3 bg-green-500/10 text-green-700 rounded-2xl font-semibold text-sm border border-green-500/20 flex items-center justify-center gap-2"
+                  disabled={liveRoomActionLoading}
+                  className={HDR_WARM}
                 >
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                  Enter Live Room
+                  Enter room
                 </button>
               )}
-              {(activeLiveRoom.host === currentUserId ||
-                activeLiveRoom.host?._id === currentUserId) && (
-                  <button
-                    onClick={handleEndOrLeaveLiveRoom}
-                    className="px-4 py-3 bg-red-500/10 text-red-600 rounded-2xl font-semibold text-sm border border-red-500/20 flex items-center justify-center gap-2"
-                  >
-                    End
-                  </button>
-                )}
-            </div>
+              {isLiveHost && (
+                <button
+                  onClick={handleEndOrLeaveLiveRoom}
+                  disabled={liveRoomActionLoading}
+                  className={HDR_DANGER}
+                >
+                  End room
+                </button>
+              )}
+            </>
           ) : (
             <button
               onClick={() => setShowLiveRoomModal(true)}
-              className="w-full px-4 py-3 bg-purple-500/10 text-purple-700 rounded-2xl font-semibold text-sm border border-purple-500/20 flex items-center justify-center gap-2"
+              disabled={liveRoomActionLoading || activeLiveRoomLoading}
+              className={HDR_OUTLINE}
             >
-              Start Live Room
+              <Video size={15} /> Start live room
             </button>
           )}
+
+          <button
+            onClick={() => router.push(`/study/my-groups/${groupId}/chat`)}
+            className={HDR_OUTLINE}
+          >
+            <MessageCircle size={15} /> Chat room
+          </button>
         </div>
+      </header>
 
-        {/* Desktop Header */}
-        <div className="hidden lg:flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-3">
-          {/* Left Section - Group Identity */}
-          <div className="flex min-w-0 items-center gap-4">
-            <button
-              onClick={() => router.push("/study/my-groups")}
-              className="flex shrink-0 items-center gap-1 text-sm font-medium text-[#6b5847] transition-all hover:text-[#4a3728]"
-            >
-              <ChevronLeft size={18} />
-              <span>Back</span>
-            </button>
-
-            <div className="h-10 w-px shrink-0 bg-[#d4c4b5]"></div>
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="max-w-[240px] truncate text-xl font-bold tracking-tight text-[#4a3728] xl:text-2xl">
-                  {groupData.title}
-                </h1>
-                {groupData.leaderId === currentUserId && (
-                  <span className="shrink-0 rounded-full bg-[#8b7355] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white">
-                    Host
-                  </span>
-                )}
-              </div>
-              <p className="max-w-[240px] truncate text-sm text-[#6b5847]">
-                {groupData.category}
-              </p>
-            </div>
-          </div>
-
-          {/* Center Section - Live Stats */}
-          <div className="flex shrink-0 items-center gap-6">
-            <div className="text-center">
-              <div className="mb-1 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-[#6b5847]">
-                Session Time
-              </div>
-              <div
-                className={`text-2xl font-bold tabular-nums tracking-tight xl:text-3xl ${isSessionActive ? "text-green-600" : "text-[#4a3728]"
-                  }`}
-              >
-                {formatTime(studyTime)}
-              </div>
-            </div>
-
-            <div className="h-12 w-px bg-[#d4c4b5]"></div>
-
-            <div className="text-center">
-              <div className="mb-1 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-[#6b5847]">
-                Active Now
-              </div>
-              <div className="text-2xl font-bold tabular-nums text-[#4a3728] xl:text-3xl">
-                {activeCount}
-                <span className="ml-1 text-lg text-[#6b5847]">
-                  / {groupData.currentMemberCount}
-                </span>
-              </div>
-            </div>
-
-            <div className="h-12 w-px bg-[#d4c4b5]"></div>
-
-            <div className="text-center">
-              <div className="mb-1 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wider text-[#6b5847]">
-                Day Streak
-              </div>
-              <div className="text-2xl font-bold tabular-nums text-[#8b7355] xl:text-3xl">
-                {userStreak ?? 0}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Section - Actions */}
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              onClick={() => setShowAnnouncementModal(true)}
-              className={HDR_OUTLINE}
-            >
-              <Megaphone size={15} />
-              Announcements
-            </button>
-
-            {/* Attendance */}
-            {attendanceStatus?.hasCheckedInToday ? (
-              <button
-                disabled
-                className={`${HDR_BTN} cursor-default border border-[#c9d4bd] bg-[#e6ece0] text-[#4f6b3a] disabled:opacity-100`}
-              >
-                <CheckCircle2 size={15} />
-                Checked In
-              </button>
-            ) : (
-              <button
-                onClick={async () => {
-                  try {
-                    await dispatch(attendanceCheckInThunk(undefined)).unwrap();
-                    dispatch(fetchAttendanceStatusThunk({ force: true }));
-                    dispatch(fetchUserStreakThunk());
-                  } catch (err) {
-                    console.error("Check-in error:", err);
+      {/* ================= Main ================= */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6">
+          <div className="mx-auto flex min-h-full flex-col items-center justify-center gap-5">
+            <div className={`grid w-full gap-3 sm:gap-4 ${gridCols}`}>
+              <ParticipantTile
+                isSelf
+                name="You"
+                initials={selfInitials}
+                avatar={user?.avatar}
+                time={studyTime}
+                stream={selfStream}
+                camOn={camOn}
+                micOn={micOn}
+                badge={
+                  <>
+                    {isUserInLiveRoom && activeLiveRoom && (
+                      <span className="mr-1.5 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                        LIVE
+                      </span>
+                    )}
+                    {isSessionActive ? (
+                      <span className="rounded-full bg-green-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                        ACTIVE
+                      </span>
+                    ) : (
+                      activeSession?.status === "paused" && (
+                        <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                          PAUSED
+                        </span>
+                      )
+                    )}
+                  </>
+                }
+              />
+              {onlineOthers.map((m) => (
+                <ParticipantTile
+                  key={m.userId || m.id}
+                  name={m.name.split(" ")[0]}
+                  initials={m.name.slice(0, 2).toUpperCase()}
+                  avatar={m.avatar}
+                  time={memberSessionTimes[m.userId] ?? 0}
+                  micOn={false}
+                  speaking={m.isSpeaking}
+                  badge={
+                    <span className="rounded-full bg-[#8b7355] px-2 py-0.5 text-[10px] font-bold text-white">
+                      {m.role === "leader" ? "👑" : `#${m.rank}`}
+                    </span>
                   }
-                }}
-                disabled={attendanceCheckInLoading}
-                className={HDR_WARM}
-              >
-                <CheckCircle2 size={15} />
-                {attendanceCheckInLoading ? "Checking In..." : "Check In"}
-              </button>
-            )}
-
-            {/* Live room */}
-            {activeLiveRoom ? (
-              <div className="flex items-center gap-2">
-                <span className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border border-red-500/20 bg-red-500/10 px-3 text-xs font-semibold text-red-600">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-red-500"></span>
-                  Live
-                </span>
-                {!isUserInLiveRoom && (
-                  <button
-                    onClick={handleJoinLiveRoom}
-                    disabled={liveRoomActionLoading}
-                    className={HDR_WARM}
-                  >
-                    Enter Room
-                  </button>
-                )}
-                {(activeLiveRoom.host === currentUserId ||
-                  activeLiveRoom.host?._id === currentUserId) && (
-                    <button
-                      onClick={handleEndOrLeaveLiveRoom}
-                      disabled={liveRoomActionLoading}
-                      className={HDR_DANGER}
-                    >
-                      End Room
-                    </button>
-                  )}
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowLiveRoomModal(true)}
-                disabled={liveRoomActionLoading || activeLiveRoomLoading}
-                className={HDR_OUTLINE}
-              >
-                <Video size={15} />
-                Start Live Room
-              </button>
-            )}
-
-            <button
-              onClick={() => router.push(`/study/my-groups/${groupId}/chat`)}
-              className={HDR_OUTLINE}
-            >
-              <MessageCircle size={15} />
-              Chat Room
-            </button>
-
-            {/* Primary action */}
-            <button
-              onClick={handleToggleSession}
-              disabled={timerApiLoading}
-              className={
-                isSessionActive
-                  ? `${HDR_BTN} bg-[#b9803f] text-white shadow-sm hover:bg-[#a06e33]`
-                  : HDR_PRIMARY
-              }
-            >
-              {isSessionActive ? <Pause size={15} /> : <Play size={15} />}
-              {isSessionActive
-                ? "Pause Session"
-                : activeSession?.status === "paused"
-                ? "Resume Session"
-                : "Start Session"}
-            </button>
-
-            <button onClick={handleLeaveRoom} className={HDR_DANGER_OUTLINE}>
-              <LogOut size={15} />
-              Leave
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content - Scrollable */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Video Grid - Scrollable */}
-        <div className="flex-1 p-2 sm:p-4 md:p-6 overflow-y-auto">
-          {/* Mobile View - Avatar/Video Cards with Study Time */}
-          <div className="lg:hidden grid grid-cols-2 gap-2 max-w-2xl mx-auto">
-            {/* Self Card */}
-            <div className="bg-white/70 backdrop-blur-md rounded-xl p-3 shadow-lg border-2 border-[#8b7355]/50">
-              <div className="flex flex-col items-center">
-                {camOn ? (
-                  <div className="w-full aspect-square bg-gradient-to-br from-[#8b7355] to-[#6b5847] rounded-lg mb-2 flex items-center justify-center overflow-hidden">
-                    {selfStream ? (
-                      <SelfVideo
-                        stream={selfStream}
-                        className="absolute inset-0 w-full h-full object-cover" />
-
-                    ) : (
-                      <Video size={40} className="text-white/90" />
-                    )}
-                  </div>
-                ) : (
-                  <div className="mb-2">
-                    {user?.avatar ? (
-                      <img
-                        src={user.avatar}
-                        alt="You"
-                        className="w-16 h-16 rounded-full object-cover border-2 border-white shadow"
-                      />
-                    ) : (
-                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#8b7355] to-[#6b5847] flex items-center justify-center border-2 border-white shadow">
-                        <span className="text-white font-bold text-lg">
-                          {(user?.name ?? user?.email ?? "Y").slice(0, 2).toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div className="font-bold text-[#4a3728] text-sm mb-1">You</div>
-                <div className="text-base font-bold text-[#4a3728] mb-2 tabular-nums">
-                  {formatTime(studyTime)}
-                </div>
-                <div className="flex gap-1">
-                  {micOn ? (
-                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                      <Mic size={12} className="text-white" />
-                    </div>
-                  ) : (
-                    <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                      <MicOff size={12} className="text-white" />
-                    </div>
-                  )}
-                  {camOn ? (
-                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                      <Video size={12} className="text-white" />
-                    </div>
-                  ) : (
-                    <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                      <VideoOff size={12} className="text-white" />
-                    </div>
-                  )}
-                </div>
-                {isSessionActive && (
-                  <div className="mt-2 px-2 py-0.5 bg-green-500 rounded-full text-xs font-bold text-white flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
-                    ACTIVE
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Other Members Cards */}
-            {members
-              .filter((m) => m.isOnline && m.userId !== currentUserId)
-              .map((member) => (
-                <div
-                  key={member.id}
-                  className={`bg-white/70 backdrop-blur-md rounded-xl p-3 shadow-lg border-2 ${member.isSpeaking ? "border-green-500" : "border-white/40"
-                    }`}
-                >
-                  <div className="flex flex-col items-center">
-                    {/* Avatar — real image ya emoji fallback */}
-                    <div className="relative mb-2">
-                      {member.avatar ? (
-                        <img
-                          src={member.avatar}
-                          alt={member.name}
-                          className="w-16 h-16 rounded-full object-cover border-2 border-white shadow"
-                        />
-                      ) : (
-                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#4a3728] to-[#6b5847] flex items-center justify-center border-2 border-white shadow">
-                          <span className="text-white font-bold text-lg">
-                            {member.name.slice(0, 2).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
-                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                    </div>
-
-                    <div className="font-bold text-[#4a3728] text-sm mb-1 text-center truncate w-full">
-                      {member.userId === currentUserId
-                        ? "You"
-                        : member.name.split(" ")[0]}
-                    </div>
-                    <div className="text-base font-bold text-[#4a3728] mb-1 tabular-nums">
-                      {member.userId === currentUserId
-                        ? formatTime(studyTime)
-                        : formatTime(memberSessionTimes[member.userId] ?? 0)}
-                    </div>
-                    <div className="flex items-center gap-1 mb-2">
-                      <Award size={12} className="text-amber-500" />
-                      <span className="text-xs font-semibold text-[#6b5847]">
-                        {member.role === "leader"
-                          ? "👑 Leader"
-                          : `Rank #${member.rank}`}
-                      </span>
-                    </div>
-                    <div className="flex gap-1">
-                      {micOn ? (
-                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                          <Mic size={12} className="text-white" />
-                        </div>
-                      ) : (
-                        <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                          <MicOff size={12} className="text-white" />
-                        </div>
-                      )}
-                      {camOn ? (
-                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                          <Video size={12} className="text-white" />
-                        </div>
-                      ) : (
-                        <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-                          <VideoOff size={12} className="text-white" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-          </div>
-
-          {/* Desktop View - Video Grid */}
-          <div className="hidden lg:flex min-h-full flex-col items-center justify-center gap-6">
-            <div
-              className={`grid w-full gap-4 ${
-                tileCount === 1
-                  ? "max-w-3xl grid-cols-1"
-                  : tileCount === 2
-                  ? "max-w-5xl grid-cols-2"
-                  : "max-w-6xl grid-cols-3"
-              }`}
-            >
-              {/* Self Video */}
-              <div className="relative aspect-video overflow-hidden rounded-xl border-4 border-[#8b7355] bg-gradient-to-br from-[#8b7355] to-[#6b5847] shadow-xl">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  {camOn ? (
-                    selfStream ? (
-                      <SelfVideo
-                        stream={selfStream}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 text-white/90">
-                        <Video size={36} />
-                        <span className="text-sm font-medium">
-                          Starting camera...
-                        </span>
-                      </div>
-                    )
-                  ) : (
-                    <div className="flex flex-col items-center gap-3 text-center">
-                      {user?.avatar ? (
-                        <img
-                          src={user.avatar}
-                          alt="You"
-                          className="h-24 w-24 rounded-full border-4 border-white/30 object-cover shadow-xl"
-                        />
-                      ) : (
-                        <div className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-white/30 bg-white/20">
-                          <span className="text-3xl font-bold text-white">
-                            {selfInitials}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1.5 text-base font-semibold text-white">
-                        <VideoOff size={16} />
-                        Camera Off
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-4 pt-10">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <span className="block truncate text-base font-semibold text-white">
-                        You
-                      </span>
-                      <div className="flex items-center gap-1.5 text-sm tabular-nums text-white/90">
-                        <Clock size={14} />
-                        {formatTime(studyTime)}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 gap-1">
-                      {micOn ? (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500">
-                          <Mic size={16} className="text-white" />
-                        </div>
-                      ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500">
-                          <MicOff size={16} className="text-white" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* LIVE only while you are actually inside a live room */}
-                {isUserInLiveRoom && activeLiveRoom && (
-                  <div className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-red-500 px-2.5 py-1 text-xs font-bold text-white">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white"></span>
-                    LIVE
-                  </div>
-                )}
-                {isSessionActive ? (
-                  <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-green-500 px-2.5 py-1 text-xs font-bold text-white">
-                    <div className="h-2 w-2 animate-pulse rounded-full bg-white"></div>
-                    ACTIVE
-                  </div>
-                ) : (
-                  activeSession?.status === "paused" && (
-                    <div className="absolute right-3 top-3 rounded-full bg-amber-500 px-2.5 py-1 text-xs font-bold text-white">
-                      PAUSED
-                    </div>
-                  )
-                )}
-              </div>
-
-              {/* Other Members - Desktop */}
-              {onlineOthers.map((member) => (
-                <div
-                  key={member.id}
-                  className={`relative aspect-video overflow-hidden rounded-xl bg-gradient-to-br from-[#4a3728] to-[#6b5847] shadow-lg ${
-                    member.isSpeaking
-                      ? "ring-4 ring-green-500"
-                      : "border-2 border-[#e0d8cf]"
-                  }`}
-                >
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    {member.avatar ? (
-                      <img
-                        src={member.avatar}
-                        alt={member.name}
-                        className="h-24 w-24 rounded-full border-4 border-white/30 object-cover shadow-xl"
-                      />
-                    ) : (
-                      <div className="text-center">
-                        <div className="mx-auto mb-2 flex h-20 w-20 items-center justify-center rounded-full border-2 border-white/30 bg-white/20">
-                          <span className="text-2xl font-bold text-white">
-                            {member.name.slice(0, 2).toUpperCase()}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-4 pt-10">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <span className="block truncate text-base font-semibold text-white">
-                          {member.name}
-                        </span>
-                        <div className="flex items-center gap-2 text-sm text-white/90">
-                          <div className="flex items-center gap-1.5 tabular-nums">
-                            <Clock size={14} />
-                            {formatTime(memberSessionTimes[member.userId] ?? 0)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500">
-                          <MicOff size={16} className="text-white" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="absolute right-3 top-3 rounded-full bg-[#8b7355] px-2.5 py-1 text-xs font-bold text-white">
-                    {member.role === "leader" ? "\u{1F451}" : `#${member.rank}`}
-                  </div>
-                </div>
+                />
               ))}
             </div>
 
@@ -1738,576 +1704,153 @@ ADD this block just before your main `return (` statement:
               </div>
             )}
           </div>
-        </div>
+        </main>
 
-        {/* Right Sidebar - Chat & Members (Desktop & Tablet) */}
-        {(showChat || showMembers) && (
-          <div className="hidden md:flex w-64 lg:w-80 bg-white/80 backdrop-blur-md border-l-2 border-[#e0d8cf] flex-col overflow-hidden">
-            {/* Tabs */}
-            <div className="flex border-b border-[#e0d8cf] shrink-0">
-              <button
-                onClick={() => {
-                  setShowChat(true);
-                  setShowMembers(false);
-                }}
-                className={`flex-1 px-3 lg:px-4 py-2.5 lg:py-3 font-semibold text-xs lg:text-sm transition-all ${showChat && !showMembers
-                  ? "bg-[#f6ede8] text-[#4a3728] border-b-4 border-[#8b7355]"
-                  : "text-[#6b5847] hover:bg-[#f6ede8]"
-                  }`}
-              >
-                <MessageCircle size={14} className="inline mr-1.5 lg:mr-2" />
-                Chat
-              </button>
-              <button
-                onClick={() => {
-                  setShowMembers(true);
-                  setShowChat(false);
-                }}
-                className={`flex-1 px-3 lg:px-4 py-2.5 lg:py-3 font-semibold text-xs lg:text-sm transition-all ${showMembers && !showChat
-                  ? "bg-[#f6ede8] text-[#4a3728] border-b-4 border-[#8b7355]"
-                  : "text-[#6b5847] hover:bg-[#f6ede8]"
-                  }`}
-              >
-                <Users size={14} className="inline mr-1.5 lg:mr-2" />
-                Members ({groupData?.currentMemberCount ?? rawMembers.length})
-              </button>
-            </div>
-
-            {/* Chat View */}
-            {showChat && !showMembers && (
-              <>
-                <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-2 lg:space-y-3">
-                  {roomMessages.length === 0 && (
-                    <div className="text-center text-xs text-[#6b5847] mt-8">
-                      No messages yet. Say hi! 👋
-                    </div>
-                  )}
-                  {roomMessages.map((msg: any) => {
-                    const isOwn = msg.sender === currentUserId;
-                    const userInfo = getUserInfoSync(msg.sender);
-                    return (
-                      <div
-                        key={msg.messageId}
-                        className={`flex gap-2 ${isOwn ? "flex-row-reverse" : ""}`}
-                      >
-                        <div className="w-7 h-7 rounded-full bg-[#8b7355] flex items-center justify-center flex-shrink-0 text-xs font-bold text-white overflow-hidden">
-                          {userInfo.avatar ? (
-                            <img
-                              src={userInfo.avatar}
-                              alt={userInfo.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            userInfo.name.charAt(0).toUpperCase()
-                          )}
-                        </div>
-                        <div className={`flex-1 ${isOwn ? "text-right" : ""}`}>
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span
-                              className={`text-xs font-semibold text-[#4a3728] ${isOwn ? "order-2" : ""}`}
-                            >
-                              {isOwn ? "You" : userInfo.name}
-                            </span>
-                            <span className="text-xs text-[#6b5847]">
-                              {new Date(msg.createdAt).toLocaleTimeString(
-                                "en-US",
-                                { hour: "numeric", minute: "2-digit" }
-                              )}
-                            </span>
-                          </div>
-                          <div
-                            className={`inline-block px-2.5 py-1.5 rounded-lg text-xs lg:text-sm break-words max-w-[180px] ${isOwn ? "bg-[#8b7355] text-white rounded-tr-none" : "bg-[#f6ede8] text-[#4a3728] rounded-tl-none"}`}
-                          >
-                            {msg.content}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div ref={chatBottomRef} />
-                </div>
-                <div className="p-3 lg:p-4 border-t border-[#e0d8cf] shrink-0">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      onKeyPress={(e) =>
-                        e.key === "Enter" && handleSendMessage()
-                      }
-                      placeholder="Type a message..."
-                      className="flex-1 px-2.5 lg:px-3 py-1.5 lg:py-2 border-2 border-[#e0d8cf] rounded-lg focus:border-[#8b7355] outline-none text-xs lg:text-sm text-[#4a3728] placeholder:text-[#6b5847]/50"
-                    />
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={sendLoading}
-                      className="px-3 lg:px-4 py-1.5 lg:py-2 bg-[#8b7355] hover:bg-[#6b5847] text-white rounded-lg transition-all disabled:opacity-50"
-                    >
-                      <Send size={16} />
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Members View */}
-            {showMembers && !showChat && (
-              <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-2">
-                {members.length === 0 && (
-                  <div className="text-center text-xs text-[#6b5847] mt-8">No members yet.</div>
-                )}
-                {members
-                  .map((member) => (
-                    <div
-                      key={member.id}
-                      className={`p-2.5 lg:p-3 rounded-lg transition-all ${member.isOnline
-                        ? "bg-[#f6ede8] hover:bg-[#e0d8cf]"
-                        : "bg-gray-100 opacity-60"
-                        }`}
-                    >
-                      <div className="flex items-center gap-2.5 lg:gap-3">
-                        <div className="relative flex-shrink-0">
-                          {member.avatar ? (
-                            <img
-                              src={member.avatar}
-                              alt={member.name}
-                              className="w-8 h-8 lg:w-9 lg:h-9 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-[#8b7355] flex items-center justify-center">
-                              <span className="text-white font-bold text-xs">
-                                {member.name.slice(0, 2).toUpperCase()}
-                              </span>
-                            </div>
-                          )}
-                          {member.isOnline && (
-                            <div className="absolute bottom-0 right-0 w-2.5 lg:w-3 h-2.5 lg:h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-[#4a3728] text-xs lg:text-sm truncate">
-                            {member.userId === currentUserId ? "You" : member.name}
-                          </div>
-                          <div className="text-xs text-[#6b5847] tabular-nums">
-                            {formatTime(member.studyTime)} • Rank #{member.rank}
-                          </div>
-                        </div>
-                        {member.isOnline && (
-                          <div className="flex gap-1 shrink-0">
-                            {member.videoEnabled && (
-                              <div className="w-5 lg:w-6 h-5 lg:h-6 bg-green-500 rounded-full flex items-center justify-center">
-                                <Video
-                                  size={10}
-                                  className="text-white lg:w-3 lg:h-3"
-                                />
-                              </div>
-                            )}
-                            {member.audioEnabled && (
-                              <div
-                                className={`w-5 lg:w-6 h-5 lg:h-6 rounded-full flex items-center justify-center ${member.isSpeaking
-                                  ? "bg-green-500 animate-pulse"
-                                  : "bg-green-500"
-                                  }`}
-                              >
-                                <Mic
-                                  size={10}
-                                  className="text-white lg:w-3 lg:h-3"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
+        {/* Desktop / tablet side panel */}
+        {panel && (
+          <aside className="hidden w-72 shrink-0 flex-col overflow-hidden border-l-2 border-[#e0d8cf] bg-white/80 backdrop-blur-md md:flex lg:w-80">
+            {renderTabs(false)}
+            {panelBody}
+          </aside>
         )}
       </div>
 
-      {/* Mobile Chat/Members Overlay */}
-      {(showChat || showMembers) && (
+      {/* Mobile bottom sheet */}
+      {panel && (
         <div
-          className="md:hidden fixed inset-0 bg-black/50 z-50"
-          onClick={() => {
-            setShowChat(false);
-            setShowMembers(false);
-          }}
+          className="fixed inset-0 z-[65] bg-black/50 md:hidden"
+          onClick={() => setPanel(null)}
         >
           <div
-            className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md rounded-t-2xl max-h-[70vh] flex flex-col border-t-2 border-white/40"
+            className="absolute inset-x-0 bottom-0 flex h-[70dvh] flex-col rounded-t-2xl border-t-2 border-white/40 bg-white/95 backdrop-blur-md"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Tabs */}
-            <div className="flex border-b border-[#e0d8cf] shrink-0">
-              <button
-                onClick={() => {
-                  setShowChat(true);
-                  setShowMembers(false);
-                }}
-                className={`flex-1 px-4 py-3 font-semibold text-sm transition-all ${showChat && !showMembers
-                  ? "bg-[#f6ede8] text-[#4a3728] border-b-4 border-[#8b7355]"
-                  : "text-[#6b5847]"
-                  }`}
-              >
-                <MessageCircle size={16} className="inline mr-2" />
-                Chat
-              </button>
-              <button
-                onClick={() => {
-                  setShowMembers(true);
-                  setShowChat(false);
-                }}
-                className={`flex-1 px-4 py-3 font-semibold text-sm transition-all ${showMembers && !showChat
-                  ? "bg-[#f6ede8] text-[#4a3728] border-b-4 border-[#8b7355]"
-                  : "text-[#6b5847]"
-                  }`}
-              >
-                <Users size={16} className="inline mr-2" />
-                Members ({members.filter((m) => m.isOnline).length})
-              </button>
-              <button
-                onClick={() => {
-                  setShowChat(false);
-                  setShowMembers(false);
-                }}
-                className="p-3 text-[#6b5847]"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Chat View */}
-
-            {showChat && !showMembers && (
-              <>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                  {roomMessages.length === 0 && (
-                    <div className="text-center text-xs text-[#6b5847] mt-8">
-                      No messages yet. Say hi! 👋
-                    </div>
-                  )}
-                  {roomMessages.map((msg: any) => {
-                    const isOwn = msg.sender === currentUserId;
-                    const userInfo = getUserInfoSync(msg.sender);
-                    return (
-                      <div
-                        key={msg.messageId}
-                        className={`flex gap-2 ${isOwn ? "flex-row-reverse" : ""}`}
-                      >
-                        <div className="w-8 h-8 rounded-full bg-[#8b7355] flex items-center justify-center flex-shrink-0 text-xs font-bold text-white overflow-hidden">
-                          {userInfo.avatar ? (
-                            <img
-                              src={userInfo.avatar}
-                              alt={userInfo.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            userInfo.name.charAt(0).toUpperCase()
-                          )}
-                        </div>
-                        <div className={`flex-1 ${isOwn ? "text-right" : ""}`}>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span
-                              className={`text-xs font-semibold text-[#4a3728] ${isOwn ? "order-2" : ""}`}
-                            >
-                              {isOwn ? "You" : userInfo.name}
-                            </span>
-                            <span className="text-xs text-[#6b5847]">
-                              {new Date(msg.createdAt).toLocaleTimeString(
-                                "en-US",
-                                {
-                                  hour: "numeric",
-                                  minute: "2-digit",
-                                }
-                              )}
-                            </span>
-                          </div>
-                          <div
-                            className={`inline-block px-3 py-2 rounded-lg text-sm break-words max-w-[200px] ${isOwn
-                              ? "bg-[#8b7355] text-white rounded-tr-none"
-                              : "bg-[#f6ede8] text-[#4a3728] rounded-tl-none"
-                              }`}
-                          >
-                            {msg.content}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="p-4 border-t border-[#e0d8cf] shrink-0 bg-white/90 backdrop-blur-md">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      onKeyPress={(e) =>
-                        e.key === "Enter" && handleSendMessage()
-                      }
-                      placeholder="Type a message..."
-                      className="flex-1 px-3 py-2 border-2 border-[#e0d8cf] rounded-lg focus:border-[#8b7355] outline-none text-sm text-[#4a3728] placeholder:text-[#6b5847]/50"
-                    />
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={sendLoading}
-                      className="px-4 py-2 bg-[#8b7355] hover:bg-[#6b5847] text-white rounded-lg transition-all disabled:opacity-50"
-                    >
-                      <Send size={18} />
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Members View */}
-            {showMembers && !showChat && (
-              <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                {members.length === 0 && (
-                  <div className="text-center text-xs text-[#6b5847] mt-8">No members yet.</div>
-                )}
-                {members
-                  .map((member) => (
-                    <div
-                      key={member.id}
-                      className={`p-3 rounded-lg transition-all ${member.isOnline
-                        ? "bg-[#f6ede8]"
-                        : "bg-gray-100 opacity-60"
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="relative flex-shrink-0">
-                          {member.avatar ? (
-                            <img
-                              src={member.avatar}
-                              alt={member.name}
-                              className="w-9 h-9 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-9 h-9 rounded-full bg-[#8b7355] flex items-center justify-center">
-                              <span className="text-white font-bold text-xs">
-                                {member.name.slice(0, 2).toUpperCase()}
-                              </span>
-                            </div>
-                          )}
-                          {member.isOnline && (
-                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-[#4a3728] text-sm">
-                            {member.userId === currentUserId ? "You" : member.name}
-                          </div>
-                          <div className="text-xs text-[#6b5847] tabular-nums">
-                            {formatTime(member.studyTime)} • Rank #{member.rank}
-                          </div>
-                        </div>
-                        {member.isOnline && (
-                          <div className="flex gap-1">
-                            {member.videoEnabled && (
-                              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                                <Video size={12} className="text-white" />
-                              </div>
-                            )}
-                            {member.audioEnabled && (
-                              <div
-                                className={`w-6 h-6 rounded-full flex items-center justify-center ${member.isSpeaking
-                                  ? "bg-green-500 animate-pulse"
-                                  : "bg-green-500"
-                                  }`}
-                              >
-                                <Mic size={12} className="text-white" />
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            )}
+            {renderTabs(true)}
+            {panelBody}
           </div>
         </div>
       )}
 
-      {/* Bottom Controls - Fixed, Responsive with Glassmorphism */}
-      <div className="backdrop-blur-md bg-white/40 border-t border-[#d4c4b5] shadow-lg px-3 sm:px-4 md:px-6 py-3 sm:py-3 shrink-0 safe-area-bottom">
-        <div className="flex items-start justify-center gap-2 sm:gap-4 md:gap-5">
-          {/* Mic */}
-          <div className="flex flex-col items-center gap-1.5">
-            <button
-              onClick={() => {
-                if (showLiveRoomView) {
-                  toggleWebRTCMic();
-                  getSocket()?.emit("toggle-mic", {
-                    roomId: activeLiveRoom?.roomId,
-                    micOn: !webrtcMicOn,
-                  });
-                  dispatch(setLocalMic(!webrtcMicOn));
-                } else {
-                  dispatch(setLocalMic(!isMicOn));
-                }
-              }}
-              className={micOn ? CTRL_TAN : CTRL_RED}
-              title={micOn ? "Mute" : "Unmute"}
-              aria-label={micOn ? "Mute microphone" : "Unmute microphone"}
-              aria-pressed={!micOn}
-            >
-              {micOn ? (
-                <Mic size={20} className="sm:w-6 sm:h-6" />
-              ) : (
-                <MicOff size={20} className="sm:w-6 sm:h-6" />
-              )}
-            </button>
-            <span className={CTRL_LABEL}>{micOn ? "Mute" : "Unmute"}</span>
-          </div>
+      {/* ================= Bottom dock ================= */}
+      <div className="shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
+        <div className="mx-auto flex w-fit max-w-full items-start gap-2 overflow-x-auto rounded-3xl border border-white/60 bg-white/60 px-3 py-2 shadow-xl backdrop-blur-xl [scrollbar-width:none] sm:gap-4 sm:px-5 [&::-webkit-scrollbar]:hidden">
+          <ControlButton
+            label={micOn ? "Mute" : "Unmute"}
+            title={micOn ? "Mute microphone" : "Unmute microphone"}
+            className={micOn ? CTRL_TAN : CTRL_RED}
+            pressed={!micOn}
+            onClick={() => {
+              if (showLiveRoomView) {
+                toggleWebRTCMic();
+                getSocket()?.emit("toggle-mic", {
+                  roomId: activeLiveRoom?.roomId,
+                  micOn: !webrtcMicOn,
+                });
+                dispatch(setLocalMic(!webrtcMicOn));
+              } else {
+                dispatch(setLocalMic(!isMicOn));
+              }
+            }}
+          >
+            {micOn ? <Mic size={20} /> : <MicOff size={20} />}
+          </ControlButton>
 
-          {/* Camera */}
-          <div className="flex flex-col items-center gap-1.5">
-            <button
-              onClick={async () => {
-                if (showLiveRoomView) {
-                  await toggleWebRTCCamera();
-                  getSocket()?.emit("toggle-camera", {
-                    roomId: activeLiveRoom?.roomId,
-                    cameraOn: !webrtcCameraOn,
-                  });
-                  dispatch(setLocalCamera(!webrtcCameraOn));
-                } else {
-                  await toggleLocalCamera();
-                }
-              }}
-              className={camOn ? CTRL_TAN : CTRL_RED}
-              title={camOn ? "Turn off camera" : "Turn on camera"}
-              aria-label={camOn ? "Turn off camera" : "Turn on camera"}
-              aria-pressed={!camOn}
-            >
-              {camOn ? (
-                <Video size={20} className="sm:w-6 sm:h-6" />
-              ) : (
-                <VideoOff size={20} className="sm:w-6 sm:h-6" />
-              )}
-            </button>
-            <span className={CTRL_LABEL}>
-              {camOn ? "Stop Video" : "Start Video"}
-            </span>
-          </div>
+          <ControlButton
+            label={camOn ? "Stop video" : "Start video"}
+            title={camOn ? "Turn off camera" : "Turn on camera"}
+            className={camOn ? CTRL_TAN : CTRL_RED}
+            pressed={!camOn}
+            onClick={async () => {
+              if (showLiveRoomView) {
+                await toggleWebRTCCamera();
+                getSocket()?.emit("toggle-camera", {
+                  roomId: activeLiveRoom?.roomId,
+                  cameraOn: !webrtcCameraOn,
+                });
+                dispatch(setLocalCamera(!webrtcCameraOn));
+              } else {
+                await toggleLocalCamera();
+              }
+            }}
+          >
+            {camOn ? <Video size={20} /> : <VideoOff size={20} />}
+          </ControlButton>
 
-          {/* Remind inactive members */}
-          <div className="flex flex-col items-center gap-1.5">
-            <button
-              onClick={() => setShowNotificationPopup(!showNotificationPopup)}
-              className={CTRL_DARK}
-              title="Remind inactive members"
-              aria-label="Remind inactive members"
-            >
-              <Bell size={20} className="sm:w-6 sm:h-6" />
-              {groupData.currentMemberCount -
-                members.filter((m) => m.isOnline).length >
-                0 && (
-                  <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500">
-                    <span className="text-[10px] font-bold text-white">
-                      {groupData.currentMemberCount -
-                        members.filter((m) => m.isOnline).length}
-                    </span>
-                  </div>
-                )}
-            </button>
-            <span className={CTRL_LABEL}>Remind</span>
-          </div>
+          <ControlButton
+            label="Remind"
+            title="Remind inactive members"
+            className={CTRL_DARK}
+            badge={inactiveCount}
+            onClick={() => setShowNotificationPopup((v) => !v)}
+          >
+            <Bell size={20} />
+          </ControlButton>
 
-          {/* Group challenge */}
-          <div className="flex flex-col items-center gap-1.5">
-            <button
-              onClick={handleCreateChallenge}
-              className={CTRL_DARK}
-              title="Start group challenge"
-              aria-label="Start group challenge"
-            >
-              <Zap size={20} className="sm:w-6 sm:h-6" />
-            </button>
-            <span className={CTRL_LABEL}>Challenge</span>
-          </div>
+          <ControlButton
+            label="Challenge"
+            title="Start group challenge"
+            className={CTRL_DARK}
+            onClick={() => setShowChallengeModal(true)}
+          >
+            <Zap size={20} />
+          </ControlButton>
 
-          {/* Chat side panel */}
-          <div className="flex flex-col items-center gap-1.5">
-            <button
-              onClick={() => {
-                setShowChat(!showChat);
-                if (showMembers && !showChat) {
-                  setShowMembers(false);
-                }
-              }}
-              className={showChat ? CTRL_TAN : CTRL_DARK}
-              title="Toggle chat panel"
-              aria-label="Toggle chat panel"
-              aria-pressed={showChat}
-            >
-              <MessageCircle size={20} className="sm:w-6 sm:h-6" />
-            </button>
-            <span className={CTRL_LABEL}>Chat</span>
-          </div>
+          <ControlButton
+            label="Chat"
+            title="Toggle chat panel"
+            className={panel === "chat" ? CTRL_TAN : CTRL_DARK}
+            pressed={panel === "chat"}
+            onClick={() => togglePanel("chat")}
+          >
+            <MessageCircle size={20} />
+          </ControlButton>
 
-          {/* Members side panel */}
-          <div className="flex flex-col items-center gap-1.5">
-            <button
-              onClick={() => {
-                setShowMembers(!showMembers);
-                if (showChat && !showMembers) {
-                  setShowChat(false);
-                }
-              }}
-              className={showMembers ? CTRL_TAN : CTRL_DARK}
-              title="Toggle members panel"
-              aria-label="Toggle members panel"
-              aria-pressed={showMembers}
-            >
-              <Users size={20} className="sm:w-6 sm:h-6" />
-            </button>
-            <span className={CTRL_LABEL}>Members</span>
-          </div>
+          <ControlButton
+            label="Members"
+            title="Toggle members panel"
+            className={panel === "members" ? CTRL_TAN : CTRL_DARK}
+            pressed={panel === "members"}
+            onClick={() => togglePanel("members")}
+          >
+            <Users size={20} />
+          </ControlButton>
         </div>
       </div>
 
-      {/* Notification Popup */}
+      {/* ================= Modals ================= */}
+
+      {/* Reminder */}
       {showNotificationPopup && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowNotificationPopup(false)}
-        >
+        <div className={modalOverlay} onClick={() => setShowNotificationPopup(false)}>
           <div
-            className="bg-white/90 backdrop-blur-md rounded-2xl p-6 max-w-sm w-full shadow-2xl transform transition-all border border-white/40"
+            className="w-full max-w-sm rounded-2xl border border-white/40 bg-white/95 p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-[#f6ede8] rounded-full flex items-center justify-center">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#f6ede8]">
                 <Bell size={24} className="text-[#8b7355]" />
               </div>
               <div>
                 <h3 className="text-lg font-bold text-[#4a3728]">
-                  Send Study Reminder
+                  Send study reminder
                 </h3>
-                <p className="text-xs text-[#6b5847]">
-                  Motivate inactive members
-                </p>
+                <p className="text-xs text-[#6b5847]">Motivate inactive members</p>
               </div>
             </div>
 
-            <div className="bg-[#f6ede8] rounded-lg p-4 mb-4">
+            <div className="mb-4 rounded-lg bg-[#f6ede8] p-4">
               <div className="mb-2 flex items-center justify-between">
                 <label
                   htmlFor="reminder-message"
                   className="text-sm font-semibold text-[#4a3728]"
                 >
-                  Message to send:
+                  Message to send
                 </label>
                 {reminderMessage !== DEFAULT_REMINDER_MESSAGE && (
                   <button
                     type="button"
                     onClick={() => setReminderMessage(DEFAULT_REMINDER_MESSAGE)}
-                    className="text-xs font-medium text-[#8b7355] hover:text-[#4a3728] underline"
+                    className="text-xs font-medium text-[#8b7355] underline hover:text-[#4a3728]"
                   >
                     Reset to default
                   </button>
@@ -2317,9 +1860,7 @@ ADD this block just before your main `return (` statement:
                 id="reminder-message"
                 value={reminderMessage}
                 onChange={(e) =>
-                  setReminderMessage(
-                    e.target.value.slice(0, REMINDER_MAX_LENGTH)
-                  )
+                  setReminderMessage(e.target.value.slice(0, REMINDER_MAX_LENGTH))
                 }
                 rows={4}
                 maxLength={REMINDER_MAX_LENGTH}
@@ -2330,218 +1871,112 @@ ADD this block just before your main `return (` statement:
               </p>
             </div>
 
-            <div className="flex items-center justify-between text-xs text-[#6b5847] mb-4">
+            <div className="mb-4 flex items-center justify-between text-xs text-[#6b5847]">
               <span>Will notify:</span>
               <span className="font-semibold text-[#4a3728]">
-                {groupData.currentMemberCount -
-                  members.filter((m) => m.isOnline).length}{" "}
-                inactive members
+                {inactiveCount} inactive members
               </span>
             </div>
 
             <div className="flex gap-3">
               <button
                 onClick={() => setShowNotificationPopup(false)}
-                className="flex-1 px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-[#4a3728] rounded-lg font-semibold transition-all"
+                className="flex-1 rounded-lg bg-gray-200 px-4 py-2.5 font-semibold text-[#4a3728] transition-all hover:bg-gray-300"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSendNotification}
                 disabled={!reminderMessage.trim()}
-                className="flex-1 px-4 py-2.5 bg-[#8b7355] hover:bg-[#6b5847] text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#8b7355] px-4 py-2.5 font-semibold text-white transition-all hover:bg-[#6b5847] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Send size={16} />
-                Send Reminder
+                <Send size={16} /> Send reminder
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Challenge Modal */}
-      {/* {showChallengeModal && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowChallengeModal(false)}
-        >
-          <div
-            className="bg-white/90 backdrop-blur-md rounded-2xl p-6 max-w-md w-full shadow-2xl transform transition-all border border-white/40"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
-                <Zap size={24} className="text-amber-500" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-[#4a3728]">
-                  Start Group Challenge
-                </h3>
-                <p className="text-xs text-[#6b5847]">
-                  Compete and motivate each other
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3 mb-5">
-              <button className="w-full p-4 bg-gradient-to-r from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 rounded-xl transition-all text-left border-2 border-purple-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold text-[#4a3728] mb-1">
-                      ⏱️ Speed Challenge
-                    </div>
-                    <div className="text-xs text-[#6b5847]">
-                      Who can study 2 hours fastest?
-                    </div>
-                  </div>
-                  <ChevronLeft
-                    className="rotate-180 text-purple-500"
-                    size={20}
-                  />
-                </div>
-              </button>
-
-              <button className="w-full p-4 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 rounded-xl transition-all text-left border-2 border-green-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold text-[#4a3728] mb-1">
-                      🔥 Streak Battle
-                    </div>
-                    <div className="text-xs text-[#6b5847]">
-                      7-day consistency challenge
-                    </div>
-                  </div>
-                  <ChevronLeft
-                    className="rotate-180 text-green-500"
-                    size={20}
-                  />
-                </div>
-              </button>
-
-              <button className="w-full p-4 bg-gradient-to-r from-amber-50 to-amber-100 hover:from-amber-100 hover:to-amber-200 rounded-xl transition-all text-left border-2 border-amber-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold text-[#4a3728] mb-1">
-                      🎯 Daily Goal Race
-                    </div>
-                    <div className="text-xs text-[#6b5847]">
-                      First to hit 8 hours today wins
-                    </div>
-                  </div>
-                  <ChevronLeft
-                    className="rotate-180 text-amber-500"
-                    size={20}
-                  />
-                </div>
-              </button>
-            </div>
-
-            <button
-              onClick={() => setShowChallengeModal(false)}
-              className="w-full px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-[#4a3728] rounded-lg font-semibold transition-all"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )} */}
-
       <GroupChallengeModal
         isOpen={showChallengeModal}
         onClose={() => setShowChallengeModal(false)}
         groupId={groupId}
-        resolveName={(id) => getUserInfoSync(id)?.name ?? ""}
+        resolveName={(id: string) => getUserInfoSync(id)?.name ?? ""}
       />
 
-      {/* Announcement Modal */}
+      {/* Announcements (demo content: replace with a real API) */}
       {showAnnouncementModal && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowAnnouncementModal(false)}
-        >
+        <div className={modalOverlay} onClick={() => setShowAnnouncementModal(false)}>
           <div
-            className="bg-white/90 backdrop-blur-md rounded-2xl p-6 max-w-md w-full shadow-2xl transform transition-all border border-white/40"
+            className="w-full max-w-md rounded-2xl border border-white/40 bg-white/95 p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
                 <Megaphone size={24} className="text-amber-600" />
               </div>
               <div>
                 <h3 className="text-lg font-bold text-[#4a3728]">
-                  Group Announcements
+                  Group announcements
                 </h3>
-                <p className="text-xs text-[#6b5847]">
-                  Important updates from host
-                </p>
+                <p className="text-xs text-[#6b5847]">Important updates from host</p>
               </div>
             </div>
 
-            <div className="space-y-3 mb-5 max-h-96 overflow-y-auto">
-              {/* Recent Announcement */}
-              <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl p-4 border-l-4 border-amber-500">
-                <div className="flex items-start justify-between mb-2">
+            <div className="mb-5 max-h-[60vh] space-y-3 overflow-y-auto">
+              <div className="rounded-xl border-l-4 border-amber-500 bg-gradient-to-r from-amber-50 to-yellow-50 p-4">
+                <div className="mb-2 flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <Crown size={14} className="text-amber-600" />
-                    <span className="text-xs font-semibold text-amber-700">
-                      Host
-                    </span>
+                    <span className="text-xs font-semibold text-amber-700">Host</span>
                   </div>
                   <span className="text-xs text-[#6b5847]">2 hours ago</span>
                 </div>
-                <p className="text-sm text-[#4a3728] font-medium mb-1">
+                <p className="mb-1 text-sm font-medium text-[#4a3728]">
                   📚 Important: Today&apos;s Focus
                 </p>
                 <p className="text-sm text-[#6b5847]">
-                  Let&apos;s aim for 6+ hours today! Remember to take breaks every 90
-                  minutes. We&apos;re almost at our group goal! 💪
+                  Let&apos;s aim for 6+ hours today! Remember to take breaks every
+                  90 minutes. We&apos;re almost at our group goal! 💪
                 </p>
               </div>
 
-              {/* Older Announcement */}
-              <div className="bg-[#f6ede8] rounded-xl p-4 border-l-4 border-[#8b7355]">
-                <div className="flex items-start justify-between mb-2">
+              <div className="rounded-xl border-l-4 border-[#8b7355] bg-[#f6ede8] p-4">
+                <div className="mb-2 flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <Crown size={14} className="text-[#8b7355]" />
-                    <span className="text-xs font-semibold text-[#6b5847]">
-                      Host
-                    </span>
+                    <span className="text-xs font-semibold text-[#6b5847]">Host</span>
                   </div>
                   <span className="text-xs text-[#6b5847]">Yesterday</span>
                 </div>
-                <p className="text-sm text-[#4a3728] font-medium mb-1">
+                <p className="mb-1 text-sm font-medium text-[#4a3728]">
                   🎉 Milestone Achieved!
                 </p>
                 <p className="text-sm text-[#6b5847]">
-                  Congrats everyone! We&apos;ve completed 15 days streak as a group.
-                  Keep up the amazing work!
+                  Congrats everyone! We&apos;ve completed 15 days streak as a
+                  group. Keep up the amazing work!
                 </p>
               </div>
 
-              {/* Info Message */}
-              <div className="bg-blue-50 rounded-xl p-4 border-l-4 border-blue-500">
-                <div className="flex items-start justify-between mb-2">
+              <div className="rounded-xl border-l-4 border-blue-500 bg-blue-50 p-4">
+                <div className="mb-2 flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <Info size={14} className="text-blue-600" />
-                    <span className="text-xs font-semibold text-blue-700">
-                      System
-                    </span>
+                    <span className="text-xs font-semibold text-blue-700">System</span>
                   </div>
                   <span className="text-xs text-[#6b5847]">3 days ago</span>
                 </div>
-                <p className="text-sm text-[#4a3728] font-medium mb-1">
-                  ℹ️ New Feature
-                </p>
+                <p className="mb-1 text-sm font-medium text-[#4a3728]">ℹ️ New Feature</p>
                 <p className="text-sm text-[#6b5847]">
                   You can now track your individual progress in real-time. Check
-                  the timer below your profile!
+                  the timer at the top of the room!
                 </p>
               </div>
             </div>
 
             <button
               onClick={() => setShowAnnouncementModal(false)}
-              className="w-full px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-[#4a3728] rounded-lg font-semibold transition-all"
+              className="w-full rounded-lg bg-gray-200 px-4 py-2.5 font-semibold text-[#4a3728] transition-all hover:bg-gray-300"
             >
               Close
             </button>
@@ -2549,19 +1984,14 @@ ADD this block just before your main `return (` statement:
         </div>
       )}
 
-      {/* Create Live Room Modal */}
+      {/* Start live room */}
       {showLiveRoomModal && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowLiveRoomModal(false)}
-        >
+        <div className={modalOverlay} onClick={() => setShowLiveRoomModal(false)}>
           <div
-            className="bg-white/90 backdrop-blur-md rounded-2xl p-6 max-w-md w-full shadow-2xl border border-white/40"
+            className="w-full max-w-md rounded-2xl border border-white/40 bg-white/95 p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-bold text-[#4a3728] mb-4">
-              Start Live Room
-            </h3>
+            <h3 className="mb-4 text-lg font-bold text-[#4a3728]">Start live room</h3>
             <input
               type="text"
               value={liveRoomTitle}
@@ -2570,25 +2000,25 @@ ADD this block just before your main `return (` statement:
                 setLiveRoomError("");
               }}
               placeholder={`${groupData?.title ?? "Study"} - Live Session`}
-              className="w-full px-4 py-3 border-2 border-[#e0d8cf] rounded-xl mb-2 text-sm outline-none focus:border-[#8b7355]"
+              className="mb-2 w-full rounded-xl border-2 border-[#e0d8cf] px-4 py-3 text-sm outline-none focus:border-[#8b7355]"
             />
             {liveRoomError && (
-              <p className="text-xs text-red-500 mb-3">{liveRoomError}</p>
+              <p className="mb-3 text-xs text-red-500">{liveRoomError}</p>
             )}
-            <div className="flex gap-3 mt-4">
+            <div className="mt-4 flex gap-3">
               <button
                 onClick={() => {
                   setShowLiveRoomModal(false);
                   setLiveRoomError("");
                 }}
-                className="flex-1 px-4 py-2.5 bg-gray-200 rounded-lg font-semibold text-sm"
+                className="flex-1 rounded-lg bg-gray-200 px-4 py-2.5 text-sm font-semibold"
               >
                 Cancel
               </button>
               <button
                 onClick={handleStartLiveRoom}
                 disabled={liveRoomActionLoading}
-                className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm disabled:opacity-50"
+                className="flex-1 rounded-lg bg-[#4a3728] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#3a2a1e] disabled:opacity-50"
               >
                 {liveRoomActionLoading ? "Starting..." : "Start"}
               </button>
@@ -2611,8 +2041,8 @@ ADD this block just before your main `return (` statement:
           <LiveRoomView
             localStream={localStream}
             currentUserId={currentUserId}
-            localUserName={user?.name ?? user?.email ?? "You"} // ← localUserName
-            localUserAvatar={user?.avatar ?? null} // ← localUserAvatar
+            localUserName={selfName}
+            localUserAvatar={user?.avatar ?? null}
             isCameraOn={webrtcCameraOn}
             isMicOn={webrtcMicOn}
             isScreenSharing={webrtcScreenSharing}
@@ -2622,8 +2052,7 @@ ADD this block just before your main `return (` statement:
             roomTitle={activeLiveRoom.title}
             onToggleCamera={async () => {
               await toggleWebRTCCamera();
-              const socket = getSocket();
-              socket?.emit("toggle-camera", {
+              getSocket()?.emit("toggle-camera", {
                 roomId: activeLiveRoom.roomId,
                 cameraOn: !webrtcCameraOn,
               });
@@ -2631,8 +2060,7 @@ ADD this block just before your main `return (` statement:
             }}
             onToggleMic={() => {
               toggleWebRTCMic();
-              const socket = getSocket();
-              socket?.emit("toggle-mic", {
+              getSocket()?.emit("toggle-mic", {
                 roomId: activeLiveRoom.roomId,
                 micOn: !webrtcMicOn,
               });
@@ -2640,8 +2068,7 @@ ADD this block just before your main `return (` statement:
             }}
             onToggleScreenShare={async () => {
               await toggleWebRTCScreenShare();
-              const socket = getSocket();
-              socket?.emit("toggle-screen-share", {
+              getSocket()?.emit("toggle-screen-share", {
                 roomId: activeLiveRoom.roomId,
                 sharing: !webrtcScreenSharing,
               });
@@ -2653,21 +2080,22 @@ ADD this block just before your main `return (` statement:
       )}
 
       {showAttendancePrompt && !attendanceStatus?.hasCheckedInToday && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white/90 backdrop-blur-md rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-white/40">
-            <div className="text-center mb-4">
-              <div className="text-4xl mb-2">✅</div>
+        <div className={modalOverlay}>
+          <div className="w-full max-w-sm rounded-2xl border border-white/40 bg-white/95 p-6 shadow-2xl">
+            <div className="mb-4 text-center">
+              <div className="mb-2 text-4xl">✅</div>
               <h3 className="text-lg font-bold text-[#4a3728]">
-                Mark Your Attendance
+                Mark your attendance
               </h3>
-              <p className="text-sm text-[#6b5847] mt-1">
-                You&apos;ve been studying for 5 minutes. Mark today&apos;s attendance?
+              <p className="mt-1 text-sm text-[#6b5847]">
+                You&apos;ve been studying for 5 minutes. Mark today&apos;s
+                attendance?
               </p>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowAttendancePrompt(false)}
-                className="flex-1 px-4 py-2.5 bg-gray-200 rounded-lg font-semibold text-sm text-[#4a3728]"
+                className="flex-1 rounded-lg bg-gray-200 px-4 py-2.5 text-sm font-semibold text-[#4a3728]"
               >
                 Later
               </button>
@@ -2677,15 +2105,16 @@ ADD this block just before your main `return (` statement:
                   setShowAttendancePrompt(false);
                 }}
                 disabled={attendanceCheckInLoading}
-                className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-sm disabled:opacity-50"
+                className="flex-1 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
               >
-                Mark Attendance
+                Mark attendance
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
 
