@@ -1,6 +1,7 @@
 //studygroup/study/groups/components/groupcard.tsx
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Clock, Eye, EyeOff, Camera, CameraOff, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -34,6 +35,17 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
   const [joinModalGroup, setJoinModalGroup] = useState<any | null>(null);
   const [joinSuccess, setJoinSuccess] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [showOpenConfirm, setShowOpenConfirm] = useState(false);
+
+  // Close the "Open Group" confirmation with the Escape key
+  useEffect(() => {
+    if (!showOpenConfirm) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowOpenConfirm(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showOpenConfirm]);
   const { getJoinRequestForGroup, addJoinRequestToCache } = useGroupData();
   const existingRequest = getJoinRequestForGroup(group.groupId);
   const isApiGroup = !!group.groupId;
@@ -45,16 +57,22 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
 
   const handleJoinClick = async () => {
     if (isMember) {
-      console.log("Navigating to group room for groupId:", group.groupId || group.id);
-      router.push(`/study/my-groups/${group.groupId || group.id}`); // Navigate to group room if already a member
+      // already member — button says "Open Group": ask for confirmation first
+      setShowOpenConfirm(true);
       return;
-    }; // already member — button says "Open Group"
+    }
     if (!isApiGroup) return;
     if (group.visibility === 'private') {
       setJoinModalGroup(group);
     } else {
       await handlePublicJoin(group.groupId);
     }
+  };
+
+  const handleConfirmOpen = () => {
+    setShowOpenConfirm(false);
+    console.log("Navigating to group room for groupId:", group.groupId || group.id);
+    router.push(`/study/my-groups/${group.groupId || group.id}`); // Navigate to group room
   };
 
   const handlePublicJoin = async (groupId: string) => {
@@ -246,6 +264,53 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
             existingRequest={existingRequest}  // ADD
           />
         )}
+      {
+        showOpenConfirm &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+            onClick={() => setShowOpenConfirm(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="open-group-confirm-title"
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
+            >
+              <div className="bg-gradient-to-br from-[#4a3728] to-[#8b6f47] px-6 py-5">
+                <h3 id="open-group-confirm-title" className="text-lg font-bold text-white">
+                  Open study room?
+                </h3>
+                <p className="mt-1 line-clamp-1 text-sm text-white/80">{group.title}</p>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-sm leading-relaxed text-[#6b5648]">
+                  You are about to enter the study room for this group. Do you want to continue?
+                </p>
+                <div className="mt-5 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowOpenConfirm(false)}
+                    className="flex-1 rounded-xl border-2 border-[#e0d8cf] bg-white py-2.5 text-sm font-bold text-[#4a3728] transition-colors hover:bg-[#faf5ef]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    autoFocus
+                    onClick={handleConfirmOpen}
+                    className="flex-1 rounded-xl bg-[#4a3728] py-2.5 text-sm font-bold text-white transition-all hover:bg-[#3a281c] active:scale-[0.98]"
+                  >
+                    Open Group
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      }
     </div >
   );
 };

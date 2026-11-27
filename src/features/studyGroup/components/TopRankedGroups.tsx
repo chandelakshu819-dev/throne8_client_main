@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { TrendingUp, Users, Award, Trophy } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { selectJoinLoading, selectTopRankedGroups, selectTopRankedGroupsLoading } from "@/hooks/studyGroup/features/groups/groupsSlice";
@@ -24,6 +25,23 @@ const TopRankedCard = ({
   onJoinClick: (group: any) => void;
 }) => {
   const [imgFailed, setImgFailed] = useState(false);
+  const [showOpenConfirm, setShowOpenConfirm] = useState(false);
+
+  // Close the "Open Group" confirmation with the Escape key
+  useEffect(() => {
+    if (!showOpenConfirm) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowOpenConfirm(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showOpenConfirm]);
+
+  const handleConfirmOpen = () => {
+    setShowOpenConfirm(false);
+    window.location.href = `/study/my-groups/${group.groupId || group.id}`;
+  };
+
   const memberCount = group.currentMemberCount ?? group.members ?? 0;
   const spotsLeft = group.capacity - memberCount;
   const isFull = spotsLeft <= 0;
@@ -107,7 +125,8 @@ const TopRankedCard = ({
           disabled={isFull && !group.isMember}
           onClick={() => {
             if (group.isMember) {
-              window.location.href = `/study/my-groups/${group.groupId || group.id}`;
+              // already member — ask for confirmation before opening the room
+              setShowOpenConfirm(true);
               return;
             }
             onJoinClick(group);
@@ -123,12 +142,65 @@ const TopRankedCard = ({
           {group.isMember ? "Open Group" : isFull ? "Full" : "Join Group"}
         </button>
       </div>
+
+      {showOpenConfirm &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+            onClick={() => setShowOpenConfirm(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="open-group-confirm-title"
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
+            >
+              <div className="bg-gradient-to-br from-[#4a3728] to-[#8b6f47] px-6 py-5">
+                <h3 id="open-group-confirm-title" className="text-lg font-bold text-white">
+                  Open study room?
+                </h3>
+                <p className="mt-1 line-clamp-1 text-sm text-white/80">{group.title}</p>
+              </div>
+              <div className="px-6 py-5">
+                <p className="text-sm leading-relaxed text-[#6b5648]">
+                  You are about to enter the study room for this group. Do you want to continue?
+                </p>
+                <div className="mt-5 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowOpenConfirm(false)}
+                    className="flex-1 rounded-xl border-2 border-[#e0d8cf] bg-white py-2.5 text-sm font-bold text-[#4a3728] transition-colors hover:bg-[#faf5ef]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    autoFocus
+                    onClick={handleConfirmOpen}
+                    className="flex-1 rounded-xl bg-[#4a3728] py-2.5 text-sm font-bold text-white transition-all hover:bg-[#3a281c] active:scale-[0.98]"
+                  >
+                    Open Group
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
 
 /* ===================== MAIN ===================== */
-export default function TopRankedGroups() {
+interface TopRankedGroupsProps {
+  /** Becomes true once the page's Top Ranked request has finished. */
+  fetched?: boolean;
+  /** Called once this section is fully ready (cards shown, or nothing to show). */
+  onReady?: () => void;
+}
+
+export default function TopRankedGroups({ fetched = true, onReady }: TopRankedGroupsProps) {
   const apiGroups = useAppSelector(selectTopRankedGroups) ?? [];
   const isLoading = useAppSelector(selectTopRankedGroupsLoading);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +209,11 @@ export default function TopRankedGroups() {
 
   // Store enriched groups in local state
   const [topThreeGroups, setTopThreeGroups] = useState<any[]>([]);
+  // True once the groups from the API have been enriched with leader info.
+  // Until then we keep showing the skeleton so this section holds its place
+  // above "University Groups" instead of popping in late.
+  const [isEnriched, setIsEnriched] = useState(false);
+  const isEnriching = apiGroups.length > 0 && !isEnriched;
 
   const INITIAL_CARDS = 3;
   const [showAll, setShowAll] = useState(false);
@@ -203,6 +280,13 @@ export default function TopRankedGroups() {
     }
   };
 
+  // Tell the page when this section is ready so it can show the sections below
+  useEffect(() => {
+    if (!fetched) return;
+    if (apiGroups.length === 0 || isEnriched) onReady?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetched, apiGroups.length, isEnriched]);
+
   useEffect(() => {
     if (apiGroups.length === 0) return;
 
@@ -231,13 +315,14 @@ export default function TopRankedGroups() {
         })
       );
       setTopThreeGroups(enriched);
+      setIsEnriched(true);
     };
 
     enrichGroups();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiGroups]);
 
-  if (isLoading) {
+  if (!fetched || isLoading || isEnriching) {
     return <SkeletonLoader count={3} className="px-4" />
   }
 

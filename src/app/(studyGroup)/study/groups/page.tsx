@@ -1,7 +1,7 @@
 "use client";
 
 import TopRankedGroups from '@/features/studyGroup/components/TopRankedGroups';
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import GroupHeader from '@/features/studyGroup/components/GroupHeader';
 import CTA from '@/features/studyGroup/components/CTA';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -17,14 +17,30 @@ const Groups: React.FC = () => {
   const dispatch = useAppDispatch();
   const { fetchMyJoinRequests } = useGroupData();
 
+  // Top Ranked request finished / Top Ranked section is fully shown
+  const [topFetched, setTopFetched] = useState(false);
+  const [topReady, setTopReady] = useState(false);
+  const handleTopReady = useCallback(() => setTopReady(true), []);
+
   useEffect(() => {
-    dispatch(fetchTopRankedGroupsThunk(10));
+    // Top Ranked loads first; everything else is fetched in parallel in the
+    // background, but those sections are only shown after Top Ranked is ready.
+    let cancelled = false;
+    (async () => {
+      await dispatch(fetchTopRankedGroupsThunk(10));
+      if (!cancelled) setTopFetched(true);
+    })();
+
     dispatch(fetchUniversityGroupsThunk(10));
     dispatch(fetchPlacementGroupsThunk(10));
     dispatch(fetchPublicGroupsThunk(10));
     dispatch(fetchTrendingGroupsThunk(6));
     dispatch(fetchPopularGroupsThunk(6));
     fetchMyJoinRequests();
+
+    return () => {
+      cancelled = true;
+    };
   }, [dispatch]);
 
 
@@ -43,39 +59,43 @@ const Groups: React.FC = () => {
         </div>
 
         <div className={SECTION}>
-          <TopRankedGroups />
+          <TopRankedGroups fetched={topFetched} onReady={handleTopReady} />
         </div>
 
-        <div className={SECTION}>
-          <GroupGrid
-            icon={<GraduationCap size={22} />}
-            title="University Groups"
-            subtitle="Find friends from your college"
-            sectionKey="university"
-          />
-        </div>
+        {topReady && (
+          <>
+            <div className={SECTION}>
+              <GroupGrid
+                icon={<GraduationCap size={22} />}
+                title="University Groups"
+                subtitle="Find friends from your college"
+                sectionKey="university"
+              />
+            </div>
 
-        <div className={SECTION}>
-          <GroupGrid
-            icon={<Globe size={22} />}
-            title="Public Groups"
-            subtitle="Open groups with instant access, no approval required"
-            sectionKey="public"
-          />
-        </div>
+            <div className={SECTION}>
+              <GroupGrid
+                icon={<Globe size={22} />}
+                title="Public Groups"
+                subtitle="Open groups with instant access, no approval required"
+                sectionKey="public"
+              />
+            </div>
 
-        <div className={SECTION}>
-          <GroupGrid
-            icon={<Briefcase size={22} />}
-            title="Placement Groups"
-            subtitle="Gear up for placements with like-minded people"
-            sectionKey="dsa"
-          />
-        </div>
+            <div className={SECTION}>
+              <GroupGrid
+                icon={<Briefcase size={22} />}
+                title="Placement Groups"
+                subtitle="Gear up for placements with like-minded people"
+                sectionKey="dsa"
+              />
+            </div>
 
-        <div className={SECTION}>
-          <CTA />
-        </div>
+            <div className={SECTION}>
+              <CTA />
+            </div>
+          </>
+        )}
 
       </div>
     </div>

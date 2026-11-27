@@ -16,6 +16,8 @@ import {
     Calendar,
     ArrowRight,
     Award,
+    ChevronDown,
+    ChevronUp,
 } from "lucide-react";
 import MentorService, { PublicSeniorMentor } from "@/lib/api/mentorship.service";
 import {
@@ -810,13 +812,16 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                                         {visibleIndustryMentors.map((mentor) => renderCard(mentor, true))}
                                     </div>
                                     {filteredIndustryMentors.length > INDUSTRY_LIMIT && (
-                                        <div className="mt-6">
+                                        <div className="mt-8 flex justify-center">
                                             <button
                                                 onClick={() => setShowAllIndustryMentors((previous) => !previous)}
-                                                className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] transition-all flex items-center justify-center gap-2"
+                                                className="flex items-center gap-2 rounded-xl border border-[#d4c4b5] bg-white/70 px-6 py-2.5 text-sm font-semibold text-[#4a3728] shadow-sm transition-colors hover:bg-white"
                                             >
-                                                <span>{showAllIndustryMentors ? "Show less" : "Show more"}</span>
-                                                <ArrowRight className={`w-4 h-4 ${showAllIndustryMentors ? "-rotate-90" : "rotate-90"}`} />
+                                                {showAllIndustryMentors ? (
+                                                    <>Show Less <ChevronUp size={18} /></>
+                                                ) : (
+                                                    <>Show More <ChevronDown size={18} /></>
+                                                )}
                                             </button>
                                         </div>
                                     )}
@@ -871,24 +876,22 @@ export default function MentorDiscoverySection({ toggleCompare, compareList }: M
                                     )}
 
                                     {collegeRemaining > 0 ? (
-                                        <div className="mt-6">
+                                        <div className="mt-8 flex justify-center">
                                             <button
                                                 onClick={() => setCollegeVisible((c) => c + COLLEGE_LIMIT)}
-                                                className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] transition-all flex items-center justify-center gap-2"
+                                                className="flex items-center gap-2 rounded-xl border border-[#d4c4b5] bg-white/70 px-6 py-2.5 text-sm font-semibold text-[#4a3728] shadow-sm transition-colors hover:bg-white"
                                             >
-                                                <span>Load more ({collegeRemaining} remaining)</span>
-                                                <ArrowRight className="w-4 h-4 rotate-90" />
+                                                Show More <ChevronDown size={18} />
                                             </button>
                                         </div>
                                     ) : (
                                         filteredCollegeMentors.length > COLLEGE_LIMIT && (
-                                            <div className="mt-6">
+                                            <div className="mt-8 flex justify-center">
                                                 <button
                                                     onClick={() => setCollegeVisible(COLLEGE_LIMIT)}
-                                                    className="group relative w-full py-4 px-6 bg-white border border-[#ece7e2] text-[#4a3728] text-sm font-bold rounded-2xl shadow-sm hover:shadow-md hover:border-[#8b7355] transition-all flex items-center justify-center gap-2"
+                                                    className="flex items-center gap-2 rounded-xl border border-[#d4c4b5] bg-white/70 px-6 py-2.5 text-sm font-semibold text-[#4a3728] shadow-sm transition-colors hover:bg-white"
                                                 >
-                                                    <span>Show less</span>
-                                                    <ArrowRight className="w-4 h-4 -rotate-90" />
+                                                    Show Less <ChevronUp size={18} />
                                                 </button>
                                             </div>
                                         )
