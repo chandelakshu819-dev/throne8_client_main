@@ -1,7 +1,7 @@
 // src/features/mentorship/components/dashboard/ServiceCard.tsx
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Clock, Users, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { Clock, CheckCircle2, MoreVertical, Pencil, Trash2, Users } from 'lucide-react';
 import { serviceTypes, getServiceIcon, getServiceAccent, getPriceLabel } from './ServicesPage';
 import ServiceThumbnail, { getServiceImage } from '@/features/mentorship/components/shared/ServiceThumbnail';
 
@@ -26,140 +26,152 @@ export function ServiceCard({ service, idx = 0, onEdit, onDelete, onMenteeStatus
   const confirmed = bookings.filter((b: any) => b.status === 'confirmed').length;
   const completed = bookings.filter((b: any) => b.status === 'completed').length;
 
+  const statusChips = [
+    { count: pending, label: 'pending', bg: '#fef3c7', color: '#b45309' },
+    { count: confirmed, label: 'confirmed', bg: '#dcfce7', color: '#15803d' },
+    { count: completed, label: 'done', bg: '#dbeafe', color: '#1d4ed8' },
+  ].filter(c => c.count > 0);
+
+  const showMenu = service.isApi && onEdit && onDelete;
+
   return (
     <div
-      className="group bg-white rounded-[20px] border flex flex-col h-full overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+      className="group bg-white rounded-[20px] border flex flex-col h-full overflow-hidden transition-all duration-300 hover:shadow-xl motion-safe:hover:-translate-y-1"
       style={{ borderColor: '#e0d8cf', boxShadow: '0 4px 20px -4px rgba(74, 55, 40, 0.08)' }}
     >
-      <div
-              className="w-full aspect-video relative overflow-hidden"
-        style={{ backgroundColor: '#f3ece4' }}
-      >
+      {/* Thumbnail with overlays: type pill (left), menu (right), status chips (bottom) */}
+      <div className="w-full aspect-video relative overflow-hidden" style={{ backgroundColor: '#f3ece4' }}>
         <ServiceThumbnail
           src={getServiceImage(service)}
           alt={service.name}
           label={typeLabel}
           type={service.type}
         />
+
+        {/* Soft gradient so overlays stay readable on any image */}
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/25 via-transparent to-black/35" />
+
         <span
-          className="absolute top-3 left-3 w-8 h-8 rounded-lg flex items-center justify-center shadow-sm z-10"
-          style={{ backgroundColor: '#fff' }}
+          className="absolute top-3 left-3 z-10 inline-flex items-center gap-1.5 pl-2 pr-3 py-1.5 rounded-full text-[11px] font-bold shadow-sm bg-white/95 backdrop-blur"
+          style={{ color: accent }}
         >
-          <Icon className="w-4 h-4" style={{ color: accent }} />
+          <Icon className="w-3.5 h-3.5" />
+          {typeLabel}
         </span>
+
+        {showMenu && (
+          <div className="absolute top-3 right-3 z-10">
+            <button
+              aria-label="Service options"
+              aria-haspopup="menu"
+              aria-expanded={isMenuOpen}
+              onClick={(e) => {
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setMenuAnchorRect({ top: rect.bottom + 6, left: rect.right - 128 });
+                setIsMenuOpen(!isMenuOpen);
+              }}
+              className="w-8 h-8 rounded-full flex items-center justify-center bg-white/95 backdrop-blur shadow-sm hover:bg-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7a5c3e]/60"
+            >
+              <MoreVertical className="w-4 h-4" style={{ color: '#4a3728' }} />
+            </button>
+            {isMenuOpen && typeof document !== "undefined" && createPortal(
+              <>
+                <div className="fixed inset-0 z-[100]" onClick={() => setIsMenuOpen(false)} />
+                <div
+                  role="menu"
+                  className="fixed z-[101] w-32 rounded-xl shadow-lg overflow-hidden"
+                  style={{
+                    top: menuAnchorRect?.top ?? 0,
+                    left: menuAnchorRect?.left ?? 0,
+                    border: '1px solid #e0d8cf',
+                    backgroundColor: '#fff',
+                  }}
+                >
+                  <button
+                    role="menuitem"
+                    onClick={() => { setIsMenuOpen(false); onEdit!(service); }}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-medium hover:bg-[#f3ece4] transition-colors"
+                    style={{ color: '#4a3728' }}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => { setIsMenuOpen(false); onDelete!(service); }}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-medium hover:bg-[#fee2e2] transition-colors"
+                    style={{ color: '#dc2626' }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete
+                  </button>
+                </div>
+              </>,
+              document.body
+            )}
+          </div>
+        )}
+
+        {statusChips.length > 0 && (
+          <div className="absolute bottom-3 left-3 right-3 z-10 flex items-center gap-1.5 flex-wrap">
+            {statusChips.map(c => (
+              <span
+                key={c.label}
+                className="text-[11px] font-bold px-2.5 py-1 rounded-full shadow-sm"
+                style={{ backgroundColor: c.bg, color: c.color }}
+              >
+                {c.count} {c.label}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="p-6 flex flex-col flex-1">
-        <div className="flex-1">
-          <div className="flex items-start justify-end mb-4">
-            <div className="flex items-center gap-1.5 flex-wrap justify-end">
-              {pending > 0 && (
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: '#fef3c7', color: '#b45309' }}>
-                  {pending} pending
-                </span>
-              )}
-              {confirmed > 0 && (
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: '#dcfce7', color: '#15803d' }}>
-                  {confirmed} confirmed
-                </span>
-              )}
-              {completed > 0 && (
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: '#dbeafe', color: '#1d4ed8' }}>
-                  {completed} done
-                </span>
-              )}
+      {/* Body */}
+      <div className="p-5 flex flex-col flex-1">
+        <h3 className="text-base font-bold leading-snug line-clamp-1" style={{ color: '#4a3728' }} title={service.name}>
+          {service.name}
+        </h3>
 
-              {service.isApi && onEdit && onDelete && (
-                <div className="relative">
-                  <button
-                    onClick={(e) => {
-                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                      setMenuAnchorRect({ top: rect.bottom + 4, left: rect.right - 128 });
-                      setIsMenuOpen(!isMenuOpen);
-                    }}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#f3ece4] transition-colors"
-                  >
-                    <MoreVertical className="w-4 h-4" style={{ color: '#8a7a6a' }} />
-                  </button>
-                  {isMenuOpen && typeof document !== "undefined" && createPortal(
-                    <>
-                      <div className="fixed inset-0 z-[100]" onClick={() => setIsMenuOpen(false)} />
-                      <div
-                        className="fixed z-[101] w-32 rounded-lg shadow-lg overflow-hidden"
-                        style={{
-                          top: menuAnchorRect?.top ?? 0,
-                          left: menuAnchorRect?.left ?? 0,
-                          border: '1px solid #e0d8cf',
-                          backgroundColor: '#fff',
-                        }}
-                      >
-                        <button
-                          onClick={() => { setIsMenuOpen(false); onEdit(service); }}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#f3ece4] transition-colors"
-                          style={{ color: '#4a3728' }}
-                        >
-                          <Pencil className="w-3 h-3" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => { setIsMenuOpen(false); onDelete(service); }}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[#fee2e2] transition-colors"
-                          style={{ color: '#dc2626' }}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                          Delete
-                        </button>
-                      </div>
-                    </>,
-                    document.body
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+        <p
+          className="mt-1.5 text-sm leading-relaxed line-clamp-2"
+          style={{ color: '#8a7a6a', overflowWrap: 'break-word', wordBreak: 'break-word', minHeight: '2.75rem' }}
+        >
+          {service.description || `Professional ${(service.name || 'mentoring').toLowerCase()} session`}
+        </p>
 
-          <h3 className="text-base font-bold mb-1.5" style={{ color: '#4a3728' }}>{service.name}</h3>
-
-          <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold mb-3"
-            style={{ backgroundColor: `${accent}1A`, color: accent }}>
-            {typeLabel}
+        {/* Meta chips */}
+        <div className="flex items-center gap-2 flex-wrap mt-4">
+          {service.duration > 0 && (
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium"
+              style={{ backgroundColor: '#f3ece4', color: '#5c4a3a' }}
+            >
+              <Clock className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
+              {service.duration} min
+            </span>
+          )}
+          <span
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium"
+            style={{ backgroundColor: '#f3ece4', color: '#5c4a3a' }}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
+            {service.sessions} completed
           </span>
-
-          <p className="mb-4 text-sm line-clamp-2" style={{ color: '#8a7a6a', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
-            {service.description || `Professional ${service.name.toLowerCase()} session`}
-          </p>
-
-          <div className="flex flex-col gap-1.5 mb-4">
-            {service.duration > 0 && (
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
-                <span className="text-xs" style={{ color: '#8a7a6a' }}>
-                  {service.duration} Minutes
-                </span>
-              </div>
-            )}
-            <div className="flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
-              <span className="text-xs" style={{ color: '#8a7a6a' }}>
-                {service.sessions} sessions completed
-              </span>
-            </div>
-          </div>
         </div>
 
-        <div className="flex justify-between items-center gap-3 pt-5 mt-auto" style={{ borderTop: '1px solid #f0ebe4' }}>
-          <span className="text-lg font-bold whitespace-nowrap" style={{ color: '#7a5c3e' }}>
+        {/* Footer: price + action */}
+        <div className="flex justify-between items-center gap-3 pt-4 mt-5" style={{ borderTop: '1px solid #f0ebe4' }}>
+          <span className="text-xl font-extrabold whitespace-nowrap" style={{ color: '#4a3728' }}>
             {getPriceLabel(service.price, service.type)}
           </span>
           {onMenteeStatus && (
             <button
               onClick={() => onMenteeStatus(service)}
-              className="editCurrentSessions px-4 py-2 rounded-lg text-white text-sm font-semibold transition-colors hover:opacity-90 whitespace-nowrap"
+              className="editCurrentSessions inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7a5c3e]/60 focus-visible:ring-offset-2"
               style={{ backgroundColor: '#4a3728' }}
             >
+              <Users className="w-4 h-4" />
               Mentee Status
             </button>
           )}

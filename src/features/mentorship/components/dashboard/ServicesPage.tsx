@@ -27,7 +27,7 @@ interface ServicesPageProps {
   handleCreateService: () => void;
 }
 
-// `icon` (lucide component) use hota hai, emoji ab kahin render nahi hota.
+// Each type uses a lucide icon component; emojis are no longer rendered anywhere.
 export const serviceTypes = [
   { name: 'quick_call', label: 'Quick Call', icon: Video, description: 'Quick 30-minute call', accent: '#2563eb' },
   { name: 'deep_dive', label: 'Deep Dive', icon: Video, description: 'In-depth 60-minute session', accent: '#7c3aed' },
@@ -39,8 +39,8 @@ export const serviceTypes = [
   { name: 'group_session', label: 'Group Session', icon: Users, description: 'Group learning sessions', accent: '#15803d' },
 ];
 
-// Har service type select karne par ek FRESH blank form banta hai,
-// taaki purani values doosre service type me carry na hon.
+// Every time a service type is selected we start with a FRESH blank form,
+// so old values never carry over between service types.
 const getDefaultFormData = (serviceType: string = '') => ({
   serviceType,
   serviceName: '',
@@ -60,11 +60,11 @@ const getDefaultFormData = (serviceType: string = '') => ({
   removeThumbnailImage: false,
   responseTime: '',
   meetingUrl: '',
-  // group_session ab hamesha availability-based hai, isliye isTemplate hamesha true.
+  // group_session is always availability-based, so isTemplate is always true.
   isTemplate: true,
 });
 
-// Browser ka actual timezone (hardcoded Asia/Kolkata ki jagah)
+// The browser's actual timezone (instead of a hardcoded Asia/Kolkata)
 const getUserTimezone = (): string => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -73,8 +73,8 @@ const getUserTimezone = (): string => {
   }
 };
 
-// Jin services (Quick Call etc.) me form se date nahi aati, unke liye safe future time.
-// 60 min lead: chhota clock skew bhi fail na kare. Backend bhi apna fallback lagata hai.
+// Services without a date in the form (Quick Call etc.) get a safe future time.
+// 60 min lead so even a small clock skew does not fail. The backend has its own fallback too.
 const SCHEDULE_LEAD_MINUTES = 60;
 const buildScheduledAtISO = (raw?: string): string => {
   if (raw) {
@@ -84,8 +84,8 @@ const buildScheduledAtISO = (raw?: string): string => {
   return new Date(Date.now() + SCHEDULE_LEAD_MINUTES * 60_000).toISOString();
 };
 
-// Local datetime-local string banata hai (browser's local timezone me),
-// toISOString() (UTC) use karne se IST users ke liye time 5:30 hrs shift ho jaata tha.
+// Builds a datetime-local string in the browser's local timezone.
+// Using toISOString() (UTC) shifted the time by 5:30 hours for IST users.
 const toLocalDatetimeString = (date: Date) => {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -102,7 +102,7 @@ export const getServiceAccent = (typeName: string) =>
   serviceTypes.find(t => t.name === typeName)?.accent || FALLBACK_ACCENT;
 
 // Status badge color helper
-const statusStyle = (status: string) => {
+export const statusStyle = (status: string) => {
   switch (status) {
     case 'confirmed': return { bg: '#dcfce7', color: '#15803d' };
     case 'pending': return { bg: '#fef3c7', color: '#b45309' };
@@ -114,15 +114,15 @@ const statusStyle = (status: string) => {
 };
 
 // -- Price unit helper --
-// group_session per-person priced hai, baaki sab per-hour.
-// Free (0) hamesha "Free" dikhata hai.
+// group_session is priced per person, everything else is a flat price.
+// A price of 0 always shows "Free".
 export const getPriceLabel = (price: number, type: string) => {
   if (!price || price === 0) return 'Free';
   if (type === 'group_session') return `₹${price}/person`;
   return `₹${price}`;
 };
 
-// Ek baar me kitni cards dikhani hain (baaki "Show all" se khulengi)
+// How many cards to show at first (the rest open with "Show all")
 const INITIAL_VISIBLE_COUNT = 6;
 
 type SortOption = 'recent' | 'price_high' | 'price_low' | 'name';
@@ -133,6 +133,76 @@ const SORT_LABELS: Record<SortOption, string> = {
   price_low: 'Price: Low to High',
   name: 'Name (A-Z)',
 };
+
+// -- Small shared UI pieces --
+const COLORS = {
+  ink: '#4a3728',
+  muted: '#8a7a6a',
+  border: '#e0d8cf',
+  soft: '#f3ece4',
+  cream: '#fbf7f3',
+  brand: '#7a5c3e',
+};
+
+const CARD_GRID_STYLE: React.CSSProperties = {
+  gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))',
+};
+
+function SectionHeader({
+  title, subtitle, count, right,
+}: { title: string; subtitle: string; count?: number; right?: React.ReactNode }) {
+  return (
+    <div className="flex items-start sm:items-end justify-between flex-col sm:flex-row gap-3 mb-5">
+      <div>
+        <div className="flex items-center gap-2.5">
+          <h3 className="text-xl font-bold tracking-tight" style={{ color: COLORS.ink }}>{title}</h3>
+          {typeof count === 'number' && (
+            <span
+              className="px-2.5 py-0.5 rounded-full text-xs font-bold"
+              style={{ backgroundColor: COLORS.soft, color: COLORS.brand }}
+            >
+              {count}
+            </span>
+          )}
+        </div>
+        <p className="text-sm mt-0.5" style={{ color: COLORS.muted }}>{subtitle}</p>
+      </div>
+      {right && <div className="flex items-center gap-3 self-end sm:self-auto">{right}</div>}
+    </div>
+  );
+}
+
+function EmptyState({
+  icon: Icon, title, text, action,
+}: { icon: React.ElementType; title: string; text: string; action?: React.ReactNode }) {
+  return (
+    <div
+      className="flex flex-col items-center justify-center text-center py-12 px-6 rounded-2xl border border-dashed"
+      style={{ borderColor: COLORS.border, backgroundColor: COLORS.cream }}
+    >
+      <div className="w-12 h-12 mb-3 rounded-xl flex items-center justify-center" style={{ backgroundColor: COLORS.soft }}>
+        <Icon className="w-5 h-5" style={{ color: COLORS.muted }} />
+      </div>
+      <p className="text-base font-bold" style={{ color: COLORS.ink }}>{title}</p>
+      <p className="text-sm mt-1 max-w-sm" style={{ color: COLORS.muted }}>{text}</p>
+      {action && <div className="mt-5">{action}</div>}
+    </div>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="rounded-[20px] border bg-white overflow-hidden motion-safe:animate-pulse" style={{ borderColor: COLORS.border }}>
+      <div className="aspect-video" style={{ backgroundColor: COLORS.soft }} />
+      <div className="p-5 space-y-3">
+        <div className="h-4 w-3/4 rounded" style={{ backgroundColor: COLORS.soft }} />
+        <div className="h-3 w-full rounded" style={{ backgroundColor: COLORS.soft }} />
+        <div className="h-3 w-2/3 rounded" style={{ backgroundColor: COLORS.soft }} />
+        <div className="h-9 w-full rounded-lg mt-4" style={{ backgroundColor: COLORS.soft }} />
+      </div>
+    </div>
+  );
+}
 
 export default function ServicesPage({
   mentorData,
@@ -163,7 +233,7 @@ export default function ServicesPage({
   const [editingSession, setEditingSession] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  // Delete block hone par (active bookings/participants) styled popup ke liye
+  // Styled popup shown when delete is blocked (active bookings/participants)
   const [blockedDeleteMessage, setBlockedDeleteMessage] = useState<string | null>(null);
 
   // -- Edit Session Modal state --
@@ -209,12 +279,12 @@ export default function ServicesPage({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchQuery, searchOpen]);
 
-  // -- Stats from API (Service Offerings, not bookings) --
+  // -- Stats from API (service offerings, not bookings) --
   const totalServicesOffered = apiSessions.length + apiGroupSessions.length;
   const activeServicesCount =
     apiSessions.filter(s => s.status !== 'cancelled' && s.status !== 'draft').length +
     apiGroupSessions.filter(g => g.status !== 'cancelled' && g.status !== 'draft').length;
-  const avgRating = "-";   // review API se aayega baad me
+  const avgRating = "-";   // will come from the review API later
 
   useEffect(() => {
     if (mentorData?.mentorId) {
@@ -270,6 +340,17 @@ export default function ServicesPage({
     }
   };
 
+  // -- Open the create form for a chosen service type --
+  const handleSelectServiceType = (type: any) => {
+    setSelectedServiceType(type);
+    setFormData(getDefaultFormData(type.name));
+    setIsEditMode(false);
+    setEditingSession(null);
+    setSaveError(null);
+    setFieldErrors({});
+    setShowServiceForm(true);
+  };
+
   // -- Edit service: prefill formData & open modal --
   const handleEditService = (service: any) => {
     const raw = apiSessions.find((s: any) => s.sessionId === service.sessionId);
@@ -287,7 +368,7 @@ export default function ServicesPage({
       scheduledAt: raw.scheduledAt ? toLocalDatetimeString(new Date(raw.scheduledAt)) : '',
       duration: raw.duration ?? '',
       followUpPeriod: String(raw.followUp?.periodDays ?? '24'),
-      // Stored value reflect hoti hai, hamesha '1' nahi.
+      // Reflects the stored value instead of always being '1'.
       followUpAllowed: raw.followUp?.allowed ? '1' : '0',
       bufferTime: String(raw.bufferTimeMinutes ?? '5'),
       minParticipants: raw.minParticipants ?? '',
@@ -338,8 +419,8 @@ export default function ServicesPage({
     try {
       if (deleteTarget.type === 'group_session') {
         await MentorService.deleteGroupSession(deleteTarget.sessionId);
-        // Group sessions apiGroupSessions me rehte hain (apiSessions se alag),
-        // isliye unhe alag se refresh karna zaroori hai.
+        // Group sessions live in apiGroupSessions (separate from apiSessions),
+        // so they need their own refresh.
         await fetchGroupSessions();
       } else {
         await SessionService.deleteSession(deleteTarget.sessionId);
@@ -372,16 +453,16 @@ export default function ServicesPage({
     setSaveError(null);
 
     try {
-      // Form se date na aaye (Quick Call etc.) to safe future time banta hai.
-      // Backend bhi apna server-time fallback lagata hai.
+      // If the form has no date (Quick Call etc.) we build a safe future time.
+      // The backend also applies its own server-time fallback.
       const scheduledAtISO = buildScheduledAtISO(formData.scheduledAt);
-      // Mentor ka real browser timezone (Asia/Kolkata hardcode nahi)
+      // The mentor's real browser timezone (not hardcoded)
       const userTimezone = getUserTimezone();
       const isGroupTemplateMode = formData.serviceType === "group_session" && !!formData.isTemplate;
 
       if (isEditMode && editingSession) {
         if (formData.serviceType === "group_session") {
-          // updateGroupSessionValidator sirf ye fields accept karta hai
+          // updateGroupSessionValidator only accepts these fields
           const groupUpdatePayload: Record<string, any> = {
             title: formData.serviceName,
             description: formData.description || "",
@@ -410,21 +491,21 @@ export default function ServicesPage({
           if (formData.thumbnailImage && typeof formData.thumbnailImage !== 'string') {
             updatePayload.thumbnailImage = formData.thumbnailImage;
           } else if (formData.removeThumbnailImage && !formData.thumbnailImage) {
-            // User ne image hata di, backend ko batao ki purani delete kare
+            // The user removed the image, tell the backend to delete the old one
             updatePayload.removeThumbnailImage = true;
           }
           await SessionService.updateSession(editingSession.sessionId, updatePayload);
         }
 
-        // Service ka Duration Availability ke default slot-duration me sync hota hai.
-        // Fail ho to service save block nahi hona chahiye.
+        // The service Duration syncs to the default slot-duration in Availability.
+        // If this fails it must not block saving the service.
         try {
           const newDuration = Number(formData.duration) || 30;
           await MentorService.updateMentorAvailability(mentorData.mentorId, {
             slotDuration: newDuration,
           });
-          // mentorData prop parent me refresh nahi hota, isliye AvailabilityPage ko
-          // localStorage (remount ke liye) + custom event (live update ke liye) se batao.
+          // The mentorData prop is not refreshed in the parent, so we notify AvailabilityPage
+          // through localStorage (for remount) + a custom event (for live update).
           try { localStorage.setItem("mentor_slotDuration", String(newDuration)); } catch {}
           window.dispatchEvent(new CustomEvent("mentorSlotDurationUpdated", { detail: newDuration }));
         } catch (syncErr: any) {
@@ -442,7 +523,7 @@ export default function ServicesPage({
       }
 
       if (formData.serviceType === "group_session") {
-        // Template mode me scheduledAt bheja hi nahi jaata (mentees availability se slot chunte hain).
+        // In template mode scheduledAt is not sent at all (mentees pick slots from availability).
         const groupSessionInput: CreateGroupSessionInput = {
           title: formData.serviceName,
           description: formData.description || "",
@@ -456,7 +537,7 @@ export default function ServicesPage({
           bufferTimeMinutes: Number(formData.bufferTime) || 0,
           followUp: {
             allowed: formData.followUpAllowed !== undefined && Number(formData.followUpAllowed) > 0,
-            // Dropdown hours me hai, backend days chahta hai (max 30)
+            // The dropdown is in hours, the backend wants days (max 30)
             periodDays: Math.max(0, Math.round((Number(formData.followUpPeriod) || 0) / 24)),
           },
           thumbnailImage: formData.thumbnailImage,
@@ -468,8 +549,8 @@ export default function ServicesPage({
 
       } else {
         const isFree = !!formData.isFree || Number(formData.price) === 0;
-        // "Ask a Query" me response time description ke saath jud jaata hai,
-        // kyunki is type ka apna description field nahi hai.
+        // For "Ask a Query" the response time is appended to the description,
+        // because this type has no description field of its own.
         const responseTimeSuffix = formData.serviceType === 'ask_query' && formData.responseTime
           ? `Response time: ${formData.responseTime} ${Number(formData.responseTime) > 1 ? 'Days' : 'Day'}`
           : "";
@@ -484,7 +565,7 @@ export default function ServicesPage({
           ...(formData.serviceType === "career_planning" ? { targetCompany: "General", targetRole: "General" } : {}),
           duration: Number(formData.duration) || 60,
           followUp: {
-            // Dropdown hours me hai (24/48/72/96/120), backend `periodDays` days me chahta hai (max 30).
+            // The dropdown is in hours (24/48/72/96/120), the backend wants `periodDays` in days (max 30).
             allowed: formData.followUpAllowed !== undefined && Number(formData.followUpAllowed) > 0,
             periodDays: Math.max(0, Math.round((Number(formData.followUpPeriod) || 0) / 24)),
           },
@@ -504,7 +585,7 @@ export default function ServicesPage({
         await SessionService.createSession(sessionInput);
       }
 
-      // Service create hote hi Availability ka default slot-duration bhi sync hota hai.
+      // As soon as a service is created, the default slot-duration in Availability syncs too.
       try {
         const newDuration = Number(formData.duration) || 30;
         await MentorService.updateMentorAvailability(mentorData.mentorId, {
@@ -524,7 +605,7 @@ export default function ServicesPage({
       setSelectedServiceType(null);
       setFormData(getDefaultFormData());
 
-      // Service create hone ke baad Availability tab par redirect
+      // After creating a service, redirect to the Availability tab
       const params = new URLSearchParams(searchParams.toString());
       params.set('tab', 'availability');
       params.delete('subtab');
@@ -556,7 +637,7 @@ export default function ServicesPage({
         duration: s.duration ?? 0,
         thumbnailImage: s.thumbnailImage || s.image || s.thumbnailUrl || null,
         isApi: true,
-        // "Most recent" sort ke liye zaroori
+        // Needed for the "Most recent" sort
         createdAt: s.createdAt || null,
         scheduledAt: s.scheduledAt || null,
       };
@@ -589,7 +670,7 @@ export default function ServicesPage({
         return a.name.localeCompare(b.name);
       case 'recent':
       default: {
-        // Naya session sabse upar, createdAt fallback scheduledAt
+        // Newest first, createdAt falls back to scheduledAt
         const aDate = new Date((a as any).createdAt || (a as any).scheduledAt || 0).getTime();
         const bDate = new Date((b as any).createdAt || (b as any).scheduledAt || 0).getTime();
         return bDate - aDate;
@@ -607,7 +688,7 @@ export default function ServicesPage({
           .some((v: string) => String(v).toLowerCase().includes(normalizedQuery));
       })
     : sortedServices;
-  // Group sessions par bhi wahi search (title / description / topic / "group session")
+  // The same search applies to group sessions (title / description / topic / "group session")
   const filteredGroupSessions = normalizedQuery
     ? apiGroupSessions.filter((g: any) =>
         [g.title, g.description, g.topic, 'group session']
@@ -623,54 +704,44 @@ export default function ServicesPage({
     ? filteredGroupSessions
     : filteredGroupSessions.slice(0, INITIAL_VISIBLE_COUNT);
 
-  const formatGroupDate = (dateString?: string) => {
-    if (!dateString) return "Date not available";
-    try {
-      const d = new Date(dateString);
-      if (isNaN(d.getTime())) return "Date not available";
-      return new Intl.DateTimeFormat('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      }).format(d);
-    } catch {
-      return "Date not available";
-    }
+  const goBackToServices = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', 'services');
+    params.delete('q');
+    router.push(`${pathname}?${params.toString()}`);
   };
+
+  const backButton = (
+    <button
+      onClick={goBackToServices}
+      className="px-5 py-2 rounded-xl text-sm font-semibold border transition-colors hover:bg-[#f3ece4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7a5c3e]/40"
+      style={{ borderColor: COLORS.border, color: COLORS.ink, backgroundColor: '#fff' }}
+    >
+      Back to Services
+    </button>
+  );
 
   // -- Render --
   return (
     <>
-      <div className="space-y-8 animate-fadeIn">
+      <div className="space-y-10">
         {isSearchView ? (
-          <div className="flex flex-col gap-3 mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 w-full mb-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
               <button
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.set('tab', 'services');
-                  params.delete('q');
-                  router.push(`${pathname}?${params.toString()}`);
-                }}
-                className="self-start flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2"
-                style={{
-                  backgroundColor: '#fbf7f3',
-                  color: '#4a3728',
-                  border: '1px solid #e0d8cf'
-                }}
+                onClick={goBackToServices}
+                className="self-start flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-colors hover:bg-[#f3ece4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7a5c3e]/40"
+                style={{ backgroundColor: '#fff', color: COLORS.ink, borderColor: COLORS.border }}
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back to Services
               </button>
 
               <div
-                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border bg-white w-full sm:w-64 transition-all focus-within:ring-2 focus-within:ring-[#7a5c3e]/20"
-                style={{ borderColor: '#e0d8cf' }}
+                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border bg-white w-full sm:w-72 transition-all focus-within:ring-2 focus-within:ring-[#7a5c3e]/20"
+                style={{ borderColor: COLORS.border }}
               >
-                <Search className="w-4 h-4 shrink-0" style={{ color: '#8a7a6a' }} />
+                <Search className="w-4 h-4 shrink-0" style={{ color: COLORS.muted }} />
                 <input
                   type="text"
                   value={resultsSearchQuery}
@@ -695,7 +766,7 @@ export default function ServicesPage({
                   placeholder="Search services..."
                   aria-label="Search services"
                   className="w-full text-sm outline-none bg-transparent placeholder-[#8a7a6a]"
-                  style={{ color: '#4a3728' }}
+                  style={{ color: COLORS.ink }}
                 />
                 {resultsSearchQuery && (
                   <button
@@ -703,25 +774,28 @@ export default function ServicesPage({
                     aria-label="Clear search"
                     className="p-0.5 hover:bg-[#f3ece4] rounded-md transition-colors shrink-0"
                   >
-                    <X className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
+                    <X className="w-3.5 h-3.5" style={{ color: COLORS.muted }} />
                   </button>
                 )}
               </div>
             </div>
-            <h2 className="text-3xl font-extrabold tracking-tight mb-2" style={{ color: '#4a3728' }}>
-              Search Results
-            </h2>
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-2">
-                <span className="text-sm" style={{ color: '#8a7a6a' }}>Results for</span>
-                <span className="px-3 py-1 rounded-full text-[13px] font-bold shadow-sm" style={{ backgroundColor: '#f3ece4', color: '#4a3728', border: '1px solid #e0d8cf' }}>
+
+            <div>
+              <h2 className="text-3xl font-extrabold tracking-tight" style={{ color: COLORS.ink }}>
+                Search results
+              </h2>
+              <div className="flex items-center gap-3 flex-wrap mt-2">
+                <span className="text-sm" style={{ color: COLORS.muted }}>Showing results for</span>
+                <span
+                  className="px-3 py-1 rounded-full text-[13px] font-bold"
+                  style={{ backgroundColor: COLORS.soft, color: COLORS.ink, border: `1px solid ${COLORS.border}` }}
+                >
                   {urlSearchQuery}
                 </span>
+                <span className="text-sm font-semibold" style={{ color: COLORS.brand }}>
+                  {filteredServices.length} {filteredServices.length === 1 ? 'service' : 'services'} and {filteredGroupSessions.length} {filteredGroupSessions.length === 1 ? 'group session' : 'group sessions'} found
+                </span>
               </div>
-              <span className="text-[#d8cec4]">|</span>
-              <span className="text-sm font-semibold" style={{ color: '#7a5c3e' }}>
-                {filteredServices.length} {filteredServices.length === 1 ? 'service' : 'services'} • {filteredGroupSessions.length} {filteredGroupSessions.length === 1 ? 'group session' : 'group sessions'} found
-              </span>
             </div>
           </div>
         ) : (
@@ -729,23 +803,26 @@ export default function ServicesPage({
             {/* Header */}
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm" style={{ backgroundColor: '#4a3728' }}>
+                <div className="flex items-center gap-4">
+                  <div
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm"
+                    style={{ backgroundColor: COLORS.ink }}
+                  >
                     <Briefcase className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold tracking-tight" style={{ color: '#4a3728' }}>My Services</h2>
-                    <p style={{ color: '#8a7a6a' }} className="text-sm">Manage your offerings</p>
+                    <h2 className="text-2xl font-bold tracking-tight" style={{ color: COLORS.ink }}>My Services</h2>
+                    <p className="text-sm" style={{ color: COLORS.muted }}>Create and manage what mentees can book with you</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  {/* Desktop Search Input */}
+                  {/* Desktop search input */}
                   <div
-                    className="hidden sm:flex items-center gap-2 px-3.5 py-2.5 rounded-xl border bg-white w-60 md:w-64 transition-all focus-within:ring-2 focus-within:ring-[#7a5c3e]/20"
-                    style={{ borderColor: '#e0d8cf' }}
+                    className="hidden sm:flex items-center gap-2 px-3.5 py-2.5 rounded-xl border bg-white w-60 md:w-72 transition-all focus-within:ring-2 focus-within:ring-[#7a5c3e]/20"
+                    style={{ borderColor: COLORS.border }}
                   >
-                    <Search className="w-4 h-4 shrink-0" style={{ color: '#8a7a6a' }} />
+                    <Search className="w-4 h-4 shrink-0" style={{ color: COLORS.muted }} />
                     <input
                       type="text"
                       value={searchQuery}
@@ -770,7 +847,7 @@ export default function ServicesPage({
                       placeholder="Search services..."
                       aria-label="Search services"
                       className="w-full text-sm outline-none bg-transparent placeholder-[#8a7a6a]"
-                      style={{ color: '#4a3728' }}
+                      style={{ color: COLORS.ink }}
                     />
                     {searchQuery && (
                       <button
@@ -778,40 +855,41 @@ export default function ServicesPage({
                         aria-label="Clear search"
                         className="p-0.5 hover:bg-[#f3ece4] rounded-md transition-colors shrink-0"
                       >
-                        <X className="w-3.5 h-3.5" style={{ color: '#8a7a6a' }} />
+                        <X className="w-3.5 h-3.5" style={{ color: COLORS.muted }} />
                       </button>
                     )}
                   </div>
 
-                  {/* Mobile Search Icon Button */}
+                  {/* Mobile search icon button */}
                   <button
                     onClick={() => setSearchOpen(!searchOpen)}
                     aria-label="Search services"
-                    className="sm:hidden flex items-center justify-center w-10 h-10 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
-                    style={{ color: '#7a5c3e', border: '1.5px solid #e0d8cf', backgroundColor: '#fff' }}
+                    className="sm:hidden flex items-center justify-center w-10 h-10 rounded-xl transition-colors hover:bg-[#f3ece4]"
+                    style={{ color: COLORS.brand, border: `1.5px solid ${COLORS.border}`, backgroundColor: '#fff' }}
                   >
                     <Search className="w-4 h-4" />
                   </button>
 
-                  {/* Refresh Button */}
+                  {/* Refresh button */}
                   <button
-                    onClick={fetchAllSessions}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
-                    style={{ color: '#7a5c3e', border: '1.5px solid #e0d8cf', backgroundColor: '#fff' }}
+                    onClick={() => { fetchAllSessions(); fetchGroupSessions(); }}
+                    aria-label="Refresh services"
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7a5c3e]/40"
+                    style={{ color: COLORS.brand, border: `1.5px solid ${COLORS.border}`, backgroundColor: '#fff' }}
                   >
-                    <RefreshCw className={`w-4 h-4 ${sessionsLoading ? 'animate-spin' : ''}`} />
-                    Refresh
+                    <RefreshCw className={`w-4 h-4 ${sessionsLoading || groupSessionsLoading ? 'animate-spin' : ''}`} />
+                    <span className="hidden sm:inline">Refresh</span>
                   </button>
                 </div>
               </div>
 
-              {/* Mobile Expanded Search Bar */}
+              {/* Mobile expanded search bar */}
               {searchOpen && (
                 <div
-                  className="sm:hidden flex items-center gap-2 px-3.5 py-2.5 rounded-xl border bg-white w-full transition-all animate-fadeIn"
-                  style={{ borderColor: '#e0d8cf' }}
+                  className="sm:hidden flex items-center gap-2 px-3.5 py-2.5 rounded-xl border bg-white w-full"
+                  style={{ borderColor: COLORS.border }}
                 >
-                  <Search className="w-4 h-4 shrink-0" style={{ color: '#8a7a6a' }} />
+                  <Search className="w-4 h-4 shrink-0" style={{ color: COLORS.muted }} />
                   <input
                     autoFocus
                     type="text"
@@ -836,7 +914,7 @@ export default function ServicesPage({
                     placeholder="Search services..."
                     aria-label="Search services"
                     className="w-full text-sm outline-none bg-transparent placeholder-[#8a7a6a]"
-                    style={{ color: '#4a3728' }}
+                    style={{ color: COLORS.ink }}
                   />
                   <button
                     onClick={() => {
@@ -846,168 +924,94 @@ export default function ServicesPage({
                     aria-label="Close search"
                     className="p-1 hover:bg-[#f3ece4] rounded-md transition-colors shrink-0"
                   >
-                    <X className="w-4 h-4" style={{ color: '#8a7a6a' }} />
+                    <X className="w-4 h-4" style={{ color: COLORS.muted }} />
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Stats - real service offerings from API */}
+            {/* Stats - real service offerings from the API */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
-                { icon: Briefcase, label: 'Services Offered', value: (sessionsLoading || groupSessionsLoading) ? '-' : String(totalServicesOffered), accent: '#2563eb' },
-                { icon: Clock, label: 'Active Services', value: (sessionsLoading || groupSessionsLoading) ? '-' : String(activeServicesCount), accent: '#15803d' },
-                { icon: Star, label: 'Avg Rating', value: avgRating, accent: '#d97706' },
+                { icon: Briefcase, label: 'Services offered', value: (sessionsLoading || groupSessionsLoading) ? '-' : String(totalServicesOffered), accent: '#2563eb' },
+                { icon: Clock, label: 'Active services', value: (sessionsLoading || groupSessionsLoading) ? '-' : String(activeServicesCount), accent: '#15803d' },
+                { icon: Star, label: 'Average rating', value: avgRating, accent: '#d97706' },
               ].map(({ icon: Icon, label, value, accent }) => (
                 <div
                   key={label}
-                  className="flex items-center gap-4 p-4 rounded-2xl bg-white border"
-                  style={{ borderColor: '#e0d8cf' }}
+                  className="flex items-center gap-4 p-5 rounded-2xl bg-white border"
+                  style={{ borderColor: COLORS.border }}
                 >
                   <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                    className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
                     style={{ backgroundColor: `${accent}1A` }}
                   >
                     <Icon className="w-5 h-5" style={{ color: accent }} />
                   </div>
                   <div>
-                    <p className="text-xs mb-0.5" style={{ color: '#8a7a6a' }}>{label}</p>
-                    <p className="text-xl font-bold leading-none" style={{ color: '#4a3728' }}>{value}</p>
+                    <p className="text-2xl font-bold leading-none" style={{ color: COLORS.ink }}>{value}</p>
+                    <p className="text-xs mt-1.5" style={{ color: COLORS.muted }}>{label}</p>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Service Type Selector + Preview */}
-            <div className="grid grid-cols-12 gap-5">
-              <div className="col-span-12 lg:col-span-3">
-                <nav className="space-y-1.5">
-                  {serviceTypes.map((type, idx) => {
-                    const Icon = type.icon;
-                    const isActive = selectedServiceType?.name === type.name;
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setSelectedServiceType(type);
-                          setFormData(getDefaultFormData(type.name));
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150"
-                        style={{
-                          backgroundColor: isActive ? '#4a3728' : 'transparent',
-                          color: isActive ? '#fff' : '#5c4a3a',
-                        }}
+            {/* Create a new service: pick a type and the form opens right away */}
+            <section>
+              <SectionHeader
+                title="Create a new service"
+                subtitle="Choose a type to open the form"
+              />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {serviceTypes.map((type) => {
+                  const Icon = type.icon;
+                  const isActive = selectedServiceType?.name === type.name && showServiceForm;
+                  return (
+                    <button
+                      key={type.name}
+                      onClick={() => handleSelectServiceType(type)}
+                      className="group relative flex flex-col items-start gap-3 p-4 rounded-2xl border bg-white text-left transition-all duration-200 motion-safe:hover:-translate-y-0.5 hover:shadow-md hover:border-[#7a5c3e]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7a5c3e]/40"
+                      style={{ borderColor: isActive ? COLORS.ink : COLORS.border }}
+                    >
+                      <span
+                        className="w-10 h-10 rounded-xl flex items-center justify-center"
+                        style={{ backgroundColor: `${type.accent}1A` }}
                       >
-                        <span
-                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ backgroundColor: isActive ? 'rgba(255,255,255,0.15)' : `${type.accent}1A` }}
-                        >
-                          <Icon className="w-4 h-4" style={{ color: isActive ? '#fff' : type.accent }} />
-                        </span>
-                        <span className="flex-1 text-left">{type.label}</span>
-                        {isActive && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </button>
-                    );
-                  })}
-                </nav>
+                        <Icon className="w-5 h-5" style={{ color: type.accent }} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold" style={{ color: COLORS.ink }}>{type.label}</span>
+                        <span className="block text-xs mt-0.5 line-clamp-1" style={{ color: COLORS.muted }}>{type.description}</span>
+                      </span>
+                      <span
+                        className="absolute top-3.5 right-3.5 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity"
+                        style={{ backgroundColor: COLORS.ink }}
+                      >
+                        <Plus className="w-3.5 h-3.5 text-white" />
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-
-              <div className="col-span-12 lg:col-span-9">
-                <div
-                  className="rounded-2xl border flex flex-col items-center justify-center text-center px-8"
-                  style={{ borderColor: '#e0d8cf', minHeight: '360px', backgroundColor: '#fbf7f3' }}
-                >
-                  {selectedServiceType ? (
-                    <>
-                      <div
-                        className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6"
-                        style={{ backgroundColor: `${selectedServiceType.accent}1A` }}
-                      >
-                        <selectedServiceType.icon className="w-9 h-9" style={{ color: selectedServiceType.accent }} />
-                      </div>
-                      <h3 className="text-2xl font-bold mb-2" style={{ color: '#4a3728' }}>
-                        Create {selectedServiceType.label}
-                      </h3>
-                      <p className="text-base max-w-sm mb-8" style={{ color: '#8a7a6a' }}>
-                        {selectedServiceType.description}
-                      </p>
-                      <button
-                        onClick={() => { setSaveError(null); setShowServiceForm(true); }}
-                        className="text-white px-7 py-3.5 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 flex items-center gap-2 font-semibold"
-                        style={{ backgroundColor: '#4a3728' }}
-                      >
-                        <Plus className="w-5 h-5" />
-                        Add {selectedServiceType.label}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <div
-                        className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6"
-                        style={{ backgroundColor: '#f3ece4' }}
-                      >
-                        <ClipboardList className="w-9 h-9" style={{ color: '#8a7a6a' }} />
-                      </div>
-                      <h3 className="text-xl font-bold mb-2" style={{ color: '#4a3728' }}>Select a service type</h3>
-                      <p className="text-sm max-w-xs mb-6" style={{ color: '#8a7a6a' }}>
-                        Choose one from the list on the left to get started.
-                      </p>
-                      <div className="flex flex-wrap items-center justify-center gap-2">
-                        {serviceTypes.slice(0, 4).map((type) => {
-                          const Icon = type.icon;
-                          return (
-                            <button
-                              key={type.name}
-                              onClick={() => {
-                                setSelectedServiceType(type);
-                                setFormData(getDefaultFormData(type.name));
-                              }}
-                              className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border transition-colors hover:bg-[#f3ece4]"
-                              style={{ borderColor: '#e0d8cf', color: '#5c4a3a', backgroundColor: '#fff' }}
-                            >
-                              <Icon className="w-3.5 h-3.5" style={{ color: type.accent }} />
-                              {type.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
+            </section>
           </>
         )}
 
-        {/* Current Services - real API data */}
-        <div>
-          <div className="flex items-start sm:items-center justify-between mb-6 flex-col sm:flex-row gap-4">
-            <div>
-              <h3 className="text-lg font-bold" style={{ color: '#4a3728' }}>Current Services</h3>
-              <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
-                {isSearchView ? "Your matching mentoring services" : "Manage your individual mentoring services"}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3 self-end sm:self-auto">
-              {isSearchView && (
-                <span className="text-sm font-semibold mr-2" style={{ color: '#7a5c3e' }}>
-                  {filteredServices.length} {filteredServices.length === 1 ? 'service' : 'services'} found
-                </span>
-              )}
-              {sessionsLoading && (
-                <span className="text-xs font-semibold px-3 py-1 rounded-full"
-                  style={{ backgroundColor: '#f3ece4', color: '#7a5c3e' }}>
-                  Loading...
-                </span>
-              )}
-
-              {sortedServices.length > 1 && (
+        {/* Current services - real API data */}
+        <section>
+          <SectionHeader
+            title="Current services"
+            subtitle={isSearchView ? "Your matching mentoring services" : "Your individual mentoring services"}
+            count={sessionsLoading && sortedServices.length === 0 ? undefined : filteredServices.length}
+            right={
+              sortedServices.length > 1 ? (
                 <div className="relative">
                   <button
                     onClick={() => setSortMenuOpen((v) => !v)}
-                    className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors hover:bg-[#f3ece4]"
-                    style={{ borderColor: '#e0d8cf', color: '#5c4a3a', backgroundColor: '#fff' }}
+                    aria-haspopup="menu"
+                    aria-expanded={sortMenuOpen}
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors hover:bg-[#f3ece4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7a5c3e]/40"
+                    style={{ borderColor: COLORS.border, color: '#5c4a3a', backgroundColor: '#fff' }}
                   >
                     <ArrowUpDown className="w-3.5 h-3.5" />
                     {SORT_LABELS[sortBy]}
@@ -1016,15 +1020,17 @@ export default function ServicesPage({
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setSortMenuOpen(false)} />
                       <div
-                        className="absolute right-0 top-10 z-20 w-44 rounded-xl shadow-lg overflow-hidden"
-                        style={{ border: '1px solid #e0d8cf', backgroundColor: '#fff' }}
+                        role="menu"
+                        className="absolute right-0 top-10 z-20 w-48 rounded-xl shadow-lg overflow-hidden"
+                        style={{ border: `1px solid ${COLORS.border}`, backgroundColor: '#fff' }}
                       >
                         {(Object.keys(SORT_LABELS) as SortOption[]).map((opt) => (
                           <button
                             key={opt}
+                            role="menuitem"
                             onClick={() => { setSortBy(opt); setSortMenuOpen(false); }}
-                            className="w-full text-left px-3.5 py-2.5 text-xs font-medium hover:bg-[#f3ece4] transition-colors"
-                            style={{ color: sortBy === opt ? '#4a3728' : '#5c4a3a', fontWeight: sortBy === opt ? 700 : 500 }}
+                            className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-[#f3ece4] transition-colors"
+                            style={{ color: sortBy === opt ? COLORS.ink : '#5c4a3a', fontWeight: sortBy === opt ? 700 : 500 }}
                           >
                             {SORT_LABELS[opt]}
                           </button>
@@ -1033,75 +1039,50 @@ export default function ServicesPage({
                     </>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
+              ) : undefined
+            }
+          />
 
-          {!sessionsLoading && sortedServices.length === 0 ? (
-            <div className="text-center py-14 rounded-2xl border" style={{ borderColor: '#e0d8cf', backgroundColor: '#fbf7f3' }}>
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
-                style={{ backgroundColor: '#f3ece4' }}
-              >
-                <ClipboardList className="w-6 h-6" style={{ color: '#8a7a6a' }} />
-              </div>
-              <p className="text-base font-bold" style={{ color: '#4a3728' }}>No services yet</p>
-              <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
-                Select a service type above and create your first offering.
-              </p>
+          {sessionsLoading && sortedServices.length === 0 ? (
+            <div className="grid gap-6" style={CARD_GRID_STYLE}>
+              {[0, 1, 2].map((i) => <SkeletonCard key={i} />)}
             </div>
+          ) : sortedServices.length === 0 ? (
+            <EmptyState
+              icon={ClipboardList}
+              title="No services yet"
+              text="Pick a service type above to create your first offering."
+            />
           ) : filteredServices.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 px-4 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
-              <div className="w-12 h-12 mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f3ece4' }}>
-                <ClipboardList className="w-5 h-5" style={{ color: '#8a7a6a' }} />
-              </div>
-              <p className="text-base font-bold" style={{ color: '#4a3728' }}>No services found</p>
-              <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
-                No services matched your search for '{isSearchView ? urlSearchQuery : searchQuery}'.
-              </p>
-              {isSearchView && (
-                <button
-                  onClick={() => {
-                    const params = new URLSearchParams(searchParams.toString());
-                    params.set('tab', 'services');
-                    params.delete('q');
-                    router.push(`${pathname}?${params.toString()}`);
-                  }}
-                  className="mt-5 px-5 py-2 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
-                  style={{ border: '1.5px solid #e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
-                >
-                  Back to Services
-                </button>
-              )}
-            </div>
+            <EmptyState
+              icon={Search}
+              title="No services found"
+              text={`No services matched your search for "${isSearchView ? urlSearchQuery : searchQuery}".`}
+              action={isSearchView ? backButton : undefined}
+            />
           ) : (
             <>
-              <div
-                className="grid gap-6"
-                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))' }}
-              >
-                {visibleServices.map((service, idx) => {
-                  return (
-                    <ServiceCard
-                      key={service.sessionId || idx}
-                      service={service}
-                      onEdit={handleEditService}
-                      onDelete={handleDeleteService}
-                      onMenteeStatus={(srv) => {
-                        setSelectedSession(srv);
-                        setModalMode('view');
-                        setIsEditModalOpen(true);
-                      }}
-                    />
-                  );
-                })}
+              <div className="grid gap-6" style={CARD_GRID_STYLE}>
+                {visibleServices.map((service, idx) => (
+                  <ServiceCard
+                    key={service.sessionId || idx}
+                    service={service}
+                    onEdit={handleEditService}
+                    onDelete={handleDeleteService}
+                    onMenteeStatus={(srv) => {
+                      setSelectedSession(srv);
+                      setModalMode('view');
+                      setIsEditModalOpen(true);
+                    }}
+                  />
+                ))}
               </div>
               {filteredServices.length > INITIAL_VISIBLE_COUNT && (
                 <div className="flex justify-center mt-6">
                   <button
                     onClick={() => setShowAllServices((v) => !v)}
-                    className="px-6 py-2.5 rounded-xl text-sm font-semibold border transition-colors hover:bg-[#f3ece4]"
-                    style={{ borderColor: '#e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
+                    className="px-6 py-2.5 rounded-xl text-sm font-semibold border transition-colors hover:bg-[#f3ece4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7a5c3e]/40"
+                    style={{ borderColor: COLORS.border, color: COLORS.ink, backgroundColor: '#fff' }}
                   >
                     {showAllServices ? 'Show less' : `Show all services (${filteredServices.length})`}
                   </button>
@@ -1109,114 +1090,85 @@ export default function ServicesPage({
               )}
             </>
           )}
-        </div>
+        </section>
 
-        {/* Current Group Sessions */}
-        <div className="animate-fadeIn">
-          <div className="flex items-start sm:items-center justify-between mb-6 flex-col sm:flex-row gap-4">
-            <div>
-              <h3 className="text-lg font-bold" style={{ color: '#4a3728' }}>Current Group Sessions</h3>
-              <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
-                {isSearchView ? "Your matching group sessions" : "Manage your upcoming group learning sessions"}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3 self-end sm:self-auto">
-              {isSearchView && (
-                <span className="text-sm font-semibold" style={{ color: '#7a5c3e' }}>
-                  {filteredGroupSessions.length} {filteredGroupSessions.length === 1 ? 'group session' : 'group sessions'} found
-                </span>
-              )}
-            </div>
-          </div>
+        {/* Current group sessions */}
+        <section>
+          <SectionHeader
+            title="Current group sessions"
+            subtitle={isSearchView ? "Your matching group sessions" : "Your upcoming group learning sessions"}
+            count={groupSessionsLoading || groupSessionsError ? undefined : filteredGroupSessions.length}
+          />
 
           {groupSessionsLoading ? (
-            <div className="flex items-center justify-center p-16 border-2 border-dashed rounded-3xl" style={{ borderColor: '#e0d8cf', backgroundColor: '#fcfaf8', minHeight: '320px' }}>
-              <span className="flex items-center gap-3 text-xl font-semibold animate-pulse" style={{ color: '#7a5c3e' }}>
-                <RefreshCw className="w-6 h-6 animate-spin" />
-                Loading group sessions...
-              </span>
+            <div className="grid gap-6" style={CARD_GRID_STYLE}>
+              {[0, 1, 2].map((i) => <SkeletonCard key={i} />)}
             </div>
           ) : groupSessionsError ? (
-            <div className="flex flex-col items-center justify-center p-16 border-2 border-dashed rounded-3xl" style={{ borderColor: '#e0d8cf', backgroundColor: '#fcfaf8', minHeight: '320px' }}>
-              <div className="w-16 h-16 mb-4 rounded-full flex items-center justify-center bg-red-100">
-                <AlertCircle className="w-8 h-8 text-red-600" />
-              </div>
-              <p className="text-xl font-bold text-red-600 mb-6">{groupSessionsError}</p>
-              <button
-                onClick={fetchGroupSessions}
-                className="px-8 py-3 rounded-2xl text-white font-bold transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
-                style={{ backgroundColor: '#4a3728' }}
-              >
-                Retry Fetching
-              </button>
-            </div>
-          ) : apiGroupSessions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 px-4 rounded-2xl" style={{ backgroundColor: '#fcfaf8', border: '1px solid #e0d8cf' }}>
-              <div className="w-12 h-12 mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f3ece4' }}>
-                <Users className="w-5 h-5" style={{ color: '#8a7a6a' }} />
-              </div>
-              <h4 className="text-base font-bold text-center" style={{ color: '#4a3728' }}>No group sessions</h4>
-              <p className="text-sm text-center max-w-sm mt-1" style={{ color: '#8a7a6a' }}>
-                Create your first group session to start teaching multiple mentees.
-              </p>
-            </div>
-          ) : filteredGroupSessions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 px-4 rounded-2xl" style={{ backgroundColor: '#fbf7f3', border: '1px solid #e0d8cf' }}>
-              <div className="w-12 h-12 mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#f3ece4' }}>
-                <Users className="w-5 h-5" style={{ color: '#8a7a6a' }} />
-              </div>
-              <p className="text-base font-bold" style={{ color: '#4a3728' }}>No group sessions found</p>
-              <p className="text-sm mt-1" style={{ color: '#8a7a6a' }}>
-                No group sessions matched your search for '{isSearchView ? urlSearchQuery : searchQuery}'.
-              </p>
-              {isSearchView && (
+            <EmptyState
+              icon={AlertCircle}
+              title="Could not load group sessions"
+              text={groupSessionsError}
+              action={
                 <button
-                  onClick={() => {
-                    const params = new URLSearchParams(searchParams.toString());
-                    params.set('tab', 'services');
-                    params.delete('q');
-                    router.push(`${pathname}?${params.toString()}`);
-                  }}
-                  className="mt-5 px-5 py-2 rounded-xl text-sm font-semibold transition-colors hover:bg-[#f3ece4]"
-                  style={{ border: '1.5px solid #e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
+                  onClick={fetchGroupSessions}
+                  className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7a5c3e]/40"
+                  style={{ backgroundColor: COLORS.ink }}
                 >
-                  Back to Services
+                  Try again
                 </button>
-              )}
-            </div>
+              }
+            />
+          ) : apiGroupSessions.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="No group sessions"
+              text="Create your first group session to start teaching multiple mentees."
+              action={
+                <button
+                  onClick={() => handleSelectServiceType(serviceTypes.find(t => t.name === 'group_session'))}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7a5c3e]/40"
+                  style={{ backgroundColor: COLORS.ink }}
+                >
+                  <Plus className="w-4 h-4" />
+                  Create group session
+                </button>
+              }
+            />
+          ) : filteredGroupSessions.length === 0 ? (
+            <EmptyState
+              icon={Search}
+              title="No group sessions found"
+              text={`No group sessions matched your search for "${isSearchView ? urlSearchQuery : searchQuery}".`}
+              action={isSearchView ? backButton : undefined}
+            />
           ) : (
             <>
-              <div
-                className="grid gap-6"
-                style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))' }}
-              >
-                {visibleGroupSessions.map((group, idx) => {
-                  return (
-                    <GroupSessionCard
-                      key={group.sessionId || group.id || idx}
-                      group={group}
-                      onEdit={() => {
-                        setSelectedSession({ ...group, isGroupSession: true });
-                        setModalMode('edit');
-                        setIsEditModalOpen(true);
-                      }}
-                      onDelete={() => handleDeleteService({ ...group, type: 'group_session' })}
-                      onMenteeStatus={(grp) => {
-                        setSelectedSession({ ...grp, isGroupSession: true });
-                        setModalMode('view');
-                        setIsEditModalOpen(true);
-                      }}
-                    />
-                  );
-                })}
+              <div className="grid gap-6" style={CARD_GRID_STYLE}>
+                {visibleGroupSessions.map((group, idx) => (
+                  <GroupSessionCard
+                    key={group.sessionId || group.id || idx}
+                    group={group}
+                    onEdit={() => {
+                      setSelectedSession({ ...group, isGroupSession: true });
+                      setModalMode('edit');
+                      setIsEditModalOpen(true);
+                    }}
+                    onDelete={() => handleDeleteService({ ...group, type: 'group_session' })}
+                    onMenteeStatus={(grp) => {
+                      setSelectedSession({ ...grp, isGroupSession: true });
+                      setModalMode('view');
+                      setIsEditModalOpen(true);
+                    }}
+                  />
+                ))}
               </div>
               {filteredGroupSessions.length > INITIAL_VISIBLE_COUNT && (
                 <div className="flex justify-center mt-6">
                   <button
                     onClick={() => setShowAllGroupSessions((v) => !v)}
-                    className="px-6 py-2.5 rounded-xl text-sm font-semibold border transition-colors hover:bg-[#f3ece4]"
-                    style={{ borderColor: '#e0d8cf', color: '#4a3728', backgroundColor: '#fff' }}
+                    className="px-6 py-2.5 rounded-xl text-sm font-semibold border transition-colors hover:bg-[#f3ece4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7a5c3e]/40"
+                    style={{ borderColor: COLORS.border, color: COLORS.ink, backgroundColor: '#fff' }}
                   >
                     {showAllGroupSessions ? 'Show less' : `Show all group sessions (${filteredGroupSessions.length})`}
                   </button>
@@ -1224,10 +1176,10 @@ export default function ServicesPage({
               )}
             </>
           )}
-        </div>
+        </section>
       </div>
 
-      {/* Modal */}
+      {/* Create / edit form modal */}
       {showServiceForm && (
         <ServiceModal
           service={{
@@ -1268,33 +1220,36 @@ export default function ServicesPage({
         }}
       />
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete confirmation modal */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
           <div
+            role="dialog"
+            aria-modal="true"
             className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl"
-            style={{ border: '1px solid #e0d8cf' }}
+            style={{ border: `1px solid ${COLORS.border}` }}
           >
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#fee2e2' }}>
                   <Trash2 className="w-5 h-5" style={{ color: '#dc2626' }} />
                 </div>
-                <h3 className="text-lg font-bold" style={{ color: '#4a3728' }}>
+                <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>
                   Delete service?
                 </h3>
               </div>
               <button
                 onClick={() => !isDeleting && setDeleteTarget(null)}
                 disabled={isDeleting}
+                aria-label="Close"
                 className="p-1 hover:bg-[#f3ece4] rounded-lg transition-colors disabled:opacity-50"
               >
-                <X className="w-4 h-4" style={{ color: '#8a7a6a' }} />
+                <X className="w-4 h-4" style={{ color: COLORS.muted }} />
               </button>
             </div>
 
-            <p className="text-sm mb-6" style={{ color: '#8a7a6a' }}>
-              Are you sure you want to delete <span className="font-semibold" style={{ color: '#4a3728' }}>"{deleteTarget.name}"</span> permanently? This cannot be undone.
+            <p className="text-sm mb-6" style={{ color: COLORS.muted }}>
+              Are you sure you want to delete <span className="font-semibold" style={{ color: COLORS.ink }}>"{deleteTarget.name}"</span> permanently? This cannot be undone.
             </p>
 
             <div className="flex justify-end gap-3 pt-4" style={{ borderTop: '1px solid #f0ebe4' }}>
@@ -1302,7 +1257,7 @@ export default function ServicesPage({
                 onClick={() => setDeleteTarget(null)}
                 disabled={isDeleting}
                 className="px-4 py-2.5 rounded-xl font-semibold text-sm border transition-colors disabled:opacity-50 hover:bg-[#f3ece4]"
-                style={{ borderColor: '#e0d8cf', color: '#4a3728', backgroundColor: '#fbf7f3' }}
+                style={{ borderColor: COLORS.border, color: COLORS.ink, backgroundColor: COLORS.cream }}
               >
                 Cancel
               </button>
@@ -1323,27 +1278,30 @@ export default function ServicesPage({
       {blockedDeleteMessage && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 backdrop-blur-sm">
           <div
+            role="alertdialog"
+            aria-modal="true"
             className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl"
-            style={{ border: '1px solid #e0d8cf' }}
+            style={{ border: `1px solid ${COLORS.border}` }}
           >
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#fef3c7' }}>
                   <AlertCircle className="w-5 h-5" style={{ color: '#b45309' }} />
                 </div>
-                <h3 className="text-lg font-bold" style={{ color: '#4a3728' }}>
+                <h3 className="text-lg font-bold" style={{ color: COLORS.ink }}>
                   Can't delete this service
                 </h3>
               </div>
               <button
                 onClick={() => setBlockedDeleteMessage(null)}
+                aria-label="Close"
                 className="p-1 hover:bg-[#f3ece4] rounded-lg transition-colors"
               >
-                <X className="w-4 h-4" style={{ color: '#8a7a6a' }} />
+                <X className="w-4 h-4" style={{ color: COLORS.muted }} />
               </button>
             </div>
 
-            <p className="text-sm mb-6" style={{ color: '#8a7a6a' }}>
+            <p className="text-sm mb-6" style={{ color: COLORS.muted }}>
               {blockedDeleteMessage}
             </p>
 
@@ -1351,7 +1309,7 @@ export default function ServicesPage({
               <button
                 onClick={() => setBlockedDeleteMessage(null)}
                 className="px-5 py-2.5 rounded-xl text-white font-semibold text-sm transition-opacity hover:opacity-90"
-                style={{ backgroundColor: '#4a3728' }}
+                style={{ backgroundColor: COLORS.ink }}
               >
                 Got it
               </button>
