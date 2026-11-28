@@ -76,6 +76,11 @@ const ROUTE_PREFIX: Record<string, string> = {
   Mentorship: "/mentorship",
 };
 
+// Jin routes ka apna mobile header hai, wahan mobile pe global navbar hide hoga.
+// Mentor dashboards (mentorProfile / senior-mentor-profile) ka header bhi
+// apna ho to unke prefix yahan add kar dena.
+const OWN_MOBILE_HEADER_PREFIXES = ["/mentorship/user-dashboard"];
+
 const ProfileNavbar: React.FC<ProfileNavbarProps> = ({
   profileImage,
   userName,
@@ -88,6 +93,10 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   // Mentorship pages par avatar dropdown band (Sign Out wahan Navigation me alag button hai)
   const isMentorshipRoute = !!pathname?.startsWith("/mentorship");
+  // Dashboard pages: mobile pe sirf dashboard ka apna header dikhe, global nav nahi
+  const hideOnMobile = OWN_MOBILE_HEADER_PREFIXES.some((p) =>
+    pathname?.startsWith(p)
+  );
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -245,7 +254,11 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({
 
   return (
     <>
-      <nav className="fixed top-0 left-0 w-full bg-[#F6EDE8] text-[#4a3728] border-b border-[#E5D9CE] shadow-sm z-50">
+      <nav
+        className={`fixed top-0 left-0 w-full bg-[#F6EDE8] text-[#4a3728] border-b border-[#E5D9CE] shadow-sm z-50 ${
+          hideOnMobile ? "hidden md:block" : ""
+        }`}
+      >
         <div className="w-full px-3 sm:px-6 lg:px-8">
           <div className="flex items-center h-16 gap-2 w-full">
             {/* Left Section: Mobile Menu Button + Wordmark */}

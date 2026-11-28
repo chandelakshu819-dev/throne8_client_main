@@ -149,26 +149,26 @@ export default function UserDashboardLayout({
   // the instant the backend emits them
   const { latestNotification, sessionStarted, sessionEnded } = useSocket('industry-mentor');
 
-    // Jo ids user ne read kar di hain, unhe yaad rakho taaki refetch unhe wapas unread na kare
-    const readIdsRef = useRef<Set<string>>(new Set());
+  // Jo ids user ne read kar di hain, unhe yaad rakho taaki refetch unhe wapas unread na kare
+  const readIdsRef = useRef<Set<string>>(new Set());
 
-    const fetchNotifications = useCallback(() => {
-      setNotificationsLoading(true);
-      NotificationService.getMentorshipNotifications({ limit: 50, module: 'industry-mentor' })
-        .then((res) =>
-          setNotifications(
-            normalizeNotifications(res).map((n: any) => ({
-              ...n,
-              isRead: n.isRead || readIdsRef.current.has(n._id),
-            }))
-          )
+  const fetchNotifications = useCallback(() => {
+    setNotificationsLoading(true);
+    NotificationService.getMentorshipNotifications({ limit: 50, module: 'industry-mentor' })
+      .then((res) =>
+        setNotifications(
+          normalizeNotifications(res).map((n: any) => ({
+            ...n,
+            isRead: n.isRead || readIdsRef.current.has(n._id),
+          }))
         )
-        .catch((err) => {
-          console.error("Failed to fetch notifications:", err);
-          setNotifications((prev) => (Array.isArray(prev) ? prev : []));
-        })
-        .finally(() => setNotificationsLoading(false));
-    }, []);
+      )
+      .catch((err) => {
+        console.error("Failed to fetch notifications:", err);
+        setNotifications((prev) => (Array.isArray(prev) ? prev : []));
+      })
+      .finally(() => setNotificationsLoading(false));
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -320,27 +320,29 @@ export default function UserDashboardLayout({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   return (
-    <div className="flex flex-col h-screen bg-[#f6ede8]">
-      <div className="h-16 shrink-0" aria-hidden="true" />
+    <div className="flex flex-col h-[100dvh] md:h-screen bg-[#f6ede8]">
+      {/* Global navbar ke liye spacer: sirf md+ pe (mobile pe global nav hidden hai) */}
+      <div className="hidden md:block h-16 shrink-0" aria-hidden="true" />
+
       {liveSession && (
         <div
-          className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-5 py-3 rounded-2xl shadow-lg"
+          className="fixed top-4 md:top-20 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 md:gap-4 px-4 md:px-5 py-3 rounded-2xl shadow-lg w-[calc(100%-2rem)] md:w-auto max-w-lg"
           style={{ background: "#4a3728" }}
         >
-          <span className="flex items-center gap-2 text-sm font-semibold text-white">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            Your mentor started "{liveSession.title}"
+          <span className="flex items-center gap-2 text-sm font-semibold text-white min-w-0">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+            <span className="truncate">Your mentor started "{liveSession.title}"</span>
           </span>
           <button
             onClick={handleJoinLiveSession}
-            className="px-4 py-1.5 rounded-lg text-xs font-bold transition-opacity hover:opacity-90"
+            className="px-4 py-1.5 rounded-lg text-xs font-bold transition-opacity hover:opacity-90 shrink-0 ml-auto"
             style={{ background: "white", color: "#4a3728" }}
           >
             Join Now
           </button>
           <button
             onClick={() => setLiveSession(null)}
-            className="text-white/70 hover:text-white text-xs"
+            className="text-white/70 hover:text-white text-xs shrink-0"
             aria-label="Dismiss"
           >
             ✕
@@ -348,7 +350,7 @@ export default function UserDashboardLayout({
         </div>
       )}
 
-      {/* Mobile Header */}
+      {/* Mobile Header (mobile pe ab ye akela top nav hai) */}
       <div className="md:hidden flex items-center justify-between px-4 h-16 shrink-0 bg-[#fbf7f3] border-b border-[#e0d8cf]">
         <button
           onClick={() => setIsMobileMenuOpen(true)}
@@ -375,14 +377,14 @@ export default function UserDashboardLayout({
         {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
           <div
-            className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
+            className="fixed inset-0 bg-black/50 z-[55] md:hidden transition-opacity"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-hidden="true"
           />
         )}
         <div
           className={`
-          absolute md:relative z-50 h-full transform transition-transform duration-300 ease-in-out
+          absolute md:relative z-[60] md:z-50 h-full transform transition-transform duration-300 ease-in-out
           ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
         `}
         >
@@ -401,7 +403,8 @@ export default function UserDashboardLayout({
           />
         </div>
         <main className="flex-1 overflow-y-auto">
-          <div className="px-4 md:px-8 py-6 max-w-[1600px] mx-auto">
+          {/* pb-28 mobile pe: neeche wale bottom nav ke peeche content na chhupe */}
+          <div className="px-4 md:px-8 pt-6 pb-28 md:pb-6 max-w-[1600px] mx-auto">
             <CurrentPage
               setActivePage={setActivePage}
               sessions={sessions}
