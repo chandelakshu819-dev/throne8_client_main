@@ -1,6 +1,6 @@
 /**
  * src/config/launch.ts
- * Launch mode config. NEXT_PUBLIC_LAUNCH_MODE=mentorship => sirf Auth + Mentorship + Profile + Notifications.
+ * Launch mode config. NEXT_PUBLIC_LAUNCH_MODE=mentorship => sirf Auth + Mentorship + Resume + Notifications (Study optional). Profile abhi band hai.
  * Value build time pe inline hoti hai, change ke baad Vercel redeploy zaroori hai.
  */
 
@@ -34,7 +34,6 @@ export const HOME_PATH = IS_MENTORSHIP_MODE ? "/mentorship" : "/dashboard";
 const MENTORSHIP_MODE_FEATURES: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
   "mentorship",
   "resume",
-  "profile",
   "notifications",
 ]);
 
@@ -52,7 +51,6 @@ const ALLOWED_PREFIXES = [
   "/auth",
   "/onboarding",
   "/mentorship",
-  "/profile",
   "/notifications",
   "/api",
 ];
@@ -62,7 +60,12 @@ const ALLOWED_PREFIXES = [
 const STUDY_PREFIXES = ["/study", "/student-dashboard"];
 
 // Allowed prefix ke andar bhi ye sub-paths band hain
+// "/profile" ko ALLOWED se hata diya hai, aur yahan bhi daala hai taaki
+// /profile aur /profile/<userId> dono (saare sub-paths) redirect ho jayein.
+// Profile wapas kholna ho to: "/profile" ko ALLOWED_PREFIXES me daalo,
+// BLOCKED_PREFIXES se hatao, aur MENTORSHIP_MODE_FEATURES me "profile" add karo.
 const BLOCKED_PREFIXES = [
+  "/profile",
   "/profile/network",
   "/profile/saved-posts",
   "/profile/hidden-posts",
