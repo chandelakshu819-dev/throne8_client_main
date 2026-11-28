@@ -13,7 +13,7 @@ interface UseMentorRoleResult {
   refetch: () => void;
 }
 
-/** LEGACY — kept so existing callers (MentorshipDashboardRouter) don't break. */
+/** LEGACY — kept so existing callers don't break. */
 export function useMentorRole(userId: string): UseMentorRoleResult {
   const [mentorData, setMentorData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -52,13 +52,24 @@ const DEFAULT_ROLES: MyRolesResponse = {
   industryMentor: "none",
 };
 
+// ── Module-level roles cache (survives route changes / remounts) ─────────────
+// Isse mentee <-> mentor switch pe loader nahi dikhta: cached roles turant
+// milte hain aur background me silently revalidate hote hain.
+const ROLES_TTL_MS = 60_000;
+const rolesCache = new Map<string, { roles: MyRolesResponse; at: number }>();
+
+function getCachedRoles(userId?: string) {
+  return userId ? rolesCache.get(userId) ?? null : null;
+}
+
+export function clearRolesCache() {
+  rolesCache.clear();
+}
+
 /**
- * FIX: /mentorship/mentors/me/roles can fail or return "none" even when the
+ * /mentorship/mentors/me/roles can fail or return "none" even when the
  * user already has a Mentor profile. In that case, double-check using the
- * Mentor-by-userId endpoint (the same one the mentor dashboard uses).
- * If a Mentor doc exists, treat the `seniorMentor` role (shown as
- * "Industry Mentor") as approved so the dropdown opens the dashboard
- * instead of the "Become a Mentor" form.
+ * Mentor-by-userId endpoint.
  */
 async function reconcileWithMentorDoc(
   base: MyRolesResponse,
@@ -84,34 +95,29 @@ async function reconcileWithMentorDoc(
       seniorMentorId: base.seniorMentorId ?? mentor.mentorId ?? mentor._id,
     };
   } catch {
-    // 404 = really not a mentor; any other error -> keep the backend value
     return base;
   }
 }
 
 /**
- * useMyRoles — fetches the current user's workspace role statuses and shares
- * them via MentorService's module-level cache.
- *
- * Pass `userId` so the hook can verify the Mentor profile as a fallback
- * (see reconcileWithMentorDoc above).
- *
- * Keys returned: mentee | seniorMentor | industryMentor
- * Re-fetches when auth state or userId changes. Call `refetch()` manually
- * after a successful application submit.
+ * useMyRoles — stale-while-revalidate:
+ *  - cache hai  -> roles turant, loading=false, background me refresh (agar TTL expire)
+ *  - cache nahi -> normal fetch with loading=true
  */
 export function useMyRoles(
   isAuthenticated: boolean,
   userId?: string
 ): UseMyRolesResult {
-  const [roles, setRoles] = useState<MyRolesResponse | null>(null);
-  const [loading, setLoading] = useState(isAuthenticated);
+  const initialCached = isAuthenticated ? getCachedRoles(userId) : null;
+
+  const [roles, setRoles] = useState<MyRolesResponse | null>(initialCached?.roles ?? null);
+  const [loading, setLoading] = useState(isAuthenticated && !initialCached);
   const [error, setError] = useState<string | null>(null);
   const keyRef = useRef<string>("");
 
   const load = useCallback(
-    async (isCancelled: () => boolean = () => false) => {
-      setLoading(true);
+    async (isCancelled: () => boolean = () => false, silent = false) => {
+      if (!silent) setLoading(true);
       let base: MyRolesResponse = DEFAULT_ROLES;
       let errMsg: string | null = null;
 
@@ -125,41 +131,57 @@ export function useMyRoles(
       const finalRoles = await reconcileWithMentorDoc(base, userId);
 
       if (isCancelled()) return;
-      setRoles(finalRoles);
-      // If the mentor doc check rescued us, don't surface the roles error.
-      setError(finalRoles.seniorMentor !== "none" ? null : errMsg);
+
+      // Network error pe achha cached value mat bigaado
+      if (!(errMsg && silent && userId && rolesCache.has(userId))) {
+        if (userId) rolesCache.set(userId, { roles: finalRoles, at: Date.now() });
+        setRoles(finalRoles);
+        setError(finalRoles.seniorMentor !== "none" ? null : errMsg);
+      }
       setLoading(false);
     },
     [userId]
   );
 
-  /** Force a fresh network fetch (ignores module-level cache). */
+  /** Force a fresh network fetch (ignores cache). */
   const refetch = useCallback(async () => {
     if (!isAuthenticated) { setLoading(false); return; }
+    if (userId) rolesCache.delete(userId);
     MentorService.invalidateRolesCache();
     await load();
-  }, [isAuthenticated, load]);
+  }, [isAuthenticated, load, userId]);
 
   useEffect(() => {
     if (!isAuthenticated) {
-      // Logged out — clear everything
       setRoles(null);
       setLoading(false);
       keyRef.current = "";
+      clearRolesCache();
       MentorService.invalidateRolesCache();
       return;
     }
 
-    // Only (re)fetch when auth state or userId actually changed
     const key = `auth:${userId ?? ""}`;
     if (keyRef.current === key) return;
     keyRef.current = key;
 
     let cancelled = false;
-    load(() => cancelled);
+    const cached = getCachedRoles(userId);
+
+    if (cached) {
+      setRoles(cached.roles);
+      setLoading(false);
+      // Fresh hai to network call hi nahi; stale hai to silent background refresh
+      if (Date.now() - cached.at >= ROLES_TTL_MS) {
+        load(() => cancelled, true);
+      }
+    } else {
+      load(() => cancelled);
+    }
+
     return () => {
       cancelled = true;
-      keyRef.current = ""; // lets StrictMode's 2nd effect run re-fetch
+      keyRef.current = ""; // lets StrictMode's 2nd effect run
     };
   }, [isAuthenticated, userId, load]);
 
