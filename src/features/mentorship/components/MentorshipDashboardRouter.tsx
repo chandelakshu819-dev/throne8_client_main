@@ -2,7 +2,8 @@
 // src/features/mentorship/components/MentorshipDashboardRouter.tsx
 //
 // Single entry point for /mentorship/[userid].
-// Dashboards are lazy-loaded so only the one being shown is downloaded.
+// Dashboards are lazy-loaded, but both chunks are preloaded in idle time
+// so that switching between Mentee <-> Mentor feels instant.
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -11,21 +12,28 @@ import { useMyRoles } from "../hooks/useMentorRole";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { routes } from "@/config/routes";
 
+const loadUserDashboard = () => import("./user-dashboard/UserDashboardLayout");
+const loadMentorDashboard = () => import("./dashboard/DashboardLayout");
+
+/** Call this from navbar dropdown (on open / hover) to warm up both chunks. */
+export const preloadMentorshipDashboards = () => {
+  loadUserDashboard();
+  loadMentorDashboard();
+};
+
 const FullScreenLoader = () => (
   <div className="flex items-center justify-center h-screen bg-[#f6ede8]">
     <span className="text-sm text-[#7a5c3e]">Loading...</span>
   </div>
 );
 
-const UserDashboardLayout = dynamic(
-  () => import("./user-dashboard/UserDashboardLayout"),
-  { loading: () => <FullScreenLoader /> }
-);
+const UserDashboardLayout = dynamic(loadUserDashboard, {
+  loading: () => <FullScreenLoader />,
+});
 
-const MentorDashboard = dynamic(
-  () => import("./dashboard/DashboardLayout"),
-  { loading: () => <FullScreenLoader /> }
-);
+const MentorDashboard = dynamic(loadMentorDashboard, {
+  loading: () => <FullScreenLoader />,
+});
 
 interface MentorshipDashboardRouterProps {
   userId: string;
@@ -42,12 +50,25 @@ export default function MentorshipDashboardRouter({
   const router = useRouter();
   const { isAuthenticated } = useAuth();
 
-  // userId is passed so useMyRoles can verify the Mentor profile when
-  // /me/roles fails or returns "none" (prevents the redirect loop).
   const { roles, loading } = useMyRoles(isAuthenticated, userId);
 
+  // ── Prefetch: dono routes + dono chunks, page load ke baad idle me ────────
+  useEffect(() => {
+    if (!userId) return;
+    router.prefetch(routes.menteeDashboard(userId));
+    router.prefetch(routes.seniorMentorDashboard(userId));
+
+    const warm = () => preloadMentorshipDashboards();
+    const w = window as any;
+    if (typeof w.requestIdleCallback === "function") {
+      const id = w.requestIdleCallback(warm, { timeout: 2000 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(warm, 800);
+    return () => clearTimeout(t);
+  }, [userId, router]);
+
   // ── Role guard ────────────────────────────────────────────────────────────
-  // Mentor URL but not approved -> back to the landing page.
   useEffect(() => {
     if (loading || !roles) return;
     if (defaultRole === "mentor" && roles.seniorMentor !== "approved") {
@@ -57,21 +78,20 @@ export default function MentorshipDashboardRouter({
 
   const isMentor = roles?.seniorMentor === "approved";
 
-  // ── Mentor URL: must wait for roles to verify approval ────────────────────
+  // ── Mentor URL: cached roles hon to turant render, warna verify tak wait ──
   if (defaultRole === "mentor") {
-    if (loading) return <FullScreenLoader />;
+    if (loading && !roles) return <FullScreenLoader />;
     if (!isMentor) return null; // redirect above is running
 
     return (
       <MentorDashboard
         userId={userId}
-        // Switching back to Mentee is done via the ProfileDropdown in the navbar.
         onSwitchRole={() => router.push(routes.menteeDashboard(userId))}
       />
     );
   }
 
-  // ── Mentee URL: render immediately, don't wait for the roles API ──────────
+  // ── Mentee URL: render immediately ────────────────────────────────────────
   return (
     <UserDashboardLayout
       userId={userId}

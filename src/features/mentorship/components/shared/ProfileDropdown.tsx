@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useMyRoles, UNLOCK_WHEN_PENDING, type MyRolesResponse } from "@/features/mentorship/hooks/useMentorRole";
+import { preloadMentorshipDashboards } from "@/features/mentorship/components/MentorshipDashboardRouter";
 import { routes } from "@/config/routes";
 import MentorService from "@/lib/api/mentorship.service";
 import {
@@ -62,6 +63,31 @@ interface WorkspaceOption extends RoleOption {
   dashboardHref: (userId: string) => string;
   applyHref: (userId: string) => string;
 }
+
+// ── Static lookups (component ke bahar: har render pe re-create nahi honge) ──
+const ROLE_ICONS: Record<WorkspaceKey, LucideIcon> = {
+  mentee:         GraduationCap,
+  seniorMentor:   Briefcase,
+  industryMentor: Users,
+};
+
+const ROLE_DASHBOARD_HREF: Record<WorkspaceKey, (uid: string) => string> = {
+  mentee:         (uid) => routes.menteeDashboard(uid),
+  seniorMentor:   (uid) => routes.seniorMentorDashboard(uid),
+  industryMentor: (uid) => routes.industryMentorDashboard(uid),
+};
+
+const ROLE_APPLY_HREF: Record<WorkspaceKey, (uid: string) => string> = {
+  mentee:         (uid)  => routes.menteeDashboard(uid),
+  seniorMentor:   (uid)  => routes.applySeniorMentor(uid),
+  industryMentor: (_uid) => routes.applyIndustryMentor,
+};
+
+const FALLBACK_ROLES: MyRolesResponse = {
+  mentee: "approved",
+  seniorMentor: "none",
+  industryMentor: "none",
+};
 
 /**
  * Detect the active workspace from the URL. Returns null on any page that is
@@ -114,10 +140,12 @@ export default function ProfileDropdown({
   const pathname = usePathname();
   const [open, setOpen]   = useState(false);
   const containerRef      = useRef<HTMLDivElement>(null);
+  const warmedRef         = useRef<Set<string>>(new Set());
 
   const userId = user?.userId || user?.id || user?._id || "";
 
-  // userId pass karo taaki /me/roles fail ho to bhi Mentor profile se role verify ho sake
+  // userId pass karo taaki /me/roles fail ho to bhi Mentor profile se role verify ho sake.
+  // Cache (module-level) ki wajah se remount pe turant roles milte hain.
   const { roles, loading: rolesLoading } = useMyRoles(isAuthenticated, userId);
 
   // Clicked role par tick turant shift ho, page load hone ka wait na kare
@@ -143,38 +171,8 @@ export default function ProfileDropdown({
     user?.email?.split("@")[0] ||
     "You";
 
-  // ── Icon lookup (keys match FrontendRoleKey) ─────────────────────────────
-  const ROLE_ICONS: Record<WorkspaceKey, LucideIcon> = {
-    mentee:         GraduationCap,
-    seniorMentor:   Briefcase,
-    industryMentor: Users,
-  };
-
-  // ── Nav-href helpers per role ─────────────────────────────────────────────
-  const ROLE_DASHBOARD_HREF: Record<WorkspaceKey, (uid: string) => string> = {
-    mentee:         (uid) => routes.menteeDashboard(uid),
-    seniorMentor:   (uid) => routes.seniorMentorDashboard(uid),
-    industryMentor: (uid) => routes.industryMentorDashboard(uid),
-  };
-
-  const ROLE_APPLY_HREF: Record<WorkspaceKey, (uid: string) => string> = {
-    mentee:         (uid)  => routes.menteeDashboard(uid),
-    seniorMentor:   (uid)  => routes.applySeniorMentor(uid),
-    industryMentor: (_uid) => routes.applyIndustryMentor,
-  };
-
   // ── Visible options (driven by getVisibleRoles) ───────────────────────────
-  // roles may still be null while loading, or the API may have failed.
-  // In both cases fall back to: Mentee approved, other two roles locked
-  // ("Apply now"), so all workspace options are always visible.
-  //
-  // FIX: removed the old `rolesError ? ...filter(mentee only)` branch that was
-  // hiding the other roles whenever /me/roles failed.
-  const baseRoles: MyRolesResponse = roles ?? {
-    mentee: "approved",
-    seniorMentor: "none",
-    industryMentor: "none",
-  };
+  const baseRoles: MyRolesResponse = roles ?? FALLBACK_ROLES;
 
   const visibleRoleOptions = getVisibleRoles(
     baseRoles,
@@ -190,6 +188,35 @@ export default function ProfileDropdown({
 
   // Falls back to the first option (Mentee) for the header label only; no tick is shown in that case.
   const activeOption = workspaceOptions.find((o) => o.key === activeRole) ?? workspaceOptions[0];
+
+  // ── Warm-up: dashboard JS chunks + route prefetch ─────────────────────────
+  // Click se pehle hi sab ready, taaki click pe switch instant lage.
+  const warmTargets = () => {
+    if (!userId) return;
+    preloadMentorshipDashboards();
+    workspaceOptions.forEach((opt) => {
+      if (opt.key === "mentee" || opt.status === "approved") {
+        const href = opt.dashboardHref(userId);
+        if (!warmedRef.current.has(href)) {
+          warmedRef.current.add(href);
+          router.prefetch(href);
+        }
+      }
+    });
+  };
+
+  // Roles aate hi idle time me prefetch (user ke click karne ka wait nahi)
+  useEffect(() => {
+    if (!isAuthenticated || !userId || !roles) return;
+    const w = window as any;
+    if (typeof w.requestIdleCallback === "function") {
+      const id = w.requestIdleCallback(warmTargets, { timeout: 2000 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(warmTargets, 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, userId, roles]);
 
   // ── Outside click + Escape ────────────────────────────────────────────────
   useEffect(() => {
@@ -215,6 +242,7 @@ export default function ProfileDropdown({
       const isApproved = opt.status === "approved";
       const isPending  = opt.status === "pending";
 
+      // Fast path: koi await nahi, tick turant shift, seedha navigate
       if (opt.key === "mentee" || isApproved || (isPending && UNLOCK_WHEN_PENDING)) {
         const target = opt.dashboardHref(userId);
         if (pathname !== target) {
@@ -224,7 +252,7 @@ export default function ProfileDropdown({
         return;
       }
 
-      // Locked (none / rejected) → go to apply flow
+      // Locked (none / rejected) -> apply flow
       const isLocked = !isApproved && !isPending;
       if (isLocked) {
         // Safety check: agar user ka Mentor profile already hai to form mat kholo,
@@ -250,7 +278,7 @@ export default function ProfileDropdown({
         }
         router.push(opt.applyHref(userId));
       }
-      // isPending && UNLOCK_WHEN_PENDING=false → disabled, do nothing
+      // isPending && UNLOCK_WHEN_PENDING=false -> disabled, do nothing
     },
     [userId, router, pathname, onOpenBecomeMentorModal]
   );
@@ -269,7 +297,8 @@ export default function ProfileDropdown({
     );
   }
 
-  if (rolesLoading) return <TriggerSkeleton />;
+  // Skeleton sirf tab jab cache me bhi kuch nahi (pehli baar load)
+  if (rolesLoading && !roles) return <TriggerSkeleton />;
 
   return (
     <div className="relative" ref={containerRef}>
@@ -279,7 +308,12 @@ export default function ProfileDropdown({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls="profile-dropdown-panel"
-        onClick={() => setOpen((p) => !p)}
+        onClick={() => {
+          if (!open) warmTargets();
+          setOpen((p) => !p);
+        }}
+        onMouseEnter={warmTargets}
+        onFocus={warmTargets}
         className="flex items-center gap-2 px-2.5 py-1.5 rounded-full transition-all focus:outline-none focus-visible:ring-2"
         style={{ background: open ? CREAM_DARK : "transparent", color: BROWN_DARK }}
       >
@@ -331,7 +365,7 @@ export default function ProfileDropdown({
           </p>
         </div>
 
-        {/* Role rows — only show roles returned by getVisibleRoles() */}
+        {/* Role rows: only show roles returned by getVisibleRoles() */}
         <ul className="py-2">
           {workspaceOptions.map((opt) => {
             const Icon       = opt.Icon;
@@ -356,10 +390,8 @@ export default function ProfileDropdown({
                   onClick={() => !isDisabled && handleOptionClick(opt)}
                   className="flex items-center gap-3 w-full px-5 py-3 text-left transition-colors"
                   style={{
-                    // Locked rows stay pointer (they navigate to apply flow)
                     cursor:  isDisabled ? "not-allowed" : "pointer",
                     opacity: isDisabled ? 0.6 : 1,
-                    // Fixed min-height so all rows are equal regardless of indicator
                     minHeight: 56,
                     background: isActive ? CREAM : "transparent",
                   }}
@@ -397,11 +429,7 @@ export default function ProfileDropdown({
                     </p>
                   </div>
 
-                  {/* Right indicator — one indicator per row:
-                      1. Active   → dark circle with white Check
-                      2. Pending  → "Under review" pill
-                      3. Other    → nothing
-                  */}
+                  {/* Right indicator: active tick / pending pill / nothing */}
                   <div className="ml-auto flex-shrink-0 w-6 flex items-center justify-center">
                     {isActive ? (
                       <div
