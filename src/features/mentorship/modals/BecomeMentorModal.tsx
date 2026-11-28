@@ -11,6 +11,7 @@ import { createMentorSchema } from "@/features/mentorship/validators/mentor.vali
 import MentorService from "@/lib/api/mentorship.service";
 import { syncProfilePhotoToAllRoles } from "@/features/mentorship/utils/syncProfilePhoto";
 import { useScrollLock } from "@/hooks/useScrollLock";
+import { getBrowserTimezone } from "@/lib/utils/timezone";
 import { DOMAINS, DOMAIN_LABELS, EXPERIENCE_OPTIONS, searchDomains } from "@/features/mentorship/constants/mentorship";
 import { CreateMentorFormData } from "@/features/mentorship/types/mentorship.types";
 import { useProfileData } from "@/features/profile/hooks/useProfileData";
@@ -349,6 +350,7 @@ export default function BecomeMentorModal({
                 branch: formData.branch,
                 linkedinUrl: formData.linkedinUrl,
                 githubUrl: formData.githubUrl,
+                timezone: getBrowserTimezone(),
                 profilePic: formData.profilePic,
             });
 

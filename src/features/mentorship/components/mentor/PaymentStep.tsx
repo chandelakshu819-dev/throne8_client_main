@@ -6,6 +6,7 @@ import { ArrowLeft } from "./Icons";
 import { C, btnPrimary } from "../../types/data";
 import type { CalendarData, Service, FormData as BookingFormData } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
+import { getBrowserTimezone } from "@/lib/utils/timezone";
 import MentorService from "@/lib/api/mentorship.service";
 import PaymentService, { PaymentCancelledError } from "@/lib/api/payment.service";
 
@@ -83,7 +84,7 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                     availabilityId: slot.availabilityId,
                     slotTime: slot.slotTime,
                     scheduledAt: slot.scheduledAt,
-                    timezone: "Asia/Kolkata",
+                    timezone: getBrowserTimezone(),
                     paymentMethod: "wallet",
                     pricing: {
                         basePrice: price,
@@ -122,7 +123,7 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
                 availabilityId: slot.availabilityId,
                 slotTime: slot.slotTime,
                 scheduledAt: slot.scheduledAt,
-                timezone: "Asia/Kolkata",
+                timezone: getBrowserTimezone(),
             });
 
             // Server ka price screen ke price se alag ho to charge karne se pehle ruk jao

@@ -12,6 +12,7 @@ import { api } from "@/lib/api/auth.service";
 import config from "@/config/env.config";
 import SkillsInput from "../shared/SkillsInput";
 import { splitSkills } from "@/shared/utils/mentorFormat";
+import { getBrowserTimezone } from "@/lib/utils/timezone";
 
 // Constants
 const DOMAINS_OPTIONS = [
@@ -149,7 +150,7 @@ export default function UpdateProfileModal({
 
         setLanguages(mentorData.languages ?? ["English"]);
         setLanguageInput("");
-        setTimezone(mentorData.availability?.timezone ?? "UTC");
+        setTimezone(mentorData.availability?.timezone ?? getBrowserTimezone());
 
         setActiveTab("basic");
         setError(null);
@@ -559,7 +560,7 @@ export default function UpdateProfileModal({
                                         onChange={(e) => setTimezone(e.target.value)}
                                         className={`${inputCls} pl-10`}
                                     >
-                                        {TIMEZONE_OPTIONS.map((tz) => (
+                                        {Array.from(new Set([timezone, ...TIMEZONE_OPTIONS])).filter(Boolean).map((tz) => (
                                             <option key={tz} value={tz}>{tz}</option>
                                         ))}
                                     </select>
