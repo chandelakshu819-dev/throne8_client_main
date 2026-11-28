@@ -432,6 +432,21 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({
                 <div className="h-8 w-px bg-[#E5D9CE] mx-1 hidden md:block" />
               )}
 
+              {/* Mobile/tablet: profile photo + workspace switch + sign out.
+                  Desktop (lg+) par mentorship pages ka apna Navigation ye dikhata hai. */}
+              {isMentorshipRoute && currentUserId && (
+                <div className="lg:hidden min-w-0">
+                  <ProfileDropdown
+                    user={{ userId: currentUserId }}
+                    isAuthenticated={!!currentUserId}
+                    profileImageUrl={profileImage}
+                    fullName={userName || undefined}
+                    onSignOut={() => handleMenuClick("Sign Out")}
+                    isLoggingOut={isLoggingOut}
+                  />
+                </div>
+              )}
+
               {/* Profile commented out from top bar as requested */}
               {/*
                             {isMentorshipRoute && (
