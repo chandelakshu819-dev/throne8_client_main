@@ -147,10 +147,16 @@ class SessionService {
         }
     }
 
-    static async getMentorSessions(mentorId: string): Promise<ApiResponse> {
+    // includeArchived: only honoured by the backend when the caller IS this mentor.
+    // Bookings / Payments pages pass it so history of deleted (archived) services stays visible.
+    static async getMentorSessions(
+        mentorId: string,
+        opts?: { includeArchived?: boolean }
+    ): Promise<ApiResponse> {
         try {
             const { data } = await api.get<ApiResponse>(
-                `${config.NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT}/${mentorId}`
+                `${config.NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT || process.env.NEXT_PUBLIC_SESSIONS_MENTOR_ENDPOINT}/${mentorId}`,
+                opts?.includeArchived ? { params: { includeArchived: true } } : undefined
             );
             return data;
         } catch (error: any) {

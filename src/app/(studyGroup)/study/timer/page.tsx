@@ -1,195 +1,85 @@
-'use client';
+// app/(studyGroup)/study/todo/components/TodoPanelModal.tsx
+"use client";
 
-import { useAppDispatch, useAppSelector } from '@/core/store/store.hooks';
-import {
-  setMinutes,
-  setSeconds,
-  completeSession,
-  startBreak,
-  endBreak,
-  resetTimer
-} from '@/hooks/studyGroup/features/timer/timerSlice';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 
-import TimerTabs from '@/features/studyGroup/components/TimerTabs';
-import TimerDisplay from '@/features/studyGroup/components/TimerDisplay';
-import CustomTimerControls from '@/features/studyGroup/components/CustomTimerControls';
-import SubjectInput from '@/features/studyGroup/components/SubjectInput';
-import TimerControls from '@/features/studyGroup/components/TimerControls';
-import UnfinishedSessionPrompt from '@/features/studyGroup/components/UnfinishedSessionPrompt';
-import MotivationalQuote from '@/features/studyGroup/components/MotivationalQuote';
-import StudyProgress from '@/features/studyGroup/components/StudyProgress';
-import { startTimerThunk, getActiveTimerThunk, getAllSessionsThunk, getTimerStatsThunk, getTodaySessionsThunk, stopTimerThunk } from '@/hooks/studyGroup/features/timer/timer.thunks';
-import { fetchUserStreakThunk } from '@/hooks/studyGroup/features/groups/group.thunks';
-import { STUDY_PAGE_WRAP } from "@/features/study-group/constants/pageLayout";
-
-// Isolated countdown + completion engine so per-second Redux ticks only re-render TimerDisplay,
-// not the entire PomodoroTimer page and all sibling panels.
-function TimerEngine({ onSessionCompleted }: { onSessionCompleted: () => void }) {
-  const dispatch = useAppDispatch();
-  const isActive = useAppSelector(state => state.timer.isActive);
-  const minutes = useAppSelector(state => state.timer.minutes);
-  const seconds = useAppSelector(state => state.timer.seconds);
-  const isBreakMode = useAppSelector(state => state.timer.isBreakMode);
-  const activeTab = useAppSelector(state => state.timer.activeTab);
-  const completedSessions = useAppSelector(state => state.timer.completedSessions);
-  const subject = useAppSelector(state => state.timer.subject);
-  const selectedGoalId = useAppSelector(state => state.timer.selectedGoalId);
-  const autoStartPomodoros = useAppSelector(state => state.timer.settings?.autoStartPomodoros);
-  const finishing = useRef(false);
-
-  // Clock-based countdown. Counting 1-second ticks drifts (every tick re-creates the
-  // interval, and browsers slow timers in background tabs), so a 5 min session ran
-  // 6+ min. Instead we keep an absolute end time and derive the remaining seconds
-  // from the real clock. The finish step below handles 0:00.
-  const remainingRef = useRef(0);
-  remainingRef.current = (minutes || 0) * 60 + (seconds || 0);
-  const endAtRef = useRef<number | null>(null);
-  const lastShownRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!isActive) {
-      endAtRef.current = null;
-      lastShownRef.current = null;
-      return;
-    }
-    const interval = setInterval(() => {
-      const now = Date.now();
-      if (endAtRef.current === null || remainingRef.current !== lastShownRef.current) {
-        endAtRef.current = now + remainingRef.current * 1000;
-        lastShownRef.current = remainingRef.current;
-      }
-      const left = Math.max(0, Math.ceil((endAtRef.current - now) / 1000));
-      if (left !== lastShownRef.current) {
-        lastShownRef.current = left;
-        // seconds first: the in-between state is never 0:00, so the finish step can't fire early
-        dispatch(setSeconds(left % 60));
-        dispatch(setMinutes(Math.floor(left / 60)));
-      }
-    }, 250);
-    return () => clearInterval(interval);
-  }, [isActive, dispatch]);
-
-  const handleTimerComplete = async () => {
-    if (activeTab === 'pomodoro' && isBreakMode) {
-      dispatch(endBreak());
-      if (autoStartPomodoros) {
-        const started: any = await dispatch(
-          startTimerThunk({
-            subject: subject || undefined,
-            goalId: selectedGoalId || undefined,
-          })
-        );
-        if (started.meta.requestStatus === 'rejected') dispatch(getActiveTimerThunk());
-      }
-      return;
-    }
-
-    const result: any = await dispatch(stopTimerThunk(undefined));
-
-    if (result.meta.requestStatus !== 'fulfilled') {
-      dispatch(resetTimer());
-      dispatch(getActiveTimerThunk());
-      return;
-    }
-
-    onSessionCompleted();
-    dispatch(completeSession());
-
-    if (activeTab === 'pomodoro') {
-      const isLongBreak = (completedSessions + 1) % 4 === 0;
-      dispatch(startBreak(isLongBreak ? 'long' : 'short'));
-    } else {
-      dispatch(resetTimer());
-    }
-
-    dispatch(getTodaySessionsThunk());
-    dispatch(getTimerStatsThunk({ force: true }));
-    dispatch(getAllSessionsThunk({ limit: 10 }));
-    dispatch(fetchUserStreakThunk({ force: true }));
-  };
-
-  useEffect(() => {
-    if (minutes !== 0 || seconds !== 0) {
-      finishing.current = false;
-      return;
-    }
-    if (!isActive || finishing.current) return;
-    finishing.current = true;
-    handleTimerComplete();
-  }, [isActive, minutes, seconds]);
-
-  return null;
+interface TodoPanelModalProps {
+  open: boolean;
+  onClose: () => void;
+  title?: string;
+  subtitle?: string;
+  children: React.ReactNode;
 }
 
-export default function PomodoroTimer() {
-  const dispatch = useAppDispatch();
-
-  const activeTab = useAppSelector(state => state.timer.activeTab);
-  const [sessionCompleted, setSessionCompleted] = useState(false);
-  const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
+/**
+ * Centered modal (bottom sheet on phones) in the same style as the
+ * "Create Study Group" dialog: white card, header with title/subtitle + X,
+ * scrollable body, dimmed backdrop, Esc / backdrop click to close.
+ */
+export default function TodoPanelModal({
+  open,
+  onClose,
+  title = "Tasks",
+  subtitle,
+  children,
+}: TodoPanelModalProps) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    dispatch(getActiveTimerThunk());
-    dispatch(getTodaySessionsThunk());
-    dispatch(getTimerStatsThunk());
-    dispatch(fetchUserStreakThunk());
-  }, [dispatch]);
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden"; // lock page scroll behind the modal
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
 
-  const handleSessionCompleted = useCallback(() => {
-    setSessionCompleted(true);
-    setTimeout(() => setSessionCompleted(false), 4000);
-  }, []);
+  if (!mounted || !open) return null;
 
-  return (
-    <div className="min-h-screen bg-[#f7f3ee] py-5 sm:py-6 lg:py-8">
-      <TimerEngine onSessionCompleted={handleSessionCompleted} />
-
-      {/* Session complete toast */}
-      {sessionCompleted && (
-        <div className="fixed top-4 right-4 bg-[#4a3728] text-[#f6ede8] px-5 py-3 rounded-xl shadow-lg text-sm font-bold z-50 flex items-center gap-2 animate-in">
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-          </svg>
-          Session completed! Great work
-        </div>
-      )}
-
-      <div className={STUDY_PAGE_WRAP}>
-        <header className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-[#4a3728] sm:text-3xl">Study Timer</h1>
-          <p className="mt-1 text-sm text-[#6b5847] sm:text-base">
-            Pick a mode, add what you are studying, then press Start. Finished sessions are saved to Today&apos;s Progress.
-          </p>
-        </header>
-
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-
-          {/* Left: the timer */}
-          <section className="overflow-hidden rounded-2xl border border-[#e0d8cf] bg-white shadow-sm">
-            <div className="h-1 bg-gradient-to-r from-[#4a3728] via-[#8b6f47] to-[#d4a574]" />
-            <div className="space-y-6 p-5 sm:p-6">
-              <UnfinishedSessionPrompt />
-              <TimerTabs />
-              <TimerDisplay />
-              {activeTab === 'timer' && <CustomTimerControls />}
-              <SubjectInput />
-              <TimerControls />
-            </div>
-          </section>
-
-          {/* Right: today's progress, then the quote */}
-          <aside className="flex flex-col gap-4">
-            <StudyProgress onViewSession={(id) => setViewingSessionId(id)} />
-            <MotivationalQuote />
-
-            {viewingSessionId && (
-              <div>{/* SessionDetailModal yahan aayega */}</div>
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+      onMouseDown={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="todo-panel-title"
+        onMouseDown={(e) => e.stopPropagation()}
+        className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:max-h-[85vh] sm:max-w-xl sm:rounded-2xl"
+      >
+        {/* Header */}
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#e0d8cf] px-5 py-4 sm:px-6">
+          <div className="min-w-0">
+            <h2
+              id="todo-panel-title"
+              className="truncate text-lg font-bold text-[#4a3728] sm:text-xl"
+            >
+              {title}
+            </h2>
+            {subtitle && (
+              <p className="mt-0.5 text-sm text-[#6b5847]">{subtitle}</p>
             )}
-          </aside>
-
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="shrink-0 rounded-lg p-1.5 text-[#6b5847] transition-colors hover:bg-[#f6ede8] hover:text-[#4a3728]"
+          >
+            <X size={22} />
+          </button>
         </div>
+
+        {/* Scrollable body (put your tabs + lists + form here) */}
+        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

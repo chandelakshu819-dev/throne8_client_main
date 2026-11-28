@@ -393,17 +393,17 @@ export default function ServicesPage({
     if (!service.sessionId) return;
 
     if (service.type === 'group_session') {
-      const participantCount = (service as any).currentParticipants ?? 0;
-      if (participantCount > 0) {
-        setBlockedDeleteMessage('This group session has registered participants. Cancel it first before deleting.');
-        return;
-      }
+      // Backend (group.service.ts -> deleteGroupSession) decides:
+      // live/upcoming sessions are blocked, completed/cancelled ones are archived.
+      // Its error message is shown via confirmDeleteService's catch.
       setDeleteTarget(service);
       return;
     }
 
     const bookings = (service as any).bookings ?? [];
-    const hasActiveBooking = bookings.some((b: any) => b.status !== 'cancelled');
+    const hasActiveBooking = bookings.some(
+      (b: any) => !['cancelled', 'completed', 'missed', 'no_show', 'refunded'].includes(b.status)
+    );
     if (hasActiveBooking) {
       setBlockedDeleteMessage('This service has active bookings. Please cancel the booking(s) first from Mentee Status before deleting.');
       return;
@@ -1249,7 +1249,7 @@ export default function ServicesPage({
             </div>
 
             <p className="text-sm mb-6" style={{ color: COLORS.muted }}>
-              Are you sure you want to delete <span className="font-semibold" style={{ color: COLORS.ink }}>"{deleteTarget.name}"</span> permanently? This cannot be undone.
+            Are you sure you want to delete <span className="font-semibold" style={{ color: COLORS.ink }}>"{deleteTarget.name}"</span>? It will be removed from your services. Past booking history is kept.
             </p>
 
             <div className="flex justify-end gap-3 pt-4" style={{ borderTop: '1px solid #f0ebe4' }}>

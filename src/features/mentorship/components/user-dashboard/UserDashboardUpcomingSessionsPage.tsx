@@ -21,6 +21,7 @@ import MentorService from "@/lib/api/mentorship.service";
 import FindMentorModal from "@/features/mentorship/components/sections/FindMentorModal";
 import CalendarStep from "@/features/mentorship/components/mentor/CalendarStep";
 import type { CalendarData } from "@/features/mentorship/types/types";
+import { zonedWallTimeToISO } from "@/lib/utils/timezone";
 
 const COLORS = {
   ink: "#4a3728",
@@ -780,7 +781,7 @@ export default function UserDashboardUpcomingSessionsPage({ setActivePage, user 
       const month = String(d.currentMonth.getMonth() + 1).padStart(2, "0");
       const day = String(d.selectedDate).padStart(2, "0");
       const startTime = d.slotTime.split(" - ")[0];
-      const iso = new Date(`${year}-${month}-${day}T${startTime}:00+05:30`).toISOString();
+      const iso = zonedWallTimeToISO(`${year}-${month}-${day}`, startTime, d.slotTimezone);
       await SessionService.rescheduleSession(
         missedReschedule.sessionId,
         iso,

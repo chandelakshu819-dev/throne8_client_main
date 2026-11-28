@@ -122,6 +122,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
     const [daySlots, setDaySlots] = useState<any[]>([]);
     const [noAvailability, setNoAvailability] = useState(false);
     const [selectedAvailabilityId, setSelectedAvailabilityId] = useState<string>("");
+    const [selectedAvailabilityTz, setSelectedAvailabilityTz] = useState<string>("");
     const [groupSlots, setGroupSlots] = useState<any[]>([]);
 
     const year: number = currentMonth.getFullYear();
@@ -276,10 +277,12 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
         if (matched) {
             setDaySlots(matched.slots);
             setSelectedAvailabilityId(matched.availabilityId);
+            setSelectedAvailabilityTz(matched.timezone || "");
             setNoAvailability(false);
         } else {
             setDaySlots([]);
             setSelectedAvailabilityId("");
+            setSelectedAvailabilityTz("");
             setNoAvailability(true);
         }
     }, [selectedDate, availability, year, month]);
@@ -477,6 +480,7 @@ const CalendarStep: React.FC<CalendarStepProps> = ({ selectedService, onBack, on
                                     currentMonth,
                                     availabilityId: selectedAvailabilityId,
                                     slotTime: selectedTime,
+                                    slotTimezone: selectedAvailabilityTz || undefined,
                                 })}
                                 style={{ ...btnPrimary, width: "100%", padding: "14px", borderRadius: "12px", fontSize: "15px" }}
                             >

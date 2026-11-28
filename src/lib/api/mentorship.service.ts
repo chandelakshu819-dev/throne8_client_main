@@ -93,6 +93,7 @@ class MentorService {
     branch: string;
     linkedinUrl: string;
     githubUrl?: string;
+    timezone?: string;
     profilePic: File;
   }): Promise<MentorResponse> {
     try {
@@ -123,6 +124,11 @@ class MentorService {
           ...(payload.githubUrl && { githubUrl: payload.githubUrl }),
         })
       );
+
+      // Mentor ka timezone (browser se detect hua) - backend ise availability.timezone me save kare
+      if (payload.timezone) {
+        formData.append('availability', JSON.stringify({ timezone: payload.timezone }));
+      }
 
       formData.append('profilePic', payload.profilePic);
 

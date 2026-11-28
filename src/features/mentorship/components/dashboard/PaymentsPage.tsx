@@ -458,7 +458,7 @@ export default function PaymentsPage({ mentorData }: PaymentsPageProps) {
     setTxLoading(true);
     setTxError(null);
 
-    SessionService.getMentorSessions(mentorId)
+    SessionService.getMentorSessions(mentorId, { includeArchived: true })
       .then((res) => {
         const sessions: any[] = Array.isArray(res.data) ? res.data : [];
         const rows: TransactionRow[] = sessions.flatMap((s: any) => {

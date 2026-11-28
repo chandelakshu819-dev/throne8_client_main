@@ -21,6 +21,7 @@ import {
 import { C, btnPrimary } from "../../types/data";
 import type { Service } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
+import { getBrowserTimezone } from "@/lib/utils/timezone";
 import AuthService from "@/lib/api/auth.service";
 import MentorService from "@/lib/api/mentorship.service";
 import WaitlistModal from "../modal/WaitlistModal";
@@ -416,7 +417,7 @@ const ServicesSection: React.FC<ServicesSectionProps> = ({
       preferredDates: [session.scheduledAt || new Date().toISOString()],
       preferredTimeSlots: ["any"],
       sessionType: session.sessionType,
-      timezone: "Asia/Kolkata",
+      timezone: getBrowserTimezone(),
       notes: note || undefined,
     });
     setWaitlistEntries((prev) => ({ ...prev, [session.sessionId]: res.data }));

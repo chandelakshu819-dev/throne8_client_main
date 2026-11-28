@@ -1,8 +1,6 @@
-// app/(studyGroup)/study/todo/components/CalendarHeader.tsx
-
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { months } from "../data";
 
 interface CalendarHeaderProps {
@@ -11,6 +9,7 @@ interface CalendarHeaderProps {
   setView: (view: "month" | "year") => void;
   changeMonth: (increment: number) => void;
   setCurrentDate: (date: Date) => void;
+  onAddTask?: () => void;
 }
 
 export default function CalendarHeader({
@@ -19,63 +18,78 @@ export default function CalendarHeader({
   setView,
   changeMonth,
   setCurrentDate,
+  onAddTask,
 }: CalendarHeaderProps) {
   return (
-    <div className="mb-4 sm:mb-6 mt-24 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-[#4a3728]">
-          Calendar & Todos
-        </h1>
-        <p className="text-sm sm:text-base text-[#6b5847] mt-1">
-          {view === "month"
-            ? `${months[currentDate.getMonth()]} ${currentDate.getFullYear()}`
-            : "All Years"}
-        </p>
+    <div className="flex flex-col gap-4">
+      {/* Title row */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-bold text-[#4a3728] sm:text-3xl">
+            Calendar &amp; Todos
+          </h1>
+          <p className="mt-0.5 text-sm font-medium text-[#6b5847] sm:text-base">
+            {view === "month"
+              ? `${months[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+              : "All Years"}
+          </p>
+        </div>
+
+        {onAddTask && (
+          <button
+            type="button"
+            onClick={onAddTask}
+            className="hidden shrink-0 items-center gap-2 rounded-xl bg-[#4a3728] px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#6b4e3d] active:scale-95 sm:inline-flex"
+          >
+            <Plus size={18} />
+            Add Task
+          </button>
+        )}
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-        {/* View Toggle */}
-        <div className="flex gap-1 sm:gap-2 bg-white rounded-lg p-1 shadow-sm">
-          <button
-            onClick={() => setView("month")}
-            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
-              view === "month"
-                ? "bg-[#8b7355] text-white"
-                : "text-[#4a3728] hover:bg-[#f6ede8]"
-            }`}
-          >
-            Month
-          </button>
-          <button
-            onClick={() => setView("year")}
-            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
-              view === "year"
-                ? "bg-[#8b7355] text-white"
-                : "text-[#4a3728] hover:bg-[#f6ede8]"
-            }`}
-          >
-            Years
-          </button>
+      {/* Toolbar row */}
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+        {/* View toggle */}
+        <div className="flex gap-1 rounded-xl bg-[#f6ede8] p-1">
+          {(["month", "year"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all sm:px-4 sm:py-2 sm:text-sm ${
+                view === v
+                  ? "bg-[#4a3728] text-white shadow-sm"
+                  : "text-[#4a3728] hover:bg-white"
+              }`}
+            >
+              {v === "month" ? "Month" : "Years"}
+            </button>
+          ))}
         </div>
 
         {/* Navigation */}
         {view === "month" && (
-          <div className="flex gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
+              type="button"
+              aria-label="Previous month"
               onClick={() => changeMonth(-1)}
-              className="p-1.5 sm:p-2 bg-white text-[#4a3728] rounded-lg hover:bg-[#8b7355] hover:text-white transition-all shadow-sm"
+              className="rounded-lg border border-[#e0d8cf] bg-white p-1.5 text-[#4a3728] shadow-sm transition-all hover:bg-[#4a3728] hover:text-white sm:p-2"
             >
               <ChevronLeft size={18} />
             </button>
             <button
+              type="button"
               onClick={() => setCurrentDate(new Date())}
-              className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white text-[#4a3728] rounded-lg hover:bg-[#8b7355] hover:text-white transition-all shadow-sm font-semibold text-xs sm:text-sm"
+              className="rounded-lg border border-[#e0d8cf] bg-white px-3 py-1.5 text-xs font-semibold text-[#4a3728] shadow-sm transition-all hover:bg-[#4a3728] hover:text-white sm:px-4 sm:py-2 sm:text-sm"
             >
               Today
             </button>
             <button
+              type="button"
+              aria-label="Next month"
               onClick={() => changeMonth(1)}
-              className="p-1.5 sm:p-2 bg-white text-[#4a3728] rounded-lg hover:bg-[#8b7355] hover:text-white transition-all shadow-sm"
+              className="rounded-lg border border-[#e0d8cf] bg-white p-1.5 text-[#4a3728] shadow-sm transition-all hover:bg-[#4a3728] hover:text-white sm:p-2"
             >
               <ChevronRight size={18} />
             </button>
