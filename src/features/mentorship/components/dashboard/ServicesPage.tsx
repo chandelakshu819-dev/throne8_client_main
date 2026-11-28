@@ -402,7 +402,7 @@ export default function ServicesPage({
 
     const bookings = (service as any).bookings ?? [];
     const hasActiveBooking = bookings.some(
-      (b: any) => !['cancelled', 'completed', 'missed'].includes(b.status)
+      (b: any) => !['cancelled', 'completed', 'missed', 'no_show', 'refunded'].includes(b.status)
     );
     if (hasActiveBooking) {
       setBlockedDeleteMessage('This service has active bookings. Please cancel the booking(s) first from Mentee Status before deleting.');
@@ -1249,7 +1249,7 @@ export default function ServicesPage({
             </div>
 
             <p className="text-sm mb-6" style={{ color: COLORS.muted }}>
-              Are you sure you want to delete <span className="font-semibold" style={{ color: COLORS.ink }}>"{deleteTarget.name}"</span> permanently? This cannot be undone.
+            Are you sure you want to delete <span className="font-semibold" style={{ color: COLORS.ink }}>"{deleteTarget.name}"</span>? It will be removed from your services. Past booking history is kept.
             </p>
 
             <div className="flex justify-end gap-3 pt-4" style={{ borderTop: '1px solid #f0ebe4' }}>

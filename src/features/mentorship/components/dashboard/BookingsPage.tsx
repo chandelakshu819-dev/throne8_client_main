@@ -373,7 +373,7 @@ export default function BookingsPage({ mentorData }: BookingProps) {
     setLoadingData(true);
 
     return Promise.all([
-      SessionService.getMentorSessions(mentorData.mentorId),
+      SessionService.getMentorSessions(mentorData.mentorId, { includeArchived: true }),
       SessionService.getMentorGroupSessionParticipants().catch((err) => {
         console.error("Failed to fetch group session bookings:", err);
         return { data: [] } as any;
