@@ -6,7 +6,7 @@ import { ArrowLeft } from "./Icons";
 import { C, btnPrimary } from "../../types/data";
 import type { CalendarData, Service, FormData as BookingFormData } from "../../types/types";
 import SessionService from "@/lib/api/session.service";
-import { getBrowserTimezone } from "@/lib/utils/timezone";
+import { getBrowserTimezone, zonedWallTimeToISO } from "@/lib/utils/timezone";
 import MentorService from "@/lib/api/mentorship.service";
 import PaymentService, { PaymentCancelledError } from "@/lib/api/payment.service";
 
@@ -51,12 +51,13 @@ const PaymentStep: React.FC<PaymentStepProps> = ({
     const isGroupSession = selectedService?.type === "GroupSession";
 
     const buildSlotInfo = () => {
-        const { selectedDate, currentMonth, availabilityId, slotTime } = calendarData;
+        const { selectedDate, currentMonth, availabilityId, slotTime, slotTimezone } = calendarData;
         const year = currentMonth.getFullYear();
         const month = String(currentMonth.getMonth() + 1).padStart(2, "0");
         const day = String(selectedDate).padStart(2, "0");
         const startTime = slotTime.split(" - ")[0];
-        const scheduledAt = new Date(`${year}-${month}-${day}T${startTime}:00+05:30`).toISOString();
+        // Slot mentor ke timezone me hai, isliye wahi timezone use karo (pehle +05:30 hardcoded tha)
+        const scheduledAt = zonedWallTimeToISO(`${year}-${month}-${day}`, startTime, slotTimezone);
         return { year, month, day, startTime, availabilityId, slotTime, scheduledAt };
     };
 

@@ -58,6 +58,8 @@ export interface CalendarData {
     currentMonth: Date;
     availabilityId: string;
     slotTime: string;
+    /** Mentor availability doc ka timezone (slot is timezone me hai) */
+    slotTimezone?: string;
 }
 
 export type BookingStep = null | "calendar" | "details" | "payment" | "confirmation";
