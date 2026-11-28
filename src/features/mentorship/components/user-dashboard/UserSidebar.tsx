@@ -101,7 +101,7 @@ export default function UserSidebar({
             e.stopPropagation();
             onToggleCollapse();
           }}
-          className="absolute -right-3.5 top-8 z-50 w-7 h-7 rounded-full flex items-center justify-center border shadow-sm transition-transform hover:scale-105"
+          className="absolute -right-3.5 top-8 z-50 w-7 h-7 rounded-full hidden md:flex items-center justify-center border shadow-sm transition-transform hover:scale-105"
           style={{ backgroundColor: "#fff", borderColor: "#ece4db", color: "#7a5c3e" }}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}

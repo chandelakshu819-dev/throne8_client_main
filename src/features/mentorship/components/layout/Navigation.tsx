@@ -21,7 +21,7 @@ interface NavigationProps {
   currentUserId?: string;
   isMentor?: boolean;
   mentorUserId?: string;
-  // Mobile par neeche tab bar dikhana hai ya nahi (default: haan)
+  // Mobile par neeche tab bar: default band, kyunki global MobileBottomNavbar (ProfileNavbar se) pehle se hai
   showMobileNav?: boolean;
 }
 
@@ -66,7 +66,7 @@ export default function Navigation({
   currentUserId,
   isMentor = false,
   mentorUserId,
-  showMobileNav = true,
+  showMobileNav = false,
 }: NavigationProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -176,9 +176,9 @@ export default function Navigation({
 
   return (
     <>
-      <nav className="fixed top-0 left-0 z-50 w-full border-b border-[#E5D9CE] bg-[#F6EDE8] text-[#4a3728] shadow-sm">
+      <nav className="fixed top-0 left-0 z-50 hidden w-full border-b border-[#E5D9CE] bg-[#F6EDE8] text-[#4a3728] shadow-sm lg:block">
         <div className="w-full px-3 sm:px-6 lg:px-8">
-          <div className="flex h-14 w-full items-center justify-between gap-2 sm:h-16">
+          <div className="flex h-16 w-full items-center justify-between gap-2">
             {/* Left: Throne8 Wordmark */}
             <div className="flex min-w-0 flex-shrink-0 items-center gap-2">
               <BrandWordmark href={HOME_PATH} />

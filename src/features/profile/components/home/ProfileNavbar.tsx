@@ -76,10 +76,10 @@ const ROUTE_PREFIX: Record<string, string> = {
   Mentorship: "/mentorship",
 };
 
-// Jin routes ka apna mobile header hai, wahan mobile pe global navbar hide hoga.
-// Mentor dashboards (mentorProfile / senior-mentor-profile) ka header bhi
-// apna ho to unke prefix yahan add kar dena.
-const OWN_MOBILE_HEADER_PREFIXES = ["/mentorship/user-dashboard"];
+// Jin routes par mobile pe global navbar hide karna ho unke prefix yahan daalo.
+// Mentee dashboard ab yahan nahi hai: uske upar global navbar (main menu) dikhna chahiye,
+// dashboard ka sidebar button uske neeche ek sub-bar me hai (mentor dashboard jaisa).
+const OWN_MOBILE_HEADER_PREFIXES: string[] = [];
 
 const ProfileNavbar: React.FC<ProfileNavbarProps> = ({
   profileImage,

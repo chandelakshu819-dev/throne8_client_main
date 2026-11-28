@@ -11,9 +11,7 @@ import { isNotificationForRole } from "@/features/mentorship/utils/notificationR
 import { joinMentorshipSession } from "@/features/mentorship/services/sessionJoin.service";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProfile } from "@/features/profile/hooks/useProfile";
-import { useNavbarData } from "@/features/profile/components/home/NavbarProvider";
 import { useSocket } from "@/core/realtime/useSocket";
-import BrandWordmark from "@/shared/uiComponents/BrandWordmark";
 
 // Tab loader: sirf jab tab khulta hai tab uska code download hota hai
 const PageLoader = () => (
@@ -38,6 +36,24 @@ const UserDashboardPaymentsPage = lazyPage(() => import("./UserDashboardPayments
 const UserDashboardNotificationsPage = lazyPage(() => import("./UserDashboardNotificationsPage"));
 const UserDashboardRecommendedMentorsPage = lazyPage(() => import("./UserDashboardRecommendedMentorsPage"));
 const UserDashboardProfilePreferencesPage = lazyPage(() => import("./UserDashboardProfilePreferencesPage"));
+
+const PAGE_TITLES: Record<string, string> = {
+  dashboard: "Overview",
+  "profile-preferences": "Profile",
+  profile: "Profile",
+  progress: "Progress",
+  queries: "Queries",
+  "upcoming-sessions": "Upcoming Sessions",
+  "my-mentors": "My Mentors",
+  "my-bookings": "My Bookings",
+  "session-history": "Session History",
+  "group-sessions": "Group Sessions",
+  waitlist: "Waitlist",
+  reviews: "Reviews",
+  payments: "Payments",
+  notifications: "Notifications",
+  "recommended-mentors": "Recommended Mentors",
+};
 
 const pageComponents: Record<string, React.FC<any>> = {
   dashboard: UserDashboardOverviewPage,
@@ -121,8 +137,6 @@ export default function UserDashboardLayout({
   const [sessions, setSessions] = useState<any[]>([]);
   const { user } = useAuth();
   const { userProfileData, loadProfile } = useProfile();
-  // Account photo na ho to mentor/senior photo fallback (NavbarProvider se)
-  const { profileData: navbarProfileData } = useNavbarData();
 
   useEffect(() => {
     if (!userProfileData && typeof loadProfile === "function") {
@@ -321,12 +335,12 @@ export default function UserDashboardLayout({
 
   return (
     <div className="flex flex-col h-[100dvh] md:h-screen bg-[#f6ede8]">
-      {/* Global navbar ke liye spacer: sirf md+ pe (mobile pe global nav hidden hai) */}
-      <div className="hidden md:block h-16 shrink-0" aria-hidden="true" />
+      {/* Global navbar (fixed, h-16) ke liye spacer: mobile + desktop dono pe */}
+      <div className="h-16 shrink-0" aria-hidden="true" />
 
       {liveSession && (
         <div
-          className="fixed top-4 md:top-20 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 md:gap-4 px-4 md:px-5 py-3 rounded-2xl shadow-lg w-[calc(100%-2rem)] md:w-auto max-w-lg"
+          className="fixed top-[4.5rem] md:top-20 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 md:gap-4 px-4 md:px-5 py-3 rounded-2xl shadow-lg w-[calc(100%-2rem)] md:w-auto max-w-lg"
           style={{ background: "#4a3728" }}
         >
           <span className="flex items-center gap-2 text-sm font-semibold text-white min-w-0">
@@ -350,27 +364,21 @@ export default function UserDashboardLayout({
         </div>
       )}
 
-      {/* Mobile Header (mobile pe ab ye akela top nav hai) */}
-      <div className="md:hidden flex items-center justify-between px-4 h-16 shrink-0 bg-[#fbf7f3] border-b border-[#e0d8cf]">
+      {/* Mobile sub-bar: sidebar menu button + current page naam (branding/main menu global navbar me hai) */}
+      <div className="md:hidden flex items-center gap-2 px-3 h-12 shrink-0 bg-[#fbf7f3] border-b border-[#e0d8cf]">
         <button
           onClick={() => setIsMobileMenuOpen(true)}
-          className="p-2 -ml-2 text-[#4a3728] hover:bg-[#f3ece4] rounded-lg transition-colors"
-          aria-label="Open menu"
+          className="relative p-2 text-[#4a3728] hover:bg-[#f3ece4] rounded-lg transition-colors"
+          aria-label="Open dashboard menu"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
-        </button>
-
-        <BrandWordmark size="sm" />
-
-        <div className="w-8 h-8 rounded-full overflow-hidden border border-[#e0d8cf] flex-shrink-0">
-          {((userProfileData as any)?.profileImageUrl || navbarProfileData?.profileImage) ? (
-            <img src={(userProfileData as any)?.profileImageUrl || navbarProfileData?.profileImage} alt="Profile" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-[#4a3728] text-white flex items-center justify-center text-xs font-bold">
-              {(userProfileData?.firstName?.[0] || user?.firstName?.[0] || "U").toUpperCase()}
-            </div>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+          {safeNotifications.some((n) => !n.isRead) && (
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#b91c1c]" />
           )}
-        </div>
+        </button>
+        <span className="text-sm font-bold text-[#4a3728] truncate">
+          {PAGE_TITLES[activePage] || "Dashboard"}
+        </span>
       </div>
 
       <div className="flex flex-1 min-h-0 relative">
