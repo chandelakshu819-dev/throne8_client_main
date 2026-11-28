@@ -212,13 +212,13 @@ export default function SeniorMentorLayout({
       <div className="flex flex-1 min-h-0 relative">
         {isMobileMenuOpen && (
           <div
-            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            className="fixed inset-0 bg-black/50 z-[105] md:hidden"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-hidden="true"
           />
         )}
         <div
-          className={`absolute md:relative z-50 h-full transform transition-transform duration-300 ease-in-out ${
+          className={`fixed md:relative inset-y-0 left-0 z-[110] md:z-auto h-[100dvh] md:h-full max-w-[85vw] transform transition-transform duration-300 ease-in-out ${
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
           } md:transform-none`}
         >

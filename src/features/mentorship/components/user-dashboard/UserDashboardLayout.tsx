@@ -377,14 +377,14 @@ export default function UserDashboardLayout({
         {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
           <div
-            className="fixed inset-0 bg-black/50 z-[55] md:hidden transition-opacity"
+            className="fixed inset-0 bg-black/50 z-[105] md:hidden transition-opacity"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-hidden="true"
           />
         )}
         <div
           className={`
-          absolute md:relative z-[60] md:z-50 h-full transform transition-transform duration-300 ease-in-out
+          fixed md:relative inset-y-0 left-0 z-[110] md:z-50 h-[100dvh] md:h-full max-w-[85vw] transform transition-transform duration-300 ease-in-out
           ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
         `}
         >

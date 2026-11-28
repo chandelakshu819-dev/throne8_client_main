@@ -622,15 +622,17 @@ export default function MentorDashboard(
         {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
           <div
-            className="absolute inset-0 bg-black/50 z-40 md:hidden transition-opacity"
+            className="fixed inset-0 bg-black/50 z-[105] md:hidden transition-opacity"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-hidden="true"
           />
         )}
 
+        {/* Mobile: fixed + full height + navbar/bottom-nav (z-50) se upar, taaki drawer peeche na khule.
+            Desktop (md+): normal relative sidebar. */}
         <div
           className={`
-            absolute md:relative inset-y-0 left-0 z-50 h-full max-w-[85vw] shrink-0
+            fixed md:relative inset-y-0 left-0 z-[110] md:z-auto h-[100dvh] md:h-full max-w-[85vw] shrink-0
             transform transition-transform duration-300 ease-in-out
             ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
           `}
