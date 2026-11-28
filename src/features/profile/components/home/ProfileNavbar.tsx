@@ -433,8 +433,10 @@ const ProfileNavbar: React.FC<ProfileNavbarProps> = ({
               )}
 
               {/* Mobile/tablet: profile photo + workspace switch + sign out.
+                  Logged-out ho to ProfileDropdown khud "Login" button dikhata hai,
+                  isliye currentUserId ki shart nahi lagayi.
                   Desktop (lg+) par mentorship pages ka apna Navigation ye dikhata hai. */}
-              {isMentorshipRoute && currentUserId && (
+              {isMentorshipRoute && (
                 <div className="lg:hidden min-w-0">
                   <ProfileDropdown
                     user={{ userId: currentUserId }}
